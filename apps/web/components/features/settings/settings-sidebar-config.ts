@@ -36,13 +36,13 @@ export interface SettingsSidebarGroup {
 
 export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
   {
-    id: 'profile',
-    label: 'Profile',
+    id: 'identity',
+    label: 'Identity',
     items: [
       {
-        id: 'artist-profile',
-        label: 'Artist Profile',
-        href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+        id: 'profile',
+        label: 'Profile',
+        href: APP_ROUTES.SETTINGS_PROFILE,
         icon: UserRound,
       },
       {

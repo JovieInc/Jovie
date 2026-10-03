@@ -106,7 +106,7 @@ function AuthShellWrapperInner({
 
   // Preview panel data hydration is available on dashboard routes and artist-profile settings
   const previewEnabled =
-    config.section === 'dashboard' || config.isArtistProfileSettings;
+    config.section === 'dashboard' || config.isProfileSettings;
   const shouldDefaultOpenPreviewPanel =
     config.section === 'dashboard' &&
     !config.isChatRoute &&
@@ -116,7 +116,7 @@ function AuthShellWrapperInner({
   // (rail toggle, `]`, or the ?panel=profile deep link). JOV-7150.
   const previewPanelScope = config.isChatRoute
     ? 'chat'
-    : config.isArtistProfileSettings
+    : config.isProfileSettings
       ? 'artist-profile-settings'
       : 'app-shell';
 

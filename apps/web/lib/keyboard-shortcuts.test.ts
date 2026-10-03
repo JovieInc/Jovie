@@ -119,7 +119,7 @@ describe('keyboard-shortcuts definitions', () => {
 
     it('opens earnings on the profile pay tab', () => {
       expect(NAV_SHORTCUTS.earnings.href).toBe(
-        `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+        `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
       );
     });
   });

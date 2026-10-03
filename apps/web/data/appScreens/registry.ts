@@ -338,9 +338,9 @@ const LEGACY_SOURCES = new Set<string>([
 
 const ALIAS_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
+  'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
-  'apps/web/app/app/(shell)/settings/profile/page.tsx',
 ]);
 
 /** Conservative: a redirecting source is never eligible as a visual reference. */
@@ -389,10 +389,10 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/profile/page.tsx',
   'apps/web/app/app/(shell)/releases/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
+  'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
-  'apps/web/app/app/(shell)/settings/profile/page.tsx',
   'apps/web/app/app/(shell)/threads/page.tsx',
   'apps/web/app/app/(shell)/tipping/page.tsx',
   'apps/web/app/app/(shell)/tracks/page.tsx',
@@ -444,8 +444,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/chats',
   },
   'apps/web/app/app/(shell)/tipping/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile?tab=earn#pay',
   },
   'apps/web/app/app/(shell)/tracks/page.tsx': {
     conceptId: '/app/library',
@@ -468,8 +468,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/settings/contacts',
   },
   'apps/web/app/app/(shell)/dashboard/earnings/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile?tab=earn#pay',
   },
   'apps/web/app/app/(shell)/dashboard/insights/page.tsx': {
     conceptId: '/app/insights',
@@ -522,16 +522,16 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/tasks',
   },
   'apps/web/app/app/(shell)/dashboard/tipping/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile?tab=earn#pay',
   },
   'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx': {
     conceptId: '/app/tour-dates',
     redirectTo: '/app/tour-dates',
   },
   'apps/web/app/app/(shell)/settings/admin/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile',
   },
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx': {
     conceptId: '/app/settings/data-privacy',
@@ -541,9 +541,9 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     conceptId: '/app/settings/account',
     redirectTo: '/app/settings/account',
   },
-  'apps/web/app/app/(shell)/settings/profile/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile',
+  'apps/web/app/app/(shell)/settings/artist-profile/page.tsx': {
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile',
   },
 };
 

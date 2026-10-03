@@ -211,7 +211,7 @@ export const paymentsNavItem: NavItem = {
 export const artistSettingsNavigation: NavItem[] = [
   {
     name: 'Profile',
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    href: APP_ROUTES.SETTINGS_PROFILE,
     id: 'artist-profile',
     icon: UserCircle,
   },

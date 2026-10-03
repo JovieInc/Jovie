@@ -70,7 +70,9 @@ export const APP_ROUTES = {
   // Settings
   SETTINGS: '/app/settings',
   SETTINGS_ACCOUNT: '/app/settings/account',
-  SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
+  SETTINGS_PROFILE: '/app/settings/profile',
+  /** @deprecated Use SETTINGS_PROFILE — the artist-profile settings path is a legacy alias. */
+  SETTINGS_ARTIST_PROFILE: '/app/settings/profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
   SETTINGS_BILLING: '/app/settings/billing',
   SETTINGS_USAGE: '/app/settings/usage',
@@ -327,7 +329,7 @@ export function buildReleaseDownloadsRoute(releaseId: string): string {
 
 /** Earnings settings live on the profile pay tab. Shortcuts should open this, not the legacy earnings redirect. */
 export function buildArtistProfilePayRoute(): string {
-  return `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`;
+  return `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`;
 }
 
 export function buildLibraryViewRoute(
