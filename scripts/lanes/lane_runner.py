@@ -656,10 +656,6 @@ def read_json(path: Path) -> dict:
         return {}
 
 
-def load_routing_policy(path: Path = ROUTING_POLICY) -> dict:
-    return read_json(path)
-
-
 def slot_free(host: "Host", name: str, slots: int) -> bool:
     for index in range(slots):
         lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
@@ -766,7 +762,7 @@ def issue_router(host: "Host", name: str, providers: dict | None = None, policy:
     providers = load_providers() if providers is None else providers
     if not any(isinstance(spec, dict) and spec.get("routes") for spec in providers.values()):
         return None
-    policy = load_routing_policy() if policy is None else policy
+    policy = read_json(ROUTING_POLICY) if policy is None else policy
     availability = lane_availability(host, name, providers)
     decisions = {}
 
@@ -784,10 +780,9 @@ def issue_router(host: "Host", name: str, providers: dict | None = None, policy:
 
 def log_route(host: "Host", lane_name: str, decision: dict) -> None:
     """Append-only routing receipts: what was required, what it cost, why this lane."""
-    path = host.state / "runs" / "routing.jsonl"
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "a") as out:
+        (host.state / "runs").mkdir(parents=True, exist_ok=True)
+        with open(host.state / "runs" / "routing.jsonl", "a") as out:
             out.write(json.dumps({**decision, "at": now_iso(), "host": HOST, "claimedBy": lane_name}) + "\n")
     except OSError as error:
         print(f"routing log unavailable: {type(error).__name__}", file=sys.stderr)

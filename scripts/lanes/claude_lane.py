@@ -2,15 +2,11 @@
 """Claude Code as a shipping lane: headless `claude -p` on the host's subscription login.
 
   claude_lane.py run --model ID --prompt-file F [--cwd DIR] [--receipt-file R]
-  claude_lane.py status    # JSON: login, quota bank, runs in the current window (HUD, router)
-  claude_lane.py health    # exit 0 only on a subscription login that is not banked
+  claude_lane.py status|health   # JSON report | exit 0 on an unbanked subscription login
 
-Subscription only (Tim, 2026-09-26: no raw model API usage). The run strips every
-Anthropic API credential from the child environment, so a stray ANTHROPIC_API_KEY in a
-host profile can never turn a lane run into metered API spend, and `health` refuses an
-API-key login. Repo and user hooks stay on: no `--bare`, no settings override.
-A usage-limit answer banks the lane until the reset Claude reports (default 5h); a burst
-rate limit or overload backs off briefly. Both are read from the run's own output.
+Subscription only (Tim, 2026-09-26: no raw model API usage): Anthropic API credentials never
+reach the child and `health` refuses an API-key login. Hooks stay on (no `--bare`). A usage
+limit banks the lane until its reported reset (default 5h); a burst limit backs off briefly.
 """
 from __future__ import annotations
 
@@ -220,8 +216,8 @@ def main(argv: list[str] | None = None) -> int:
     go.add_argument("--prompt-file", required=True)
     go.add_argument("--cwd")
     go.add_argument("--receipt-file")
-    sub.add_parser("status")
-    sub.add_parser("health")
+    for name in ("status", "health"):
+        sub.add_parser(name)
     args = parser.parse_args(argv)
     if args.command == "run":
         return run(args.model, Path(args.prompt_file).read_text(), args.cwd, args.receipt_file)

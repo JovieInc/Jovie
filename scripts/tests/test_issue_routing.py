@@ -1,8 +1,4 @@
-"""Cost-aware issue routing across the lanes (JOV-7706).
-
-Run with:
-    python3 -m pytest scripts/tests/test_issue_routing.py -v
-"""
+"""Cost-aware issue routing across the lanes (JOV-7706)."""
 from __future__ import annotations
 
 import importlib.util
@@ -48,6 +44,7 @@ def chosen(decision):
 class CapabilityFloorTest(unittest.TestCase):
     def test_default_is_standard(self):
         self.assertEqual(remediation.required_capability("Fix tab", "", [], POLICY)["capability"], "standard")
+        self.assertEqual(remediation.capability_rank("galaxy-brain"), remediation.capability_rank("standard"))
 
     def test_protected_surfaces_need_frontier(self):
         for title in ("Production controller never authorizes staging", "Merge queue drops batches",
@@ -69,9 +66,6 @@ class CapabilityFloorTest(unittest.TestCase):
                          "bounded")
         self.assertEqual(remediation.required_capability("Merge queue rename", "<!-- frozen-plan -->", [],
                                                          POLICY)["capability"], "frontier")
-
-    def test_unknown_capability_ranks_as_standard(self):
-        self.assertEqual(remediation.capability_rank("galaxy-brain"), remediation.capability_rank("standard"))
 
 
 class RouteIssueTest(unittest.TestCase):

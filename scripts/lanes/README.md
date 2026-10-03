@@ -282,62 +282,34 @@ exclusions.
 
 ## Routing (JOV-7706)
 
-Each lane lists its `routes` in `providers.json`: a model, the capability it clears
-(`bounded` < `standard` < `frontier`), a `costClass` and a base `cost`. Today: Devin SWE-2
-(free, 0), Hyperagent GLM 5.3 Developer (subsidized credits, 1), Claude Sonnet 5.5
-(subscription, 2), Claude Opus 5.5 (subscription, frontier, 3), Codex xhigh (subscription,
-frontier, 3.5; kept with headroom because sensitive labels are Codex-only). No route calls a
-raw model API key.
+Each lane's `routes` in `providers.json` give a model, the capability it clears (`bounded` <
+`standard` < `frontier`), a cost class and a base cost: Devin SWE-2 free 0, Hyperagent GLM 5.3
+subsidized 1, Sonnet 5.5 2, Opus 5.5 frontier 3, Codex xhigh frontier 3.5 (headroom for the
+Codex-only sensitive labels). No route calls a raw model API key. `routing.json` sets the floor:
+JOV-7343 protected surfaces and orchestration labels are frontier, frozen plans and docs are
+bounded (a frozen plan on a protected surface stays frontier), the rest is standard.
 
-`routing.json` sets the floor. Frontier: protected surfaces from JOV-7343 (staging/production
-controllers, merge queue, admission/promotion/rollback, model routing, governor/control plane,
-migrations, entitlements) and the `ws:release-deploy`, `ws:symphony-throughput`,
-`ws:security-auth`, `protected`, `governance` and `route:frontier` labels. Bounded: frozen plans
-(`<!-- frozen-plan` marker, `frozen-plan`, `mechanical`, `route:bounded`, docs). A frozen plan
-on a protected surface is still frontier. Everything else is standard.
+Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, banked Codex
+accounts, Hyperagent runs per day. Banked, cooling, unhealthy, saturated, budget-blocked or
+slotless lanes are unavailable; the next cheapest qualifying route takes the work. Frontier work
+with no frontier route is held (`route-held:frontier`), never downgraded. `route:<lane>[:<alias>]`
+or the lane label pins a route that clears the floor. Each claim writes the decision to
+`runs/routing.jsonl`, the receipt (`route`) and the Linear claim comment; the doctor uses the
+same router for idle capacity. Claude and Hyperagent lanes:
 
-Effective cost = base cost x (1 + quota pressure). Pressure is the share of the lane's quota
-window already spent: Claude runs in its 5h window (`claude-quota.json`), banked Codex accounts,
-Hyperagent runs per day from the ledger. A banked lane, a lane with no slots on this host, a
-cooling or unhealthy lane, a lane whose last worker stopped on a budget or rate limit, and a
-lane with every slot busy are unavailable; the next cheapest qualifying route takes the work.
-Nothing drops below the floor: frontier work with no frontier route available is held
-(`route-held:frontier`), not handed to a cheaper lane. `route:<lane>[:<alias>]` (or the lane's
-own label) pins the lane and model when it clears the floor; otherwise the pin is ignored and
-the receipt notes it. Sensitive labels still route only to Codex.
+`claude_lane.py run --model <id>` runs `claude -p` (`bypassPermissions`, JSON output, no session
+files, hooks on) on the host's claude.ai subscription or a `claude setup-token` in
+`~/.config/jovie-lanes/claude.env`. Anthropic API credentials are stripped and `health` refuses an
+API-key login. A usage limit banks the lane until its reset (default 5h); a burst limit backs off
+5 minutes; a banked run exits 75 so the harness fails over. Repairs use Sonnet.
 
-Every claim appends the decision (required floor, reasons, candidates with cost, pressure and
-availability, chosen route, rationale) to `runs/routing.jsonl`, copies it onto the run receipt
-as `route`, and states the rationale in the Linear claim comment. The doctor applies the same
-router, so work routed to another lane is not counted as this lane's idle capacity.
-
-## Claude lane
-
-`claude_lane.py run --model <id>` runs headless Claude Code in the worktree:
-`claude -p --model claude-opus-5-5|claude-sonnet-5-5 --permission-mode bypassPermissions
---output-format json --no-session-persistence`, prompt on stdin. It uses the host's claude.ai
-subscription login (or `CLAUDE_CODE_OAUTH_TOKEN` from `~/.config/jovie-lanes/claude.env`,
-written by `claude setup-token`). Every Anthropic API credential is stripped from the child
-environment and `health` refuses an API-key login. Repo and user hooks stay on (no `--bare`).
-A usage-limit answer banks the lane until the reset Claude reports (default 5h); a burst
-limit or overload backs off 5 minutes. A banked run exits 75 so the harness fails over.
-`claude_lane.py status` is the JSON the router reads. Claude repairs and adopts like Devin and
-Codex, on its default model (Sonnet).
-
-## Hyperagent lane
-
-Hyperagent runs on agent `cmtj3n2q901i407adklzzq01t` ("GLM 5.3 Developer", `auto` mode). The
-agent id picks the model; `--model` is only a label. Astra Planner is `confirm` mode and a
-planner, so frontier implementation goes to Opus or Codex. The lane is remote-only
-(`repairs: false`): it claims issues through `hyperagent_lane.py`, never repairs or adopts a
-local checkout, and the local lanes maintain its PRs like an orphan's.
-
-Each attempt rebuilds its spend proof: a live `list_agents` read (id, name, `auto` mode) joined
-with the owner's settings attestation at `~/.config/jovie-lanes/hyperagent-attestation.json`
-(`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`,
-`attestedAt`, `expiresAt`, `attestedBy`). The API exposes no balance or cap, so the owner checks
-them in Hyperagent settings and writes this file. Without a current attestation the lane is
-unhealthy (`provider-down:hyperagent` reaches Triage) and no remote thread is created.
+Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks
+the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues
+through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live
+`list_agents` identity read with the owner's attestation at
+`~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`,
+`currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`,
+`attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy.
 
 ## Install on a host
 
