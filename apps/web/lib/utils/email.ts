@@ -127,7 +127,7 @@ export const SYNTHETIC_PRINCIPAL_EMAIL_TAG = '+synthetic-' as const;
 export const PRODUCTION_CANARY_EMAIL_TAG =
   '+jovie-prod-waitlist-canary' as const;
 const SYNTHETIC_PRINCIPAL_TAG_PATTERN =
-  /\+synthetic-[a-z0-9]|\+jovie-prod-waitlist-canary$/;
+  /\+synthetic-(?:[a-z0-9])|\+jovie-prod-waitlist-canary$/;
 
 /** Seeded demo personas, e.g. dualipa-public@jov.ie */
 const DEMO_PLACEHOLDER_LOCAL_PART_PATTERN = /-public$/;
@@ -150,7 +150,7 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
   // Clerk test-address tag anywhere in the local part
   `^[^@]*\\+clerk_test(\\+[^@]*)?@`,
   // Synthetic dogfood principal tag anywhere in the local part (JOV-7697)
-  '^[^@]*\\+synthetic-[a-z0-9][^@]*@',
+  '^[^@]*\\+synthetic-([a-z0-9])[^@]*@',
   '^[^@]*\\+jovie-prod-waitlist-canary@',
   // Demo placeholder personas: *-public@…
   '^[^@]+-public@',
