@@ -43,7 +43,8 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
       // Creator Financial Health is a release-blocking gate (JOV-4621):
       // owner-only financial data must stay dark for everyone — including
       // admins — until the privacy/correctness matrix is certified.
-      flagName !== 'CREATOR_FINANCE'
+      flagName !== 'CREATOR_FINANCE' &&
+      flagName !== 'VISIBILITY_AUDIT_OFFER'
   )
 );
 

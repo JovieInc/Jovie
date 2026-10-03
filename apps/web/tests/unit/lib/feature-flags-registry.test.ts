@@ -104,6 +104,7 @@ describe('feature flag registry integrity', () => {
             'PAID_WELCOME_EMAIL',
             'MERCH_QA_GATE',
             'CREATOR_FINANCE',
+            'VISIBILITY_AUDIT_OFFER',
           ].includes(name)
       )
       .map(([, value]) => value);
@@ -114,6 +115,7 @@ describe('feature flag registry integrity', () => {
     expect(APP_FLAG_DEFAULTS.PAID_WELCOME_EMAIL).toBe(false);
     expect(APP_FLAG_DEFAULTS.MERCH_QA_GATE).toBe(false);
     expect(APP_FLAG_DEFAULTS.CREATOR_FINANCE).toBe(false);
+    expect(APP_FLAG_DEFAULTS.VISIBILITY_AUDIT_OFFER).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {
