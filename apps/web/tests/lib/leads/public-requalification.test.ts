@@ -203,6 +203,17 @@ describe('requalifyPublicLead', () => {
     expect(result.decisionDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(result.expiresAt).toBe('2026-10-12T22:30:00.000Z');
     expect(
+      result.machineCertification.receipts.map(receipt => receipt.id)
+    ).toEqual([
+      'identity',
+      'spotify',
+      'avatar',
+      'contact',
+      'fit',
+      'bio',
+      'representation',
+    ]);
+    expect(
       result.machineCertification.receipts.every(
         receipt =>
           receipt.sourceSha?.startsWith('sha256:') &&
@@ -488,6 +499,53 @@ describe('requalifyPublicLead', () => {
     expect(shared.persistRunReceipt).toHaveBeenCalledTimes(2);
     expect(shared.receipts.size).toBe(1);
     expect(left.runId).toBe(right.runId);
+  });
+
+  it('rejects a conflicting decision returned by a racing writer', async () => {
+    const first = dependencies();
+    const initial = await requalifyPublicLead(
+      { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+      first.deps
+    );
+    const winner = first.getReceipt(initial.attemptEventType);
+    if (!winner) throw new Error('Expected the first run receipt to exist');
+    const winningRun = winner as unknown as PublicCandidateRun;
+    const getRunReceipt = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(winningRun as unknown as Record<string, unknown>);
+    const incomingRuns: PublicCandidateRun[] = [];
+    const persistRunReceipt = vi.fn(
+      async ({
+        run,
+      }: {
+        leadId: string;
+        run: PublicCandidateRun;
+        eventType: string;
+      }) => {
+        incomingRuns.push(run);
+        return false;
+      }
+    );
+    const { deps } = dependencies({
+      getLeadByHandle: vi.fn(async () => ({
+        ...lead(),
+        hasRepresentation: true,
+      })),
+      getRunReceipt,
+      getLatestRunReceipt: vi.fn(async () => null),
+      persistRunReceipt,
+    });
+
+    await expect(
+      requalifyPublicLead(
+        { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+        deps
+      )
+    ).rejects.toBeInstanceOf(PublicRequalificationConflictError);
+    expect(incomingRuns).toHaveLength(1);
+    expect(incomingRuns[0]?.sourceRevision).toBe(winningRun.sourceRevision);
+    expect(incomingRuns[0]?.decisionDigest).not.toBe(winningRun.decisionDigest);
   });
 
   it('refuses preview and production execution', async () => {

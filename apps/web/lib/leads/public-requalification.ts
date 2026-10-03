@@ -91,6 +91,29 @@ function assertDevEnvironment(environment: PublicRequalificationEnvironment) {
     );
   }
 }
+
+function assertSameRunIdentity(
+  existingRun: PublicCandidateRun,
+  incomingRun: PublicCandidateRun
+): void {
+  if (
+    existingRun.attemptEventType !== incomingRun.attemptEventType ||
+    existingRun.candidateId !== incomingRun.candidateId ||
+    existingRun.candidateKey !== incomingRun.candidateKey ||
+    existingRun.dedupeKey !== incomingRun.dedupeKey ||
+    existingRun.environment !== incomingRun.environment ||
+    existingRun.sourceRevision !== incomingRun.sourceRevision ||
+    existingRun.sourceDigest !== incomingRun.sourceDigest ||
+    existingRun.decisionDigest !== incomingRun.decisionDigest
+  ) {
+    throw new PublicRequalificationConflictError({
+      candidateId: incomingRun.candidateId,
+      existingSourceRevision: existingRun.sourceRevision,
+      incomingSourceRevision: incomingRun.sourceRevision,
+    });
+  }
+}
+
 function buildLeadUpdate(input: {
   qualification: QualificationResult;
   spotify: SpotifyLeadEnrichment;
@@ -379,22 +402,7 @@ export async function requalifyPublicLead(
         incomingSourceRevision: run.sourceRevision,
       });
     }
-    if (
-      existingRun.attemptEventType !== run.attemptEventType ||
-      existingRun.candidateId !== run.candidateId ||
-      existingRun.candidateKey !== run.candidateKey ||
-      existingRun.dedupeKey !== run.dedupeKey ||
-      existingRun.environment !== run.environment ||
-      existingRun.sourceRevision !== run.sourceRevision ||
-      existingRun.sourceDigest !== run.sourceDigest ||
-      existingRun.decisionDigest !== run.decisionDigest
-    ) {
-      throw new PublicRequalificationConflictError({
-        candidateId: lead.id,
-        existingSourceRevision: existingRun.sourceRevision,
-        incomingSourceRevision: run.sourceRevision,
-      });
-    }
+    assertSameRunIdentity(existingRun, run);
     return resultFromRun(existingRun, true);
   }
 
@@ -412,11 +420,12 @@ export async function requalifyPublicLead(
   const persistedRun = persistedMetadata
     ? runFromMetadata(persistedMetadata)
     : null;
-  if (!persistedRun || persistedRun.sourceRevision !== run.sourceRevision) {
+  if (!persistedRun) {
     throw new Error(
       'Public requalification run was not durably persisted with its source revision'
     );
   }
+  assertSameRunIdentity(persistedRun, run);
 
   return resultFromRun(persistedRun, !inserted);
 }
