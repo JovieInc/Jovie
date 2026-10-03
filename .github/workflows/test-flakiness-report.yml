@@ -8,12 +8,12 @@ on:
   workflow_run:
     workflows: [CI, Changed-Evidence Test Suites, E2E Full Browser Matrix]
     types: [completed]
-    branches: [main, 'gh-readonly-queue/main/**']
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: test-flakiness-report
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -35,11 +35,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node .github/scripts/collect-quarantine-evidence.mjs
 
-      - name: Collect verified quarantine execution history
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node .github/scripts/collect-quarantine-evidence.mjs
-
+      # Keep exhaustive seven-day quarantine collection off this hot path.
+      # Merge-queue volume exceeds GitHub's 1,000-result search window, and
+      # missing quarantine evidence cannot authorize a ledger change.
       - name: Analyze test results from recent runs
         id: analyze
         env:
@@ -56,14 +54,13 @@ jobs:
         run: node .github/scripts/check-flaky-ratchet.js
 
       - name: Upload flakiness report
-        if: always() && (hashFiles('flakiness-report.md') != '' || hashFiles('quarantine-evidence.json') != '')
+        if: always() && hashFiles('flakiness-report.md') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: flakiness-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             flakiness-report.md
             flakiness-clusters.json
-            quarantine-evidence.json
           retention-days: 90
 
       - name: Find or create tracking issue
