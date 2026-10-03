@@ -40,6 +40,9 @@ GITHUB_MIN_REMAINING = 300
 # An open PR older than this is a governor signal (JOV-7079): the cockpit names it and its
 # disposition instead of letting it age silently.
 AGED_PR_S = 7 * 24 * 3600
+MERGE_THROUGHPUT_REFRESH_S = 5 * 60
+MERGE_THROUGHPUT_CACHE_S = 10 * 60
+PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
 
 
 def now_iso() -> str:
@@ -110,7 +113,7 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
 
 
 def observe(host, lane, codex, now: float | None = None) -> dict:
-    """Everything the doctor judges, gathered once (cheap: local files plus two API reads)."""
+    """Everything the doctor judges, gathered once from local state and bounded API reads."""
     sample_clock = time.time if now is None else lambda: now
     now = sample_clock()
     state = host.state
@@ -160,15 +163,22 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         eligible_pool, eligible_by_provider, budgets = None, {}, {}
         design_census = None
     github = None
-    merged, merged_error = [], None
+    merged, merged_error, merge_throughput, merge_throughput_error = [], None, None, None
     try:
         lane.load_github_env()
         budget = lane.graphql_budget()
         github = budget[0] if budget else None
-        if not os.environ.get("LANES_SELFTEST"):
-            merged = merged_prs_24h(lane, now)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
-        merged_error = "merged-pr-attribution-unreadable"
+        merged_error = "github-budget-unreadable"
+    if not os.environ.get("LANES_SELFTEST"):
+        try:
+            merged = merged_prs_24h(lane, now)
+        except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
+            merged_error = "merged-pr-attribution-unreadable"
+        try:
+            merge_throughput, merge_throughput_error = sample_merge_throughput(state, now)
+        except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+            merge_throughput_error = f"{type(error).__name__}: {error}"[:200]
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
@@ -207,6 +217,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "designGate": design_census,
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
+        "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
+        "autoscale": _autoscale_block(host),
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
@@ -244,6 +256,49 @@ def merged_prs_24h(lane, now: float) -> list[dict]:
         raise RuntimeError((result.stderr or result.stdout or "merged PR read failed")[-120:])
     rows = json.loads(result.stdout or "[]")
     return [row for row in rows if row.get("number") and row.get("mergedAt")]
+
+
+def sample_merge_throughput(state: Path, now: float, run=subprocess.run) -> tuple[dict | None, str | None]:
+    """Refresh the one-hour GitHub queue signal at most every five minutes."""
+    path = Path(state) / "merge-throughput.json"
+    cached = read_json(path, {})
+    observed = cached.get("observedAt")
+    if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+            and 0 <= now - observed < MERGE_THROUGHPUT_REFRESH_S:
+        return cached, None
+    try:
+        result = run(
+            ["node", str(PROMOTION_SCRIPT), "--since", "1h", "--until", epoch_iso(now), "--json", "--autoscale"],
+            capture_output=True, text=True, timeout=90)
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        metrics = json.loads(result.stdout)
+        occupancy, wait, intake, ejections = (
+            metrics.get("occupancy") or {}, metrics.get("queueWaitMinutes") or {},
+            metrics.get("intake") or {}, metrics.get("ejections") or {})
+        signal = {
+            "schema": "symphony-merge-throughput/v1",
+            "observedAt": now,
+            "windowHours": (metrics.get("window") or {}).get("hours"),
+            "queueDepth": occupancy.get("inQueue"),
+            "queueWaitP50Minutes": wait.get("p50"),
+            "mergedPerHour": intake.get("mergesPerHour"),
+            "openedPerHour": intake.get("opensPerHour"),
+            "ejectionRate": ejections.get("rate"),
+        }
+        required = ("queueDepth", "mergedPerHour", "openedPerHour")
+        if any(isinstance(signal[key], bool) or not isinstance(signal[key], (int, float)) for key in required):
+            raise ValueError("merge-throughput output missing required numeric signals")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+                and 0 <= now - observed <= MERGE_THROUGHPUT_CACHE_S:
+            return cached, f"{type(error).__name__}: {error}"[:200]
+        return None, f"{type(error).__name__}: {error}"[:200]
 
 
 def failed_by_reason(failures: dict) -> dict[str, int]:
@@ -404,6 +459,17 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    brake = (obs.get("autoscale") or {}).get("throughputBrake") or {}
+    held_for = brake.get("heldForS")
+    interval = brake.get("intervalS")
+    if brake.get("active") and isinstance(held_for, (int, float)) and isinstance(interval, (int, float)) \
+            and held_for > interval:
+        signal = brake.get("signal") or {}
+        alerts["bottleneck:merge-queue"] = (
+            f"merge-throughput brake held {int(held_for // 60)}m: queue {signal.get('queueDepth', 'unknown')}, "
+            f"p50 wait {signal.get('queueWaitP50Minutes', 'unknown')}m, "
+            f"{signal.get('mergedPerHour', 'unknown')} merged/h vs {signal.get('openedPerHour', 'unknown')} opened/h, "
+            f"ejection rate {signal.get('ejectionRate', 'unknown')}")
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
@@ -441,6 +507,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "spawn-exit": "dispatch-provider-workers",
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
+        "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -449,6 +516,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "spawn-exit": ["dispatch-tick", "worker-pool"],
         "hud-stale": ["tty1-hud", "status-feed"],
         "no-landing": ["shipping-throughput"],
+        "bottleneck:merge-queue": ["merge-queue", "lane-slots"],
     }
     for key, evidence in alerts.items():
         old = prior.get(key) or {}
@@ -502,12 +570,26 @@ class Tracker:
         self.linear, self.host = linear, host_name
 
     def title(self, key: str) -> str:
+        if key == "bottleneck:merge-queue":
+            return "remediation:symphony-bottleneck-merge-queue"
         return f"Symphony doctor: {key} ({self.host})"
 
     def existing(self, key: str) -> str | None:
         """An open issue for this key and host, if a previous tick (or a lost doctor.json)
         already raised it. Linear is the durable truth; local state is only a cache."""
         try:
+            if key == "bottleneck:merge-queue":
+                data = self.linear.gql(
+                    'query($t:String!){issues(first:5,filter:{team:{key:{eq:"JOV"}},title:{eq:$t}})'
+                    '{nodes{id state{type}}}}', {"t": self.title(key)})
+                nodes = data["issues"]["nodes"]
+                if not nodes:
+                    return None
+                issue = nodes[0]
+                if (issue.get("state") or {}).get("type") in ("completed", "canceled"):
+                    self.linear.move(issue["id"], "Triage")
+                    self.linear.comment(issue["id"], f"🤖 doctor: merge-queue bottleneck fired again at {now_iso()}.")
+                return issue["id"]
             data = self.linear.gql(
                 'query($t:String!){issues(first:5,filter:{team:{key:{eq:"JOV"}},title:{eq:$t},'
                 'state:{type:{nin:["completed","canceled"]}}}){nodes{id}}}', {"t": self.title(key)})
@@ -729,6 +811,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
+            "mergeThroughput": obs.get("mergeThroughput"),
+            "mergeThroughputError": obs.get("mergeThroughputError"),
             "capacity": capacity,
             "prs": (obs.get("reconcile") or {}).get("counts") or {}, "_idleQualifiedSince": next_idle_since,
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
