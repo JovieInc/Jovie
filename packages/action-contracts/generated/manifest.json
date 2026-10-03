@@ -345,6 +345,66 @@
         "invocation": "schemas/defect.report.invocation.json",
         "result": "schemas/defect.report.result.json"
       }
+    },
+    {
+      "id": "fleet.directory",
+      "schemaVersion": 1,
+      "titleKey": "actions.fleet.directory.title",
+      "descriptionKey": "actions.fleet.directory.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "fleet:discover"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/fleet.directory.input.json",
+        "output": "schemas/fleet.directory.output.json",
+        "invocation": "schemas/fleet.directory.invocation.json",
+        "result": "schemas/fleet.directory.result.json"
+      }
+    },
+    {
+      "id": "work.request",
+      "schemaVersion": 1,
+      "titleKey": "actions.work.request.title",
+      "descriptionKey": "actions.work.request.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "work:request"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/work.request.input.json",
+        "output": "schemas/work.request.output.json",
+        "invocation": "schemas/work.request.invocation.json",
+        "result": "schemas/work.request.result.json"
+      }
     }
   ]
 }

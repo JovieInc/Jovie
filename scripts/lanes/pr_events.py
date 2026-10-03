@@ -24,6 +24,8 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
@@ -52,8 +54,8 @@ FIX_LEASE_S = 3 * 3600
 RECONCILE_S = 30 * 60
 STALE_DRAFT_S = 48 * 3600
 # A non-lane agent draft this old that is also stalled (idle past STALE_DRAFT_S, or already
-# conflicting/red) is abandoned work: the sweep closes it unless a dependency it names is
-# still open. Younger or still-moving drafts are left to their writer.
+# conflicting/red) needs repair, unless a dependency it names is still open. Age and
+# retry exhaustion never authorize closing unfinished work (JOV-INV-011).
 AGENT_DRAFT_S = 7 * 24 * 3600
 # A PR updated this recently is between events (CI starting, enroll pending), not an orphan.
 ORPHAN_GRACE_S = 30 * 60
@@ -255,7 +257,8 @@ def open_dependencies(prs: list[dict], now: float, sh=run) -> dict[int, list[int
     return deps
 
 
-def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int, now: float) -> list[dict]:
+def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int, now: float,
+                 held: dict | None = None) -> list[dict]:
     """One truthful disposition per open PR, oldest first (JOV-7079): the reconcile sweep's
     record is what the doctor and the shipping cockpit render, so an old draft with no
     advancing event shows its blocker instead of sitting silent."""
@@ -275,7 +278,12 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
         row = {"pr": number, "draft": bool(pr.get("isDraft")),
                "ageH": round((now - created) / 3600, 1) if created is not None else None,
                "idleH": round(idle_s / 3600, 1), "head": pr.get("headRefName")}
-        if number in closing:
+        protected = preservation_reason(pr, attempts.get(str(number), {}), max_attempts,
+                                        held=(held or {}).get(str(number)), now=now)
+        if protected:
+            row.update(state="hold:" + protected, reason=protected,
+                       next="preserve work and diagnosis; re-entry requires a fenced material-change receipt")
+        elif number in closing:
             row.update(state="closing", reason=closing[number], next="closed this sweep")
         elif number in dep_holds:
             row.update(state="hold:dependency", reason="waits on " + ", ".join(f"#{n}" for n in dep_holds[number]),
@@ -292,12 +300,13 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
             row.update(state="ready", next="enroll in the merge queue")
         elif pr.get("rollup") in ("PENDING", "EXPECTED") or idle_s < ORPHAN_GRACE_S:
             row.update(state="advancing", reason="settling", next="its own checks/events report")
-        elif attempts.get(str(number), {}).get("count", 0) >= max_attempts:
-            row.update(state="hold:fix-exhausted", next="bug intake / the pool")
+        elif abandoned_agent_draft(pr, now):
+            row.update(state="repair", reason="stalled agent draft",
+                       next="repair unfinished work; closure requires an explicit duplicate label")
         elif pr.get("isDraft"):
             if idle_s >= STALE_DRAFT_S:
                 row.update(state="draft", reason="past the 48h stale SLO",
-                           next=("closes as abandoned at the 7d age SLO" if agent_owned(pr)
+                           next=("repair unfinished work; closure requires an explicit duplicate label" if agent_owned(pr)
                                  else "writer-owned branch; the sweep never closes non-agent drafts"))
             else:
                 row.update(state="draft", reason="inside the 48h stale SLO",
@@ -325,33 +334,79 @@ POISON_WINDOW_S = 24 * 3600
 FAILED_DEQUEUE = "failed_checks"
 
 
-def queue_ejections(number: int, now: float, sh=run) -> int | None:
-    """Failure removals from the merge queue in the last 24 h (the current one included)."""
-    owner, name = REPO.split("/")
-    listed = sh(["gh", "api", "graphql", "-f", f"query={{repository(owner:\"{owner}\",name:\"{name}\"){{"
-                 f"pullRequest(number:{number}){{timelineItems(last:20,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){{"
-                 "nodes{... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}",
-                 "--jq", ".data.repository.pullRequest.timelineItems.nodes"])
-    if listed.returncode != 0:
+def queue_ejections(number: int, now: float, sh=run, *, head: str) -> int | None:
+    """Count failed removals after the latest current-head event, never prior repairs.
+
+    Walk the ordered timeline backwards; force pushes can restore an old commit whose
+    committedDate predates the repair, so commit timestamps cannot define this boundary.
+    Missing, partial or changing history does not authorize a poison mutation.
+    """
+    if not head:
         return None
-    count = 0
-    for item in json.loads(listed.stdout or "[]"):
-        at = iso_ts(item.get("createdAt"))
-        if at and now - at <= POISON_WINDOW_S and str(item.get("reason") or "").lower() == FAILED_DEQUEUE:
-            count += 1
-    return count
+    owner, name = REPO.split("/")
+    cursor, seen, count = None, set(), 0
+    for _ in range(100):
+        before = f",before:{json.dumps(cursor)}" if cursor is not None else ""
+        query = (f'{{repository(owner:"{owner}",name:"{name}"){{pullRequest(number:{number}){{'
+                 'headRefOid state timelineItems(last:100' + before +
+                 ',itemTypes:[PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){'
+                 'pageInfo{hasPreviousPage startCursor} nodes{__typename '
+                 '... on PullRequestCommit{commit{oid}} '
+                 '... on HeadRefForcePushedEvent{afterCommit{oid}} '
+                 '... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}')
+        listed = sh(["gh", "api", "graphql", "-f", f"query={query}"])
+        if listed.returncode != 0:
+            return None
+        try:
+            payload = json.loads(listed.stdout)
+            node = payload["data"]["repository"]["pullRequest"]
+            if payload.get("errors") or node["state"] != "OPEN" or node["headRefOid"] != head:
+                return None
+            timeline = node["timelineItems"]
+            if not isinstance(timeline["nodes"], list):
+                return None
+            for item in reversed(timeline["nodes"]):
+                kind = item.get("__typename")
+                if kind == "PullRequestCommit" and (item.get("commit") or {}).get("oid") == head:
+                    return count
+                if kind == "HeadRefForcePushedEvent" and (item.get("afterCommit") or {}).get("oid") == head:
+                    return count
+                if kind == "RemovedFromMergeQueueEvent":
+                    at = iso_ts(item.get("createdAt"))
+                    if at is not None and 0 <= now - at <= POISON_WINDOW_S \
+                            and str(item.get("reason") or "").lower() == FAILED_DEQUEUE:
+                        count += 1
+            page = timeline["pageInfo"]
+            if not page["hasPreviousPage"]:
+                return None
+            cursor = page["startCursor"]
+            if not cursor or cursor in seen:
+                return None
+            seen.add(cursor)
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return None
+    return None
 
 
 def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
-    """JOV-6904: a PR the queue ejected twice in 24 h is poison. Every re-entry (usually a sync
+    """JOV-6904: a source revision the queue ejected twice in 24 h is poison. Every re-entry (usually a sync
     with main, same defect) fails the group it joins and every group behind it. Label it so
     the enroll workflow skips it; the lanes still fix it and drop the label with their fix."""
-    if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh) or 0) < 2:
+    if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh, head=pr.get("headRefOid")) or 0) < 2:
+        return False
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
+                 "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
+    try:
+        live = json.loads(viewed.stdout or "{}")
+    except (ValueError, TypeError):
+        return False
+    if viewed.returncode or live.get("headRefOid") != pr.get("headRefOid") \
+            or not in_scope(live, "dequeued", set()) or POISON_LABEL in label_names(live):
         return False
     if sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={POISON_LABEL}"]).returncode:
         return False
     sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body",
-        f"🤖 `{POISON_LABEL}`: the merge queue ejected this PR twice in 24 h, so it stays out of the queue "
+        f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
         "until a fix lands (each re-entry fails every merge group behind it). The lanes are fixing it from "
         "the merge-group failure and remove this label when their fix pushes; remove it by hand once the "
         "failing merge-group check passes locally."])
@@ -367,9 +422,9 @@ NON_CHECK_BLOCKER = re.compile(
     r"(?i)dependenc|blocked\s+(?:by|on)|qualification|pricing|red[ -]?line|spend|taste")
 
 HOLD_CONTEXT_QUERY = ('{repository(owner:"%s",name:"%s"){pullRequest(number:%d){'
-                      "timelineItems(last:30,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{"
+                      "timelineItems(last:100,itemTypes:[LABELED_EVENT]){pageInfo{hasPreviousPage}nodes{... on LabeledEvent{"
                       "createdAt label{name} actor{login}}}}"
-                      "comments(last:30){nodes{createdAt author{login} body}}"
+                      "comments(last:100){pageInfo{hasPreviousPage}nodes{createdAt author{login} body}}"
                       "commits(last:1){nodes{commit{oid committedDate}}}}}}")
 
 
@@ -385,6 +440,17 @@ def hold_context(number: int, sh=run) -> dict | None:
         node = json.loads(result.stdout)["data"]["repository"]["pullRequest"]
     except (ValueError, KeyError, TypeError):
         return None
+    if not isinstance(node, dict):
+        return None
+    # Missing or truncated provenance cannot prove absence of founder authority.
+    # Keep the hold intact instead of suggesting an automatic lift.
+    for connection in ("timelineItems", "comments"):
+        value = node.get(connection)
+        if not isinstance(value, dict) or not isinstance(value.get("nodes"), list):
+            return None
+        page = value.get("pageInfo")
+        if not isinstance(page, dict) or page.get("hasPreviousPage") is not False:
+            return None
     events = []
     for item in (node.get("timelineItems") or {}).get("nodes") or []:
         label = str((item.get("label") or {}).get("name") or "")
@@ -413,7 +479,8 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
     hold_at = event["at"]
     if now - hold_at <= STALE_HOLD_S:
         return None
-    notes = [n for n in ctx["notes"] if n["at"] is None or n["at"] >= hold_at - 3600]
+    # A later bot label does not supersede an earlier founder hold note.
+    notes = ctx["notes"]
     if event["actor"] in TIM_LOGINS or any(n["author"] in TIM_LOGINS for n in notes):
         return None  # Tim's hold or Tim's hold note: stays, silently
     blocker = any(NON_CHECK_BLOCKER.search(n["body"]) for n in notes)
@@ -493,6 +560,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         pr = json.loads(viewed.stdout or "{}")
         if sha and pr.get("headRefOid") != sha:
             continue  # a newer head is already running CI; its own events speak for it
+        if not in_scope(pr, kind, disabled):
+            continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
             added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):
@@ -501,7 +570,117 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             added.append((number, kind))
     if event == "push":
         added += label_backlog(sh, disabled, kinds=("conflict",))
+    intake = remediation.non_pr_event(event, payload)
+    if intake:
+        created = upsert_intake(intake, sh)
+        if created:
+            added.append((created, remediation.INTAKE_LABEL))
     return added
+
+
+def upsert_intake(event: dict, sh=run, now: float | None = None) -> int | None:
+    """One GitHub issue per fingerprint. A hit inside 30 minutes is the claim window."""
+    now = time.time() if now is None else now
+    marker = f"fingerprint={event.get('fingerprint')}"
+    listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
+                 "--limit", "50", "--json", "number,body,updatedAt"])
+    try:
+        rows = json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
+    except (ValueError, AttributeError):
+        rows = []
+    if not isinstance(rows, list):
+        rows = []
+    for row in rows:
+        if not isinstance(row, dict) or marker not in (row.get("body") or ""):
+            continue
+        return None  # one record per fingerprint; the tick converts after the claim window
+    created = sh(["gh", "issue", "create", "--repo", REPO,
+                  "--title", remediation.linear_intake_plan(event)["title"][:80],
+                  "--body", remediation.intake_body(event),
+                  "--label", remediation.INTAKE_LABEL])
+    found = re.search(r"/issues/(\d+)", created.stdout or "")
+    if not found:
+        return None
+    # Touch nothing else inside the claim window; updatedAt on the new issue starts it.
+    if remediation.claim_open(now, now + 1):
+        return int(found.group(1))
+    return int(found.group(1))
+
+
+def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
+    """After the 30-minute claim window, one Linear issue per fingerprint. No new secret."""
+    listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
+                 "--limit", "30", "--json", "number,title,body,updatedAt"])
+    try:
+        rows = json.loads(listed.stdout or "[]") if getattr(listed, "returncode", 1) == 0 else []
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(rows, list) or not rows:
+        return None
+    due = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        body = row.get("body") or ""
+        if "linear-issue-id:" in body:
+            continue
+        updated = iso_ts(row.get("updatedAt"))
+        if updated is None or remediation.claim_open(updated, now):
+            continue
+        due.append(row)
+    if not due:
+        return None
+    try:
+        linear = linear_factory()
+    except Exception:
+        return None
+    if linear is None or not hasattr(linear, "gql"):
+        return None
+    linked = []
+    for row in due:
+        body = row.get("body") or ""
+        found = re.search(r"fingerprint=([0-9a-f]+)", body)
+        ws = "ci"
+        if "ws:release-deploy" in body or "release-deploy" in body:
+            ws = "release-deploy"
+        elif "ws:reliability" in body or "source': 'sentry'" in body or "sentry" in body[:80]:
+            ws = "reliability"
+        event = {"source": "intake", "fingerprint": found.group(1) if found else str(row.get("number")),
+                 "ws": ws, "subject": {"github_issue": row.get("number")}, "evidence": {"excerpt": body[:400]}}
+        try:
+            issue_id = ensure_linear_intake(linear, event)
+        except Exception:
+            continue
+        if not issue_id:
+            continue
+        sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
+            f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+        linked.append(row["number"])
+    return linked or None
+
+
+def ensure_linear_intake(linear, event: dict) -> str | None:
+    """Create the remediation label only when it is missing, then one agent-ready issue."""
+    team = linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                      {})["teams"]["nodes"][0]
+    names = {label["name"]: label["id"] for label in team["labels"]["nodes"]}
+    wanted = remediation.intake_labels(str(event.get("ws") or "ci"))
+    ids = []
+    for name in wanted:
+        if name in names:
+            ids.append(names[name])
+            continue
+        if name != remediation.REMEDIATION_LABEL:
+            continue
+        created = linear.gql('mutation($n:String!,$t:String!){issueLabelCreate(input:{name:$n,teamId:$t}){issueLabel{id}}}',
+                             {"n": name, "t": team["id"]})
+        ids.append(created["issueLabelCreate"]["issueLabel"]["id"])
+    todo = next(state["id"] for state in team["states"]["nodes"] if state["name"] == "Todo")
+    plan = remediation.linear_intake_plan(event)
+    data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id}}}',
+                      {"i": {"teamId": team["id"], "stateId": todo, "labelIds": ids,
+                             "title": plan["title"], "description": plan["description"]}})
+    return data["issueCreate"]["issue"]["id"]
 
 
 def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "green", "orphan")) -> list[tuple[int, str]]:
@@ -550,9 +729,11 @@ def queued_prs(lane, kinds) -> list[dict]:
                           "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
         return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
     # Per-check rollups over 100 PRs are the costliest GraphQL read the lanes make, and every
-    # worker pass asked for them; one read per minute per host serves them all.
+    # worker pass asked for them; one read per minute per host serves them all. This is part
+    # of the claim scan, so it shares that TTL with lane issues, in-flight, and fix candidates.
     shared = getattr(lane, "shared", None)
-    prs = shared("queued-" + "-".join(sorted(kinds)), 60, fetch) if shared else fetch()
+    ttl = getattr(lane, "CLAIM_SCAN_TTL_S", 60)
+    prs = shared("queued-" + "-".join(sorted(kinds)), ttl, fetch) if shared else fetch()
     if prs is None:
         return []
     for pr in prs:
@@ -617,6 +798,8 @@ def same_generation(record: dict, sha: str) -> bool:
     fail closed to the same generation."""
     if not record.get("count"):
         return False
+    if not isinstance(sha, str) or not sha.strip() or not isinstance(record.get("sha"), str) or not record["sha"].strip():
+        return True  # absent head evidence cannot authorize a new generation
     if record.get("sha") is None and record.get("pushedHead") is None:
         return True  # legacy record: nothing proves the head changed
     if sha in (record.get("sha"), record.get("pushedHead")):
@@ -630,6 +813,46 @@ def spent(record: dict, sha: str, max_attempts: int) -> bool:
     return record.get("count", 0) >= max_attempts and same_generation(record, sha)
 
 
+def terminal_reason(pr: dict, record: dict, max_attempts: int, *, allow_reentry: bool = False) -> str | None:
+    """Observation never consumes exhaustion. Only a repair claim may receipt a proven new head."""
+    sha = pr.get("headRefOid")
+    if spent(record, sha, max_attempts):
+        return "fix-exhausted"
+    if PREFIX + EXHAUSTED in {label.lower() for label in label_names(pr)}:
+        external = record.get("count", 0) > 0 and not same_generation(record, sha)
+        if not (allow_reentry and external):
+            return "exhausted-without-reentry"
+    return None
+
+
+def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict | None = None,
+                        now: float | None = None, allow_reentry: bool = False) -> str | None:
+    """One guard for the existing claim, event and maintenance paths; no new retry authority."""
+    labels = {label.lower() for label in label_names(pr)}
+    if not isinstance(pr.get("headRefOid"), str) or not pr["headRefOid"].strip():
+        return "head-unavailable"
+    if holds := labels & HOLD_LABELS:
+        return sorted(holds)[0]
+    if reason := terminal_reason(pr, record, max_attempts, allow_reentry=allow_reentry):
+        return reason
+    # A different remote head is material evidence, not revocation of a local
+    # writer's live lease. Wait for that attempt to end before recording re-entry.
+    if now is not None and in_flight(record, {"headRefOid": record.get("sha")}, now):
+        return "repair-active"
+    entry = held or {}
+    if entry.get("sha") == pr.get("headRefOid") and not fixable_hold(entry, pr.get("headRefOid")):
+        return entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
+    return None
+
+
+def maintenance_hold(host, lane, pr: dict, now: float) -> str | None:
+    reason = preservation_reason(pr, read_state(host, "fix-attempts.json").get(str(pr["number"]), {}),
+                                 lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now)
+    if reason:
+        return reason
+    return "repair-active" if lane.claimed_elsewhere(pr["number"], pr.get("headRefOid"), "fix") else None
+
+
 def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: float) -> None:
     """Charge one fix attempt to this PR. A head that is neither the attempted head nor the
     head our fix produced is new authoritative evidence: it starts a new bounded generation
@@ -640,12 +863,35 @@ def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: f
              "lane": lane_name, "at": now}
     if not rollover and record.get("pushedHead"):
         entry["pushedHead"] = record["pushedHead"]  # self-pushes stay in the same generation
+    if not rollover and record.get("reentry"):
+        entry["reentry"] = record["reentry"]
+    if not rollover:
+        for key in ("escalations", "pendingEscalation", "escalated", "priorEscalations"):
+            if key in record:
+                entry[key] = record[key]
     if rollover:
+        prior = list(record.get("escalations") or []) + list(record.get("priorEscalations") or [])
         entry["reentry"] = {"schema": "jovie-reentry/v1", "materialChange": "new-pr-head",
                             "fromGeneration": {"head": record.get("sha"), "attempts": record.get("count", 0),
                                                "pushedHead": record.get("pushedHead")},
                             "toGeneration": {"head": sha}, "at": now}
+        if prior:
+            entry["reentry"]["priorEscalations"] = prior
+            entry["priorEscalations"] = prior
+        # A new generation does not inherit `escalated`. Spent attempt history stays on the receipt.
     attempts[str(number)] = entry
+
+
+def fresh_reentry(lane, pr: dict, record: dict) -> dict | None:
+    """Under the existing claim fence, a cached head cannot consume another head's exhaustion."""
+    if not record.get("count") or same_generation(record, pr.get("headRefOid")):
+        return pr
+    live = lane.reconcile_fix_target(pr)
+    if not live or live.get("state") != "OPEN" or live.get("headRefOid") != pr.get("headRefOid") \
+            or live.get("headRefName") != pr.get("headRefName") or live.get("isCrossRepository") \
+            or {label.lower() for label in label_names(live)} & HOLD_LABELS:
+        return None
+    return live
 
 
 def read_state(host, name: str) -> dict:
@@ -688,7 +934,10 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
     disabled = set(providers) - set(order)
     for pr in sorted(prs, key=lambda item: item["number"]):
         record = attempts.get(str(pr["number"]), {})
-        if not in_scope(pr, "red", disabled) or not needs_work(lane, pr):
+        needs_repair = needs_work(lane, pr)
+        if preservation_reason(pr, record, lane.MAX_FIX_ATTEMPTS, now=now, allow_reentry=needs_repair):
+            continue
+        if not in_scope(pr, "red", disabled) or not needs_repair:
             consume(lane, pr)
             continue
         if spent(record, pr["headRefOid"], lane.MAX_FIX_ATTEMPTS) or in_flight(record, pr, now):
@@ -702,22 +951,43 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
             continue
         if not may_take(name, pr, record, order, now) or lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
+        pr = fresh_reentry(lane, pr, record)
+        if pr is None or not needs_work(lane, pr):
+            continue
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
         if "dequeued" in (pr.get("eventKinds") or []):
             pr = {**pr, "queueFailure": queue_failure(lane, pr["number"])}
-        record_attempt(attempts, pr["number"], pr["headRefOid"], name, now)
-        path.write_text(json.dumps(attempts))
+        if not charge_reentry(lane, path, pr, record, name, now):
+            continue
+        if PREFIX + EXHAUSTED in {label.lower() for label in label_names(pr)}:
+            # The linked receipt above is durable before the old exhaustion marker is consumed.
+            consume(lane, pr, [EXHAUSTED])
         lane.post_claim(pr["number"], pr["headRefOid"], "fix")
         consume(lane, pr)
         return pr
     return None
 
 
+def charge_reentry(lane, path: Path, pr: dict, expected: dict, name: str, now: float) -> bool:
+    """Atomically persist the claim and linked receipt before consuming any remote label."""
+    charged = False
+    def charge(current):
+        nonlocal charged
+        if current.get(str(pr["number"]), {}) != expected:
+            return  # another claim/state update owns the new evidence
+        record_attempt(current, pr["number"], pr["headRefOid"], name, now)
+        charged = True
+    lane.update_json(path, charge)
+    return charged
+
+
 def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     """The lane is the PR's writer (JOV-INV-022): a CLEAN lane draft whose head no diff policy
     held is marked ready together with its native merge intent. Returns what happened."""
+    if reason := maintenance_hold(host, lane, pr, now):
+        return f"held:{reason}"
     entry = held.get(str(pr["number"]), {})
     if entry.get("sha") == pr["headRefOid"]:
         code = entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
@@ -754,13 +1024,56 @@ def linear_issue(linear, identifier: str) -> dict | None:
     return nodes[0] if nodes else None
 
 
-def return_to_pool(lane, linear, pr: dict, why: str) -> None:
-    """Close a disabled lane's PR and put its issue back in Todo for a live lane."""
+RETIREMENT_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
+pullRequest(number:$number){number state headRefOid headRefName isCrossRepository isInMergeQueue
+labels(first:100){pageInfo{hasNextPage} nodes{name}}}}}"""
+
+
+def duplicate_authorized(pr: dict) -> bool:
+    labels = {name.lower() for name in label_names(pr)}
+    return ("duplicate" in labels and not labels & (HOLD_LABELS | {POISON_LABEL})
+            and pr.get("state", "OPEN") == "OPEN" and not pr.get("isCrossRepository")
+            and not pr.get("isInMergeQueue"))
+
+
+def close_duplicate(lane, pr: dict, why: str, *, host, now: float | None = None) -> bool:
+    """Revalidate explicit duplicate authority and the source lease before retirement.
+    A failed or incomplete read preserves the PR; neither age nor ranking grants authority.
+    """
+    if not duplicate_authorized(pr) or not pr.get("headRefOid"):
+        return False
+    owner, name = lane.REPO_SLUG.split("/")
+    try:
+        read = lane.sh(["gh", "api", "graphql", "-f", f"query={RETIREMENT_QUERY}",
+                        "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"number={pr['number']}"])
+        data = json.loads(read.stdout) if read.returncode == 0 else {}
+        live = data["data"]["repository"]["pullRequest"]
+        labels = live["labels"]
+        if (data.get("errors") or labels["pageInfo"]["hasNextPage"] is not False
+                or live["number"] != pr["number"] or live["state"] != "OPEN"
+                or live["headRefOid"] != pr["headRefOid"]
+                or live["headRefName"] != pr["headRefName"]
+                or live["isCrossRepository"] is not False or live["isInMergeQueue"] is not False
+                or not duplicate_authorized({**live, "labels": labels["nodes"]})):
+            return False
+    except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.SubprocessError):
+        return False
+    # Retirement intent cannot supersede a terminal generation or a repair owner.
+    # Read their current persisted state after the network read, at the close boundary.
+    live = {**live, "labels": labels["nodes"]}
+    if maintenance_hold(host, lane, live, time.time() if now is None else now):
+        return False
+    return lane.sh(["gh", "pr", "close", str(pr["number"]), "--repo", lane.REPO_SLUG, "--comment",
+                    f"🤖 lanes: closing this explicitly labeled duplicate ({why}); source branch preserved."]).returncode == 0
+
+
+def return_to_pool(lane, linear, pr: dict, why: str, *, host, now: float | None = None) -> bool:
+    """Return explicitly retired duplicate work to the pool only after a successful close."""
+    if maintenance_hold(host, lane, pr, time.time() if now is None else now):
+        return False
+    if not close_duplicate(lane, pr, why, host=host, now=now):
+        return False
     found = LANE_BRANCH.match(pr.get("headRefName") or "")
-    tail = "the issue goes back to the pool for a live lane." if found else \
-        "reopen it if the work is still wanted."
-    lane.sh(["gh", "pr", "close", str(pr["number"]), "--repo", lane.REPO_SLUG, "--comment",
-             f"🤖 lanes: closing this {why}; {tail}"])
     try:
         issue = linear_issue(linear, found.group("issue")) if found else None
         if issue and issue["state"]["type"] not in ("completed", "canceled"):
@@ -769,11 +1082,13 @@ def return_to_pool(lane, linear, pr: dict, why: str) -> None:
                                         "back in Todo for a live lane.")
     except Exception:
         pass
+    return True
 
 
-def retire_orphan(lane, linear, pr: dict, open_prs: list[dict]) -> str:
-    """A disabled lane's PR: close it when another PR for the issue supersedes it or the issue
-    is already done; otherwise the live lanes adopt it (lane_prs includes disabled lanes)."""
+def retire_orphan(lane, linear, pr: dict, open_prs: list[dict], *, host, now: float | None = None) -> str:
+    """Adopt disabled-lane work; retire only explicitly authorized, unheld duplicates."""
+    if reason := maintenance_hold(host, lane, pr, time.time() if now is None else now):
+        return f"held:{reason}"
     found = LANE_BRANCH.match(pr.get("headRefName") or "")
     if not found:
         return "not-a-lane-pr"
@@ -781,21 +1096,20 @@ def retire_orphan(lane, linear, pr: dict, open_prs: list[dict]) -> str:
              if (match := LANE_BRANCH.match(other.get("headRefName") or "")) and match.group("issue") == found.group("issue")}
     group[pr["number"]] = pr
     best = lane.best_per_issue(list(group.values()))
-    if best and best[0]["number"] != pr["number"]:
-        lane.sh(["gh", "pr", "close", str(pr["number"]), "--repo", lane.REPO_SLUG, "--comment",
-                 f"🤖 lanes: superseded by #{best[0]['number']} for the same issue; closing this orphaned draft."])
+    if best and best[0]["number"] != pr["number"] and close_duplicate(
+            lane, pr, f"superseded by #{best[0]['number']} for the same issue", host=host, now=now):
         return f"superseded-by:{best[0]['number']}"
     try:
         issue = linear_issue(linear, found.group("issue"))
     except Exception:
         return "linear-unreadable"
-    if issue and issue["state"]["type"] in ("completed", "canceled"):
-        lane.sh(["gh", "pr", "close", str(pr["number"]), "--repo", lane.REPO_SLUG, "--comment",
-                 f"🤖 lanes: {found.group('issue').upper()} is already {issue['state']['name']}; closing this orphaned draft."])
+    if issue and issue["state"]["type"] in ("completed", "canceled") and close_duplicate(
+            lane, pr, f"{found.group('issue').upper()} is already {issue['state']['name']}", host=host, now=now):
         return "issue-done"
     lane.sh(["gh", "pr", "comment", str(pr["number"]), "--repo", lane.REPO_SLUG, "--body",
              "🤖 lanes: this lane is off; the live lanes adopt this PR (gate, fix loop, ready on green). "
-             "If it exhausts its fix attempts it is closed and the issue returns to the pool."])
+             "Exhausted attempts preserve the branch and file a bounded repair disposition; "
+             "only an explicit duplicate label authorizes retirement."])
     return "adopted"
 
 
@@ -804,6 +1118,8 @@ def sync_main(host, lane, pr: dict, now: float) -> str:
     (exact head, no force), so the PR gets a new head, fresh CI and a fresh enroll. The queue
     never takes a rejected head twice (JOV-INV-022), so this is the one sanctioned re-enqueue.
     Once per PR per stuck episode; a second removal goes to a model with the queue's log."""
+    if reason := maintenance_hold(host, lane, pr, now):
+        return f"held:{reason}"
     revoked = lane.publication_revocation(host, pr.get("headRefName"))
     if revoked:
         return f"revoked:{revoked.get('reason', '?')}"
@@ -859,13 +1175,13 @@ def open_prs_state(lane) -> list[dict] | None:
 
 
 def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_attempts: int, now: float,
-                   deps: dict | None = None) -> dict:
+                   deps: dict | None = None, held: dict | None = None) -> dict:
     """Pure: what the sweep changes, and which open PRs nobody owns. The invariant: every open
     non-draft PR is in the merge queue, carries a fix label the lanes will still act on, or is
     held with a reason (a hold label, or `lane-fix-exhausted` after bug intake). JOV-7079:
     every open PR also gets one truthful disposition in `dispositions`, and a stale
-    agent-owned draft is either advancing (a `stale` label a lane will work), held on a
-    still-open dependency (`depHolds`), or closed — never just counted forever."""
+    agent-owned draft has a repair or live dependency disposition. Retirement requires
+    explicit duplicate authority; age, provider state and retry exhaustion never grant it."""
     plan = {"label": [], "unlabel": [], "reset": [], "stale": [], "close": [], "orphans": [],
             "depHolds": [], "dispositions": [], "counts": {}}
     lane_groups: dict[str, list[dict]] = {}
@@ -890,10 +1206,11 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
             and not pr.get("isDraft")
         counts["exhausted"] += PREFIX + EXHAUSTED in labels
         counts.setdefault("staleAgentDrafts", 0)
+        if preservation_reason(pr, attempts.get(str(number), {}), max_attempts,
+                               held=(held or {}).get(str(number)), now=now):
+            continue
         if pr.get("mergeStateStatus") == "CLEAN" or pr.get("isInMergeQueue"):
-            plan["reset"].append(number)  # the stuck episode is over: attempts and sync start fresh
-            if PREFIX + EXHAUSTED in labels:
-                plan["unlabel"].append((number, EXHAUSTED))
+            plan["reset"].append(number)  # only synchronization housekeeping; attempts remain immutable here
         wanted = []
         if POISON_LABEL in labels:
             wanted.append("dequeued")  # repeated ejections need the merge-group log and a model fix
@@ -911,11 +1228,8 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                 group = lane_groups.get(found.group("issue"), [pr])
                 best = max(group, key=lambda item: (not item.get("isDraft"), item.get("mergeStateStatus") != "DIRTY",
                                                     item["number"]))
-                if best["number"] != number:
+                if best["number"] != number and duplicate_authorized(pr):
                     plan["close"].append((number, f"superseded by #{best['number']} for the same issue"))
-                    continue
-                if generation_spent:
-                    plan["close"].append((number, "stale for 48h after its fix attempts ran out"))
                     continue
                 wanted.append("stale")
             elif agent_owned(pr):
@@ -923,7 +1237,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                 if waiting_on:
                     counts["staleAgentDrafts"] += 1
                     plan["depHolds"].append((number, waiting_on))
-                elif stalled_agent_draft:
+                elif stalled_agent_draft and duplicate_authorized(pr):
                     opened = iso_ts(pr.get("createdAt"))
                     days = int((now - opened) // 86400) if opened is not None else int(age // 86400)
                     plan["close"].append((number, f"abandoned agent draft: open {days}d with no "
@@ -940,13 +1254,13 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                 labels.add(PREFIX + kind)
         if pr.get("isDraft") or pr.get("isCrossRepository") or pr.get("isInMergeQueue"):
             continue
-        held = {label.lower() for label in labels} & HOLD_LABELS or PREFIX + EXHAUSTED in labels
+        explicitly_held = {label.lower() for label in labels} & HOLD_LABELS or PREFIX + EXHAUSTED in labels
         queued = any(PREFIX + kind in labels for kind in FIX_KINDS) and not generation_spent
         settling = age < ORPHAN_GRACE_S or pr.get("rollup") in ("PENDING", "EXPECTED")
-        if not (held or queued or settling):
+        if not (explicitly_held or queued or settling):
             plan["orphans"].append(number)
     plan["counts"] = counts
-    plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now)
+    plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now, held)
     return plan
 
 
@@ -962,8 +1276,9 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     providers = lane.load_providers()
     disabled = set(providers) - set(cost_order(providers))
     deps = open_dependencies(prs, now, lane.sh)
-    plan = reconcile_plan(prs, read_state(host, "fix-attempts.json"), disabled, lane.MAX_FIX_ATTEMPTS, now,
-                          deps)
+    attempts = read_state(host, "fix-attempts.json")
+    held = read_state(host, "held.json")
+    plan = reconcile_plan(prs, attempts, disabled, lane.MAX_FIX_ATTEMPTS, now, deps, held)
     for number, kind in plan["label"]:
         add_label(number, kind, lane.sh)
     for number, kind in plan["unlabel"]:
@@ -973,17 +1288,31 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         def drop(data: dict) -> None:
             for key in reset & set(data):
                 del data[key]
-        for name in ("fix-attempts.json", "synced.json"):
-            lane.update_json(host.state / name, drop)
+        lane.update_json(host.state / "synced.json", drop)
     by_number = {pr["number"]: pr for pr in prs}
     # JOV-7066: held PRs whose hold outlived its cause get one alert per stale episode; the
     # opt-in stricter mode lifts automation holds whose head already moved past the hold.
     announced = {row.get("pr") for row in previous.get("staleHolds") or []}
-    stale = stale_holds(prs, now, lane.sh)
+    nags = previous.get("holdNags") or {}
+    next_nags = dict(nags)
+    stale_candidates = []
+    for pr in prs:
+        record = attempts.get(str(pr["number"]), {})
+        if terminal_reason(pr, record, lane.MAX_FIX_ATTEMPTS) \
+                or in_flight(record, {"headRefOid": record.get("sha")}, now):
+            continue
+        if pr.get("mergeStateStatus") == "CLEAN" and {label.lower() for label in label_names(pr)} & HOLD_LABELS \
+                and lane.claimed_elsewhere(pr["number"], pr.get("headRefOid"), "fix"):
+            continue
+        stale_candidates.append(pr)
+    stale = stale_holds(stale_candidates, now, lane.sh)
     auto_unhold = os.environ.get("LANES_STALE_HOLD_UNHOLD", "").lower() in ("1", "true", "yes")
     for row in stale:
         if row["pr"] in announced:
             continue
+        if not remediation.hold_nag_due(nags, row["pr"], row["head"], now):
+            continue
+        next_nags[str(row["pr"])] = {"head": row["head"], "at": now}
         if auto_unhold and row["auto"]:
             for name in (label for label in label_names(by_number[row["pr"]])
                          if label.lower() in HOLD_LABELS or label == POISON_LABEL):
@@ -996,20 +1325,33 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         else:
             lane.sh(["gh", "pr", "comment", str(row["pr"]), "--repo", lane.REPO_SLUG, "--body",
                      stale_hold_alert(row)])
-    linear = None
+    linear, closed = None, []
     for number, why in plan["close"]:
+        if reason := maintenance_hold(host, lane, by_number[number], now):
+            for row in plan["dispositions"]:
+                if row["pr"] == number:
+                    row.update(state=f"hold:{reason}", reason=reason, next="preserve existing work")
+            continue
         if linear is None:
             try:
                 linear = linear_factory()
             except Exception:
                 linear = False
         if linear:
-            return_to_pool(lane, linear, by_number[number], why)
+            retired = return_to_pool(lane, linear, by_number[number], why, host=host, now=now)
         else:
-            lane.sh(["gh", "pr", "close", str(number), "--repo", lane.REPO_SLUG, "--comment", f"🤖 lanes: closing this {why}."])
+            retired = close_duplicate(lane, by_number[number], why, host=host, now=now)
+        if retired:
+            closed.append(number)
+        else:
+            for row in plan["dispositions"]:
+                if row["pr"] == number:
+                    row.update(state="hold:retirement-unavailable", reason="retirement refused or failed",
+                               next="preserve source; revalidate retirement authority")
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
-              "closed": [number for number, _ in plan["close"]], "orphans": plan["orphans"],
-              "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale}
+              "closed": closed, "orphans": plan["orphans"],
+              "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
+              "holdNags": next_nags}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
     return record
 
@@ -1021,6 +1363,9 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     swept = reconcile(host, lane, linear_factory, now)
     prs = queued_prs(lane, TICK_KINDS + ("dequeued",))
     outcomes = {"reconciled": swept["counts"]} if swept else {}
+    intake = convert_intake(lane, linear_factory, lane.sh, now)
+    if intake:
+        outcomes["intake"] = intake
     if not prs:
         return outcomes
     held_file = lane.held_path(host)
@@ -1028,6 +1373,9 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     synced = read_state(host, "synced.json")
     open_prs, linear = None, None
     for pr in prs:
+        if reason := maintenance_hold(host, lane, pr, now):
+            outcomes[pr["number"]] = f"held:{reason}"
+            continue
         if "dequeued" in pr["eventKinds"] and str(pr["number"]) not in synced and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
                 and in_scope(pr, "red", set()):
@@ -1037,15 +1385,15 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
         if "green" in pr["eventKinds"]:
             outcome = ready_green(host, lane, pr, held, now)
             outcomes[pr["number"]] = outcome
-            if outcome != "wait":
+            if outcome != "wait" and not outcome.startswith("held:"):
                 consume(lane, pr, ["green"])
         if "orphan" in pr["eventKinds"]:
             if open_prs is None:
                 open_prs = list_open(lane.sh)
                 linear = linear_factory()
-            outcome = retire_orphan(lane, linear, pr, open_prs)
+            outcome = retire_orphan(lane, linear, pr, open_prs, host=host, now=now)
             outcomes[pr["number"]] = outcome
-            if outcome != "linear-unreadable":
+            if outcome != "linear-unreadable" and not outcome.startswith("held:"):
                 consume(lane, pr, ["orphan"])
     return outcomes
 

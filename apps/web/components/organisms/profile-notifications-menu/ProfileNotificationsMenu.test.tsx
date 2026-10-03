@@ -38,5 +38,7 @@ describe('ProfileNotificationsMenu', () => {
     expect(screen.getByText('How You Get Notified')).toBeInTheDocument();
     expect(screen.getByText('Listening Preference')).toBeInTheDocument();
     expect(screen.getByText('What You Hear About')).toBeInTheDocument();
+    expect(screen.queryByText('Instagram DMs')).not.toBeInTheDocument();
+    expect(screen.queryByText('Coming soon')).not.toBeInTheDocument();
   });
 });

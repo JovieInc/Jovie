@@ -70,6 +70,7 @@ import {
   LibraryCatalogProvidersCell,
   LibraryCatalogStatusCell,
 } from '@/components/features/library/library-catalog-columns';
+import { WorkInspectorActions } from '@/components/features/library/WorkInspectorActions';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -148,6 +149,7 @@ import {
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
+import type { WorkLaunchSummary } from '@/lib/library/work-actions';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
 import {
   type ColumnDef,
@@ -599,11 +601,7 @@ const ReleaseDateCell = memo(function ReleaseDateCell({
 
 const libraryColumnHelper = createColumnHelper<LibraryReleaseAsset>();
 
-function createLibraryTypeColumn(
-  metaClassName: string,
-  size: number,
-  minSize: number
-) {
+function createLibraryTypeColumn(size: number, minSize: number) {
   return libraryColumnHelper.display({
     id: 'type',
     header: 'Type',
@@ -614,7 +612,12 @@ function createLibraryTypeColumn(
     ),
     size,
     minSize,
-    meta: { className: metaClassName },
+    meta: {
+      className: 'px-2',
+      priority: 2,
+      minWidth: size,
+      compact: asset => formatLibraryItemType(asset),
+    },
   });
 }
 
@@ -673,7 +676,7 @@ export const LIBRARY_TABLE_COLUMNS = [
     minSize: 220,
     size: 9999,
     enableSorting: false,
-    meta: { className: alignment.workspaceSeamX },
+    meta: { className: alignment.workspaceSeamX, primary: true, minWidth: 220 },
   }),
   libraryColumnHelper.display({
     id: 'releaseDate',
@@ -681,17 +684,26 @@ export const LIBRARY_TABLE_COLUMNS = [
     cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
     size: 112,
     minSize: 96,
-    meta: { className: 'pl-2 pr-3' },
+    meta: {
+      className: 'pl-2 pr-3',
+      priority: 5,
+      minWidth: 112,
+      compact: asset => <ReleaseDateCell asset={asset} />,
+    },
   }),
-  // Release + Approval share the same md breakpoint so a Released+Draft
-  // row never shows bare "Draft" alone (JOV-3333 / #10384).
+  // Release and Approval share a tier so a row never shows bare "Draft" alone.
   libraryColumnHelper.display({
     id: 'status',
     header: 'Release',
     cell: ({ row }) => <LibraryCatalogStatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 112,
+      compact: asset => <LibraryCatalogStatusCell asset={asset} />,
+    },
   }),
   libraryColumnHelper.display({
     id: 'approval',
@@ -699,16 +711,26 @@ export const LIBRARY_TABLE_COLUMNS = [
     cell: ({ row }) => <ApprovalStatusCell asset={row.original} />,
     size: 128,
     minSize: 108,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 128,
+      compact: asset => <ApprovalStatusCell asset={asset} />,
+    },
   }),
-  createLibraryTypeColumn('hidden lg:table-cell px-2', 104, 88),
+  createLibraryTypeColumn(104, 88),
   libraryColumnHelper.display({
     id: 'providers',
     header: 'Providers',
     cell: ({ row }) => <LibraryCatalogProvidersCell asset={row.original} />,
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 3,
+      minWidth: 120,
+      compact: asset => <LibraryCatalogProvidersCell asset={asset} />,
+    },
   }),
   libraryColumnHelper.display({
     id: 'shareUrl',
@@ -722,7 +744,14 @@ export const LIBRARY_TABLE_COLUMNS = [
     size: 220,
     minSize: 180,
     enableSorting: false,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 1,
+      minWidth: 220,
+      compact: asset => (
+        <LibraryAssetShareUrlCell asset={asset} share={asset.share} />
+      ),
+    },
   }),
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
@@ -2148,7 +2177,8 @@ function AssetDrawer({
   profileId,
   approvalSavingIds,
   artistHandle,
-  pressKitCandidates,
+  shareCandidates,
+  workLaunches,
   merchProducts,
   relationships,
   postReleaseBundle,
@@ -2167,7 +2197,8 @@ function AssetDrawer({
   readonly profileId: string | null;
   readonly approvalSavingIds: ReadonlySet<string>;
   readonly artistHandle: string | null;
-  readonly pressKitCandidates: readonly LibraryReleaseAsset[];
+  readonly shareCandidates: readonly LibraryReleaseAsset[];
+  readonly workLaunches: readonly WorkLaunchSummary[];
   readonly merchProducts: readonly {
     readonly id: string;
     readonly title: string;
@@ -2321,6 +2352,18 @@ function AssetDrawer({
                         disabledTabIndex={closedTabIndex}
                       />
                     </div>
+                  </InspectorSection>
+                ) : null}
+
+                {!isMerch ? (
+                  <InspectorSection title='Actions'>
+                    <WorkInspectorActions
+                      asset={current}
+                      launches={workLaunches}
+                      canPublish={profileId !== null}
+                      disabled={!open}
+                      onSharePrivately={() => setActiveTab('files')}
+                    />
                   </InspectorSection>
                 ) : null}
 
@@ -2513,11 +2556,11 @@ function AssetDrawer({
                   <InspectorSection title='Share Files Privately'>
                     <LibraryShareDropCreator
                       releaseIds={[current.id]}
-                      candidateAssets={pressKitCandidates.map(item => ({
+                      candidateAssets={shareCandidates.map(item => ({
                         id: item.id,
                         title: item.title,
                       }))}
-                      defaultTitle={`${current.title} press kit`}
+                      defaultTitle={`${current.title} files`}
                     />
                   </InspectorSection>
                 ) : null}
@@ -2554,6 +2597,7 @@ function LibraryStatusBar({
 }
 
 const EMPTY_MERCH_PRODUCTS: readonly LibraryMerchProductOption[] = [];
+const EMPTY_WORK_LAUNCHES: readonly WorkLaunchSummary[] = [];
 
 export function LibrarySurface({
   assets,
@@ -2567,6 +2611,7 @@ export function LibrarySurface({
   merchProducts = EMPTY_MERCH_PRODUCTS,
   relationships = EMPTY_RELATIONSHIPS,
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+  workLaunches = EMPTY_WORK_LAUNCHES,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
@@ -2579,6 +2624,11 @@ export function LibrarySurface({
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
+  /**
+   * Canonical launch summaries (JOV-7472 read contract). Only launches scoped
+   * to the selected work render; absent data means no press-kit slot is shown.
+   */
+  readonly workLaunches?: readonly WorkLaunchSummary[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -3291,9 +3341,10 @@ export function LibrarySurface({
         profileId={profileId}
         approvalSavingIds={approvalSavingIds}
         artistHandle={artistHandle}
-        pressKitCandidates={effectiveAssets.filter(
+        shareCandidates={effectiveAssets.filter(
           item => getLibraryItemKind(item) === 'release'
         )}
+        workLaunches={workLaunches}
         merchProducts={effectiveAssets.flatMap(asset =>
           getLibraryItemKind(asset) === 'merch' &&
           asset.source?.provider === 'merch'
@@ -3323,6 +3374,7 @@ export function LibrarySurface({
       profileId,
       relationships,
       selectedAsset,
+      workLaunches,
     ]
   );
 

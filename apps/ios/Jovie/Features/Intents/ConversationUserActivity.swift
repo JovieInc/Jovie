@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 
 /// Spotlight / Siri Suggestions payload for an individual Jovie conversation.
 enum ConversationUserActivity {

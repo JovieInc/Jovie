@@ -30,10 +30,13 @@ function fixture({
   candidates = [candidate()],
   first = pr(),
   second = first,
+  third = undefined,
+  failLabel = false,
   parents = [{ sha: old }],
   files = reports,
   ancestor = true,
   failClose = false,
+  profile = 'coverage-audit',
 } = {}) {
   const calls = [];
   let reads = 0;
@@ -45,13 +48,24 @@ function fixture({
       if (failClose) throw new Error('close denied');
       return '';
     }
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      if (failLabel) throw new Error('label denied');
+      return '';
+    }
     if (args.includes('--paginate')) return files;
     if (args[1].includes('/git/commits/')) return JSON.stringify({ parents });
-    return JSON.stringify(reads++ === 0 ? first : second);
+    return JSON.stringify(
+      reads++ === 0
+        ? first
+        : reads === 2
+          ? second
+          : (third ?? { ...second, labels: [{ name: 'duplicate' }] })
+    );
   };
   const run = () =>
     retireCoverageReports({
       gh,
+      profile,
       repo,
       url,
       source,
@@ -74,9 +88,39 @@ test('retires only the older measured-source report after checking ancestry, par
   assert.deepEqual(f.closed(), [['pr', 'close', '1', '--repo', repo]]);
   assert.equal(
     f.calls.filter(args => args[1] === `repos/${repo}/pulls/1`).length,
-    2
+    3
   );
   assert.ok(f.calls.some(args => args.includes('--paginate')));
+});
+
+test('closure requires an explicit duplicate label on the same proven report head', () => {
+  const f = fixture();
+  assert.deepEqual(f.run(), [1]);
+  const label = ['pr', 'edit', '1', '--repo', repo, '--add-label', 'duplicate'];
+  assert.deepEqual(
+    f.calls.find(args => args[1] === 'edit'),
+    label
+  );
+  assert.ok(
+    f.calls.findIndex(args => args[1] === 'edit') <
+      f.calls.findIndex(args => args[1] === 'close')
+  );
+  assert.throws(() => fixture({ failLabel: true }).run(), /label denied/);
+  for (const override of [
+    { labels: [] },
+    { labels: [{ name: 'duplicate' }, { name: 'hold' }] },
+    { labels: [{ name: 'duplicate' }, { name: 'queue-poison' }] },
+    { head: { ...pr().head, sha: source } },
+    { state: 'closed' },
+    { draft: false },
+    { body: 'writer takeover' },
+  ]) {
+    const held = fixture({
+      third: { ...pr(), labels: [{ name: 'duplicate' }], ...override },
+    });
+    assert.deepEqual(held.run(), []);
+    assert.deepEqual(held.closed(), []);
+  }
 });
 
 test('preserves the replacement, newer runs, held/ready PRs and non-report branches', () => {
@@ -140,4 +184,67 @@ test('missing publication receipts never authorize cleanup and cleanup failures 
     /Invalid replacement/
   );
   assert.throws(() => fixture({ failClose: true }).run(), /close denied/);
+});
+
+const nightlyFiles =
+  'docs/NIGHTLY_TESTING_AGENT_REPORT.md\napps/web/reports/nightly-agent/last-run.json';
+const nightlyCandidate = () => ({
+  ...candidate(),
+  headRefName: 'bot/nightly-evidence-123-1',
+});
+const nightlyPR = () => ({
+  ...pr(),
+  title: 'chore(testing): refresh nightly testing evidence',
+  head: { ...pr().head, ref: nightlyCandidate().headRefName },
+});
+
+test('nightly retirement closes only an older nightly report and preserves coverage', () => {
+  const f = fixture({
+    profile: 'nightly-evidence',
+    candidates: [candidate(), nightlyCandidate()],
+    first: nightlyPR(),
+    files: nightlyFiles,
+  });
+  assert.deepEqual(f.run(), [1]);
+  assert.equal(f.closed().length, 1);
+  assert.equal(f.calls.filter(args => args.includes('--paginate')).length, 1);
+});
+
+test('coverage and nightly ownership cannot cross report namespaces, titles or files', () => {
+  assert.deepEqual(
+    fixture({
+      candidates: [nightlyCandidate()],
+      first: nightlyPR(),
+      files: nightlyFiles,
+    }).run(),
+    []
+  );
+  assert.deepEqual(fixture({ profile: 'nightly-evidence' }).run(), []);
+  for (const override of [
+    { title: pr().title },
+    { labels: [{ name: 'hold' }] },
+    { draft: false },
+    { head: { ...nightlyPR().head, sha: source } },
+  ]) {
+    const f = fixture({
+      profile: 'nightly-evidence',
+      candidates: [nightlyCandidate()],
+      first: nightlyPR(),
+      second: { ...nightlyPR(), ...override },
+      files: nightlyFiles,
+    });
+    assert.deepEqual(f.run(), []);
+  }
+  for (const files of [reports, `${nightlyFiles}\nsource.ts`, '']) {
+    assert.deepEqual(
+      fixture({
+        profile: 'nightly-evidence',
+        candidates: [nightlyCandidate()],
+        first: nightlyPR(),
+        files,
+      }).run(),
+      []
+    );
+  }
+  assert.throws(() => fixture({ profile: 'unknown' }).run(), /report profile/);
 });

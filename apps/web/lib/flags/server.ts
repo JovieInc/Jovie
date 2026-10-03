@@ -110,6 +110,12 @@ export async function getAppFlagValue(
     // Ignore — fall through to the registry default.
   }
 
+  // The mock release planner is a local demo. Keep it available in dev and
+  // preview, and fail closed in production unless an override above published it.
+  if (flagName === 'RELEASE_PLAN_DEMO' && !isProductionRuntime()) {
+    return true;
+  }
+
   return APP_FLAG_REGISTRY[flagName].run({
     identify: {
       userId: options?.userId ?? null,

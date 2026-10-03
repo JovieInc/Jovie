@@ -341,12 +341,14 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('runs source checks once per revision and never on ready_for_review', () => {
+  it('revalidates size after contract edits without draft-state or label churn', () => {
     const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
     // Draft state does not change the source SHA. The original source checks
     // remain authoritative when the owner pairs ready with native auto-merge.
-    expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(
+      'types: [opened, synchronize, reopened, edited]'
+    );
     expect(FORK_GATE_WORKFLOW).toContain(
       `pull_request:\n    ${sourceRevisionTrigger}`
     );
@@ -1033,6 +1035,46 @@ describe('merge_group workflow contract', () => {
       expect(job).toContain("github.event_name == 'workflow_dispatch'");
       expect(job).not.toContain("github.event_name == 'pull_request'");
       expect(job).toContain('runs-on: ubuntu-latest');
+    }
+  });
+
+  it('uses the trusted-base blog profile inside stable PR Ready aggregates', () => {
+    const paths = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const blog = getJobBlock(CI_WORKFLOW, 'ci-blog-content');
+    const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    const sourceReady = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+
+    expect(paths).toContain(
+      'git show "${BASE_SHA}:scripts/lib/blog-content-ci.mjs"'
+    );
+    expect(paths).toContain('--policy-ref "$BASE_SHA"');
+    expect(paths).toContain('reason:"trusted-classifier-unavailable"');
+    expect(paths).toContain('--qualification-profile "$profile"');
+    expect(blog).toContain('name: Blog Content Qualification');
+    expect(blog).toContain(
+      "needs.ci-path-changes.outputs.blog_content_only == 'true'"
+    );
+    expect(blog).toContain('tests/unit/lib/blog/publication.test.ts');
+    expect(blog).toContain('scripts/marketing-factory/blog-adapter.test.ts');
+    expect(blog).toContain('pnpm turbo build --filter=@jovie/web');
+    expect(blog).toContain('qualificationStartedAt');
+    expect(blog).toContain('confirmedLiveAt:null');
+    expect(mergeReady).toContain('ci-blog-content');
+    expect(sourceReady).toContain('ci-blog-content');
+    expect(receipt).toContain('ci-blog-content');
+    expect(receipt).toContain('web_results="[\\"$BLOG\\",\\"$FAST\\"]"');
+
+    for (const jobId of [
+      'ci-unit-tests',
+      'ci-build-layout',
+      'ci-build-ovie',
+      'ci-typecheck-ovie',
+      'ci-storybook-surfaces',
+    ]) {
+      expect(getJobBlock(CI_WORKFLOW, jobId)).toContain(
+        "needs.ci-path-changes.outputs.blog_content_only != 'true'"
+      );
     }
   });
 
@@ -2301,7 +2343,7 @@ ${selectedGateScript}`,
 
     expect(coalesce).toContain('timeout-minutes: 5');
     expect(coalesce).toContain(
-      "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
+      "needs.release-source.outputs.eligible == 'true'"
     );
     // No universal fixed delay: the bounded window derives from merge-queue
     // depth and is capped inside the 5-minute job budget.
@@ -2326,7 +2368,7 @@ ${selectedGateScript}`,
     expect(coalesce).toContain('echo "is_current=false"');
     expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
-      'needs: [coalesce-production, fleet-promotion]'
+      'needs: [release-source, coalesce-production, fleet-promotion]'
     );
     expect(authorize).toContain(
       "needs.coalesce-production.outputs.is_current == 'true'"
@@ -2379,7 +2421,10 @@ ${selectedGateScript}`,
     expect(PRODUCTION_RELEASE_WORKFLOW).toContain('  promote-production:');
     expect(PRODUCTION_RELEASE_WORKFLOW).not.toContain('concurrency:');
 
-    expect(verified).toContain("github.event.workflow_run.event == 'push'");
+    expect(verified).toContain("needs.release-source.result == 'success'");
+    expect(verified).toContain(
+      "fromJSON(needs.release-source.outputs.ci || '{}').event == 'push'"
+    );
     expect(verified).toContain(
       "needs.authorize-production.result == 'success'"
     );
@@ -3794,7 +3839,7 @@ describe('merge-group Playwright artifact guard', () => {
   });
 });
 
-describe('merge-queue green enroll scan window (JOV-6831)', () => {
+describe('merge-queue green enroll scan window and failure hold', () => {
   const ENROLL = readFileSync(
     resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
     'utf8'
@@ -3808,9 +3853,55 @@ describe('merge-queue green enroll scan window (JOV-6831)', () => {
     expect(ENROLL).not.toMatch(/direction:\s*ASC/);
   });
 
-  it('keeps the rejected-head rule: no re-enqueue without a new push', () => {
+  it('persists the exact-head failure before any bounded re-enrollment', () => {
+    expect(ENROLL).toContain('workflow_run:');
     expect(ENROLL).toContain(
-      'if (removedAt && committedAt && removedAt > committedAt) continue;'
+      'github.event.workflow_run.workflow_id == 178737329'
     );
+    expect(ENROLL).toContain(
+      "github.event.workflow_run.event == 'merge_group'"
+    );
+    expect(ENROLL).toContain(
+      'node scripts/merge-group-failure-hold.mjs --event-path "$GITHUB_EVENT_PATH"'
+    );
+    expect(ENROLL).toContain('failurePolicy.revisionFailureDisposition({');
+    expect(ENROLL).toContain("failure.action === 'block'");
+    expect(ENROLL).toContain("failure.action === 'retry-once'");
+    expect(ENROLL).toContain(
+      "if (removedUnchangedHead && failure.action !== 'retry-once') continue;"
+    );
+    for (const runtimePath of [
+      'scripts/merge-group-failure-hold.mjs',
+      'scripts/lib/merge-queue-guard.mjs',
+      'scripts/lib/pre-land-changelog.mjs',
+      'scripts/version-fanout-guard.mjs',
+    ]) {
+      expect(ENROLL).toContain(runtimePath);
+    }
+    expect(ENROLL).toContain('FAILURE_RETRY_CONTEXT');
+    expect(ENROLL.indexOf('FAILURE_RETRY_CONTEXT')).toBeLessThan(
+      ENROLL.indexOf('enqueuePullRequest(input:')
+    );
+  });
+
+  it('keeps a denied dequeue from failing the exact-head hold', () => {
+    const hold = ENROLL.slice(
+      ENROLL.indexOf('  hold-failed-revision:'),
+      ENROLL.indexOf('\n  enroll:')
+    );
+    expect(hold).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
+    expect(hold).toContain('permission-pull-requests: write');
+    expect(hold).toContain('permission-statuses: write');
+    expect(hold).not.toContain('permission-merge-queues:');
+    expect(hold).not.toContain('permission-administration:');
+    expect(hold).toContain('Resource not accessible by integration');
+    expect(hold).toContain('not in queue');
+    const script = readFileSync(
+      resolve(REPO_ROOT, 'scripts/merge-group-failure-hold.mjs'),
+      'utf8'
+    );
+    expect(script).toContain('resource not accessible by integration');
+    expect(script).toContain('not in queue');
+    expect(script).toContain('dequeueOutcome');
   });
 });

@@ -3,16 +3,20 @@ const assert = require('node:assert/strict');
 
 const {
   COMMENT_MARKER,
+  gh,
+  isTransientGhError,
   buildCommentBody,
   buildIssueBody,
   diagnoseStuckPr,
   findMarkerComment,
+  hasRevisionFailureHold,
   needsAutoMergeEnable,
   enableMissingAutoMerge,
 } = require('./auto-merge-stuck-triage');
 
 const basePr = {
   number: 42,
+  headRefOid: 'a'.repeat(40),
   title: 'Test PR',
   url: 'https://github.com/o/r/pull/42',
   mergeable: 'MERGEABLE',
@@ -118,6 +122,22 @@ test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', ()
     }),
     true
   );
+  const revisionHold = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    description: 'class=deterministic-source;n=1;run=123;try=1',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    target_url: 'https://github.com/o/r/actions/runs/123',
+  };
+  assert.equal(hasRevisionFailureHold([revisionHold], 'o/r'), true);
+  assert.equal(needsAutoMergeEnable(eligible, [revisionHold], 'o/r'), false);
+  assert.equal(
+    hasRevisionFailureHold(
+      [{ ...revisionHold, creator: { type: 'User', login: 'spoof' } }],
+      'o/r'
+    ),
+    false
+  );
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {
@@ -136,12 +156,114 @@ test('the customer-notes handoff requests auto-merge only for its checked head',
     isDraft: false,
     customerNotesReadyHead: 'checked-sha',
   };
-  enableMissingAutoMerge('o/r', [pr], false, args => calls.push(args));
+  const readStatuses = (repo, head) => {
+    assert.equal(repo, 'o/r');
+    assert.equal(head, pr.headRefOid);
+    return [];
+  };
+  enableMissingAutoMerge(
+    'o/r',
+    [pr],
+    false,
+    args => calls.push(args),
+    readStatuses
+  );
   assert.deepEqual(calls[0].slice(-2), ['--match-head-commit', 'checked-sha']);
   const before = calls.length;
-  enableMissingAutoMerge('o/r', [pr], true, args => calls.push(args));
-  enableMissingAutoMerge('o/r', [{ ...pr, isDraft: true }], false, args =>
-    calls.push(args)
+  enableMissingAutoMerge(
+    'o/r',
+    [pr],
+    true,
+    args => calls.push(args),
+    readStatuses
+  );
+  enableMissingAutoMerge(
+    'o/r',
+    [{ ...pr, isDraft: true }],
+    false,
+    args => calls.push(args),
+    readStatuses
   );
   assert.equal(calls.length, before);
+});
+
+test('enable pass skips missing heads and preserves an exact-head revision hold', () => {
+  const pr = { ...basePr, autoMergeRequest: null, headRefOid: 'a'.repeat(40) };
+  const calls = [];
+  const reads = [];
+  const readStatuses = (repo, head) => {
+    reads.push([repo, head]);
+    return [
+      {
+        context: 'jovie-queue-failure-hold/v1',
+        state: 'success',
+        creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+        target_url: 'https://github.com/o/r/actions/runs/123',
+        description: 'class=deterministic-source;n=1;run=123;try=1',
+      },
+    ];
+  };
+  enableMissingAutoMerge(
+    'o/r',
+    [{ ...pr, headRefOid: undefined }, pr],
+    false,
+    args => calls.push(args),
+    readStatuses
+  );
+  assert.deepEqual(reads, [['o/r', pr.headRefOid]]);
+  assert.deepEqual(calls, []);
+});
+
+test('gh retries transient HTTP 5xx then succeeds', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    if (calls < 3) {
+      const err = new Error('Command failed: gh api graphql');
+      err.stderr = 'gh: HTTP 502\n';
+      err.stdout = '<html>502 Bad Gateway</html>';
+      throw err;
+    }
+    return '{"ok":true}';
+  };
+  const out = gh(['api', 'graphql'], { exec, sleep: () => {} });
+  assert.equal(out, '{"ok":true}');
+  assert.equal(calls, 3);
+});
+
+test('gh does not retry non-transient failures', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    const err = new Error('Command failed: gh api repos/o/r');
+    err.stderr = 'gh: HTTP 404: Not Found\n';
+    throw err;
+  };
+  assert.throws(() => gh(['api', 'repos/o/r'], { exec, sleep: () => {} }));
+  assert.equal(calls, 1);
+});
+
+test('gh gives up after the attempt cap on persistent 5xx', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    const err = new Error('Command failed: gh api graphql');
+    err.stderr = 'gh: HTTP 503\n';
+    throw err;
+  };
+  assert.throws(() => gh(['api', 'graphql'], { exec, sleep: () => {} }));
+  assert.equal(calls, 4);
+});
+
+test('isTransientGhError only matches transient shapes', () => {
+  const mk = (stderr, stdout = '') =>
+    Object.assign(new Error('fail'), { stderr, stdout });
+  assert.equal(isTransientGhError(mk('gh: HTTP 502\n')), true);
+  assert.equal(isTransientGhError(mk('gh: HTTP 500\n')), true);
+  assert.equal(isTransientGhError(mk('connection reset by peer\n')), true);
+  assert.equal(isTransientGhError(mk('gh: HTTP 404: Not Found\n')), false);
+  assert.equal(
+    isTransientGhError(mk('gh: HTTP 401: Bad credentials\n')),
+    false
+  );
 });

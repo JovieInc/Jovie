@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { requiredStrategyTheses } from './strategy-index.mjs';
 export const CONTEXT_GATE_SCHEMA = 'symphony-context/v1';
 export const CONTEXT_GATE_PREFIX = '<!-- symphony-context/v1 -->';
 export const CONTEXT_GATE_SUFFIX = '<!--/symphony-context-->';
@@ -20,6 +21,7 @@ export const CONTEXT_BLOCKER = Object.freeze({
   ORG_CHART_MISSING: 'org-chart-missing',
   OWNERSHIP_CONFLICT: 'ownership-conflict',
   NO_RESULTS: 'context-no-results',
+  STRATEGY_MISS: 'strategy-miss',
 });
 
 function sorted(value) {
@@ -363,6 +365,63 @@ export async function collectContextEvidence({
       detail: `targeted context query returned no bindable pages: ${priorDecisionQuery}`,
     };
 
+  const strategyStartedAt = clock();
+  let strategyEvidence = null;
+  let requiredTheses;
+  try {
+    requiredTheses = requiredStrategyTheses(issue);
+  } catch {
+    return {
+      evidence: null,
+      reason: CONTEXT_BLOCKER.STRATEGY_MISS,
+      detail: 'strategy-theses-index-unavailable',
+    };
+  }
+  if (requiredTheses.length > 0) {
+    const boundTheses = [];
+    try {
+      for (const thesis of requiredTheses) {
+        const remaining = remainingLookupMs(
+          lookupStartedAt,
+          clock,
+          lookupBudgetMs
+        );
+        if (remaining <= 0)
+          throw Object.assign(new Error('deadline'), { code: 'ETIMEDOUT' });
+        const lookup = await getPageEvidence(
+          gbrain,
+          thesis.slug,
+          remaining,
+          clock
+        );
+        const bound = boundPage(lookup?.page);
+        if (!bound) throw new Error('unbindable-strategy-page');
+        boundTheses.push(bound);
+      }
+    } catch (error) {
+      return {
+        evidence: null,
+        reason: CONTEXT_BLOCKER.STRATEGY_MISS,
+        detail: lookupFailure(
+          'get',
+          requiredTheses.map(thesis => thesis.slug).join(','),
+          error,
+          lookupStartedAt,
+          clock,
+          lookupBudgetMs
+        ).detail,
+      };
+    }
+    strategyEvidence = {
+      theses: boundTheses,
+      matched: requiredTheses.map(thesis => thesis.id),
+      lookup: {
+        source: 'index',
+        ms: Math.max(0, clock() - strategyStartedAt),
+      },
+    };
+  }
+
   const queries = [
     {
       query: ownershipQuery,
@@ -395,6 +454,7 @@ export async function collectContextEvidence({
       },
       ledger: boundLedger,
       queries,
+      ...(strategyEvidence ? { strategy: strategyEvidence } : {}),
       observedAt: now,
     },
     reason: null,
@@ -473,6 +533,33 @@ export function validateContextEvidence(
       return 'context-query-mismatch';
   }
 
+  let requiredTheses;
+  try {
+    requiredTheses = requiredStrategyTheses(issue);
+  } catch {
+    return CONTEXT_BLOCKER.STRATEGY_MISS;
+  }
+  if (requiredTheses.length === 0) {
+    if (evidence.strategy) return 'context-malformed';
+  } else {
+    const strategy = evidence.strategy;
+    if (!strategy || !Array.isArray(strategy.theses))
+      return CONTEXT_BLOCKER.STRATEGY_MISS;
+    const boundTheses = strategy.theses.map(boundPage);
+    if (boundTheses.some(page => !page)) return 'context-malformed';
+    const expectedSlugs = requiredTheses.map(thesis => thesis.slug).sort();
+    const actualSlugs = boundTheses.map(page => page.slug).sort();
+    if (JSON.stringify(actualSlugs) !== JSON.stringify(expectedSlugs))
+      return CONTEXT_BLOCKER.STRATEGY_MISS;
+    if (
+      !strategy.lookup ||
+      strategy.lookup.source !== 'index' ||
+      !Number.isFinite(strategy.lookup.ms) ||
+      strategy.lookup.ms < 0
+    )
+      return 'context-malformed';
+  }
+
   const nowMs = Date.parse(now);
   if (!isFreshTimestamp(evidence.observedAt, nowMs, maxAgeMs))
     return 'context-stale';
@@ -506,6 +593,22 @@ function normalizedEvidence(evidence) {
             slug: evidence.ledger.slug.trim(),
             id: String(evidence.ledger.id).trim(),
             revision: String(evidence.ledger.revision).trim(),
+          },
+        }
+      : {}),
+    ...(evidence.strategy
+      ? {
+          strategy: {
+            theses: evidence.strategy.theses.map(page => ({
+              slug: page.slug.trim(),
+              id: String(page.id).trim(),
+              revision: String(page.revision).trim(),
+            })),
+            matched: evidence.strategy.matched.map(id => String(id).trim()),
+            lookup: {
+              source: evidence.strategy.lookup.source.trim(),
+              ms: evidence.strategy.lookup.ms,
+            },
           },
         }
       : {}),

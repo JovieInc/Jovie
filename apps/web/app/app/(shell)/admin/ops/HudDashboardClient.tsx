@@ -25,7 +25,9 @@ import { DesignProposalReviewPanel } from '@/components/features/admin/design-la
 import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
 import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
+import { HudDrilldownSearch } from '@/components/features/admin/hud/HudDrilldownSearch';
 import { HudEnvExceptionsPanel } from '@/components/features/admin/hud/HudEnvExceptionsPanel';
+import { HudExceptionsStrip } from '@/components/features/admin/hud/HudExceptionsStrip';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import { HudGithubBudgetPanel } from '@/components/features/admin/hud/HudShipperPanels';
@@ -46,7 +48,6 @@ import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import type { FounderFunnelData } from '@/lib/admin/types';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
-import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import {
   composeHudForPresentation,
   type HudComposedSection,
@@ -662,23 +663,20 @@ export interface HudDashboardClientProps {
   readonly initialShippingData?: DailyBucket[];
   /** ISO timestamp of when shipping data was last cached. */
   readonly initialShippingCachedAt?: string;
-  /** When true and agentRuns empty, show dev fixtures on Agent OS panel. */
-  readonly useFixtureAgentRuns?: boolean;
+  /** Server-selected dev fixtures, used only when authoritative runs are empty. */
+  readonly initialFixtureAgentRuns?: readonly AgentRunArtifact[];
   /** Prefetched founder funnel for the signed-in Ops need band. */
   readonly initialFunnel?: FounderFunnelData | null;
 }
 
 function resolveAgentOsArtifacts(
   metrics: HudMetrics,
-  useFixtureAgentRuns: boolean
+  fixtureAgentRuns: readonly AgentRunArtifact[]
 ): AgentRunArtifact[] {
   if (metrics.agentRuns.length > 0) {
     return [...metrics.agentRuns];
   }
-  if (useFixtureAgentRuns) {
-    return [...AGENT_OS_ADMIN_FIXTURE_ARTIFACTS];
-  }
-  return [];
+  return [...fixtureAgentRuns];
 }
 
 function makeItemKey(item: HudMetrics['aiOps']['blockers'][number]): string {
@@ -715,7 +713,7 @@ export function HudDashboardClient({
   kioskToken = null,
   initialShippingData,
   initialShippingCachedAt,
-  useFixtureAgentRuns = false,
+  initialFixtureAgentRuns = [],
   initialFunnel = null,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
@@ -724,7 +722,7 @@ export function HudDashboardClient({
   );
   const agentOsArtifacts = resolveAgentOsArtifacts(
     metrics,
-    useFixtureAgentRuns
+    initialFixtureAgentRuns
   );
 
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
@@ -817,6 +815,12 @@ export function HudDashboardClient({
         );
       case 'factory-health':
         return <HudSystemHealthStrip metrics={metrics} />;
+      case 'exceptions':
+        return (
+          <div data-testid={section.testId}>
+            <HudExceptionsStrip metrics={metrics} />
+          </div>
+        );
       case 'shipper':
         return <OvieShippingStateCard kioskToken={kioskToken} />;
       case 'morning-walk':
@@ -1012,6 +1016,22 @@ export function HudDashboardClient({
             data-testid={section.testId}
           >
             <HudEnvExceptionsPanel />
+          </div>
+        );
+      case 'drilldowns':
+        return presentation === 'token' ? (
+          <ContentSurfaceCard surface='details' data-testid={section.testId}>
+            <div className='space-y-3 p-3'>
+              <SectionLabel>Search records</SectionLabel>
+              <p className='text-app text-secondary-token'>
+                Customer, release, event, and exception drill-downs stay on the
+                signed-in operator path.
+              </p>
+            </div>
+          </ContentSurfaceCard>
+        ) : (
+          <div data-testid={section.testId}>
+            <HudDrilldownSearch metrics={metrics} />
           </div>
         );
       default: {

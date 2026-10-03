@@ -243,6 +243,7 @@ web.tasks|web|tasks|apps/web/app/app/(shell)/tasks/page.tsx,apps/web/app/app/(sh
 web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mobile
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
+web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
@@ -256,6 +257,7 @@ web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/a
 web.admin-platform-connections|web|admin-platform-connections|apps/web/app/app/(shell)/admin/platform-connections/|desktop,mobile
 web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx|desktop,mobile
 web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
+web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-wiki|web|admin-wiki|apps/web/app/app/(shell)/admin/wiki/|desktop,mobile

@@ -621,7 +621,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
 
     # backlog
     for name in local["slots"]:
-        lines.append(rgb(FG, f"CLAIMABLE {name}  ", bold=True) + rgb(DIM, pool_hint(name, local)))
+        lines.append(rgb(FG, f"NEW ISSUES {name}  ", bold=True) + rgb(DIM, pool_hint(name, local)))
     if linear.get("ok"):
         pool = linear["pool"]
         backlog = " · ".join(f"{label} {pool.get(label, 0)}" for label in LANE_LABELS)
@@ -650,18 +650,25 @@ def pool_hint(name: str, local: dict) -> str:
         stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
         elapsed = (utcnow() - stamp).total_seconds()
         if elapsed < 0 or elapsed > 3 * REFRESH_REMOTE_S:
-            return "claimable unknown (doctor stale)"
+            return "new issues unknown (doctor stale)"
     except (KeyError, TypeError, ValueError):
-        return "claimable unknown (doctor unread)"
+        return "new issues unknown (doctor unread)"
     if admission.get("error"):
-        return "claimable unknown (" + admission["error"] + ")"
+        return "new issues unknown (" + admission["error"] + ")"
     qualified = (admission.get("poolByProvider") or {}).get(name)
     candidates = (admission.get("candidatePoolByProvider") or {}).get(name)
-    if qualified is None or candidates is None:
-        return "claimable unknown (admission unread)"
+    budget = (admission.get("newIssueBudgetByProvider") or {}).get(name)
+    eligible = (admission.get("eligiblePoolByProvider") or {}).get(name)
+    if not budget:
+        return "new issues unknown (PR budget unread)"
+    if budget.get("reason") == "pr-inventory-unavailable":
+        return f"new issues unknown (PR inventory unread) · eligible {eligible}/{candidates}"
+    if qualified is None or candidates is None or eligible is None:
+        return "new issues unknown (admission unread)"
     reasons = (admission.get("rejectedByProvider") or {}).get(name) or {}
     distribution = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
-    return f"claimable {qualified}/{candidates}" + (" · " + distribution if distribution else "")
+    capacity = f"PRs {budget['used']}/{budget['cap']} {budget['reason']}"
+    return f"new issues {qualified} · eligible {eligible}/{candidates} · {capacity}" + (" · " + distribution if distribution else "")
 
 
 def vacancy_hint(name: str, local: dict, linear: dict) -> str:

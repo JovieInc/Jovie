@@ -15,14 +15,16 @@ The harness, not the model, owns:
 |---|---|
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
-| Open-PR budget: a lane holding `slots × 2` open non-green PRs only fixes/adopts until it drains | `over_budget()` |
-| Sweep (every 30 min per lane): close duplicate PRs as superseded, close drafts with no green run and no push for 24 h, issue back to Todo | `sweep_lane_prs()` |
+| Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
+| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
 | Fresh worktree from `origin/main`, shared-store hardlink install, removal after | `run_issue()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
 | Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
+| Host-local exact-head gate reservation before adoption setup or original verification; claims are never proof | `reserve_gate()`, `claim_adoptable_pr()`, `gate_pr()` |
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
@@ -31,7 +33,7 @@ The harness, not the model, owns:
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
 | Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
 | Ready on green: a CLEAN lane draft gets `gh pr ready` plus its merge intent in one writer action | `pr_events.ready_green()` |
-| Disabled-lane drafts: closed when superseded or done, else adopted; closed and the issue returned to Todo once their fix attempts run out | `pr_events.retire_orphan()`, `return_to_pool()` |
+| Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
@@ -45,6 +47,76 @@ The harness, not the model, owns:
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
+
+New-issue admission reports three separate counts: raw Todo candidates, candidates
+passing the issue predicate, and new issues after the owning lane's PR budget.
+Worker and doctor share the same budget decision: each dated lane branch counts
+once while non-green, with a cap of effective slots × 2. Manual branches and
+disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+malformed or truncation-ambiguous inventory stays unknown and cannot admit new
+issues. Maintenance claims still run first and do not depend on that budget read.
+HUD labels this count as new issues; it is not total company demand or a claim of
+available worker capacity. Slot occupancy, account leases and PR work remain
+separate facts. Empty-demand alerts require known zero eligibility and no open
+PR maintenance; unknown evidence and backpressure reset the empty timer.
+
+Account attribution uses the existing status rows without changing account
+admission. Lease occupancy and cooldown are independent; an account can be both
+leased and in a recorded hold. The existing available flag means eligible under
+cooldown policy, not a fresh positive quota reading. An empty unleased-available
+list does not mean all quotas are exhausted. Usage-limit, auth, rate and unknown
+holds remain distinct, and stale or incomplete rows report unknown.
+
+Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
+its reservation through checkout, install, checks and terminal receipt publication;
+another contender skips that head without taking a heavy seat or charging an issue
+retry. A small gate-command process inherits the reservation and seat, retaining them
+across worker death even when command wrappers close inherited descriptors. It reuses
+the existing provider process observer to drain observed descendants on completion or
+timeout. If cleanup cannot be proven, it retains the locks and logs an operator boundary.
+As with the existing observer, a child daemonizing before its first observation cannot
+be recovered from process metadata. Lock files must not be unlinked as stale cleanup.
+
+`verified.json` holds atomic terminal gate results under `PR:SHA` keys, bound to the
+gate policy digest and sensitive-review mode. Legacy SHA strings were claim markers,
+not certification, and are ignored. Failed setup and transient timeouts remain
+retryable; legacy held records, active repairs and spent generations retain their
+existing dispositions without being converted into certification. A changed or
+unreadable remote/local head cannot publish proof; enqueue requests bind the expected
+head with `--match-head-commit`. A reused terminal result is reported as
+`gate-already-completed`, not another landing.
+
+This reservation is host-local. It does not replace the cross-host claim policy or
+JOV-5257 admission serialization. During a drain-safe release update, old workers
+still run their old code; runtime singleflight is proven only after those workers
+and their gate descendants have naturally drained. Never kill or reset their work
+to make an activation claim.
+
+## Workstreams and leverage-first admission (JOV-7514, JOV-7423, JOV-7330, JOV-5555)
+
+Every issue belongs to exactly one workstream (`workstreams.py`). An explicit
+`ws:<key>` Linear label wins; otherwise the first matching rule (labels, then title)
+in classification order; otherwise `general`. Dispatch rank, compounding
+infrastructure first:
+
+`ci` → `symphony-throughput` → `release-deploy` → `reliability` → `security-auth` →
+`ui-ia` → `native-apps` → `chat-agent` → `ovie-ops` → `profiles-marketing` →
+`library-content` → `analytics-gtm` → `docs-changelog` → `lyb` → `memory-gbrain` →
+`general` → `human-decision`.
+
+`pick_issue()` orders candidates by `admission_order()`: tier 0 is urgent work
+(effective P1, including work aged to P1) or a compounding workstream (CI, Symphony
+throughput); then aged priority; then workstream rank; then age. Urgent-first and
+anti-starvation aging are preserved; a non-urgent CI or throughput fix runs ahead of
+non-urgent product work. The Linear backlog carries the same `ws:*` labels so new
+intake and existing work follow one rule.
+
+Duplicate identity is deliberately exact: titles equal after case, punctuation and
+conventional `bug:`/`P1:` prefixes are stripped (bracketed tags such as `[web-053]`
+are identity). Only the oldest member is admissible; the others are rejected as
+`duplicate-candidate:<JOV>` in the worker and counted under `duplicate-candidate` in
+the doctor census. Near-duplicates are grouped by workstream, never auto-merged.
+Lane reads paginate the Todo pool (up to `LANE_ISSUE_PAGES` × 100).
 
 ## Event queue (JOV-6672)
 
@@ -67,18 +139,24 @@ Gaps closed after the first week (no PR may sit unowned):
   Once per stuck episode; a second removal goes to a model with the merge group's failing log.
 - Every 30 minutes the tick reconciles all open PRs in a few GraphQL pages (missed events
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
-  draft idle for 48h gets `stale` (or is closed when superseded or out of attempts, its issue
-  back to Todo), and a PR that went CLEAN or entered the queue starts a fresh episode.
+  draft idle for 48h gets `stale` when it is still eligible. CLEAN/queued observations clear
+  only synchronization bookkeeping, never consumed attempts or exhaustion labels. Terminal
+  work, explicit holds and active repairs survive stale/supersession retirement and event
+  ready/update-branch handlers. A genuine external head needing repair re-enters only after
+  the existing fenced claim writes its linked receipt, retained across later attempts.
+  An exhausted CLEAN external head without that receipt stays held; observing green is not
+  a repair attempt or new authority.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
-  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). An aged-out agent
-  draft is closed as abandoned — unless its body names a still-open dependency
-  ("blocked by #n", "pull/n"), in which case it holds as `hold:dependency` and is revalidated
-  every sweep: the note is never authoritative once the dependency lands or closes. A human's
-  branch is never touched.
+  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
+  drafts receive `repair`, or `hold:dependency` while a named dependency is open.
+  A landed dependency releases repair; it never grants authority to discard the branch.
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement. Every
+  close path re-reads the live source head, state, complete labels, fork and queue status;
+  revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
   oldest first: `advancing`, `queued`, `ready`, `hold:<reason>`, `hold:dependency`,
-  `closing`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
+  `closing`, `repair`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
   7 days that is still undecided — `hold:*` dispositions are already deliberate parks and
   stay named in `oldest_prs` — so the shipping cockpit always names the oldest open PRs
   and why they are still open.
@@ -177,6 +255,11 @@ Gem (systemd user timer) or a Mac (launchd), with a dedicated clone:
 git clone https://github.com/JovieInc/Jovie.git ~/devin-sweep/Jovie
 LANES_REPO=~/devin-sweep/Jovie scripts/lanes/install.sh
 ```
+
+Select the repository's pinned Node in the installing shell first. The installer
+puts that Node directory first in the timer PATH on both Linux and macOS.
+After changing the host's Node installation, rerun the installer so the timer
+does not retain a removed runtime directory.
 
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
@@ -281,3 +364,31 @@ Re-evaluate when observed dispatches and real workflow/check-in receipts prove
 recurrence, or native scheduling reliably supplies the cadence again. Then:
 remove unnecessary recovery calls while retaining the independent deadman.
 JOV-6909 remains commissioning until recurrence is observed after deployment.
+
+## Design gate (JOV-7541)
+
+UI and landing work does not enter a build lane until a design brief has
+finished the founder's IA-first pipeline (steps 1–9 of
+`docs/design/design-brief-template.md`). Step 2 may cite only certified
+capability ids from `scripts/lanes/certified-capabilities.gen.json`, a
+checked-in projection of `apps/web/data/product-truth/registry.ts`:
+publication `public`, `marketing.proofAuthorized` true, maturity not
+`proposed`, access not `unavailable`.
+
+`design_gate.py` is pure stdlib, no I/O at import. An issue is gated on
+`ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or when title or
+description names a `GATED_PATH_PREFIXES` path or clearly targets a
+homepage, landing, or marketing page. `worker()` calls
+`design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
+gated issue with an incomplete brief is not claimed, and the runner writes
+`needs-design-brief` plus the matching Linear label at most once. The label
+routes a design pass — it does not itself block — and the next claim admits
+the issue once steps 1–9 are complete.
+
+`doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
+`needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
+`rejectedByProvider["needs-design-brief"]`.
+
+CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
+paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
+is truthy, and unreadable briefs stay warnings even then.

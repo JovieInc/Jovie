@@ -68,8 +68,8 @@ const CLS_ROUTES: readonly ClsRoute[] = [
   },
   {
     id: 'profile-notifications',
-    path: '/testartist?mode=subscribe',
-    expectedArtistName: 'Test Artist',
+    path: '/dualipa/notifications',
+    expectedArtistName: 'Dua Lipa',
     targetSelector: '[data-testid="profile-compact-surface"]',
     budget: 0.05,
     readySelectors: ['[data-testid="profile-mobile-notifications-flow"]'],

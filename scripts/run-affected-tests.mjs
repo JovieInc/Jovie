@@ -4,7 +4,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
+import {
+  DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+} from './ci-fast-lanes.mjs';
+import {
+  BLOG_CERTIFICATION_PROOFS,
+  classifyBlogContentDiff,
+  isBlogContentCandidatePath,
+} from './lib/blog-content-ci.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -332,6 +340,7 @@ const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
 const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-eval.test.mjs',
@@ -1054,17 +1063,112 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 
-export function buildAffectedTestPlan(
+export function classifyBlogContentForAffectedTests(base, head, options) {
+  try {
+    return classifyBlogContentDiff(base, head, options);
+  } catch {
+    console.warn(
+      '[affected-tests] Blog diff classification failed; requiring the full suite.'
+    );
+    return undefined;
+  }
+}
+
+const LANE_PYTHON_COVERAGE_INPUTS = new Set(
+  [
+    'lane_runner',
+    'pr_events',
+    'reason_lane',
+    'doctor',
+    'disk_guard',
+    'hyperagent_lane',
+    'execution_attempt',
+  ].flatMap(name => [
+    `scripts/lanes/${name}.py`,
+    `scripts/tests/test_${name}.py`,
+  ])
+);
+
+export function buildAffectedTestPlan(changedFiles, options) {
+  const files = unique(changedFiles.filter(Boolean));
+  const plan = planAffectedTests(files, options);
+  const lanePythonCoverage = files.some(file =>
+    LANE_PYTHON_COVERAGE_INPUTS.has(file)
+  );
+  const unknownPythonPeer =
+    lanePythonCoverage &&
+    files.some(
+      file => file.endsWith('.py') && !LANE_PYTHON_COVERAGE_INPUTS.has(file)
+    );
+  // Global/full early returns need the same command fields as focused plans.
+  // Retain lane coverage even when an unrelated input requires the full suite.
+  return {
+    selectedTests: [],
+    rootVitestTests: [],
+    pythonTests: [],
+    pythonUnittestTests: [],
+    scriptVitestTests: [],
+    scriptVitestCoverageArgs: [],
+    nodeTests: [],
+    nodeTestArgs: [],
+    retouchPromptCoverage: false,
+    ...plan,
+    ...(lanePythonCoverage
+      ? {
+          lanePythonCoverage: true,
+          mode: unknownPythonPeer
+            ? 'full'
+            : plan.mode === 'none'
+              ? 'selected'
+              : plan.mode,
+          ...(unknownPythonPeer
+            ? {
+                fallbackReason: 'unmapped Python peer mixed with lane coverage',
+              }
+            : {}),
+        }
+      : {}),
+  };
+}
+
+function planAffectedTests(
   changedFiles,
   {
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
+    blogContentReceipt = undefined,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (files.some(isBlogContentCandidatePath)) {
+    if (
+      !blogContentReceipt?.contentOnly ||
+      files.length !== blogContentReceipt.changedPaths?.length ||
+      files.some(file => !blogContentReceipt.changedPaths.includes(file))
+    ) {
+      return fullSuitePlan(
+        'blog content diff was mixed, unsafe, or lacked status-aware qualification'
+      );
+    }
+    if (!BLOG_CERTIFICATION_PROOFS.every(isFileAvailable)) {
+      return fullSuitePlan('blog certification proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [...BLOG_CERTIFICATION_PROOFS],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [],
+      nodeTests: [],
+      blogCandidateBuild: true,
+    };
   }
   const isBoundedCertificationNormalizationChange = files.includes(
     CERTIFICATION_NORMALIZATION_SOURCE
@@ -2327,7 +2431,7 @@ async function runCommands(commands, concurrency = 1, options = {}) {
   }
 
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  process.exit(failureStatus);
+  return failureStatus;
 }
 
 export function buildCompanyRegistryTestCommand() {
@@ -2391,6 +2495,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/github-open-prs-rest.mjs',
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
+    '--coverage.include=lib/product-lane-classifier.mjs',
     '--coverage.thresholds.perFile=true',
     '--coverage.thresholds.lines=85',
     '--coverage.thresholds.branches=75',
@@ -2431,6 +2536,14 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (plan.lanePythonCoverage) {
+    // Qualification must fail when the CI-pinned Python dependencies are absent,
+    // even on a local host; the structural wrapper's local skip is not proof.
+    commands.push([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+  }
   if (plan.selectedTests.includes(SUMMER_PIN_GUARD_WEB_TEST)) {
     commands.push(SUMMER_PIN_GUARD_NODE_COMMAND);
   }
@@ -2555,6 +2668,25 @@ export function buildSelectedTestCommands(
         '--passWithNoTests',
         '--maxWorkers',
         maxWorkers,
+      ],
+    ]);
+  }
+  if (plan.blogCandidateBuild) {
+    commands.push([
+      'env',
+      [
+        'NEXT_PUBLIC_APP_URL=http://localhost:3100',
+        'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
+        'NEXT_PUBLIC_CLERK_MOCK=1',
+        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_E2E_MODE=1',
+        'NEXT_IGNORE_ESLINT=1',
+        'NEXT_IGNORE_TYPECHECK=1',
+        'NEXT_PRIVATE_SKIP_SIZE_CHECK=true',
+        'pnpm',
+        'turbo',
+        'build',
+        '--filter=@jovie/web',
       ],
     ]);
   }
@@ -2720,9 +2852,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
-  const plan = buildAffectedTestPlan(
-    explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base)
+  const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
+  const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
+    existsSync(resolve(REPO_ROOT, file))
   );
+  const blogContentReceipt =
+    !explicitFiles && files.some(isBlogContentCandidatePath)
+      ? classifyBlogContentForAffectedTests(base, 'HEAD', {
+          prerequisitesAvailable,
+        })
+      : undefined;
+  const plan = buildAffectedTestPlan(files, { blogContentReceipt });
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);
@@ -2735,11 +2875,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     // 2k-file web suite to trigger host memory pressure near teardown. Keep
     // deterministic, bounded-memory shards, but schedule a small bounded set
     // concurrently so a complete fail-closed suite does not serialize all 8.
-    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency, {
-      timeoutMs: shardTimeoutMs,
-      progressIntervalMs,
-      labelPrefix: 'shard',
-    });
+    const fullStatus = await runCommands(
+      buildFullSuiteCommands(maxWorkers),
+      shardConcurrency,
+      {
+        timeoutMs: shardTimeoutMs,
+        progressIntervalMs,
+        labelPrefix: 'shard',
+      }
+    );
+    if (fullStatus !== 0) process.exit(fullStatus);
   }
 
   const coverageBase = plan.retouchPromptCoverage
@@ -2754,13 +2899,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         encoding: 'utf8',
       }).trim()
     : undefined;
-  await runCommands(
-    buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
-    1,
-    {
-      timeoutMs: shardTimeoutMs,
-      progressIntervalMs,
-      labelPrefix: 'selected',
-    }
+  process.exit(
+    await runCommands(
+      buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
+      1,
+      {
+        timeoutMs: shardTimeoutMs,
+        progressIntervalMs,
+        labelPrefix: 'selected',
+      }
+    )
   );
 }

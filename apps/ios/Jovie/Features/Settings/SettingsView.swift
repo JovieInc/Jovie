@@ -1,14 +1,66 @@
 import SwiftUI
 
+enum ReleaseChannel: String, Equatable {
+  case appStore
+  case testFlight
+  case development
+
+  var displayName: String {
+    switch self {
+    case .appStore: return "App Store"
+    case .testFlight: return "TestFlight"
+    case .development: return "Development"
+    }
+  }
+}
+
 struct AppBuildInfo: Equatable {
   let version: String
   let build: String
+  let channel: ReleaseChannel
+  let commit: String?
+
+  var shortCommit: String? {
+    guard let commit, commit.count > 7 else { return commit }
+    return String(commit.prefix(7))
+  }
 
   static func current(bundle: Bundle = .main) -> AppBuildInfo {
     AppBuildInfo(
       version: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0",
-      build: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+      build: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1",
+      channel: channel(bundle: bundle),
+      commit: gitCommit(bundle: bundle)
     )
+  }
+
+  // Apple controls the install source: App Store installs carry a "receipt",
+  // TestFlight installs carry a "sandboxReceipt". Nothing in-app can convert
+  // one channel into the other; this only reports provenance.
+  static func channel(bundle: Bundle = .main) -> ReleaseChannel {
+    #if DEBUG
+      return .development
+    #else
+      return channel(receiptName: bundle.appStoreReceiptURL?.lastPathComponent)
+    #endif
+  }
+
+  static func channel(receiptName: String?) -> ReleaseChannel {
+    switch receiptName {
+    case "receipt": return .appStore
+    case "sandboxReceipt": return .testFlight
+    default: return .development
+    }
+  }
+
+  static func gitCommit(bundle: Bundle = .main) -> String? {
+    guard
+      let url = bundle.url(forResource: "Configuration.local", withExtension: "plist"),
+      let values = NSDictionary(contentsOf: url) as? [String: Any],
+      let commit = (values["GitCommit"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !commit.isEmpty
+    else { return nil }
+    return commit
   }
 }
 
@@ -24,6 +76,7 @@ enum SettingsExternalURL {
   static let support = URL(string: "https://jov.ie/support")
   static let privacy = URL(string: "https://jov.ie/legal/privacy")
   static let terms = URL(string: "https://jov.ie/legal/terms")
+  static let testflight = URL(string: "https://testflight.apple.com")
 }
 
 struct SettingsView: View {
@@ -162,6 +215,27 @@ struct SettingsView: View {
     Section("App") {
       LabeledContent("Version", value: buildInfo.version)
       LabeledContent("Build", value: buildInfo.build)
+      LabeledContent("Channel", value: buildInfo.channel.displayName)
+        .accessibilityIdentifier("settings-release-channel")
+      if let shortCommit = buildInfo.shortCommit {
+        LabeledContent("Commit", value: shortCommit)
+          .accessibilityIdentifier("settings-build-commit")
+      }
+
+      // Admin-only dogfood rail entry. The link only opens Apple's own
+      // TestFlight enrollment/install surface; channel switching stays
+      // Apple-controlled (JOV-7534).
+      if showsWorkspaceSwitch, buildInfo.channel != .testFlight,
+        let testflight = SettingsExternalURL.testflight
+      {
+        SettingsLinkRow(
+          title: "Open TestFlight",
+          systemImage: "testtube.2",
+          destination: testflight
+        )
+        .jovieSurface(radius: JovieRadius.medium, interactive: true)
+        .accessibilityIdentifier("settings-open-testflight")
+      }
     }
   }
 

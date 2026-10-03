@@ -8,7 +8,15 @@
  *  - submitMessage is NOT called
  *  - notifyJankSend is NOT called (no jank instrumentation for a non-send)
  */
+
+import { act, screen } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  ChatEntityPanelProvider,
+  useChatEntityPanel,
+} from '@/app/app/(shell)/chat/ChatEntityPanelContext';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
@@ -54,6 +62,7 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 vi.mock('@/components/jovie/hooks', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/components/jovie/hooks')>();
+  const { useRef, useState } = await import('react');
   return {
     ...actual,
     useSuggestedProfiles: () => ({
@@ -67,8 +76,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       reject: vi.fn(),
       isActioning: false,
     }),
-    useJovieChat: () => ({
-      input: '',
+    useJovieChatController: () => ({
+      draft: useState(() => createComposerDraft(''))[0],
       setInput: mockFns.setInput,
       messages: [],
       chatError: null,
@@ -79,7 +88,7 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       conversationTitle: null,
       status: 'idle',
       activeConversationId: null,
-      inputRef: { current: null },
+      inputRef: useRef<HTMLTextAreaElement>(null),
       handleSubmit: vi.fn(),
       handleRetry: vi.fn(),
       handleSuggestedPrompt: vi.fn(),
@@ -143,7 +152,13 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
 });
 
 vi.mock('@/components/jovie/components', () => ({
-  ChatInput: () => <div data-testid='chat-input' />,
+  ChatInput: ({ ref }: { ref?: React.Ref<HTMLTextAreaElement> }) => (
+    <textarea
+      ref={ref}
+      aria-label='Audio review draft'
+      data-testid='chat-input'
+    />
+  ),
   ChatMessage: () => <div data-testid='chat-message' />,
   ChatConversationComposerSkeleton: () => (
     <div data-testid='chat-conversation-composer-skeleton' />
@@ -192,6 +207,16 @@ afterAll(() => {
       .scrollIntoView;
   }
 });
+
+function AudioPanelProbe({
+  capture,
+}: {
+  capture: (panel: ReturnType<typeof useChatEntityPanel>) => void;
+}) {
+  const panel = useChatEntityPanel();
+  useLayoutEffect(() => capture(panel), [capture, panel]);
+  return null;
+}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -266,5 +291,82 @@ describe('JovieChat audio upload — review-before-send (GH-11950)', () => {
     });
 
     expect(mockFns.notifyJankSend).not.toHaveBeenCalled();
+  });
+
+  it('keeps upload callbacks stable across panel updates but observes current context dismissal', () => {
+    let panel: ReturnType<typeof useChatEntityPanel> | undefined;
+    const view = renderWithQueryClient(
+      <ChatEntityPanelProvider>
+        <AudioPanelProbe
+          capture={current => {
+            panel = current;
+          }}
+        />
+        <JovieChat profileId='profile-1' />
+      </ChatEntityPanelProvider>
+    );
+    expect(panel).toBeDefined();
+    const initialCallback = capturedCallbacks.onAudioUploaded;
+    expect(initialCallback).toBeTypeOf('function');
+    act(() =>
+      panel?.upsertContext({
+        kind: 'contact',
+        id: 'unrelated',
+        source: 'tool',
+        focusKey: 'unrelated-context',
+      })
+    );
+    expect(capturedCallbacks.onAudioUploaded).toBe(initialCallback);
+    act(() =>
+      panel?.open({
+        kind: 'contact',
+        id: 'manual',
+        source: 'manual',
+        focusKey: 'manual-panel',
+      })
+    );
+    expect(capturedCallbacks.onAudioUploaded).toBe(initialCallback);
+
+    const audioResult = {
+      fileName: 'review.mp3',
+      previewUrl: 'blob:http://localhost/review',
+      releaseId: 'rel-review',
+      releaseTitle: 'Review',
+      inference: {
+        kind: 'attach-to-existing',
+        confidence: 'high',
+        suggestedTitle: 'Review',
+        releaseId: 'rel-review',
+        releaseTitle: 'Review',
+        matchScore: 1,
+      },
+      prompt: 'Review this recording',
+    } satisfies Parameters<
+      NonNullable<typeof capturedCallbacks.onAudioUploaded>
+    >[0];
+    act(() => capturedCallbacks.onAudioUploaded?.(audioResult));
+    expect(panel?.target?.id).toBe('rel-review');
+    expect(panel?.contextTargets).toContainEqual(
+      expect.objectContaining({ focusKey: 'audio-upload:rel-review' })
+    );
+    expect(mockFns.setInput).toHaveBeenLastCalledWith('Review this recording');
+    expect(
+      screen.getByRole('textbox', { name: 'Audio review draft' })
+    ).toHaveFocus();
+    expect(capturedCallbacks.onAudioUploaded).toBe(initialCallback);
+
+    act(() => panel?.dismissContext('audio-upload:rel-review'));
+    expect(capturedCallbacks.onAudioUploaded).not.toBe(initialCallback);
+    act(() => capturedCallbacks.onAudioUploaded?.(audioResult));
+    expect(panel?.contextTargets).not.toContainEqual(
+      expect.objectContaining({ focusKey: 'audio-upload:rel-review' })
+    );
+    expect(mockFns.setInput).toHaveBeenLastCalledWith('Review this recording');
+    expect(
+      screen.getByRole('textbox', { name: 'Audio review draft' })
+    ).toHaveFocus();
+    expect(mockFns.submitMessage).not.toHaveBeenCalled();
+    expect(mockFns.notifyJankSend).not.toHaveBeenCalled();
+    view.unmount();
   });
 });
