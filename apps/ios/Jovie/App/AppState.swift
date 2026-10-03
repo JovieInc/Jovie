@@ -108,6 +108,12 @@ final class AppState {
     case completed(NativeSessionOwnership)
   }
   private var reconciliation: Reconciliation?
+  var reconciliationTask: Task<Void, Never>? {
+    switch reconciliation {
+    case let .profile(_, task), let .terminal(_, _, _, task): task
+    case .completed(_), nil: nil
+    }
+  }
   private struct AcceptedPresentation {
     let owner: NativeSessionOwnership
     let userID: String

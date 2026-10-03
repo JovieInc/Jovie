@@ -2,6 +2,40 @@ import Foundation
 import Testing
 @testable import Jovie
 
+extension MobileAuthFinalizationTests {
+  @Test(arguments: ["nil-to-B", "A-to-B", "same-bytes", "external-change", "consume", "clear"])
+  @MainActor func pendingSnapshotsFenceReplacementAndConsumeOnlyOnce(change: String) throws {
+    let suite = "MobileAuthPendingSnapshotTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let store = MobileAuthPendingStore(defaults: defaults)
+    if change != "nil-to-B" { store.save(codeVerifier: "verifier-A") }
+    let original = store.snapshot()
+    switch change {
+    case "nil-to-B", "A-to-B": store.save(codeVerifier: "verifier-B")
+    case "same-bytes": store.save(codeVerifier: "verifier-A")
+    case "external-change":
+      defaults.set("verifier-B", forKey: "ie.jov.Jovie.auth.pendingCodeVerifier")
+    case "consume":
+      #expect(store.consumeCodeVerifier(matching: original) == "verifier-A")
+      #expect(store.consumeCodeVerifier(matching: original) == nil)
+      #expect(!store.clear(matching: original) && !store.hasCodeVerifier())
+      return
+    default:
+      #expect(store.clear(matching: original))
+      #expect(!store.clear(matching: original))
+      #expect(store.consumeCodeVerifier(matching: original) == nil && !store.hasCodeVerifier())
+      return
+    }
+    let replacement = store.snapshot()
+    #expect(!store.isCurrent(original))
+    #expect(store.consumeCodeVerifier(matching: original) == nil)
+    #expect(!store.clear(matching: original))
+    #expect(store.isCurrent(replacement) && store.hasCodeVerifier())
+    #expect(store.consumeCodeVerifier(matching: replacement) == (change == "same-bytes" ? "verifier-A" : "verifier-B"))
+  }
+}
+
 @Suite(.serialized)
 struct MobileAuthFinalizationTests {
   @Test func sessionTokenPlanUsesBetterAuthSession() {

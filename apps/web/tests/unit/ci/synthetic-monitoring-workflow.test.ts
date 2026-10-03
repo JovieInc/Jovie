@@ -1,5 +1,13 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { GATEWAY_ALLOWLIST_NAME } from '@/lib/constants/ai-models';
@@ -40,6 +48,72 @@ function getStepBlock(workflow: string, stepName: string): string {
 }
 
 describe('synthetic monitoring workflow parser', () => {
+  it.each([
+    [workflowPath, 0],
+    [workflowPath, 1],
+    [agentTickWorkflowPath, 0],
+    [agentTickWorkflowPath, 1],
+  ])(
+    'keeps canary exit and token isolation for %s with probe exit %i',
+    (path, probeExit) => {
+      const step = getStepBlock(
+        readFileSync(path as string, 'utf8'),
+        'Run Production Waitlist Canary'
+      );
+      const command = step
+        .split('        run: |\n')[1]!
+        .split('\n        continue-on-error:')[0]!
+        .split('\n')
+        .map(line => line.replace(/^ {10}/, ''))
+        .join('\n');
+      const directory = mkdtempSync(join(tmpdir(), 'jovie-waitlist-canary-'));
+      try {
+        const node = join(directory, 'node');
+        writeFileSync(
+          node,
+          '#!/bin/sh\n[ -z "${DOPPLER_TOKEN:-}" ] || exit 91\nprintf "guard-command:%s\\n" "$*"\nexit 17\n'
+        );
+        chmodSync(node, 0o755);
+        const result = spawnSync(
+          'bash',
+          [
+            '-e',
+            '-c',
+            `
+        doppler() {
+          if [[ "\${@: -1}" == env ]]; then return "$FIXTURE_PROBE_EXIT"; fi
+          while [[ "$1" != -- ]]; do shift; done
+          shift
+          "$@"
+        }
+        ${command}
+      `,
+          ],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: `${directory}:${process.env.PATH}`,
+              DOPPLER_TOKEN: 'synthetic-canary-token',
+              FIXTURE_PROBE_EXIT: String(probeExit),
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(17);
+        expect(result.stdout.match(/guard-command:/g)).toHaveLength(1);
+        expect(result.stdout).toContain(
+          'guard-playwright-artifacts.mjs --run -- pnpm'
+        );
+        expect(result.stdout).toContain(
+          'tests/e2e/synthetic-production-waitlist.spec.ts'
+        );
+        expect(result.stdout).not.toContain('synthetic-canary-token');
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('uses the shared parser module instead of inline skip-as-failure logic', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const parseStep = getStepBlock(workflow, 'Parse test results');

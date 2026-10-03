@@ -194,7 +194,8 @@ function buildArtistBrief(
 ): MerchArtistBrief {
   const name = artistName(profile);
   const genres = profile.genres?.filter(Boolean) ?? [];
-  const genreLine = genres.length > 0 ? genres.join(', ') : 'independent music';
+  const genreLine =
+    genres.length > 0 ? genres.join(', ') : 'independent creative work';
   const locationLine = profile.location ? ` from ${profile.location}` : '';
 
   return {
@@ -219,9 +220,9 @@ function buildArtistBrief(
     ],
     campaign_context: `${releaseContext} Artist request: ${prompt}`,
     best_merch_hypothesis:
-      'A black premium tee with deterministic typography, real artist naming, and no fake claims is the safest first SKU.',
+      'A black premium tee with deterministic typography, real creator naming, and no fake claims is the safest first SKU.',
     commercial_angle:
-      'Make one item that works as both artist merch and a wearable graphic object.',
+      'Make one item that works as both creator merch and a wearable graphic object.',
     risk_level:
       profile.spotifyPopularity && profile.spotifyPopularity > 45
         ? 'medium'
@@ -269,8 +270,8 @@ function buildOptionSpecs(
     {
       lane: 'band_tour_uniform',
       designName: `${name} Signal ${productSuffix}`,
-      concept: `A real-show uniform built around ${name} with heavyweight front typography and no fake dates.`,
-      whyItFits: `It gives ${name} a clear merch-table object without inventing tour claims.`,
+      concept: `A signature uniform built around ${name} with heavyweight front typography and no invented claims.`,
+      whyItFits: `It gives ${name} a clear identity object for fans without inventing event claims.`,
       typographyStyle: 'stacked venue typography',
       density: 'maximal',
       motifs: [genre, city, 'signal grid'],
@@ -278,7 +279,7 @@ function buildOptionSpecs(
     {
       lane: 'fashion_graphic_item',
       designName: `${name} Object ${productSuffix}`,
-      concept: `A restrained fashion graphic item that reads as a premium ${productLabel} first and artist merch second.`,
+      concept: `A restrained fashion graphic item that reads as a premium ${productLabel} first and creator merch second.`,
       whyItFits:
         'It is wearable for fans who want taste and context without a loud logo.',
       typographyStyle: 'quiet capsule typography',
@@ -289,9 +290,9 @@ function buildOptionSpecs(
       lane: 'artist_world_artifact',
       designName: `${name} Archive ${productSuffix}`,
       concept:
-        'A collectible artifact from the artist world, using coded language and a structured print layout.',
+        'A collectible artifact from the creator world, using coded language and a structured print layout.',
       whyItFits:
-        'It gives top fans something specific enough to feel owned by the artist universe.',
+        'It gives top fans something specific enough to feel owned by the creator universe.',
       typographyStyle: 'archive label typography',
       density: 'medium',
       motifs: [genre, 'archive label', city],
