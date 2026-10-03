@@ -82,6 +82,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 
 import { db } from '@/lib/db';
 import {
+  getNotificationPreferences,
   markNotificationDismissed,
   mergePreferences,
   updateNotificationPreferences,
@@ -273,14 +274,26 @@ describe('Notification Preferences', () => {
       expect(defaults.channels.push).toBe(false);
     });
 
-    it('should have in_app enabled by default', () => {
-      const defaults: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: true },
-        marketingEmails: true,
-        dismissedNotificationIds: [],
-      };
+    it('leaves in-app off when no channel preferences are stored', async () => {
+      dbMocks.selectLimit.mockResolvedValueOnce([
+        {
+          creatorProfileId: 'profile-123',
+          email: 'artist@example.com',
+          marketingOptOut: false,
+          settings: {},
+        },
+      ]);
 
-      expect(defaults.channels.in_app).toBe(true);
+      const result = await getNotificationPreferences({
+        creatorProfileId: 'profile-123',
+      });
+
+      expect(result.channels).toEqual({
+        email: true,
+        sms: true,
+        push: false,
+        in_app: false,
+      });
     });
   });
 

@@ -470,6 +470,11 @@ export const sendNotification = async (
       continue;
     }
 
+    if (channel === 'in_app') {
+      results.push(buildSkippedResult(channel, 'Channel not implemented yet'));
+      continue;
+    }
+
     const isChannelEnabled = preferences.channels[channel] ?? false;
 
     if (!isChannelEnabled) {

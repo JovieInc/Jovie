@@ -29,7 +29,8 @@ const DEFAULT_CHANNELS: Record<NotificationDeliveryChannel, boolean> = {
   email: true,
   sms: true,
   push: false,
-  in_app: true,
+  // No settings control delivers in-app yet. Leave it off until a transport exists.
+  in_app: false,
 };
 
 const EMPTY_PREFERENCES: NotificationPreferences = {

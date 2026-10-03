@@ -326,6 +326,22 @@ describe('Notification Service', () => {
       expect(result.results).toHaveLength(1);
     });
 
+    it('skips in-app delivery even when preferences enable it', async () => {
+      const result = await sendNotification(
+        { ...baseMessage, channels: ['in_app'] },
+        baseTarget
+      );
+
+      expect(result.delivered).toEqual([]);
+      expect(result.skipped).toEqual([
+        {
+          channel: 'in_app',
+          status: 'skipped',
+          detail: 'Channel not implemented yet',
+        },
+      ]);
+    });
+
     it('should deliver push through APNs', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
         channels: { email: true, sms: true, push: true, in_app: true },
