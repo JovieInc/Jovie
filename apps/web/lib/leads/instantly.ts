@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { isInstantlyOutboundEnabled } from './outbound-gates';
 import { pipelineError, pipelineLog } from './pipeline-logger';
 
 const INSTANTLY_API_BASE = 'https://api.instantly.ai/api/v2';
@@ -73,6 +74,10 @@ async function attemptLeadPush(
 export async function pushLeadToInstantly(
   params: PushLeadParams
 ): Promise<string> {
+  if (!isInstantlyOutboundEnabled()) {
+    throw new Error('Instantly outbound is disabled');
+  }
+
   const apiKey = process.env.INSTANTLY_API_KEY;
   const campaignId = process.env.INSTANTLY_CAMPAIGN_ID;
 

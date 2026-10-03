@@ -731,6 +731,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
   },
+  IN_HOUSE_RESOLVER: {
+    nonMarketing:
+      'JOV-7323 cross-DSP resolver cutover; MusicFetch stays a dormant fallback',
+  },
   AUTH_OFFER_SUMMARY: {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',

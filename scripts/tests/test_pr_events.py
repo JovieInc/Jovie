@@ -402,6 +402,26 @@ class RelayTest(unittest.TestCase):
         ]
         self.assertEqual(events.backlog_targets(prs, {"claude"}), [(1, "green"), (2, "orphan")])
 
+    def test_main_ci_failure_opens_one_intake_issue_without_a_new_secret(self):
+        run = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
+               "head_sha": "abc", "pull_requests": [], "html_url": "https://example.test/run/1",
+               "updated_at": "2026-10-02T00:00:00Z"}
+        payload = {"workflow_run": run}
+        event = events.remediation.non_pr_event("workflow_run", payload)
+        shell = Shell({("gh", "issue", "list"): [],
+                       ("gh", "issue", "create"): "https://github.com/JovieInc/Jovie/issues/4242\n"})
+        added = events.relay("workflow_run", payload, shell, set())
+        self.assertEqual(added, [(4242, "symphony-remediation")])
+        self.assertIn(event["fingerprint"], " ".join(shell.made("gh", "issue", "create")[0]))
+        again = Shell({("gh", "issue", "list"): [{
+            "number": 4242, "body": events.remediation.intake_body(event),
+            "updatedAt": "2026-10-02T00:00:00Z"}]})
+        self.assertEqual(events.relay("workflow_run", payload, again, set()), [])
+        self.assertEqual(again.made("gh", "issue", "create"), [])
+        sentry = events.remediation.event_from_sentry({"issue_id": "S1", "message": "boom", "url": "https://s"})
+        self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
+        self.assertIsNone(events.remediation.event_from_sentry({}))
+
     def test_push_event_runs_the_conflict_read(self):
         shell = Shell({("gh", "pr", "list"): []})
         self.assertEqual(events.relay("push", {}, shell, set()), [])
@@ -887,9 +907,9 @@ class GapTest(unittest.TestCase):
     def hold_ctx(self, events_list, notes=(), committed="2033-05-18T00:00:00Z", oid="h"):
         """A canned hold_context GraphQL reply: labeled events, comments, last commit."""
         return {"data": {"repository": {"pullRequest": {
-            "timelineItems": {"nodes": [{"createdAt": at, "label": {"name": label},
+            "timelineItems": {"pageInfo": {"hasPreviousPage": False}, "nodes": [{"createdAt": at, "label": {"name": label},
                                          "actor": {"login": actor}} for at, label, actor in events_list]},
-            "comments": {"nodes": [{"createdAt": at, "author": {"login": who}, "body": body}
+            "comments": {"pageInfo": {"hasPreviousPage": False}, "nodes": [{"createdAt": at, "author": {"login": who}, "body": body}
                                    for at, who, body in notes]},
             "commits": {"nodes": [{"commit": {"oid": oid, "committedDate": committed}}]}}}}}
 
@@ -934,6 +954,24 @@ class GapTest(unittest.TestCase):
         row = events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
                                 Shell({("gh", "api", "graphql"): same_head}))
         self.assertFalse(row["auto"], "the head never moved past the hold")
+
+    def test_founder_note_before_a_later_bot_hold_remains_authoritative(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ctx = self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")],
+                            notes=[("2033-05-10T00:00:00Z", "itstimwhite",
+                                    "On hold: scanners are subscription-only; no AI Gateway key in scanner paths.")])
+        self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                          Shell({("gh", "api", "graphql"): ctx})))
+
+    def test_truncated_or_unproven_hold_history_never_authorizes_unhold_advice(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        for connection in ("timelineItems", "comments"):
+            for page_info in ({"hasPreviousPage": True}, {}, None):
+                with self.subTest(connection=connection, page_info=page_info):
+                    ctx = self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")])
+                    ctx["data"]["repository"]["pullRequest"][connection]["pageInfo"] = page_info
+                    self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                                      Shell({("gh", "api", "graphql"): ctx})))
 
     def test_reconcile_alerts_once_per_stale_hold_episode(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
@@ -1036,12 +1074,18 @@ class RunnerHookTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
                 (host.state / "fix-attempts.json").write_text(json.dumps(
-                    {"7": {"sha": "h0", "count": 2, "pushed": True}}))
+                    {"7": {"sha": "h1", "count": 2, "pushed": True, "escalations": [
+                        {"kind": "deterministic", "rung": "update-branch", "head": "h1", "at": 1},
+                        {"kind": "model", "rung": "escalate", "lane": "devin", "head": "h1", "at": 2},
+                        {"kind": "model", "rung": "top-rung", "lane": "codex", "head": "h1", "at": 3, "topRung": True},
+                    ]}}))
+                os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
                 runner.escalate_exhausted(host, [stuck], linear)
                 held = json.loads((host.state / "held.json").read_text())["7"]
                 runner.escalate_exhausted(host, [stuck], linear)
         finally:
             runner.sh, runner.load_providers = saved
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertFalse(any(call[:3] == ["gh", "pr", "close"] for call in calls),
                          "retry exhaustion is evidence of a held generation, not redundant work")
         self.assertEqual(moves, [("iss", "Backlog")])
@@ -1063,12 +1107,14 @@ class RunnerHookTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
                 runner.record_held(host, 7, "h1", ["diff-too-large:2000"])
+                os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
                 runner.escalate_exhausted(host, [stuck], linear)
                 runner.escalate_exhausted(host, [stuck], linear)  # intake once, not every pass
                 held = json.loads((host.state / "held.json").read_text())["7"]
                 attempts = json.loads((host.state / "fix-attempts.json").read_text())["7"]
         finally:
             runner.sh, runner.load_providers, events.return_to_pool = saved
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertEqual(triaged, [], "an unfixable hold gets a terminal disposition, not Triage inventory")
         self.assertEqual((held["reason"], held["sha"]), ("diff-too-large", "h1"),
                          "a zero-attempt hold keeps its real reason instead of fix-exhausted")
@@ -1222,7 +1268,13 @@ class TerminalPreservationTest(unittest.TestCase):
                 with patch.object(events,'reconcile',return_value=None), patch.object(events,'queued_prs',return_value=[target]):
                     outcome = events.tick(self.host,fake_lane(shell),lambda: self.fail('must not load Linear'),NOW)
                 self.assertTrue(outcome[5].startswith('held:'))
-                self.assertEqual(shell.calls, [], 'no ready, merge, close, update-branch or label consumption')
+                # The tick reads open symphony-remediation issues. That read is not
+                # ready, merge, close, update-branch, or label consumption.
+                self.assertEqual(shell.calls, [[
+                    "gh", "issue", "list", "--repo", "JovieInc/Jovie", "--state", "open",
+                    "--label", "symphony-remediation", "--limit", "30",
+                    "--json", "number,title,body,updatedAt",
+                ]])
 
     def test_direct_helpers_cannot_bypass_missing_history_exhaustion(self):
         target = pr(draft=True,merge='CLEAN',labels=['lane-fix-exhausted'])

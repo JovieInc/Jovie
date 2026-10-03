@@ -12,12 +12,6 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    releaseId: 'rel-123',
-    trackId: 'track-456',
-    username: DEMO_ARTIST.handle,
-    slug: 'my-release',
-    hasSpotify: true,
-    hasAppleMusic: true,
     releaseDate: new Date(Date.now() + 7 * 86_400_000),
     artistData: DEMO_ARTIST,
   },
