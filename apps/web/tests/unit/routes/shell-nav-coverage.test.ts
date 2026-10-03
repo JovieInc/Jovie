@@ -56,6 +56,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/ov/presence': 'Internal admin workspace pending Ovie IA placement',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
+  [APP_ROUTES.ADMIN_VISIBILITY_AUDIT]:
+    'Internal visibility-audit sample retained for direct admin access outside founder navigation',
   '/app/ov/system':
     'Internal system diagnostics retained for direct admin access outside founder navigation',
   '/app/ov/agent-runs/[id]':
