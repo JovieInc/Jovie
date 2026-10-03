@@ -466,5 +466,5 @@ export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/llms.txt':
     '9feafc8a8ac82bdcb4d6176c0f7ec3bfffee3156c2985331c4ffa42286dfba87',
   '/llms-full.txt':
-    'aaceaecf39bdc6d371ee791d81ff2aa1a533ebfb13ceb21be1eb5b3a320ee778',
+    'c8d6652e5d51b947f76ba1ed259c7c15403e8bf31fe85d186529110a7fe33bad',
 } as const;

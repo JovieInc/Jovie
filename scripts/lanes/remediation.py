@@ -366,6 +366,240 @@ def classify_event(event: dict) -> dict:
     return blocker("fixable-by-model", source or "event", [excerpt[:240] or "remediation event"], "route")
 
 
+def _indexed(providers: dict) -> list[tuple[int, int, str, dict]]:
+    rows = []
+    for index, (name, spec) in enumerate(providers.items()):
+        if not isinstance(spec, dict):
+            continue
+        tier = spec.get("tier", index)
+        try:
+            tier = int(tier)
+        except (TypeError, ValueError):
+            tier = index
+        rows.append((tier, index, name, spec))
+    rows.sort()
+    return rows
+
+
+def route_lane(providers: dict, *, exclude: set[str] | None = None, healthy=None, cooled: set[str] | None = None) -> dict | None:
+    """Next enabled, healthy, uncooled lane. Disabled registry entries are never chosen."""
+    exclude = exclude or set()
+    cooled = cooled or set()
+    healthy = healthy or (lambda name, spec: True)
+    for tier, index, name, spec in _indexed(providers):
+        if name in exclude or name in cooled or not spec.get("enabled", True):
+            continue
+        if not healthy(name, spec):
+            continue
+        return {"lane": name, "spec": spec, "tier": tier, "index": index}
+    return None
+
+
+def failover(providers: dict, current: str, reason: str, *, exclude: set[str] | None = None,
+             healthy=None, cooled: set[str] | None = None) -> dict:
+    """Cool `current` and take the next registry lane. The receipt records the handoff."""
+    cooled = set(cooled or ())
+    cooled.add(current)
+    skipped = set(exclude or ())
+    skipped.add(current)
+    nxt = route_lane(providers, exclude=skipped, healthy=healthy, cooled=cooled)
+    return {"from": current, "to": None if nxt is None else nxt["lane"], "reason": reason,
+            "cooled": sorted(cooled), "lane": nxt}
+
+
+def select_escalation_lane(providers: dict, attempted: set[str], *, healthy=None, cooled: set[str] | None = None,
+                           top_rung_used: bool = False) -> dict | None:
+    """Lowest tier strictly stronger than every lane that already attempted this head.
+
+    When none is stronger, one top-rung retry on the strongest enabled healthy lane.
+    """
+    cooled = cooled or set()
+    healthy = healthy or (lambda name, spec: True)
+    catalog = []
+    tiers = {}
+    for tier, index, name, spec in _indexed(providers):
+        tiers[name] = tier
+        if not spec.get("enabled", True) or name in cooled or not healthy(name, spec):
+            continue
+        catalog.append({"lane": name, "spec": spec, "tier": tier, "index": index})
+    if not catalog:
+        return None
+    ceiling = max((tiers[name] for name in attempted if name in tiers), default=-1)
+    stronger = [row for row in catalog if row["tier"] > ceiling and row["lane"] not in attempted]
+    if stronger:
+        return {**stronger[0], "topRung": False}
+    if top_rung_used:
+        return None
+    strongest = max(catalog, key=lambda row: (row["tier"], -row["index"]))
+    return {**strongest, "topRung": True}
+
+
+def _rungs(record: dict, head: str, kind: str | None = None, rung: str | None = None) -> list[dict]:
+    rows = []
+    for row in list(record.get("escalations") or []) + list(record.get("priorEscalations") or []):
+        if not isinstance(row, dict):
+            continue
+        if head and row.get("head") not in (None, head) and kind == "model" and row.get("kind") == "model":
+            # Per-head model rows are filtered by the caller. Keep PR-wide rows available.
+            pass
+        if kind and row.get("kind") != kind:
+            continue
+        if rung and row.get("rung") != rung:
+            continue
+        rows.append(row)
+    return rows
+
+
+def deterministic_used(record: dict, head: str, rung: str) -> bool:
+    return any(row.get("head") == head and row.get("rung") == rung and row.get("kind") == "deterministic"
+               for row in (record.get("escalations") or []) if isinstance(row, dict))
+
+
+def model_escalations(record: dict, head: str | None = None) -> list[dict]:
+    rows = [row for row in (record.get("escalations") or []) + (record.get("priorEscalations") or [])
+            if isinstance(row, dict) and row.get("kind") == "model"]
+    if head is None:
+        return rows
+    return [row for row in rows if row.get("head") == head]
+
+
+def caps_allow(record: dict, head: str, now: float) -> tuple[bool, str | None]:
+    if len(model_escalations(record, head)) >= per_head_cap():
+        return False, "ladder-exhausted"
+    if len(model_escalations(record, None)) >= per_pr_cap():
+        return False, "ladder-exhausted"
+    stamps = [float(row.get("at") or 0) for row in model_escalations(record, None)
+              if isinstance(row, dict)]
+    latest = max(stamps, default=0)
+    if latest and now - latest < cooldown_s():
+        return False, "cooldown"
+    return True, None
+
+
+def attempted_lanes(record: dict, head: str) -> set[str]:
+    lanes = set()
+    if record.get("lane") and record.get("sha") == head:
+        lanes.add(record["lane"])
+    for row in record.get("escalations") or []:
+        if isinstance(row, dict) and row.get("head") == head and row.get("lane"):
+            lanes.add(row["lane"])
+    for name in record.get("lanes") or []:
+        lanes.add(name)
+    return lanes
+
+
+def top_rung_used(record: dict, head: str) -> bool:
+    return any(isinstance(row, dict) and row.get("head") == head and row.get("topRung")
+               for row in record.get("escalations") or [])
+
+
+def plan_ladder(classified: dict, record: dict, providers: dict, now: float, head: str, *,
+                healthy=None, cooled: set[str] | None = None) -> dict:
+    """Next rung. Deterministic actions spend no model. Caps end at ladder-exhausted."""
+    cls = classified["cls"]
+    subtype = classified.get("subtype")
+    record = record or {}
+    if not escalation_enabled() and cls in {"fixable-by-model", "needs-rebase", "flaky-infra"}:
+        return {"action": "surface", "reason": "escalation-disabled", "cls": cls}
+    if cls in {"obsolete", "needs-human-decision"}:
+        return {"action": "surface", "reason": cls, "cls": cls}
+    if cls == "main-red" or subtype == "main-red":
+        return {"action": "wait", "reason": "main-red", "cls": "main-red"}
+    if cls == "ready":
+        if subtype == "awaiting":
+            return {"action": "wait", "reason": "awaiting", "cls": cls}
+        if classified["next_action"] in {"none", "ready-green"}:
+            return {"action": classified["next_action"], "reason": subtype or "ready", "cls": cls}
+        return {"action": "arm", "reason": "ready", "cls": cls}
+    if cls == "flaky-infra":
+        if not deterministic_used(record, head, "rerun"):
+            return {"action": "rerun", "reason": "flaky-infra", "kind": "deterministic", "cls": cls}
+    if cls == "needs-rebase":
+        if subtype == "lockfile-only" and not deterministic_used(record, head, "lockfile"):
+            return {"action": "resolve-lockfile", "reason": "lockfile-only", "kind": "deterministic", "cls": cls}
+        if not deterministic_used(record, head, "update-branch"):
+            return {"action": "update-branch", "reason": subtype or "needs-rebase", "kind": "deterministic", "cls": cls}
+    if cls in {"fixable-by-model", "needs-rebase", "flaky-infra"}:
+        allowed, why = caps_allow(record, head, now)
+        if not allowed and why == "cooldown":
+            return {"action": "wait", "reason": "cooldown", "cls": cls}
+        if not allowed:
+            return {"action": "surface", "reason": "ladder-exhausted", "cls": cls}
+        chosen = select_escalation_lane(providers, attempted_lanes(record, head), healthy=healthy, cooled=cooled,
+                                         top_rung_used=top_rung_used(record, head))
+        if chosen is None:
+            return {"action": "surface", "reason": "ladder-exhausted", "cls": cls}
+        return {"action": "model", "reason": "top-rung" if chosen["topRung"] else "escalate",
+                "lane": chosen["lane"], "tier": chosen["tier"], "topRung": chosen["topRung"],
+                "kind": "model", "cls": cls, "spec": chosen["spec"]}
+    return {"action": "wait", "reason": cls, "cls": cls}
+
+
+def append_rung(record: dict, *, rung: str, lane: str | None, cls: str, at: float, head: str,
+                kind: str, top_rung: bool = False, ok: bool | None = None) -> dict:
+    """Record a rung without resetting spent attempt history."""
+    entry = dict(record or {})
+    rows = list(entry.get("escalations") or [])
+    rows.append({"rung": rung, "lane": lane, "cls": cls, "at": at, "head": head, "kind": kind,
+                 "topRung": top_rung, "ok": ok})
+    entry["escalations"] = rows
+    entry["escalation"] = {"rung": rung, "lane": lane, "cls": cls, "at": at}
+    return entry
+
+
+def dossier(pr: dict, classified: dict, record: dict | None = None) -> str:
+    record = record or {}
+    lines = [
+        f"Blocker class: {classified['cls']}" + (f" ({classified.get('subtype')})" if classified.get("subtype") else ""),
+        "Evidence:",
+        *[f"- {item}" for item in (classified.get("evidence") or ["none"])],
+    ]
+    if pr.get("conflictFiles"):
+        lines.append("Conflict files: " + ", ".join(str(path) for path in pr["conflictFiles"]))
+    log = pr.get("queueFailure") or pr.get("mergeGroupLog")
+    if log:
+        lines += ["Merge-group / failing log:", str(log)[:2000]]
+    threads = _unresolved(_threads(pr))
+    if threads:
+        lines.append("Unresolved review threads:")
+        for thread in threads[:8]:
+            lines.append(f"- {thread.get('author') or 'unknown'}: {(thread.get('body') or '')[:400]}")
+    author, note = _hold_text(pr, None)
+    if note:
+        lines.append(f"Hold note ({author or 'unknown'}): {note[:1000]}")
+    prior = record.get("escalations") or []
+    if prior:
+        lines.append("Prior rungs: " + "; ".join(
+            f"{row.get('kind')}:{row.get('rung')}:{row.get('lane') or '-'}" for row in prior if isinstance(row, dict)))
+    if record.get("count"):
+        lines.append(f"Fix attempts already spent on this generation: {record.get('count')} "
+                     f"(pushed={record.get('pushed')})")
+    linked = pr.get("linkedIssue") or {}
+    if linked.get("identifier") or pr.get("issue"):
+        lines.append(f"Linked issue: {linked.get('identifier') or pr.get('issue')}")
+    lines.append("Do not reset attempt history. Push to this branch. Do not open a new PR.")
+    return "\n".join(lines)
+
+
+def surface_marker(number, head: str) -> str:
+    return f"<!-- {SURFACE_MARKER} pr={number} head={head} -->"
+
+
+def surface_body(pr: dict, classified: dict, reason: str) -> str:
+    evidence = "; ".join(classified.get("evidence") or [])[:800] or "none"
+    decision = classified.get("next_action") or reason
+    subtype = f" ({classified['subtype']})" if classified.get("subtype") else ""
+    return (f"🤖 lanes: `{classified['cls']}`{subtype} — {reason}.\n"
+            f"Evidence: {evidence}.\n"
+            f"Decision needed: {decision}.\n"
+            + surface_marker(pr.get("number"), pr.get("headRefOid") or ""))
+
+
+def already_surfaced(texts: list[str], number, head: str) -> bool:
+    marker = surface_marker(number, head)
+    return any(marker in (text or "") for text in texts)
+
+
 def hold_nag_due(nags: dict, pr: int, head: str, now: float) -> bool:
     """At most one hold nag per PR per head per 24h, even if a pass misses the row."""
     row = (nags or {}).get(str(pr)) or {}
@@ -669,6 +903,346 @@ def has_remediation_event_label(labels) -> bool:
         if event_label({"labels": [{"name": name}]}):
             return True
     return False
+
+
+def issue_is_history(issue: dict) -> bool:
+    """Closed or Done. History for recurrence and attempt count, not an active duplicate."""
+    if not isinstance(issue, dict) or not issue_open(issue):
+        return True
+    name = str((issue.get("state") or {}).get("name") or "").strip().lower()
+    return name in HISTORY_STATE_NAMES
+
+
+def _active_and_history(group: list, recorded_id: str | None) -> tuple[dict | None, list, list]:
+    """Label group only. Titles are not a match key.
+
+    The active event is the recorded open issue, else the oldest open issue.
+    Closed and Done issues stay in history.
+    """
+    history, active = [], []
+    for issue in group:
+        if not isinstance(issue, dict):
+            continue
+        (history if issue_is_history(issue) else active).append(issue)
+    active.sort(key=lambda issue: issue.get("createdAt") or "9999")
+    chosen = next((issue for issue in active if recorded_id and issue.get("id") == recorded_id), None)
+    if chosen is None and active:
+        chosen = active[0]
+    others = [issue for issue in active if chosen is None or issue.get("id") != chosen.get("id")]
+    return chosen, others, history
+
+
+def _state_id(issue: dict, name: str) -> str | None:
+    team = issue.get("team") or {}
+    states = team.get("states") or {}
+    nodes = states.get("nodes") if isinstance(states, dict) else states
+    for node in nodes or []:
+        if isinstance(node, dict) and node.get("name") == name and node.get("id"):
+            return node["id"]
+    return None
+
+
+def _human_category(key: str, blob: str) -> str | None:
+    """Needs Tim: spend, billing actions, env/DNS/secrets, store submissions,
+    outside humans, manual deploys. Ordinary billing or health text stays fixable."""
+    lowered = key.lower()
+    tokens = set(re.split(r"[\s:/]+", lowered.replace("-", " ")))
+    text = blob.lower()
+    if lowered in {"asc-agreements", "asc-agreement"} or "store submission" in text or "store-submission" in lowered:
+        return "store submission"
+    if "spend" in tokens or re.search(r"\bspend\b", text):
+        return "spend"
+    if re.search(r"billing[\s-]*actions?", text) or "billing-action" in lowered or "billing-actions" in lowered:
+        return "billing action"
+    if re.search(r"manual[\s-]*deploys?", text) or "manual-deploy" in lowered:
+        return "manual deploy"
+    if re.search(r"outside[\s-]*humans?", text) or "outside-human" in lowered:
+        return "outside human"
+    if tokens & {"dns", "secret", "secrets"} or lowered.startswith("env-") or "-env-" in f"-{lowered}-":
+        return "env/DNS/secrets"
+    if re.search(r"env\s*/\s*dns|dns\s*/\s*secrets?|\brotate\b.{0,40}\bsecrets?\b", text):
+        return "env/DNS/secrets"
+    return None
+
+
+def exact_ask(label: str, category: str, *, exhausted: bool = False) -> str:
+    """The one comment a human-only or ladder-exhausted event is allowed to post."""
+    if exhausted:
+        return (f"needs-human `{NEEDS_HUMAN_LABEL_ID}`: `{label}` exhausted the lane ladder. "
+                "Ask: Tim needs to decide the next step. An agent must not open another attempt.")
+    sentence = HUMAN_ASKS.get(category, "Tim needs to decide.")
+    return (f"needs-human `{NEEDS_HUMAN_LABEL_ID}`: `{label}` is human-only ({category}). "
+            f"Ask: {sentence}")
+
+
+def classify_labeled_event(fingerprint: str, title: str = "", description: str = "") -> dict:
+    """Fixable-by-agent, or human-only when the gap needs Tim.
+
+    `remediation:musicfetch-*` is the in-house resolver cutover (JOV-7323). The route
+    never asks an agent to renew MusicFetch, even when the issue text says to.
+    """
+    key = fingerprint_key(fingerprint)
+    label = f"{LABEL_PREFIX}{key}"
+    if is_musicfetch(key):
+        return blocker(
+            "fixable-by-agent", "musicfetch-cutover",
+            [f"Route to the in-house resolver cutover ({MUSICFETCH_CUTOVER}). Do not renew MusicFetch."],
+            MUSICFETCH_CUTOVER)
+    category = _human_category(key, " ".join([key.replace("-", " "), title or "", description or ""]))
+    if category:
+        return blocker("human-only", category, [exact_ask(label, category)], "tim-decides")
+    return blocker("fixable-by-agent", "agent", [title or key], "escalate")
+
+
+def event_dossier(classified: dict, title: str, identifier: str) -> str:
+    if classified.get("subtype") == "musicfetch-cutover":
+        return (
+            "Blocker class: fixable-by-agent (musicfetch-cutover)\n"
+            f"Route to the in-house resolver cutover ({MUSICFETCH_CUTOVER}). "
+            "Do not renew MusicFetch. Do not purchase, extend, or restore a MusicFetch subscription.\n"
+            f"Issue: {identifier} {title}"
+        )
+    subtype = f" ({classified.get('subtype')})" if classified.get("subtype") else ""
+    evidence = "\n".join(f"- {item}" for item in (classified.get("evidence") or ["none"]))
+    return f"Blocker class: {classified.get('cls')}{subtype}\nEvidence:\n{evidence}\nIssue: {identifier} {title}"
+
+
+def event_marker(kind: str, fingerprint: str) -> str:
+    return f"<!-- symphony-event {kind} fp={fingerprint} -->"
+
+
+def event_dispatch_lane(providers: dict, attempts: list, *, healthy=None, cooled: set[str] | None = None) -> dict | None:
+    """First dispatch is a stronger model than the weakest enabled lane, then failover.
+
+    A failed lane is recorded on `attempts` and skipped. When nothing enabled is
+    stronger, one top-rung retry remains, matching `select_escalation_lane`.
+    """
+    attempted = {row.get("lane") for row in attempts if isinstance(row, dict) and row.get("lane")}
+    top = any(isinstance(row, dict) and row.get("topRung") for row in attempts)
+    seeded = set(attempted)
+    if not seeded:
+        weakest = route_lane(providers, healthy=healthy, cooled=cooled)
+        if weakest:
+            seeded.add(weakest["lane"])
+    return select_escalation_lane(providers, seeded, healthy=healthy, cooled=cooled, top_rung_used=top)
+
+
+def _group_labeled(issues: list) -> dict[str, list]:
+    grouped: dict[str, list] = {}
+    for issue in issues or []:
+        if not isinstance(issue, dict):
+            continue
+        label = event_label(issue)
+        if not label:
+            continue
+        grouped.setdefault(fingerprint_key(label), []).append(issue)
+    for rows in grouped.values():
+        rows.sort(key=lambda issue: issue.get("createdAt") or "9999")
+    return grouped
+
+
+def _absorb_event(row: dict, issue: dict, fingerprint: str) -> None:
+    label = event_label(issue) or f"{LABEL_PREFIX}{fingerprint}"
+    row["fingerprint"] = fingerprint
+    row["label"] = label
+    row["issueId"] = issue.get("id")
+    row["identifier"] = issue.get("identifier")
+    row["team"] = (issue.get("team") or {}).get("key")
+    row["title"] = issue.get("title") or ""
+    row["description"] = issue.get("description") or ""
+    row["labels"] = [node.get("name") if isinstance(node, dict) else str(node) for node in _label_nodes(issue)]
+    todo, started = _state_id(issue, "Todo"), _state_id(issue, "In Progress")
+    if todo:
+        row["todoStateId"] = todo
+    if started:
+        row["startedStateId"] = started
+
+
+def _note(row: dict, issue_id: str) -> bool:
+    noted = list(row.get("noted") or [])
+    if not issue_id or issue_id in noted:
+        return False
+    noted.append(issue_id)
+    row["noted"] = noted
+    return True
+
+
+def _surface_event(row: dict, *, exhausted: bool, comments: list, labels: list) -> None:
+    label = row.get("label") or f"{LABEL_PREFIX}{row.get('fingerprint')}"
+    category = row.get("subtype") or "human-only"
+    row["status"] = "exhausted" if exhausted else "human"
+    if exhausted:
+        row["cls"] = row.get("cls") or "fixable-by-agent"
+    else:
+        row["cls"] = "human-only"
+    row["lane"] = None
+    row["running"] = False
+    row["ask"] = exact_ask(label, category, exhausted=exhausted)
+    if notify_tim() and not row.get("asked") and row.get("issueId"):
+        kind = "exhausted" if exhausted else "ask"
+        comments.append({"id": row["issueId"], "body": row["ask"] + "\n" + event_marker(kind, row.get("fingerprint") or "")})
+        labels.append({"id": row["issueId"], "labelId": NEEDS_HUMAN_LABEL_ID})
+        row["asked"] = True
+
+
+def _assign_event(row: dict, classified: dict, providers: dict, now: float, *, healthy, cooled: set[str]) -> tuple[str, dict | None]:
+    """Returns (status, chosen lane or None). Mutates `row` attempts when a new lane is taken."""
+    fingerprint = row.get("fingerprint") or ""
+    attempts = [item for item in (row.get("attempts") or []) if isinstance(item, dict)]
+    allowed, why = caps_allow({"escalations": attempts, "priorEscalations": []}, fingerprint, now)
+    lane_name = row.get("lane")
+    spec = providers.get(lane_name) if isinstance(providers.get(lane_name), dict) else {}
+    lane_dead = bool(lane_name) and (lane_name in cooled or not spec.get("enabled", True) or not healthy(lane_name, spec))
+    if not allowed and why == "ladder-exhausted":
+        return "exhausted", None
+    # A live claim stays put. A dead lane fails over immediately; cooldown only
+    # holds a lane that can still run.
+    if lane_name and not lane_dead and not row.get("release") and row.get("status") == "claimed":
+        return "claimed", None
+    if not allowed and why == "cooldown" and not lane_dead:
+        return "claimed", None
+    chosen = event_dispatch_lane(providers, attempts, healthy=healthy, cooled=cooled)
+    if chosen is None:
+        return "exhausted", None
+    if row.get("release") or not attempts or attempts[-1].get("lane") != chosen["lane"]:
+        attempts.append({"kind": "model", "lane": chosen["lane"], "head": fingerprint, "at": now,
+                         "topRung": bool(chosen.get("topRung")), "ok": None})
+    row["attempts"] = attempts
+    row["lane"] = chosen["lane"]
+    row["release"] = False
+    row["running"] = False
+    return "claimed", chosen
+
+
+def _event_stale(row: dict, now: float) -> bool:
+    try:
+        return now - float(row.get("claimedAt") or 0) >= EVENT_CLAIM_TTL_S
+    except (TypeError, ValueError):
+        return True
+
+
+def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, now: float, *,
+                        healthy=None, cooled: set[str] | None = None) -> dict:
+    """One open event per fingerprint. Recurrence reopens the canonical issue and comments.
+
+    The plan is pure: callers perform `reopens`, `comments`, and `labels`. Human-only
+    and ladder-exhausted comments and the `needs-human` label are included only when
+    `LANES_ESCALATION_NOTIFY_TIM` is on. State is still recorded when the flag is off.
+    """
+    healthy = healthy or (lambda name, spec: True)
+    cooled = set(cooled or ())
+    events = {key: dict(row) for key, row in (recorded or {}).items() if isinstance(row, dict)}
+    comments, labels, reopens = [], [], []
+    for fingerprint, group in _group_labeled(issues).items():
+        row = dict(events.get(fingerprint) or {})
+        recorded_id = row.get("issueId")
+        if escalation_enabled():
+            canonical, duplicates, history = _active_and_history(group, recorded_id)
+            prior_attempts = [item for item in (row.get("attempts") or []) if isinstance(item, dict)]
+            row["attempts"] = prior_attempts
+            row["recurrence"] = len(history)
+            row["attemptCount"] = len(prior_attempts)
+            if canonical is None:
+                if history:
+                    _absorb_event(row, history[0], fingerprint)
+                row["status"] = "done"
+                row["running"] = False
+                events[fingerprint] = row
+                continue
+            _absorb_event(row, canonical, fingerprint)
+            for other in duplicates:
+                if _note(row, other.get("id")):
+                    comments.append({
+                        "id": other.get("id"),
+                        "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` already has one event on "
+                                 f"{canonical.get('identifier')}. This issue is not a second event.\n"
+                                 + event_marker("dup", fingerprint)),
+                    })
+            if recorded_id and canonical.get("id") != recorded_id:
+                row["release"] = True
+                row["running"] = False
+                row["lane"] = None
+                if row.get("status") in {"done", "human", "exhausted"}:
+                    row["status"] = "open"
+                    row["asked"] = False
+        else:
+            by_id = {issue.get("id"): issue for issue in group}
+            canonical = by_id.get(recorded_id) or group[0]
+            _absorb_event(row, canonical, fingerprint)
+            for other in group:
+                if other.get("id") == canonical.get("id") or not issue_open(other):
+                    continue
+                if _note(row, other.get("id")):
+                    comments.append({
+                        "id": other.get("id"),
+                        "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` already has one event on "
+                                 f"{canonical.get('identifier')}. This issue is not a second event.\n"
+                                 + event_marker("dup", fingerprint)),
+                    })
+        if not escalation_enabled() and not issue_open(canonical):
+            opener = next((issue for issue in group if issue.get("id") != canonical.get("id") and issue_open(issue)), None)
+            if opener is None:
+                row["status"] = "done"
+                row["running"] = False
+                events[fingerprint] = row
+                continue
+            todo = row.get("todoStateId") or _state_id(canonical, "Todo")
+            if todo and _note(row, f"reopen:{opener.get('id')}"):
+                reopens.append({"id": canonical.get("id"), "stateId": todo})
+                comments.append({
+                    "id": canonical.get("id"),
+                    "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` recurred. "
+                             f"Reopened {canonical.get('identifier')} instead of a second event. "
+                             f"New signal: {opener.get('identifier')} {opener.get('title') or ''}\n"
+                             + event_marker("reopen", fingerprint)),
+                })
+                row["status"] = "open"
+                row["release"] = True
+                row["running"] = False
+                row["asked"] = False
+            elif row.get("status") in {"claimed", "human", "exhausted"} and not row.get("release"):
+                events[fingerprint] = row
+                continue
+        elif row.get("status") in {"human", "exhausted", "done"} and not row.get("release"):
+            if row.get("status") == "done":
+                stamp = str(canonical.get("updatedAt") or "")
+                if _note(row, f"recur:{stamp}"):
+                    comments.append({
+                        "id": canonical.get("id"),
+                        "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` was reopened. "
+                                 "Claiming the same event again instead of filing another.\n"
+                                 + event_marker("reopen", fingerprint)),
+                    })
+                row["status"] = "open"
+                row["release"] = True
+                row["asked"] = False
+            else:
+                events[fingerprint] = row
+                continue
+        if row.get("running") and not _event_stale(row, now):
+            events[fingerprint] = row
+            continue
+        if row.get("running") and _event_stale(row, now):
+            row["running"] = False
+            row["release"] = True
+            row["lane"] = None
+        classified = classify_labeled_event(fingerprint, canonical.get("title") or "", canonical.get("description") or "")
+        row["cls"] = classified["cls"]
+        row["subtype"] = classified.get("subtype")
+        row["dossier"] = event_dossier(classified, canonical.get("title") or "", canonical.get("identifier") or "")
+        if classified["subtype"] == "musicfetch-cutover":
+            row["route"] = MUSICFETCH_CUTOVER
+        if classified["cls"] == "human-only":
+            _surface_event(row, exhausted=False, comments=comments, labels=labels)
+            events[fingerprint] = row
+            continue
+        status, _chosen = _assign_event(row, classified, providers, now, healthy=healthy, cooled=cooled)
+        if status == "exhausted":
+            _surface_event(row, exhausted=True, comments=comments, labels=labels)
+        else:
+            row["status"] = "claimed"
+        events[fingerprint] = row
+    return {"events": events, "comments": comments, "labels": labels, "reopens": reopens}
 
 
 def events_summary(snapshot: dict | None) -> dict:

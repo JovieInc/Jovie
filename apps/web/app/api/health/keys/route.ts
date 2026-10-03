@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,7 +55,7 @@ const RECOMMENDED_KEYS = [
   },
 ] as const;
 
-export async function GET() {
+export async function GET(request: Request) {
   const now = new Date().toISOString();
 
   // Check required keys
@@ -70,6 +74,11 @@ export async function GET() {
   const missingRecommended = recommendedResults.filter(r => !r.present);
 
   const allRequiredPresent = missingRequired.length === 0;
+  const authorized = await canReadHealthDetail(request, '/api/health/keys');
+
+  if (!authorized) {
+    return publicHealthLiveness(allRequiredPresent);
+  }
 
   const response = {
     status: allRequiredPresent ? 'ok' : 'error',
@@ -97,6 +106,6 @@ export async function GET() {
 
   return NextResponse.json(response, {
     status: allRequiredPresent ? 200 : 503,
-    headers: NO_STORE_HEADERS,
+    headers: HEALTH_DETAIL_HEADERS,
   });
 }

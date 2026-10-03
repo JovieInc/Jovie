@@ -87,7 +87,7 @@ async function mapLimit(items, limit, worker) {
  *   transport: (call: {model: string, system: string, prompt: string, maxOutputTokens: number, signal?: AbortSignal}) => Promise<{text: string, usage?: {inputTokens?: number, outputTokens?: number}}>,
  *   prices: Record<string, {family: string, inPerMillion: number, outPerMillion: number}>,
  *   readLiveHead: () => Promise<string>,
- *   limits?: typeof DEFAULT_RUN_LIMITS,
+ *   limits?: Omit<typeof DEFAULT_RUN_LIMITS, 'budgetUsd'> & {budgetUsd: number},
  *   routes: {discovery: string, verification: string},
  *   signal?: AbortSignal,
  *   now?: () => string,

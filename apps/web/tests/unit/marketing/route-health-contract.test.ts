@@ -12,6 +12,25 @@ import {
 } from '@/data/marketing';
 
 describe('marketing route health contract', () => {
+  it('keeps the retired /new alias bound to the live homepage redirect', () => {
+    const alias = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/new');
+    expect(alias).toMatchObject({
+      status: 'deprecated',
+      noindex: true,
+      aliasOf: '/',
+      renderedSections: [],
+      bindingEvidence: { status: 'unverified' },
+    });
+    expect(getMarketingRouteHealthTarget(alias!)).toMatchObject({
+      path: '/new',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
+    });
+    expect(
+      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.some(target => target.url === '/new')
+    ).toBe(false);
+  });
+
   it('has one concrete target per manifest entry', () => {
     expect(MARKETING_ROUTE_HEALTH_TARGETS).toHaveLength(
       MARKETING_ROUTE_MANIFEST.length
@@ -126,11 +145,22 @@ describe('marketing route health contract', () => {
       target => target.expected === 'redirect'
     );
     expect(redirects).toEqual([
-      expect.objectContaining({
+      {
+        glob: '(marketing)/new/page.tsx',
+        path: '/new',
+        expected: 'redirect',
+        allowedFinalPaths: ['/'],
+        allowsAuthShell: false,
+        requiresSharedChrome: true,
+      },
+      {
         glob: '(marketing)/artist-profile/page.tsx',
         path: '/artist-profile',
+        expected: 'redirect',
         allowedFinalPaths: ['/artist-profiles'],
-      }),
+        allowsAuthShell: false,
+        requiresSharedChrome: false,
+      },
     ]);
 
     expect(

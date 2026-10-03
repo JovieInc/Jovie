@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
+import { buildPublicWorkLinkLines } from '@/lib/agent/public-work-links';
 import {
   isPublicProfileIndexable,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
@@ -105,6 +106,7 @@ interface RouteParams {
  * Role wording follows creator_type. Artist and music lines are limited to
  * music profiles, and tour, release, and stream sections render only when
  * that data exists. The canonical entity URL is the Jovie profile page.
+ * Public work links follow the llmstxt.org proposal.
  */
 export async function GET(_req: Request, { params }: RouteParams) {
   const { username } = await params;
@@ -168,6 +170,12 @@ export async function GET(_req: Request, { params }: RouteParams) {
 
   const dspLines: string[] = [];
   const socialLines: string[] = [];
+  const otherLinks: typeof links = [];
+  const listedUrls: Array<string | null | undefined> = [
+    profile.spotify_url,
+    profile.apple_music_url,
+    profile.youtube_url,
+  ];
 
   // Profile columns take priority over social links table
   if (profile.spotify_url)
@@ -178,16 +186,25 @@ export async function GET(_req: Request, { params }: RouteParams) {
     dspLines.push(`- **YouTube**: ${profile.youtube_url}`);
 
   for (const link of links) {
-    if (!link.url || !link.platform) continue;
-    const platform = link.platform.toLowerCase();
-    const dspName = DSP_PLATFORM_NAMES[platform];
-    const socialName = SOCIAL_PLATFORM_NAMES[platform];
-    if (dspName && !dspLines.some(l => l.includes(dspName))) {
+    if (!link.url) continue;
+    const platform = link.platform?.toLowerCase() ?? '';
+    const dspName = Object.hasOwn(DSP_PLATFORM_NAMES, platform)
+      ? DSP_PLATFORM_NAMES[platform]
+      : undefined;
+    const socialName = Object.hasOwn(SOCIAL_PLATFORM_NAMES, platform)
+      ? SOCIAL_PLATFORM_NAMES[platform]
+      : undefined;
+    if (!dspName && !socialName) {
+      otherLinks.push(link);
+    } else if (dspName && !dspLines.some(l => l.includes(dspName))) {
       dspLines.push(`- **${dspName}**: ${link.url}`);
+      listedUrls.push(link.url);
     } else if (socialName) {
       socialLines.push(`- **${socialName}**: ${link.url}`);
+      listedUrls.push(link.url);
     }
   }
+  const workLines = buildPublicWorkLinkLines(otherLinks, listedUrls);
 
   const lines: string[] = [];
 
@@ -222,6 +239,10 @@ export async function GET(_req: Request, { params }: RouteParams) {
 
   if (socialLines.length > 0) {
     lines.push('## Social', '', ...socialLines, '');
+  }
+
+  if (workLines.length > 0) {
+    lines.push('## Links', '', ...workLines, '');
   }
 
   if (latestRelease?.title) {

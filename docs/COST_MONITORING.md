@@ -263,6 +263,7 @@ Slack alert lands and one GitHub incident opens. Production is unchanged.
    ```bash
    doppler run -- vercel ls --token "$VERCEL_TOKEN" | head -5
    curl -s https://jov.ie/api/health
+   # 200 {"status":"ok"} when the database answers. 503 is {"healthy":false,"timestamp"} with no database field.
    ```
 
 2. **Identify the deployment or traffic source correlated with the spike:**

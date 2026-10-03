@@ -11,6 +11,21 @@ const retired = readFileSync(
 );
 
 describe('flaky-test filing remediation', () => {
+  it('keeps report runs bounded to superseding main completions', () => {
+    const triggers = retired
+      .split('\non:\n', 2)[1]
+      .split('\nconcurrency:', 1)[0];
+    const concurrency = retired
+      .split('\nconcurrency:\n', 2)[1]
+      .split('\npermissions:', 1)[0];
+
+    expect(triggers).toContain('branches: [main]');
+    expect(triggers).not.toContain('gh-readonly-queue/main/**');
+    expect(concurrency).toContain('cancel-in-progress: true');
+    expect(retired).not.toContain('collect-quarantine-evidence.mjs');
+    expect(retired).not.toContain('quarantine-evidence.json');
+  });
+
   it('keeps GitHub issue filing retired', () => {
     expect(githubIssueFilingRetired(retired)).toBe(true);
     expect(retired).toContain("github.event_name == '__retired_linear_only__'");
