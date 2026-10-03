@@ -61,6 +61,7 @@ export type ProfileRouteKey =
   | 'track-smart-link'
   | 'sounds'
   | 'promo-download'
+  | 'press-coverage'
   // external-action (§1.3)
   | 'claim'
   | 'shop'
@@ -716,6 +717,19 @@ export const PROFILE_ROUTE_CONFIG: Record<ProfileRouteKey, ProfileRouteConfig> =
       profileMode: null,
       analyticsSurface: 'promo_download',
       hasOwnMetadata: false,
+      caching: 'server-dynamic',
+    },
+
+    'press-coverage': {
+      key: 'press-coverage',
+      category: 'secondary',
+      label: 'Press Coverage',
+      buildPath: (username, slug) => `/${username}/press/${slug ?? '[slug]'}`,
+      showBottomTabBar: false,
+      activeTab: null,
+      profileMode: null,
+      analyticsSurface: 'press_coverage',
+      hasOwnMetadata: true,
       caching: 'server-dynamic',
     },
 

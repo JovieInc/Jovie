@@ -81,13 +81,13 @@ describe('server analytics contract', () => {
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
-    expect(countProductionCallSites(WEB_ROOT)).toBe(36);
+    expect(countProductionCallSites(WEB_ROOT)).toBe(38);
     expect(
       SERVER_ANALYTICS_CALLSITE_INVENTORY.reduce(
         (total, entry) => total + entry.invocations,
         0
       )
-    ).toBe(36);
+    ).toBe(38);
 
     for (const entry of SERVER_ANALYTICS_CALLSITE_INVENTORY) {
       const source = readFileSync(join(WEB_ROOT, entry.path), 'utf8');

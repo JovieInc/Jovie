@@ -1087,6 +1087,19 @@ export {
   type PreSaveToken,
   preSaveTokens,
 } from './pre-save';
+// Press Coverage (press-to-audience pilot, JOV-7408)
+export {
+  insertPressCoverageSchema,
+  type NewPressCoverage,
+  type PressCoverage,
+  type PressCoverageInspection,
+  type PressCoverageStatus,
+  pressCoverageExcerptKindEnum,
+  pressCoverageProvenanceEnum,
+  pressCoverageStatusEnum,
+  pressCoverages,
+  selectPressCoverageSchema,
+} from './press-coverage';
 // Product Update Subscribers
 export {
   insertProductUpdateSubscriberSchema,

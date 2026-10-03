@@ -158,6 +158,29 @@ export const SERVER_ANALYTICS_EVENTS = {
     ],
     source: { property: 'releaseId', type: 'release' },
   },
+  press_coverage_created: {
+    category: 'profile',
+    properties: [
+      'profileId',
+      'coverageId',
+      'publisher_domain',
+      'experiment_key',
+      'mention_verified',
+    ],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  press_coverage_viewed: {
+    category: 'profile',
+    properties: [
+      'profileId',
+      'coverageId',
+      'publisher_domain',
+      'experiment_key',
+      'utm_source',
+      'utm_medium',
+    ],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
   bandsintown_api_key_saved: {
     category: 'tour',
     properties: ['profileId'],
@@ -381,6 +404,16 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['smart_link_clicked'],
   },
   {
+    path: 'app/[username]/press/[slug]/page.tsx',
+    invocations: 1,
+    events: ['press_coverage_viewed'],
+  },
+  {
+    path: 'app/api/dashboard/press-coverage/route.ts',
+    invocations: 1,
+    events: ['press_coverage_created'],
+  },
+  {
     path: 'lib/notifications/analytics.ts',
     invocations: 7,
     events: [
@@ -438,6 +471,7 @@ type SafePropertyValue = string | number | boolean | null;
 const UUID_PROPERTY_NAMES = new Set([
   'artist_id',
   'asset_id',
+  'coverageId',
   'drop_id',
   'eventId',
   'event_id',
@@ -454,6 +488,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'error_type',
   'experiment_id',
   'gate',
+  'publisher_domain',
   'plan',
   'planRequired',
   'provider',
@@ -470,6 +505,7 @@ const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   channel: new Set(['email', 'sms']),
   client: new Set(['web', 'ios', 'electron']),
   contract_version: new Set([LIMITED_DROP_FUNNEL_CONTRACT_VERSION]),
+  experiment_key: new Set(['LAUNCH-AUDIENCE-2026-10-01/press-to-audience']),
   intent: new Set(['sign_in', 'sign_up']),
   method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
   funnel_id: new Set(SIGNUP_FUNNEL_IDS),
