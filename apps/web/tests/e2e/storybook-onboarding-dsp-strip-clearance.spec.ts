@@ -71,31 +71,50 @@ for (const viewport of VIEWPORTS) {
     );
 
     const phone = page.getByTestId('onboarding-phone-preview');
+    // The visible screen is the aspect-ratio `.mobile-web-screen`, which can
+    // overflow a height-clamped frame. Measure it, not the frame's box: the
+    // 2026-10-03 golden-path blocker was the screen overflowing under the
+    // strip while the frame box itself cleared it.
+    const screen = page.locator('[data-device="mobile-web"]').first();
     const strip = page.getByTestId('onboarding-dsp-match-strip');
     const cta = phone.getByRole('link', { name: 'Listen now' });
     await expect(phone).toBeVisible();
     await expect(strip).toBeVisible();
     await expect(cta).toBeVisible();
-    // The inline phone is shorter than the home card, so Listen now starts
-    // below the scrollport. Bring it into the phone before measuring.
-    await cta.scrollIntoViewIfNeeded();
 
-    const phoneBox = await readBox(phone);
+    const screenBox = await readBox(screen);
     const stripBox = await readBox(strip);
     const ctaBox = await readBox(cta);
-    const visibleCta = intersects(ctaBox, phoneBox);
 
+    if (viewport.id === 'desktop') {
+      // As rendered in the golden-path keyframe: no scrolling, the whole
+      // CTA is on screen and clear of the strip.
+      expect(
+        ctaBox.y + ctaBox.height,
+        `Listen now is cut off by the phone at ${viewport.id}`
+      ).toBeLessThanOrEqual(screenBox.y + screenBox.height + 1);
+    } else {
+      // The inline phone is shorter than the home card; bring the CTA into
+      // the phone before measuring.
+      await cta.scrollIntoViewIfNeeded();
+    }
+
+    const visibleCta = intersects(await readBox(cta), screenBox);
     expect(
       visibleCta.height,
       `Listen now is clipped inside the phone at ${viewport.id}`
     ).toBeGreaterThan(8);
     expect(
       overlaps(visibleCta, stripBox),
-      `DSP strip overlaps Listen now at ${viewport.id}: cta=${JSON.stringify(visibleCta)} strip=${JSON.stringify(stripBox)}`
+      `DSP strip overlaps Listen now at ${viewport.id}: cta=${JSON.stringify(visibleCta)} strip=${JSON.stringify(stripBox)} screen=${JSON.stringify(screenBox)}`
     ).toBe(false);
+    // The strip sits in the hero's top-left corner, above the profile
+    // identity, never in the CTA band.
+    const name = phone.getByRole('link', { name: 'Test Artist' }).first();
+    const nameBox = await readBox(name);
     expect(
-      stripBox.y,
-      `DSP strip still shares the Listen now band at ${viewport.id}`
-    ).toBeGreaterThanOrEqual(visibleCta.y + visibleCta.height - 1);
+      stripBox.y + stripBox.height,
+      `DSP strip reaches the profile identity at ${viewport.id}`
+    ).toBeLessThanOrEqual(nameBox.y);
   });
 }
