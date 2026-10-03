@@ -38,7 +38,7 @@ describe('creator vocabulary', () => {
       'fashion_graphic_item',
       'artist_world_artifact',
     ]);
-    expect(merchLaneLabel('band_tour_uniform')).toBe('Tour uniform');
+    expect(merchLaneLabel('band_tour_uniform')).toBe('Signature uniform');
     expect(merchLaneLabel('fashion_graphic_item')).toBe('Graphic item');
     expect(merchLaneLabel('artist_world_artifact')).toBe('Identity artifact');
     expect(MERCH_LANE_LABELS.band_tour_uniform).not.toBe('band_tour_uniform');

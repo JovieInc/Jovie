@@ -30,7 +30,7 @@ export const MUSIC_EVENTS_ROUTE = APP_ROUTES.TOUR_DATES;
  * Display labels for merch_design_lane. Enum values and print artwork stay.
  */
 export const MERCH_LANE_LABELS = {
-  band_tour_uniform: 'Tour uniform',
+  band_tour_uniform: 'Signature uniform',
   fashion_graphic_item: 'Graphic item',
   artist_world_artifact: 'Identity artifact',
 } as const satisfies Record<MerchDesignLane, string>;
