@@ -154,6 +154,16 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
     }
   });
+  it('registers the admin chat playground route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
+      'apps/web/app/app/(shell)/admin/chat-playground/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.admin-chat-playground');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
     const platforms = [...new Set(gated().map(e => e.platform))].sort();

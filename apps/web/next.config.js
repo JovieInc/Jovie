@@ -779,6 +779,9 @@ const nextConfig = {
       '@dnd-kit/utilities',
       'framer-motion',
       'motion',
+      // Motion's React entry declares full motion aliases beside wildcard
+      // exports. Resolve named helpers to their leaves before bundling.
+      'motion/react',
       'zod',
       '@tanstack/react-table',
       '@tanstack/react-virtual',

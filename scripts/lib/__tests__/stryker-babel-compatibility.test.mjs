@@ -49,7 +49,12 @@ describe('Stryker TypeScript instrumentation', () => {
       reporter.onTestRunEnd();
       expect(
         JSON.parse(readFileSync(join(sandbox, 'unit.flaky.json'), 'utf8'))
-      ).toMatchObject({ schemaVersion: 1, flaky: [] });
+      ).toMatchObject({
+        schemaVersion: 2,
+        flaky: [],
+        executions: [],
+        complete: false,
+      });
       expect(
         loaded.config.resolve.alias.find(
           alias => alias.find instanceof RegExp && alias.find.test('@jovie/ui')

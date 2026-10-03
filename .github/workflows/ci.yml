@@ -3548,6 +3548,7 @@ jobs:
           pnpm --filter @jovie/auth-routing test
           pnpm --filter @jovie/action-contracts test
           pnpm --filter @jovie/audio-contracts test
+          pnpm --filter @jovie/release-channel-contracts test
 
   ci-product-lane-receipt:
     name: Product Lane Receipt

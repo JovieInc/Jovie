@@ -91,6 +91,8 @@ export const APP_ROUTES = {
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
+  /** Internal visual catalog for canonical chat lifecycle and artifact states. */
+  ADMIN_CHAT_PLAYGROUND: '/app/ov/chat-playground',
   /** Founder home: business and production reality in one scan. */
   ADMIN_NOW: '/hud',
   ADMIN_OPS: '/hud',
