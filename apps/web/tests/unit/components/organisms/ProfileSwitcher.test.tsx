@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -160,6 +160,24 @@ describe('IdentitySwitcher identity context selection', () => {
     expect(
       screen.queryByRole('button', { name: 'Presence' })
     ).not.toBeInTheDocument();
+  });
+
+  it('stages the identity label exit on the shared rail-motion contract (JOV-4522)', () => {
+    render(<IdentitySwitcher />);
+
+    const trigger = screen.getByRole('button', { name: 'Switch Identity' });
+    const label = within(trigger).getByText('Alpha Artist');
+    // The label collapses on max-width + opacity + travel instead of
+    // display:none, and the trigger releases its gap/padding so the avatar
+    // centers in the 52px rail.
+    expect(label.className).toContain(
+      'transition-[max-width,opacity,transform]'
+    );
+    expect(label.className).toContain('group-data-[collapsible=icon]:max-w-0');
+    expect(label.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
+    );
+    expect(trigger.className).toContain('group-data-[collapsible=icon]:px-0');
   });
 
   it('does not burden a single-identity account with a switcher', () => {
