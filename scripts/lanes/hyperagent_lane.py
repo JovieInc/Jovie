@@ -1,9 +1,14 @@
 """Bounded remote provider adapter used by the existing lane runner.
 
 The installed Hyperagent CLI supplies transport, not model/cap/repository proof.
-Its list_agents API currently lacks those fields. An owner-verified settings
-readback is required; missing proof leaves this disabled lane held. Receipts
-live in the existing runs directory, and unknown creation outcomes never retry.
+Its list_agents API exposes only id, name and execution mode, so the proof joins
+two sources (JOV-7706): a live list_agents identity readback on every attempt, and
+the owner's settings attestation on the host (model, repository, current
+instructions, all-in cap, balance), which expires. Missing or expired attestation,
+or a live identity that no longer matches, leaves the lane held and unhealthy.
+Receipts live in the existing runs directory; unknown creation outcomes never retry.
+
+  hyperagent_lane.py health   # exit 0 when a fresh proof can be built right now
 """
 import fcntl
 import hashlib
@@ -11,10 +16,15 @@ import json
 import math
 import os
 import re
+import sys
 import time
 from pathlib import Path
 
 REPO = "JovieInc/Jovie"
+PROOF_SOURCES = ("hyperagent-settings-readback", "hyperagent-identity+owner-attestation")
+PROOF_TTL_S = 300
+ATTESTATION = Path(os.environ.get("HYPERAGENT_LANE_ATTESTATION",
+                                  Path.home() / ".config/jovie-lanes/hyperagent-attestation.json"))
 
 
 def verified(spec, now):
@@ -25,12 +35,76 @@ def verified(spec, now):
     return (isinstance(proof.get("agentId"), str) and bool(proof["agentId"])
             and proof.get("model") == spec.get("model") and proof.get("model") not in (None, "auto")
             and proof.get("repository") == REPO and proof.get("currentInstructions") is True
-            and proof.get("source") == "hyperagent-settings-readback"
+            and proof.get("source") in PROOF_SOURCES
             and isinstance(proof.get("evidenceSha256"), str) and re.fullmatch(r"[a-f0-9]{64}", proof["evidenceSha256"]) is not None
             and proof.get("executionMode") == "auto" and proof.get("allInCap") is True
             and all(number(proof.get(k)) for k in ("balanceUsd", "maxCostUsd", "verifiedAt", "expiresAt"))
             and 0 < proof["maxCostUsd"] <= proof["balanceUsd"]
-            and 0 <= now - proof["verifiedAt"] <= 300 and now < proof["expiresAt"])
+            and 0 <= now - proof["verifiedAt"] <= PROOF_TTL_S and now < proof["expiresAt"])
+
+
+def refresh_proof(spec, call, now, attestation=None):
+    """Build `verifiedRemote` from a live identity read plus the owner's attestation.
+
+    Returns (proof, None) or (None, reason). The live agent must be the configured id,
+    name and `auto` mode; the attestation must name the same agent and model, this
+    repository, current instructions and an all-in cap that fits the balance.
+    """
+    try:
+        owner = json.loads(Path(ATTESTATION if attestation is None else attestation).read_text())
+    except FileNotFoundError:
+        return None, "owner-attestation-missing"
+    except (OSError, ValueError):
+        return None, "owner-attestation-unreadable"
+    if not isinstance(owner, dict):
+        return None, "owner-attestation-unreadable"
+    number = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    if not (number(owner.get("expiresAt")) and now < owner["expiresAt"]):
+        return None, "owner-attestation-expired"
+    if owner.get("agentId") != spec.get("agentId") or owner.get("model") != spec.get("model"):
+        return None, "owner-attestation-mismatch"
+    try:
+        agents = call("list_agents", {}).get("agents", [])
+    except Exception as error:
+        return None, failure(error)
+    live = next((a for a in agents if isinstance(a, dict) and a.get("id") == spec.get("agentId")), None)
+    if live is None or live.get("name") != spec.get("agentName"):
+        return None, "remote-agent-identity-unverified"
+    if live.get("executionMode") != "auto":
+        return None, "remote-agent-not-auto"
+    evidence = json.dumps({"live": live, "owner": owner}, sort_keys=True).encode()
+    proof = {"agentId": live["id"], "model": owner.get("model"), "repository": owner.get("repository"),
+             "currentInstructions": owner.get("currentInstructions"), "allInCap": owner.get("allInCap"),
+             "balanceUsd": owner.get("balanceUsd"), "maxCostUsd": owner.get("maxCostUsd"),
+             "executionMode": live["executionMode"], "source": PROOF_SOURCES[1],
+             "evidenceSha256": hashlib.sha256(evidence).hexdigest(),
+             "verifiedAt": now, "expiresAt": min(now + PROOF_TTL_S, owner["expiresAt"])}
+    spec = {**spec, "verifiedRemote": proof}
+    return (proof, None) if verified(spec, now) else (None, "owner-attestation-incomplete")
+
+
+def main(argv=None, call=None, clock=time.time):
+    """`health`: the providers.json probe. Builds the same proof a run would use."""
+    import runpy
+    import shutil
+    args = sys.argv[1:] if argv is None else argv
+    if args[:1] != ["health"]:
+        print("usage: hyperagent_lane.py health", file=sys.stderr)
+        return 2
+    spec = json.loads((Path(__file__).resolve().parent / "providers.json").read_text())["hyperagent"]
+    if call is None:
+        executable = shutil.which("hyperagent")
+        if not executable:
+            print("available: false reason=transport-missing")
+            return 1
+        call = runpy.run_path(executable)["mcp_call"]
+    proof, reason = refresh_proof(spec, call, clock())
+    if proof is None:
+        print(f"available: false reason={reason}")
+        return 1
+    print(f"available: true agent={spec.get('agentName')} model={proof['model']} "
+          f"cap={proof['maxCostUsd']} balance={proof['balanceUsd']}")
+    return 0
 
 
 def failure(error):
@@ -43,13 +117,20 @@ def failure(error):
 
 
 def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
-        timeout=1800, clock=time.time, pause=time.sleep, before_dispatch=lambda: None):
+        timeout=1800, clock=time.time, pause=time.sleep, before_dispatch=lambda: None, refresh=None):
     """One existing attempt: create once, read/resume its thread, gate its same PR.
 
     Settings proof must be refreshed even on resume. The file lock spans the
     bounded attempt; a concurrent invocation cannot dispatch or adopt twice.
     Approval and timeout only pause polling; neither cancels a remote job.
+    `refresh(spec, now)` rebuilds an expired proof; a long remote run outlives its TTL.
     """
+    def fresh(current):
+        if verified(current, clock()) or refresh is None:
+            return current
+        proof, _reason = refresh(current, clock())
+        return {**current, "verifiedRemote": proof} if proof else current
+    spec = fresh(spec)
     held = lambda reason, thread=None: {"verdict": "remote-held", "reasons": [reason],
                                        "remoteThreadId": thread, "next_action": "reconcile-existing-remote-attempt"}
     if not verified(spec, clock()):
@@ -145,7 +226,8 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                     or marker not in pr.get("body", "")
                     or heads != {pr.get("headRefOid")}):
                     return held("remote-pr-attribution-mismatch", thread)
-                if not verified(spec, clock()):
+                spec = fresh(spec)
+                if not verified(spec, clock()) or spec["verifiedRemote"]["agentId"] != proof["agentId"]:
                     return held("remote-preflight-unverified", thread)
                 save(gateIntent=True, headSha=pr["headRefOid"])
                 result = {**gate(pr), "remoteThreadId": thread, "remoteAgentId": proof["agentId"],
@@ -155,3 +237,7 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
             return held("remote-running-timeout", thread)
         except Exception as error:
             return held(failure(error), thread)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
