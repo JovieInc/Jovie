@@ -109,6 +109,7 @@ struct UITestExitButton: View {
 
 struct UITestingAuthCallbackRoot: View {
   @Bindable var appState: AppState
+  let authCoordinator: MobileAuthCoordinator
   @State private var authErrorMessage: String?
   @State private var handledStates: Set<String> = []
   @State private var authenticatedUserID: String?
@@ -118,8 +119,9 @@ struct UITestingAuthCallbackRoot: View {
   private let statusKey = "ie.jov.Jovie.authCallbackUITestStatus"
   private let handledCountKey = "ie.jov.Jovie.authCallbackUITestHandledCount"
 
-  init(appState: AppState) {
+  init(appState: AppState, authCoordinator: MobileAuthCoordinator) {
     self.appState = appState
+    self.authCoordinator = authCoordinator
     // Seed the verifier before the first onOpenURL from a cold launch via
     // XCUIApplication.open(_:) — the async .task below is too late on CI.
     MobileAuthPendingStore.shared.save(codeVerifier: "test_verifier")
@@ -132,9 +134,8 @@ struct UITestingAuthCallbackRoot: View {
       isSignInUnavailable: false,
       authenticatedUserID: authenticatedUserID,
       authErrorMessage: authErrorMessage,
-      onLogout: { await appState.signOut() },
-      onAuthReturn: handleAuthReturn,
-      onAuthError: { authErrorMessage = $0 }
+      authCoordinator: authCoordinator,
+      onLogout: { authCoordinator.cancelCurrentAuth(); _ = await appState.signOut() }
     )
     .onOpenURL { url in
       handleCallbackURL(url)

@@ -5,8 +5,11 @@ const hoisted = vi.hoisted(() => ({
   getReleasesForProfileLite: vi.fn(),
   getLiveMerchCardsForProfile: vi.fn(),
   getUpcomingTourDatesForProfile: vi.fn(),
+  getActiveLinksForProfile: vi.fn(),
   getClientIP: vi.fn(),
   publicArtistApiLimiterLimit: vi.fn(),
+  riderRows: vi.fn(),
+  youtubeSnapshotRows: vi.fn(),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -40,9 +43,19 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: () => ({
-      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
-    }),
+    select: (columns: Record<string, unknown>) => {
+      const rows = Object.hasOwn(columns, 'rawValues')
+        ? hoisted.youtubeSnapshotRows()
+        : hoisted.riderRows();
+      return {
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({ limit: () => rows }),
+            limit: () => rows,
+          }),
+        }),
+      };
+    },
   },
 }));
 
@@ -58,6 +71,9 @@ vi.mock('@/lib/merch/service', () => ({
 vi.mock('@/lib/tour-dates/queries', () => ({
   getUpcomingTourDatesForProfile: hoisted.getUpcomingTourDatesForProfile,
 }));
+vi.mock('@/lib/services/social-links/queries', () => ({
+  getActiveLinksForProfile: hoisted.getActiveLinksForProfile,
+}));
 vi.mock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
 
 describe('GET /api/v1/[username]', () => {
@@ -70,6 +86,9 @@ describe('GET /api/v1/[username]', () => {
       remaining: 99,
       reset: new Date(Date.now() + 60_000),
     });
+    hoisted.getActiveLinksForProfile.mockResolvedValue([]);
+    hoisted.riderRows.mockResolvedValue([]);
+    hoisted.youtubeSnapshotRows.mockResolvedValue([]);
   });
 
   it('excludes protected synthetic identities from public API discovery', async () => {
@@ -110,7 +129,38 @@ describe('GET /api/v1/[username]', () => {
       spotifyUrl: null,
       appleMusicUrl: null,
       youtubeUrl: null,
+      creatorType: 'creator',
+      spotifyId: 'spotify-artist-1',
+      appleMusicId: 'apple-artist-1',
+      youtubeMusicId: null,
+      deezerId: 'deezer-artist-1',
+      tidalId: null,
+      soundcloudId: 'realartist',
+      musicbrainzId: null,
+      spotifyFollowers: 9876,
     });
+    hoisted.getActiveLinksForProfile.mockResolvedValue([
+      {
+        platform: 'website',
+        url: 'https://realartist.example',
+        displayText: 'Official website',
+      },
+      {
+        platform: 'instagram',
+        url: 'https://instagram.com/realartist',
+        displayText: null,
+      },
+    ]);
+    hoisted.youtubeSnapshotRows.mockResolvedValue([
+      {
+        rawValues: {
+          precision: 'exact',
+          subscriberCount: 1234567,
+          channelId: 'UC1234567890123456789012',
+        },
+        fetchedAt: new Date('2026-10-02T18:30:00.000Z'),
+      },
+    ]);
     hoisted.getReleasesForProfileLite.mockResolvedValue([]);
     hoisted.getLiveMerchCardsForProfile.mockResolvedValue([]);
     hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([]);
@@ -134,8 +184,126 @@ describe('GET /api/v1/[username]', () => {
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('99');
     expect(res.headers.get('Retry-After')).toBeNull();
     const body = await res.json();
-    expect(body.artist.username).toBe('realartist');
+    expect(body.artist).toMatchObject({
+      username: 'realartist',
+      creatorType: 'creator',
+      audience: {
+        platform: 'youtube',
+        count: 1234567,
+        countText: '1,234,567',
+        observedAt: '2026-10-02T18:30:00.000Z',
+      },
+      links: [
+        {
+          platform: 'website',
+          url: 'https://realartist.example',
+          displayText: 'Official website',
+        },
+        {
+          platform: 'instagram',
+          url: 'https://instagram.com/realartist',
+          displayText: null,
+        },
+      ],
+      platformIds: {
+        spotify: 'spotify-artist-1',
+        appleMusic: 'apple-artist-1',
+        youtube: 'UC1234567890123456789012',
+        deezer: 'deezer-artist-1',
+        tidal: null,
+        soundcloud: 'realartist',
+        musicbrainz: null,
+      },
+    });
     expect(body._links.rider).toBeUndefined();
+  });
+
+  it('does not expose a rounded audience count and derives a channel ID from the public URL', async () => {
+    hoisted.getProfileByUsername.mockResolvedValue({
+      id: 'profile-1',
+      username: 'realartist',
+      displayName: 'Real Artist',
+      isPublic: true,
+      bio: null,
+      location: null,
+      genres: [],
+      avatarUrl: null,
+      spotifyUrl: null,
+      appleMusicUrl: null,
+      youtubeUrl: 'https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv',
+      creatorType: 'artist',
+      spotifyId: null,
+      appleMusicId: null,
+      youtubeMusicId: null,
+      deezerId: null,
+      tidalId: null,
+      soundcloudId: null,
+      musicbrainzId: null,
+      spotifyFollowers: null,
+    });
+    hoisted.youtubeSnapshotRows.mockResolvedValue([
+      {
+        rawValues: {
+          precision: 'rounded',
+          subscriberCount: 1200000,
+          channelId: null,
+        },
+        fetchedAt: new Date('2026-10-02T18:30:00.000Z'),
+      },
+    ]);
+    hoisted.getReleasesForProfileLite.mockResolvedValue([]);
+    hoisted.getLiveMerchCardsForProfile.mockResolvedValue([]);
+    hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([]);
+
+    const { GET } = await import('./route');
+    const res = await GET(new Request('https://jov.ie/api/v1/realartist'), {
+      params: Promise.resolve({ username: 'realartist' }),
+    });
+    const body = await res.json();
+
+    expect(body.artist.audience).toBeNull();
+    expect(body.artist.platformIds.youtube).toBe('UCabcdefghijklmnopqrstuv');
+  });
+
+  it('falls back to stored Spotify followers without inventing an observation time', async () => {
+    hoisted.getProfileByUsername.mockResolvedValue({
+      id: 'profile-1',
+      username: 'realartist',
+      displayName: 'Real Artist',
+      isPublic: true,
+      bio: null,
+      location: null,
+      genres: [],
+      avatarUrl: null,
+      spotifyUrl: 'https://open.spotify.com/artist/spotify-artist-1',
+      appleMusicUrl: null,
+      youtubeUrl: null,
+      creatorType: 'artist',
+      spotifyId: 'spotify-artist-1',
+      appleMusicId: null,
+      youtubeMusicId: null,
+      deezerId: null,
+      tidalId: null,
+      soundcloudId: null,
+      musicbrainzId: null,
+      spotifyFollowers: 9876,
+    });
+    hoisted.getReleasesForProfileLite.mockResolvedValue([]);
+    hoisted.getLiveMerchCardsForProfile.mockResolvedValue([]);
+    hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([]);
+
+    const { GET } = await import('./route');
+    const res = await GET(new Request('https://jov.ie/api/v1/realartist'), {
+      params: Promise.resolve({ username: 'realartist' }),
+    });
+    const body = await res.json();
+
+    expect(body.artist.audience).toEqual({
+      platform: 'spotify',
+      count: 9876,
+      countText: '9,876',
+      observedAt: null,
+    });
   });
 
   it('hides a private profile the same way as a missing one', async () => {

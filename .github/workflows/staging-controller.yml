@@ -3,6 +3,7 @@ name: Staging Controller
 # accountable-writer: Symphony
 # capability-gap: Exact successful CI receipts are available only after the source CI workflow completes.
 # revisit-trigger: Remove this hop when CI can invoke one post-success staging job without a workflow boundary.
+run-name: ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
 on:
   workflow_run:
     workflows: [CI]
@@ -16,26 +17,65 @@ jobs:
     runs-on: ubuntu-latest
     outputs: {exact_sha: "${{ steps.lineage.outputs.exact_sha }}", outcome: "${{ steps.lineage.outputs.outcome }}"}
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with: {name: "product-lane-release-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.run_attempt }}", path: "${{ runner.temp }}/product-lane-release", github-token: "${{ github.token }}", run-id: "${{ github.event.workflow_run.id }}"}
+      - name: Fetch sealed product-lane release receipt
+        env: {EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", REPOSITORY: "${{ github.repository }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", SOURCE_CI_RUN_ATTEMPT: "${{ github.event.workflow_run.run_attempt }}", GH_TOKEN: "${{ github.token }}"}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/product-lane-release"
+          receipt_name="product-lane-release-${EXPECTED_SHA}-${SOURCE_CI_RUN_ATTEMPT}"
+          artifact_id="$(gh api \
+            "repos/$REPOSITORY/actions/artifacts?name=$receipt_name&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.id) | last | .id // empty')"
+          if [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]; then
+            gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
+              > "$RUNNER_TEMP/product-lane-release/receipt.zip"
+            unzip -q "$RUNNER_TEMP/product-lane-release/receipt.zip" \
+              -d "$RUNNER_TEMP/product-lane-release"
+            rm "$RUNNER_TEMP/product-lane-release/receipt.zip"
+          else
+            # A main attempt that was superseded or never release-authorized
+            # seals no receipt; the lineage step resolves that outcome instead
+            # of hard-failing the hop.
+            echo "::notice::Source CI attempt $SOURCE_CI_RUN_ID/$SOURCE_CI_RUN_ATTEMPT sealed no $receipt_name artifact."
+          fi
       - id: lineage
         env: {EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", REPOSITORY: "${{ github.repository }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", SOURCE_CI_RUN_ATTEMPT: "${{ github.event.workflow_run.run_attempt }}", SOURCE_CI_WORKFLOW_PATH: "${{ github.event.workflow_run.path }}", SOURCE_CI_HEAD_BRANCH: "${{ github.event.workflow_run.head_branch }}", SOURCE_CI_HEAD_REPOSITORY: "${{ github.event.workflow_run.head_repository.full_name }}", GH_TOKEN: "${{ github.token }}"}
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] && [[ "$SOURCE_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]] && [[ "$SOURCE_CI_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] && [ "$SOURCE_CI_WORKFLOW_PATH" = ".github/workflows/ci.yml" ] && [ "$SOURCE_CI_HEAD_BRANCH" = "main" ] && [ "$SOURCE_CI_HEAD_REPOSITORY" = "$REPOSITORY" ] || { echo "::error::Staging Controller received malformed exact-main CI evidence."; exit 1; }
           receipt="$RUNNER_TEMP/product-lane-release/release.json"
-          jq -e --arg sha "$EXPECTED_SHA" --arg run "$SOURCE_CI_RUN_ID" '.provenance.sha == $sha and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | type == "array")' "$receipt" >/dev/null || { echo "::error::Canonical release lineage receipt does not match the exact successful CI attempt."; exit 1; }
+          receipt_missing=false
+          if [ -f "$receipt" ]; then
+            jq -e --arg sha "$EXPECTED_SHA" --arg run "$SOURCE_CI_RUN_ID" '.provenance.sha == $sha and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | type == "array")' "$receipt" >/dev/null || { echo "::error::Canonical release lineage receipt does not match the exact successful CI attempt."; exit 1; }
+          else
+            receipt_missing=true
+          fi
           current_main="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Could not resolve exact main before staging mutation."; exit 1; }
           outcome=proceed replacement_sha="$EXPECTED_SHA"
-          if ! jq -e '.selectedLanes | index("web") != null' "$receipt" >/dev/null; then
+          if [ "$receipt_missing" = true ]; then
+            # An authorized attempt always seals its receipt, so a missing
+            # receipt means this generation was never release-authorized. It is
+            # superseded once current main is a strict descendant; a current
+            # head without its own receipt stays fail-closed.
+            if [ "$current_main" = "$EXPECTED_SHA" ]; then
+              echo "::error::Current main CI attempt sealed no product-lane release receipt."
+              exit 1
+            fi
+            compare_status="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
+            if [ "$compare_status" != ahead ]; then
+              echo "::error::Unreceipted CI attempt $EXPECTED_SHA is not an ancestor of current main; supersession cannot be proven."
+              exit 1
+            fi
+            outcome=superseded replacement_sha="$current_main"
+          elif ! jq -e '.selectedLanes | index("web") != null' "$receipt" >/dev/null; then
             outcome=not_applicable
           elif [ "$current_main" != "$EXPECTED_SHA" ]; then
             compare_status="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
             if [ "$compare_status" != ahead ]; then
               outcome=superseded replacement_sha="$current_main"
             else
-              newer_runs="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=100")"
+              newer_runs="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=100")"
               while IFS=$'\t' read -r candidate_id candidate_attempt candidate_sha; do
                 [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_attempt" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_sha" =~ ^[0-9a-f]{40}$ ]] || continue
                 # A later CI run can replay an older SHA after a main rewind.
@@ -72,7 +112,20 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$AUTHORIZATION_RESULT" != success ]; then echo "::error::Staging blocker: exact CI lineage authorization failed. Next: inspect the product-lane receipt. Proof: CI run ${{ github.event.workflow_run.id }}."; exit 1; fi
-          if [ "$AUTHORIZATION_OUTCOME" = not_applicable ] || [ "$AUTHORIZATION_OUTCOME" = superseded ]; then echo "Staging generation $EXACT_SHA finished as $AUTHORIZATION_OUTCOME."; exit 0; fi
-          if [ "$RELEASE_RESULT" = success ] && [ "$STAGING_ELIGIBLE" != true ]; then echo "Staging generation $EXACT_SHA finished as superseded before mutation."; exit 0; fi
-          if [ "$RELEASE_RESULT" != success ] || [ "$STAGING_DEPLOYED" != true ]; then echo "::error::Staging blocker: exact environment mutation or verification failed. Next: inspect build, canary, alias, and build-info proof. Proof: staging-deployment-$EXACT_SHA."; exit 1; fi
-          echo "Staging generation $EXACT_SHA finished as $STAGING_STATE with an exact immutable receipt."
+          if [ "$AUTHORIZATION_OUTCOME" = not_applicable ] || [ "$AUTHORIZATION_OUTCOME" = superseded ]; then
+            outcome="$AUTHORIZATION_OUTCOME"
+          elif [ "$RELEASE_RESULT" = success ] && [ "$STAGING_ELIGIBLE" != true ]; then
+            outcome=superseded
+          elif [ "$RELEASE_RESULT" != success ] || [ "$STAGING_DEPLOYED" != true ]; then
+            echo "::error::Staging blocker: exact environment mutation or verification failed. Next: inspect build, canary, alias, and build-info proof. Proof: staging-deployment-$EXACT_SHA."; exit 1
+          else
+            outcome=deployed
+          fi
+          # Terminal data reconciles late completion and no-op outcomes.
+          jq -n --arg repository '${{ github.repository }}' --arg sha "$EXACT_SHA" --arg outcome "$outcome" \
+            --arg sourceCiRunId '${{ github.event.workflow_run.id }}' --arg sourceCiRunAttempt '${{ github.event.workflow_run.run_attempt }}' \
+            --arg controllerRunId '${{ github.run_id }}' --arg controllerRunAttempt '${{ github.run_attempt }}' \
+            '{schema:"jovie-staging-completion/v1", terminal:true, repository:$repository, sha:$sha, outcome:$outcome, sourceCiRunId:$sourceCiRunId, sourceCiRunAttempt:$sourceCiRunAttempt, controllerRunId:$controllerRunId, controllerRunAttempt:$controllerRunAttempt}' > "$RUNNER_TEMP/staging-completion.json"
+          echo "Staging generation $EXACT_SHA finished as $outcome ($STAGING_STATE)."
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with: {name: "staging-completion-${{ github.run_attempt }}", path: "${{ runner.temp }}/staging-completion.json", if-no-files-found: error, retention-days: 30}

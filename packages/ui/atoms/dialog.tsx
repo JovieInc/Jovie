@@ -48,6 +48,8 @@ interface DialogContentProps
   readonly overlayProps?: DialogOverlayProps;
   readonly disablePortal?: boolean;
   readonly hideClose?: boolean;
+  /** Full-screen takeovers retain the same focus and dismissal behavior. */
+  readonly variant?: 'default' | 'fullscreen';
   /**
    * Test ID for the dialog content.
    * @default "dialog-content"
@@ -67,6 +69,7 @@ const DialogContent = React.forwardRef<
       overlayProps,
       disablePortal = false,
       hideClose = false,
+      variant = 'default',
       testId = 'dialog-content',
       onCloseAutoFocus,
       ...props
@@ -78,15 +81,26 @@ const DialogContent = React.forwardRef<
       onCloseAutoFocus
     );
     const contentClassName = cn(
-      centeredContentStyles.position,
-      centeredContentStyles.layout,
-      centeredContentStyles.surface,
-      centeredContentStyles.animation,
+      variant === 'fullscreen'
+        ? 'fixed inset-0 z-modal grid h-dvh w-full max-w-none gap-0 overflow-hidden bg-(--app-shell-content-surface) text-primary-token data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0'
+        : cn(
+            centeredContentStyles.position,
+            centeredContentStyles.layout,
+            centeredContentStyles.surface,
+            centeredContentStyles.animation,
+            centeredContentStyles.rounded
+          ),
       'duration-cinematic ease-cinematic',
-      centeredContentStyles.rounded,
       centeredContentStyles.reducedMotion,
       className
     );
+    const resolvedOverlayProps = {
+      ...overlayProps,
+      className: cn(
+        variant === 'fullscreen' && 'bg-(--app-shell-content-surface)',
+        overlayProps?.className
+      ),
+    };
 
     const content = (
       <DialogPrimitive.Content
@@ -113,7 +127,7 @@ const DialogContent = React.forwardRef<
     if (disablePortal) {
       return (
         <>
-          <DialogOverlay {...overlayProps} />
+          <DialogOverlay {...resolvedOverlayProps} />
           {content}
         </>
       );
@@ -121,7 +135,7 @@ const DialogContent = React.forwardRef<
 
     return (
       <DialogPortal {...portalProps}>
-        <DialogOverlay {...overlayProps} />
+        <DialogOverlay {...resolvedOverlayProps} />
         {content}
       </DialogPortal>
     );

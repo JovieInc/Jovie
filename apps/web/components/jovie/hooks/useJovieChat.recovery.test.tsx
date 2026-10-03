@@ -195,6 +195,22 @@ describe('Summer failed turn recovery', () => {
     expect(result.current.chatError).toBeNull();
   });
 
+  it('interrupts with the latest functional draft edit before another render', async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.submitMessage('First question');
+    });
+    await act(async () => {
+      result.current.setInput('Replacement');
+      result.current.setInput(current => `${current} question`);
+      result.current.handleInterruptAndSubmit();
+    });
+    expect(h.stop).toHaveBeenCalledTimes(1);
+    expect(h.send).toHaveBeenCalledTimes(2);
+    expect(h.send.mock.calls[1][0].text).toBe('Replacement question');
+    expect(result.current.input).toBe('');
+  });
+
   it('keeps a newer composer draft when the submitted turn fails', async () => {
     const { result } = mount();
     await act(async () => {
@@ -216,6 +232,28 @@ describe('Summer failed turn recovery', () => {
     act(() => result.current.setInput('New draft edited after failure'));
     expect(result.current.chatError).toBeNull();
   });
+
+  it.each([false, true])(
+    'handles a failed send and a same-batch draft edit (newer text: %s)',
+    async newerText => {
+      const { result } = mount();
+      await act(async () => {
+        await result.current.submitMessage('First question');
+      });
+      act(() => {
+        h.onError?.(new TypeError('Failed to fetch'));
+        result.current.setInput(current =>
+          newerText ? `${current} edited` : current
+        );
+      });
+      expect(result.current.input).toBe(
+        newerText ? 'First question edited' : 'First question'
+      );
+      if (newerText) expect(result.current.chatError).toBeNull();
+      else
+        expect(result.current.chatError?.failedMessage).toBe('First question');
+    }
+  );
 
   it('retains the response request reference when a stream fails without JSON metadata', async () => {
     vi.stubGlobal(

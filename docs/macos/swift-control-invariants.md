@@ -19,7 +19,8 @@ remains historical evidence; its Electron-only prohibition is superseded.
 The native development target is `apps/ios/JovieMac.xcodeproj`, using the existing
 `JovieKit` package and canonical `JovieTheme`. Its distinct Development identity
 defaults to unavailable; only Debug accepts `--jovie-development-fixture` for
-immutable, read-only content. Release excludes that fixture. Required unsigned
+immutable, read-only content or `--jovie-development-composer` for local editing.
+Release excludes both development modes. Required unsigned
 Mac Debug/Release tests cover this boundary and bundled Inter font resolution;
 they do not establish authentication, distribution or installed performance.
 The scaffold is a bounded extraction from Tim White's #18958 (`3dde45bbe4d5`,
@@ -27,6 +28,33 @@ co-authored with Claude Opus 5.5). JOV-7528 owns this source slice; JOV-6750,
 JOV-6754, JOV-6748 and JOV-6759 retain shared-client, parity and release acceptance.
 The deprecated standalone Swift Ovie implementation
 stays read-only by policy. Do not grow MenuMonitor into a second product shell.
+
+### Local editor boundary (JOV-7571)
+
+The explicit composer exercise contains one persistent AppKit plain-text editor.
+Its draft lives only in that mounted view: it is not saved or sent. Typing, Enter
+for a newline, selection, paste and undo/redo use native text-system behavior.
+There is no authentication, transport, assistant response or conversation owner.
+The existing read-only fixture is unchanged. If both Debug arguments are supplied,
+the local composer takes precedence; neither argument enables a Release surface.
+
+The editor reserves the same frame for empty, typed and marked text, and for
+focused/unfocused states. Pointer/keyboard editing and the visible **Focus draft**
+button are the direct actions; the native text accessibility role exposes the
+draft. No custom global shortcut or motion is added.
+
+Unrelated host updates keep the native view, selection, scroll, undo and focus.
+An explicit focus request is consumed once after successful window attachment;
+later renders do not steal focus from another control. Equal text is never
+written back into the native text storage. A genuine external replacement outside
+composition clamps selection in UTF-16 coordinates and clears only this editor's
+undo stack. During marked-text composition, AppKit wins: conflicting external
+replacement is discarded, not queued. Commit or unmark reconciles the current
+binding, so an old replacement cannot reappear after composition.
+
+Native Debug/Release tests exercise local editing contracts. Physical input
+methods, VoiceOver and installed-Mac performance remain separate acceptance;
+source or app-hosted tests do not establish live native chat parity.
 
 ## Transition plan
 

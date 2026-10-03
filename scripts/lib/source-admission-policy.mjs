@@ -179,8 +179,16 @@ export function evaluateSourceAdmission({
             status.description
           )
         : null;
+    const baseBranchMatch =
+      status.context === 'jovie-queue-failure-hold/v1' &&
+      typeof status.description === 'string'
+        ? /^class=base-branch;n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*;main=([0-9a-f]{40})$/.exec(
+            status.description
+          )
+        : null;
+    const matchedFailure = failureMatch ?? baseBranchMatch;
     const description =
-      failureMatch !== null ||
+      matchedFailure !== null ||
       (status.context === 'jovie-queue-product-failure/v1'
         ? status.description === 'blocked:merge-group-product-failure'
         : status.context === 'jovie-native-unmergeable/v1' &&
@@ -201,8 +209,9 @@ export function evaluateSourceAdmission({
       typeof status.target_url !== 'string' ||
       !status.target_url.startsWith(prefix) ||
       !/^[1-9][0-9]*$/.test(status.target_url.slice(prefix.length)) ||
-      (failureMatch !== null &&
-        status.target_url.slice(prefix.length) !== failureMatch[2])
+      (matchedFailure !== null &&
+        status.target_url.slice(prefix.length) !==
+          (failureMatch ? failureMatch[2] : baseBranchMatch[1]))
     ) {
       blockers.push('tombstone-provenance-unavailable');
       continue;

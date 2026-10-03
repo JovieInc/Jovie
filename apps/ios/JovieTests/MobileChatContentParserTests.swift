@@ -928,3 +928,205 @@ struct MobileChatThinkingIndicatorTests {
     )
   }
 }
+
+struct MobileChatResultOnlyMerchTests {
+  // Exact generation JSON from completionPreservesResultOnlyMerchHandoff (JOV-7692).
+  private let generation = #"{"success":true,"generationId":"generation-merch","nextStep":"Choose your design","options":[{"#
+    + #""id":"option-merch","option_number":1,"design_name":"Night Sky","product_type":"t-shirt","#
+    + #""printful_product_name":"Premium Tee","colorway":"Black","concept":"Stars above the stage","#
+    + #""mockup_urls":["https://images.example/merch.png"],"price_recommendation":{"sale_price":"29.00"}}]}"#
+  // Exact preview output fields from the JOV-7692 terminal persistence fixture.
+  private let preview = #"{"success":true,"generationId":"gen-2","designs":[{"id":"design-1","option_number":1,"design_name":"Neon Pulse","status":"ready","preview_url":"https://cdn.test/neon.jpg"}]}"#
+
+  private func options(_ id: String = "generation-merch", updated: Bool = false) -> String {
+    var json = generation.replacingOccurrences(of: "generation-merch", with: id)
+    if updated {
+      json = json.replacingOccurrences(of: "Night Sky", with: "Dawn Sky")
+        .replacingOccurrences(of: "merch.png", with: "updated.png")
+        .replacingOccurrences(of: "29.00", with: "39.00")
+    }
+    return json
+  }
+
+  private func expectedOptions(_ id: String = "generation-merch", updated: Bool = false) -> MobileChatMerchArtifact {
+    .productOptions(MobileChatMerchOptionsPayload(
+      generationId: id, nextStep: "Choose your design", options: [MobileChatMerchOptionCard(
+        id: "option-merch", optionNumber: 1, designName: updated ? "Dawn Sky" : "Night Sky",
+        productLabel: "Premium Tee", colorway: "Black", concept: "Stars above the stage",
+        mockupURL: URL(string: updated ? "https://images.example/updated.png" : "https://images.example/merch.png"),
+        salePrice: updated ? "39.00" : "29.00"
+      )]
+    ))
+  }
+
+  private var expectedPreview: MobileChatMerchArtifact {
+    .designCarousel(MobileChatMerchDesignsPayload(generationId: "gen-2", nextStep: nil, designs: [
+      MobileChatMerchDesignCard(id: "design-1", optionNumber: 1, designName: "Neon Pulse",
+        concept: "", previewURL: URL(string: "https://cdn.test/neon.jpg"), isReady: true),
+    ]))
+  }
+
+  private func result(_ json: String, name: String = "createMerch", dialect: String = "tool_result", state: String = "success") -> String {
+    "<\(dialect)><name>\(name)</name><state>\(state)</state><json>\(json)</json></\(dialect)>"
+  }
+
+  private func call(_ name: String, function: Bool = false) -> String {
+    function ? "<function_calls><invoke name=\"\(name)\"></invoke></function_calls>"
+      : "<tool_call><name>\(name)</name><parameters></parameters></tool_call>"
+  }
+
+  private func artifacts(_ segments: [MobileChatRenderableSegment]) -> [MobileChatMerchArtifact] {
+    segments.compactMap { if case let .merchArtifact(value) = $0 { return value }; return nil }
+  }
+
+  private func order(_ segments: [MobileChatRenderableSegment]) -> [String] {
+    segments.compactMap {
+      if case let .toolCall(value) = $0 { return "call:\(value.toolName)" }
+      if case let .merchArtifact(value) = $0 { return value.id }
+      return nil
+    }
+  }
+
+  @Test(arguments: ["tool_result", "function_result"], [false, true])
+  func canonicalResultOnlyPayloadSurvivesWithoutFabricatedCalls(dialect: String, withProse: Bool) {
+    let prose = withProse ? "Your merch options are ready.\n" : ""
+    let fixtures = [("createMerch", generation, expectedOptions()), ("previewMerchOptions", preview, expectedPreview)]
+    for (name, json, expectedArtifact) in fixtures {
+      let content = prose + result(json, name: name, dialect: dialect)
+      let expected: [MobileChatRenderableSegment] = (withProse ? [.text(runs: [.text("Your merch options are ready.")])] : [])
+        + [.merchArtifact(expectedArtifact)]
+      for streaming in [false, true] {
+        let first = MobileChatContentParser.segments(from: content, isStreaming: streaming)
+        #expect(first == expected)
+        #expect(MobileChatContentParser.segments(from: content, isStreaming: streaming) == first)
+        #expect(MobileChatContentParser.displayText(from: content, isStreaming: streaming) == prose.trimmingCharacters(in: .newlines))
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func mixedDialectUpdatesKeepFirstSuccessRankAndLatestFullPayload(mirrored: Bool) {
+    let first = mirrored ? "tool_result" : "function_result"
+    let last = mirrored ? "function_result" : "tool_result"
+    let content = "🎸 Results\n" + result(options("A"), dialect: first)
+      + result(options("B"), dialect: last) + result(options("A", updated: true), dialect: last)
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+    #expect(artifacts(segments) == [expectedOptions("A", updated: true), expectedOptions("B")])
+    #expect(order(segments) == ["merch-options:A", "merch-options:B"])
+  }
+
+  @Test(arguments: [false, true])
+  func repeatedCallsRetainTheirCardsAndEmitEveryGenerationOnlyOnce(function: Bool) {
+    let invocation = call("createMerch", function: function)
+    let content = invocation + result(options("A")) + result(options("B"))
+      + invocation + result(options("A", updated: true))
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+    #expect(order(segments) == ["call:createMerch", "merch-options:A", "merch-options:B", "call:createMerch"])
+    #expect(artifacts(segments) == [expectedOptions("A", updated: true), expectedOptions("B")])
+    let cards = segments.compactMap { if case let .toolCall(value) = $0 { return value }; return nil }
+    let original = MobileChatContentParser.segments(from: invocation + result(options("A")), isStreaming: false)
+    let originalCards = original.compactMap { if case let .toolCall(value) = $0 { return value }; return nil }
+    #expect(cards == originalCards + originalCards)
+  }
+
+  @Test func kindSpecificIDsAndFirstSuccessfulNameControlPlacement() {
+    let designs = preview.replacingOccurrences(of: "gen-2", with: "A")
+    let content = call("previewMerchOptions") + call("createMerch")
+      + result(options("A")) + result(designs, name: "previewMerchOptions")
+      + result(options("A", updated: true), name: "previewMerchOptions", dialect: "function_result")
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+    #expect(order(segments) == ["call:previewMerchOptions", "merch-designs:A", "call:createMerch", "merch-options:A"])
+    #expect(artifacts(segments).last == expectedOptions("A", updated: true))
+    #expect(Set(artifacts(segments).map(\.id)).count == 2)
+  }
+
+  @Test func explicitCallAnchorsTakePriorityOverCrossToolResultArrivalOrder() {
+    let results = result(preview, name: "previewMerchOptions") + result(generation)
+    let anchored = MobileChatContentParser.segments(from: call("createMerch") + call("previewMerchOptions") + results, isStreaming: false)
+    let unanchored = MobileChatContentParser.segments(from: results, isStreaming: false)
+    #expect(order(anchored) == ["call:createMerch", "merch-options:generation-merch", "call:previewMerchOptions", "merch-designs:gen-2"])
+    #expect(artifacts(anchored) == [expectedOptions(), expectedPreview])
+    #expect(artifacts(unanchored) == [expectedPreview, expectedOptions()])
+  }
+
+  @Test(arguments: ["failed", "running", "malformed"])
+  func unsuccessfulSameIDCannotEraseSuccessfulPayloadOrChangeCallState(failure: String) {
+    let state = failure == "malformed" ? "success" : failure
+    let json = failure == "malformed" ? #"{"generationId":"A","success":true,"# : options("A", updated: true)
+    let content = call("createMerch") + result(options("A")) + result(json, state: state)
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+    let states = segments.compactMap { if case let .toolCall(value) = $0 { return value.state }; return nil }
+    let expectedState: MobileChatToolCallState = failure == "failed" ? .failed : (failure == "running" ? .running : .succeeded)
+    #expect(states == [expectedState])
+    #expect(artifacts(segments) == [expectedOptions("A")])
+    #expect(order(segments) == ["call:createMerch", "merch-options:A"])
+  }
+
+  @Test(arguments: ["failed", "running", "success-false", "missing-generation", "empty-generation", "missing-cards", "empty-cards", "invalid-cards", "malformed", "unsupported"])
+  func ineligibleResultsPreserveUnrelatedAndEnumeratedProse(reason: String) {
+    var json = generation
+    switch reason {
+    case "success-false": json = generation.replacingOccurrences(of: "\"success\":true", with: "\"success\":false")
+    case "missing-generation": json = generation.replacingOccurrences(of: "\"generationId\":\"generation-merch\",", with: "")
+    case "empty-generation": json = generation.replacingOccurrences(of: "generation-merch", with: "")
+    case "missing-cards": json = #"{"success":true,"generationId":"A"}"#
+    case "empty-cards": json = #"{"success":true,"generationId":"A","options":[],"designs":[]}"#
+    case "invalid-cards": json = #"{"success":true,"generationId":"A","options":[{}]}"#
+    case "malformed": json = #"{"success":true,"generationId":"A","#
+    default: break
+    }
+    let prose = "Keep this context.\n**1. Night Sky** is the only explanation."
+    for dialect in ["tool_result", "function_result"] {
+      let content = prose + result(json, name: reason == "unsupported" ? "unknownMerchTool" : "createMerch",
+        dialect: dialect, state: reason == "failed" || reason == "running" ? reason : "success")
+      #expect(MobileChatContentParser.segments(from: content, isStreaming: false) == [.text(runs: [.text(prose)])])
+      #expect(MobileChatContentParser.displayText(from: content, isStreaming: false) == prose)
+    }
+  }
+
+  @Test func failedObservationCannotClaimFirstRankOrPlacementAnchor() {
+    let content = call("previewMerchOptions") + call("createMerch")
+      + result(options("A"), name: "previewMerchOptions", state: "failed")
+      + result(options("B")) + result(options("A"))
+      + result(options("A", updated: true), name: "previewMerchOptions")
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+    #expect(order(segments) == ["call:previewMerchOptions", "call:createMerch", "merch-options:B", "merch-options:A"])
+    #expect(artifacts(segments) == [expectedOptions("B"), expectedOptions("A", updated: true)])
+  }
+
+  @Test(arguments: ["tool_result", "function_result", "tool_call", "function_calls"])
+  func onlyCompleteResultsProduceArtifactsAmidPartialStreamingMarkup(dialect: String) {
+    let partial: String
+    if dialect.hasSuffix("result") {
+      partial = result(options("incomplete-B"), dialect: dialect)
+        .replacingOccurrences(of: "</\(dialect)>", with: "")
+    } else {
+      partial = dialect == "tool_call" ? "<tool_call><name>createMerch</name><parameters>"
+        : "<function_calls><invoke name=\"createMerch\">"
+    }
+    let content = "Ready\n" + result(generation) + partial
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
+    #expect(artifacts(segments) == [expectedOptions()])
+    #expect(MobileChatContentParser.displayText(from: content, isStreaming: true) == "Ready")
+    #expect(MobileChatContentParser.segments(from: content, isStreaming: true) == segments)
+  }
+
+  @Test func merchArtifactsDoNotCollapseStreamingAndCompletedCacheModes() {
+    let prose = "Look @release:rel_1[Midnight Dri"
+    let content = result(generation) + prose
+    let streaming = MobileChatContentParser.segments(from: content, isStreaming: true)
+    let completed = MobileChatContentParser.segments(from: content, isStreaming: false)
+    #expect(streaming != completed)
+    #expect(artifacts(streaming) == [expectedOptions()] && artifacts(completed) == [expectedOptions()])
+    #expect(MobileChatContentParser.displayText(from: content, isStreaming: true) == "Look")
+    #expect(MobileChatContentParser.displayText(from: content, isStreaming: false) == prose)
+    #expect(MobileChatContentParser.segments(from: content, isStreaming: true) == streaming)
+    #expect(MobileChatContentParser.segments(from: content, isStreaming: false) == completed)
+  }
+
+  @Test func actualResultOnlyArtifactSuppressesItsEnumeratedDuplicateProse() {
+    let content = "**1. Night Sky** — Stars above the stage.\n" + result(generation)
+    #expect(MobileChatContentParser.segments(from: content, isStreaming: false) == [.merchArtifact(expectedOptions())])
+    #expect(MobileChatContentParser.displayText(from: content, isStreaming: false).isEmpty)
+  }
+}

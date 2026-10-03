@@ -2,7 +2,7 @@
   {
     "file": ".claude/rules/auth.md",
     "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
-    "bodySha256": "977d28661a368d7ff8617026b4cbbed677705f31c007041fe455e9c3af373ee8"
+    "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
   },
   {
     "file": ".claude/rules/ci-branching.md",
@@ -112,7 +112,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "2ec1c4a6c47cb29023f47f753e6f01daf7f14b0bb84388d84a3fc4949f6cb076"
+    "bodySha256": "7cd69dc11cfe4f4f784611444631ca17a2394514791a66c844de301a5545e2b7"
   },
   {
     "file": ".claude/rules/security.md",

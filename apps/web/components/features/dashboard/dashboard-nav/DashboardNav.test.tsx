@@ -53,6 +53,53 @@ describe('DashboardNav route warming', () => {
     resetDashboardNavTestMocks();
   });
 
+  it.each([false, true])(
+    'leaves home attention to the brand row and retains destinations with INBOX_HOME=%s',
+    inboxHome => {
+      const label = inboxHome ? 'Inbox' : 'Home';
+      const destinations = () =>
+        screen.getAllByRole('link').map(link => ({
+          label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
+          href: link.getAttribute('href'),
+        }));
+      const baseline = renderDashboardNav({
+        renderFn: render,
+        appFlags: { INBOX_HOME: inboxHome },
+      });
+      const attention = document.querySelector('[data-inbox-attention]');
+      expect(attention).toHaveAccessibleName(label);
+      expect(attention).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+      const retained = destinations();
+      const attentionIndex = screen
+        .getAllByRole('link')
+        .findIndex(link => link === attention);
+      retained.splice(attentionIndex, 1);
+      expect(retained.length).toBeGreaterThan(0);
+      baseline.unmount();
+      renderDashboardNav({
+        renderFn: render,
+        headerOwnsInbox: true,
+        appFlags: { INBOX_HOME: inboxHome },
+      });
+      expect(document.querySelector('[data-inbox-attention]')).toBeNull();
+      expect(destinations()).toEqual(retained);
+      expect(
+        document.querySelector('[data-sidebar-search-divider]')
+      ).toBeNull();
+    }
+  );
+
+  it('keeps the divider when a search surface precedes navigation actions', () => {
+    renderDashboardNav({
+      renderFn: render,
+      navChildren: <button type='button'>Search</button>,
+    });
+    expect(screen.getByRole('button', { name: 'Search' })).toBeVisible();
+    expect(
+      document.querySelector('[data-sidebar-search-divider]')
+    ).toBeInTheDocument();
+  });
+
   it('fully prefetches every canonical dynamic customer route', () => {
     renderDashboardNav({
       renderFn: render,
