@@ -281,6 +281,11 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
         'publish_merch_card',
       ])
     );
+    const descriptions = body.result.tools.map(
+      (tool: { description?: string }) => tool.description ?? ''
+    );
+    expect(descriptions.join('\n')).not.toContain('this artist profile');
+    expect(descriptions.join('\n')).toContain('this creator profile');
   });
 
   it('rejects merch generation without an authenticated owner session', async () => {
@@ -533,7 +538,7 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       { params: Promise.resolve({ username: 'artist1' }) }
     );
     const body = await res.json();
-    expect(body.error.message).toContain('do not own');
+    expect(body.error.message).toBe('You do not own this creator profile');
     expect(hoisted.getVideoMetricsForProfile).not.toHaveBeenCalled();
   });
 

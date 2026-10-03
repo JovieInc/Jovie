@@ -380,7 +380,7 @@ function buildToolDescriptors() {
     {
       name: 'generate_merch',
       description:
-        'Generate exactly three merch design options for the authenticated owner of this artist profile. Creates drafts only; it never publishes.',
+        'Generate exactly three merch design options for the authenticated owner of this creator profile. Creates drafts only; it never publishes.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -447,7 +447,7 @@ function buildToolDescriptors() {
     {
       name: 'get_video_metrics',
       description:
-        'Get analytics metric snapshots for one video in the library. Requires authenticated ownership of this artist profile.',
+        'Get analytics metric snapshots for one video in the library. Requires authenticated ownership of this creator profile.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -475,7 +475,7 @@ function buildToolDescriptors() {
     {
       name: 'register_thumbnail_version',
       description:
-        'Register a candidate thumbnail version for a video (pending human approval). Never performs a YouTube-side thumbnail swap. Requires authenticated ownership of this artist profile.',
+        'Register a candidate thumbnail version for a video (pending human approval). Never performs a YouTube-side thumbnail swap. Requires authenticated ownership of this creator profile.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -763,7 +763,7 @@ async function callTool(
     }
     const ownedProfile = await getAuthenticatedProfile(db, profile.id, userId);
     if (!ownedProfile) {
-      return { error: 'You do not own this artist profile' };
+      return { error: 'You do not own this creator profile' };
     }
 
     if (name === 'get_video_metrics') {
