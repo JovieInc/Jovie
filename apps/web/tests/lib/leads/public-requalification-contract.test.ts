@@ -6,6 +6,7 @@ import {
   PUBLIC_REQUALIFICATION_SCOPE,
   publicRequalificationEventType,
   runFromMetadata,
+  sortLinks,
 } from '@/lib/leads/public-requalification-contract';
 import type { QualificationResult } from '@/lib/leads/qualify';
 import type { SpotifyLeadEnrichment } from '@/lib/leads/spotify-enrich-lead';
@@ -115,6 +116,40 @@ describe('public requalification contract', () => {
       'https://linktr.ee/publicartist',
       'https://open.spotify.com/artist/artist123',
     ]);
+  });
+
+  it('uses code-unit ordering and preserves revisions across reordering', () => {
+    expect(
+      sortLinks([
+        { url: 'https://example.com/a' },
+        { url: 'https://example.com/A' },
+      ])
+    ).toEqual([
+      { url: 'https://example.com/A' },
+      { url: 'https://example.com/a' },
+    ]);
+
+    const original = qualification();
+    const permuted = Object.fromEntries(
+      Object.entries(original).reverse()
+    ) as unknown as QualificationResult;
+    permuted.allLinks = [...original.allLinks].reverse();
+    const build = (value: QualificationResult) =>
+      buildPublicRun({
+        candidateId: 'lead-public-artist',
+        candidateKey: 'publicartist',
+        profileUrl: 'https://linktr.ee/publicartist',
+        qualification: value,
+        spotify: spotify(),
+        existingRepresentation: false,
+        observedAt: new Date('2026-09-12T22:30:00.000Z'),
+        previousAttemptRunId: null,
+      });
+
+    const left = build(original);
+    const right = build(permuted);
+    expect(right.sourceDigest).toBe(left.sourceDigest);
+    expect(right.sourceRevision).toBe(left.sourceRevision);
   });
 
   it('maps public DSP presence into fit inputs and preserves it in the digest', () => {

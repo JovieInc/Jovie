@@ -100,10 +100,7 @@ export async function spotifyEnrichLead(
       leadId,
       spotifyUrl,
     });
-    return {
-      ...skipped('invalid_spotify_url'),
-      artistId: null,
-    };
+    return skipped('invalid_spotify_url');
   }
 
   return Sentry.startSpan(

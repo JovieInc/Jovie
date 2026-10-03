@@ -230,7 +230,7 @@ export class PublicRequalificationConflictError extends Error {
     incomingSourceRevision: string;
   }) {
     super(
-      `Public requalification receipt already exists for candidate ${input.candidateId} with a different source revision`
+      `Public requalification receipt already exists for candidate ${input.candidateId} with a conflicting immutable identity`
     );
     this.name = 'PublicRequalificationConflictError';
     this.candidateId = input.candidateId;
@@ -238,13 +238,18 @@ export class PublicRequalificationConflictError extends Error {
     this.incomingSourceRevision = input.incomingSourceRevision;
   }
 }
+
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function stableSerialize(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(item => stableSerialize(item)).join(',')}]`;
   }
   if (value && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareCodeUnits(left, right))
       .map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`)
       .join(',')}}`;
   }
@@ -257,7 +262,7 @@ function sha256(value: unknown): string {
 
 export function sortLinks(links: readonly unknown[]): unknown[] {
   return [...links].sort((left, right) =>
-    stableSerialize(left).localeCompare(stableSerialize(right))
+    compareCodeUnits(stableSerialize(left), stableSerialize(right))
   );
 }
 
@@ -421,12 +426,12 @@ export function buildPublicRun(input: {
   const expiresAt = new Date(
     input.observedAt.getTime() + PUBLIC_REQUALIFICATION_TTL_MS
   );
-  const sourceUrls = [
-    input.profileUrl,
-    ...input.qualification.allLinks.map(link => link.url),
-  ]
-    .filter((url, index, urls) => urls.indexOf(url) === index)
-    .sort((left, right) => left.localeCompare(right));
+  const sourceUrls = Array.from(
+    new Set([
+      input.profileUrl,
+      ...input.qualification.allLinks.map(link => link.url),
+    ])
+  ).sort(compareCodeUnits);
 
   return {
     contract: PUBLIC_REQUALIFICATION_CONTRACT,
