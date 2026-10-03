@@ -12,9 +12,8 @@ private struct AppContentView: View {
   let isAuthAvailable: Bool
   let isSignInUnavailable: Bool
   let authErrorMessage: String?
+  let authCoordinator: MobileAuthCoordinator
   let onLogout: @MainActor () async -> Void
-  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
-  let onAuthError: @MainActor (String?) -> Void
   @State private var chatRepository: ChatRepository?
   @State private var chatDraft = ""
   @State private var homeData: MobileHomeDataStore
@@ -33,17 +32,15 @@ private struct AppContentView: View {
     isAuthAvailable: Bool,
     isSignInUnavailable: Bool,
     authErrorMessage: String?,
-    onLogout: @escaping @MainActor () async -> Void,
-    onAuthReturn: @escaping @MainActor (MobileAuthReturn) -> Void,
-    onAuthError: @escaping @MainActor (String?) -> Void
+    authCoordinator: MobileAuthCoordinator,
+    onLogout: @escaping @MainActor () async -> Void
   ) {
     self.appState = appState
     self.isAuthAvailable = isAuthAvailable
     self.isSignInUnavailable = isSignInUnavailable
     self.authErrorMessage = authErrorMessage
     self.onLogout = onLogout
-    self.onAuthReturn = onAuthReturn
-    self.onAuthError = onAuthError
+    self.authCoordinator = authCoordinator
     let homeData = MobileHomeDataStore()
     homeData.showFixture(
       audience: Self.previewAudienceHighlightsState(for: appState.launchMode),
@@ -103,10 +100,8 @@ private struct AppContentView: View {
         AuthScreen(
           isMock: !isAuthAvailable,
           isSignInUnavailable: isSignInUnavailable,
-          webBaseURL: appState.configuration.webBaseURL,
           errorMessage: authErrorMessage,
-          onAuthReturn: onAuthReturn,
-          onAuthError: onAuthError
+          authCoordinator: authCoordinator
         )
         .transition(.opacity)
       case .needsOnboarding:
@@ -607,9 +602,8 @@ struct RootView: View {
   let isSignInUnavailable: Bool
   let authenticatedUserID: String?
   let authErrorMessage: String?
+  let authCoordinator: MobileAuthCoordinator
   let onLogout: @MainActor () async -> Void
-  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
-  let onAuthError: @MainActor (String?) -> Void
 
   var body: some View {
     ZStack {
@@ -618,9 +612,8 @@ struct RootView: View {
         isAuthAvailable: isAuthAvailable,
         isSignInUnavailable: isSignInUnavailable,
         authErrorMessage: authErrorMessage,
-        onLogout: onLogout,
-        onAuthReturn: onAuthReturn,
-        onAuthError: onAuthError
+        authCoordinator: authCoordinator,
+        onLogout: onLogout
       )
 
 #if DEBUG
