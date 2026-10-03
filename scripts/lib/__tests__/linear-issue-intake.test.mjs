@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  clearRemediationLabelCache,
+  closeLinearIssueByFingerprint,
+  ensureLinearLabel,
   remediationKey,
+  remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from '../linear-issue-intake.mjs';
 
@@ -308,5 +312,276 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
         JSON.parse(String(call[1].body)).query.includes('issueCreate')
       )
     ).toBe(false);
+  });
+
+  it('reopens by default when a stable remediation key is set', async () => {
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('FindIssueByFingerprint')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: {
+                states: {
+                  nodes: [{ id: 'backlog', name: 'Backlog', type: 'backlog' }],
+                },
+                labels: { nodes: [] },
+              },
+              issues: {
+                nodes: [
+                  {
+                    id: 'lin-9',
+                    identifier: 'JOV-9',
+                    title:
+                      'P0: Golden Path nightly is red (golden-path-nightly:failure)',
+                    state: { id: 'done', name: 'Done', type: 'completed' },
+                    labels: { nodes: [] },
+                  },
+                ],
+              },
+            },
+          })
+        );
+      }
+      if (payload.query.includes('issueLabelCreate')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              issueLabelCreate: {
+                success: true,
+                issueLabel: { id: 'label-new' },
+              },
+            },
+          })
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: { id: 'lin-9', identifier: 'JOV-9' },
+            },
+          },
+        })
+      );
+    });
+    clearRemediationLabelCache();
+    const result = await upsertLinearIssueByTitleFingerprint({
+      fingerprint: 'golden-path-nightly:failure',
+      labelKey: 'golden-path-nightly',
+      title: 'P0: Golden Path nightly is red',
+      description: 'red',
+      apiKey: 'lin-key',
+      fetchImpl,
+    });
+    expect(result).toMatchObject({ ok: true, reopened: true });
+    const update = JSON.parse(String(fetchImpl.mock.calls.at(-1)[1].body));
+    expect(update.variables.input.stateId).toBe('backlog');
+    expect(update.variables.input.labelIds).toEqual(['label-new']);
+    expect(update.variables.input.description).toContain(
+      'Fingerprint: remediation:golden-path-nightly'
+    );
+    const createdLabel = JSON.parse(String(fetchImpl.mock.calls[1][1].body));
+    expect(createdLabel.variables.color).toBe('#E5484D');
+  });
+
+  it('rejects a remediation key that is not a slug', async () => {
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        fingerprint: 'nightly',
+        labelKey: 'Not A Key',
+        title: 't',
+        description: 'd',
+        apiKey: 'lin-key',
+        fetchImpl: vi.fn(),
+      })
+    ).resolves.toEqual({ ok: false, reason: 'invalid_remediation_key' });
+  });
+});
+
+describe('ensureLinearLabel', () => {
+  it('creates a team label only when it is missing, then caches it', async () => {
+    clearRemediationLabelCache();
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              issueLabelCreate: {
+                success: true,
+                issueLabel: { id: 'label-1' },
+              },
+            },
+          })
+        )
+    );
+    const first = await ensureLinearLabel({
+      name: 'remediation:billing-sync-stale',
+      nodes: [],
+      apiKey: 'lin-key',
+      fetchImpl,
+    });
+    const second = await ensureLinearLabel({
+      name: 'remediation:billing-sync-stale',
+      nodes: [],
+      apiKey: 'lin-key',
+      fetchImpl,
+    });
+    expect(first).toEqual({ ok: true, id: 'label-1' });
+    expect(second).toEqual({ ok: true, id: 'label-1' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const present = await ensureLinearLabel({
+      name: 'remediation:billing-health-public',
+      nodes: [{ id: 'existing', name: 'remediation:billing-health-public' }],
+      apiKey: 'lin-key',
+      fetchImpl,
+    });
+    expect(present).toEqual({ ok: true, id: 'existing' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('closeLinearIssueByFingerprint', () => {
+  it('no-ops when nothing is open', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              team: { states: { nodes: [] }, labels: { nodes: [] } },
+              issues: { nodes: [] },
+            },
+          })
+        )
+    );
+    await expect(
+      closeLinearIssueByFingerprint({
+        fingerprint: 'billing-health-public',
+        labelKey: 'billing-health-public',
+        runId: 'run-1',
+        apiKey: 'lin-key',
+        fetchImpl,
+      })
+    ).resolves.toMatchObject({ ok: true, action: 'noop', reason: 'none_open' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('comments once per run and moves the open issue to Done', async () => {
+    const open = {
+      id: 'lin-1',
+      identifier: 'JOV-1',
+      title: 'billing-health-public',
+      state: { id: 'todo', name: 'Todo', type: 'unstarted' },
+      labels: {
+        nodes: [{ id: 'lab', name: 'remediation:billing-health-public' }],
+      },
+    };
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('FindIssueToClose')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: {
+                states: {
+                  nodes: [{ id: 'done', name: 'Done', type: 'completed' }],
+                },
+                labels: { nodes: [] },
+              },
+              issues: { nodes: [open] },
+            },
+          })
+        );
+      }
+      if (payload.query.includes('ListLinearIssueComments')) {
+        const commented = fetchImpl.mock.calls.some(call =>
+          JSON.parse(String(call[1].body)).query.includes('commentCreate')
+        );
+        return new Response(
+          JSON.stringify({
+            data: {
+              issue: {
+                comments: {
+                  nodes: commented
+                    ? [
+                        {
+                          id: 'c1',
+                          body: 'cleared\n\n<!-- recovered-run:run-9 -->',
+                        },
+                      ]
+                    : [],
+                },
+              },
+            },
+          })
+        );
+      }
+      if (payload.query.includes('commentCreate')) {
+        return new Response(
+          JSON.stringify({
+            data: { commentCreate: { success: true, comment: { id: 'c1' } } },
+          })
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: { id: 'lin-1', identifier: 'JOV-1' },
+            },
+          },
+        })
+      );
+    });
+
+    const first = await closeLinearIssueByFingerprint({
+      fingerprint: 'billing-health-public',
+      runId: 'run-9',
+      apiKey: 'lin-key',
+      fetchImpl,
+    });
+    expect(first).toMatchObject({
+      ok: true,
+      action: 'resolved',
+      commented: true,
+    });
+    const comment = fetchImpl.mock.calls
+      .map(call => JSON.parse(String(call[1].body)))
+      .find(payload => payload.query.includes('commentCreate'));
+    expect(comment.variables.body).toContain('recovered-run:run-9');
+
+    open.state = { id: 'done', name: 'Done', type: 'completed' };
+    const second = await closeLinearIssueByFingerprint({
+      fingerprint: 'billing-health-public',
+      runId: 'run-9',
+      apiKey: 'lin-key',
+      fetchImpl,
+    });
+    expect(second).toMatchObject({ ok: true, action: 'noop' });
+    expect(
+      fetchImpl.mock.calls.filter(call =>
+        JSON.parse(String(call[1].body)).query.includes('commentCreate')
+      )
+    ).toHaveLength(1);
+  });
+});
+
+describe('remediationTriggersEnabled', () => {
+  it('files when the kill switch is unset', () => {
+    expect(remediationTriggersEnabled({})).toBe(true);
+    expect(
+      remediationTriggersEnabled({ REMEDIATION_TRIGGERS_ENABLED: 'false' })
+    ).toBe(true);
+  });
+
+  it('skips only when REMEDIATION_TRIGGERS_DISABLED is true', () => {
+    expect(
+      remediationTriggersEnabled({ REMEDIATION_TRIGGERS_DISABLED: 'true' })
+    ).toBe(false);
+    expect(
+      remediationTriggersEnabled({ REMEDIATION_TRIGGERS_DISABLED: 'false' })
+    ).toBe(true);
   });
 });

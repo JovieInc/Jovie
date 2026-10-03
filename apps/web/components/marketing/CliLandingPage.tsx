@@ -10,7 +10,7 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export const CLI_HEADLINE = 'Jovie, for your agents.';
 export const CLI_SUBTITLE =
-  'Give any artist a Jovie profile from their Spotify link, then read public artist data. One package: CLI, MCP server, and agent skill. No account or API key.';
+  'Give any creator a Jovie profile from their Spotify link, then read public profile data. One package: CLI, MCP server, and agent skill. No account or API key.';
 export const CLI_PRIMARY_CTA_LABEL = 'Install the CLI';
 
 export const CLI_DOCUMENTED_COMMANDS = [
@@ -57,7 +57,7 @@ export const CLI_FAQ_ITEMS = [
   {
     question: 'Does the CLI require an account or API key?',
     answer:
-      'No. Every command is anonymous. The only writes are profile create, which makes an unclaimed profile the artist claims by verifying their Spotify artist, and the report commands, which file bugs and feedback. The CLI does not log in, cache responses, or send telemetry.',
+      'No. Every command is anonymous. The only writes are profile create, which makes an unclaimed profile the creator claims by verifying their Spotify artist, and the report commands, which file bugs and feedback. The CLI does not log in, cache responses, or send telemetry.',
   },
   {
     question: 'Which Node.js version does it need?',
@@ -82,9 +82,9 @@ jovie --version`;
 
 const CLI_JOBS = [
   {
-    title: 'Give an artist a profile',
+    title: 'Give a creator a profile',
     command: 'jovie profile create <spotify-artist-url>',
-    body: 'Create a Jovie profile from a Spotify artist link. You get the profile URL and a claim link the artist opens to take ownership.',
+    body: 'Create a Jovie profile from a Spotify artist link. You get the profile URL and a claim link the creator opens to take ownership.',
   },
   {
     title: 'Plug Jovie into an agent',
@@ -92,14 +92,14 @@ const CLI_JOBS = [
     body: 'Run the same commands as MCP tools, or run jovie init to install the Jovie skill into every agent on this machine.',
   },
   {
-    title: 'Get an artist',
+    title: 'Get a profile',
     command: 'jovie artist get <username>',
-    body: 'Fetch the structured public artist profile for a real Jovie username. Add --json when you want to pipe the response into another tool.',
+    body: 'Fetch the structured public profile for a real Jovie username. Add --json when you want to pipe the response into another tool.',
   },
   {
-    title: 'Give an artist to an agent',
+    title: 'Give a profile to an agent',
     command: 'jovie artist llms <username>',
-    body: 'Fetch the artist’s public llms.txt context so an agent can understand the artist without scraping a profile page.',
+    body: 'Fetch the profile’s public llms.txt context so an agent can understand the creator without scraping a profile page.',
   },
   {
     title: 'Build against Jovie',
@@ -244,7 +244,7 @@ export function CliLandingPage() {
 
       <MarketingFooterCta
         title='Jovie, for your agents.'
-        body='Install the Jovie CLI and give an artist a profile from their Spotify link.'
+        body='Install the Jovie CLI and give a creator a profile from their Spotify link.'
         ctaLabel={CLI_PRIMARY_CTA_LABEL}
         ctaHref='#install'
         ctaAnalyticsEvent='cli_install_cta'
