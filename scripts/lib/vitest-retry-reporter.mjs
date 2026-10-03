@@ -85,7 +85,12 @@ export function executionReceipt(module, workspaceRoot, initialHash) {
     .join('/');
   if (file.startsWith('../') || path.isAbsolute(file) || !initialHash)
     return null;
-  const source = fs.readFileSync(module.moduleId);
+  let source;
+  try {
+    source = fs.readFileSync(module.moduleId);
+  } catch {
+    return null;
+  }
   if (createHash('sha256').update(source).digest('hex') !== initialHash)
     return null;
   const cases = [...module.children.allTests()];

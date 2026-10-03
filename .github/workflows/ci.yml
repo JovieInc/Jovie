@@ -505,6 +505,9 @@ jobs:
       # JOV-5960: selects the source-lane visual snapshot compare on homepage
       # PRs so a skipped compare can never read as green there.
       run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
+      # Marketing surfaces select the rendered DOM invariant certification
+      # (route-dom-certification.spec.ts) in the same compare job.
+      run_marketing_dom: ${{ steps.homepage-visual.outputs.run_marketing_dom || 'false' }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
@@ -1016,6 +1019,12 @@ jobs:
           else
             echo "run_homepage_visual=false" >> "$GITHUB_OUTPUT"
           fi
+          MARKETING_DOM_PATTERN='^(\.github/workflows/ci\.yml|apps/web/app/\((marketing|home)\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(marketing|site|homepage|features/home|molecules/PhoneFrame)|apps/web/data/|apps/web/styles/|apps/web/public/(product-screenshots|device-bezels)/|apps/web/tests/e2e/utils/(route-dom|image-contrast)-detector\.ts|apps/web/tests/product-screenshots/route-dom-|apps/web/playwright\.config\.screenshots\.ts|packages/ui/)'
+          if grep -q -E "$MARKETING_DOM_PATTERN" "$CHANGED_PATHS"; then
+            echo "run_marketing_dom=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_marketing_dom=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Preserve intake product-lane receipt
         if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
@@ -1400,7 +1409,8 @@ jobs:
         (github.event_name == 'merge_group' &&
         needs.ci-merge-group-workspace.result == 'success') ||
         (github.event_name == 'pull_request' &&
-        needs.ci-path-changes.outputs.run_homepage_visual == 'true')
+        (needs.ci-path-changes.outputs.run_homepage_visual == 'true' ||
+        needs.ci-path-changes.outputs.run_marketing_dom == 'true'))
       )
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -1427,11 +1437,11 @@ jobs:
       - name: Validate snapshot inventory and workflow contract
         run: node scripts/visual-snapshot-compare.mjs compare
       - uses: ./.github/actions/setup-node-pnpm
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         with:
           reuse_merge_group_workspace: 'true'
       - uses: ./.github/actions/setup-playwright
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
       # The build below spent 3.2 of its ~4.2 min in a cold Turbopack compile
       # (PR run 36197543391). Restore the Build + Layout Turbopack cache that
       # only trusted push-to-main runs write; this job never saves it. The path
@@ -1439,10 +1449,10 @@ jobs:
       # this job's own inputs and env, so the rendered output is unchanged.
       - name: Resolve Next build cache hour
         id: next-build-cache-hour
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
       - name: Restore Next build cache (read-only)
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache/turbopack
@@ -1451,7 +1461,7 @@ jobs:
             ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
             ${{ runner.os }}-next-build-web-v1-
       - name: Build homepage for rendered snapshot compare
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: pnpm turbo build --filter=@jovie/web
         env:
           # Still reads the restored cache but skips persisting it (13-55s of
@@ -1534,8 +1544,56 @@ jobs:
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: user_test
+      # Rendered marketing design invariants (route DOM detector: nested
+      # surfaces, stranded copy, heading hierarchy, clipped headings,
+      # misaligned stacks, orphans, layout shift, placeholder copy, contrast)
+      # block the merge queue. Taste kinds ratchet via
+      # route-dom-marketing-baseline.json; other kinds are zero-tolerance.
+      - name: Certify marketing route DOM invariants
+        if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        run: |
+          set -euo pipefail
+          cd apps/web
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found; marketing DOM certification cannot start."
+            exit 1
+          fi
+          export HOSTNAME=localhost
+          PORT=3230 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/marketing-dom-server.log" 2>&1 &
+          SERVER_PID=$!
+          for _attempt in $(seq 1 30); do
+            curl -sf http://localhost:3230 > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://localhost:3230 > /dev/null || { cat "$RUNNER_TEMP/marketing-dom-server.log"; exit 1; }
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts \
+              --config=playwright.config.screenshots.ts --project=screenshots \
+              --workers=1 --retries=0 --reporter=line \
+              -g 'deliberate-red|certifies every marketing route'
+        env:
+          BASE_URL: http://localhost:3230
+          CI: 'true'
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          ROUTE_DOM_CERTIFICATION_SCOPE: marketing
+          ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: test-results/route-dom-certification
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          CLERK_SECRET_KEY: sk_test_mock
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
       - name: Upload homepage visual failure evidence
-        if: ${{ failure() && needs.ci-path-changes.outputs.run_homepage_visual == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        if: ${{ failure() && (needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}
@@ -3490,6 +3548,7 @@ jobs:
           pnpm --filter @jovie/auth-routing test
           pnpm --filter @jovie/action-contracts test
           pnpm --filter @jovie/audio-contracts test
+          pnpm --filter @jovie/release-channel-contracts test
 
   ci-product-lane-receipt:
     name: Product Lane Receipt
@@ -7093,6 +7152,7 @@ jobs:
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
+          RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           DATABASE_CERTIFICATION_RESULT="${{ needs.neon-db.result }}"
           DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
@@ -7281,6 +7341,7 @@ jobs:
           RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
+          RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
 
           {
             echo "### PR Ready"
@@ -7296,7 +7357,7 @@ jobs:
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
-            echo "| Visual Snapshot Compare (homepage PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
+            echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
             echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
@@ -7340,6 +7401,10 @@ jobs:
           # source lane and skipped is not green (JOV-5960).
           if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
             echo "❌ Visual Snapshot Compare did not pass on a homepage PR; skipped is not green (JOV-5960) (result: $VISUAL_COMPARE_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
+            echo "❌ Marketing DOM invariant certification did not pass on a marketing PR; skipped is not green (result: $VISUAL_COMPARE_RESULT)"
             exit 1
           fi
 

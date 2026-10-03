@@ -661,3 +661,103 @@ export async function closeLinearIssueByFingerprint({
     commented: !already,
   };
 }
+/** Resolve the open issue when its description names this source workflow. */
+export async function noteFingerprintedIssueGreen({
+  fingerprint,
+  source,
+  comment,
+  commentMarker = '<!-- remediation-green -->',
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (typeof fingerprint !== 'string' || fingerprint.trim().length === 0) {
+    return { ok: false, reason: 'missing_fingerprint' };
+  }
+  const labelName = remediationKey(fingerprint);
+  const found = await linearGraphql(
+    {
+      query: `
+        query FindRemediationForGreen($teamId: String!, $teamFilterId: ID!, $labelName: String!) {
+          team(id: $teamId) { states { nodes { id name type } } }
+          issues(
+            filter: {
+              team: { id: { eq: $teamFilterId } }
+              labels: { some: { name: { eq: $labelName } } }
+            }
+            first: 25
+          ) { nodes { ${ISSUE_FIELDS} } }
+        }
+      `,
+      variables: {
+        teamId: JOVIE_TEAM_ID,
+        teamFilterId: JOVIE_TEAM_ID,
+        labelName,
+      },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_search'
+  );
+  if (!found.ok) return found;
+  const match = resolveLinearIssueByFingerprint(
+    found.data?.issues?.nodes,
+    fingerprint
+  );
+  if (!match) return { ok: true, action: 'none' };
+  if (['completed', 'canceled'].includes(match.state?.type)) {
+    return { ok: true, action: 'already_closed', id: match.id };
+  }
+  const sourceLine = source ? `Source-workflow: ${source}` : '';
+  if (sourceLine && !String(match.description ?? '').includes(sourceLine)) {
+    return {
+      ok: true,
+      action: 'source_mismatch',
+      id: match.id,
+      identifier: match.identifier ?? null,
+    };
+  }
+  const posted = await addLinearIssueComment({
+    issueId: match.id,
+    body: comment || `${commentMarker}\n${sourceLine} is green.`,
+    apiKey,
+    fetchImpl,
+  });
+  if (!posted.ok) return posted;
+  const states = found.data?.team?.states?.nodes ?? [];
+  const done =
+    states.find(state => state?.name === 'Done') ??
+    states.find(state => state?.type === 'completed');
+  if (!done?.id) return { ok: false, reason: 'linear_done_state_missing' };
+  const updated = await linearGraphql(
+    {
+      query: `
+        mutation ResolveRemediation($id: String!, $stateId: String!) {
+          issueUpdate(id: $id, input: { stateId: $stateId }) {
+            success
+            issue { id identifier url }
+          }
+        }
+      `,
+      variables: { id: match.id, stateId: done.id },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_update'
+  );
+  if (!updated.ok) return updated;
+  if (!updated.data?.issueUpdate?.success) {
+    return {
+      ok: false,
+      reason: 'linear_update_unsuccessful',
+      body: updated.raw,
+    };
+  }
+  return {
+    ok: true,
+    action: 'resolved',
+    id: match.id,
+    identifier: updated.data.issueUpdate.issue?.identifier ?? match.identifier,
+    url: updated.data.issueUpdate.issue?.url ?? match.url,
+  };
+}
