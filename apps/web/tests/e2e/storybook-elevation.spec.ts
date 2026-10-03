@@ -636,3 +636,162 @@ test.describe('central runtime notifications', () => {
     ).toBe(1);
   });
 });
+
+test.describe('sidebar attention and Settings header', () => {
+  test('legacy admin keeps its fallback Inbox link', async ({ page }) => {
+    await openStory(page, 'organisms-unifiedsidebar--legacy-admin', 'light');
+    await expect(
+      page.getByRole('link', { name: 'Inbox', exact: true })
+    ).toHaveAttribute('href', '/app');
+    await expect(page.locator('[data-sidebar-search-divider]')).toHaveCount(0);
+  });
+
+  test('mobile brand actions leave the collapse control at the row edge', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 760 });
+    await openStory(page, 'organisms-unifiedsidebar--dashboard', 'light');
+    const mobile = page.getByRole('dialog');
+    const row = mobile.locator('[data-sidebar-brand-row]');
+    const collapse = mobile.getByRole('button', {
+      name: 'Collapse sidebar',
+      exact: true,
+    });
+    const search = mobile.getByRole('button', {
+      name: 'Search Jovie',
+      exact: true,
+    });
+    await expect(collapse).toBeVisible();
+    const bounds = (await row.boundingBox())!;
+    const control = (await collapse.boundingBox())!;
+    const action = (await search.boundingBox())!;
+    expect(
+      Math.abs(bounds.x + bounds.width - control.x - control.width)
+    ).toBeLessThanOrEqual(2);
+    expect(control.x).toBeGreaterThanOrEqual(action.x + action.width);
+  });
+
+  test('demo search fills the space preceding its divider and actions', async ({
+    page,
+  }) => {
+    await openStory(page, 'organisms-unifiedsidebar--demo', 'light');
+    const slot = page.locator('[data-sidebar-search-slot]');
+    const search = page.getByRole('button', {
+      name: 'Search Jovie',
+      exact: true,
+    });
+    const divider = page.locator('[data-sidebar-search-divider]');
+    await expect(search).toBeVisible();
+    await expect(divider).toBeVisible();
+    const shell = (await slot.boundingBox())!;
+    const trigger = (await search.boundingBox())!;
+    const line = (await divider.boundingBox())!;
+    const gap = await slot.evaluate(el =>
+      Number.parseFloat(getComputedStyle(el).columnGap)
+    );
+    expect(trigger.width).toBeGreaterThan(shell.width / 2);
+    expect(
+      Math.abs(line.x - trigger.x - trigger.width - gap)
+    ).toBeLessThanOrEqual(2);
+    await expect(
+      page.getByRole('link', { name: 'Inbox', exact: true })
+    ).toBeVisible();
+  });
+
+  test('headerless media routes retain a window-control safe area', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 760 });
+    await page.addInitScript(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.documentElement.dataset.desktopRuntime = 'electron';
+      });
+    });
+    await openStory(
+      page,
+      'organisms-appshellframe--route-owned-header',
+      'light'
+    );
+    const control = (await page
+      .getByTestId('electron-sidebar-toggle')
+      .boundingBox())!;
+    const action = (await page
+      .getByRole('button', { name: 'Route header action' })
+      .boundingBox())!;
+    expect(action.y).toBeGreaterThanOrEqual(control.y + control.height);
+  });
+  for (const width of [1200, 390]) {
+    test(`Settings title shares native band at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 760 });
+      await page.addInitScript(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.documentElement.dataset.desktopRuntime = 'electron';
+        });
+      });
+      await openStory(
+        page,
+        'organisms-appshellframe--settings-header-alignment',
+        'light'
+      );
+      const toggle = page.getByTestId('electron-sidebar-toggle');
+      const heading = page.getByRole('heading', {
+        name: 'Account',
+        exact: true,
+      });
+      await expect(heading).toHaveCount(1);
+      const verify = async () => {
+        const title = (await heading.boundingBox())!;
+        const control = (await toggle.boundingBox())!;
+        expect(
+          Math.abs(title.y + title.height / 2 - control.y - control.height / 2)
+        ).toBeLessThanOrEqual(2);
+        expect(title.x).toBeGreaterThanOrEqual(200);
+        expect(
+          await heading.evaluate(el => el.scrollWidth <= el.clientWidth)
+        ).toBe(true);
+        await expect(
+          page.getByText('Security, theme, and notifications.')
+        ).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+      };
+      await verify();
+      if (width > 1024) {
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-label', 'Expand sidebar');
+        await verify();
+      }
+    });
+  }
+  for (const theme of THEMES) {
+    test(`brand bell and search share one row [${theme}]`, async ({ page }) => {
+      await openStory(page, 'organisms-unifiedsidebar--dashboard', theme);
+      const row = page.locator('[data-sidebar-brand-row]');
+      const inbox = page.getByRole('link', { name: /Inbox —/ });
+      const search = page.getByRole('button', { name: 'Search Jovie' });
+      await expect(inbox).toHaveAttribute('href', '/app');
+      await expect(search).toHaveCount(1);
+      await expect(row).toContainText('Jovie');
+      const bellBox = (await inbox.boundingBox())!;
+      const searchBox = (await search.boundingBox())!;
+      expect(Math.abs(bellBox.y - searchBox.y)).toBeLessThanOrEqual(1);
+      expect(searchBox.x).toBeGreaterThan(bellBox.x);
+      await expect(
+        page.getByRole('link', { name: 'Inbox', exact: true })
+      ).toHaveCount(0);
+      // Current navigation groups Calendar within Work. Preserve every
+      // canonical destination exposed by this default-flags story.
+      for (const [name, href] of [
+        ['Home', '/app'],
+        ['Identity', '/app/presence'],
+        ['Work', '/app/library'],
+        ['Audience', '/app/contacts?tab=audience'],
+      ]) {
+        const destination = page.getByRole('link', { name, exact: true });
+        await expect(destination).toBeVisible();
+        await expect(destination).toHaveAttribute('href', href);
+      }
+    });
+  }
+});
