@@ -331,6 +331,27 @@ export async function POST(request: NextRequest) {
           .join('\n')
       : '';
 
+    const sentryAction = boundedString(payload.action, 32);
+    const shortId = boundedString(issue.shortId, 64);
+    const remediation = await syncSentryRemediationIssue({
+      action: sentryAction,
+      shortId,
+      issueId,
+      title,
+      url,
+      culprit,
+    });
+    if (sentryAction === 'resolved') {
+      return NextResponse.json(
+        {
+          received: true,
+          resolved: true,
+          linear: remediation?.identifier ?? null,
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Fire GitHub repository_dispatch
     // Canonical product repo. Never fall back to a legacy org/name — silent misfires.
     const owner = env.VERCEL_GIT_REPO_OWNER || 'JovieInc';
@@ -349,6 +370,8 @@ export async function POST(request: NextRequest) {
           event_type: 'sentry-issue',
           client_payload: {
             issue_id: issueId,
+            short_id: shortId,
+            linear_identifier: remediation?.identifier ?? '',
             dedupe_key: dedupeKey,
             title,
             culprit,
@@ -422,6 +445,98 @@ export async function POST(request: NextRequest) {
       { error: 'Webhook processing failed' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
+  }
+}
+
+function sentryRemediationKey(shortId: string, issueId: string): string {
+  const slug = String(shortId || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return `sentry-${slug}`;
+  const numeric = String(issueId || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(numeric)) return `sentry-${numeric}`;
+  return 'sentry-unknown';
+}
+
+async function syncSentryRemediationIssue({
+  action,
+  shortId,
+  issueId,
+  title,
+  url,
+  culprit,
+}: {
+  action: string;
+  shortId: string;
+  issueId: string;
+  title: string;
+  url: string;
+  culprit: string;
+}): Promise<{ identifier?: string | null } | null> {
+  const key = sentryRemediationKey(shortId, issueId);
+  const disabled = process.env.REMEDIATION_TRIGGERS_DISABLED === 'true';
+  const summerLive = process.env.SUMMER_SENTRY_INTAKE_LIVE === 'true';
+  if (disabled || summerLive) {
+    if (!summerLive) {
+      const planned = action === 'resolved' ? 'resolve' : 'upsert';
+      console.log(
+        `remediation dry-run ${planned} key=${key} fingerprint=${key}`
+      );
+      console.log(
+        JSON.stringify({
+          remediation: 'dry-run',
+          action: planned,
+          key,
+          fingerprint: key,
+        })
+      );
+    }
+    return null;
+  }
+  try {
+    const intake = (await import(
+      '../../../../../../scripts/lib/linear-issue-intake.mjs'
+    )) as unknown as {
+      closeLinearIssueByFingerprint: (input: {
+        fingerprint: string;
+        labelKey: string;
+        comment: string;
+        runId: string;
+      }) => Promise<{ identifier?: string | null }>;
+      upsertLinearIssueByTitleFingerprint: (input: {
+        fingerprint: string;
+        labelKey: string;
+        title: string;
+        description: string;
+        priority: number;
+        reopenTerminal: boolean;
+      }) => Promise<{ identifier?: string | null }>;
+    };
+    if (action === 'resolved') {
+      return await intake.closeLinearIssueByFingerprint({
+        fingerprint: key,
+        labelKey: key,
+        comment: 'Sentry marked the issue resolved.',
+        runId: issueId,
+      });
+    }
+    return await intake.upsertLinearIssueByTitleFingerprint({
+      fingerprint: key,
+      labelKey: key,
+      title: `Sentry: ${title} (${key})`.slice(0, 240),
+      description: `Sentry issue ${issueId} ${shortId}\n${url}\n${culprit}`,
+      priority: 2,
+      reopenTerminal: true,
+    });
+  } catch (error) {
+    logger.warn('[Sentry Webhook] Linear remediation sync failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
 
