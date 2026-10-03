@@ -974,7 +974,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:preserve-incident
-    jobCount: 4
+    jobCount: 5
   - name: Production Controller Health
     path: .github/workflows/production-controller-health.yml
     active: true
@@ -1004,7 +1004,7 @@ nodes:
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:publish-customer-changelog
-    jobCount: 10
+    jobCount: 12
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1027,7 +1027,7 @@ nodes:
     triggeringStateTransition:
       - workflow_call
     terminalReceipt: job:release-result
-    jobCount: 15
+    jobCount: 16
   - name: Quality Gap Finder
     path: .github/workflows/quality-gap-finder.yml
     active: true
