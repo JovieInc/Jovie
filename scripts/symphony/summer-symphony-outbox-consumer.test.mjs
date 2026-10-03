@@ -1214,6 +1214,7 @@ describe('existing owned repair transport', () => {
       v => (v.execution.provider = 'codex'),
       v => (v.completedAt = '2026-09-06T01:00:00Z'),
       v => (v.execution.runId = 'other'),
+      v => (v.execution.taskAcceptanceDigest = '0'.repeat(64)),
     ]) {
       const changed = structuredClone(outcome);
       mutate(changed);

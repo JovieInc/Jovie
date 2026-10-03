@@ -43,6 +43,19 @@ export const OUTBOX_PATH = '/summer/v1/symphony/outbox';
 export const OUTCOME_PATH = '/summer/v1/symphony/outcomes';
 export const EXECUTION_HOLD =
   'v1-missing-explicit-execution-target-and-decision-fingerprint';
+const TASK_ACCEPTANCE_SCHEMA = 'symphony-existing-repair-task-acceptance/v1';
+export const SOURCE_EVALUATION_SCHEMA =
+  'symphony-existing-repair-source-evaluation/v1';
+const EXECUTION_EVIDENCE_KEYS =
+  'runId provider model authPoolIdentity leaseIdentity evidenceDigest assignmentDigest providerGrantDigest acceptanceDigest runDigest taskAcceptanceDigest baseHead finalHead outputDigest sourceEvaluation verification'.split(' ');
+const SOURCE_EVALUATION_KEYS =
+  'schema taskKey taskSelectionDigest sourceVersion snapshotDigest targetDigest identifier issueId repository pr baseHead finalHead targetObserved observedIssueId observedIssueRevision observedPrNumber observedPrHead observedRepository prMergeStateStatus mergeable workerAttested selectedEvidence taskResolved reason digest'.split(' ');
+const VERIFICATION_KEYS =
+  'schema claimRecorded acceptanceRecorded runStarted runTerminal resultPersisted leaseHeld workspaceBound headObserved headChanged taskAccepted'.split(' ');
+const SOURCE_EVALUATION_REASONS = new Set([
+  'target-observation-unavailable', 'target-identity-mismatch', 'head-unchanged',
+  'task-check-unresolved', 'task-check-evidence-unavailable', 'task-check-passed',
+]);
 const CONTROLLER_TIMEOUT_MS = (5400 + 30) * 1000;
 const CONTROLLER_OUTPUT_LIMIT = 128 * 1024;
 export const OWNED_REPAIR_CONTROLLER_PACKAGE_SCHEMA =
@@ -100,12 +113,67 @@ export function canonical(value) {
   return JSON.stringify(value);
 }
 
+function digest(value) {
+  return createHash('sha256').update(canonical(value)).digest('hex');
+}
+
+function taskAcceptanceDigestV3(taskKey, existingRepair) {
+  return digest({
+    schema: TASK_ACCEPTANCE_SCHEMA,
+    taskKey,
+    assignmentDigest: existingRepair.assignmentDigest,
+    existingRepair,
+  });
+}
+
+export function symphonyTaskSelectionDigestV3(task) {
+  return digest({
+    taskKey: task.taskKey,
+    action: task.action,
+    selected: task.selected,
+    source: task.source,
+  });
+}
+
+export function symphonySourceEvaluationDigestV3(evaluation) {
+  const { digest: _digest, ...unsigned } = evaluation;
+  return digest({ schema: SOURCE_EVALUATION_SCHEMA, ...unsigned });
+}
+
 function exactKeys(value, keys) {
   return (
     value !== null &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
     Object.keys(value).sort().join('\0') === [...keys].sort().join('\0')
+  );
+}
+
+const SELECTED_CHECK_EVIDENCE_KEYS = ['id', 'handle', 'check', 'result', 'source'];
+
+function selectedCheckEvidenceShapeValid(value) {
+  if (value === null) return true;
+  return (
+    exactKeys(value, SELECTED_CHECK_EVIDENCE_KEYS) &&
+    typeof value.id === 'string' &&
+    typeof value.handle === 'string' &&
+    typeof value.check === 'string' &&
+    value.id.length > 0 &&
+    value.handle.length > 0 &&
+    value.check.length > 0 &&
+    value.result === 'SUCCESS' &&
+    value.source === 'github-status-check-rollup'
+  );
+}
+
+function selectedCheckEvidenceValid(value, boundTask) {
+  if (!selectedCheckEvidenceShapeValid(value) || value === null) return false;
+  const selected = boundTask?.selected;
+  if (!selected) return true;
+  return (
+    value.id === selected.id &&
+    value.handle === selected.handle &&
+    (value.check === selected.id || value.check === selected.handle)
   );
 }
 
@@ -404,38 +472,28 @@ export function signOutcomeV3(task, result, privateKey, keyId) {
   };
 }
 
-export function validateExecutionEvidenceV3(outcome) {
+export function validateExecutionEvidenceV3(outcome, boundTask) {
   const execution = outcome?.execution;
   const verification = execution?.verification;
+  const sourceEvaluation = execution?.sourceEvaluation;
+  const target = outcome?.existingRepair;
+  const sourceTaskResolved =
+    sourceEvaluation?.targetObserved &&
+    sourceEvaluation.finalHead !== sourceEvaluation.baseHead &&
+    sourceEvaluation.prMergeStateStatus === 'CLEAN' &&
+    sourceEvaluation.mergeable === 'MERGEABLE' &&
+    selectedCheckEvidenceValid(sourceEvaluation?.selectedEvidence, boundTask);
+  const sourceObservationMatches =
+    !sourceEvaluation?.targetObserved ||
+    (sourceEvaluation.observedIssueId === target?.issueId &&
+      sourceEvaluation.observedIssueRevision === target?.issueRevision &&
+      sourceEvaluation.observedPrNumber === target?.pr &&
+      sourceEvaluation.observedPrHead === execution?.finalHead &&
+      sourceEvaluation.observedRepository === target?.repository);
   if (
-    !exactKeys(execution, [
-      'runId',
-      'provider',
-      'model',
-      'authPoolIdentity',
-      'leaseIdentity',
-      'evidenceDigest',
-      'assignmentDigest',
-      'providerGrantDigest',
-      'acceptanceDigest',
-      'runDigest',
-      'baseHead',
-      'finalHead',
-      'outputDigest',
-      'verification',
-    ]) ||
-    !exactKeys(verification, [
-      'schema',
-      'claimRecorded',
-      'acceptanceRecorded',
-      'runStarted',
-      'runTerminal',
-      'resultPersisted',
-      'leaseHeld',
-      'workspaceBound',
-      'headObserved',
-      'headChanged',
-    ]) ||
+    !exactKeys(execution, EXECUTION_EVIDENCE_KEYS) ||
+    !exactKeys(sourceEvaluation, SOURCE_EVALUATION_KEYS) ||
+    !exactKeys(verification, VERIFICATION_KEYS) ||
     verification.schema !== 'symphony-existing-repair-evidence/v1' ||
     ![
       'claimRecorded',
@@ -448,27 +506,51 @@ export function validateExecutionEvidenceV3(outcome) {
       'headObserved',
     ].every(key => verification[key] === true) ||
     typeof verification.headChanged !== 'boolean' ||
+    typeof verification.taskAccepted !== 'boolean' ||
     !DIGEST.test(execution.assignmentDigest) ||
     !DIGEST.test(execution.providerGrantDigest) ||
     !DIGEST.test(execution.acceptanceDigest) ||
     !DIGEST.test(execution.runDigest) ||
+    !DIGEST.test(execution.taskAcceptanceDigest) ||
     !DIGEST.test(execution.outputDigest) ||
     !SHA.test(execution.baseHead) ||
     !SHA.test(execution.finalHead) ||
-    execution.baseHead !== outcome?.existingRepair?.head ||
-    verification.headChanged !== (execution.baseHead !== execution.finalHead)
+    execution.baseHead !== target?.head ||
+    execution.taskAcceptanceDigest !==
+      taskAcceptanceDigestV3(outcome?.taskKey, outcome?.existingRepair) ||
+    verification.headChanged !== (execution.baseHead !== execution.finalHead) ||
+    sourceEvaluation.schema !== SOURCE_EVALUATION_SCHEMA ||
+    sourceEvaluation.taskKey !== outcome?.taskKey ||
+    !DIGEST.test(sourceEvaluation.taskSelectionDigest ?? '') ||
+    (boundTask &&
+      sourceEvaluation.taskSelectionDigest !==
+        symphonyTaskSelectionDigestV3(boundTask)) ||
+    sourceEvaluation.sourceVersion !== outcome?.source?.sourceVersion ||
+    sourceEvaluation.snapshotDigest !== outcome?.source?.snapshotDigest ||
+    sourceEvaluation.targetDigest !== digest(target) ||
+    sourceEvaluation.identifier !== target?.identifier ||
+    sourceEvaluation.issueId !== target?.issueId ||
+    sourceEvaluation.repository !== target?.repository ||
+    sourceEvaluation.pr !== target?.pr ||
+    sourceEvaluation.baseHead !== execution.baseHead ||
+    sourceEvaluation.finalHead !== execution.finalHead ||
+    typeof sourceEvaluation.targetObserved !== 'boolean' ||
+    typeof sourceEvaluation.workerAttested !== 'boolean' ||
+    !selectedCheckEvidenceShapeValid(sourceEvaluation.selectedEvidence) ||
+    typeof sourceEvaluation.taskResolved !== 'boolean' ||
+    !SOURCE_EVALUATION_REASONS.has(sourceEvaluation.reason) ||
+    sourceEvaluation.digest !==
+      symphonySourceEvaluationDigestV3(sourceEvaluation) ||
+    !sourceObservationMatches ||
+    (sourceEvaluation.taskResolved && sourceEvaluation.reason !== 'task-check-passed') ||
+    sourceEvaluation.taskResolved !== sourceTaskResolved ||
+    verification.taskAccepted !==
+      (sourceEvaluation.workerAttested && sourceEvaluation.taskResolved)
   ) {
     throw new Error('consumer-execution-evidence-invalid-or-cross-bound');
   }
   const { evidenceDigest: _evidenceDigest, ...unsigned } = execution;
-  const expected = createHash('sha256')
-    .update(
-      canonical({
-        schema: 'symphony-existing-repair-evidence/v1',
-        ...unsigned,
-      })
-    )
-    .digest('hex');
+  const expected = digest({ schema: 'symphony-existing-repair-evidence/v1', ...unsigned });
   if (expected !== execution.evidenceDigest) {
     throw new Error('consumer-execution-evidence-digest-invalid');
   }
@@ -517,9 +599,11 @@ export function validateOutcomeV3(outcome, task, publicKey) {
       'providerGrantDigest',
       'acceptanceDigest',
       'runDigest',
+      'taskAcceptanceDigest',
       'baseHead',
       'finalHead',
       'outputDigest',
+      'sourceEvaluation',
       'verification',
     ]) ||
     !['runId', 'provider', 'model'].every(
@@ -537,7 +621,7 @@ export function validateOutcomeV3(outcome, task, publicKey) {
   ) {
     throw new Error('consumer-execution-outcome-invalid-or-cross-bound');
   }
-  validateExecutionEvidenceV3(outcome);
+  validateExecutionEvidenceV3(outcome, task);
   const { signature, ...unsigned } = outcome;
   if (
     !publicKey ||
