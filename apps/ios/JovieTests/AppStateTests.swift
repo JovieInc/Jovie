@@ -5,6 +5,15 @@ import Testing
 import UserNotifications
 @testable import Jovie
 
+/// Share the existing process-wide lease for one test case, with no nested acquisition.
+private struct NativeSessionStoreScope: TestTrait, TestScoping {
+  func provideScope(
+    for _: Test, testCase _: Test.Case?, performing function: @Sendable () async throws -> Void
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation(function)
+  }
+}
+
 private actor ProfileRevalidationGate {
   private var completion: CheckedContinuation<Void, Never>?
   private var startedObserver: CheckedContinuation<Bool, Never>?
@@ -363,7 +372,7 @@ struct AppStateTests {
     observabilityEnvironment: "test"
   )
 
-  @Test func mapsReadyResponseToReadyRoute() async throws {
+  @Test(NativeSessionStoreScope()) func mapsReadyResponseToReadyRoute() async throws {
     let repository = MockRepository(
       nextResult: .success(
         MeRepositoryResult(response: .previewReady, isStale: false)
@@ -384,7 +393,7 @@ struct AppStateTests {
     #expect(appState.dashboardState == .loaded(.previewReady))
   }
 
-  @Test func paintsCachedSnapshotInstantlyThenRevalidates() async throws {
+  @Test(NativeSessionStoreScope()) func paintsCachedSnapshotInstantlyThenRevalidates() async throws {
     let fresh = MobileMeResponse(
       state: .ready,
       displayName: "Fresh Name",
@@ -432,7 +441,7 @@ struct AppStateTests {
     #expect(appState.isOffline == false)
   }
 
-  @Test func cachedSnapshotPaintDoesNotDuplicateNetworkLoad() async throws {
+  @Test(NativeSessionStoreScope()) func cachedSnapshotPaintDoesNotDuplicateNetworkLoad() async throws {
     let repository = MockRepository(
       nextResult: .success(
         MeRepositoryResult(response: .previewReady, isStale: false)
@@ -457,7 +466,7 @@ struct AppStateTests {
     #expect(appState.route == .ready)
   }
 
-  @Test func mapsNeedsOnboardingResponseToNeedsOnboardingRoute() async throws {
+  @Test(NativeSessionStoreScope()) func mapsNeedsOnboardingResponseToNeedsOnboardingRoute() async throws {
     let repository = MockRepository(
       nextResult: .success(
         MeRepositoryResult(response: .previewNeedsOnboarding, isStale: false)
@@ -483,7 +492,7 @@ struct AppStateTests {
     #expect(appState.continueOnWebURL.absoluteString == "https://jov.ie/app")
   }
 
-  @Test func mapsWaitlistPendingResponseAwayFromProfileCompletion() async throws {
+  @Test(NativeSessionStoreScope()) func mapsWaitlistPendingResponseAwayFromProfileCompletion() async throws {
     let pending = MobileMeResponse(
       state: .waitlistPending,
       displayName: nil,
@@ -515,7 +524,7 @@ struct AppStateTests {
     #expect(appState.dashboardState == .loaded(pending))
   }
 
-  @Test func coldProfileLoadShowsInteractiveShellBeforeNetworkReturns() async throws {
+  @Test(NativeSessionStoreScope()) func coldProfileLoadShowsInteractiveShellBeforeNetworkReturns() async throws {
     let repository = MockRepository(
       nextResult: .success(
         MeRepositoryResult(response: .previewReady, isStale: false)
@@ -542,7 +551,7 @@ struct AppStateTests {
     #expect(appState.dashboardState == .loaded(.previewReady))
   }
 
-  @Test func cachedNeedsOnboardingSnapshotPreservesContinueOnWebURL() async throws {
+  @Test(NativeSessionStoreScope()) func cachedNeedsOnboardingSnapshotPreservesContinueOnWebURL() async throws {
     let onboarding = MobileMeResponse(
       state: .needsOnboarding,
       displayName: nil,
@@ -592,8 +601,8 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange("user_123")
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      await appState.handleSignedInUserChange("user_123")
       await appState.signOut()
     }
 
@@ -622,8 +631,8 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange("user_123")
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      await appState.handleSignedInUserChange("user_123")
       await appState.signOut()
     }
 
@@ -650,8 +659,8 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange("user_123")
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      await appState.handleSignedInUserChange("user_123")
       await appState.handleExpiredSession()
     }
 
@@ -683,8 +692,8 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange(userID)
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      await appState.handleSignedInUserChange(userID)
       await appState.signOut()
     }
 
@@ -714,8 +723,8 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange(userID)
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      await appState.handleSignedInUserChange(userID)
       await appState.handleExpiredSession()
     }
 
@@ -755,8 +764,8 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange(userID)
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      await appState.handleSignedInUserChange(userID)
       await appState.signOut()
     }
 
@@ -798,8 +807,8 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange(userID)
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      await appState.handleSignedInUserChange(userID)
       await appState.handleExpiredSession()
     }
 
@@ -810,7 +819,7 @@ struct AppStateTests {
     #expect(await actionLoopCache.loadCalendar(for: userID) == nil)
   }
 
-  @Test func signedInUserSetsObservabilityUserID() async throws {
+  @Test(NativeSessionStoreScope()) func signedInUserSetsObservabilityUserID() async throws {
     let observability = RecordingObservabilityProvider()
     Observability.useProviderForTesting(observability)
     defer { Observability.resetForTesting() }
@@ -862,7 +871,7 @@ struct AppStateTests {
     }
   }
 
-  @Test func duplicateSignedInUserLoadIsIgnoredWhileInFlight() async throws {
+  @Test(NativeSessionStoreScope()) func duplicateSignedInUserLoadIsIgnoredWhileInFlight() async throws {
     let repository = MockRepository(
       nextResult: .success(
         MeRepositoryResult(response: .previewReady, isStale: false)
@@ -902,12 +911,12 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    async let load: Void = appState.handleSignedInUserChange("user_123")
-    try await Task.sleep(for: .milliseconds(10))
-    try await withNativeSessionTokenStoreTestIsolation {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      async let load: Void = appState.handleSignedInUserChange("user_123")
+      try await Task.sleep(for: .milliseconds(10))
       await appState.signOut()
+      _ = await load
     }
-    _ = await load
 
     #expect(appState.route == .signedOut)
     #expect(appState.dashboardState == .idle)
@@ -915,7 +924,7 @@ struct AppStateTests {
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
-  @Test func profileLoadFailureShowsRecoveryStateAndRetryRestoresDashboard() async throws {
+  @Test(NativeSessionStoreScope()) func profileLoadFailureShowsRecoveryStateAndRetryRestoresDashboard() async throws {
     let repository = MockRepository(
       nextResult: .failure(APIClientError.requestFailed(statusCode: 500))
     )
@@ -975,7 +984,7 @@ struct AppStateTests {
     #expect(await repository.loadCount() == 0)
   }
 
-  @Test func coldOfflineProfileLoadShowsOfflineStateAndRetryClearsIt() async throws {
+  @Test(NativeSessionStoreScope()) func coldOfflineProfileLoadShowsOfflineStateAndRetryClearsIt() async throws {
     let repository = MockRepository(
       nextResult: .failure(APIClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue))
     )
@@ -1065,7 +1074,7 @@ struct AppStateTests {
     #expect(await cache.load(for: "user_123") == nil)
   }
 
-  @Test func staleProfileSnapshotShowsOfflineStateAndRetryClearsIt() async throws {
+  @Test(NativeSessionStoreScope()) func staleProfileSnapshotShowsOfflineStateAndRetryClearsIt() async throws {
     let repository = MockRepository(
       nextResult: .success(
         MeRepositoryResult(response: .previewReady, isStale: true)
@@ -3300,10 +3309,14 @@ private actor PausedProfileAPIClient: APIClientProtocol {
   let gate: ProfileLoadGate
   let cancellations = ProfileTaskCancellationLog()
   private var calls = 0
-  init(base: MutableAPIClient, gate: ProfileLoadGate) { self.base = base; self.gate = gate }
+  private let heldCall: Int
+  init(base: MutableAPIClient, gate: ProfileLoadGate, heldCall: Int = 1) {
+    self.base = base; self.gate = gate; self.heldCall = heldCall
+  }
+  func callCount() -> Int { calls }
   func fetchMe() async throws -> MobileMeResponse {
     calls += 1
-    if calls == 1 { _ = await gate.wait() }
+    if calls == heldCall { _ = await gate.wait() }
     await cancellations.record(Task.isCancelled)
     return try await base.fetchMe()
   }
@@ -3480,7 +3493,8 @@ extension AppStateTests {
           return
         }
         #expect(state.route == .signedOut && state.dashboardState == .idle)
-        #expect(await cancellations.recorded() == [kind == "retired-receipt"])
+        #expect(await api.cancellations.recorded() == (kind == "retired-receipt" ? [false, true] : [false]))
+        #expect(await cancellations.recorded() == [false])
         #expect(push.unregisterCount == 1 && push.storedToken == nil)
         if replaceDuringCleanup {
           _ = try saveSession()
@@ -3493,7 +3507,7 @@ extension AppStateTests {
         }
         let context = NativeSessionTokenStore.captureSessionContext()
         await cleanupGate.complete(true); await caller.value
-        #expect(await cancellations.recorded() == [kind == "retired-receipt", kind == "retired-receipt"])
+        #expect(await cancellations.recorded() == [false, false])
         await caches.expectContents(present: replaceDuringCleanup, profile: .previewNeedsOnboarding)
         #expect(state.route == (replaceDuringCleanup ? .needsOnboarding : .signedOut))
         #expect(NativeSessionTokenStore.captureSessionContext() == context)
@@ -3527,5 +3541,192 @@ extension AppStateTests {
       state = nil
       #expect(observed == nil)
     }
+  }
+}
+
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func exactExpiryCleanupSurvivesCallerCancellationAndReplay(profileOrigin: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let authorization = try saveSession(), apiGate = ProfileLoadGate(), cleanupGate = ProfileLoadGate()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), log = ProfileTaskCancellationLog()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let api = PausedProfileAPIClient(base: caches.api, gate: apiGate)
+      let repository = FirstHeldAuthCleanupRepository(base: MeRepository(apiClient: api, cache: caches.me),
+        gate: cleanupGate, cancellations: log)
+      let awaitedPush = ChatReceiptPush(push.manager), revoker = MockSessionRevoker(result: .revoked)
+      let state = AppState(configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker, pushNotifications: awaitedPush,
+        chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      let profile = Task {
+        await state.handleSignedInUserChange(caches.userID)
+        if profileOrigin { await cleanupGate.ownerFinished() }
+      }
+      #expect(await apiGate.waitUntilEntered())
+      #expect(await awaitedPush.waitForActivation())
+      if !profileOrigin { await apiGate.complete(true); await profile.value }
+      let receipt: NativeSessionExpiryReceipt
+      do { receipt = try ownedProfileExpiryReceipt(authorization) }
+      catch { await apiGate.complete(true); await cleanupGate.complete(true); await profile.value; throw error }
+      let caller: Task<Void, Never>
+      if profileOrigin {
+        await caches.api.updateMode(.failure(NativeSessionRequestError.expired(receipt)))
+        await apiGate.complete(true); caller = profile
+      } else { caller = Task { await state.handleExpiredSession(receipt); await cleanupGate.ownerFinished() } }
+      let entered = await cleanupGate.waitUntilEntered()
+      #expect(entered)
+      caller.cancel()
+      let duplicate = Task { await state.handleExpiredSession(receipt) }
+      await state.handleSignedInUserChange(caches.userID)
+      await state.handleSignedInUserChange(nil); await state.handleSignedInUserChange(caches.userID)
+      #expect(state.route == .signedOut && state.activeUserID == nil && state.dashboardState == .idle)
+      await cleanupGate.complete(true); await caller.value; await duplicate.value
+      #expect(await log.recorded() == [false, false], "Caller cancellation must not abandon retained cleanup")
+      await state.handleExpiredSession(receipt)
+      await state.handleSignedInUserChange(caches.userID)
+      await state.handleSignedInUserChange(nil); await state.handleSignedInUserChange(caches.userID)
+      #expect(state.route == .signedOut && state.dashboardState == .idle)
+      #expect(await log.recorded().count == 2, "Running and completed receipt replays must not dispatch again")
+      await caches.expectContents(present: false)
+      #expect(await revoker.calls() == 0)
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(push.unregisterCount == 1 && NativeSessionTokenStore.captureOwnership() == receipt.ownership)
+    }
+  }
+}
+
+private actor FirstHeldAuthCleanupRepository: AppStateRepository {
+  let base: MeRepository
+  let gate: ProfileLoadGate
+  private var removals = 0
+  private let cancellations: ProfileTaskCancellationLog?
+  init(base: MeRepository, gate: ProfileLoadGate, cancellations: ProfileTaskCancellationLog? = nil) {
+    self.base = base; self.gate = gate; self.cancellations = cancellations
+  }
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse? { await base.cachedSnapshot(for: userID) }
+  func loadMe(for userID: String) async throws -> MeRepositoryResult { try await base.loadMe(for: userID) }
+  func loadMe(for userID: String, ifOwnedBy owner: NativeSessionOwnership) async throws -> MeRepositoryResult {
+    try await base.loadMe(for: userID, ifOwnedBy: owner)
+  }
+  func clearCachedUser(_ userID: String) async { await base.clearCachedUser(userID) }
+  func clearCachedUser(_ userID: String, ifOwnedBy owner: NativeSessionOwnership) async {
+    removals += 1
+    let isFirst = removals == 1
+    await cancellations?.record(Task.isCancelled)
+    if isFirst { _ = await gate.wait() }
+    await base.clearCachedUser(userID, ifOwnedBy: owner)
+    await cancellations?.record(Task.isCancelled)
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func replacementOfHeldTerminalKeepsItsCleanupUserAndNewProfile(installs: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession(), terminalGate = ProfileLoadGate(), profileGate = ProfileLoadGate()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let api = PausedProfileAPIClient(base: caches.api, gate: profileGate, heldCall: 2)
+      let repository = FirstHeldAuthCleanupRepository(base: MeRepository(apiClient: api, cache: caches.me), gate: terminalGate)
+      let revoker = MockSessionRevoker(result: .noSession)
+      let state = AppState(configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker, pushNotifications: push.manager,
+        chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      await state.handleSignedInUserChange(caches.userID)
+      await push.manager.activate()
+      let receipt = try ownedProfileExpiryReceipt(original)
+      let old = Task { await state.handleExpiredSession(receipt); await terminalGate.ownerFinished() }
+      #expect(await terminalGate.waitUntilEntered())
+      let next: Task<Void, Never>
+      if installs {
+        _ = try saveSession()
+        next = Task {
+          await state.handleSignedInUserChange(caches.userID)
+          await profileGate.ownerFinished()
+        }
+      } else { next = Task { _ = await state.signOut() } }
+      if installs { #expect(await profileGate.waitUntilEntered()) }
+      else { await next.value; await caches.expectContents(present: false) }
+      let current = NativeSessionTokenStore.captureSessionContext()
+      await terminalGate.complete(true); await old.value
+      if installs {
+        #expect(state.activeSessionOwnership == current.ownership && state.route == .ready)
+        await state.handleSignedInUserChange(caches.userID)
+        #expect(await api.callCount() == 2, "Old terminal release must not drop B's dedupe owner")
+        await profileGate.complete(true); await next.value
+        #expect(state.dashboardState == .loaded(.previewReady))
+        await caches.expectContents(present: true)
+      }
+      #expect(NativeSessionTokenStore.captureSessionContext() == current)
+      #expect(await revoker.calls() == (installs ? 0 : 1))
+    }
+  }
+}
+
+private enum NativeSessionScopeFailure: Error { case sentinel }
+
+extension NativeSessionTokenStoreTestLockTests {
+  @Test(NativeSessionStoreScope(), arguments: ["scope-a", "scope-b"])
+  func nativeSessionScopeWrapsEachRegisteredCase(token: String) async {
+    #expect(NativeSessionTokenStore.load() == nil)
+    NativeSessionTokenStore.save(token: token, userID: token,
+      expiresAt: Date().addingTimeInterval(3600))
+    let owner = NativeSessionTokenStore.captureOwnership()
+    await Task.yield()
+    #expect(NativeSessionTokenStore.load()?.token == token)
+    #expect(NativeSessionTokenStore.captureOwnership() == owner)
+  }
+
+  @Test(arguments: ["return", "throw", "cancel"])
+  func nativeSessionScopeRetainsItsLeaseUntilTeardown(outcome: String) async throws {
+    let test = try #require(Test.current)
+    let gate = ProfileLoadGate()
+    let contenderEntries = ProfileTaskCancellationLog()
+    let owner = Task {
+      let result: String
+      do {
+        try await NativeSessionStoreScope().provideScope(for: test, testCase: nil) {
+          #expect(NativeSessionTokenStore.load() == nil)
+          NativeSessionTokenStore.save(token: "held-scope", userID: "held-scope",
+            expiresAt: Date().addingTimeInterval(3600))
+          _ = await gate.wait()
+          #expect(NativeSessionTokenStore.load()?.token == "held-scope")
+          if outcome == "throw" { throw NativeSessionScopeFailure.sentinel }
+          try Task.checkCancellation()
+        }
+        result = "return"
+      } catch NativeSessionScopeFailure.sentinel {
+        result = "throw"
+      } catch is CancellationError {
+        result = "cancel"
+      } catch {
+        Issue.record(error)
+        result = "unexpected"
+      }
+      await gate.ownerFinished()
+      return result
+    }
+    #expect(await gate.waitUntilEntered())
+    if outcome == "cancel" { owner.cancel() }
+    let contender = Task {
+      await NativeSessionTokenStoreTestLock.shared.withExclusive {
+        // A new isolation-helper entry would clear and conceal broken teardown.
+        defer { NativeSessionTokenStore.clear() }
+        await contenderEntries.record(true)
+        #expect(NativeSessionTokenStore.load() == nil)
+      }
+    }
+    // Match the existing lock regressions' bounded opportunity to expose bypasses.
+    try? await Task.sleep(for: .milliseconds(50))
+    #expect(await contenderEntries.recorded().isEmpty)
+    await gate.complete(true)
+    #expect(await owner.value == outcome)
+    await contender.value
+    #expect(await contenderEntries.recorded() == [true])
   }
 }
