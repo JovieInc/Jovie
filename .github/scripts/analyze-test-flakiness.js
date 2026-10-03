@@ -19,10 +19,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const crypto = require('crypto');
 
 // Configuration
 const ANALYSIS_LIMIT = 30; // Number of recent workflow runs to analyze
 const MAIN_BRANCH = 'main'; // Only main-branch runs — PR failures are deterministic, not flaky
+const ARTIFACT_RUN_LIMIT = 12; // Max main runs to scan JUnit artifacts from
+const MERGE_GROUP_ARTIFACT_LIMIT = 12; // Max merge_group runs to scan (queue-only flakes)
+const QUARANTINE_WINDOW_HOURS = 24; // Rolling window for quarantine candidacy
+const QUARANTINE_MIN_OCCURRENCES = 3; // Flakes in window -> quarantine candidate
 const FLAKY_FAILURE_THRESHOLD = 5; // % failure rate to flag as flaky
 const FLAKY_RETRY_THRESHOLD = 10; // % retry rate to flag as flaky
 const HIGH_FLAKINESS_THRESHOLD = 5; // Number of flaky tests to trigger alert
@@ -109,13 +114,12 @@ async function fetchRunJobs(token, owner, repo, runId) {
 }
 
 /**
- * Fetch artifacts for a workflow run (for JSON test results)
- * Currently unused but kept for future Playwright JSON report parsing
+ * Fetch artifacts for a workflow run
  */
-async function _fetchRunArtifacts(token, owner, repo, runId) {
+async function fetchRunArtifacts(token, owner, repo, runId) {
   try {
     const data = await githubRequest(
-      `/repos/${owner}/${repo}/actions/runs/${runId}/artifacts`,
+      `/repos/${owner}/${repo}/actions/runs/${runId}/artifacts?per_page=100`,
       token
     );
     return data.artifacts || [];
@@ -125,6 +129,281 @@ async function _fetchRunArtifacts(token, owner, repo, runId) {
     );
     return [];
   }
+}
+
+/**
+ * Fetch recent merge_group runs — queue-only flakes (green on PR head, red in
+ * the queue) only appear here.
+ */
+async function fetchMergeGroupRuns(token, owner, repo) {
+  const params = new URLSearchParams({
+    per_page: String(MERGE_GROUP_ARTIFACT_LIMIT),
+    status: 'completed',
+    event: 'merge_group',
+  });
+  const data = await githubRequest(
+    `/repos/${owner}/${repo}/actions/workflows/ci.yml/runs?${params}`,
+    token
+  );
+  return data.workflow_runs || [];
+}
+
+/**
+ * Normalize failure text into a stable signature input.
+ * Strips timestamps, durations, UUIDs, ports, shard ids, hex blobs, and
+ * absolute paths so the same root cause across shards/runs hashes identically.
+ */
+function normalizeFailureText(text) {
+  return String(text || '')
+    .replace(/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[\d.:Z+-]*/g, '<ts>')
+    .replace(/\b\d+(\.\d+)?\s*(ms|s|min)\b/gi, '<dur>')
+    .replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      '<uuid>'
+    )
+    .replace(/\b[0-9a-f]{16,}\b/gi, '<hex>')
+    .replace(/\b\d{4,5}\b/g, '<port>')
+    .replace(/\(\d+\/\d+\)/g, '(<shard>)')
+    .replace(
+      /(?:[A-Za-z]:)?[\w./-]*?(?:\.run|\.work|runner|home|Users)\/[\w./-]+/g,
+      '<path>'
+    )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Signature hash for a single test failure: normalized test id + normalized
+ * error text. Same root cause on 10 shards -> one signature.
+ */
+function failureSignature(testId, errorText) {
+  const input = `${normalizeFailureText(testId)}::${normalizeFailureText(errorText).slice(0, 500)}`;
+  return crypto.createHash('sha256').update(input).digest('hex').slice(0, 16);
+}
+
+function decodeXml(text) {
+  return String(text || '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, '&');
+}
+
+function xmlAttr(tag, attr) {
+  const match = tag.match(new RegExp(`${attr}="([^"]*)"`));
+  return match ? decodeXml(match[1]) : '';
+}
+
+/**
+ * Parse JUnit XML into failure/flaky-retry records.
+ * `flakyFailure` elements mean the test failed then passed on retry within one
+ * run — the strongest flake signal (vitest/Playwright retries).
+ */
+function parseJunitXml(xml) {
+  const records = [];
+  const testcaseRegex = /<testcase\b[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+  let m;
+  while ((m = testcaseRegex.exec(xml)) !== null) {
+    const openTag = m[0].slice(0, m[0].indexOf('>') + 1);
+    const body = m[1] || '';
+    const name = xmlAttr(openTag, 'name');
+    const file = xmlAttr(openTag, 'file') || xmlAttr(openTag, 'classname');
+    const testId = `${file}::${name}`;
+
+    const terminal = body.match(
+      /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/
+    );
+    if (terminal) {
+      records.push({
+        testId,
+        file,
+        name,
+        kind: 'failure',
+        error: decodeXml(terminal[1]).slice(0, 2000),
+      });
+      continue;
+    }
+
+    const flakyRegex = /<flakyFailure\b[^>]*>([\s\S]*?)<\/flakyFailure>/g;
+    let f;
+    let sawFlaky = false;
+    while ((f = flakyRegex.exec(body)) !== null) {
+      sawFlaky = true;
+      const error = decodeXml(f[1]).slice(0, 2000);
+      records.push({ testId, file, name, kind: 'flaky-retry', error });
+    }
+
+    if (!sawFlaky) {
+      const failMatch = body.match(
+        /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/
+      );
+      if (failMatch) {
+        const error = decodeXml(failMatch[1]).slice(0, 2000);
+        records.push({ testId, file, name, kind: 'failure', error });
+      }
+    }
+  }
+  return records;
+}
+
+/**
+ * Download and parse JUnit artifacts for a run, returning failure records
+ * annotated with run metadata.
+ */
+async function collectRunFailureRecords(token, owner, repo, run) {
+  const artifacts = await fetchRunArtifacts(token, owner, repo, run.id);
+  const junitArtifacts = artifacts.filter(
+    a =>
+      !a.expired && /unit-test|test-report|junit|playwright/i.test(a.name || '')
+  );
+  if (junitArtifacts.length === 0) return [];
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flake-junit-'));
+  const records = [];
+  try {
+    for (const artifact of junitArtifacts) {
+      if (!Number.isSafeInteger(artifact.id) || artifact.id < 1)
+        throw new Error('Invalid artifact identifier');
+      const artifactDir = path.join(tmpDir, String(artifact.id));
+      fs.mkdirSync(artifactDir);
+      const zipPath = path.join(artifactDir, 'report.zip');
+      fs.writeFileSync(
+        zipPath,
+        execFileSync(
+          'gh',
+          [
+            'api',
+            `repos/${owner}/${repo}/actions/artifacts/${artifact.id}/zip`,
+          ],
+          { timeout: 60000, maxBuffer: 32 * 1024 * 1024 }
+        )
+      );
+      execFileSync('unzip', ['-o', '-q', '-j', zipPath, '-d', artifactDir], {
+        timeout: 10000,
+      });
+      for (const file of fs
+        .readdirSync(artifactDir)
+        .filter(f => f.endsWith('.xml'))) {
+        const xml = fs.readFileSync(path.join(artifactDir, file), 'utf8');
+        for (const rec of parseJunitXml(xml)) {
+          records.push({
+            ...rec,
+            artifactFile: file,
+            artifactId: artifact.id,
+            artifactShard:
+              file.match(/test-report\.([\d-]+)\.junit/)?.[1] || null,
+            runId: run.id,
+            runAttempt: run.run_attempt,
+            runUrl: run.html_url,
+            runEvent: run.event,
+            runAt: run.created_at,
+          });
+        }
+      }
+    }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+  return records;
+}
+
+/**
+ * Cluster failure records by signature hash across shards, runs, and events.
+ * A js-yaml-style failure across 10 shards reads as ONE incident.
+ */
+function clusterFailureRecords(records) {
+  const clusters = new Map();
+  const now = Date.now();
+  const windowStart = now - QUARANTINE_WINDOW_HOURS * 3600 * 1000;
+
+  for (const rec of records) {
+    const sig = failureSignature(rec.testId, rec.error);
+    if (!clusters.has(sig)) {
+      clusters.set(sig, {
+        signature: sig,
+        testId: rec.testId,
+        file: rec.file,
+        occurrences: 0,
+        occurrences24h: 0,
+        flakyRetries: 0,
+        flakyRunAttempts24h: new Set(),
+        shards: new Set(),
+        firstSeenAt: rec.runAt,
+        lastSeenAt: rec.runAt,
+        runUrls: new Set(),
+        events: new Set(),
+        mergeGroupOnly: true, // cleared when seen on a non-merge_group run
+        errorExcerpt: rec.error.split('\n').slice(0, 3).join(' ').slice(0, 300),
+      });
+    }
+    const c = clusters.get(sig);
+    c.occurrences++;
+    if (rec.kind === 'flaky-retry') c.flakyRetries++;
+    const at = new Date(rec.runAt).getTime();
+    if (at >= windowStart && at <= now) {
+      c.occurrences24h++;
+      if (
+        rec.kind === 'flaky-retry' &&
+        Number.isSafeInteger(rec.runId) &&
+        rec.runId > 0 &&
+        Number.isSafeInteger(rec.runAttempt) &&
+        rec.runAttempt > 0
+      ) {
+        c.flakyRunAttempts24h.add(`${rec.runId}:${rec.runAttempt}`);
+      }
+    }
+    if (rec.artifactShard) c.shards.add(rec.artifactShard);
+    if (rec.runAt < c.firstSeenAt) c.firstSeenAt = rec.runAt;
+    if (rec.runAt > c.lastSeenAt) c.lastSeenAt = rec.runAt;
+    if (c.runUrls.size < 10) c.runUrls.add(rec.runUrl);
+    c.events.add(rec.runEvent);
+    if (rec.runEvent !== 'merge_group') c.mergeGroupOnly = false;
+  }
+
+  return [...clusters.values()]
+    .map(c => ({
+      ...c,
+      shards: [...c.shards],
+      runUrls: [...c.runUrls],
+      events: [...c.events],
+      flakyRunAttempts24h: c.flakyRunAttempts24h.size,
+      quarantineCandidate:
+        c.flakyRunAttempts24h.size >= QUARANTINE_MIN_OCCURRENCES,
+    }))
+    .sort((a, b) => b.occurrences - a.occurrences);
+}
+
+/**
+ * Signature-clustered failure analysis: scans JUnit artifacts from recent main
+ * runs AND merge_group runs so queue-only flakes are visible.
+ */
+async function analyzeFailureSignatures(token, owner, repo, mainRuns) {
+  let mergeGroupRuns = [];
+  try {
+    mergeGroupRuns = await fetchMergeGroupRuns(token, owner, repo);
+  } catch (error) {
+    console.warn(`Could not fetch merge_group runs: ${error.message}`);
+  }
+
+  const candidates = [
+    ...mainRuns.slice(0, ARTIFACT_RUN_LIMIT),
+    ...mergeGroupRuns,
+  ];
+  const allRecords = [];
+
+  for (const run of candidates) {
+    try {
+      const records = await collectRunFailureRecords(token, owner, repo, run);
+      allRecords.push(...records);
+    } catch (error) {
+      console.warn(`Run ${run.id}: ${error.message}`);
+    }
+  }
+
+  return clusterFailureRecords(allRecords);
 }
 
 /**
@@ -266,6 +545,7 @@ async function analyzeFlakiness(token, owner, repo) {
     totalRuns,
     runsWithRetries,
     runsWithFailures,
+    runs,
   };
 }
 
@@ -512,7 +792,8 @@ function generateReport(
   flakyTests,
   totalRuns,
   runsWithRetries,
-  runsWithFailures
+  runsWithFailures,
+  clusters = []
 ) {
   const reportDate = new Date().toISOString().split('T')[0];
   const retryRate = ((runsWithRetries / totalRuns) * 100).toFixed(1);
@@ -540,6 +821,24 @@ function generateReport(
   } else {
     report += `### 🔴 Test Suite Health: Poor\n\n`;
     report += `Significant flakiness detected. Immediate action required!\n\n`;
+  }
+
+  // Signature-clustered incidents: one row per root cause, not per shard.
+  if (clusters.length > 0) {
+    report += `## Failure Signature Clusters (${clusters.length})\n\n`;
+    report += `Failures are fingerprinted by normalized test id + normalized error text (timestamps, durations, UUIDs, ports, shard ids stripped). The same root cause across shards, runs, and events collapses into one incident.\n\n`;
+    report += `| Signature | 24h / total | Flaky retries | Shards | Queue-only | Test | First seen | Last seen | Example runs |\n`;
+    report += `|-----------|-------------|---------------|--------|------------|------|------------|-----------|--------------|\n`;
+    for (const c of clusters) {
+      const mark = c.quarantineCandidate ? ' 🚧' : '';
+      const runs = c.runUrls
+        .slice(0, 3)
+        .map(u => `[run](${u})`)
+        .join(', ');
+      const shardCount = c.shards.length > 0 ? c.shards.length : '-';
+      report += `| \`${c.signature}\`${mark} | ${c.occurrences24h} / ${c.occurrences} | ${c.flakyRetries} | ${shardCount} | ${c.mergeGroupOnly ? 'yes' : 'no'} | \`${c.testId}\` | ${c.firstSeenAt.split('T')[0]} | ${c.lastSeenAt.split('T')[0]} | ${runs} |\n`;
+    }
+    report += `\n🚧 = quarantine candidate (successful retry evidence in ≥${QUARANTINE_MIN_OCCURRENCES} distinct run attempts in ${QUARANTINE_WINDOW_HOURS}h). "Queue-only" means the signature has only been seen on merge_group runs.\n\n`;
   }
 
   // Flaky tests table
@@ -645,6 +944,7 @@ async function main() {
       totalRuns,
       runsWithRetries,
       runsWithFailures,
+      runs,
     } = await analyzeFlakiness(token, owner, repo);
 
     const flakyTests = [
@@ -653,17 +953,41 @@ async function main() {
     ].sort(
       (a, b) => parseFloat(b.flakinessScore) - parseFloat(a.flakinessScore)
     );
+    // Signature-clustered failure analysis from JUnit artifacts on main and
+    // merge_group runs. Bounded by ARTIFACT_RUN_LIMIT/MERGE_GROUP_ARTIFACT_LIMIT.
+    let clusters = [];
+    try {
+      clusters = await analyzeFailureSignatures(token, owner, repo, runs);
+    } catch (error) {
+      console.warn(`Signature analysis skipped: ${error.message}`);
+    }
+
     const report = generateReport(
       flakyTests,
       totalRuns,
       runsWithRetries,
-      runsWithFailures
+      runsWithFailures,
+      clusters
     );
 
     // Write report to file
     const reportPath = path.join(process.cwd(), 'flakiness-report.md');
     fs.writeFileSync(reportPath, report);
     console.log(`\n✅ Report generated: ${reportPath}`);
+
+    // Write clustered failure signatures for the quarantine/filing steps
+    const clustersPath = path.join(process.cwd(), 'flakiness-clusters.json');
+    fs.writeFileSync(
+      clustersPath,
+      JSON.stringify(
+        { generatedAt: new Date().toISOString(), clusters },
+        null,
+        2
+      )
+    );
+    console.log(
+      `✅ Clusters written: ${clustersPath} (${clusters.length} signatures)`
+    );
 
     // Output metrics for GitHub Actions
     if (process.env.GITHUB_OUTPUT) {
@@ -679,6 +1003,8 @@ async function main() {
         `retry_rate=${((runsWithRetries / totalRuns) * 100).toFixed(1)}`,
         `high_severity=${highSeverity.length}`,
         `quarantine_candidates=${JSON.stringify(candidates)}`,
+        `cluster_count=${clusters.length}`,
+        `signature_quarantine_candidates=${clusters.filter(c => c.quarantineCandidate).length}`,
       ].join('\n');
       fs.appendFileSync(process.env.GITHUB_OUTPUT, output + '\n');
     }
@@ -729,4 +1055,10 @@ module.exports = {
   shouldCountAsRetry,
   FLAKY_FAILURE_THRESHOLD,
   FLAKY_RETRY_THRESHOLD,
+  normalizeFailureText,
+  failureSignature,
+  parseJunitXml,
+  clusterFailureRecords,
+  analyzeFailureSignatures,
+  QUARANTINE_MIN_OCCURRENCES,
 };
