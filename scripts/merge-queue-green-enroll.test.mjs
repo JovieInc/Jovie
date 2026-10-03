@@ -19,6 +19,16 @@ const run = new AsyncFunction(
   script
 );
 const sha = 'a'.repeat(40);
+test('both native queue mutation clients request repository contents write', () => {
+  for (const job of [
+    workflow.jobs['hold-failed-revision'],
+    workflow.jobs.enroll,
+  ]) {
+    const token = job.steps.find(step => step.id === 'app-token');
+    assert.equal(token.with['permission-contents'], 'write');
+    assert.equal(token.with['permission-pull-requests'], 'write');
+  }
+});
 const candidate = number => ({
   number,
   draft: false,

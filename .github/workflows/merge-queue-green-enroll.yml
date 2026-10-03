@@ -79,7 +79,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-actions: read
-          permission-contents: read
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
 
@@ -123,7 +123,7 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: read
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
 
