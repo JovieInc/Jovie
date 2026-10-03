@@ -497,3 +497,77 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg s "$SUMMARY" --arg r "$RUN_URL" \
               '{text: ("High: production rate-limit store unhealthy; requireRedis limiters fail closed (onboarding chat, /api/v1). " + $s + " <" + $r + "|run>")}')"
+
+  billing-health-public:
+    name: Billing health public probe
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Probe anonymous billing health
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/billing-health-public.json"
+          rm -f "$response_file"
+          code="$(curl --silent --show-error --connect-timeout 10 --max-time 20 --max-filesize 32768 -o "$response_file" -w '%{http_code}' https://jov.ie/api/billing/health || true)"
+          echo "anonymous billing health HTTP ${code}" | tee -a "$GITHUB_STEP_SUMMARY"
+          BILLING_HEALTH_STATUS="$code" BILLING_HEALTH_RESPONSE_FILE="$response_file" \
+            node scripts/billing-health-public-intake.mjs
+
+  billing-sync-stale:
+    name: Billing sync stale probe
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+      - name: Read authenticated billing health
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016
+          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+            env -u DOPPLER_TOKEN sh -c 'curl --silent --show-error --connect-timeout 10 --max-time 20 \
+              -H "Authorization: Bearer $CRON_SECRET" https://jov.ie/api/billing/health' > "$RUNNER_TEMP/billing-health.json"
+          BILLING_HEALTH_JSON="$(cat "$RUNNER_TEMP/billing-health.json")" \
+            node scripts/billing-sync-intake.mjs
+
+  docs-deploy-jovie:
+    name: jovie-docs deploy signal
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      deployments: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: File or resolve a failed jovie-docs production deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+        run: node scripts/docs-deploy-intake.mjs

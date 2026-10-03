@@ -176,6 +176,10 @@ function sendToSentry(params: {
       tags.error_class = context.error_class;
     }
 
+    if (typeof context?.remediation === 'string' && context.remediation) {
+      tags.remediation = context.remediation;
+    }
+
     const quotaFailure = isRedisQuotaFailure(error);
     if (quotaFailure && !tags.error_class) {
       tags.error_class = 'redis_quota_exceeded';
