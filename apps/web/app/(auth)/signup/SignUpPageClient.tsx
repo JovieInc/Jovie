@@ -6,7 +6,12 @@ import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
+import {
+  AuthLayout,
+  AuthOfferSummary,
+  AuthRoutePrefetch,
+  AuthShell,
+} from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
@@ -67,7 +72,11 @@ function SignUpClaimDataPersistence() {
         let source = 'pricing';
         if (spotifyUrl) source = 'hero_spotify';
         else if (handle) source = 'hero_claim';
-        track('plan_intent_captured', { plan: validatedPlan, source });
+        track('plan_intent_captured', {
+          plan: validatedPlan,
+          interval: searchParams.get('interval') ?? 'month',
+          source,
+        });
       }
     }
 
@@ -266,7 +275,11 @@ function getFallbackRedirectUrl(
  * buttons are gated by `lib/auth/oauth-providers.ts` - Apple stays hidden
  * until its env flag is set (JOV-2062).
  */
-export function SignUpPageClient() {
+export function SignUpPageClient({
+  showOfferSummary = false,
+}: Readonly<{
+  readonly showOfferSummary?: boolean;
+}> = {}) {
   const searchParams = useSearchParams();
   const desktopReturnRoute = sanitizeDesktopReturnRoute(
     searchParams.get('desktop_return')
@@ -298,6 +311,7 @@ export function SignUpPageClient() {
         <AuthRoutePrefetch href={signInUrl} />
         <SignUpOauthErrorBanner signInUrl={signInUrl} />
         <SignUpClaimDataPersistence />
+        {showOfferSummary ? <AuthOfferSummary mode='sign-up' enabled /> : null}
         <AuthShell
           mode='sign-up'
           forceOppositeModeHardNavigation

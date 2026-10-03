@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
 import { ArtistNotificationFloatingCardView } from '@/components/marketing/MarketingStoryPrimitives';
 import type { ArtistNotificationsLandingCopy } from '@/data/artistNotificationsCopy';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 
 interface ArtistNotificationsHeroProps {
   readonly hero: ArtistNotificationsLandingCopy['hero'];
@@ -74,7 +75,12 @@ export function ArtistNotificationsHero({
                 variant='whitePill'
                 className='system-b-artist-notifications-hero-cta'
               >
-                <Link href={hero.primaryCtaHref}>{hero.primaryCtaLabel}</Link>
+                <Link
+                  href={hero.primaryCtaHref}
+                  prefetch={resolveMarketingAuthPrefetch(hero.primaryCtaHref)}
+                >
+                  {hero.primaryCtaLabel}
+                </Link>
               </Button>
             </div>
           </div>

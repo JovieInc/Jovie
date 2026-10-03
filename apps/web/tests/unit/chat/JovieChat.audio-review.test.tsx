@@ -8,7 +8,9 @@
  *  - submitMessage is NOT called
  *  - notifyJankSend is NOT called (no jank instrumentation for a non-send)
  */
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
@@ -67,8 +69,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       reject: vi.fn(),
       isActioning: false,
     }),
-    useJovieChat: () => ({
-      input: '',
+    useJovieChatController: () => ({
+      draft: createComposerDraft(''),
       setInput: mockFns.setInput,
       messages: [],
       chatError: null,

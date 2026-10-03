@@ -125,7 +125,11 @@ export function VoicePageContent() {
               </ul>
               <div className='mt-8 flex flex-wrap gap-3'>
                 <Button asChild variant='primary'>
-                  <Link href={APP_ROUTES.START} data-testid='voice-trust-cta'>
+                  <Link
+                    href={APP_ROUTES.START}
+                    prefetch={false}
+                    data-testid='voice-trust-cta'
+                  >
                     Start your first clone
                   </Link>
                 </Button>
@@ -150,7 +154,11 @@ export function VoicePageContent() {
               demand.
             </p>
             <Button asChild variant='secondary' className='mt-2'>
-              <Link href={APP_ROUTES.START} data-testid='voice-final-cta'>
+              <Link
+                href={APP_ROUTES.START}
+                prefetch={false}
+                data-testid='voice-final-cta'
+              >
                 Clone my voice now
               </Link>
             </Button>

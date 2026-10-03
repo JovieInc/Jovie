@@ -68,6 +68,7 @@ const BINARY_EXTENSIONS = new Set([
 const BINARY_ALLOWLIST = [
   /^\.agents\/skills\//,
   /^apps\/desktop\/assets\//,
+  /^apps\/docs\/public\/proof\//,
   /^apps\/ios\/Jovie\/Resources\/Assets\.xcassets\//,
   /^apps\/should-i-make\/public\//,
   /^apps\/web\/assets\//,

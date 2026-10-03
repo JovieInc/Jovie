@@ -134,6 +134,22 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
             "remainingBudgets": _remaining(policy, {**used, "attempts": number, "concurrency": used["concurrency"] + 1})}
         return {"admitted": True, **row}, [row]
     return _locked(Path(path), ident, coordination, decide)
+def resume(path: Path, ident: dict, fence: str, owner: dict, now: float | None = None, coordination: dict | None = None) -> dict:
+    """Resume the same live fenced attempt; never renew its lease or budgets.
+
+    The caller additionally holds its provider journal lock. No terminal or
+    expired attempt can be revived, and ownership must match exactly.
+    """
+    now = time.time() if now is None else now
+    def decide(all_rows):
+        rows = _for(all_rows, ident)
+        start = next((r for r in reversed(rows) if r["event"] == "attempt_started" and r.get("fencingToken") == fence), None)
+        if (not start or start["owner"] != owner or start["leaseExpiresAt"] <= now
+            or any(r.get("terminalState") in TERMINAL or (r["event"] == "attempt_finished" and r.get("fencingToken") == fence) for r in rows)):
+            return {"admitted": False, "reason": "resume_not_admitted"}, []
+        return {"admitted": True, **start, "resumed": True}, []
+    return _locked(Path(path), ident, coordination, decide)
+
 def boundary(path: Path, ident: dict, fence: str, reservation: dict, now: float | None = None, coordination: dict | None = None) -> dict:
     now = time.time() if now is None else now
     reservation = {"spend": reservation.get("spend", 0), "mutations": reservation.get("mutations", 0)}
