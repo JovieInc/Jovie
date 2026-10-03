@@ -35,7 +35,9 @@ describe('SettingsProfileSection', () => {
   it('asks for the name on the profile', () => {
     render(
       <SettingsProfileSection
-        artist={{ name: 'Ada', handle: 'ada', image_url: null } as Artist}
+        artist={
+          { name: 'Ada', handle: 'ada', image_url: null } as unknown as Artist
+        }
         onRefresh={vi.fn()}
       />
     );
