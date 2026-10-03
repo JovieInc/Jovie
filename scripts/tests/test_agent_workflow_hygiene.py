@@ -1323,6 +1323,14 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     assert "SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}" in job
     assert "SLACK_CI_CHANNEL_ID: ${{ vars.SLACK_CI_CHANNEL_ID }}" in job
     assert "SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}" in job
+    notice = _step_block(
+        "nightly-tests.yml", "Skip Slack when bot token or channel is unset"
+    )
+    assert "env.SLACK_BOT_TOKEN == ''" in notice
+    assert "env.SLACK_CI_CHANNEL_ID == ''" in notice
+    assert "SLACK_BOT_TOKEN or SLACK_CI_CHANNEL_ID is unset" in notice
+    assert "Skipping Slack. Tim sets these later." in notice
+    assert "exit 0" in notice
     for step, result in (
         (knip_failure, "needs.knip.result == 'failure'"),
         (unit_failure, "needs.unit-tests.result == 'failure'"),
@@ -1599,31 +1607,35 @@ def test_background_controllers_never_consume_fixed_ci_capacity() -> None:
 
 
 def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
-    """Cancelled CI and non-hold labels must not occupy a jovie-fixed slot."""
+    """PR, check, and status fan-out must not occupy a jovie-fixed slot."""
     workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
     trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
-    assert "schedule:" not in trigger
+    assert "schedule:" in trigger
+    assert "cron: '*/5 * * * *'" in trigger
     assert "workflow_run:" not in trigger
-    assert "opened" in trigger
-    assert "edited" in trigger
-    assert "synchronize" in trigger
+    assert "pull_request:" not in trigger
+    assert "pull_request_target:" not in trigger
+    assert "check_run:" not in trigger
+    assert "check_suite:" not in trigger
+    assert "\n  status:" not in trigger
+    assert "opened" not in trigger
+    assert "synchronize" not in trigger
     assert "Production Marker Recovery]" not in trigger
-    assert "group: fleet-gate-event-refresh" in workflow
-    assert "cancel-in-progress: false" in workflow
-    assert "github.event.pull_request.merged != true" in block
-    assert "github.event.label.name == 'hold'" in block
-    assert "github.event.label.name == 'gated'" in block
-    assert "github.event.label.name == 'queue-deferred'" in block
+    assert "fleet-gate-receipt" in workflow
+    assert "fleet-gate-triage-" in workflow
+    assert "cancel-in-progress: true" in workflow
     assert "github.event.label.name == 'needs-human'" not in block
-    assert "github.event.label.name == 'duplicate'" in block
+    assert "0 <= age < 120" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
     assert "Persist stack policy repair actions" in block
     assert "--closure-health-file=" in block
     assert "delivery-state-machine.mjs" in block
-    assert "\n  pull_request_target:\n" in workflow and "\n  pull_request:\n" not in workflow and "converted_to_draft" in trigger and "github.event_name != 'pull_request_target'" in block and "steps.refresh.outputs.receipt_path" in block and "state/gem-priority-gate/latest.json" not in block
+    assert "steps.refresh.outputs.receipt_path" in block
+    assert "state/gem-priority-gate/latest.json" not in block
     assert "steps.stack-actions.outcome == 'success'" in block
+    assert "push:" in trigger and "branches: [main]" in trigger
 
 
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:
@@ -1673,9 +1685,11 @@ def test_one_workflow_owns_automatic_issue_admission() -> None:
     assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
 
     workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-    # One file-level concurrency group serializes every admission event.
+    # One file-level concurrency block. Receipt refreshes share a group;
+    # triage assessments coalesce per issue and do not cancel a receipt write.
     assert workflow.count("concurrency:") == 1
-    assert "group: fleet-gate-event-refresh" in workflow
+    assert "fleet-gate-receipt" in workflow
+    assert "github.event.client_payload.issue_identifier" in workflow
     assert workflow.index("concurrency:") < workflow.index("jobs:")
 
 

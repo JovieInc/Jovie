@@ -272,6 +272,18 @@ nodes:
       - issue_comment
     terminalReceipt: job:claude
     jobCount: 1
+  - name: CODEOWNERS Path Drift
+    path: .github/workflows/codeowners-drift.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:drift
+    jobCount: 1
   - name: CodeQL Security Analysis
     path: .github/workflows/codeql.yml
     active: true
@@ -331,6 +343,17 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:intake
+    jobCount: 1
+  - name: Design gate
+    path: .github/workflows/design-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:brief
     jobCount: 1
   - name: Design Governance
     path: .github/workflows/design-governance.yml
@@ -452,9 +475,9 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - pull_request_target
       - push
       - repository_dispatch
+      - schedule
       - workflow_dispatch
     terminalReceipt: job:assess
     jobCount: 2
@@ -999,6 +1022,18 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:find
+    jobCount: 1
+  - name: Remediation Sweep
+    path: .github/workflows/remediation-sweep.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:sweep
     jobCount: 1
   - name: Repository documentation shadow
     path: .github/workflows/repository-docs-shadow.yml

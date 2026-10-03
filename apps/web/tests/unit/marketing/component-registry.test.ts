@@ -5,8 +5,11 @@ import {
   BUTTON_SIZE_NAMES,
   BUTTON_VARIANT_NAMES,
 } from '@jovie/ui';
+import { render, screen } from '@testing-library/react';
+import { createElement } from 'react';
 import * as ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import {
   BUTTON_PEN_PROPAGATION_FIXTURES,
   DESIGN_SYSTEM_COMPONENT_IDS,
@@ -1696,4 +1699,31 @@ describe('CTA source identity and Pen mapping', () => {
       )
     ).toBe(false);
   });
+});
+
+vi.mock('next/link', async () => {
+  const { createElement, forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      import('react').ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, href, ...props }, ref) {
+      return createElement('a', {
+        ...props,
+        href: href ?? '#',
+        ref,
+        'data-test-prefetch': String(prefetch),
+      });
+    }),
+  };
+});
+
+it('preserves the mounted homepage front-door auth boundary and public secondary navigation', () => {
+  const { container } = render(createElement(HomepageV2Route));
+  const auth = screen.getByTestId('homepage-v2-hero-primary-cta');
+  expect(auth).toHaveAttribute('href', '/signup');
+  expect(auth).toHaveAttribute('data-test-prefetch', 'false');
+  const publicLink = container.querySelector('a.public-action-secondary');
+  expect(publicLink).toHaveAttribute('href', '/artist-profiles');
+  expect(publicLink).toHaveAttribute('data-test-prefetch', 'undefined');
 });

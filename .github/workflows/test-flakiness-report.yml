@@ -193,6 +193,15 @@ jobs:
               console.log(`Created deflake issue #${issue.number}: ${deflakeTitle}`);
             }
 
+      - name: File Linear remediation when the ratchet is red
+        if: ${{ failure() && steps.ratchet.outcome == 'failure' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
+          RATCHET_STATUS: ${{ steps.ratchet.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/flaky-test-filing-intake.mjs
+
       - name: Summarize report
         if: always()
         env:

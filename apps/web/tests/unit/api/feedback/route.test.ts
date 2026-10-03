@@ -4,6 +4,7 @@ const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateFeedbackItem = vi.hoisted(() => vi.fn());
 const mockNotifySlackFeedbackSubmission = vi.hoisted(() => vi.fn());
 const mockFindFirst = vi.hoisted(() => vi.fn());
+const mockSelectLimit = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
@@ -24,6 +25,11 @@ vi.mock('@/lib/notifications/providers/slack', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: mockSelectLimit }),
+      }),
+    }),
     query: {
       users: {
         findFirst: mockFindFirst,
@@ -70,6 +76,7 @@ describe('POST /api/feedback', () => {
       name: 'Test User',
       email: 'test@example.com',
     });
+    mockSelectLimit.mockResolvedValue([]);
     mockCreateFeedbackItem.mockResolvedValue({ id: 'feedback_1' });
     mockNotifySlackFeedbackSubmission.mockResolvedValue(undefined);
   });
@@ -106,6 +113,24 @@ describe('POST /api/feedback', () => {
   it('persists opportunity inbox rating metadata in feedback context', {
     timeout: 15_000,
   }, async () => {
+    mockSelectLimit.mockResolvedValueOnce([
+      {
+        kind: 'social_reply.draft',
+        payload: {
+          schemaVersion: 1,
+          title: 'Reply to a collaborator',
+          platform: 'youtube',
+          sourceId: 'video-1',
+          targetId: 'comment-1',
+          authorLabel: '@collaborator',
+          authorKind: 'collab',
+          inboundText: 'Want to collab?',
+          inboundAt: '2026-10-01T12:00:00.000Z',
+          draftedText: 'Yes — sending you a note.',
+          sourceUrl: 'https://youtube.com/watch?v=video-1',
+        },
+      },
+    ]);
     const { POST } = await import('@/app/api/feedback/route');
 
     const response = await POST(
@@ -130,6 +155,12 @@ describe('POST /api/feedback', () => {
           pathname: '/app',
           suggestedActionId: '11111111-1111-4111-8111-111111111111',
           rating: 'positive',
+          socialInboxFeatureKeys: expect.arrayContaining([
+            'identity:collab',
+            'intent:collab_ask',
+            'intent:question',
+            'state:unanswered',
+          ]),
         }),
       })
     );

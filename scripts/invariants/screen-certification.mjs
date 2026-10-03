@@ -243,6 +243,7 @@ web.tasks|web|tasks|apps/web/app/app/(shell)/tasks/page.tsx,apps/web/app/app/(sh
 web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mobile
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
+web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile

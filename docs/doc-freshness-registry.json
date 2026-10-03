@@ -339,7 +339,7 @@
     "CLAUDE.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router implements the company constitution without replacing it.",
-      "documentSha256": "1b75c23c85e8d0b7431ff336dfa6211d9ef2f5e49649963530500ff0081222ec",
+      "documentSha256": "8a34aa0ffe385bdc1ee2872e0f6a22df21d6a860dfcb224d2c150e951e7dcafa",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
