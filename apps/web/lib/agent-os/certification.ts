@@ -1000,7 +1000,7 @@ const ADMISSION_AUDIT_SUMMARIES = {
   founder_rejected: 'Founder rejection returns certification to working.',
   review_packet_incomplete:
     'Certification packet failed closed before founder review.',
-  taste_card_emitted: 'Review-ready packet emits one Taste Inbox card.',
+  taste_card_emitted: 'Review-ready packet creates one Inbox decision.',
   transition_allowed: 'Requested state is admitted.',
   transition_blocked: 'Requested state is blocked.',
 } as const satisfies Record<CertificationAuditEvent['type'], string>;
