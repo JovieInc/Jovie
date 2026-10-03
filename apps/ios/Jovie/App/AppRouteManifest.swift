@@ -16,6 +16,10 @@ enum AppRouteClassification: String, Equatable, Sendable {
   case deprecated
   /// Declared but no path leads to it.
   case unreachable
+  /// Intentionally served by the web app only (JOV-7632). The AASA excludes
+  /// the path from universal links and `MobileWebOnlyRouteBoundary` hands any
+  /// stragglers back to Safari; no in-app surface may claim the destination.
+  case webOnly
 }
 
 /// How a destination is mounted or left.
@@ -127,7 +131,7 @@ extension IntentNavigationRequest {
 /// Versioned, executable census of the iOS route graph (JOV-6095). Bump
 /// `version` whenever a route is added, reclassified, or removed.
 enum AppRouteManifest {
-  static let version = 2
+  static let version = 3
 
   static let entries: [AppRouteEntry] = [
     // MARK: Root routes (AppState.route → RootView)
@@ -642,6 +646,75 @@ enum AppRouteManifest {
       test: "AppShellIntentNavigationTests"
     ),
 
+    // MARK: Web-only boundaries (JOV-7632; documented, never mounted in-app)
+
+    AppRouteEntry(
+      id: "webOnly.youtube",
+      title: "YouTube",
+      classification: .webOnly,
+      presentation: .externalLink,
+      source: "apps/web/app/app/(shell)/youtube",
+      userTask: "Run the YouTube packaging optimizer",
+      stateOwner: "web app; AASA NOT /app/youtube*",
+      entry: "Browser only — excluded from universal links",
+      exit: "Safari"
+    ),
+    AppRouteEntry(
+      id: "webOnly.insights",
+      title: "Insights",
+      classification: .webOnly,
+      presentation: .externalLink,
+      source: "apps/web/app/app/(shell)/insights",
+      userTask: "Read audience/release insights",
+      stateOwner: "web app; AASA NOT /app/insights*",
+      entry: "Browser only — excluded from universal links",
+      exit: "Safari"
+    ),
+    AppRouteEntry(
+      id: "webOnly.jovieWork",
+      title: "Jovie Work",
+      classification: .webOnly,
+      presentation: .externalLink,
+      source: "apps/web/app/app/(shell)/jovie-work",
+      userTask: "Use the Jovie Work workspace",
+      stateOwner: "web app; AASA NOT /app/jovie-work*",
+      entry: "Browser only — excluded from universal links",
+      exit: "Safari"
+    ),
+    AppRouteEntry(
+      id: "webOnly.releasePlan",
+      title: "Release Plan",
+      classification: .webOnly,
+      presentation: .externalLink,
+      source: "apps/web/app/app/(shell)/dashboard/release-plan",
+      userTask: "Review the release plan",
+      stateOwner: "web app; AASA NOT /app/dashboard/release-plan*",
+      entry: "Browser only — excluded from universal links",
+      exit: "Safari"
+    ),
+    AppRouteEntry(
+      id: "webOnly.dashboardInsights",
+      title: "Dashboard Insights",
+      classification: .webOnly,
+      presentation: .externalLink,
+      source: "apps/web/app/app/(shell)/dashboard/insights",
+      userTask: "Read insights under the dashboard namespace",
+      stateOwner: "web app; AASA NOT /app/dashboard/insights*",
+      entry: "Browser only — excluded from universal links",
+      exit: "Safari"
+    ),
+    AppRouteEntry(
+      id: "webOnly.merchCheckout",
+      title: "Merch Checkout",
+      classification: .webOnly,
+      presentation: .externalLink,
+      source: "apps/web/app/[username]/merch/[cardId]/page.tsx",
+      userTask: "Buy a merch item",
+      stateOwner: "web app; /<handle>/merch/<cardId> is outside /app/* and never claimed by the AASA",
+      entry: "Browser only — public profile route",
+      exit: "Safari"
+    ),
+
     // MARK: DEBUG / UITest-only branches (not shipped surface area)
 
     AppRouteEntry(
@@ -769,6 +842,12 @@ enum AppRouteManifest {
          route.entry.isEmpty || route.exit.isEmpty
       {
         issues.append("live route \(route.id) must declare a visible entry and exit")
+      }
+    }
+
+    for prefix in MobileWebOnlyRouteBoundary.pathPrefixes {
+      if !entries.contains({ $0.classification == .webOnly && $0.stateOwner.contains(prefix) }) {
+        issues.append("web-only path \(prefix) lacks a webOnly manifest entry")
       }
     }
 

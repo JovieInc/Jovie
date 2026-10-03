@@ -670,6 +670,15 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
       if let route = MobileSignedInLinkRoute.resolve(url) {
         Observability.addBreadcrumb(.deepLinkRouteMatched, context: ["route": route.rawValue, "url": url])
         IntentNavigationStore.shared.submit(route.intent)
+      } else if MobileWebOnlyRouteBoundary.isWebOnly(url) {
+        // JOV-7632: web-only workspaces stay out of iOS navigation. If a link
+        // still reaches the app (stale AASA cache, older build), hand it back
+        // to Safari instead of stranding the user in-app.
+        Observability.addBreadcrumb(.deepLinkRouteMatched, context: ["route": "web_only", "url": url])
+        let fallback = MobileWebOnlyRouteBoundary.webFallbackURL(
+          for: url, webBaseURL: appState.configuration.webBaseURL
+        )
+        UIApplication.shared.open(fallback)
       } else {
         Observability.addBreadcrumb(.deepLinkRouteUnmatched, level: .warning, context: ["url": url])
         Observability.addBreadcrumb(.deepLinkParseFailed, level: .warning, context: ["url": url])
