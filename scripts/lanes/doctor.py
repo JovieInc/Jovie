@@ -639,7 +639,11 @@ class Tracker:
                 issue = nodes[0]
                 if (issue.get("state") or {}).get("type") in ("completed", "canceled"):
                     self.linear.move(issue["id"], "Triage")
-                    self.linear.comment(issue["id"], f"🤖 doctor: merge-queue bottleneck fired again at {now_iso()}.")
+                    try:
+                        self.linear.comment(issue["id"], f"🤖 doctor: merge-queue bottleneck fired again at {now_iso()}.")
+                    except Exception as error:
+                        print(f"doctor: reopened merge-queue owner; notification failed ({type(error).__name__})",
+                              file=sys.stderr)
                 return issue["id"]
             data = self.linear.gql(
                 'query($t:String!){issues(first:5,filter:{team:{key:{eq:"JOV"}},title:{eq:$t},'

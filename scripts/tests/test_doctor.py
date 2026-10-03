@@ -365,6 +365,32 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(linear.moves, [("remediation", "Triage")])
         self.assertIn("fired again", linear.comments[0][1])
 
+    def test_reopened_merge_queue_owner_survives_notification_failure_without_duplicate(self):
+        class FakeLinear:
+            def __init__(self):
+                self.moves, self.creates = [], []
+
+            def gql(self, query, variables):
+                if "issueCreate" in query:
+                    self.creates.append(variables)
+                    return {"issueCreate": {"issue": {"id": "duplicate"}}}
+                return {"issues": {"nodes": [{"id": "remediation", "state": {"type": "completed"}}]}}
+
+            def move(self, issue_id, state):
+                self.moves.append((issue_id, state))
+
+            def comment(self, issue_id, text):
+                raise RuntimeError("notification unavailable")
+
+        linear = FakeLinear()
+        tracker = doctor.Tracker(linear, "gem")
+        with mock.patch.object(tracker, "apply_alert_label"), mock.patch.object(tracker, "_team", return_value={
+            "id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]}, "labels": {"nodes": []},
+        }), mock.patch.object(tracker, "_remediation_label_id", return_value=None):
+            self.assertEqual(tracker.open("bottleneck:merge-queue", "queue stalled"), "remediation")
+        self.assertEqual(linear.moves, [("remediation", "Triage")])
+        self.assertEqual(linear.creates, [])
+
     def test_new_condition_generation_reopens_completed_liveness_owner(self):
         class FakeLinear:
             def __init__(self):
