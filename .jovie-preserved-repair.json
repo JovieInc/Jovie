@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261002T093319Z-PR19925-devin-fix-f069a5",
+ "pr": 19925,
+ "issue": null,
+ "reason": [
+  "target-head-superseded"
+ ],
+ "branch": "dependabot/npm_and_yarn/tanstack/react-pacer-0.24.0",
+ "headBefore": "52728a42d95db7d5092be6062b29d73a37adef29",
+ "at": "2026-10-02T09:37:13Z"
+}
