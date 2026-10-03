@@ -1,8 +1,15 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  closeSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -16,12 +23,42 @@ import { crc32 } from 'node:zlib';
 
 export const GH_FAKE_HOST = 'github.localhost';
 
+/**
+ * A `gh` on PATH can be a host shim (jovie-lanes wraps gh to mint an app token
+ * per call). The wrapper needs the host's real HOME for the app key and reaches
+ * the network this harness removes, so it must not shadow the real binary.
+ */
+function isGhShim(path) {
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      const head = Buffer.alloc(8192);
+      return readSync(fd, head, 0, head.length, 0) > 0
+        ? head.toString('utf8').includes('gh_app_token')
+        : false;
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return false;
+  }
+}
+
+/** PATH minus any directory whose `gh` is a token-minting shim. */
+export function realGhPath(path = process.env.PATH ?? '') {
+  return path
+    .split(delimiter)
+    .filter(dir => !isGhShim(join(dir, 'gh')))
+    .join(delimiter);
+}
+
 /** Absolute path of the real gh binary, or null when it is not installed. */
 export function resolveRealGh() {
   try {
     return (
       execFileSync('sh', ['-c', 'command -v gh'], {
         encoding: 'utf8',
+        env: { PATH: realGhPath() },
       }).trim() || null
     );
   } catch {
@@ -116,7 +153,7 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
+          PATH: realGhPath(),
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
