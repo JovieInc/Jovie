@@ -540,7 +540,7 @@ export async function processMusicFetchEnrichmentJob(
   if (!artistData) {
     if (musicfetchCircuitBreaker.getState() === 'OPEN') {
       await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'idle');
-      return result;
+      throw new Error('MusicFetch circuit breaker open; retry enrichment');
     }
     logger.warn('MusicFetch enrichment: API returned no data', {
       creatorProfileId,
