@@ -265,7 +265,7 @@ jobs:
         if: ${{ always() }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           FAILED_TESTS: ${{ steps.test-results.outputs.failed_tests }}
           TEST_STATUS: ${{ steps.test-results.outputs.test_status }}
           FLAKY_TESTS: ${{ steps.test-results.outputs.flaky_tests }}
@@ -417,7 +417,7 @@ jobs:
         if: ${{ always() && (steps.health.outcome != 'success' || steps.health.outputs.health_status != 'passed') }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           WEB_AI_HEALTH_RECEIPT_PATH: ${{ runner.temp }}/web-ai-health/receipt.json
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -427,7 +427,7 @@ jobs:
         if: ${{ steps.health.outcome == 'success' && steps.health.outputs.health_status == 'passed' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           WEB_AI_HEALTH_STATUS: passed
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: node scripts/web-ai-health-intake.mjs

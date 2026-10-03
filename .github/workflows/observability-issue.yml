@@ -32,7 +32,7 @@ jobs:
       - name: Sync deduped observability issue
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           OBSERVABILITY_PAYLOAD: ${{ toJson(github.event.client_payload) }}
           OCCURRENCE_DELTA: ${{ github.event.client_payload.occurrence_delta }}
         run: node scripts/observability-issue-linear.mjs

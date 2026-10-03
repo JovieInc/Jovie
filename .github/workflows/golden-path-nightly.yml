@@ -89,10 +89,10 @@ jobs:
           if [ "$conclusion" != "success" ]; then exit 1; fi
 
       - name: File Linear issue on red
-        if: ${{ failure() && steps.run.outputs.run_id != '' }}
+        if: ${{ failure() && steps.skip.outputs.skip != 'true' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           RUN_URL: ${{ steps.run.outputs.run_url }}
           CONCLUSION: ${{ steps.run.outputs.conclusion }}
           MAIN_SHA: ${{ steps.skip.outputs.main_sha }}
@@ -138,7 +138,7 @@ jobs:
         if: ${{ success() || steps.skip.outputs.skip == 'true' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
