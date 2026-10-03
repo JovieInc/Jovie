@@ -2982,7 +2982,7 @@ extension AppStateTests {
       let gate = ProfileLoadGate()
       let client = OwnedChatTestClient(original, gate: gate, operation: "list")
       var receiptDeliveries = 0
-      func make(_ identity: NativeChatIdentity) -> ChatRepository {
+      @MainActor func make(_ identity: NativeChatIdentity) -> ChatRepository {
         ChatRepository(client: client, cache: caches.chat, userID: identity.userID,
           webBaseURL: URL(string: "https://jov.ie")!, identity: identity,
           onSessionExpired: { receipt in

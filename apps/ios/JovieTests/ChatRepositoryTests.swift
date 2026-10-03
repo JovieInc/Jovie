@@ -2220,7 +2220,7 @@ extension ChatRepositoryTests {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
       let h = try OwnedChatHarness(); defer { h.cleanup() }
       var creations = 0
-      func make(_ identity: NativeChatIdentity) -> ChatRepository {
+      @MainActor func make(_ identity: NativeChatIdentity) -> ChatRepository {
         creations += 1
         return ChatRepository(client: SuccessfulChatClient(), cache: h.cache, userID: identity.userID,
           webBaseURL: URL(string: "https://jov.ie")!, identity: identity)
