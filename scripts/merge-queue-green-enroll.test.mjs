@@ -40,7 +40,7 @@ const current = number => ({
   timelineItems: { nodes: [] },
 });
 
-async function fixture({
+async function fixture(/** @type {any} */ {
   roster = [candidate(1)],
   overrides = {},
   dry = false,
