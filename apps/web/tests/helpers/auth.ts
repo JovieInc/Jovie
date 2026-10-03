@@ -2,7 +2,10 @@ import { expect, type Locator, type Page, type Route } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
-import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
+import {
+  smokeNavigateWithRetry,
+  withRetry,
+} from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
 
 // ============================================================================
@@ -23,11 +26,10 @@ import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 60_000;
-// The enter route 303s into /app, so page.goto also covers the redirect
-// target's DOMContentLoaded. The bypass-server warmup only pre-compiles the
-// server-side route (curl fetches no JS); the first real browser hit still
-// compiles /app's client modules, which exceeds the nightly suite's 45s
-// navigationTimeout (JOV-7206). Give this navigation its own budget.
+// The bypass-server warmup only pre-compiles the server-side route (curl
+// fetches no JS); the first real browser hit still compiles /app's client
+// modules, which exceeds the nightly suite's 45s navigationTimeout
+// (JOV-7206). Give the enter request and shell navigation their own budget.
 const AUTH_ENTER_NAVIGATION_TIMEOUT_MS = 120_000;
 
 export class TestAuthError extends Error {
@@ -147,18 +149,44 @@ async function enableTestAuthBypass(
   const redirect = process.env.E2E_AUTH_REDIRECT ?? AUTH_READY_ROUTE;
   const enterUrl = `${baseUrl}/api/dev/test-auth/enter?persona=${persona}&redirect=${redirect}`;
 
-  // The enter route mints a real BA session cookie and redirects to the
-  // target path. Navigate to it directly — the cookie is set on the
-  // same origin, so subsequent navigations are authenticated.
-  const response = await page.goto(enterUrl, {
-    waitUntil: 'domcontentloaded',
-    timeout: AUTH_ENTER_NAVIGATION_TIMEOUT_MS,
-  });
+  // Mint the session cookie through the request API instead of a browser
+  // navigation: the enter route 303s into the app shell, so page.goto only
+  // resolves after the redirect target finishes its cold dev compile —
+  // that wedged the nightly auth bootstrap past its 120s budget and left
+  // the dev server dead for retries (ERR_EMPTY_RESPONSE, JOV-7559). The
+  // fetch returns as soon as the 303 is emitted and the cookie lands in
+  // the same context jar; the real navigation below then carries its own
+  // timeout and retry budget against the cold compile.
+  const enterResponse = await withRetry(
+    () =>
+      page.request.get(enterUrl, {
+        maxRedirects: 0,
+        timeout: AUTH_ENTER_NAVIGATION_TIMEOUT_MS,
+      }),
+    {
+      retries: 2,
+      onRetry: attempt =>
+        console.warn(`Test auth enter retry ${attempt} for ${persona}`),
+    }
+  );
 
   // Fail closed with a typed error when the proxy rewrites /api/dev/* to
   // 404 or the route returns JSON (missing VERCEL_ENV=development /
   // E2E_USE_TEST_AUTH_BYPASS on the standalone server). auth.setup treats
   // CLERK_SETUP_FAILED as soft-fail and writes empty storage state.
+  if (enterResponse.status() !== 303) {
+    const body = await enterResponse.text().catch(() => '');
+    throw new TestAuthError(
+      `Test auth enter did not redirect (status=${enterResponse.status()}): ${body.slice(0, 240)}`,
+      'CLERK_SETUP_FAILED'
+    );
+  }
+
+  const response = await smokeNavigateWithRetry(page, `${baseUrl}${redirect}`, {
+    timeout: AUTH_ENTER_NAVIGATION_TIMEOUT_MS,
+    retries: 2,
+  });
+
   const landedPath = new URL(page.url()).pathname;
   if (
     landedPath.startsWith('/api/dev/test-auth/') ||
