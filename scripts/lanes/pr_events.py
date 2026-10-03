@@ -24,6 +24,8 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
@@ -556,7 +558,117 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             added.append((number, kind))
     if event == "push":
         added += label_backlog(sh, disabled, kinds=("conflict",))
+    intake = remediation.non_pr_event(event, payload)
+    if intake:
+        created = upsert_intake(intake, sh)
+        if created:
+            added.append((created, remediation.INTAKE_LABEL))
     return added
+
+
+def upsert_intake(event: dict, sh=run, now: float | None = None) -> int | None:
+    """One GitHub issue per fingerprint. A hit inside 30 minutes is the claim window."""
+    now = time.time() if now is None else now
+    marker = f"fingerprint={event.get('fingerprint')}"
+    listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
+                 "--limit", "50", "--json", "number,body,updatedAt"])
+    try:
+        rows = json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
+    except (ValueError, AttributeError):
+        rows = []
+    if not isinstance(rows, list):
+        rows = []
+    for row in rows:
+        if not isinstance(row, dict) or marker not in (row.get("body") or ""):
+            continue
+        return None  # one record per fingerprint; the tick converts after the claim window
+    created = sh(["gh", "issue", "create", "--repo", REPO,
+                  "--title", remediation.linear_intake_plan(event)["title"][:80],
+                  "--body", remediation.intake_body(event),
+                  "--label", remediation.INTAKE_LABEL])
+    found = re.search(r"/issues/(\d+)", created.stdout or "")
+    if not found:
+        return None
+    # Touch nothing else inside the claim window; updatedAt on the new issue starts it.
+    if remediation.claim_open(now, now + 1):
+        return int(found.group(1))
+    return int(found.group(1))
+
+
+def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
+    """After the 30-minute claim window, one Linear issue per fingerprint. No new secret."""
+    listed = sh(["gh", "issue", "list", "--repo", REPO, "--state", "open", "--label", remediation.INTAKE_LABEL,
+                 "--limit", "30", "--json", "number,title,body,updatedAt"])
+    try:
+        rows = json.loads(listed.stdout or "[]") if getattr(listed, "returncode", 1) == 0 else []
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(rows, list) or not rows:
+        return None
+    due = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        body = row.get("body") or ""
+        if "linear-issue-id:" in body:
+            continue
+        updated = iso_ts(row.get("updatedAt"))
+        if updated is None or remediation.claim_open(updated, now):
+            continue
+        due.append(row)
+    if not due:
+        return None
+    try:
+        linear = linear_factory()
+    except Exception:
+        return None
+    if linear is None or not hasattr(linear, "gql"):
+        return None
+    linked = []
+    for row in due:
+        body = row.get("body") or ""
+        found = re.search(r"fingerprint=([0-9a-f]+)", body)
+        ws = "ci"
+        if "ws:release-deploy" in body or "release-deploy" in body:
+            ws = "release-deploy"
+        elif "ws:reliability" in body or "source': 'sentry'" in body or "sentry" in body[:80]:
+            ws = "reliability"
+        event = {"source": "intake", "fingerprint": found.group(1) if found else str(row.get("number")),
+                 "ws": ws, "subject": {"github_issue": row.get("number")}, "evidence": {"excerpt": body[:400]}}
+        try:
+            issue_id = ensure_linear_intake(linear, event)
+        except Exception:
+            continue
+        if not issue_id:
+            continue
+        sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
+            f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+        linked.append(row["number"])
+    return linked or None
+
+
+def ensure_linear_intake(linear, event: dict) -> str | None:
+    """Create the remediation label only when it is missing, then one agent-ready issue."""
+    team = linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                      {})["teams"]["nodes"][0]
+    names = {label["name"]: label["id"] for label in team["labels"]["nodes"]}
+    wanted = remediation.intake_labels(str(event.get("ws") or "ci"))
+    ids = []
+    for name in wanted:
+        if name in names:
+            ids.append(names[name])
+            continue
+        if name != remediation.REMEDIATION_LABEL:
+            continue
+        created = linear.gql('mutation($n:String!,$t:String!){issueLabelCreate(input:{name:$n,teamId:$t}){issueLabel{id}}}',
+                             {"n": name, "t": team["id"]})
+        ids.append(created["issueLabelCreate"]["issueLabel"]["id"])
+    todo = next(state["id"] for state in team["states"]["nodes"] if state["name"] == "Todo")
+    plan = remediation.linear_intake_plan(event)
+    data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id}}}',
+                      {"i": {"teamId": team["id"], "stateId": todo, "labelIds": ids,
+                             "title": plan["title"], "description": plan["description"]}})
+    return data["issueCreate"]["issue"]["id"]
 
 
 def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "green", "orphan")) -> list[tuple[int, str]]:
@@ -605,9 +717,11 @@ def queued_prs(lane, kinds) -> list[dict]:
                           "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
         return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
     # Per-check rollups over 100 PRs are the costliest GraphQL read the lanes make, and every
-    # worker pass asked for them; one read per minute per host serves them all.
+    # worker pass asked for them; one read per minute per host serves them all. This is part
+    # of the claim scan, so it shares that TTL with lane issues, in-flight, and fix candidates.
     shared = getattr(lane, "shared", None)
-    prs = shared("queued-" + "-".join(sorted(kinds)), 60, fetch) if shared else fetch()
+    ttl = getattr(lane, "CLAIM_SCAN_TTL_S", 60)
+    prs = shared("queued-" + "-".join(sorted(kinds)), ttl, fetch) if shared else fetch()
     if prs is None:
         return []
     for pr in prs:
@@ -739,11 +853,20 @@ def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: f
         entry["pushedHead"] = record["pushedHead"]  # self-pushes stay in the same generation
     if not rollover and record.get("reentry"):
         entry["reentry"] = record["reentry"]
+    if not rollover:
+        for key in ("escalations", "pendingEscalation", "escalated", "priorEscalations"):
+            if key in record:
+                entry[key] = record[key]
     if rollover:
+        prior = list(record.get("escalations") or []) + list(record.get("priorEscalations") or [])
         entry["reentry"] = {"schema": "jovie-reentry/v1", "materialChange": "new-pr-head",
                             "fromGeneration": {"head": record.get("sha"), "attempts": record.get("count", 0),
                                                "pushedHead": record.get("pushedHead")},
                             "toGeneration": {"head": sha}, "at": now}
+        if prior:
+            entry["reentry"]["priorEscalations"] = prior
+            entry["priorEscalations"] = prior
+        # A new generation does not inherit `escalated`. Spent attempt history stays on the receipt.
     attempts[str(number)] = entry
 
 
@@ -1158,6 +1281,8 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     # JOV-7066: held PRs whose hold outlived its cause get one alert per stale episode; the
     # opt-in stricter mode lifts automation holds whose head already moved past the hold.
     announced = {row.get("pr") for row in previous.get("staleHolds") or []}
+    nags = previous.get("holdNags") or {}
+    next_nags = dict(nags)
     stale_candidates = []
     for pr in prs:
         record = attempts.get(str(pr["number"]), {})
@@ -1173,6 +1298,9 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     for row in stale:
         if row["pr"] in announced:
             continue
+        if not remediation.hold_nag_due(nags, row["pr"], row["head"], now):
+            continue
+        next_nags[str(row["pr"])] = {"head": row["head"], "at": now}
         if auto_unhold and row["auto"]:
             for name in (label for label in label_names(by_number[row["pr"]])
                          if label.lower() in HOLD_LABELS or label == POISON_LABEL):
@@ -1210,7 +1338,8 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
                                next="preserve source; revalidate retirement authority")
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
               "closed": closed, "orphans": plan["orphans"],
-              "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale}
+              "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
+              "holdNags": next_nags}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
     return record
 
@@ -1222,6 +1351,9 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     swept = reconcile(host, lane, linear_factory, now)
     prs = queued_prs(lane, TICK_KINDS + ("dequeued",))
     outcomes = {"reconciled": swept["counts"]} if swept else {}
+    intake = convert_intake(lane, linear_factory, lane.sh, now)
+    if intake:
+        outcomes["intake"] = intake
     if not prs:
         return outcomes
     held_file = lane.held_path(host)

@@ -421,6 +421,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ios-ci-cache-contract.test.mjs',
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
+  'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/__tests__/canonical-json.test.mjs',
@@ -444,6 +445,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/summer-commissioning/product-quality-governor.test.mjs',
   'scripts/summer-commissioning/project-creation-policy.test.mjs',
   'scripts/summer-commissioning/receipt-trust.test.mjs',
+  'scripts/docs-pagefind-staging.test.mjs',
+  'scripts/docs-proof-materialize.test.mjs',
   'scripts/vercel-source-contract.test.mjs',
   'scripts/verify-workflow-references.test.mjs',
   'scripts/vision/art-evaluator.test.mjs',
@@ -477,6 +480,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
+  'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
   'scripts/lib/__tests__/help-center-recertification-workflow.test.mjs',
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
@@ -490,6 +494,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/pr-review-contracts.test.mjs',
   'scripts/lib/__tests__/pr-review-kernel.test.mjs',
+  'scripts/lib/__tests__/pr-review-rank.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-label-override.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
@@ -501,6 +506,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ratchet-core.test.mjs',
   'scripts/lib/__tests__/remediation-sweep.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
+  'scripts/lib/__tests__/remediation-reopen.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-learning.test.mjs',
   'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
@@ -2090,6 +2096,7 @@ export async function runStructural(opts = {}) {
       ? ['pnpm invariants:check']
       : [];
   const operationsParts = [
+    'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-source.mjs --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/staging-release-source.test.mjs',
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs',
