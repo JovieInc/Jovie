@@ -132,16 +132,17 @@ struct SettingsStyleGuardTests {
 // switch is possible.
 struct ReleaseChannelGuardTests {
   @Test func provenanceDerivationMatchesAppleReceiptNames() {
-    #expect(AppBuildInfo.provenance(receiptName: "receipt") == .appStore)
-    #expect(AppBuildInfo.provenance(receiptName: "sandboxReceipt") == .testFlight)
-    #expect(AppBuildInfo.provenance(receiptName: nil) == .development)
-    #expect(AppBuildInfo.provenance(receiptName: "unexpected") == .development)
+    #expect(AppBuildInfo.provenance(receiptName: "receipt", isDebugBuild: false) == .appStore)
+    #expect(AppBuildInfo.provenance(receiptName: "sandboxReceipt", isDebugBuild: false) == .testFlight)
+    #expect(AppBuildInfo.provenance(receiptName: nil, isDebugBuild: false) == .unknown)
+    #expect(AppBuildInfo.provenance(receiptName: "unexpected", isDebugBuild: false) == .unknown)
   }
 
   @Test func provenanceDisplayNamesAreHonest() {
     #expect(AppDistributionProvenance.appStore.displayName == "App Store")
     #expect(AppDistributionProvenance.testFlight.displayName == "TestFlight")
     #expect(AppDistributionProvenance.development.displayName == "Development")
+    #expect(AppDistributionProvenance.unknown.displayName == "Unknown")
   }
 
   @Test func shortCommitOnlyTruncatesLongSHAs() {
@@ -154,6 +155,16 @@ struct ReleaseChannelGuardTests {
     #expect(short.shortCommit == "abc123")
     let none = AppBuildInfo(version: "1.0", build: "1", provenance: .development, commit: nil)
     #expect(none.shortCommit == nil)
+  }
+
+  @Test(arguments: [nil, "abc123", "d12f22983e2ec0a4ea2a3b411708a181633b6a2c"] as [String?])
+  func commitDetailsStayOnTheAdminSurface(commit: String?) {
+    let info = AppBuildInfo(version: "1.0", build: "1", provenance: .appStore, commit: commit)
+    #expect(info.displayedCommit(isAdmin: false) == nil)
+    #expect(info.displayedCommit(isAdmin: true) == info.shortCommit)
+    #expect(info.version == "1.0")
+    #expect(info.build == "1")
+    #expect(info.channel == .stable)
   }
 
   @Test func currentBuildInfoCarriesProvenance() {
@@ -173,6 +184,7 @@ struct ReleaseChannelGuardTests {
     #expect(source.contains("LabeledContent(\"Channel\", value: channel.displayName)"))
     #expect(source.contains("settings-release-channel"))
     #expect(source.contains("settings-build-commit"))
+    #expect(source.contains("buildInfo.displayedCommit(isAdmin: showsWorkspaceSwitch)"))
     #expect(source.contains("https://testflight.apple.com"))
     // Admin gate + Apple-controlled install surface; no in-app channel toggle.
     #expect(source.contains("showsWorkspaceSwitch, buildInfo.provenance != .testFlight"))
@@ -180,7 +192,7 @@ struct ReleaseChannelGuardTests {
     #expect(!source.contains("switchChannel"))
     #expect(!source.contains("Join Beta"))
     #expect(!source.contains("appStoreReceiptURL?.lastPathComponent == \"sandboxReceipt\""),
-            "Channel derivation must stay inside AppBuildInfo.provenance(receiptName:).")
+            "Channel derivation must stay inside AppBuildInfo.provenance(receiptName:isDebugBuild:).")
   }
 
   @Test func testflightURLOpensAppleEnrollmentSurface() {

@@ -51,12 +51,14 @@ export function releaseChannelForDesktopFeed(
  * iOS: the channel is derived from install provenance, never toggled in-app.
  * An App Store build cannot self-switch into TestFlight; Beta enrollment
  * deep-links to the canonical TestFlight flow. Debug/development builds sit
- * on no published rail.
+ * on no published rail. Missing or unrecognized provenance is unknown, never
+ * evidence of a published channel or a development build.
  */
 export type IosDistributionProvenance =
   | 'app-store'
   | 'testflight'
-  | 'development';
+  | 'development'
+  | 'unknown';
 
 export function releaseChannelForIosProvenance(
   provenance: IosDistributionProvenance
@@ -67,6 +69,7 @@ export function releaseChannelForIosProvenance(
     case 'testflight':
       return 'beta';
     case 'development':
+    case 'unknown':
       return null;
   }
 }

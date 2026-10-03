@@ -1664,6 +1664,11 @@ describe('merge_group workflow contract', () => {
     expect(ios).toContain("outputs.run_ios == 'true'");
     expect(macos).toContain("outputs.run_macos == 'true'");
     expect(crossProduct).toContain("outputs.run_cross_product == 'true'");
+    expect(
+      getStepRunScript(crossProduct, 'Run model-free shared contracts')
+        .trim()
+        .split('\n')
+    ).toContain('pnpm --filter @jovie/release-channel-contracts test');
     expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining')).toContain(
       'CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}'
     );

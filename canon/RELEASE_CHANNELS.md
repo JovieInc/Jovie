@@ -25,7 +25,8 @@ Do not invent per-platform synonyms — "staging build", "alpha", "preview",
 | macOS `local` dev shell | no updater feed | no published channel |
 | iOS App Store install | install provenance | Stable |
 | iOS TestFlight install | install provenance | Beta / Dogfood |
-| iOS debug/development build | no store receipt | no published channel |
+| iOS debug/development build | positive development-build evidence | no published channel |
+| iOS missing/unrecognized provenance | unknown install source | no inferred published channel |
 | Mac App Store (if adopted later) | distribution adapter | Stable only |
 
 ## Settings rules

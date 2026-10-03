@@ -55,6 +55,7 @@ describe('iOS provenance mapping', () => {
     expect(releaseChannelForIosProvenance('app-store')).toBe('stable');
     expect(releaseChannelForIosProvenance('testflight')).toBe('beta');
     expect(releaseChannelForIosProvenance('development')).toBeNull();
+    expect(releaseChannelForIosProvenance('unknown')).toBeNull();
   });
 });
 

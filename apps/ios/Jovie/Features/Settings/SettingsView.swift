@@ -11,11 +11,12 @@ struct AppBuildInfo: Equatable {
     return String(commit.prefix(7))
   }
 
-  /// The canonical release channel this binary rides on, or nil when the
-  /// install sits on no published rail (debug/development builds).
-  var channel: ReleaseChannel? {
-    ReleaseChannelResolver.channel(for: provenance)
+  func displayedCommit(isAdmin: Bool) -> String? {
+    isAdmin ? shortCommit : nil
   }
+
+  /// Unknown provenance and development builds imply no published channel.
+  var channel: ReleaseChannel? { provenance.channel }
 
   static func current(bundle: Bundle = .main) -> AppBuildInfo {
     AppBuildInfo(
@@ -31,17 +32,22 @@ struct AppBuildInfo: Equatable {
   // one channel into the other; this only reports provenance.
   static func provenance(bundle: Bundle = .main) -> AppDistributionProvenance {
     #if DEBUG
-      return .development
+      let isDebugBuild = true
     #else
-      return provenance(receiptName: bundle.appStoreReceiptURL?.lastPathComponent)
+      let isDebugBuild = false
     #endif
+    return provenance(
+      receiptName: bundle.appStoreReceiptURL?.lastPathComponent,
+      isDebugBuild: isDebugBuild
+    )
   }
 
-  static func provenance(receiptName: String?) -> AppDistributionProvenance {
+  static func provenance(receiptName: String?, isDebugBuild: Bool) -> AppDistributionProvenance {
+    if isDebugBuild { return .development }
     switch receiptName {
     case "receipt": return .appStore
     case "sandboxReceipt": return .testFlight
-    default: return .development
+    default: return .unknown
     }
   }
 
@@ -80,6 +86,15 @@ enum AppDistributionProvenance: Equatable {
   case appStore
   case testFlight
   case development
+  case unknown
+
+  var channel: ReleaseChannel? {
+    switch self {
+    case .appStore: .stable
+    case .testFlight: .beta
+    case .development, .unknown: nil
+    }
+  }
 
   /// Honest install-source label (provenance, not a channel synonym).
   var displayName: String {
@@ -87,45 +102,8 @@ enum AppDistributionProvenance: Equatable {
     case .appStore: "App Store"
     case .testFlight: "TestFlight"
     case .development: "Development"
+    case .unknown: "Unknown"
     }
-  }
-}
-
-enum ReleaseChannelResolver {
-  static var isDebugBuild: Bool {
-    #if DEBUG
-      true
-    #else
-      false
-    #endif
-  }
-
-  static func provenance(
-    receiptLastPathComponent: String?,
-    isDebugBuild: Bool = ReleaseChannelResolver.isDebugBuild
-  ) -> AppDistributionProvenance {
-    if isDebugBuild { return .development }
-    if receiptLastPathComponent == "sandboxReceipt" { return .testFlight }
-    return .appStore
-  }
-
-  /// Debug/development builds sit on no published rail and report no channel.
-  static func channel(
-    for provenance: AppDistributionProvenance
-  ) -> ReleaseChannel? {
-    switch provenance {
-    case .appStore: .stable
-    case .testFlight: .beta
-    case .development: nil
-    }
-  }
-
-  static func currentChannel(bundle: Bundle = .main) -> ReleaseChannel? {
-    channel(
-      for: provenance(
-        receiptLastPathComponent: bundle.appStoreReceiptURL?.lastPathComponent
-      )
-    )
   }
 }
 
@@ -284,7 +262,7 @@ struct SettingsView: View {
         LabeledContent("Channel", value: channel.displayName)
           .accessibilityIdentifier("settings-release-channel")
       }
-      if let shortCommit = buildInfo.shortCommit {
+      if let shortCommit = buildInfo.displayedCommit(isAdmin: showsWorkspaceSwitch) {
         LabeledContent("Commit", value: shortCommit)
           .accessibilityIdentifier("settings-build-commit")
       }

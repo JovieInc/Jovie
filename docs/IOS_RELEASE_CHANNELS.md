@@ -44,11 +44,14 @@ must surface with evidence and never gate unrelated web/Mac/customer releases.
 `AppBuildInfo` (`apps/ios/Jovie/Features/Settings/SettingsView.swift`) reports:
 
 - **Channel**: derived from `Bundle.appStoreReceiptURL` — `receipt` ⇒ App
-  Store, `sandboxReceipt` ⇒ TestFlight, DEBUG/absent ⇒ Development. This is
-  read-only provenance; it cannot change the install channel.
+  Store/Stable, `sandboxReceipt` ⇒ TestFlight/Beta. DEBUG establishes
+  Development; missing/unrecognized receipts in non-debug builds mean Unknown.
+  Development and Unknown imply no published channel. This is read-only
+  provenance; it cannot change the install channel.
 - **Version / Build**: `CFBundleShortVersionString` / `CFBundleVersion`.
-- **Commit**: the `GitCommit` key written into `Configuration.local.plist` by
-  `apps/ios/scripts/write-configuration.sh`. The `beta` lane binds it to the
+- **Commit** (admin surface only): the `GitCommit` key written into
+  `Configuration.local.plist` by `apps/ios/scripts/write-configuration.sh`.
+  The `beta` lane binds it to the
   authorized `RELEASE_SHA`; local builds fall back to worktree HEAD.
 - **Open TestFlight**: shown only to the admin surface
   (`showsWorkspaceSwitch`) when the running build is not already on the
