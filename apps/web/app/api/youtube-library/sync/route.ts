@@ -6,7 +6,10 @@ import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { loadFreshGoogleAccessToken } from '@/lib/connectors/google-calendar/access-token';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
-import { createYouTubeLibraryProvider } from '@/lib/connectors/youtube/provider';
+import {
+  createYouTubeLibraryProvider,
+  YouTubeProviderError,
+} from '@/lib/connectors/youtube/provider';
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
@@ -14,6 +17,8 @@ import { captureError } from '@/lib/error-tracking';
 import { syncChannelVideos } from '@/lib/youtube-library/sync';
 
 const bodySchema = z.object({ creatorProfileId: z.string().uuid() });
+const conflict = (error: string) =>
+  NextResponse.json({ error }, { status: 409 });
 
 export async function POST(request: Request) {
   const { userId } = await getCachedAuth();
@@ -27,7 +32,7 @@ export async function POST(request: Request) {
   if (!access.ok)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const [account] = await db
+  const accounts = await db
     .select({
       id: connectorAccounts.id,
       channelId: connectorAccounts.providerAccountId,
@@ -42,18 +47,13 @@ export async function POST(request: Request) {
         eq(connectorAccounts.status, 'connected')
       )
     )
-    .limit(1);
-  if (!account)
-    return NextResponse.json(
-      { error: 'YouTube is not connected' },
-      { status: 409 }
-    );
-  if (!YOUTUBE_OAUTH_SCOPES.every(scope => account.scopes.includes(scope))) {
-    return NextResponse.json(
-      { error: 'Reconnect YouTube to refresh access' },
-      { status: 409 }
-    );
-  }
+    .limit(2);
+  const [account] = accounts;
+  if (!account) return conflict('YouTube is not connected');
+  if (accounts.length > 1)
+    return conflict('Reconnect YouTube to resolve multiple channels');
+  if (!YOUTUBE_OAUTH_SCOPES.every(scope => account.scopes.includes(scope)))
+    return conflict('Reconnect YouTube to refresh access');
 
   let accessToken: string | null = null;
   try {
@@ -92,6 +92,12 @@ export async function POST(request: Request) {
       .where(eq(connectorAccounts.id, account.id));
     return NextResponse.json(result);
   } catch (error) {
+    const needsReauth =
+      error instanceof YouTubeProviderError &&
+      (error.status === 401 ||
+        (error.status === 403 &&
+          error.message ===
+            'The authorized account does not own the selected YouTube channel'));
     const message =
       error instanceof Error ? error.message : 'Unknown YouTube sync error';
     const safe = accessToken
@@ -100,10 +106,16 @@ export async function POST(request: Request) {
     await db
       .update(connectorAccounts)
       .set({
-        lastErrorCode: 'youtube_sync_failed',
+        ...(needsReauth
+          ? { status: asConnectorStatusSql('needs_reauth') }
+          : {}),
+        lastErrorCode: needsReauth
+          ? 'youtube_reauth_required'
+          : 'youtube_sync_failed',
         lastErrorDevMessage: safe,
-        lastErrorUserMessage:
-          'YouTube could not be synced. Try again or reconnect the channel.',
+        lastErrorUserMessage: needsReauth
+          ? 'Reconnect YouTube to refresh access.'
+          : 'YouTube could not be synced. Try again or reconnect the channel.',
         updatedAt: new Date(),
       })
       .where(eq(connectorAccounts.id, account.id))

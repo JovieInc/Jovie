@@ -16,46 +16,29 @@ const querySchema = z.object({
   returnTo: z.string().startsWith('/').default(APP_ROUTES.LIBRARY),
 });
 
-function redirectError(origin: string, error: string) {
-  return NextResponse.redirect(
-    `${origin}${APP_ROUTES.LIBRARY}?error=${error}`,
-    { status: 302 }
-  );
-}
+const redirectError = (origin: string, error: string) =>
+  NextResponse.redirect(`${origin}${APP_ROUTES.LIBRARY}?error=${error}`, {
+    status: 302,
+  });
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const parsed = querySchema.safeParse({
-    creatorProfileId: url.searchParams.get('creatorProfileId'),
-    returnTo: url.searchParams.get('returnTo') ?? APP_ROUTES.LIBRARY,
-  });
-  if (!parsed.success) {
-    return redirectError(url.origin, 'youtube_profile');
-  }
+  const parsed = querySchema.safeParse(Object.fromEntries(url.searchParams));
+  if (!parsed.success) return redirectError(url.origin, 'youtube_profile');
 
   try {
     const { userId } = await getCachedAuth();
     if (!userId)
       return NextResponse.redirect(`${url.origin}/sign-in`, { status: 302 });
-    const access = await getExactProfileAccess(
-      db,
-      userId,
-      parsed.data.creatorProfileId
-    );
-    if (!access.ok) {
-      return redirectError(url.origin, 'youtube_profile_access');
-    }
-    if (!env.GOOGLE_OAUTH_CLIENT_ID) {
+    const { creatorProfileId, returnTo: requestedReturnTo } = parsed.data;
+    const access = await getExactProfileAccess(db, userId, creatorProfileId);
+    if (!access.ok) return redirectError(url.origin, 'youtube_profile_access');
+    if (!env.GOOGLE_OAUTH_CLIENT_ID)
       return redirectError(url.origin, 'youtube_not_configured');
-    }
 
     const returnTo =
-      sanitizeRedirectUrl(parsed.data.returnTo) ?? APP_ROUTES.LIBRARY;
-    const state = signGoogleOAuthState({
-      userId,
-      creatorProfileId: parsed.data.creatorProfileId,
-      returnTo,
-    });
+      sanitizeRedirectUrl(requestedReturnTo) ?? APP_ROUTES.LIBRARY;
+    const state = signGoogleOAuthState({ userId, creatorProfileId, returnTo });
     const params = new URLSearchParams({
       client_id: env.GOOGLE_OAUTH_CLIENT_ID,
       redirect_uri: youtubeOAuthRedirectUri(url.origin),

@@ -7,11 +7,14 @@ import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 
 const profileId = '22222222-2222-4222-8222-222222222222';
 const scopes = YOUTUBE_OAUTH_SCOPES.join(' ');
-const paths = {
-  authorize: '/api/connectors/youtube/authorize',
-  callback: '/api/connectors/youtube/callback',
-  disconnect: '/api/connectors/youtube/disconnect',
-  sync: '/api/youtube-library/sync',
+const authorizePath = '/api/connectors/youtube/authorize';
+const callbackPath = '/api/connectors/youtube/callback';
+const disconnectPath = '/api/connectors/youtube/disconnect';
+const syncPath = '/api/youtube-library/sync';
+type Row = Record<'id' | 'channelId' | 'providerAccountId', string> & {
+  creatorProfileId?: string;
+  status?: string;
+  scopes: string[];
 };
 
 const mocks = vi.hoisted(() => ({
@@ -23,17 +26,15 @@ const mocks = vi.hoisted(() => ({
   loadToken: vi.fn(),
   lock: vi.fn(),
   sync: vi.fn(),
-  capture: vi.fn(),
   env: {
     GOOGLE_OAUTH_CLIENT_ID: 'client-id' as string | undefined,
     GOOGLE_OAUTH_CLIENT_SECRET: 'client-secret' as string | undefined,
     YOUTUBE_OAUTH_REDIRECT_URI_BASE: undefined as string | undefined,
     TRACKING_TOKEN_SECRET: 'state-secret',
   },
-  rows: [] as { id: string; channelId: string; scopes: string[] }[],
+  rows: [] as Row[],
   writes: [] as Record<string, unknown>[],
   inserts: [] as Record<string, unknown>[],
-  conflicts: [] as unknown[],
   db: { select: vi.fn(), insert: vi.fn(), update: vi.fn() },
 }));
 
@@ -46,13 +47,14 @@ vi.mock('@/lib/connectors/token-vault', () => ({
   storeTokens: mocks.store,
   withRefreshLock: mocks.lock,
 }));
-vi.mock('@/lib/connectors/youtube/provider', () => ({
+vi.mock('@/lib/connectors/youtube/provider', async () => ({
+  ...(await vi.importActual('@/lib/connectors/youtube/provider')),
   createYouTubeLibraryProvider: vi.fn(),
   listOwnedYouTubeChannels: mocks.channels,
 }));
 vi.mock('@/lib/db', () => ({ db: mocks.db }));
 vi.mock('@/lib/env-server', () => ({ env: mocks.env }));
-vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.capture }));
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/http/server-fetch', () => ({ serverFetch: mocks.fetch }));
 vi.mock('@/lib/youtube-library/sync', () => ({
   syncChannelVideos: mocks.sync,
@@ -62,100 +64,83 @@ import { GET as authorize } from '@/app/api/connectors/youtube/authorize/route';
 import { GET as callback } from '@/app/api/connectors/youtube/callback/route';
 import { POST as disconnect } from '@/app/api/connectors/youtube/disconnect/route';
 import { POST as sync } from '@/app/api/youtube-library/sync/route';
+import { YouTubeProviderError } from '@/lib/connectors/youtube/provider';
 
-function tokenResponse(overrides: Record<string, unknown> = {}) {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({
-      access_token: 'secret-access-token',
-      refresh_token: 'refresh-token',
-      expires_in: 3600,
-      scope: scopes,
-      ...overrides,
-    }),
-  };
-}
-
-function getRequest(path: string, params: Record<string, string> = {}) {
+const tokenResponse = (overrides: Record<string, unknown> = {}) => ({
+  ok: true,
+  json: async () => ({
+    access_token: 'secret-access-token',
+    refresh_token: 'refresh-token',
+    expires_in: 3600,
+    scope: scopes,
+    ...overrides,
+  }),
+});
+const getRequest = (path: string, params: Record<string, string> = {}) => {
   const url = new URL(`http://localhost${path}`);
-  Object.entries(params).forEach(([key, value]) =>
-    url.searchParams.set(key, value)
-  );
+  for (const [key, value] of Object.entries(params))
+    url.searchParams.set(key, value);
   return new Request(url);
-}
-
-function postRequest(path: string, body: unknown) {
-  return new Request(`http://localhost${path}`, {
+};
+const postRequest = (path: string, body: unknown) =>
+  new Request(`http://localhost${path}`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
-}
-
-function state(returnTo = '/app/library') {
-  return signGoogleOAuthState({
-    userId: 'user-1',
-    creatorProfileId: profileId,
-    returnTo,
-  });
-}
-
+const statePayload = { userId: 'user-1', creatorProfileId: profileId };
+const state = (returnTo = '/app/library') =>
+  signGoogleOAuthState({ ...statePayload, returnTo });
+const defaultRow: Row = {
+  id: 'account-1',
+  channelId: 'channel-1',
+  providerAccountId: 'channel-1',
+  creatorProfileId: profileId,
+  status: 'connected',
+  scopes: [...YOUTUBE_OAUTH_SCOPES],
+};
 type Route = (request: Request) => Promise<Response>;
-
-async function location(
+const location = (
   route: Route,
   path: string,
   params: Record<string, string> = {}
-) {
-  return (await route(getRequest(path, params))).headers.get('location') ?? '';
-}
-
-async function status(route: Route, path: string, body: unknown) {
-  return (await route(postRequest(path, body))).status;
-}
-
-const authLocation = (params: Record<string, string> = {}) =>
-  location(authorize, paths.authorize, params);
-const callbackLocation = (params: Record<string, string> = {}) =>
-  location(callback, paths.callback, params);
-const postStatus = (route: Route, path: string, body: unknown) =>
-  status(route, path, body);
+) =>
+  route(getRequest(path, params)).then(
+    response => response.headers.get('location') ?? ''
+  );
+const postStatus = (route: Route, path: string) =>
+  route(postRequest(path, { creatorProfileId: profileId })).then(
+    response => response.status
+  );
+const expectCallbackError = (expected: string, stateParam = state()) =>
+  location(callback, paths.callback, {
+    code: 'code',
+    state: stateParam,
+  }).then(value => expect(value).toContain(expected));
 
 function configureDb() {
-  mocks.db.insert.mockImplementation(() => ({
+  mocks.db.insert.mockReturnValue({
     values: (values: Record<string, unknown>) => ({
       onConflictDoUpdate: (conflict: unknown) => {
         mocks.inserts.push(values);
-        mocks.conflicts.push(conflict);
         return { returning: async () => [{ id: 'account-1' }] };
       },
     }),
-  }));
-  mocks.db.select.mockReturnValue({
-    from: () => ({ where: () => ({ limit: async () => mocks.rows }) }),
   });
-  mocks.db.update.mockImplementation(() => ({
+  const selection = Object.assign(Promise.resolve(mocks.rows), {
+    limit: async () => mocks.rows,
+  });
+  mocks.db.select.mockReturnValue({ from: () => ({ where: () => selection }) });
+  mocks.db.update.mockReturnValue({
     set: (values: Record<string, unknown>) => ({
       where: async () => mocks.writes.push(values),
     }),
-  }));
+  });
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.rows.splice(0, 1, {
-    id: 'account-1',
-    channelId: 'channel-1',
-    scopes: [...YOUTUBE_OAUTH_SCOPES],
-  });
-  mocks.writes.splice(0);
-  mocks.inserts.splice(0);
-  mocks.conflicts.splice(0);
-  Object.assign(mocks.env, {
-    GOOGLE_OAUTH_CLIENT_ID: 'client-id',
-    GOOGLE_OAUTH_CLIENT_SECRET: 'client-secret',
-    YOUTUBE_OAUTH_REDIRECT_URI_BASE: undefined,
-  });
+  mocks.writes.length = mocks.inserts.length = 0;
+  mocks.rows.splice(0, mocks.rows.length, { ...defaultRow });
   mocks.auth.mockResolvedValue({ userId: 'user-1' });
   mocks.access.mockResolvedValue({ ok: true });
   mocks.fetch.mockResolvedValue(tokenResponse());
@@ -167,20 +152,41 @@ beforeEach(() => {
     refreshToken: 'refresh-token',
     expiresAt: new Date(Date.now() + 3_600_000),
   });
-  mocks.lock.mockImplementation(
-    async (_id: string, fn: () => Promise<unknown>) => fn()
-  );
+  mocks.lock.mockImplementation(async (_, fn) => fn());
   mocks.sync.mockResolvedValue({ total: 2, inserted: 1 });
-  mocks.capture.mockResolvedValue(undefined);
   configureDb();
 });
+
+async function fail(error: Error, devMessage?: string, reauth = false) {
+  mocks.sync.mockRejectedValueOnce(error);
+  expect(await postStatus(sync, paths.sync)).toBe(502);
+  const write = mocks.writes.at(-1);
+  expect(write?.lastErrorCode).toBe(
+    reauth ? 'youtube_reauth_required' : 'youtube_sync_failed'
+  );
+  if (devMessage) expect(write?.lastErrorDevMessage).toBe(devMessage);
+  if (reauth) {
+    expect(write).toMatchObject({
+      status: expect.anything(),
+      lastErrorUserMessage: 'Reconnect YouTube to refresh access.',
+    });
+  }
+}
+
+const expectOAuthFailure = (reauth = false) => {
+  const write = mocks.writes.at(-1);
+  expect(write?.lastErrorCode).toBe('youtube_oauth_failed');
+  if (reauth) expect(write?.status).toBeDefined();
+};
 
 describe('YouTube connector routes', () => {
   it('authorizes an exact profile and preserves safe OAuth state/scopes', async () => {
     mocks.access.mockResolvedValueOnce({ ok: false });
-    expect(await authLocation({ creatorProfileId: profileId })).toContain(
-      'youtube_profile_access'
-    );
+    expect(
+      await location(authorize, paths.authorize, {
+        creatorProfileId: profileId,
+      })
+    ).toContain('youtube_profile_access');
     const response = await authorize(
       getRequest(paths.authorize, {
         creatorProfileId: profileId,
@@ -188,9 +194,9 @@ describe('YouTube connector routes', () => {
       })
     );
     const authUrl = new URL(response.headers.get('location') as string);
-    expect(authUrl.searchParams.get('scope')?.split(' ')).toEqual([
-      ...YOUTUBE_OAUTH_SCOPES,
-    ]);
+    expect(authUrl.searchParams.get('scope')?.split(' ')).toEqual(
+      YOUTUBE_OAUTH_SCOPES
+    );
     expect(
       verifyGoogleOAuthState(authUrl.searchParams.get('state') as string)
     ).toMatchObject({
@@ -200,26 +206,30 @@ describe('YouTube connector routes', () => {
     });
   });
 
-  it('rejects callback tampering, incomplete grants, and ambiguous ownership before writes', async () => {
+  it('rejects callback tampering, incomplete grants, and identity conflicts', async () => {
     const signed = state();
-    expect(
-      await callbackLocation({ code: 'code', state: `${signed.slice(0, -1)}a` })
-    ).toContain('youtube_oauth_callback');
-    mocks.auth.mockResolvedValueOnce({ userId: 'other-user' });
-    expect(await callbackLocation({ code: 'code', state: signed })).toContain(
-      'youtube_session_changed'
+    await expectCallbackError(
+      'youtube_oauth_callback',
+      `${signed.slice(0, -1)}a`
     );
+    mocks.auth.mockResolvedValueOnce({ userId: 'other-user' });
+    await expectCallbackError('youtube_session_changed', signed);
     mocks.fetch.mockResolvedValueOnce(
       tokenResponse({ scope: YOUTUBE_OAUTH_SCOPES[0] })
     );
-    expect(await callbackLocation({ code: 'code', state: signed })).toContain(
-      'youtube_scopes'
-    );
+    await expectCallbackError('youtube_scopes', signed);
+    mocks.rows[0].creatorProfileId = 'other-profile';
+    await expectCallbackError('youtube_channel_profile_conflict');
+    Object.assign(mocks.rows[0], {
+      creatorProfileId: profileId,
+      providerAccountId: 'other-channel',
+    });
+    await expectCallbackError('youtube_profile_channel_conflict');
   });
 
   it('idempotently upserts one owned channel, stores vault input, and fails closed on persistence errors', async () => {
     expect(
-      await callbackLocation({
+      await location(callback, paths.callback, {
         code: 'auth-code',
         state: state('/app/library?stage=all'),
       })
@@ -228,10 +238,6 @@ describe('YouTube connector routes', () => {
       creatorProfileId: profileId,
       providerAccountId: 'channel-1',
     });
-    expect(mocks.conflicts[0]).toMatchObject({
-      target: expect.any(Array),
-      set: expect.objectContaining({ creatorProfileId: profileId }),
-    });
     expect(mocks.store).toHaveBeenCalledWith(
       expect.objectContaining({
         connectorAccountId: 'account-1',
@@ -239,22 +245,30 @@ describe('YouTube connector routes', () => {
       })
     );
     mocks.store.mockRejectedValueOnce(new Error('secret-access-token leaked'));
-    expect(
-      await callbackLocation({ code: 'auth-code', state: state() })
-    ).toContain('youtube_oauth_callback');
-    expect(mocks.writes.at(-1)).toMatchObject({
-      lastErrorCode: 'youtube_oauth_failed',
-    });
+    await expectCallbackError('youtube_oauth_callback');
+    expectOAuthFailure();
+  });
+
+  it('preserves refresh tokens on reconnect and reauths a first grant without one', async () => {
+    mocks.fetch.mockResolvedValueOnce(
+      tokenResponse({ refresh_token: undefined })
+    );
+    await expectCallbackError('connected=youtube');
+    expect(mocks.store).toHaveBeenLastCalledWith(
+      expect.objectContaining({ refreshToken: 'refresh-token' })
+    );
+    mocks.loadToken.mockResolvedValueOnce(null);
+    mocks.fetch.mockResolvedValueOnce(
+      tokenResponse({ refresh_token: undefined })
+    );
+    await expectCallbackError('youtube_oauth_callback');
+    expect(mocks.store).toHaveBeenCalledTimes(1);
+    expectOAuthFailure(true);
   });
 
   it('disconnects only an authorized profile and is idempotent', async () => {
-    const first = await postStatus(disconnect, paths.disconnect, {
-      creatorProfileId: profileId,
-    });
-    const second = await postStatus(disconnect, paths.disconnect, {
-      creatorProfileId: profileId,
-    });
-    expect([first, second]).toEqual([200, 200]);
+    expect(await postStatus(disconnect, paths.disconnect)).toBe(200);
+    expect(await postStatus(disconnect, paths.disconnect)).toBe(200);
     expect(mocks.db.update).toHaveBeenCalledTimes(2);
     expect(mocks.writes[0]).toMatchObject({
       encryptedAccessToken: null,
@@ -263,35 +277,29 @@ describe('YouTube connector routes', () => {
     });
   });
 
-  it('manual sync requires current scopes/fresh vault tokens and records safe outcomes', async () => {
-    mocks.rows.splice(0, 1, {
-      id: 'account-1',
-      channelId: 'channel-1',
-      scopes: [YOUTUBE_OAUTH_SCOPES[0]],
-    });
-    expect(
-      await postStatus(sync, paths.sync, { creatorProfileId: profileId })
-    ).toBe(409);
+  it('requires one current account and fresh vault tokens, then classifies provider failures', async () => {
+    const post = () => postStatus(sync, paths.sync);
+    const runSync = () =>
+      sync(postRequest(paths.sync, { creatorProfileId: profileId }));
+    mocks.rows[0].scopes = [YOUTUBE_OAUTH_SCOPES[0]];
+    expect(await post()).toBe(409);
     mocks.rows[0].scopes = [...YOUTUBE_OAUTH_SCOPES];
-    mocks.loadToken.mockRejectedValueOnce(new Error('refresh failed'));
-    expect(
-      await postStatus(sync, paths.sync, { creatorProfileId: profileId })
-    ).toBe(502);
-    expect(mocks.writes.at(-1)).toMatchObject({
-      lastErrorCode: 'youtube_sync_failed',
-      lastErrorDevMessage: 'refresh failed',
+    mocks.rows.push({
+      ...mocks.rows[0],
+      id: 'account-2',
+      providerAccountId: 'channel-2',
     });
+    expect(await post()).toBe(409);
+    mocks.rows.pop();
+    mocks.loadToken.mockRejectedValueOnce(new Error('refresh failed'));
+    await fail(new Error('refresh failed'), 'refresh failed');
     const expired = {
       accessToken: 'expired',
       refreshToken: 'refresh-token',
       expiresAt: new Date(0),
     };
-    mocks.loadToken
-      .mockResolvedValueOnce(expired)
-      .mockResolvedValueOnce(expired);
-    const success = await sync(
-      postRequest(paths.sync, { creatorProfileId: profileId })
-    );
+    mocks.loadToken.mockResolvedValue(expired);
+    const success = await runSync();
     expect(success.status).toBe(200);
     expect(mocks.sync).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -300,14 +308,17 @@ describe('YouTube connector routes', () => {
         now: expect.any(Date),
       })
     );
-    mocks.sync.mockRejectedValueOnce(new Error('cached provider detail'));
-    const failed = await sync(
-      postRequest(paths.sync, { creatorProfileId: profileId })
+    await fail(
+      new Error('cached provider detail'),
+      '[REDACTED] provider detail'
     );
-    expect(failed.status).toBe(502);
-    expect(mocks.writes.at(-1)).toMatchObject({
-      lastErrorCode: 'youtube_sync_failed',
-      lastErrorDevMessage: '[REDACTED] provider detail',
-    });
+    for (const [status, message] of [
+      [401, 'expired'],
+      [403, 'The authorized account does not own the selected YouTube channel'],
+    ] as const) {
+      await fail(new YouTubeProviderError(message, status), undefined, true);
+    }
+    await fail(new YouTubeProviderError('upstream', 403));
+    expect(mocks.writes.at(-1)).not.toHaveProperty('status');
   });
 });

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
@@ -8,7 +8,7 @@ import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { verifyGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
-import { storeTokens } from '@/lib/connectors/token-vault';
+import { loadDecryptedToken, storeTokens } from '@/lib/connectors/token-vault';
 import { youtubeOAuthRedirectUri } from '@/lib/connectors/youtube/oauth';
 import { listOwnedYouTubeChannels } from '@/lib/connectors/youtube/provider';
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
@@ -20,7 +20,7 @@ import { serverFetch } from '@/lib/http/server-fetch';
 
 const tokenSchema = z.object({
   access_token: z.string().min(1),
-  refresh_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional(),
   expires_in: z.number().finite().nonnegative(),
   scope: z.string().min(1),
 });
@@ -102,6 +102,26 @@ export async function GET(request: Request) {
       canAnalytics: true,
       channelTitle: channel.title,
     };
+    const existing = await db
+      .select()
+      .from(connectorAccounts)
+      .where(
+        and(
+          eq(connectorAccounts.userId, session.userId),
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.youtube)
+        )
+      );
+    const conflict = existing.find(row =>
+      row.providerAccountId === channel.id
+        ? row.creatorProfileId !== profileId
+        : row.status === 'connected' && row.creatorProfileId === profileId
+    );
+    if (conflict)
+      return fail(
+        conflict.providerAccountId === channel.id
+          ? 'youtube_channel_profile_conflict'
+          : 'youtube_profile_channel_conflict'
+      );
     const [account] = await db
       .insert(connectorAccounts)
       .values({
@@ -133,10 +153,14 @@ export async function GET(request: Request) {
       .returning({ id: connectorAccounts.id });
     if (!account) throw new Error('YouTube connector account write failed');
     accountId = account.id;
+    const refreshToken =
+      parsed.data.refresh_token ??
+      (await loadDecryptedToken(account.id))?.refreshToken;
+    if (!refreshToken) throw new Error('YouTube OAuth refresh token missing');
     await storeTokens({
       connectorAccountId: account.id,
       accessToken,
-      refreshToken: parsed.data.refresh_token,
+      refreshToken,
       expiresAt: new Date(Date.now() + parsed.data.expires_in * 1000),
     });
     return redirectWith(url.origin, returnTo, { connected: 'youtube' });
