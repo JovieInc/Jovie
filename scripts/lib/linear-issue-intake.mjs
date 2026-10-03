@@ -143,8 +143,13 @@ export function isValidRemediationKey(value) {
   return REMEDIATION_KEY_RE.test(bareRemediationKey(value));
 }
 
+/**
+ * File by default. Skip only when REMEDIATION_TRIGGERS_DISABLED is exactly
+ * "true". An unset variable still files. The old REMEDIATION_TRIGGERS_ENABLED
+ * opt-in is ignored so a missing repo variable cannot silence red intake.
+ */
 export function remediationTriggersEnabled(env = process.env) {
-  return env.REMEDIATION_TRIGGERS_ENABLED === 'true';
+  return env.REMEDIATION_TRIGGERS_DISABLED !== 'true';
 }
 
 export function logRemediationDryRun(plan) {

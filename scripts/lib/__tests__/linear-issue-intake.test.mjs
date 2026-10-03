@@ -4,6 +4,7 @@ import {
   closeLinearIssueByFingerprint,
   ensureLinearLabel,
   remediationKey,
+  remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from '../linear-issue-intake.mjs';
 
@@ -564,5 +565,23 @@ describe('closeLinearIssueByFingerprint', () => {
         JSON.parse(String(call[1].body)).query.includes('commentCreate')
       )
     ).toHaveLength(1);
+  });
+});
+
+describe('remediationTriggersEnabled', () => {
+  it('files when the kill switch is unset', () => {
+    expect(remediationTriggersEnabled({})).toBe(true);
+    expect(
+      remediationTriggersEnabled({ REMEDIATION_TRIGGERS_ENABLED: 'false' })
+    ).toBe(true);
+  });
+
+  it('skips only when REMEDIATION_TRIGGERS_DISABLED is true', () => {
+    expect(
+      remediationTriggersEnabled({ REMEDIATION_TRIGGERS_DISABLED: 'true' })
+    ).toBe(false);
+    expect(
+      remediationTriggersEnabled({ REMEDIATION_TRIGGERS_DISABLED: 'false' })
+    ).toBe(true);
   });
 });
