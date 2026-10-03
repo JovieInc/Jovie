@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261002T093643Z-PR19928-devin-fix-fac4cb",
+ "pr": 19928,
+ "issue": null,
+ "reason": [
+  "target-head-superseded"
+ ],
+ "branch": "dependabot/npm_and_yarn/sentry/nextjs-11.1.0",
+ "headBefore": "a9f8a06aab7377dcba289af75119572f22b8c7ee",
+ "at": "2026-10-02T10:02:30Z"
+}
