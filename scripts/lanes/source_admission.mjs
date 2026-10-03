@@ -5,7 +5,7 @@ import {
   SOURCE_ADMISSION_SCHEMA,
 } from '../lib/source-admission-policy.mjs';
 
-function requestWithGh(path, { deadlineMs }) {
+async function requestWithGh(path, { deadlineMs = 0 } = {}) {
   const remaining = deadlineMs - Date.now();
   if (remaining <= 0) throw new Error('admission deadline exceeded');
   // Keep authentication in the existing gh shim. No token extraction or new identity.
