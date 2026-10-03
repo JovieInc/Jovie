@@ -290,6 +290,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/insights/page.tsx',
   'apps/web/app/app/(shell)/jovie-work/page.tsx',
   'apps/web/app/app/(shell)/library/page.tsx',
+  'apps/web/app/app/(shell)/links/page.tsx',
   'apps/web/app/app/(shell)/lyrics/[trackId]/page.tsx',
   'apps/web/app/app/(shell)/page.tsx',
   'apps/web/app/app/(shell)/presence/page.tsx',
@@ -482,8 +483,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/library',
   },
   'apps/web/app/app/(shell)/dashboard/links/page.tsx': {
-    conceptId: '/app/chat',
-    redirectTo: '/app/chat?panel=profile',
+    conceptId: '/app/links',
+    redirectTo: '/app/links',
   },
   'apps/web/app/app/(shell)/dashboard/page.tsx': {
     conceptId: '/app',

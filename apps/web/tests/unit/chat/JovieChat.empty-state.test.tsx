@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
 import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
@@ -103,7 +104,10 @@ vi.mock('@tanstack/react-virtual', () => ({
 }));
 
 vi.mock('@/components/jovie/hooks', () => ({
-  useJovieChat: () => mockChatState,
+  useJovieChatController: () => ({
+    ...mockChatState,
+    draft: createComposerDraft(mockChatState.input),
+  }),
   useChatFileAttachments: () => ({
     pendingFiles: [],
     isDragOver: false,

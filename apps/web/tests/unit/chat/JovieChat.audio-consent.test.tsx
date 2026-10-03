@@ -12,6 +12,7 @@
 
 import { act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
@@ -81,7 +82,10 @@ vi.mock('@tanstack/react-virtual', () => ({
 }));
 
 vi.mock('@/components/jovie/hooks', () => ({
-  useJovieChat: () => mockChatState,
+  useJovieChatController: () => ({
+    ...mockChatState,
+    draft: createComposerDraft(mockChatState.input),
+  }),
   useChatFileAttachments: (opts: {
     onAudioUploaded?: (result: unknown) => void;
     [key: string]: unknown;

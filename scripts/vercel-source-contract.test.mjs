@@ -36,13 +36,21 @@ describe('Vercel source contract', () => {
     assert.equal(web.buildCommand, 'pnpm run build');
     assert.doesNotMatch(web.installCommand, /corepack/);
     assert.doesNotMatch(web.buildCommand, /corepack/);
+
+    const docs = JSON.parse(readFileSync('apps/docs/vercel.json', 'utf8'));
+    assert.doesNotMatch(docs.installCommand, /corepack/);
+    assert.doesNotMatch(docs.buildCommand, /corepack/);
   });
 
   it('builds the docs package instead of inheriting the web project config', () => {
     const config = JSON.parse(readFileSync('apps/docs/vercel.json', 'utf8'));
 
     assert.equal(config.framework, 'nextjs');
-    assert.equal(config.buildCommand, 'corepack pnpm run build');
+    assert.equal(
+      config.installCommand,
+      'cd ../.. && pnpm install --frozen-lockfile'
+    );
+    assert.equal(config.buildCommand, 'pnpm run build');
     assert.equal(config.outputDirectory, '.next');
     // The current native Vercel policy builds release branches and skips PRs.
     for (const { branch, status } of [
