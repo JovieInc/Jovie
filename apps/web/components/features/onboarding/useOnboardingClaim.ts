@@ -40,6 +40,7 @@ type ClaimStatus =
   | 'claimed'
   | 'no-op'
   | 'retry-after-webhook'
+  | 'identity-conflict'
   | 'error';
 
 interface ClaimResponse {
@@ -48,6 +49,7 @@ interface ClaimResponse {
   readonly retryAfterWebhook?: boolean;
   readonly alreadyClaimed?: boolean;
   readonly errorCode?: string;
+  readonly profileError?: { readonly errorCode: string };
   readonly waitlistIntakeRequired?: boolean;
   readonly waitlist?: {
     readonly entryId: string;
@@ -125,6 +127,17 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         // reserved / locked-in / manage-as-owner success navigation.
         markTriggerCompleted();
         setStatus('error');
+        return;
+      }
+
+      if (
+        body.errorCode === 'SPOTIFY_IDENTITY_CONFLICT' ||
+        body.profileError?.errorCode === 'SPOTIFY_IDENTITY_CONFLICT'
+      ) {
+        // Preserve the transcript for correction; a saved waitlist receipt is
+        // not proof that its requested profile/handle was reserved.
+        markTriggerCompleted();
+        setStatus('identity-conflict');
         return;
       }
 
