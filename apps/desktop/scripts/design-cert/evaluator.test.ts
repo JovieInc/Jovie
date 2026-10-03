@@ -29,17 +29,17 @@ function observation(
         label: 'Week-over-week Growth',
         in_web_content: true,
       },
-      {
-        role: 'AXStaticText',
-        label: 'Shipping Throughput',
-        in_web_content: true,
-      },
       { role: 'AXStaticText', label: 'Active Users', in_web_content: true },
       { role: 'AXStaticText', label: '—', in_web_content: true },
       {
         role: 'AXStaticText',
         label:
           'Revenue and active-user inputs are unavailable. Reload Jovie to retry.',
+        in_web_content: true,
+      },
+      {
+        role: 'AXStaticText',
+        label: 'Shipping Throughput',
         in_web_content: true,
       },
       { role: 'AXLink', label: 'Back to Jovie', in_web_content: true },
@@ -64,8 +64,14 @@ describe('desktop design certification evaluator', () => {
     const result = evaluateDesktopCapture(
       observation({
         elements: [
-          ...observation().elements,
-          { role: 'AXStaticText', label: '0', in_web_content: true },
+          ...observation().elements.flatMap(element =>
+            element.label === 'Active Users'
+              ? [
+                  element,
+                  { role: 'AXStaticText', label: '0', in_web_content: true },
+                ]
+              : [element]
+          ),
           {
             role: 'AXStaticText',
             label: '1% means not figured out',
@@ -86,6 +92,19 @@ describe('desktop design certification evaluator', () => {
     );
   });
 
+  it('does not confuse a zero shipping count with unavailable active users', () => {
+    const result = evaluateDesktopCapture(
+      observation({
+        elements: [
+          ...observation().elements,
+          { role: 'AXStaticText', label: '0', in_web_content: true },
+        ],
+      })
+    );
+
+    expect(result).toMatchObject({ outcome: 'pass', failures: [] });
+  });
+
   it('fails closed on a near-solid screenshot', () => {
     const result = evaluateDesktopCapture(
       observation({
@@ -98,6 +117,23 @@ describe('desktop design certification evaluator', () => {
         },
       })
     );
+    expect(result.outcome).toBe('fail');
+    expect(result.failures.map(item => item.invariant)).toContain('not-blank');
+  });
+
+  it('fails closed on the observed DOM-alive but unpainted dark frame', () => {
+    const result = evaluateDesktopCapture(
+      observation({
+        pixelStats: {
+          width: 3016,
+          height: 1936,
+          entropy: 0.5338,
+          meanLuma: 6.3439,
+          maxChannelStdDev: 4.782,
+        },
+      })
+    );
+
     expect(result.outcome).toBe('fail');
     expect(result.failures.map(item => item.invariant)).toContain('not-blank');
   });

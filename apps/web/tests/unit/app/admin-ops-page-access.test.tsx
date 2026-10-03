@@ -4,10 +4,12 @@ const {
   getHudMetricsMock,
   getFounderFunnelDataMock,
   getOvieMacHudSnapshotMock,
+  requireCurrentAdminPageAccessMock,
 } = vi.hoisted(() => ({
   getHudMetricsMock: vi.fn(),
   getFounderFunnelDataMock: vi.fn(),
   getOvieMacHudSnapshotMock: vi.fn(),
+  requireCurrentAdminPageAccessMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -17,6 +19,9 @@ vi.mock('@/lib/admin/founder-funnel', () => ({
 }));
 vi.mock('@/lib/hud/ovie-mac-hud.server', () => ({
   getOvieMacHudSnapshot: getOvieMacHudSnapshotMock,
+}));
+vi.mock('@/lib/admin/page-access', () => ({
+  requireCurrentAdminPageAccess: requireCurrentAdminPageAccessMock,
 }));
 vi.mock('@/lib/env-server', () => ({
   env: { HUD_AGENT_RUNS_FIXTURES: '0' },
@@ -77,6 +82,7 @@ describe('authenticated in-shell Ops page', () => {
     });
     expect(getHudMetricsMock).not.toHaveBeenCalled();
     expect(findElementByName(result, 'HudDashboardClient')).toBeNull();
+    expect(requireCurrentAdminPageAccessMock).toHaveBeenCalledOnce();
   });
 
   it('keeps fullscreen as a presentation of the same in-shell Ovie route', async () => {

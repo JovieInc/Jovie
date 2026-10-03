@@ -5,6 +5,7 @@ import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedDevTestAuthSession } from '@/lib/auth/dev-test-auth.server';
 
 export interface AdminPageAccess {
   readonly userId: string | null;
@@ -29,10 +30,15 @@ export const getCurrentAdminPageAccess = cache(
       };
     }
 
+    const devTestSession = await getCachedDevTestAuthSession();
+    const hasTrustedLocalAdminSession =
+      devTestSession?.dbUserId === userId && devTestSession.isAdmin;
+
     return {
       userId,
       isAuthenticated: true,
-      hasAdminRole: await checkAdminRole(userId),
+      hasAdminRole:
+        hasTrustedLocalAdminSession || (await checkAdminRole(userId)),
     };
   }
 );

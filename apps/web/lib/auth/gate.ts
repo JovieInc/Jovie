@@ -69,7 +69,8 @@ function canUseE2ETestAuthFallback(): boolean {
   return (
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
     process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
-    process.env.VERCEL_ENV !== 'preview'
+    process.env.VERCEL_ENV !== 'preview' &&
+    process.env.VERCEL_ENV !== 'production'
   );
 }
 
@@ -675,7 +676,11 @@ async function resolveUserStateInternal(
 
   // 1. Resolve Better Auth identity and prefetch waitlist gate in parallel.
   const identityPromise = resolveAuthIdentity(knownClerkUserId);
-  const waitlistGatePromise = isWaitlistGateEnabled();
+  // Secretless visual/test capture deliberately has no database. Its synthetic
+  // ACTIVE fallback must not be pre-empted by the unrelated waitlist query.
+  const waitlistGatePromise = canUseE2ETestAuthFallback()
+    ? Promise.resolve(false)
+    : isWaitlistGateEnabled();
   const { clerkUserId, email } = await identityPromise;
 
   if (!clerkUserId) {

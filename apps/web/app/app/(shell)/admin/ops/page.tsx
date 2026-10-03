@@ -6,6 +6,7 @@ import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { getOvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud.server';
@@ -33,6 +34,8 @@ function firstString(value: string | string[] | undefined): string | null {
 export default async function AdminOpsPage({
   searchParams,
 }: Readonly<{ readonly searchParams: Promise<SearchParams> }>) {
+  await requireCurrentAdminPageAccess();
+
   const params = await searchParams;
   const fullscreen =
     firstString(params.fs) === '1' || firstString(params.mode) === 'kiosk';

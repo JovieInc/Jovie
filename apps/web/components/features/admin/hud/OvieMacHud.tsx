@@ -66,6 +66,7 @@ export function OvieMacHud({
         `${refreshUrl.pathname}${refreshUrl.search}${refreshUrl.hash}`,
         { scroll: false }
       );
+      router.refresh();
     }, REFRESH_INTERVAL_MS);
 
     return () => globalThis.clearInterval(refreshTimer);

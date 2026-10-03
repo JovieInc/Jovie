@@ -5,8 +5,14 @@ import {
   requireCurrentAdminPageAccess,
 } from '@/lib/admin/page-access';
 
-const { mockGetCachedAuth, mockIsAdmin, mockRedirect } = vi.hoisted(() => ({
+const {
+  mockGetCachedAuth,
+  mockGetCachedDevTestAuthSession,
+  mockIsAdmin,
+  mockRedirect,
+} = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
+  mockGetCachedDevTestAuthSession: vi.fn(),
   mockIsAdmin: vi.fn(),
   mockRedirect: vi.fn((href: string) => {
     throw new Error(`NEXT_REDIRECT:${href}`);
@@ -20,6 +26,10 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
 
+vi.mock('@/lib/auth/dev-test-auth.server', () => ({
+  getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
+}));
+
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mockIsAdmin,
 }));
@@ -27,6 +37,7 @@ vi.mock('@/lib/admin/roles', () => ({
 describe('getCurrentAdminPageAccess', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCachedDevTestAuthSession.mockResolvedValue(null);
   });
 
   it('returns signed-out access without querying admin role', async () => {
@@ -53,6 +64,21 @@ describe('getCurrentAdminPageAccess', () => {
       hasAdminRole: true,
     });
     expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
+  });
+
+  it('honors a trusted local synthetic admin without requiring a database role lookup', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_local_admin' });
+    mockGetCachedDevTestAuthSession.mockResolvedValue({
+      dbUserId: 'user_local_admin',
+      isAdmin: true,
+    });
+
+    await expect(getCurrentAdminPageAccess()).resolves.toEqual({
+      userId: 'user_local_admin',
+      isAuthenticated: true,
+      hasAdminRole: true,
+    });
+    expect(mockIsAdmin).not.toHaveBeenCalled();
   });
 
   it('denies page access for authenticated non-admins', async () => {

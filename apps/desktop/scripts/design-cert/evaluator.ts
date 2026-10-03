@@ -54,7 +54,7 @@ const DESKTOP_OWNER = 'Desktop shell owner — apps/desktop';
 const MIN_PRIMARY_WINDOW_WIDTH = 1200;
 const MIN_PRIMARY_WINDOW_HEIGHT = 700;
 
-function normalizedLabels(
+function normalizedLabelSequence(
   elements: readonly DesktopAxElement[]
 ): readonly string[] {
   const allowedNativeLabels = new Set([
@@ -63,7 +63,7 @@ function normalizedLabels(
     'Reload',
     'Force Reload',
   ]);
-  const labels = elements.flatMap(element => {
+  return elements.flatMap(element => {
     if (
       !element.in_web_content &&
       !allowedNativeLabels.has(element.label ?? '')
@@ -74,14 +74,27 @@ function normalizedLabels(
       .filter((value): value is string => Boolean(value?.trim()))
       .map(value => value.trim());
   });
-  return [...new Set(labels)];
+}
+
+function normalizedLabels(
+  elements: readonly DesktopAxElement[]
+): readonly string[] {
+  return [...new Set(normalizedLabelSequence(elements))];
 }
 
 function isBlank(stats: DesktopPixelStats): boolean {
   const nearSolid = stats.entropy < 0.12 && stats.maxChannelStdDev < 4;
   const emptyExtreme =
     (stats.meanLuma < 3 || stats.meanLuma > 252) && stats.maxChannelStdDev < 6;
-  return nearSolid || emptyExtreme;
+  // A compositor-stalled Electron window can retain the native frame and a
+  // live DOM while the content area is effectively black. The captured failure
+  // measured entropy 0.5338, luma 6.3439, and channel stddev 4.782; healthy
+  // Ovie frames measured entropy >3 and channel stddev >20.
+  const unpaintedDarkFrame =
+    stats.entropy < 0.75 &&
+    stats.meanLuma < 10 &&
+    stats.maxChannelStdDev < 8;
+  return nearSolid || emptyExtreme || unpaintedDarkFrame;
 }
 
 function failure(
@@ -99,6 +112,7 @@ export function evaluateDesktopCapture(
 ): DesktopDesignEvaluation {
   const instrumentationBlockers: string[] = [];
   const failures: DesktopDesignFailure[] = [];
+  const labelSequence = normalizedLabelSequence(observation.elements);
   const labels = normalizedLabels(observation.elements);
   const labelSet = new Set(labels);
 
@@ -241,7 +255,9 @@ export function evaluateDesktopCapture(
     const unavailable = labels.some(label =>
       /unavailable|unknown/i.test(label)
     );
-    const falseZero = labelSet.has('Active Users') && labelSet.has('0');
+    const activeUsersIndex = labelSequence.indexOf('Active Users');
+    const activeUsersValue = labelSequence[activeUsersIndex + 1];
+    const falseZero = activeUsersIndex >= 0 && activeUsersValue === '0';
     const falseVerdict = labelSet.has('1% means not figured out');
     const recoveryNamed = labels.some(label =>
       /refresh|retry|reload/i.test(label)

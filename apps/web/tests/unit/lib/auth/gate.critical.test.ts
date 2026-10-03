@@ -363,6 +363,23 @@ describe('@critical gate.ts (Better Auth)', () => {
     );
     expect(mockEq).not.toHaveBeenCalledWith('users.id', 'ba_creator_ready');
     expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockIsWaitlistGateEnabled).not.toHaveBeenCalled();
+  });
+
+  it('never skips the production waitlist gate when test bypass flags are misconfigured', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    mockGetSession.mockResolvedValue({
+      user: { id: 'ba_user_1', email: 'artist@example.com' },
+      session: { id: 'sess_1' },
+    });
+    mockDbSelect.mockReturnValue(chainLimit([activeDbUser()]));
+
+    await expect(resolveUserState()).resolves.toMatchObject({
+      state: CanonicalUserState.ACTIVE,
+    });
+    expect(mockIsWaitlistGateEnabled).toHaveBeenCalledOnce();
   });
 
   it('creates a DB user when waitlist gate is disabled and no waitlist entry exists', async () => {

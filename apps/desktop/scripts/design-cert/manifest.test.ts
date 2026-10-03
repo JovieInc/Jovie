@@ -75,6 +75,12 @@ describe('desktop design certification manifest', () => {
       getDesktopDesignScreenForState('desktop.ovie.metrics-unavailable')?.route
     ).toBe('/app/ov/ops?ovie=mac');
     expect(
+      getDesktopDesignState('desktop.ovie.metrics-unavailable')?.label
+    ).toBe('founder financial and growth inputs unavailable');
+    expect(
+      getDesktopDesignState('desktop.ovie.metrics-unavailable')?.trigger
+    ).toMatch(/shipping telemetry may remain independently available/i);
+    expect(
       getDesktopDesignState('desktop.ovie.in-shell')?.invariants
     ).toContain('app-shell-present');
     expect(

@@ -3,10 +3,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
 import type { OvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud';
 
-const navigationMocks = vi.hoisted(() => ({ replace: vi.fn() }));
+const navigationMocks = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  replace: vi.fn(),
+}));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: navigationMocks.replace }),
+  useRouter: () => ({
+    refresh: navigationMocks.refresh,
+    replace: navigationMocks.replace,
+  }),
 }));
 
 vi.mock('@/components/atoms/DesktopTitlebar', () => ({
@@ -152,5 +158,26 @@ describe('OvieMacHud', () => {
       '/app/ov/ops?ovie=mac&runtime=electron',
       { scroll: false }
     );
+  });
+
+  it('forces a fresh server snapshot after each visible refresh receipt', () => {
+    vi.useFakeTimers();
+    window.history.replaceState(
+      {},
+      '',
+      '/app/ov/ops?ovie=mac&runtime=electron'
+    );
+    render(<OvieMacHud snapshot={BASE} />);
+
+    vi.advanceTimersByTime(30_000);
+
+    expect(navigationMocks.replace).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\/app\/ov\/ops\?ovie=mac&runtime=electron&ovie_refresh=\d+$/
+      ),
+      { scroll: false }
+    );
+    expect(navigationMocks.refresh).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 });

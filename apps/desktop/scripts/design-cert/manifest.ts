@@ -311,10 +311,11 @@ const DESKTOP_ONLY_SCREENS = [
       },
       {
         id: 'desktop.ovie.metrics-unavailable',
-        label: 'all metric inputs unavailable',
+        label: 'founder financial and growth inputs unavailable',
         kind: 'error',
         reachability: 'direct',
-        trigger: 'Open Ovie while all three telemetry sources are unavailable.',
+        trigger:
+          'Open Ovie while founder financial and growth inputs are unavailable; shipping telemetry may remain independently available.',
         invariants: [
           'shell-active',
           'not-blank',
@@ -325,7 +326,7 @@ const DESKTOP_ONLY_SCREENS = [
         ],
         owner: OVIE_OWNER,
         nextProof:
-          'Local packaged capture shows em dashes, no zero/YC verdict, recovery copy, and Back to Jovie.',
+          'Local packaged capture shows em dashes and no derived alive/growth verdict, preserves any independently available shipping value, and exposes recovery plus Back to Jovie.',
         nonterminal: true,
       },
       {
