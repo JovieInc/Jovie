@@ -161,5 +161,8 @@ export function renderVisibilityAuditMarkdown(
     lines.push(fixLine(fix));
   }
   lines.push('');
-  return `${lines.join('\n').replace(/\n{3,}/g, '\n\n')}\n`;
+  return `${lines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\n+$/, '')}\n`;
 }
