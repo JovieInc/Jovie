@@ -10,10 +10,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { assembleReceipt } from '../lib/pr-review-contracts.mjs';
 import { collectContext, runGit } from './context.mjs';
 import {
-  assertRoutes,
   createGatewayTransport,
-  loadModelPrices,
-  resolveRoutes,
+  rankReviewModels,
+  selectRoutes,
 } from './models.mjs';
 import { runReview } from './run.mjs';
 
@@ -125,9 +124,10 @@ async function main() {
     expectedHead,
   ]);
 
-  const prices = loadModelPrices();
-  const routes = resolveRoutes(process.env);
-  assertRoutes(prices, routes);
+  const { routes, prices, routing } = selectRoutes(
+    rankReviewModels(),
+    process.env
+  );
   const riskRuleIds = readRiskRuleIds(process.env.RISK_JSON);
   const context = await collectContext({ baseSha, headSha: expectedHead });
   if (riskRuleIds === null) context.truncated.push('risk-classification');
@@ -142,7 +142,7 @@ async function main() {
     routes,
     readLiveHead,
   });
-  write(receipt);
+  write({ ...receipt, routing });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
