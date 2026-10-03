@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import {
+  artistSettingsNavigation,
+  paymentsNavItem,
+  userSettingsNavigation,
+} from '@/components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '@/constants/routes';
+import { APP_SCREEN_REGISTRY } from '@/data/appScreens/registry';
+import { validateSettingsAdmission } from '@/data/appScreens/validation';
 import {
   filterSettingsGroups,
+  getSettingsAdmission,
   isSettingsItemActive,
   SETTINGS_SIDEBAR_GROUPS,
 } from './settings-sidebar-config';
@@ -133,5 +141,130 @@ describe('isSettingsItemActive', () => {
         APP_ROUTES.SETTINGS_BILLING
       )
     ).toBe(false);
+  });
+});
+
+describe('settings decision admission', () => {
+  it('validates the navigation actually rendered by UnifiedSidebar, including gated Payments', () => {
+    expect(
+      validateSettingsAdmission(
+        [
+          {
+            items: [
+              ...userSettingsNavigation,
+              ...artistSettingsNavigation,
+              paymentsNavItem,
+            ],
+          },
+        ],
+        APP_SCREEN_REGISTRY
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects a live navigation entry without admission', () => {
+    expect(() => getSettingsAdmission('unreviewed')).toThrow(
+      'Missing settings admission'
+    );
+  });
+
+  it('connects each navigation entry to an existing canonical screen', () => {
+    expect(
+      validateSettingsAdmission(SETTINGS_SIDEBAR_GROUPS, APP_SCREEN_REGISTRY)
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['export', 'data-privacy'],
+    ['scopes', 'connections'],
+    ['legibility', 'account'],
+  ])('finds the user job %s', (query, id) => {
+    expect(
+      filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, query).flatMap(group =>
+        group.items.map(item => item.id)
+      )
+    ).toEqual([id]);
+  });
+
+  it('preserves consent, account controls and meaningful manual overrides', () => {
+    expect(getSettingsAdmission('connections').scope).toBe('account');
+    const items = SETTINGS_SIDEBAR_GROUPS.flatMap(group => group.items);
+    expect(
+      items.find(item => item.id === 'connections')?.admission.roles
+    ).toContain('consent');
+    expect(
+      items.find(item => item.id === 'data-privacy')?.admission.roles
+    ).toContain('account-control');
+    expect(
+      items.find(item => item.id === 'account')?.admission.overrideReason
+    ).toBeTruthy();
+  });
+
+  it.each([
+    ['missing rationale', { screenRationale: '' }, 'missing-rationale'],
+    ['unknown scope', { scope: 'operator' }, 'invalid-scope'],
+    ['empty roles', { roles: [] }, 'invalid-role'],
+    [
+      'invented screen',
+      { canonicalRoute: '/app/settings/invented' },
+      'canonical-screen-mismatch',
+    ],
+    ['task approval', { roles: ['workflow-action'] }, 'invalid-role'],
+    ['operator setting', { roles: ['operator'] }, 'invalid-role'],
+    [
+      'unexplained default',
+      { defaultBehavior: 'Automatic', overrideReason: undefined },
+      'missing-override-reason',
+    ],
+  ])('rejects %s metadata', (_name, change, code) => {
+    const groups = SETTINGS_SIDEBAR_GROUPS.map(group => ({
+      ...group,
+      items: group.items.map(item =>
+        item.id === 'connections'
+          ? { ...item, admission: { ...item.admission, ...change } }
+          : item
+      ),
+    }));
+    expect(
+      validateSettingsAdmission(
+        groups as typeof SETTINGS_SIDEBAR_GROUPS,
+        APP_SCREEN_REGISTRY
+      ).map(issue => issue.code)
+    ).toContain(code);
+  });
+
+  it('rejects duplicate navigation identities and orphaned routes', () => {
+    const first = SETTINGS_SIDEBAR_GROUPS[0];
+    const groups = [
+      ...SETTINGS_SIDEBAR_GROUPS,
+      {
+        ...first,
+        items: [{ ...first.items[0], href: '/app/settings/orphan' }],
+      },
+    ];
+    expect(
+      validateSettingsAdmission(groups, APP_SCREEN_REGISTRY).map(
+        issue => issue.code
+      )
+    ).toEqual(['duplicate-item', 'canonical-screen-mismatch']);
+  });
+
+  it('does not promote an alias into a separate canonical screen', () => {
+    const groups = SETTINGS_SIDEBAR_GROUPS.map(group => ({
+      ...group,
+      items: group.items.map(item =>
+        item.id === 'delete-account'
+          ? {
+              ...item,
+              admission: { ...item.admission, canonicalRoute: item.href },
+            }
+          : item
+      ),
+    }));
+    expect(
+      validateSettingsAdmission(groups, APP_SCREEN_REGISTRY).map(
+        issue => issue.code
+      )
+    ).toContain('canonical-screen-mismatch');
   });
 });

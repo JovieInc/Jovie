@@ -20,6 +20,10 @@ import {
   UserCircle,
   Users,
 } from 'lucide-react';
+import {
+  getSettingsAdmission,
+  type SettingsAdmission,
+} from '@/components/features/settings/settings-sidebar-config';
 
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
@@ -164,18 +168,22 @@ export const settingsNavItem: NavItem = {
   icon: Settings,
 };
 
+export type SettingsNavItem = NavItem & { admission: SettingsAdmission };
+
 /** User-level settings: account, preferences, billing */
-export const userSettingsNavigation: NavItem[] = [
+export const userSettingsNavigation: SettingsNavItem[] = [
   {
     name: 'Account',
     href: APP_ROUTES.SETTINGS_ACCOUNT,
     id: 'account',
+    admission: getSettingsAdmission('account'),
     icon: ShieldCheck,
   },
   {
     name: 'Connections',
     href: APP_ROUTES.SETTINGS_CONNECTORS,
     id: 'connections',
+    admission: getSettingsAdmission('connections'),
     icon: Plug,
     description: 'Manage account-authorized services',
   },
@@ -183,60 +191,97 @@ export const userSettingsNavigation: NavItem[] = [
     name: 'Usage Stats',
     href: APP_ROUTES.SETTINGS_USAGE,
     id: 'usage',
+    admission: getSettingsAdmission('usage'),
     icon: Gauge,
   },
   {
     name: 'Billing & Subscription',
     href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
+    admission: getSettingsAdmission('billing'),
     icon: Banknote,
   },
   {
     name: 'Data & Privacy',
     href: APP_ROUTES.SETTINGS_DATA_PRIVACY,
     id: 'data-privacy',
+    admission: getSettingsAdmission('data-privacy'),
     icon: Lock,
   },
 ];
 
 /** Payments settings item — feature-gated, included conditionally */
-export const paymentsNavItem: NavItem = {
+export const paymentsNavItem: SettingsNavItem = {
   name: 'Payments',
   href: APP_ROUTES.SETTINGS_PAYMENTS,
   id: 'payments',
+  admission: {
+    userJob: 'Review payment connection status and manage payout setup',
+    scope: 'account',
+    roles: ['status', 'consent', 'account-control'],
+    canonicalRoute: APP_ROUTES.SETTINGS_PAYMENTS,
+    screenRationale:
+      'Feature-gated payment setup needs explicit access and financial context.',
+  },
   icon: HandCoins,
 };
 
 /** Artist-level settings: profile, links, branding, tracking */
-export const artistSettingsNavigation: NavItem[] = [
+export const artistSettingsNavigation: SettingsNavItem[] = [
   {
     name: 'Profile',
     href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     id: 'artist-profile',
+    admission: getSettingsAdmission('artist-profile'),
     icon: UserCircle,
   },
   {
     name: 'Contacts',
     href: APP_ROUTES.SETTINGS_CONTACTS,
     id: 'contacts',
+    admission: getSettingsAdmission('contacts'),
     icon: IdCard,
   },
   {
     name: 'Touring',
     href: APP_ROUTES.SETTINGS_TOURING,
     id: 'touring',
+    admission: {
+      userJob: 'Review tour-date service access and synchronization choices',
+      scope: 'workspace',
+      roles: ['status', 'consent', 'preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_TOURING,
+      screenRationale:
+        'Related touring integration choices share a recovery and configuration context.',
+    },
     icon: CalendarDays,
   },
   {
     name: 'Analytics',
     href: APP_ROUTES.SETTINGS_ANALYTICS,
     id: 'analytics',
+    admission: {
+      userJob: 'Control whether personal visits appear in analytics',
+      scope: 'profile',
+      roles: ['preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_ANALYTICS,
+      screenRationale:
+        'The existing analytics destination provides context for measurement preferences.',
+    },
     icon: PieChart,
   },
   {
     name: 'Audience & Tracking',
     href: APP_ROUTES.SETTINGS_AUDIENCE,
     id: 'audience-tracking',
+    admission: {
+      userJob: 'Review fan verification, opt-ins and audience tracking',
+      scope: 'profile',
+      roles: ['consent', 'preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_AUDIENCE,
+      screenRationale:
+        'Verification and tracking decisions need a coherent privacy context.',
+    },
     icon: MailCheck,
   },
 ];
