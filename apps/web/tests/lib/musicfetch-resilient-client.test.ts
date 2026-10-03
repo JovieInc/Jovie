@@ -38,6 +38,12 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+const sentry = vi.hoisted(() => ({
+  addBreadcrumb: vi.fn(),
+  captureMessage: vi.fn(),
+}));
+vi.mock('@sentry/nextjs', () => sentry);
+
 describe('musicfetch resilient client', () => {
   afterEach(async () => {
     const { resetMusicfetchDormantForTests } = await import(
@@ -191,6 +197,55 @@ describe('musicfetch resilient client', () => {
     expect(mockReserveMusicfetchBudget).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each([401, 403])(
+    'opens the circuit and does not retry MusicFetch HTTP %i',
+    async status => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status,
+        headers: { get: () => null },
+        text: async () =>
+          JSON.stringify({
+            error: { message: 'subscription not active' },
+          }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { musicfetchRequest, MusicfetchVendorUnavailableError } =
+        await import('@/lib/musicfetch/resilient-client');
+      const { musicfetchCircuitBreaker } = await import(
+        '@/lib/discography/musicfetch-circuit-breaker'
+      );
+      const { logger } = await import('@/lib/utils/logger');
+      const params = new URLSearchParams({
+        url: 'https://open.spotify.com/artist/1',
+      });
+
+      await expect(
+        musicfetchRequest('/url', params, { timeoutMs: 2000 })
+      ).rejects.toBeInstanceOf(MusicfetchVendorUnavailableError);
+      await expect(
+        musicfetchRequest('/url', params, { timeoutMs: 2000 })
+      ).rejects.toMatchObject({
+        failureClass: 'vendor_unavailable',
+        vendorUnavailable: true,
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(mockReserveMusicfetchBudget).toHaveBeenCalledTimes(1);
+      expect(musicfetchCircuitBreaker.getState()).toBe('OPEN');
+      expect(logger.warn).toHaveBeenCalledTimes(status === 401 ? 1 : 0);
+      expect(sentry.captureMessage).not.toHaveBeenCalled();
+      expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+      expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'info',
+          message: expect.stringContaining('CLOSED -> OPEN'),
+        })
+      );
+    }
+  );
 
   it('preserves API error details on non-retryable HTTP failures', async () => {
     const fetchMock = vi.fn().mockResolvedValue({

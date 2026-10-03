@@ -123,6 +123,20 @@ describe('agent release resolution', () => {
     resetMusicfetchDormantForTests();
     delete process.env.FEATURE_IN_HOUSE_RESOLVER;
     delete process.env.MUSICFETCH_API_TOKEN;
+    resolveInHouse.mockResolvedValue({
+      status: 'no_match',
+      kind: 'track',
+      title: null,
+      artist: null,
+      isrc: null,
+      upc: null,
+      mbid: null,
+      links: [],
+      candidates: [],
+      confidence: 0,
+      provenance: {},
+      candidateCount: 0,
+    });
   });
 
   it('resolves a DSP URL into normalized public release and smart-link facts', async () => {
@@ -383,6 +397,129 @@ describe('agent release resolution', () => {
     });
   });
 
+  it.each([401, 403])(
+    'treats MusicFetch HTTP %i as non-retryable vendor unavailable',
+    async status => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      request.mockRejectedValueOnce(
+        new MusicfetchRequestError('subscription not active', status)
+      );
+      const result = await resolveAgentRelease(
+        prepareReleaseLaunchSchema.parse({
+          ...draft,
+          release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        })
+      );
+      expect(result).toEqual({
+        status: 'error',
+        code: 'UPSTREAM_FAILURE',
+        retryable: false,
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('uses the in-house resolver when MusicFetch is unavailable, before cached metadata', async () => {
+    const { MusicfetchRequestError } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    request.mockRejectedValueOnce(
+      new MusicfetchRequestError('unavailable', 401)
+    );
+    resolveInHouse.mockResolvedValueOnce({
+      status: 'resolved',
+      kind: 'album',
+      title: 'Signal Fire',
+      artist: 'The Artist',
+      isrc: null,
+      upc: '00123456789012',
+      mbid: null,
+      links: [
+        {
+          provider: 'spotify',
+          url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          provenance: 'input_url',
+          confidence: 0.95,
+        },
+      ],
+      candidates: [],
+      confidence: 0.95,
+      provenance: { spotify: 'input_url' },
+      candidateCount: 1,
+    });
+    const result = await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        release_metadata: {
+          title: 'Cached Title',
+          artist_name: 'Cached Artist',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      })
+    );
+    expect(resolveInHouse).toHaveBeenCalledWith({
+      kind: 'album',
+      url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+    });
+    expect(result).toEqual({
+      status: 'resolved',
+      facts: [
+        {
+          source: 'release_url',
+          content_type: 'album',
+          title: 'Signal Fire',
+          artist_name: 'The Artist',
+          release_date: null,
+          artwork_url: null,
+          upc: '00123456789012',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+          artists: [{ name: 'The Artist', ids: {} }],
+        },
+      ],
+    });
+  });
+
+  it('falls back to supplied release metadata when MusicFetch is vendor-unavailable', async () => {
+    const { MusicfetchRequestError } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    request.mockRejectedValueOnce(
+      new MusicfetchRequestError('subscription not active', 401)
+    );
+    const result = await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        release_metadata: {
+          title: 'Signal Fire',
+          artist_name: 'The Artist',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      })
+    );
+    expect(result).toMatchObject({
+      status: 'resolved',
+      facts: [
+        {
+          source: 'release_metadata',
+          title: 'Signal Fire',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      ],
+    });
+  });
+
   it('routes a MusicFetch 401 to JOV-7323 and does not call it again', async () => {
     const { MusicfetchRequestError } = await import(
       '@/lib/musicfetch/resilient-client'
@@ -410,7 +547,7 @@ describe('agent release resolution', () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
-  it.each([400, 402, 403, 422, 429, 500, 503])(
+  it.each([400, 402, 422, 429, 500, 503])(
     'keeps provider HTTP %i failures distinct from a missing release',
     async status => {
       const { MusicfetchRequestError } = await import(
