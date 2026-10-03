@@ -249,24 +249,30 @@ export function collectArtifacts(runs, api = jsonApi, execute = execFileSync) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+export function collectCiHistory(workflowId, now, api = jsonApi) {
+  check(
+    positive(workflowId) && Number.isFinite(now),
+    'Canonical CI identity required'
+  );
+  const cutoff = new Date(now - 7 * 86400000).toISOString();
+  // Each event has its own ten-page/1,000-run limit. The complete combined
+  // history therefore has a 2,000-run bound, rather than rejecting two valid
+  // per-event collections whose sum exceeds 1,000. Never truncate a history.
+  return ['push', 'merge_group'].flatMap(event =>
+    collectPaged(
+      `repos/${REPOSITORY}/actions/workflows/${workflowId}/runs?event=${event}&status=completed&created=%3E%3D${cutoff}`,
+      'workflow_runs',
+      api
+    )
+  );
+}
 export function main() {
   const headSha = execFileSync('git', ['rev-parse', 'HEAD'], {
     encoding: 'utf8',
   }).trim();
   const now = Date.now();
-  const cutoff = new Date(now - 7 * 86400000).toISOString();
   const workflow = jsonApi(`repos/${REPOSITORY}/actions/workflows/ci.yml`);
-  check(positive(workflow.id), 'Canonical CI workflow is unavailable');
-  const runs = ['push', 'merge_group'].flatMap(event =>
-    collectPaged(
-      `repos/${REPOSITORY}/actions/workflows/${workflow.id}/runs?event=${event}&status=completed&created=%3E%3D${cutoff}`,
-      'workflow_runs',
-      jsonApi
-    )
-  );
-  // Cover the complete seven-day cooldown. Truncated run history is a
-  // handoff, never permission to discard an intervening failed execution.
-  check(runs.length <= 1000, 'CI history exceeds the collection budget');
+  const runs = collectCiHistory(workflow.id, now);
   const selected = runs.sort(
     (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)
   );

@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   buildQuarantineEvidence,
   collectArtifacts,
+  collectCiHistory,
   collectPaged,
 } from './collect-quarantine-evidence.mjs';
 
@@ -273,4 +274,35 @@ test('actual ZIP reader consumes JSON via bounded pipes and refuses traversal me
     assert.throws(() =>
       collectArtifacts([b.run], api, execute(zipBytes(entries)))
     );
+});
+
+test('collects both complete event histories up to 2,000 runs without truncation', () => {
+  const calls = [];
+  const api = endpoint => {
+    calls.push(endpoint);
+    const event = endpoint.includes('event=push') ? 'push' : 'merge_group';
+    const page = Number(endpoint.match(/&page=(\d+)$/)[1]);
+    return {
+      total_count: 1000,
+      workflow_runs: Array.from({ length: 100 }, (_, i) => ({
+        id: (event === 'push' ? 0 : 1000) + (page - 1) * 100 + i + 1,
+      })),
+    };
+  };
+  const runs = collectCiHistory(178737329, now, api);
+  assert.equal(runs.length, 2000);
+  assert.equal(new Set(runs.map(r => r.id)).size, 2000);
+  assert.equal(calls.length, 20);
+  assert.ok(
+    calls.every(call => call.includes('created=%3E%3D2026-09-26T12:00:00.000Z'))
+  );
+  assert.throws(() => collectCiHistory(0, now, api));
+  assert.throws(
+    () =>
+      collectCiHistory(1, now, () => ({
+        total_count: 1001,
+        workflow_runs: [],
+      })),
+    /Incomplete API collection/
+  );
 });
