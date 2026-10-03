@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const p = await b.newPage();
+p.on('console', m => console.log('console', m.type(), m.text().slice(0,200)));
+p.on('request', r => { if (!/_next|\.woff|\.png|\.svg|__nextjs/.test(r.url())) console.log('req', r.method(), r.url()); });
+p.on('response', r => { if (/api\/auth/.test(r.url())) r.text().then(t=>console.log('resp', r.status(), r.url(), t.slice(0,200))).catch(()=>{}); });
+await p.goto('http://localhost:3591/signup', { waitUntil: 'domcontentloaded', timeout: 120000 });
+await p.waitForTimeout(8000);
+await p.getByLabel('Email').fill(`probe-${Date.now().toString(36)}+e2e@test.jovie.com`);
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Send sign-in code' }).click();
+await p.waitForTimeout(10000);
+await p.screenshot({ path: process.argv[2] });
+console.log('alert:', await p.locator('[role=alert]').allInnerTexts());
+await b.close();
