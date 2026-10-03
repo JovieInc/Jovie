@@ -35,9 +35,11 @@ import { rankPaletteReleases } from '@/lib/commands/palette-ranking';
 import {
   type Command,
   commandsForSurface,
+  isCommandVisible,
   type NavCommand,
   type SkillCommand,
 } from '@/lib/commands/registry';
+import { useAppFlag } from '@/lib/flags/client';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
@@ -79,9 +81,15 @@ interface CmdKPaletteProps {
 }
 
 function useCmdkData(profileId: string, query: string, open: boolean) {
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const commands = useMemo<readonly Command[]>(
-    () => commandsForSurface('cmdk'),
-    []
+    () =>
+      commandsForSurface('cmdk').filter(command =>
+        isCommandVisible(command, {
+          PROFILES_WORKSPACE: profilesWorkspaceEnabled,
+        })
+      ),
+    [profilesWorkspaceEnabled]
   );
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
     profileId,

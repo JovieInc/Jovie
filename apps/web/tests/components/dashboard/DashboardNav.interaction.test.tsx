@@ -39,7 +39,10 @@ describe('DashboardNav interactions', () => {
   });
 
   it('exposes an icon and label for each canonical navigation item', () => {
-    renderDashboardNav({ renderFn: render });
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
+    });
 
     for (const label of PRIMARY_LABELS) {
       const link = screen.getByRole('link', { name: label });
@@ -116,6 +119,7 @@ describe('DashboardNav interactions', () => {
   it('routes Identity through root navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -233,6 +237,7 @@ describe('DashboardNav interactions', () => {
     vi.useFakeTimers();
     renderDashboardNav({
       renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -280,7 +285,10 @@ describe('DashboardNav interactions', () => {
   it('keeps demo-disabled rows as links while intercepting unavailable content', async () => {
     const user = userEvent.setup();
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
-    renderDashboardNav({ renderFn: render });
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
+    });
 
     const identityLink = screen.getByRole('link', { name: 'Identity' });
     expect(identityLink).toHaveAttribute('href', APP_ROUTES.PRESENCE);

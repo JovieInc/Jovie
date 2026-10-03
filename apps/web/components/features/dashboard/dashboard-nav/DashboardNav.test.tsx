@@ -54,7 +54,10 @@ describe('DashboardNav route warming', () => {
   });
 
   it('fully prefetches every canonical dynamic customer route', () => {
-    renderDashboardNav({ renderFn: render });
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
+    });
 
     for (const label of [
       'Inbox',
