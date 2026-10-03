@@ -57,7 +57,9 @@ describe('SettingsSmsAccessSection', () => {
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Let your audience opt in to text alerts when you publish.')
+      screen.getByText(
+        'Let your audience opt in to text alerts when you publish.'
+      )
     ).toBeInTheDocument();
   });
 

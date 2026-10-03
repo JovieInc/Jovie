@@ -52,7 +52,9 @@ export function SettingsSmsAccessSection({
                 <span className='font-semibold text-primary-token'>
                   {smsSubscriberCount}
                 </span>{' '}
-                {smsSubscriberCount === 1 ? 'subscriber has' : 'subscribers have'}{' '}
+                {smsSubscriberCount === 1
+                  ? 'subscriber has'
+                  : 'subscribers have'}{' '}
                 signed up for text alerts.
               </p>
             )}
