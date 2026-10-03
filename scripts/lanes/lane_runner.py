@@ -2737,37 +2737,105 @@ def note_event_outcome(host: Host, issue, verdict: str) -> None:
 
 
 def claim_escalation_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
-    """Take a pending model rung for this lane. Charges an escalation row, not `count`."""
+    """Under claim.lock: validate a pending model rung before charging its separate budget."""
     path = host.state / "fix-attempts.json"
-    if not path.exists():
-        return None
     try:
         attempts = json.loads(path.read_text())
-    except ValueError:
+        held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+        if not isinstance(attempts, dict) or not isinstance(held, dict):
+            return None
+    except (OSError, ValueError):
         return None
-    now = time.time()
-    data = load_escalation(host)
+    providers = load_providers()
+    disabled = set(providers) - set(pr_events.cost_order(providers))
     for key, record in attempts.items():
         if not isinstance(record, dict):
             continue
+        if type(record.get("count", 0)) is not int or record.get("count", 0) < 0 \
+                or any(field in record and (not isinstance(record[field], list)
+                       or any(not isinstance(row, dict) for row in record[field]))
+                       for field in ("escalations", "priorEscalations")):
+            continue  # Malformed accounting is not permission to reinterpret spent history.
         pending = record.get("pendingEscalation") or {}
-        if pending.get("lane") != name or not pending.get("dossier"):
+        if not isinstance(pending, dict) or pending.get("lane") != name \
+                or not isinstance(pending.get("dossier"), str) or not pending["dossier"].strip():
             continue
         pr = next((item for item in prs if str(item.get("number")) == str(key)), None)
-        if pr is None or pending.get("head") not in (None, pr.get("headRefOid")):
+        entry = held.get(key, {})
+        if pr is None or pending.get("head") not in (None, pr.get("headRefOid")) \
+                or not pr.get("headRefOid") or not pr.get("headRefName") \
+                or pr.get("isInMergeQueue") is True or not isinstance(entry, dict):
             continue
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix", timeout=30):
             continue
-        updated = remediation.append_rung(record, rung="escalate" if not pending.get("topRung") else "top-rung",
-                                          lane=name, cls=pending.get("cls") or "fixable-by-model", at=now,
-                                          head=pr["headRefOid"], kind="model", top_rung=bool(pending.get("topRung")))
-        updated.pop("pendingEscalation", None)
-        attempts[key] = updated
-        path.write_text(json.dumps(attempts))
-        data["attempts"].append({"pr": pr["number"], "at": now, "lane": name})
-        save_escalation(host, data)
-        post_claim(pr["number"], pr["headRefOid"], "fix")
-        return {**pr, "dossier": pending["dossier"],
+        try:
+            live = require_fix_target(pr, "before-escalation-claim", repair=True)
+        except RepairStopped:
+            continue
+        owned = LANE_BRANCH.match(live.get("headRefName", ""))
+        if live.get("headRefName") != pr["headRefName"] or live.get("isCrossRepository") is not False \
+                or (live.get("isDraft") and not (owned and owned.group("lane") in {name, *disabled})):
+            continue
+        holds = {label.lower() for label in pr_events.label_names(live)} & pr_events.HOLD_LABELS
+        prior_holds = {label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS
+        # Exhaustion has its own authorized rung, but does not erase a stronger
+        # same-head hold (including legacy rows lacking normalized reason fields).
+        evidence = entry.get("evidence") or []
+        if not isinstance(evidence, list) or (entry.get("reason") is not None and not isinstance(entry["reason"], str)):
+            continue
+        evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
+        reason = entry.get("reason")
+        if not reason or reason == "fix-exhausted":
+            reason = pr_events.held_reason(evidence)[0]
+        policy_entry = {**entry, "evidence": evidence, "reason": reason}
+        action = next((action for _, code, action in pr_events.HELD_REASONS if code == reason), None)
+        if not pr_events.fixable_hold(policy_entry, live["headRefOid"]) \
+                or (entry.get("sha") == live["headRefOid"] and action and action not in pr_events.FIXABLE_ACTIONS):
+            continue
+        classified = remediation.classify_blocker(live, policy_entry, record)
+        if classified["cls"] not in {"fixable-by-model", "needs-rebase", "flaky-infra"} \
+                or classified.get("subtype") == "main-red" \
+                or pending.get("cls") != classified["cls"] or pending.get("subtype") != classified.get("subtype"):
+            continue
+        # Preserve the canonical prescribed-fix exception, never extending it to a
+        # new hold or altered prescription. Auxiliary holdNote is still cached.
+        if holds and (holds != prior_holds or pending.get("subtype") != "human-hold"
+                      or classified.get("subtype") != "human-hold"
+                      or live.get("holdNote") != pr.get("holdNote")):
+            continue
+        now = time.time()
+
+        def charge(current):
+            fresh_held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+            if not isinstance(current, dict) or current.get(key) != record \
+                    or not isinstance(fresh_held, dict) or fresh_held.get(key, {}) != entry \
+                    or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()) \
+                    or publication_revocation(host, live["headRefName"]):
+                raise RepairStopped("escalation-claim-changed", live, "before-escalation-charge")
+            updated = remediation.append_rung(record, rung="top-rung" if pending.get("topRung") else "escalate",
+                                              lane=name, cls=pending.get("cls") or "fixable-by-model", at=now,
+                                              head=live["headRefOid"], kind="model", top_rung=bool(pending.get("topRung")))
+            updated.pop("pendingEscalation", None)
+            current[key] = updated
+
+        charged = False
+
+        def summarize(data):
+            nonlocal charged
+            if not isinstance(data, dict) or not isinstance(data.get("attempts", []), list):
+                raise RepairStopped("escalation-summary-unavailable", live, "before-escalation-charge")
+            update_json(path, charge)
+            charged = True
+            data.setdefault("attempts", []).append({"pr": live["number"], "at": now, "lane": name})
+
+        try:
+            update_json(host.state / "escalation.json", summarize)
+        except (OSError, ValueError, TypeError, RepairStopped):
+            if charged:
+                raise  # Durable charge plus failed summary: stop this scan; never refund/reset.
+            continue
+        post_claim(live["number"], live["headRefOid"], "fix")
+        return {**live, "dossier": pending["dossier"],
                 "liftHold": pending.get("subtype") == "human-hold"}
     return None
 

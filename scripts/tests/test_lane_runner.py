@@ -3920,6 +3920,176 @@ if __name__ == "__main__":
     unittest.main()
 
 
+
+class EscalationQueueAuthorityTest(unittest.TestCase):
+    def run_case(self, fault, *, human_hold=False, top=False):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            pr = {"number": 7, "headRefOid": "head-A", "headRefName": "codex/jov-7648-20261003",
+                  "state": "OPEN", "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
+                  "mergeStateStatus": "DIRTY", "labels": [], "statusCheckRollup": []}
+            if human_hold:
+                pr.update(labels=[{"name": "hold"}], holdNote={"author": "itstimwhite",
+                          "body": "use computeRatePercent from @/lib/analytics/metrics and remove hold"})
+            live = json.loads(json.dumps(pr))
+            record = {"sha": "head-A", "pushedHead": "head-A", "count": lane.MAX_FIX_ATTEMPTS,
+                      "lane": "devin", "at": 1, "endedAt": 2, "reentry": {"keep": True},
+                      "priorEscalations": [{"rung": "retained"}], "escalations": [],
+                      "pendingEscalation": {"lane": "codex", "head": "head-A", "dossier": "existing authority",
+                                            "cls": "fixable-by-model" if human_hold else "needs-rebase",
+                                            "subtype": "human-hold" if human_hold else "semantic", "topRung": top}}
+            if fault == "pending-head": record["pendingEscalation"]["head"] = "head-B"
+            if fault == "malformed-dossier": record["pendingEscalation"]["dossier"] = {"invalid": True}
+            if fault == "empty-dossier": record["pendingEscalation"]["dossier"] = "  "
+            malformed_history = {"rungs-string": ("escalations", "bad"), "rungs-object": ("escalations", {"old": {"kind": "model"}}),
+                                 "rungs-mixed": ("escalations", [{"kind": "model"}, "bad"]),
+                                 "prior-string": ("priorEscalations", "bad"), "count-string": ("count", "bad"),
+                                 "count-bool": ("count", True), "count-negative": ("count", -1)}
+            if fault in malformed_history:
+                field, value = malformed_history[fault]; record[field] = value
+            if fault == "cached-queued": pr["isInMergeQueue"] = True
+            if fault == "cached-unknown": pr.pop("isInMergeQueue")
+            if fault == "active-recorded-head":
+                record.update(sha="old-local-head", at=1000); record.pop("endedAt")
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps({"7": record, "9": {"count": 1}}))
+            held = host.state / "held.json"
+            held.write_text("{}")
+            held_faults = {"legacy-secret": ["secret-like-file-changed:file"], "empty-diff": ["empty-diff"],
+                           "exhausted-secret": ["fix-exhausted", "secret-like-file-changed:file"],
+                           "exhausted-size": ["fix-exhausted", "diff-too-large:100"],
+                           "legacy-lockfile": ["lockfile-without-manifest"], "only-exhausted": ["fix-exhausted"]}
+            if fault in held_faults:
+                held.write_text(json.dumps({"7": {"sha": "head-A", "evidence": held_faults[fault]}}))
+            if fault == "declared-empty-diff":
+                held.write_text(json.dumps({"7": {"sha": "head-A", "reason": "empty-diff"}}))
+            summary = host.state / "escalation.json"
+            summary.write_text(json.dumps({"events": {"existing": {"status": "claimed"}}, "attempts": []}))
+            bad_summaries = {"summary-corrupt": "[", "summary-list": "[]", "summary-null": "null",
+                             "summary-attempts-null": '{"attempts":null}', "summary-attempts-string": '{"attempts":"bad"}'}
+            order = []
+            expected = json.loads(path.read_text())
+            summary_expected = json.loads(summary.read_text())
+
+            def mutate():
+                if fault in {"attempt-race", "pending-race", "unrelated-race", "late-CAS-race"}:
+                    current = json.loads(path.read_text())
+                    if fault == "pending-race": current["7"]["pendingEscalation"]["dossier"] = "new prescription"
+                    elif fault == "unrelated-race": current["10"] = {"count": 2, "keep": True}
+                    else: current["7"]["escalations"].append({"rung": "concurrent"})
+                    path.write_text(json.dumps(current)); expected.clear(); expected.update(current)
+                if fault in {"new-held", "changed-held-prescription"}:
+                    held.write_text(json.dumps({"7": lane.pr_events.held_record("head-A", ["diff-too-large:100"])}))
+                if fault == "corrupt-held": held.write_text("[")
+                if fault == "malformed-held": held.write_text("[]")
+                if fault == "revoked": lane.revoke_publication(host, branch=pr["headRefName"], reason="new-revocation")
+                if fault == "summary-race":
+                    current = json.loads(summary.read_text()); current["events"]["concurrent"] = {"keep": True}
+                    current["attempts"].append({"pr": 99})
+                    summary.write_text(json.dumps(current)); summary_expected.clear(); summary_expected.update(current)
+                if fault in bad_summaries: summary.write_text(bad_summaries[fault])
+
+            def owner(*args, **kwargs):
+                self.assertEqual(kwargs, {"timeout": 30}); order.append("owner")
+                return fault == "owner"
+
+            def target(_):
+                order.append("target")
+                if fault == "unreadable": return None
+                if fault == "queued": live["isInMergeQueue"] = True
+                if fault == "unknown": live["isInMergeQueue"] = None
+                if fault == "missing-queue": live.pop("isInMergeQueue")
+                if fault == "head": live["headRefOid"] = "head-B"
+                if fault == "branch": live["headRefName"] = "foreign/branch"
+                if fault == "fork": live["isCrossRepository"] = True
+                if fault == "closed": live["state"] = "CLOSED"
+                if fault == "merged": live["state"] = "MERGED"
+                if fault == "new-hold": live["labels"].append({"name": "tim-hold"})
+                if fault == "human-decision": live["labels"].append({"name": "needs-human"})
+                if fault == "changed-note": live["holdNote"] = {"body": "new human decision"}
+                if fault == "foreign-draft": live["isDraft"] = True
+                if fault in {"ready-green", "ready-pending"}:
+                    live.update(mergeStateStatus="CLEAN", statusCheckRollup=[{
+                        "name": "ci", "status": "COMPLETED" if fault == "ready-green" else "IN_PROGRESS",
+                        "conclusion": "SUCCESS" if fault == "ready-green" else None}])
+                if fault == "changed-class":
+                    live.update(mergeStateStatus="CLEAN", statusCheckRollup=[{
+                        "name": "ci", "status": "COMPLETED", "conclusion": "FAILURE"}])
+                if fault == "changed-subtype": live["conflictFiles"] = ["pnpm-lock.yaml"]
+                if fault != "late-CAS-race": mutate()
+                return live
+
+            if fault == "foreign-draft":
+                pr["headRefName"] = live["headRefName"] = "devin/jov-7648-20261003"
+            original_update = lane.update_json
+            original_replace = lane.os.replace
+
+            def replace(src, dst):
+                if Path(dst) == summary and fault == "summary-write-fails": raise OSError("fixture summary I/O failure")
+                return original_replace(src, dst)
+
+            def update(file, change):
+                if file == path and fault == "late-CAS-race": mutate()
+                return original_update(file, change)
+
+            with patch.object(lane, "claimed_elsewhere", side_effect=owner), \
+                 patch.object(lane, "reconcile_fix_target", side_effect=target), \
+                 patch.object(lane, "post_claim") as posted, patch.object(lane, "sh", side_effect=AssertionError("no external command")), \
+                 patch.object(lane, "load_providers", return_value={"codex": {"enabled": True}, "devin": {"enabled": True}}), \
+                 patch.object(lane, "update_json", side_effect=update), patch.object(lane.os, "replace", side_effect=replace), \
+                 patch.object(lane.time, "time", return_value=1000):
+                if fault == "summary-write-fails":
+                    with self.assertRaisesRegex(OSError, "summary I/O failure"):
+                        lane.claim_escalation_pr(host, "codex", [pr])
+                    selected = None
+                else: selected = lane.claim_escalation_pr(host, "codex", [pr])
+            charged = fault in {"none", "cached-unknown", "unrelated-race", "summary-race", "only-exhausted"}
+            after = json.loads(path.read_text())
+            self.assertEqual(bool(selected), charged, fault)
+            if charged:
+                updated = after.pop("7"); before = expected.pop("7")
+                self.assertEqual(after, expected)
+                for key, value in before.items():
+                    if key not in {"pendingEscalation", "escalations"}: self.assertEqual(updated[key], value, key)
+                self.assertNotIn("pendingEscalation", updated)
+                self.assertEqual(len(updated["escalations"]), 1)
+                self.assertEqual(updated["escalations"][0]["topRung"], top)
+                self.assertEqual(selected["liftHold"], human_hold)
+                self.assertEqual(selected["dossier"], "existing authority")
+                posted.assert_called_once_with(7, "head-A", "fix")
+                summary_expected["attempts"].append({"pr": 7, "at": 1000, "lane": "codex"})
+            elif fault == "summary-write-fails":
+                self.assertEqual(after["7"]["count"], record["count"])
+                self.assertEqual(len(after["7"]["escalations"]), 1)
+                self.assertNotIn("pendingEscalation", after["7"])
+                posted.assert_not_called()
+            else:
+                self.assertEqual(after, expected); posted.assert_not_called()
+            if fault in bad_summaries: self.assertEqual(summary.read_text(), bad_summaries[fault])
+            else: self.assertEqual(json.loads(summary.read_text()), summary_expected)
+            self.assertEqual(order, [] if fault in {"pending-head", "cached-queued", "malformed-dossier", "empty-dossier", *malformed_history} else
+                             ["owner"] if fault == "owner" else ["owner", "target"])
+
+    def test_refused_targets_retain_pending_history_and_claims(self):
+        for fault in ("pending-head", "cached-queued", "owner", "queued", "unknown", "missing-queue", "unreadable",
+                      "head", "branch", "fork", "closed", "merged", "new-hold", "human-decision", "foreign-draft",
+                      "active-recorded-head", "attempt-race", "pending-race", "late-CAS-race", "new-held",
+                      "corrupt-held", "malformed-held", "revoked", "legacy-secret", "empty-diff", "exhausted-secret",
+                      "exhausted-size", "legacy-lockfile", "declared-empty-diff", "ready-green", "ready-pending",
+                      "summary-corrupt", "summary-list", "summary-null", "summary-attempts-null", "summary-attempts-string",
+                      "summary-write-fails", "changed-class", "changed-subtype", "malformed-dossier", "empty-dossier",
+                      "rungs-string", "rungs-object", "rungs-mixed", "prior-string", "count-string", "count-bool", "count-negative"):
+            with self.subTest(fault=fault): self.run_case(fault)
+
+    def test_separate_rung_budget_and_concurrent_unrelated_history_survive(self):
+        for fault in ("none", "cached-unknown", "unrelated-race", "summary-race", "only-exhausted"):
+            with self.subTest(fault=fault): self.run_case(fault, top=True)
+
+    def test_prescribed_human_hold_does_not_authorize_new_preservation(self):
+        for fault in ("none", "new-hold", "changed-note", "changed-held-prescription", "human-decision"):
+            with self.subTest(fault=fault): self.run_case(fault, human_hold=True)
+
+
 class OnePrPerIssueTest(unittest.TestCase):
     """JOV-6833: one open PR per Linear key; slots count open non-green PRs."""
     NOW = 1_800_000_000
