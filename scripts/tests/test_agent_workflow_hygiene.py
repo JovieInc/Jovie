@@ -1323,6 +1323,14 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     assert "SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}" in job
     assert "SLACK_CI_CHANNEL_ID: ${{ vars.SLACK_CI_CHANNEL_ID }}" in job
     assert "SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}" in job
+    notice = _step_block(
+        "nightly-tests.yml", "Skip Slack when bot token or channel is unset"
+    )
+    assert "env.SLACK_BOT_TOKEN == ''" in notice
+    assert "env.SLACK_CI_CHANNEL_ID == ''" in notice
+    assert "SLACK_BOT_TOKEN or SLACK_CI_CHANNEL_ID is unset" in notice
+    assert "Skipping Slack. Tim sets these later." in notice
+    assert "exit 0" in notice
     for step, result in (
         (knip_failure, "needs.knip.result == 'failure'"),
         (unit_failure, "needs.unit-tests.result == 'failure'"),
@@ -1723,7 +1731,15 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
         assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
-    assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production
+    assert (
+        "expected-sha: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}"
+        in production
+    )
+    source = (REPO_ROOT / ".github/scripts/staging-release-source.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "exactRun(ci, repository, CI_PATH, 'push')" in source
+    assert "ci.head_sha === completion.sha" in source
 
 
 def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:

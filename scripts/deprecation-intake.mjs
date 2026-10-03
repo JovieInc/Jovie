@@ -85,6 +85,7 @@ async function main() {
       ].join('\n'),
       priority: 4,
       createStateName: 'Todo',
+      reopenTerminal: true,
       createLabelIds: [devinLabel],
       apiKey,
     });

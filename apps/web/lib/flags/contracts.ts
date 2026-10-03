@@ -37,7 +37,12 @@ export const APP_FLAG_DEFAULTS = {
   PLAYLIST_ENGINE: true,
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: true,
-  RELEASE_PLAN_DEMO: true,
+  /**
+   * Mock EP planner at /app/dashboard/release-plan. Off in production.
+   * Dev and preview stay on unless an env override publishes a value
+   * (`getAppFlagValue`).
+   */
+  RELEASE_PLAN_DEMO: false,
   RELEASE_TO_REVENUE_AUTOPILOT: true,
   AI_CONNECTORS_BETA: true,
   MERCH_MVP: true,
@@ -303,7 +308,7 @@ export const APP_FLAG_AUDIT_REGISTRY = Object.fromEntries(
 export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PLAYLIST_ENGINE', // internal v1 default-on feature; no remote gate
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
-  'RELEASE_PLAN_DEMO', // internal v1 default-on feature; no remote gate
+  'RELEASE_PLAN_DEMO', // mock EP planner; default off in production, on in dev/preview, no remote gate
   'RELEASE_TO_REVENUE_AUTOPILOT', // internal v1 default-on pilot surface; no remote gate
   'INBOX_HOME', // rollout gate for Inbox-as-home IA; default off in prod (JOV-3931)
   'PROFILES_WORKSPACE', // JOV-2659 Tim-first unified Profiles rollout
