@@ -20,7 +20,7 @@ The harness, not the model, owns:
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
-| Fresh worktree from `origin/main`, shared-store hardlink install, removal after | `run_issue()` |
+| Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; removal after | `run_issue()`, `worktree_pool.take()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
 | Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
@@ -293,6 +293,20 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+## Worktree pool and shared caches (JOV-7705)
+
+`worktree_pool.py` (CLI: `scripts/agent/worktree-new`) keeps `JOVIE_WORKTREE_POOL_SIZE`
+(default 2) detached worktrees per repository, each installed and with a warm web
+`tsbuildinfo`, under `$JOVIE_CACHE_ROOT/worktree-pool/<hash of git common dir>/`
+(default `~/.cache/jovie`). Taking a slot is `git worktree move` + checkout of the new
+branch + an incremental install. A fill is one detached process per pool (flock), runs
+after every take, rebuilds slots older than 3 days, and never builds below
+`JOVIE_WORKTREE_POOL_MIN_FREE_GB` (default 30). `disk_guard` drains idle slots once free
+space is under that same floor, so a sweep and a refill never fight. Disk-cleanup agents
+must leave `~/.cache/jovie` and the pnpm store (`pnpm store path`) alone; use
+`scripts/agent/worktree-new --drain` to reclaim pool space. Tests and
+`JOVIE_WORKTREE_POOL=0` never touch the pool.
 
 ## Preserved repairs (JOV-7347)
 

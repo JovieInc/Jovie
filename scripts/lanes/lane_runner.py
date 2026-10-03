@@ -47,6 +47,7 @@ import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
+import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -91,6 +92,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py",
+              "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
@@ -1687,9 +1689,13 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
 
             require_disk(host, "issue-checkout")
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
-            sh(["git", "worktree", "add", "-q", "-b", branch, str(worktree), "origin/main"], cwd=host.repo, log=log)
+            # A pooled slot arrives installed and typecheck-warm; the install below is then
+            # an incremental no-op instead of ~5 minutes of per-file linking.
+            receipt["worktreeSource"] = worktree_pool.take(host.repo, worktree, branch, "origin/main",
+                                                           log=log, sh=sh)
             # Always installed: the gate's checks need it even when the provider works remotely.
             install_dependencies(host, worktree, log)
+            worktree_pool.refill_in_background(host.repo)
             brain_context = context_pack(issue)
             prompt = render_prompt(issue, branch, brain_context, provider=name)
             prompt_file = runs / f"{run_id}.prompt.md"

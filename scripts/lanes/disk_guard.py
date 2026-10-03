@@ -4,7 +4,8 @@
 Runs inside the existing event paths — the dispatch tick and each worker spawn —
 never on its own timer. Below LOW_PCT free on the state filesystem the guard sweeps,
 in order: DerivedData idle > 5h, clean worktrees idle > 12h (branches kept),
-.next/test-results inside idle worktrees that stay, `xcrun simctl delete
+.next/test-results inside idle worktrees that stay, idle worktree-pool slots once
+free space is under the pool's floor (`worktree_pool.shed`), `xcrun simctl delete
 unavailable`. The shared pnpm store stays intact: pruning it while active worktrees
 install with copy imports amplifies disk use. Free space at or below CRITICAL_PCT
 after the sweep is `critical` in the receipt; the doctor turns that reading into a
@@ -17,9 +18,13 @@ import fcntl
 import os
 import shutil
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import worktree_pool  # noqa: E402  (sibling module of the release)
 
 LOW_PCT = 15.0
 CRITICAL_PCT = 5.0
@@ -176,6 +181,11 @@ def sweep_worktrees(host, run, now: float, report: dict) -> None:
             prune_build_dirs(path, report)
 
 
+def sweep_worktree_pool(host, report: dict) -> None:
+    """Pre-installed pool slots are regenerable; below the pool's own floor they go."""
+    report["actions"].extend(f"drained pool slot {name}" for name in worktree_pool.shed(host.repo))
+
+
 def sweep_host_tools(run, report: dict) -> None:
     for cmd in (["xcrun", "simctl", "delete", "unavailable"],):
         if shutil.which(cmd[0]) is None:
@@ -207,6 +217,7 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
                     report["cleanup"] = "acquired"
                     for step in (lambda: sweep_derived_data(now, report),
                                  lambda: sweep_worktrees(host, run, now, report),
+                                 lambda: sweep_worktree_pool(host, report),
                                  lambda: sweep_host_tools(run, report)):
                         # Pressure can change between steps; never keep sweeping critically low disk.
                         current = free_pct(host.state)
