@@ -20,7 +20,7 @@ function requireEvidence(condition, reason) {
 }
 // Completed runs may retain artifacts across reruns. Read every bounded page;
 // incomplete, changing, or duplicated listings never authorize production.
-function completeRunListing(api, route, key, reason) {
+export function completeRunListing(api, route, key, reason) {
   const first = api(route);
   const total = first?.total_count;
   requireEvidence(
