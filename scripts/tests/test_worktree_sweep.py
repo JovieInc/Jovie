@@ -89,6 +89,8 @@ class SweepTest(unittest.TestCase):
         (path / "new.txt").write_text("untracked\n")
         (path / "node_modules/pkg").mkdir(parents=True)
         (path / "node_modules/pkg/index.js").write_text("build output\n")
+        (path / ".pnpm-store-private/v10").mkdir(parents=True)
+        (path / ".pnpm-store-private/v10/blob").write_text("per-checkout store\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
         self.assertEqual(report["backups"], ["backup/mac/dirty-20261003"])
@@ -258,6 +260,13 @@ class HostWiringTest(unittest.TestCase):
         self.assertTrue(sweeper.busy(Path("/w/wt-a"), live))
         self.assertFalse(sweeper.busy(Path("/w/wt-b"), live))
         self.assertIsNone(sweeper.live_paths(lambda *a, **k: (_ for _ in ()).throw(OSError("no lsof"))))
+
+    def test_lsof_resolves_outside_launchd_path(self):
+        with patch.object(sweeper.shutil, "which", return_value=None), \
+                patch.object(Path, "exists", return_value=True):
+            self.assertEqual(sweeper.lsof_command(), "/usr/sbin/lsof")
+        with patch.object(sweeper.shutil, "which", return_value="/usr/bin/lsof"):
+            self.assertEqual(sweeper.lsof_command(), "lsof")
 
     def test_defaults_cover_agent_roots_and_skip_shared_caches(self):
         with tempfile.TemporaryDirectory() as tmp:

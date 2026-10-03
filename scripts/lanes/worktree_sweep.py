@@ -31,13 +31,18 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from disk_guard import lsof_command  # noqa: E402  (sibling module of the release)
+
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
 CLOSED_GRACE_S = 3600
 PRESERVED_TTL_S = 3 * 86400
 INTERVAL_S = 3600
 LOW_INTERVAL_S = 600
-BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData"})
+# Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
+BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
+                        ".pnpm-store", ".pnpm-store-private"})
 EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}"]
 
 
@@ -76,7 +81,7 @@ def live_paths(run) -> set[Path] | None:
     """Every absolute path in a process argv or cwd; None when either inventory fails."""
     try:
         ps = run(["ps", "-axo", "args="], capture_output=True, text=True, timeout=30)
-        lsof = run(["lsof", "-nP", "-a", "-d", "cwd", "-F", "n"], capture_output=True, text=True, timeout=120)
+        lsof = run([lsof_command(), "-nP", "-a", "-d", "cwd", "-F", "n"], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError):
         return None
     if ps.returncode != 0 or lsof.returncode not in (0, 1):
