@@ -290,7 +290,7 @@ describe('Public Profile Page Logic', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'getConfirmedFeaturedPlaylistFallback(profileSettings)'
       );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchGoogleCSE');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchWeb');
       expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
         'discoverThisIsPlaylistCandidate'
       );
