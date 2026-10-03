@@ -51,7 +51,7 @@ describe('homepage hero contract (JOV-5864)', () => {
       'Be found. Be understood.'
     );
     expect(HOMEPAGE_IDENTITY_COPY.hero.subhead).toBe(
-      'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.'
+      'Claim your name. Jovie makes you easy to reach, for people and for agents.'
     );
   });
 
