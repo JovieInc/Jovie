@@ -240,6 +240,7 @@ nodes:
       - iOS CI
       - Merge Queue Green Enroll
       - PR Conflict Handler
+      - PR Review (shadow)
       - Production Controller
       - Rolling CI Dispatch
       - Staging Controller
@@ -884,6 +885,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:prepare
     jobCount: 2
+  - name: PR Review (shadow)
+    path: .github/workflows/pr-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:review
+    jobCount: 1
   - name: PR Size Guard Label Override
     path: .github/workflows/pr-size-guard-label-override.yml
     active: true
@@ -1429,6 +1441,9 @@ edges:
     type: workflow_run
   - from: PR Size Guard
     to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: CI
+    to: PR Review (shadow)
     type: workflow_run
   - from: CI
     to: Production Controller

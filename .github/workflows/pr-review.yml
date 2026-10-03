@@ -1,0 +1,82 @@
+name: PR Review (shadow)
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim
+# necessary-trust-boundary: The review job holds a Gateway model key, so it runs trusted main code after PR CI and reads the PR only as git data; PR code never runs with that key.
+# removal-trigger: Remove the workflow_run wake when GitHub offers a native post-CI hook that can hold a model credential without running PR-controlled code.
+#
+# Advisory draft-PR review kernel, Phase 1 (shadow). See
+# docs/evaluations/pr-review-kernel.md.
+# - Writes a pr-review-receipt/v1 artifact only. Never comments, never blocks,
+#   never becomes a required check.
+# - Disabled until vars.PR_REVIEW_ENABLED is 'true' and the
+#   PR_REVIEW_AI_GATEWAY_API_KEY secret exists. Without the key the receipt
+#   reports status incomplete / failure no-key.
+# - PR code is fetched as git objects and read with git diff/show/grep.
+#   Nothing from the PR is checked out as the workspace or executed.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+
+concurrency:
+  group: pr-review-${{ github.event.workflow_run.pull_requests[0].number || github.run_id }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  review:
+    name: PR Review (shadow)
+    if: >-
+      vars.PR_REVIEW_ENABLED == 'true' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0].number != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout main policy code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          package_cache: 'false'
+
+      - name: Download CI risk classification
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ci-risk-classification-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/risk
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Run advisory review
+        env:
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_REVIEW_AI_GATEWAY_API_KEY: ${{ secrets.PR_REVIEW_AI_GATEWAY_API_KEY }}
+          RISK_JSON: ${{ runner.temp }}/risk/ci-risk-classification.json
+          OUT: ${{ runner.temp }}/pr-review-receipt.json
+        run: node scripts/pr-review/cli.mjs
+
+      - name: Upload review receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-review-receipt-${{ github.event.workflow_run.pull_requests[0].number }}-${{ github.event.workflow_run.head_sha }}
+          path: ${{ runner.temp }}/pr-review-receipt.json
+          if-no-files-found: warn
+          retention-days: 14
