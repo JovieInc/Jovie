@@ -19,7 +19,10 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
-import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
+import {
+  isInstantlyOutboundEnabled,
+  isOutreachQuietHours,
+} from '@/lib/leads/outbound-gates';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 
 export const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
@@ -55,6 +58,9 @@ function getPendingEmailWhereClause(now = new Date()) {
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),
+    // Consent gate: only leads with recorded outbound consent may be sent.
+    // Until a consent-capture path writes this column, the batch sends nothing.
+    isNotNull(leads.outreachConsentAt),
     or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
   );
 }
@@ -280,7 +286,7 @@ export async function processOutreachBatch(
   limit: number,
   options: ProcessOutreachBatchOptions = {}
 ): Promise<OutreachBatchResult> {
-  if (!isInstantlyOutboundEnabled()) {
+  if (!isInstantlyOutboundEnabled() || isOutreachQuietHours(new Date())) {
     return {
       attempted: 0,
       queued: 0,

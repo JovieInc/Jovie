@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockTransaction,
@@ -65,6 +67,13 @@ describe('processOutreachBatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+    // Disable quiet hours (equal start/end) so tests are time-independent.
+    vi.stubEnv('OUTREACH_QUIET_HOURS_START_UTC', '0');
+    vi.stubEnv('OUTREACH_QUIET_HOURS_END_UTC', '0');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('does not claim or push leads when Instantly outbound is off', async () => {
@@ -82,6 +91,29 @@ describe('processOutreachBatch', () => {
     });
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+  });
+
+  it('does not claim or push leads during quiet hours', async () => {
+    vi.stubEnv('OUTREACH_QUIET_HOURS_START_UTC', '1');
+    vi.stubEnv('OUTREACH_QUIET_HOURS_END_UTC', '15');
+    vi.useFakeTimers();
+    // 05:00 UTC sits inside the 01:00-15:00 UTC quiet window.
+    vi.setSystemTime(new Date('2026-10-03T05:00:00Z'));
+
+    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
+    const result = await processOutreachBatch(10);
+
+    expect(result).toEqual({
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      dismissed: 0,
+      remainingPending: 0,
+    });
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 
   it('skips send for suppressed leads (Fix #1)', async () => {
@@ -184,5 +216,13 @@ describe('processOutreachBatch', () => {
       dismissed: 0,
       remainingPending: 0,
     });
+  });
+
+  it('gates the pending-email query on recorded outreach consent (JOV-7628)', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../../../lib/leads/outreach-batch.ts'),
+      'utf8'
+    );
+    expect(source).toMatch(/isNotNull\(leads\.outreachConsentAt\)/);
   });
 });

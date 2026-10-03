@@ -79,7 +79,10 @@ function getOutreachRouteWhereClause(
   }
 }
 
-function getPendingEmailWhereClause(now = new Date()) {
+function getPendingEmailWhereClause(
+  now = new Date(),
+  includeConsentGate = true
+) {
   const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
 
   return and(
@@ -89,6 +92,7 @@ function getPendingEmailWhereClause(now = new Date()) {
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),
+    ...(includeConsentGate ? [isNotNull(leads.outreachConsentAt)] : []),
     or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
   );
 }
@@ -119,7 +123,9 @@ function isMissingLeadSchemaColumnError(error: unknown): boolean {
     normalized.includes('column "paid_at" does not exist') ||
     normalized.includes('column "paid_subscription_id" does not exist') ||
     normalized.includes('column "attribution_status" does not exist') ||
-    normalized.includes('column "scrape_attempts" does not exist')
+    normalized.includes('column "scrape_attempts" does not exist') ||
+    normalized.includes('column "outreach_consent_at" does not exist') ||
+    normalized.includes('column "outreach_consent_source" does not exist')
   );
 }
 
@@ -203,6 +209,11 @@ export async function GET(request: NextRequest) {
       queue === 'email'
         ? getPendingEmailWhereClause()
         : and(whereClause, eq(leads.outreachStatus, 'pending'));
+    // Legacy-schema fallback: consent columns do not exist there either.
+    const legacyPendingWhereClause =
+      queue === 'email'
+        ? getPendingEmailWhereClause(new Date(), false)
+        : pendingWhereClause;
 
     // Sort
     const sortColumn =
@@ -289,7 +300,10 @@ export async function GET(request: NextRequest) {
           .limit(limit)
           .offset(offset),
         db.select({ total: count() }).from(leads).where(whereClause),
-        db.select({ total: count() }).from(leads).where(pendingWhereClause),
+        db
+          .select({ total: count() })
+          .from(leads)
+          .where(legacyPendingWhereClause),
       ]);
     }
 
