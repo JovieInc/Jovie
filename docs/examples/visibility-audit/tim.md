@@ -93,4 +93,3 @@ Agentic fixes map to Pro submissions (MusicBrainz, AllMusic) and DSP bio sync. M
 8. Add missing ad pixels — manual `configure_ad_pixels`. No pixel init was stored for: facebook, tiktok, google, twitter, snapchat, pinterest.
 9. Record Google page-1 ownership by hand — manual `manual_search_ownership`. Google page-1 ownership is a manual check while PROFILE_SEARCH_MONITORING is off. Record query, rank, URL, and whether the result is owned by the artist. This generator does not call SerpAPI.
 10. Spot-check answer-engine citations — manual `manual_citation_spot_check`. Answer-engine citation spot checks use the canonical question set. Paste manual results per engine. This generator does not query answer engines.
-
