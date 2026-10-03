@@ -356,10 +356,7 @@ test('real repository .vercelignore parses and re-includes runtime files', () =>
   assert.equal(ignore.ignores('apps/docs/lib/help-center-seo.mjs'), false);
   assert.equal(ignore.ignores('apps/docs/lib/visual-proof-assets.mjs'), true);
   assert.equal(ignore.ignores('apps/docs/lib/article-registry.test.mjs'), true);
-  assert.equal(
-    ignore.ignores('apps/docs/scripts/build-pagefind.mjs'),
-    false
-  );
+  assert.equal(ignore.ignores('apps/docs/scripts/build-pagefind.mjs'), false);
   assert.equal(
     ignore.ignores('apps/docs/scripts/materialize-proof.mjs'),
     false
