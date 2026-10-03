@@ -339,6 +339,62 @@ class WorkstreamAdmissionTest(unittest.TestCase):
         self.assertEqual(lane.workstreams.KEYS[-1], "human-decision")
 
 
+class HotspotAdmissionTest(unittest.TestCase):
+    """JOV-7708: an issue aimed at a hotspot an open PR holds waits instead of conflicting."""
+
+    def titled(self, identifier, title, description="body", labels=()):
+        task = issue(identifier, labels=labels)
+        task.title, task.description = title, description
+        return task
+
+    def open_pr(self, number, *paths, labels=()):
+        return {"number": number, "files": [{"path": path} for path in paths],
+                "labels": [{"name": name} for name in labels]}
+
+    def test_seed_and_shared_files_are_hotspots_held_by_the_oldest_active_pr(self):
+        prs = [self.open_pr(30, "apps/web/lib/flags/code-flags.ts", "apps/web/a.ts"),
+               self.open_pr(20, "apps/web/a.ts"),
+               self.open_pr(10, "scripts/lanes/hud.py", labels=["lane-fix-exhausted"]),
+               self.open_pr(11, "scripts/lanes/doctor.py", labels=["hold"]),
+               self.open_pr(40, "apps/web/b.ts")]
+        self.assertEqual(lane.hotspot_holds(prs), {"apps/web/lib/flags/code-flags.ts": 30,
+                                                   "apps/web/a.ts": 20})
+
+    def test_predicted_touch_prefers_named_files_then_the_workstream_area(self):
+        named = self.titled("JOV-1", "Lane cooldown", "Edit `lane_runner.py` and lib/flags/code-flags.ts.")
+        self.assertEqual(lane.predicted_touch(named), frozenset({"lane_runner.py", "lib/flags/code-flags.ts"}))
+        area = self.titled("JOV-2", "Symphony lanes admission singleflight", "no paths here")
+        self.assertEqual(lane.predicted_touch(area), lane.LANES_HARNESS)
+        self.assertEqual(lane.predicted_touch(self.titled("JOV-3", "Sidebar jank on profile")), frozenset())
+
+    def test_held_hotspot_rejects_only_issues_that_would_touch_it(self):
+        holds = {"apps/web/lib/flags/code-flags.ts": 30, "scripts/lanes/lane_runner.py": 41}
+        flag = self.titled("JOV-1", "Add a flag", "Register it in lib/flags/code-flags.ts")
+        lanes_work = self.titled("JOV-2", "Symphony lane cooldown shared across hosts")
+        product = self.titled("JOV-3", "Sidebar jank on profile")
+        self.assertEqual(lane.pool_rejections([flag, lanes_work, product], holds),
+                         {"JOV-1": "hotspot-held:apps/web/lib/flags/code-flags.ts#30",
+                          "JOV-2": "hotspot-held:scripts/lanes/lane_runner.py#41"})
+        self.assertEqual(lane.pick_issue([flag, lanes_work, product], {}, holds=holds).identifier, "JOV-3")
+        # No holds (or an unreadable read) admits as before.
+        self.assertEqual(lane.pool_rejections([flag, lanes_work, product], {}), {})
+        self.assertEqual(lane.pick_issue([lanes_work, product], {}).identifier, "JOV-2")
+
+    def test_a_suffix_hint_never_matches_a_different_file(self):
+        holds = {"apps/web/lib/commands/registry.ts": 7}
+        self.assertIsNone(lane.held_hotspot(frozenset({"data/product-truth/registry.ts"}), holds))
+        self.assertIsNone(lane.held_hotspot(frozenset({"istry.ts"}), holds))
+        self.assertEqual(lane.held_hotspot(frozenset({"registry.ts"}), holds),
+                         ("apps/web/lib/commands/registry.ts", 7))
+
+    def test_open_hotspot_holds_fails_open_when_github_is_unreadable(self):
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1, stdout="", stderr="502")):
+            self.assertEqual(lane.open_hotspot_holds(), {})
+        listed = json.dumps([self.open_pr(5, "scripts/lanes/hud.py")])
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=listed, stderr="")):
+            self.assertEqual(lane.open_hotspot_holds(), {"scripts/lanes/hud.py": 5})
+
+
 class PromptTest(unittest.TestCase):
     def test_contract_names_branch_issue_and_independent_gate(self):
         prompt = lane.render_prompt(issue("JOV-42"), "devin/jov-42-x", "prior decision: use tokens")
@@ -1983,6 +2039,18 @@ class DispatchTest(unittest.TestCase):
                 shell.assert_not_called()
                 tick = json.loads((host.state / "tick.json").read_text())
                 self.assertFalse(tick["disk"]["admitted"])
+
+    def test_critical_disk_still_starts_the_worktree_sweep(self):
+        # JOV-7704: admission denial must not also deny the cleanup that would end it.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(lane.disk_guard, "free_pct", return_value=4.0), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="spawned") as sweep, \
+                patch.object(lane.doctor, "run"):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.dispatch(host), 1)
+            sweep.assert_called_once_with(host.state, host.repo, 4.0)
+            self.assertEqual(json.loads((host.state / "tick.json").read_text())["worktreeSweep"], "spawned")
+
     def test_spawns_one_worker_per_slot_without_cleanup_on_the_dispatch_tick(self):
         saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
                  lane.disk_guard.check)

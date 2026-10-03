@@ -26,13 +26,16 @@ test('the commissioned recovery writer cannot slow or supersede the hot report',
   assert.equal(fast.on.workflow_run.branches[0], 'main');
   assert.equal(fast.concurrency['cancel-in-progress'], true);
   assert.ok(!JSON.stringify(fast).includes('collect-quarantine-evidence.mjs'));
-  assert.ok(
-    !recovery.on.workflow_run && !recovery.on.pull_request && !recovery.on.push
-  );
+  assert.ok(!recovery.on.pull_request && !recovery.on.push);
+  assert.deepEqual(recovery.on.workflow_run.workflows, ['CI']);
+  assert.deepEqual(recovery.on.workflow_run.types, ['completed']);
   assert.equal(recovery.concurrency['cancel-in-progress'], false);
   assert.deepEqual(recovery.permissions, { contents: 'read', actions: 'read' });
   const job = recovery.jobs['recover-quarantine'];
-  assert.equal(job.if, "${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' }}");
+  assert.equal(
+    job.if,
+    "${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' && github.event_name != 'workflow_run' }}"
+  );
   const checkout = job.steps.find(step =>
     step.uses?.startsWith('actions/checkout@')
   );
@@ -56,6 +59,28 @@ test('the commissioned recovery writer cannot slow or supersede the hot report',
   );
   assert.ok(writer.if.includes("steps.intake.outcome == 'success'"));
   assert.ok(writer.if.includes("steps.proposal-token.outcome == 'success'"));
+  const publisher = recovery.jobs['publish-queue-results'];
+  for (const guard of [
+    "vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true'",
+    "github.event_name == 'workflow_run'",
+    'github.event.workflow_run.workflow_id == 178737329',
+    "github.event.workflow_run.event == 'merge_group'",
+    'github.event.workflow_run.head_repository.full_name == github.repository',
+  ])
+    assert.ok(publisher.if.includes(guard));
+  assert.deepEqual(publisher.permissions, {
+    contents: 'read',
+    actions: 'read',
+  });
+  const upload = publisher.steps.find(step =>
+    step.uses?.startsWith('codecov/test-results-action@')
+  );
+  assert.equal(upload.if, "${{ steps.reports.outputs.upload == 'true' }}");
+  assert.equal(
+    upload.with.override_commit,
+    '${{ steps.reports.outputs.head_sha }}'
+  );
+  assert.ok(!JSON.stringify(publisher).includes('create-github-app-token'));
 });
 
 const roots = [];

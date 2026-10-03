@@ -82,7 +82,9 @@ export function spawnProcessGroup(command, args, options = {}) {
  */
 export function killProcessGroup(child, signal = 'SIGTERM') {
   const pid = child && typeof child.pid === 'number' ? child.pid : null;
-  if (pid === null) return;
+  // kill(0) and kill(-0) signal the caller's own process group, so a pid read
+  // from a half-written pid file (Number('') === 0) would SIGKILL the runner.
+  if (pid === null || !Number.isSafeInteger(pid) || pid <= 0) return;
   try {
     process.kill(-pid, signal);
   } catch {
@@ -515,7 +517,9 @@ export function createStorybookVitestLease(options) {
     deadlineAt: options.deadlineAt,
     armFile: options.armFile ?? null,
     tempRoot: options.tempRoot,
-    controllers: options.controllers ?? [],
+    // Kernel/task-host ancestors can report PGID zero. They cannot be safely
+    // signaled and would make the persisted lease fail its own validator.
+    controllers: (options.controllers ?? []).filter(isValidProcessReceipt),
     browserGroups: options.browserGroups ?? [],
     watchdogPid: options.watchdogPid ?? null,
     watchdogPgid: options.watchdogPgid ?? null,

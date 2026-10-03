@@ -1654,7 +1654,8 @@ describe('ci-fast bounded parallel workflow', () => {
         process.env.GITHUB_EVENT_NAME = previousEvent;
       }
     }
-  }, 30000);
+    // Runs three nested Vitest suites synchronously; a loaded Mac needs >30s.
+  }, 120_000);
 
   it('fails closed onto structural UI gates for every web UI source and guard', () => {
     const remaining = jobBlock(
