@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { deriveWorkFiles, fileNameFromMediaUrl } from './work-files';
+import {
+  deriveWorkFiles,
+  fileNameFromMediaUrl,
+} from '@/lib/library/work-files';
 
 describe('fileNameFromMediaUrl', () => {
   it('returns the decoded last path segment', () => {

@@ -112,11 +112,14 @@ export function LibraryFilesPanel({
     if (!releaseId) return [];
     return downloads.filter(download => download.releaseId === releaseId);
   }, [downloads, releaseId]);
-  const files = useMemo(() => deriveWorkFiles(asset, stems), [asset, stems]);
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [localArtworkUrl, setLocalArtworkUrl] = useState(asset.artworkUrl);
   const artworkUrl = localArtworkUrl ?? asset.artworkUrl;
+  const files = useMemo(
+    () => deriveWorkFiles({ ...asset, artworkUrl }, stems),
+    [asset, artworkUrl, stems]
+  );
 
   useEffect(() => {
     setFocusedId(null);
@@ -210,7 +213,7 @@ export function LibraryFilesPanel({
       onClick={() => setFocusedId(null)}
       tabIndex={disabledTabIndex}
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token',
+        'inline-flex h-11 items-center gap-1.5 rounded-md px-1.5 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token',
         ROW_FOCUS_CLASS
       )}
       data-testid='library-file-back'
@@ -327,7 +330,7 @@ export function LibraryFilesPanel({
                     tabIndex={disabledTabIndex}
                     data-testid={`library-file-${file.id}`}
                     className={cn(
-                      'flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 text-left',
+                      'flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-2 text-left',
                       ROW_FOCUS_CLASS
                     )}
                   >
@@ -378,7 +381,7 @@ export function LibraryFilesPanel({
                   data-asset-slot-mode='acquisition'
                   tabIndex={disabledTabIndex ?? (disabled ? -1 : undefined)}
                   className={cn(
-                    'group flex min-h-8 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1',
+                    'group flex min-h-11 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1',
                     ROW_FOCUS_CLASS
                   )}
                 >
@@ -400,7 +403,7 @@ export function LibraryFilesPanel({
                   data-testid={`library-${entry.id}-acquisition`}
                   data-asset-slot-mode='acquisition'
                   className={cn(
-                    'group flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 disabled:opacity-60',
+                    'group flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 disabled:opacity-60',
                     ROW_FOCUS_CLASS
                   )}
                 >

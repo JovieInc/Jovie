@@ -383,7 +383,7 @@ export function AudioWaveformEditor({
             type='button'
             onClick={handleRetryPreview}
             disabled={disabled}
-            className='focus-ring-themed mt-2 inline-flex h-7 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 text-2xs font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-2 disabled:opacity-60'
+            className='focus-ring-themed mt-2 inline-flex h-11 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-2xs font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-2 disabled:opacity-60'
             data-testid='audio-preview-retry'
           >
             <RotateCcw className='h-3 w-3' aria-hidden='true' />
