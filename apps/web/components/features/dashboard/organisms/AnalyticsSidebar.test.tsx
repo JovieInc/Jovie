@@ -156,6 +156,10 @@ describe('AnalyticsSidebar', () => {
       'present'
     );
     expect(screen.getByText('Audience funnel')).toBeInTheDocument();
+    expect(screen.getByText('Unique Visitors')).toBeInTheDocument();
+    expect(screen.getByText('Subscribers')).toBeInTheDocument();
+    expect(screen.queryByText('Fans')).not.toBeInTheDocument();
+    expect(screen.queryByText('Subscribed Fans')).not.toBeInTheDocument();
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
   });
 

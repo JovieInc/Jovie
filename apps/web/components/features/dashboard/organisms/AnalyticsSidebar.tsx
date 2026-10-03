@@ -139,7 +139,7 @@ export function FunnelStage({
   );
 }
 
-/** Vertical waterfall funnel card — Views → Fans → Subscribed Fans */
+/** Vertical waterfall funnel card — Views → Visitors → Subscribers */
 function FunnelCard({
   stages,
   loading,
@@ -286,9 +286,11 @@ export function AnalyticsSidebarView({
       label: CANONICAL_METRICS.profile_views.label,
       value: data?.profile_views ?? 0,
     },
-    // Display aliases for CANONICAL_METRICS.unique_users / .subscribers
-    { label: 'Fans', value: data?.unique_users ?? 0 },
-    { label: 'Subscribed Fans', value: data?.subscribers ?? 0 },
+    {
+      label: CANONICAL_METRICS.unique_users.label,
+      value: data?.unique_users ?? 0,
+    },
+    { label: 'Subscribers', value: data?.subscribers ?? 0 },
   ];
 
   return (
