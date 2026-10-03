@@ -1,5 +1,14 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { delimiter, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -39,5 +48,73 @@ describe('pr-review workflow contract', () => {
       /ref:\s*\$\{\{\s*github\.event\.workflow_run\.head/
     );
     expect(workflow).not.toContain('pull_requests[0].head');
+  });
+
+  it('reads only the main learning publisher and supplies its optional ledger to the router', () => {
+    const { load } = createRequire(import.meta.url)('js-yaml');
+    const steps = load(workflow).jobs.review.steps;
+    const download = steps.find(
+      step => step.name === 'Download learned model outcomes'
+    );
+    const review = steps.find(step => step.name === 'Run advisory review');
+    expect(download.continue_on_error ?? download['continue-on-error']).toBe(
+      true
+    );
+    expect(review.env.PR_REVIEW_OUTCOMES).toBe(
+      '${{ runner.temp }}/outcomes/model-outcomes.json'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'review-outcomes-workflow-'));
+    const calls = join(root, 'calls.jsonl');
+    try {
+      writeFileSync(
+        join(root, 'gh'),
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify(a)+'\\n');if(a[1]==='list')process.stdout.write(process.env.TEST_RUN_ID);\n`
+      );
+      chmodSync(join(root, 'gh'), 0o755);
+      for (const runId of ['123', '', 'unknown']) {
+        writeFileSync(calls, '');
+        const result = spawnSync(
+          'bash',
+          ['-e', '-o', 'pipefail', '-c', download.run],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: root + delimiter + process.env.PATH,
+              GITHUB_REPOSITORY: 'JovieInc/Jovie',
+              RUNNER_TEMP: root,
+              TEST_RUN_ID: runId,
+            },
+          }
+        );
+        expect(result.status).toBe(runId === 'unknown' ? 1 : 0);
+        const requests = readFileSync(calls, 'utf8')
+          .trim()
+          .split('\n')
+          .map(line => JSON.parse(line));
+        expect(requests[0]).toContain('pr-review-learn.yml');
+        expect(
+          requests[0].slice(
+            requests[0].indexOf('--branch'),
+            requests[0].indexOf('--branch') + 2
+          )
+        ).toEqual(['--branch', 'main']);
+        expect(requests).toHaveLength(runId === '123' ? 2 : 1);
+        if (runId === '123')
+          expect(requests[1]).toEqual([
+            'run',
+            'download',
+            '123',
+            '--repo',
+            'JovieInc/Jovie',
+            '--name',
+            'model-outcomes',
+            '--dir',
+            join(root, 'outcomes'),
+          ]);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

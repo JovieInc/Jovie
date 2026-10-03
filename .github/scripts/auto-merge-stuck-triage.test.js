@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const {
   COMMENT_MARKER,
+  gh,
+  isTransientGhError,
   buildCommentBody,
   buildIssueBody,
   diagnoseStuckPr,
@@ -210,4 +212,58 @@ test('enable pass skips missing heads and preserves an exact-head revision hold'
   );
   assert.deepEqual(reads, [['o/r', pr.headRefOid]]);
   assert.deepEqual(calls, []);
+});
+
+test('gh retries transient HTTP 5xx then succeeds', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    if (calls < 3) {
+      const err = new Error('Command failed: gh api graphql');
+      err.stderr = 'gh: HTTP 502\n';
+      err.stdout = '<html>502 Bad Gateway</html>';
+      throw err;
+    }
+    return '{"ok":true}';
+  };
+  const out = gh(['api', 'graphql'], { exec, sleep: () => {} });
+  assert.equal(out, '{"ok":true}');
+  assert.equal(calls, 3);
+});
+
+test('gh does not retry non-transient failures', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    const err = new Error('Command failed: gh api repos/o/r');
+    err.stderr = 'gh: HTTP 404: Not Found\n';
+    throw err;
+  };
+  assert.throws(() => gh(['api', 'repos/o/r'], { exec, sleep: () => {} }));
+  assert.equal(calls, 1);
+});
+
+test('gh gives up after the attempt cap on persistent 5xx', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    const err = new Error('Command failed: gh api graphql');
+    err.stderr = 'gh: HTTP 503\n';
+    throw err;
+  };
+  assert.throws(() => gh(['api', 'graphql'], { exec, sleep: () => {} }));
+  assert.equal(calls, 4);
+});
+
+test('isTransientGhError only matches transient shapes', () => {
+  const mk = (stderr, stdout = '') =>
+    Object.assign(new Error('fail'), { stderr, stdout });
+  assert.equal(isTransientGhError(mk('gh: HTTP 502\n')), true);
+  assert.equal(isTransientGhError(mk('gh: HTTP 500\n')), true);
+  assert.equal(isTransientGhError(mk('connection reset by peer\n')), true);
+  assert.equal(isTransientGhError(mk('gh: HTTP 404: Not Found\n')), false);
+  assert.equal(
+    isTransientGhError(mk('gh: HTTP 401: Bad credentials\n')),
+    false
+  );
 });

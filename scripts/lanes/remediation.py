@@ -366,6 +366,240 @@ def classify_event(event: dict) -> dict:
     return blocker("fixable-by-model", source or "event", [excerpt[:240] or "remediation event"], "route")
 
 
+def _indexed(providers: dict) -> list[tuple[int, int, str, dict]]:
+    rows = []
+    for index, (name, spec) in enumerate(providers.items()):
+        if not isinstance(spec, dict):
+            continue
+        tier = spec.get("tier", index)
+        try:
+            tier = int(tier)
+        except (TypeError, ValueError):
+            tier = index
+        rows.append((tier, index, name, spec))
+    rows.sort()
+    return rows
+
+
+def route_lane(providers: dict, *, exclude: set[str] | None = None, healthy=None, cooled: set[str] | None = None) -> dict | None:
+    """Next enabled, healthy, uncooled lane. Disabled registry entries are never chosen."""
+    exclude = exclude or set()
+    cooled = cooled or set()
+    healthy = healthy or (lambda name, spec: True)
+    for tier, index, name, spec in _indexed(providers):
+        if name in exclude or name in cooled or not spec.get("enabled", True):
+            continue
+        if not healthy(name, spec):
+            continue
+        return {"lane": name, "spec": spec, "tier": tier, "index": index}
+    return None
+
+
+def failover(providers: dict, current: str, reason: str, *, exclude: set[str] | None = None,
+             healthy=None, cooled: set[str] | None = None) -> dict:
+    """Cool `current` and take the next registry lane. The receipt records the handoff."""
+    cooled = set(cooled or ())
+    cooled.add(current)
+    skipped = set(exclude or ())
+    skipped.add(current)
+    nxt = route_lane(providers, exclude=skipped, healthy=healthy, cooled=cooled)
+    return {"from": current, "to": None if nxt is None else nxt["lane"], "reason": reason,
+            "cooled": sorted(cooled), "lane": nxt}
+
+
+def select_escalation_lane(providers: dict, attempted: set[str], *, healthy=None, cooled: set[str] | None = None,
+                           top_rung_used: bool = False) -> dict | None:
+    """Lowest tier strictly stronger than every lane that already attempted this head.
+
+    When none is stronger, one top-rung retry on the strongest enabled healthy lane.
+    """
+    cooled = cooled or set()
+    healthy = healthy or (lambda name, spec: True)
+    catalog = []
+    tiers = {}
+    for tier, index, name, spec in _indexed(providers):
+        tiers[name] = tier
+        if not spec.get("enabled", True) or name in cooled or not healthy(name, spec):
+            continue
+        catalog.append({"lane": name, "spec": spec, "tier": tier, "index": index})
+    if not catalog:
+        return None
+    ceiling = max((tiers[name] for name in attempted if name in tiers), default=-1)
+    stronger = [row for row in catalog if row["tier"] > ceiling and row["lane"] not in attempted]
+    if stronger:
+        return {**stronger[0], "topRung": False}
+    if top_rung_used:
+        return None
+    strongest = max(catalog, key=lambda row: (row["tier"], -row["index"]))
+    return {**strongest, "topRung": True}
+
+
+def _rungs(record: dict, head: str, kind: str | None = None, rung: str | None = None) -> list[dict]:
+    rows = []
+    for row in list(record.get("escalations") or []) + list(record.get("priorEscalations") or []):
+        if not isinstance(row, dict):
+            continue
+        if head and row.get("head") not in (None, head) and kind == "model" and row.get("kind") == "model":
+            # Per-head model rows are filtered by the caller. Keep PR-wide rows available.
+            pass
+        if kind and row.get("kind") != kind:
+            continue
+        if rung and row.get("rung") != rung:
+            continue
+        rows.append(row)
+    return rows
+
+
+def deterministic_used(record: dict, head: str, rung: str) -> bool:
+    return any(row.get("head") == head and row.get("rung") == rung and row.get("kind") == "deterministic"
+               for row in (record.get("escalations") or []) if isinstance(row, dict))
+
+
+def model_escalations(record: dict, head: str | None = None) -> list[dict]:
+    rows = [row for row in (record.get("escalations") or []) + (record.get("priorEscalations") or [])
+            if isinstance(row, dict) and row.get("kind") == "model"]
+    if head is None:
+        return rows
+    return [row for row in rows if row.get("head") == head]
+
+
+def caps_allow(record: dict, head: str, now: float) -> tuple[bool, str | None]:
+    if len(model_escalations(record, head)) >= per_head_cap():
+        return False, "ladder-exhausted"
+    if len(model_escalations(record, None)) >= per_pr_cap():
+        return False, "ladder-exhausted"
+    stamps = [float(row.get("at") or 0) for row in model_escalations(record, None)
+              if isinstance(row, dict)]
+    latest = max(stamps, default=0)
+    if latest and now - latest < cooldown_s():
+        return False, "cooldown"
+    return True, None
+
+
+def attempted_lanes(record: dict, head: str) -> set[str]:
+    lanes = set()
+    if record.get("lane") and record.get("sha") == head:
+        lanes.add(record["lane"])
+    for row in record.get("escalations") or []:
+        if isinstance(row, dict) and row.get("head") == head and row.get("lane"):
+            lanes.add(row["lane"])
+    for name in record.get("lanes") or []:
+        lanes.add(name)
+    return lanes
+
+
+def top_rung_used(record: dict, head: str) -> bool:
+    return any(isinstance(row, dict) and row.get("head") == head and row.get("topRung")
+               for row in record.get("escalations") or [])
+
+
+def plan_ladder(classified: dict, record: dict, providers: dict, now: float, head: str, *,
+                healthy=None, cooled: set[str] | None = None) -> dict:
+    """Next rung. Deterministic actions spend no model. Caps end at ladder-exhausted."""
+    cls = classified["cls"]
+    subtype = classified.get("subtype")
+    record = record or {}
+    if not escalation_enabled() and cls in {"fixable-by-model", "needs-rebase", "flaky-infra"}:
+        return {"action": "surface", "reason": "escalation-disabled", "cls": cls}
+    if cls in {"obsolete", "needs-human-decision"}:
+        return {"action": "surface", "reason": cls, "cls": cls}
+    if cls == "main-red" or subtype == "main-red":
+        return {"action": "wait", "reason": "main-red", "cls": "main-red"}
+    if cls == "ready":
+        if subtype == "awaiting":
+            return {"action": "wait", "reason": "awaiting", "cls": cls}
+        if classified["next_action"] in {"none", "ready-green"}:
+            return {"action": classified["next_action"], "reason": subtype or "ready", "cls": cls}
+        return {"action": "arm", "reason": "ready", "cls": cls}
+    if cls == "flaky-infra":
+        if not deterministic_used(record, head, "rerun"):
+            return {"action": "rerun", "reason": "flaky-infra", "kind": "deterministic", "cls": cls}
+    if cls == "needs-rebase":
+        if subtype == "lockfile-only" and not deterministic_used(record, head, "lockfile"):
+            return {"action": "resolve-lockfile", "reason": "lockfile-only", "kind": "deterministic", "cls": cls}
+        if not deterministic_used(record, head, "update-branch"):
+            return {"action": "update-branch", "reason": subtype or "needs-rebase", "kind": "deterministic", "cls": cls}
+    if cls in {"fixable-by-model", "needs-rebase", "flaky-infra"}:
+        allowed, why = caps_allow(record, head, now)
+        if not allowed and why == "cooldown":
+            return {"action": "wait", "reason": "cooldown", "cls": cls}
+        if not allowed:
+            return {"action": "surface", "reason": "ladder-exhausted", "cls": cls}
+        chosen = select_escalation_lane(providers, attempted_lanes(record, head), healthy=healthy, cooled=cooled,
+                                         top_rung_used=top_rung_used(record, head))
+        if chosen is None:
+            return {"action": "surface", "reason": "ladder-exhausted", "cls": cls}
+        return {"action": "model", "reason": "top-rung" if chosen["topRung"] else "escalate",
+                "lane": chosen["lane"], "tier": chosen["tier"], "topRung": chosen["topRung"],
+                "kind": "model", "cls": cls, "spec": chosen["spec"]}
+    return {"action": "wait", "reason": cls, "cls": cls}
+
+
+def append_rung(record: dict, *, rung: str, lane: str | None, cls: str, at: float, head: str,
+                kind: str, top_rung: bool = False, ok: bool | None = None) -> dict:
+    """Record a rung without resetting spent attempt history."""
+    entry = dict(record or {})
+    rows = list(entry.get("escalations") or [])
+    rows.append({"rung": rung, "lane": lane, "cls": cls, "at": at, "head": head, "kind": kind,
+                 "topRung": top_rung, "ok": ok})
+    entry["escalations"] = rows
+    entry["escalation"] = {"rung": rung, "lane": lane, "cls": cls, "at": at}
+    return entry
+
+
+def dossier(pr: dict, classified: dict, record: dict | None = None) -> str:
+    record = record or {}
+    lines = [
+        f"Blocker class: {classified['cls']}" + (f" ({classified.get('subtype')})" if classified.get("subtype") else ""),
+        "Evidence:",
+        *[f"- {item}" for item in (classified.get("evidence") or ["none"])],
+    ]
+    if pr.get("conflictFiles"):
+        lines.append("Conflict files: " + ", ".join(str(path) for path in pr["conflictFiles"]))
+    log = pr.get("queueFailure") or pr.get("mergeGroupLog")
+    if log:
+        lines += ["Merge-group / failing log:", str(log)[:2000]]
+    threads = _unresolved(_threads(pr))
+    if threads:
+        lines.append("Unresolved review threads:")
+        for thread in threads[:8]:
+            lines.append(f"- {thread.get('author') or 'unknown'}: {(thread.get('body') or '')[:400]}")
+    author, note = _hold_text(pr, None)
+    if note:
+        lines.append(f"Hold note ({author or 'unknown'}): {note[:1000]}")
+    prior = record.get("escalations") or []
+    if prior:
+        lines.append("Prior rungs: " + "; ".join(
+            f"{row.get('kind')}:{row.get('rung')}:{row.get('lane') or '-'}" for row in prior if isinstance(row, dict)))
+    if record.get("count"):
+        lines.append(f"Fix attempts already spent on this generation: {record.get('count')} "
+                     f"(pushed={record.get('pushed')})")
+    linked = pr.get("linkedIssue") or {}
+    if linked.get("identifier") or pr.get("issue"):
+        lines.append(f"Linked issue: {linked.get('identifier') or pr.get('issue')}")
+    lines.append("Do not reset attempt history. Push to this branch. Do not open a new PR.")
+    return "\n".join(lines)
+
+
+def surface_marker(number, head: str) -> str:
+    return f"<!-- {SURFACE_MARKER} pr={number} head={head} -->"
+
+
+def surface_body(pr: dict, classified: dict, reason: str) -> str:
+    evidence = "; ".join(classified.get("evidence") or [])[:800] or "none"
+    decision = classified.get("next_action") or reason
+    subtype = f" ({classified['subtype']})" if classified.get("subtype") else ""
+    return (f"🤖 lanes: `{classified['cls']}`{subtype} — {reason}.\n"
+            f"Evidence: {evidence}.\n"
+            f"Decision needed: {decision}.\n"
+            + surface_marker(pr.get("number"), pr.get("headRefOid") or ""))
+
+
+def already_surfaced(texts: list[str], number, head: str) -> bool:
+    marker = surface_marker(number, head)
+    return any(marker in (text or "") for text in texts)
+
+
 def hold_nag_due(nags: dict, pr: int, head: str, now: float) -> bool:
     """At most one hold nag per PR per head per 24h, even if a pass misses the row."""
     row = (nags or {}).get(str(pr)) or {}

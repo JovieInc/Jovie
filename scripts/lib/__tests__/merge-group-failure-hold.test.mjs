@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   applyMergeGroupFailure,
+  classifyDequeueDenial,
   classifyMergeGroupFailure,
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
@@ -170,6 +171,90 @@ process.stdout.write(JSON.stringify(result));
       }
     );
     expect(disposition([trusted]).action).toBe('block');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it('completes the hold CLI when gh denies dequeuePullRequest', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'failure-hold-deny-'));
+  try {
+    const fixturePath = join(dir, 'fixture.json');
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({ run, timeline, source: SOURCE })
+    );
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!${process.execPath}
+const args = process.argv.slice(2);
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query=')) || '';
+  if (query.includes('dequeuePullRequest')) {
+    process.stderr.write('gh: Resource not accessible by integration\\n');
+    process.exit(1);
+  }
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: true, mergeQueueEntry: { id: 'MQE_42' }, autoMergeRequest: null };
+  process.stdout.write(JSON.stringify({ data: { repository: { pullRequest: pr } } }));
+} else if (args.includes('POST')) {
+  process.stdout.write('{}');
+} else if (args[1].includes('/jobs?')) {
+  process.stdout.write(JSON.stringify({ jobs: [
+    { steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] }
+  ] }));
+} else if (args[1].includes('/statuses')) {
+  process.stdout.write('[]');
+} else {
+  process.stdout.write(JSON.stringify(fixture.run));
+}
+`,
+      { mode: 0o755 }
+    );
+    const eventPath = join(dir, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        repository: { full_name: REPOSITORY },
+        workflow_run: { id: run.id },
+      })
+    );
+    const outputPath = join(dir, 'output');
+    const execution = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+        '--event-path',
+        eventPath,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          HOLD_TEST_FIXTURE: fixturePath,
+          GITHUB_OUTPUT: outputPath,
+        },
+      }
+    );
+    expect(execution.status, execution.stderr).toBe(0);
+    expect(execution.stderr).toContain(
+      'Resource not accessible by integration'
+    );
+    const receipt = JSON.parse(execution.stdout);
+    expect(receipt).toMatchObject({
+      statusWritten: true,
+      dequeued: false,
+      dequeueOutcome: 'inaccessible',
+      autoMergeDisabled: false,
+    });
+    expect(readFileSync(outputPath, 'utf8')).toBe(
+      `failure_receipt=${JSON.stringify(receipt)}\n`
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -400,5 +485,132 @@ describe('terminal failure hold application', () => {
     });
     expect(dequeuePullRequest).not.toHaveBeenCalled();
     expect(disableAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('classifies only the integration denial and an already-removed queue', () => {
+    const denied = Object.assign(new Error('Command failed: gh api graphql'), {
+      stderr: 'gh: Resource not accessible by integration\n',
+    });
+    expect(classifyDequeueDenial(denied)).toBe('inaccessible');
+    expect(
+      classifyDequeueDenial(
+        new Error('The pull request is not in the merge queue')
+      )
+    ).toBe('not-in-queue');
+    expect(classifyDequeueDenial(new Error('not in queue'))).toBe(
+      'not-in-queue'
+    );
+    expect(classifyDequeueDenial(new Error('HTTP 502'))).toBeNull();
+    expect(classifyDequeueDenial(new Error('socket hang up'))).toBeNull();
+  });
+
+  it('persists the hold when dequeue is denied and still disables auto-merge', async () => {
+    let state = {
+      id: 'PR_42',
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_42' },
+      autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+    };
+    const order = [];
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus: vi.fn(async () => {
+        order.push('status');
+      }),
+      readPullRequest: vi.fn(async () => structuredClone(state)),
+      dequeuePullRequest: vi.fn(async () => {
+        order.push('dequeue');
+        const error = Object.assign(
+          new Error('Command failed: gh api graphql'),
+          { stderr: 'gh: Resource not accessible by integration\n' }
+        );
+        throw error;
+      }),
+      disableAutoMerge: vi.fn(async () => {
+        order.push('disable');
+        state = { ...state, autoMergeRequest: null };
+      }),
+    });
+
+    expect(order).toEqual(['status', 'dequeue', 'disable']);
+    expect(result).toMatchObject({
+      statusWritten: true,
+      dequeued: false,
+      dequeueOutcome: 'inaccessible',
+      autoMergeDisabled: true,
+      exactHeadStillCurrent: true,
+    });
+  });
+
+  it('treats an already-removed pull request as a logged non-fatal dequeue', async () => {
+    let reads = 0;
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => {
+        reads += 1;
+        const queued = reads < 3;
+        return {
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: queued,
+          mergeQueueEntry: queued ? { id: 'MQE_42' } : null,
+          autoMergeRequest: null,
+        };
+      }),
+      dequeuePullRequest: vi.fn(async () => {
+        throw new Error('The pull request is not in the merge queue');
+      }),
+      disableAutoMerge: vi.fn(),
+    });
+
+    expect(result).toMatchObject({
+      dequeued: false,
+      dequeueOutcome: 'not-in-queue',
+      autoMergeDisabled: false,
+    });
+  });
+
+  it('still fails the hold when dequeue hits a genuine error', async () => {
+    const writeStatus = vi.fn();
+    await expect(
+      applyMergeGroupFailure(failureInput, {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: true,
+          mergeQueueEntry: { id: 'MQE_42' },
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(async () => {
+          throw new Error('HTTP 502');
+        }),
+        disableAutoMerge: vi.fn(),
+      })
+    ).rejects.toThrow(/HTTP 502/);
+    expect(writeStatus).toHaveBeenCalledOnce();
+  });
+
+  it('still fails when auto-merge remains after a denied dequeue', async () => {
+    await expect(
+      applyMergeGroupFailure(failureInput, {
+        writeStatus: vi.fn(),
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: true,
+          mergeQueueEntry: { id: 'MQE_42' },
+          autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+        })),
+        dequeuePullRequest: vi.fn(async () => {
+          throw new Error('gh: Resource not accessible by integration');
+        }),
+        disableAutoMerge: vi.fn(),
+      })
+    ).rejects.toThrow(/native queue intent/);
   });
 });

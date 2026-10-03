@@ -54,7 +54,6 @@ export default async function InvestorLayout({
 
       {/* Bottom sticky action bar */}
       <InvestorStickyBar
-        bookCallUrl={settings?.bookCallUrl ?? null}
         investUrl={settings?.investUrl ?? null}
         showProgress={
           (settings?.showProgressBar ?? false) && sourcedRaiseTarget !== null

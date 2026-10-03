@@ -3883,4 +3883,25 @@ describe('merge-queue green enroll scan window and failure hold', () => {
       ENROLL.indexOf('enqueuePullRequest(input:')
     );
   });
+
+  it('keeps a denied dequeue from failing the exact-head hold', () => {
+    const hold = ENROLL.slice(
+      ENROLL.indexOf('  hold-failed-revision:'),
+      ENROLL.indexOf('\n  enroll:')
+    );
+    expect(hold).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
+    expect(hold).toContain('permission-pull-requests: write');
+    expect(hold).toContain('permission-statuses: write');
+    expect(hold).not.toContain('permission-merge-queues:');
+    expect(hold).not.toContain('permission-administration:');
+    expect(hold).toContain('Resource not accessible by integration');
+    expect(hold).toContain('not in queue');
+    const script = readFileSync(
+      resolve(REPO_ROOT, 'scripts/merge-group-failure-hold.mjs'),
+      'utf8'
+    );
+    expect(script).toContain('resource not accessible by integration');
+    expect(script).toContain('not in queue');
+    expect(script).toContain('dequeueOutcome');
+  });
 });

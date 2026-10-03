@@ -62,6 +62,17 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
+      - name: Download learned model outcomes
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow pr-review-learn.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$run_id" ]; then
+            [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || exit 1
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name model-outcomes --dir "$RUNNER_TEMP/outcomes"
+          fi
+
       - name: Run advisory review
         env:
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
@@ -69,6 +80,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PR_REVIEW_AI_GATEWAY_API_KEY: ${{ secrets.PR_REVIEW_AI_GATEWAY_API_KEY }}
           RISK_JSON: ${{ runner.temp }}/risk/ci-risk-classification.json
+          PR_REVIEW_OUTCOMES: ${{ runner.temp }}/outcomes/model-outcomes.json
           OUT: ${{ runner.temp }}/pr-review-receipt.json
         run: node scripts/pr-review/cli.mjs
 
