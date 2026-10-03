@@ -1442,13 +1442,21 @@ def cool_down(host: Host, name: str) -> None:
 
 
 def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
-    """The cheapest enabled, healthy, non-cooling lane not yet tried on this run."""
-    for name, spec in (providers or load_providers()).items():
-        if name in exclude or not spec.get("enabled", True) or cooling(host, name):
-            continue
-        if provider_healthy(spec):
-            return name, spec
-    return None
+    """The cheapest enabled, healthy, non-cooling lane not yet tried on this run.
+
+    Order comes from providers.json (optional `tier`, else list position). A registry
+    entry with `enabled: false` — Hyperagent, grok, kimi — is never chosen.
+    """
+    catalog = providers or load_providers()
+    cooled = {name for name in catalog if cooling(host, name)}
+
+    def healthy(_name, spec):
+        return provider_healthy(spec)
+
+    chosen = remediation.route_lane(catalog, exclude=set(exclude), healthy=healthy, cooled=cooled)
+    if chosen is None:
+        return None
+    return chosen["lane"], chosen["spec"]
 
 
 # ------------------------------------------------- publication revocation (JOV-5060)
@@ -1621,7 +1629,9 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                     {"previous_prompt": prompt, "handoff_note": handoff_note}))
                 log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
                 log.flush()
-                handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
+                handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode,
+                                 "reason": "provider-error"})
+                note_failover(host, current, nxt_name, "provider-error")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
@@ -2130,7 +2140,9 @@ def exhausted_prs(prs: list[dict], attempts: dict, held: dict | None = None) -> 
     stuck = []
     for pr in prs:
         record = attempts.get(str(pr["number"]), {})
-        if record.get("escalated"):
+        # Escalation is sticky only for this generation. A new external head re-enters
+        # (JOV-7089); a zero-count unfixable hold stays terminal.
+        if record.get("escalated") and (not record.get("count") or pr_events.same_generation(record, pr["headRefOid"])):
             continue
         if not pr_events.fixable_hold((held or {}).get(str(pr["number"])), pr["headRefOid"]):
             stuck.append(pr)  # deterministic hold: intake once, not MAX_FIX_ATTEMPTS model calls
@@ -2188,39 +2200,217 @@ def apply_terminal_disposition(linear, pr: dict, record: dict, reason: str) -> N
                    f"envelope.\n```json\n{json.dumps(receipt, sort_keys=True)}\n```")
 
 
+def load_escalation(host: Host) -> dict:
+    path = host.state / "escalation.json"
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        data = {}
+    for key, empty in (("classified", []), ("escalating", []), ("ladderExhausted", []),
+                       ("surfaced", []), ("attempts", []), ("failovers", [])):
+        data.setdefault(key, empty)
+    data.setdefault("bySource", {})
+    data.setdefault("routedByLane", {})
+    data.setdefault("events", {})
+    return data
+
+
+def save_escalation(host: Host, data: dict) -> None:
+    path = host.state / "escalation.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data))
+
+
+def note_failover(host: Host, previous: str, nxt: str, reason: str) -> None:
+    """A providers.json handoff (error, exhausted account, unhealthy lane) for doctor.json."""
+    try:
+        data = load_escalation(host)
+        data["failovers"].append({"from": previous, "to": nxt, "reason": reason, "at": time.time()})
+        data["routedByLane"][nxt] = int(data["routedByLane"].get(nxt) or 0) + 1
+        save_escalation(host, data)
+    except OSError:
+        pass
+
+
+def _remember_class(data: dict, pr: dict, classified: dict) -> None:
+    number = pr.get("number")
+    data["classified"] = [row for row in data["classified"]
+                          if not (isinstance(row, dict) and row.get("pr") == number)]
+    data["classified"].append({"pr": number, "cls": classified["cls"], "at": time.time()})
+    data["bySource"]["pr"] = int(data["bySource"].get("pr") or 0) + 1
+
+
+def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, reason: str,
+                       linear, attempts: dict, data: dict) -> None:
+    """One deduped surface: PR comment, terminal disposition, exhausted label. No second queue."""
+    head = pr.get("headRefOid") or ""
+    number = pr["number"]
+    already = any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
+                  for row in data.get("surfaced") or [])
+    if not already:
+        sh(["gh", "pr", "comment", str(number), "--repo", REPO_SLUG, "--body",
+            remediation.surface_body(pr, classified, reason)])
+        data["surfaced"].append({"pr": number, "cls": classified["cls"], "reason": reason,
+                                 "head": head, "at": time.time()})
+        if reason == "ladder-exhausted" and number not in data["ladderExhausted"]:
+            data["ladderExhausted"].append(number)
+    attempts[str(number)] = {**record, "escalated": True}
+    pr_events.add_label(number, pr_events.EXHAUSTED, sh)
+    prefix = ["fix-exhausted"] if record.get("count", 0) else []
+    update_json(held_path(host), lambda held, number=number, head=head, prefix=prefix: held.update(
+        {str(number): pr_events.held_record(head, [*prefix, *held.get(str(number), {}).get("evidence", [])])}))
+    if remediation.notify_tim() and linear is not None and hasattr(linear, "comment"):
+        try:
+            issue = owning_issue(linear, pr)
+            if issue:
+                linear.comment(issue["id"],
+                               f"needs-human `{remediation.NEEDS_HUMAN_LABEL_ID}`: #{number} {classified['cls']}. "
+                               + remediation.surface_body(pr, classified, reason))
+        except Exception:
+            pass
+    try:
+        apply_terminal_disposition(linear, pr, record, reason if reason != "ladder-exhausted" else "fix-exhausted")
+    except Exception:
+        pass
+    if number in data["escalating"]:
+        data["escalating"] = [item for item in data["escalating"] if item != number]
+
+
 def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
-    """Terminal disposition, never a queue: comment on the PR, tombstone the head, move the
-    owning issue to its explicit Backlog disposition once (JOV-7089)."""
+    """Deterministic rungs, then a stronger lane, then one surface (JOV-7540 / JOV-7089).
+
+    Default off (`LANES_ESCALATION_STUCK_PRS`). Stuck-PR detection is
+    remediation-sweep, which files `remediation:pr-<n>-hold` and
+    `remediation:pr-<n>-conflict` (lane-fix-exhausted). Those are ordinary
+    labeled events. When the flag is on, `LANES_ESCALATION` unset stays on
+    and off restores the immediate terminal disposition. A model rung records
+    `pendingEscalation` and does not increment `count`.
+    """
+    if not remediation.stuck_pr_escalation_enabled():
+        return
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    providers = load_providers()
+    cooled = {name for name in providers if cooling(host, name)}
+    data = load_escalation(host)
+    now = time.time()
+
+    def healthy(_name, spec):
+        return provider_healthy(spec)
+
     for pr in exhausted_prs(prs, attempts, held):
-        record = attempts.get(str(pr["number"]), {})
-        if record.get("count", 0):
-            reason = "fix-exhausted"
-            body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
-                    f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
-                    "Terminal disposition on the owning issue (needs human decision); the lanes stop here. "
-                    "Re-entry needs a new head, a cleared dependency, or a policy override (JOV-7089).")
-        else:
-            reason = (held.get(str(pr["number"])) or {}).get("reason") or "unfixable"
-            body = (f"🤖 lanes: the gate held head `{pr['headRefOid'][:7]}` for a reason no code push can clear "
-                    f"(`{reason}`; merge state {pr.get('mergeStateStatus')}). "
-                    "Terminal disposition on the owning issue (needs human decision); the lanes stop here.")
-        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
-        attempts[str(pr["number"])] = {**record, "escalated": True}
-        pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)  # held with a reason, visible on the PR
-        # Spent attempts rename the hold fix-exhausted; a zero-attempt hold keeps its real reason.
-        prefix = ["fix-exhausted"] if record.get("count", 0) else []
-        update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
-            pr["headRefOid"], [*prefix, *held.get(str(pr["number"]), {}).get("evidence", [])])}))
-        # A disabled implementation lane does not make its preserved work redundant.
-        # Exhaustion holds this source generation; semantic retirement is a separate disposition.
-        try:
-            apply_terminal_disposition(linear, pr, record, reason)
-        except Exception:
-            pass  # Linear down: the PR label and held record still tombstone the head
+        record = dict(attempts.get(str(pr["number"]), {}))
+        classified = remediation.classify_blocker(pr, held.get(str(pr["number"])), record)
+        _remember_class(data, pr, classified)
+        if not remediation.escalation_enabled():
+            _legacy_terminal(host, pr, record, held, linear, attempts)
+            continue
+        plan = remediation.plan_ladder(classified, record, providers, now, pr["headRefOid"],
+                                       healthy=healthy, cooled=cooled)
+        if plan["action"] == "update-branch":
+            outcome = pr_events.sync_main(host, THIS, pr, now)
+            record = remediation.append_rung(record, rung="update-branch", lane=None, cls=classified["cls"],
+                                             at=now, head=pr["headRefOid"], kind="deterministic",
+                                             ok=outcome == "synced")
+            attempts[str(pr["number"])] = record
+            pr_events.add_label(pr["number"], "escalating", sh)
+            if pr["number"] not in data["escalating"]:
+                data["escalating"].append(pr["number"])
+            if outcome != "synced":
+                plan = remediation.plan_ladder(classified, record, providers, now, pr["headRefOid"],
+                                               healthy=healthy, cooled=cooled)
+            else:
+                plan = {"action": "wait"}
+        if plan.get("action") == "rerun":
+            rerun = _rerun_failed(pr)
+            record = remediation.append_rung(record, rung="rerun", lane=None, cls=classified["cls"],
+                                             at=now, head=pr["headRefOid"], kind="deterministic",
+                                             ok=bool(rerun))
+            attempts[str(pr["number"])] = record
+            if not rerun:
+                plan = remediation.plan_ladder(classified, record, providers, now, pr["headRefOid"],
+                                               healthy=healthy, cooled=cooled)
+            else:
+                plan = {"action": "wait"}
+        if plan.get("action") == "resolve-lockfile":
+            record = remediation.append_rung(record, rung="lockfile", lane=None, cls=classified["cls"],
+                                             at=now, head=pr["headRefOid"], kind="deterministic", ok=None)
+            record["pendingEscalation"] = {"lane": None, "cls": classified["cls"], "head": pr["headRefOid"],
+                                           "rung": "lockfile", "at": now}
+            attempts[str(pr["number"])] = record
+            plan = {"action": "wait"}
+        if plan.get("action") == "model":
+            pack = remediation.dossier(pr, classified, record)
+            record["pendingEscalation"] = {"lane": plan["lane"], "cls": classified["cls"],
+                                           "subtype": classified.get("subtype"), "head": pr["headRefOid"],
+                                           "topRung": plan.get("topRung"), "at": now, "dossier": pack}
+            attempts[str(pr["number"])] = record
+            pr_events.add_label(pr["number"], "escalating", sh)
+            if pr["number"] not in data["escalating"]:
+                data["escalating"].append(pr["number"])
+            data["routedByLane"][plan["lane"]] = int(data["routedByLane"].get(plan["lane"]) or 0) + 1
+        elif plan.get("action") == "surface":
+            _surface_exhausted(host, pr, record, classified, plan.get("reason") or classified["cls"],
+                               linear, attempts, data)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(attempts))
+    save_escalation(host, data)
+
+
+def _legacy_terminal(host: Host, pr: dict, record: dict, held: dict, linear, attempts: dict) -> None:
+    """Kill switch: immediate terminal disposition, the pre-ladder behavior."""
+    if record.get("count", 0):
+        reason = "fix-exhausted"
+        body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
+                f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
+                "Terminal disposition on the owning issue (needs human decision); the lanes stop here. "
+                "Re-entry needs a new head, a cleared dependency, or a policy override (JOV-7089).")
+    else:
+        reason = (held.get(str(pr["number"])) or {}).get("reason") or "unfixable"
+        body = (f"🤖 lanes: the gate held head `{pr['headRefOid'][:7]}` for a reason no code push can clear "
+                f"(`{reason}`; merge state {pr.get('mergeStateStatus')}). "
+                "Terminal disposition on the owning issue (needs human decision); the lanes stop here.")
+    sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+    attempts[str(pr["number"])] = {**record, "escalated": True}
+    pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)
+    prefix = ["fix-exhausted"] if record.get("count", 0) else []
+    number, head = pr["number"], pr["headRefOid"]
+    update_json(held_path(host), lambda held_rows, number=number, head=head, prefix=prefix: held_rows.update(
+        {str(number): pr_events.held_record(head, [*prefix, *held_rows.get(str(number), {}).get("evidence", [])])}))
+    try:
+        apply_terminal_disposition(linear, pr, record, reason)
+    except Exception:
+        pass
+
+
+def _rerun_failed(pr: dict):
+    for check in pr.get("statusCheckRollup") or []:
+        if check.get("conclusion") not in RED:
+            continue
+        found = re.search(r"/runs/(\d+)", check.get("detailsUrl") or "")
+        if not found:
+            continue
+        result = sh(["gh", "run", "rerun", found.group(1), "--failed", "--repo", REPO_SLUG])
+        return result.returncode == 0
+    return False
+
+
+def arm_ready_prs(host: Host, prs: list[dict]) -> None:
+    """Green, unarmed, non-draft PRs get squash auto-merge. Drafts stay on ready_green."""
+    if not prs or not remediation.escalation_enabled():
+        return
+    path = host.state / "fix-attempts.json"
+    attempts = json.loads(path.read_text()) if path.exists() else {}
+    held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    for pr in prs:
+        record = attempts.get(str(pr.get("number")), {})
+        classified = remediation.classify_blocker(pr, held.get(str(pr.get("number"))), record)
+        if classified.get("next_action") != "arm":
+            continue
+        sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto", "--squash"])
+        for label in sorted(remediation.STALE_LABELS):
+            sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{label}"])
 
 
 def failure_excerpt(pr: dict, limit: int = 6000) -> str:
@@ -2275,7 +2465,9 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     if "stale" in pr.get("eventKinds", ()):
         problem += ["This lane draft has had no activity for 48 hours. Finish it: resolve what the gate",
                     "held, make its checks green and push. If it cannot ship, end with NOT-SHIPPABLE.", ""]
+    dossier = pr.get("dossier")
     return "\n".join([
+        *([dossier, ""] if dossier else []),
         f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
         "",
         f"You are on its branch `{pr['headRefName']}`.",
@@ -2725,6 +2917,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
                     f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
+                if pr.get("liftHold") and remediation.lift_human_holds():
+                    sh(["gh", "api", "-X", "DELETE",
+                        f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/hold"], log=log)
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
                 verify_target({**pr, "headRefOid": after}, "before-merge-intent")
@@ -3009,14 +3204,15 @@ def over_budget(name: str, prs: list[dict], slots: int) -> bool:
 def pr_is_terminal(pr: dict) -> bool:
     """Held or repair-exhausted: only a human (or another lane's adopt) can move it."""
     labels = {label.lower() for label in pr_events.label_names(pr)}
-    return bool(labels & (pr_events.HOLD_LABELS | {pr_events.PREFIX + pr_events.EXHAUSTED}))
+    return bool(labels & (pr_events.HOLD_LABELS | {pr_events.PREFIX + pr_events.EXHAUSTED,
+                                                   pr_events.PREFIX + "escalating"}))
 
 
 def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
     """One owning lane's new-issue budget; maintenance/orphan work is separate.
 
     Active (advanceable) non-green PRs are capped at slots x OPEN_PRS_PER_SLOT.
-    Terminal PRs (hold / lane-fix-exhausted) are capped separately at
+    Terminal PRs (hold / lane-fix-exhausted / lane-fix-escalating) are capped separately at
     slots x TERMINAL_PRS_PER_SLOT so a lane cannot accumulate unbounded parked work,
     but parked work alone can no longer pin a lane idle (JOV-7514)."""
     cap = max(0, slots) * OPEN_PRS_PER_SLOT
@@ -3309,6 +3505,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         candidates = fix_candidates(name)
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
         requeue_verified(host, prs)
+        arm_ready_prs(host, candidates)
         escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
         red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)

@@ -1070,7 +1070,7 @@ class RunIssueTest(unittest.TestCase):
         receipt = lane.run_issue(self.host, "codex", {"cmd": [sys.executable, "-c", "raise SystemExit(75)"]},
                                  FakeLinear([]), issue("JOV-9"))
         self.assertEqual(receipt["verdict"], "landing")
-        self.assertEqual(receipt["handoffs"], [{"from": "codex", "to": "devin", "exit": 75}])
+        self.assertEqual(receipt["handoffs"], [{"from": "codex", "to": "devin", "exit": 75, "reason": "provider-error"}])
         self.assertEqual(receipt["finishedBy"], "devin")
         self.assertEqual(receipt["agentExit"], 0)
         self.assertEqual(seen[0], {"codex"})
@@ -1534,8 +1534,9 @@ class NewIssueBudgetTest(unittest.TestCase):
         rows = [{**self.row(n), "labels": [{"name": name} for name in labels]}
                 for n, labels in enumerate(terminal, start=1)]
         rows.append({**self.row(99), "labels": []})
+        rows.append({**self.row(50), "labels": [{"name": "lane-fix-escalating"}]})
         result = lane.new_issue_budget("codex", 3, rows)
-        self.assertEqual((result["used"], result["terminal"], result["reason"]), (1, 7, "within-budget"))
+        self.assertEqual((result["used"], result["terminal"], result["reason"]), (1, 8, "within-budget"))
         self.assertTrue(result["allowed"])
         # Parked work is still bounded: slots x TERMINAL_PRS_PER_SLOT.
         parked = [{**self.row(n), "labels": [{"name": "hold"}]} for n in range(1, 13)]
@@ -2802,6 +2803,27 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][:4], ["gh", "pr", "view", "8"])
 
+    def test_stuck_pr_escalation_stays_off_unless_the_flag_is_on(self):
+        stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
+                 "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
+        os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        real = lane.sh
+        calls = []
+        lane.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
+        linear = FakeLinear([])
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                (host.state / "fix-attempts.json").write_text(json.dumps(
+                    {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}))
+                lane.escalate_exhausted(host, [stuck], linear)
+                self.assertFalse((host.state / "escalation.json").exists())
+        finally:
+            lane.sh = real
+        self.assertEqual(calls, [])
+        self.assertEqual(linear.moves, [])
+        self.assertEqual(linear.comments, [])
+
     def test_exhausted_heads_get_one_terminal_disposition_not_queue_inventory(self):
         stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
                  "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
@@ -2824,11 +2846,25 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
             try:
+                lane.escalate_exhausted(host, [stuck], linear)
+                fresh = json.loads((host.state / "fix-attempts.json").read_text())["7"]
+                self.assertEqual(fresh["count"], lane.MAX_FIX_ATTEMPTS)
+                self.assertNotIn("escalated", fresh)
+                self.assertEqual(fresh["escalations"][0]["rung"], "update-branch")
+                self.assertEqual(fresh["escalations"][0]["kind"], "deterministic")
+                self.assertEqual(linear.moves, [], "a deterministic rung is not a terminal disposition")
+                fresh["escalations"] += [
+                    {"kind": "model", "rung": "escalate", "lane": "devin", "head": "h1", "at": 1},
+                    {"kind": "model", "rung": "top-rung", "lane": "codex", "head": "h1", "at": 2, "topRung": True},
+                ]
+                (host.state / "fix-attempts.json").write_text(json.dumps({"7": fresh}))
                 lane.escalate_exhausted(host, [stuck], linear)
                 lane.escalate_exhausted(host, [stuck], linear)
             finally:
                 lane.sh = real
+                os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
             self.assertEqual(linear.triaged, [], "a terminal outcome is not generic Triage inventory (JOV-7089)")
             self.assertEqual(linear.moves, [("id-JOV-7", "Backlog")],
                              "the owning issue gets exactly one explicit disposition")
@@ -2837,6 +2873,8 @@ class FixRedTest(unittest.TestCase):
             self.assertIn("jovie-terminal-disposition/v1", linear.comments[0][1])
             self.assertEqual(len([p for p in posted if p[:3] == ["gh", "pr", "comment"]]), 1)
             self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
+            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["7"]["count"],
+                             lane.MAX_FIX_ATTEMPTS)
 
     def test_terminal_disposition_dedupes_on_the_issue_when_local_flag_is_lost(self):
         stuck = {**self.pr(number=19246), "headRefName": "devin/jov-46-20260928000000",
@@ -2849,11 +2887,19 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             # A later attempt rewrote the record without `escalated` (the duplicate-issue bug).
-            (host.state / "fix-attempts.json").write_text(json.dumps({"19246": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}))
+            (host.state / "fix-attempts.json").write_text(json.dumps({"19246": {
+                "sha": "h1", "count": lane.MAX_FIX_ATTEMPTS,
+                "escalations": [
+                    {"kind": "deterministic", "rung": "update-branch", "head": "h1", "at": 1},
+                    {"kind": "model", "rung": "escalate", "lane": "devin", "head": "h1", "at": 2},
+                    {"kind": "model", "rung": "top-rung", "lane": "codex", "head": "h1", "at": 3, "topRung": True},
+                ]}}))
+            os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
             try:
                 lane.escalate_exhausted(host, [stuck], linear)
             finally:
                 lane.sh = real
+                os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertEqual(linear.triaged, [], "no queue inventory for a terminal generation")
         self.assertEqual(linear.moves, [], "a receipted disposition is not applied twice")
 
