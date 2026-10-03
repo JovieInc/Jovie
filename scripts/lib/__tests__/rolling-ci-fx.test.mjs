@@ -1216,7 +1216,8 @@ describe('hosted rolling CI repair policy', () => {
     expect(event.fingerprint).toBe('component-ship-gate\nlint\nCI');
     expect(event.subject).toEqual({ pr: 17, sha: 'abc', workflow: 'CI' });
     expect(
-      symphonyRemediationEvent({ failedChecks: ['lint'], workflow: 'CI' }).intake
+      symphonyRemediationEvent({ failedChecks: ['lint'], workflow: 'CI' })
+        .intake
     ).toBe('symphony-remediation');
   });
 
