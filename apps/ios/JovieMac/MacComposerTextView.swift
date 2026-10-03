@@ -32,6 +32,7 @@ struct MacComposerTextView: NSViewRepresentable {
     editor.setAccessibilityIdentifier("mac-local-draft-editor")
     editor.string = text
     editor.delegate = context.coordinator
+    context.coordinator.observeUndo(in: editor)
     editor.onCompositionEnded = { [weak coordinator = context.coordinator, weak editor] in
       guard let editor else { return }
       coordinator?.publish(editor)
@@ -61,11 +62,26 @@ struct MacComposerTextView: NSViewRepresentable {
   @MainActor
   final class Coordinator: NSObject, NSTextViewDelegate {
     private var binding: Binding<String>?
+    private weak var editor: MacComposerEditor?
     private var requestedFocus: UUID?
     private var consumedFocus: UUID?
     private var isApplyingModel = false
 
     init(text: Binding<String>) { binding = text }
+
+    func observeUndo(in editor: MacComposerEditor) {
+      self.editor = editor
+      for name in [UndoManager.didUndoChangeNotification, UndoManager.didRedoChangeNotification] {
+        NotificationCenter.default.addObserver(
+          self, selector: #selector(undoOrRedoDidComplete(_:)), name: name, object: editor.draftUndoManager
+        )
+      }
+    }
+
+    @objc private func undoOrRedoDidComplete(_ notification: Notification) {
+      guard let editor else { return }
+      publish(editor)
+    }
 
     func update(_ editor: MacComposerEditor, text: Binding<String>, focusRequest: UUID?) {
       binding = text
@@ -109,6 +125,8 @@ struct MacComposerTextView: NSViewRepresentable {
     }
 
     func disconnect() {
+      NotificationCenter.default.removeObserver(self)
+      editor = nil
       binding = nil
       requestedFocus = nil
     }

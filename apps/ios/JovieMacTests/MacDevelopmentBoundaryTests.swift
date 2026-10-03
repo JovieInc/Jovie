@@ -243,7 +243,9 @@ final class MacDevelopmentBoundaryTests: XCTestCase {
     XCTAssertNil(editor.onWindowChanged)
     XCTAssertTrue(h.window.makeFirstResponder(h.otherResponder))
     let disconnectedValue = h.draft.text
-    editor.insertText("!", replacementRange: NSRange(location: NSNotFound, length: 0))
+    h.edit(editor) {
+      editor.insertText("!", replacementRange: NSRange(location: NSNotFound, length: 0))
+    }
     coordinator.publish(editor)
     coordinator.applyFocus(to: editor)
     XCTAssertEqual(h.draft.text, disconnectedValue)
