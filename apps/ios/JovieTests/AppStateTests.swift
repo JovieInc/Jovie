@@ -4430,7 +4430,7 @@ private final class BrowserOwnerHarness {
   var nonceFails = false
   var exchangeFailure: Error?
   func seed(_ verifier: String) {
-    pending.save(codeVerifier: verifier, nativeAttempt: nonce, baseURL: Configuration.mock.webBaseURL)
+    pending.save(codeVerifier: verifier, nativeAttempt: nonce, baseURL: AppConfiguration.mock.webBaseURL)
   }
   init() { defaults = UserDefaults(suiteName: suite)!; pending = MobileAuthPendingStore(defaults: defaults) }
   func owner(_ state: AppState) -> MobileAuthCoordinator {
