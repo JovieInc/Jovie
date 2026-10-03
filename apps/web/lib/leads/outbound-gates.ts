@@ -27,7 +27,7 @@ function parseUtcHour(value: string | undefined, fallback: number): number {
  */
 export function isOutreachQuietHours(
   now: Date,
-  env: NodeJS.ProcessEnv = process.env
+  env: Record<string, string | undefined> = process.env
 ): boolean {
   const start = parseUtcHour(
     env.OUTREACH_QUIET_HOURS_START_UTC,
