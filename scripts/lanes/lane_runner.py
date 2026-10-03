@@ -970,7 +970,103 @@ def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
 
 # ---------------------------------------------------------------- one run
 
-def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
+def reconcile_hyperagent_completion(host: Host, spec: dict, linear: Linear, issue: Issue, *, expected_pr=None, enqueue=False):
+    """Exact completed source fence, then bounded local qualification; no provider transport."""
+    held = {"verdict": "remote-held", "reasons": ["remote-completion-unverified"]}
+    ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
+                                       {"title": issue.title, "description": issue.description})
+    path = host.state / "runs" / f"{ident['identityDigest']}.provider.jsonl"
+    ledger = host.state / "runs/execution-attempts.jsonl"
+    coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
+    try:
+        with path.open("r+") as journal:
+            fcntl.flock(journal, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            state = json.loads(journal.read().splitlines()[-1])
+            original = state.get("result")
+            if not original: return None
+            fresh, status = linear.get_issue(issue.id)
+            if (not spec.get("enabled", True) or not hyperagent_lane.verified(spec, time.time()) or status != "In Progress"
+                or fresh != issue or not state.get("threadId") or original.get("remoteThreadId") != state["threadId"]): return held
+            binding = state["binding"]; fence = binding["attempt"]
+            owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"), "tool": "lane_runner", "accountPool": "hyperagent"}
+            def completed(identity, token, expected_owner, qualification=False):
+                def inspect(rows):
+                    rows = execution_attempt._for(rows, identity)
+                    start = next((r for r in rows if r["event"] == "attempt_started" and r.get("fencingToken") == token), {})
+                    finish = next((r for r in rows if r["event"] == "attempt_finished" and r.get("fencingToken") == token), {})
+                    valid = finish.get("result") == finish.get("terminalState") == "succeeded"
+                    valid = valid or (qualification and finish.get("result") == "failed_known" and ((finish.get("failureClass") == "flaky_infra" and finish.get("terminalState") in (None, "budget_exhausted")) or (finish.get("failureClass") == "qualification_failed" and finish.get("terminalState") == "failed_known")))
+                    return finish if start.get("owner") == expected_owner and valid else None, []
+                return execution_attempt._locked(ledger, identity, coordination, inspect)
+            execution = completed(ident, fence, owner)
+            branch = f"hyperagent/{issue.identifier.lower()}-{ident['identityDigest'][:15]}"
+            if (not execution or binding != {"issue": issue.identifier, "attempt": fence, "agentId": spec["verifiedRemote"]["agentId"], "model": spec["model"], "repository": REPO_SLUG, "branch": branch}): return held
+            viewed = sh(["gh", "pr", "view", str(original["pr"]), "--repo", REPO_SLUG, "--json", "number,url,state,title,body,headRefName,headRefOid,labels"])
+            pr = json.loads(viewed.stdout) if viewed.returncode == 0 else {}
+            marker = f"<!-- hyperagent-attempt-id:{hashlib.sha256(fence.encode()).hexdigest()} -->"
+            if (pr.get("state") != "OPEN" or pr.get("number") != original["pr"] or pr.get("url") != original.get("prUrl")
+                or pr.get("url") != f"https://github.com/{REPO_SLUG}/pull/{original['pr']}" or pr.get("headRefName") != branch
+                or pr.get("headRefOid") != state.get("headSha") or pr.get("headRefOid") != original.get("headSha")
+                or not re.search(rf"(?<![A-Za-z0-9]){re.escape(issue.identifier)}(?![A-Za-z0-9])", pr.get("title", ""))
+                or f"<!-- linear-issue-id:{issue.identifier} -->" not in pr.get("body", "") or marker not in pr.get("body", "")
+                or (expected_pr and (expected_pr.get("number"), expected_pr.get("headRefOid"), expected_pr.get("headRefName")) != (pr["number"], pr["headRefOid"], branch))): return held
+            if state.get("completionIntent") and not state.get("completionResult"): return held
+            result = state.get("completionResult") or original
+            qual_owner = {**owner, "tool": "hyperagent-qualification"}
+            if state.get("qualification"):
+                q = state["qualification"]
+                expected = execution_attempt.identity("hyperagent-qualification", {"sourceFence": fence, "pr": pr["number"], "operation": state["completionIntent"]["operation"]}, {"issueGeneration": ident["executionGeneration"], "headSha": pr["headRefOid"]})
+                finish = completed(q["identity"], q["fencingToken"], qual_owner, qualification=True)
+                if (q["identity"] != expected or not finish or finish.get("sourceFence") != fence or finish.get("headSha") != pr["headRefOid"]
+                    or finish.get("sensitive") != state["completionIntent"]["sensitive"] or result.get("qualificationExecution", {}).get("fencingToken") != q["fencingToken"]
+                    or (finish.get("failureClass") == "qualification_failed" and result.get("verdict") != "remote-repair-required")
+                    or (result.get("verdict") in ("landing", "held") and finish.get("terminalState") != "succeeded")): return held
+            if result.get("pr") != pr["number"] or result.get("headSha") != pr["headRefOid"] or result.get("prUrl") != pr["url"]: return held
+            def save():
+                journal.seek(0, os.SEEK_END); journal.write(json.dumps(state) + "\n"); journal.flush(); os.fsync(journal.fileno())
+            base = {**result, "execution": execution, "remoteThreadId": state["threadId"], "sourceFencingToken": fence}
+            if result.get("verdict") == "held":
+                return {**base, "verdict": "remote-repair-required", "dependencies": ["automatic-hyper-repair-unavailable"], "next_action": "repair-existing-remote-pr"}
+            if result.get("verdict") not in ("gate-timeout", "verified-not-queued"): return base
+            if enqueue != (result["verdict"] == "verified-not-queued"): return held
+            sensitive = issue_is_sensitive(fresh) or SENSITIVE_PR_LABEL in {l["name"].lower() for l in pr.get("labels", [])}
+            if original.get("gateSensitive") != execution.get("gateSensitive"): return held
+            gate_sensitive = result.get("gateSensitive")
+            if state.get("qualification") and gate_sensitive != finish.get("sensitive"): return held
+            trusted_gate = isinstance(gate_sensitive, bool) and (not sensitive or gate_sensitive)
+            operation = "enqueue" if enqueue and trusted_gate else "gate"
+            if operation == "enqueue": sensitive = gate_sensitive
+            if operation == "gate" and sensitive:
+                state["completionResult"] = {**base, "verdict": "remote-repair-required", "dependencies": ["automatic-guarded-review-budget-unavailable"], "reasons": result.get("reasons", []) + ["automatic-guarded-review-budget-unavailable"]}; save()
+                return state["completionResult"]
+            qualification = execution_attempt.identity("hyperagent-qualification", {"sourceFence": fence, "pr": pr["number"], "operation": operation}, {"issueGeneration": ident["executionGeneration"], "headSha": pr["headRefOid"]})
+            attempts = MAX_FAILURES if enqueue else MAX_GATE_TIMEOUTS
+            claim = execution_attempt.claim(ledger, qualification, qual_owner,
+                {"attempts": attempts, "concurrency": 1, "wallSeconds": host.gate_timeout * attempts, "spend": 1, "mutations": attempts, "leaseSeconds": host.gate_timeout + 900},
+                {"triggerId": uuid.uuid4().hex, "correlationId": issue.identifier, "causationId": fence}, coordination=coordination)
+            # The positive unused spend budget is required by claim(); reservations are always zero.
+            if not claim["admitted"]: return {**held, "reasons": ["remote-qualification-" + claim["reason"]]}
+            state.update(completionIntent={"head": pr["headRefOid"], "operation": operation, "sensitive": sensitive}, qualification={"identity": qualification, "fencingToken": claim["fencingToken"]})
+            state.pop("completionResult", None); save()
+            execution_attempt.boundary(ledger, qualification, claim["fencingToken"], {"spend": 0, "mutations": 1}, coordination=coordination)
+            if operation == "enqueue":
+                ready = sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG])
+                queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto", "--match-head-commit", pr["headRefOid"]]) if ready.returncode == 0 else ready
+                outcome = {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
+            else:
+                outcome = {**adopt_pr(host, "hyperagent", pr, sensitive=sensitive), "gateSensitive": sensitive}
+            retry = outcome.get("verdict") in ("gate-timeout", "verified-not-queued")
+            failed = outcome.get("verdict") in ("failed", "skipped")
+            finished = execution_attempt.finish(ledger, qualification, claim["fencingToken"], "failed_known" if retry or failed else "succeeded",
+                {"failureClass": "flaky_infra" if retry else "qualification_failed" if failed else None, "failureFingerprint": f"{operation}:{claim['attempt']}", "headSha": pr["headRefOid"], "sourceFence": fence, "sensitive": sensitive}, coordination=coordination)
+            if failed or finished.get("terminalState") == "budget_exhausted":
+                outcome = {**outcome, "verdict": "remote-repair-required", "dependencies": ["automatic-hyper-repair-unavailable"], "reasons": outcome.get("reasons", []) + ([] if failed else ["local-qualification-budget-exhausted"])}
+            state["completionResult"] = {**outcome, "headSha": pr["headRefOid"], "remoteThreadId": state["threadId"], "qualificationExecution": finished}; save()
+            return {**base, **state["completionResult"]}
+    except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError, RuntimeError): return held
+
+
+def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear=None) -> dict:
     """Use the same execution contract and gate for remote work, without local-code failover."""
     import runpy
     runs = host.state / "runs"
@@ -990,7 +1086,10 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
              "tool": "lane_runner", "accountPool": "hyperagent"}
     receipt["pendingBinding"] = {**ident, "owner": owner}
     claimed = None
-    if not hyperagent_lane.verified(spec, time.time()):
+    completion = reconcile_hyperagent_completion(host, spec, linear, issue) if linear and evidence.exists() else None
+    if completion is not None:
+        receipt.update(completion)
+    elif not hyperagent_lane.verified(spec, time.time()):
         receipt.update(hold("remote-preflight-unverified"))
     else:
         coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
@@ -1029,7 +1128,8 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                     boundary(0, 1)
                     # Existing adoption owns its isolated checkout, diff policy,
                     # canonical checks and native queue; no second PR is created.
-                    return adopt_pr(host, "hyperagent", pr, sensitive=issue_is_sensitive(issue))
+                    sensitive = issue_is_sensitive(issue) or SENSITIVE_PR_LABEL in {l["name"].lower() for l in pr.get("labels", [])}
+                    return {**adopt_pr(host, "hyperagent", pr, sensitive=sensitive), "gateSensitive": sensitive}
                 def unreserved(fence, retry=False):
                     def inspect(rows):
                         rows = execution_attempt._for(rows, ident)
@@ -1059,13 +1159,17 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                 if receipt["verdict"] != "remote-held":
                     result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
                     receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
-                        claimed["fencingToken"], result, {"evidenceDigest": execution_attempt.digest(receipt),
+                        claimed["fencingToken"], result, {"evidenceDigest": execution_attempt.digest(receipt), "gateSensitive": receipt.get("gateSensitive"),
                             "costs": {"apiCost": None}, "dependencies": ["hyperagent"],
                             "mutationsPerformed": ["remote_thread", "pull_request_adoption"]}, coordination=coordination)
         except Exception:
             # Never expose OAuth errors, call another model, or call an unknown
             # create outcome cancelled. Its durable journal remains authoritative.
             receipt.update(hold("remote-adapter-unavailable"))
+    if receipt.get("verdict") == "held":
+        receipt.update(verdict="remote-repair-required", dependencies=["automatic-hyper-repair-unavailable"], next_action="repair-existing-remote-pr")
+    if receipt.get("execution", {}).get("terminalState") in execution_attempt.TERMINAL - {"succeeded"}:
+        receipt["verdict"] = "quarantined"
     receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": receipt.get("pr"),
                    "prUrl": receipt.get("prUrl"), "commit": receipt.get("headSha")})
     with (runs / "ledger.jsonl").open("a") as ledger:
@@ -1075,7 +1179,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
     if name == "hyperagent":
-        return run_hyperagent_issue(host, spec, issue)
+        return run_hyperagent_issue(host, spec, issue, linear)
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -1331,7 +1435,7 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
         record_held(host, pr["number"], pr["headRefOid"], reasons + evidence)
         return {**result, "verdict": "held"}
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
-    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+    queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto", "--match-head-commit", pr["headRefOid"]], log=log)
     if queued.returncode != 0:
         # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
         # would strand a green PR; each worker pass retries it via requeue_verified.
@@ -1352,17 +1456,24 @@ def update_json(path: Path, change) -> None:
     path.write_text(json.dumps(data))
 
 
-def requeue_verified(host: Host, prs: list[dict]) -> None:
+def requeue_verified(host: Host, prs: list[dict], remote_retry=None) -> None:
     """Retry enqueueing gate-verified PRs whose enqueue failed; drop them once queued or moved."""
     path = host.state / "requeue.json"
     if not path.exists():
         return
-    heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
+    inventory = {str(pr["number"]): pr for pr in prs}
     def retry(requeue: dict) -> None:
         for number, head in list(requeue.items()):
-            if heads.get(number) != head:
+            if number not in inventory:
+                live = reconcile_fix_target({"number": int(number), "headRefOid": head})
+                if live is None: continue
+                inventory[number] = live
+            if inventory[number].get("state", "OPEN") != "OPEN" or inventory[number].get("headRefOid") != head:
                 del requeue[number]  # merged, closed, or a new head that the gate owns again
                 continue
+            if remote_digest_pr(inventory[number]):
+                if remote_retry and remote_retry(inventory[number]): del requeue[number]
+                continue  # withheld exact entries retain their retry evidence
             sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
             if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
                 del requeue[number]
@@ -1880,6 +1991,8 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
 
 
 def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True) -> dict:
+    if remote_digest_pr(pr):
+        return {"verdict": "remote-held", "reasons": ["remote-reconciliation-required"], "pr": pr["number"]}
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -2327,7 +2440,7 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
         return
     marker.write_text(json.dumps({"at": now}))
-    superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
+    superseded, stale = sweep_plan([pr for pr in lane_prs(name, fields=LIGHT_PR_FIELDS) if not remote_digest_pr(pr)], now, last_pushes())
     for pr, keep in superseded:
         sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
             f"🤖 lane sweep: superseded by #{keep} (one open PR per Linear issue, JOV-6833)."])
@@ -2343,9 +2456,14 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
                                   "no push for 24 h); back to Todo.")
 
 
+def remote_digest_pr(pr: dict) -> bool:
+    return bool(re.fullmatch(r"hyperagent/jov-\d+-[a-f0-9]{15}", pr.get("headRefName") or ""))
+
+
 def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     path = host.state / "verified.json"
     verified = json.loads(path.read_text()) if path.exists() else {}
+    prs = [pr for pr in prs if not remote_digest_pr(pr)]
     pr = unverified_pr(prs, verified)
     # Another host gating a head skips it, not the whole pass: returning None here idled every
     # worker behind one claimed PR (2026-09-28, 0 running with 45 eligible PRs).
@@ -2361,7 +2479,7 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
 
 def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict | None:
     """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
-    prs = lane_prs(name) if prs is None else prs
+    prs = [pr for pr in (lane_prs(name) if prs is None else prs) if not remote_digest_pr(pr)]
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
@@ -2408,30 +2526,40 @@ def pending_hyperagent_issue(host: Host, spec: dict, linear: Linear) -> Issue | 
     path = host.state / "runs/ledger.jsonl"
     try:
         latest = {}
-        for row in (json.loads(line) for line in path.read_text().splitlines()):
+        for line in path.read_text().splitlines():
+            try: row = json.loads(line)
+            except ValueError: continue
+            if not isinstance(row, dict): continue
             if row.get("provider") == "hyperagent" and row.get("issue") and row.get("linearIssueId"):
                 prior = latest.get(row["issue"], {}).get("execution")
-                if not row.get("execution") and prior and prior.get("identityDigest") == row.get("pendingBinding", {}).get("identityDigest"):
+                if not row.get("execution") and isinstance(prior, dict) and isinstance(row.get("pendingBinding", {}), dict) and prior.get("identityDigest") == row.get("pendingBinding", {}).get("identityDigest"):
                     row = {**row, "execution": prior}
                 latest[row["issue"]] = row
         for row in latest.values():
-            execution = row.get("execution") or row.get("pendingBinding") or {}
-            owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"),
-                     "tool": "lane_runner", "accountPool": "hyperagent"}
-            if row.get("verdict") != "remote-held" or execution.get("terminalState") or execution.get("owner") != owner:
-                continue
-            issue, state = linear.get_issue(row["linearIssueId"])
-            ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
-                                               {"title": issue.title, "description": issue.description})
-            evidence = host.state / "runs" / f"{ident['identityDigest']}.provider.jsonl"
-            binding_matches = not evidence.exists() and not row.get("execution")
-            if row.get("execution"):
-                provider = json.loads(evidence.read_text().splitlines()[-1])
-                binding_matches = provider.get("binding", {}).get("attempt") == execution.get("fencingToken")
-            if (state == "In Progress" and issue.identifier == row["issue"] and issue.id == row["linearIssueId"]
-                and ident["identityDigest"] == execution.get("identityDigest")
-                and binding_matches):
-                return issue
+            try:
+                execution = row.get("execution") or row.get("pendingBinding") or {}
+                owner = {"owner": HOST, "runtime": "symphony-lanes", "provider": "hyperagent", "model": spec.get("model"),
+                         "tool": "lane_runner", "accountPool": "hyperagent"}
+                completed = execution.get("terminalState") == "succeeded"
+                actual_owner = row.get("pendingBinding", {}).get("owner") if completed else execution.get("owner")
+                if completed and actual_owner is None:
+                    actual_owner = execution_attempt._locked(host.state / "runs/execution-attempts.jsonl", execution,
+                        execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR), lambda rows: (next((r.get("owner") for r in execution_attempt._for(rows, execution)
+                        if r["event"] == "attempt_started" and r.get("fencingToken") == execution.get("fencingToken")), None), []))
+                if row.get("verdict") not in ("remote-held", "held", "gate-timeout", "verified-not-queued", "remote-repair-required") or execution.get("terminalState") not in (None, "succeeded") or actual_owner != owner: continue
+                issue, state = linear.get_issue(row["linearIssueId"])
+                ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
+                                                   {"title": issue.title, "description": issue.description})
+                evidence = host.state / "runs" / f"{ident['identityDigest']}.provider.jsonl"
+                binding_matches = not evidence.exists() and not row.get("execution")
+                if row.get("execution"):
+                    provider = json.loads(evidence.read_text().splitlines()[-1])
+                    binding_matches = provider.get("binding", {}).get("attempt") == execution.get("fencingToken")
+                if (state == "In Progress" and issue.identifier == row["issue"] and issue.id == row["linearIssueId"]
+                    and ident["identityDigest"] == execution.get("identityDigest")
+                    and binding_matches):
+                    return issue
+            except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError): continue
     except (OSError, ValueError, KeyError, TypeError):
         return None
     return None
@@ -2466,18 +2594,31 @@ def worker(host: Host, name: str) -> int:
         # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
         # then ungated lane drafts, then new issues.
         prs = lane_prs(name)
-        candidates = fix_candidates(name)
-        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
-        requeue_verified(host, prs)
+        candidates = [pr for pr in fix_candidates(name) if not remote_digest_pr(pr)]
+        events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if not remote_digest_pr(pr)]
+        continuation = None
+        def remote_retry(pr):
+            nonlocal continuation
+            if continuation: return False
+            try:
+                issue, _ = linear.get_issue(LANE_BRANCH.match(pr["headRefName"]).group("issue").upper())
+                result = reconcile_hyperagent_completion(host, spec, linear, issue, expected_pr=pr, enqueue=True)
+                if result and result.get("verdict") in ("landing", "verified-not-queued", "gate-timeout", "remote-repair-required"):
+                    receipt = {**result, "provider": name, "issue": issue.identifier, "linearIssueId": issue.id, "endedAt": now_iso()}
+                    with (host.state / "runs/ledger.jsonl").open("a") as ledger: ledger.write(json.dumps(receipt) + "\n")
+                    continuation = (issue, receipt)
+                return result and result.get("verdict") == "landing"
+            except (OSError, ValueError, KeyError, TypeError, RuntimeError): return False
+        requeue_verified(host, prs, remote_retry=remote_retry if name == "hyperagent" else None)
         escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-        red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
-        adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
-        issue = None
+        red = None if continuation else pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
+        adopt = None if red or continuation or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
+        issue = continuation[0] if continuation else None
         sweep_lane_prs(host, name, linear)
         full = not (red or adopt) and over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
                                                   host.slots(name, spec.get("slots", 1)))
         in_flight = None if red or adopt or full else in_flight_issues()
-        if not (red or adopt) and name == "hyperagent":
+        if issue is None and not (red or adopt) and name == "hyperagent":
             issue = pending_hyperagent_issue(host, spec, linear)
         if in_flight is not None and issue is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
@@ -2502,7 +2643,7 @@ def worker(host: Host, name: str) -> int:
         slot.release()
         return 0
     linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
-    receipt = run_issue(host, name, spec, linear, issue)
+    receipt = continuation[1] if continuation else run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
     if verdict == "disk-held":
         linear.move(issue.id, "Todo")
@@ -2540,6 +2681,10 @@ def worker(host: Host, name: str) -> int:
                                  "once a healthy lane or a human clears it.")
         slot.release()
         return 1
+    if verdict == "remote-repair-required":
+        linear.move(issue.id, "Backlog")
+        linear.comment(issue.id, f"Hyperagent automatic continuation is blocked. Existing PR {receipt.get('prUrl')} head {receipt.get('headSha')} thread {receipt.get('remoteThreadId')} preserved; gate reasons: {receipt.get('reasons', [])}. Dependencies: {receipt.get('dependencies', [])}; reconcile the existing PR.")
+        slot.release(); return 1
     if verdict == "remote-held":
         # Leave remote ownership In Progress. Retrying a local worktree or
         # another model would duplicate a live/unknown paid remote attempt.
@@ -2553,7 +2698,7 @@ def worker(host: Host, name: str) -> int:
                                  "Disposition: obsolete/invalid — needs a human decision, not a work queue.")
     elif verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
-                                 f"queued; required checks and the merge queue decide.")
+                                 f"{'queued' if verdict == 'landing' else 'verified; enqueue retry pending'}; required checks and the merge queue decide.")
     elif verdict == "held" and receipt.get("pr"):
         # One PR per issue: the fix loop repairs it on the same branch instead of a fresh attempt.
         linear.comment(issue.id, f"🤖 lane `{name}`: the lane gate held PR {receipt.get('prUrl')} "

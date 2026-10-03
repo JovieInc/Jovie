@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 """Remote Hyperagent lifecycle regressions; all external calls are deterministic."""
 import importlib.util
 import json
@@ -330,7 +331,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             stack.enter_context(patch.object(lane, "check_commands", return_value=[]))
             review = stack.enter_context(patch.object(lane, "sensitive_review", return_value=(False, ["sensitive-review-fixture"])))
             result = self.run_entry()
-        self.assertEqual(result["verdict"], "held")
+        self.assertEqual(result["verdict"], "remote-repair-required")
         self.assertEqual(result["reasons"], reasons)
         self.assertEqual(review.call_count, int(review_expected))
         self.assertFalse(any(args[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for args in commands))
@@ -416,7 +417,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             self.assertFalse(lane.over_budget("hyperagent", light[:1], slots=1))
             self.assertIn("JOV-6871", lane.in_flight_issues())
         with patch.object(lane, "claimed_elsewhere", return_value=False), patch.object(lane, "post_claim"):
-            self.assertEqual(lane.claim_adoptable_pr(self.host, "hyperagent", found), draft)
+            self.assertIsNone(lane.claim_adoptable_pr(self.host, "hyperagent", [draft]))
             self.assertEqual(lane.claim_adoptable_pr(self.host, "hyperagent", found), dated)
             self.assertIsNone(lane.claim_adoptable_pr(self.host, "hyperagent", found))
         older = {**draft, "number": 5, "headRefName": "hyperagent/jov-6871-20260929t100000"}
@@ -466,7 +467,8 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(result["reasons"], ["expired_attempt_reconciled"])
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
-    def test_worker_resumes_only_its_receipt_owned_current_in_progress_issue(self):
+    @contextmanager
+    def worker_fixture(self):
         from unittest.mock import patch
         from contextlib import ExitStack
         from types import SimpleNamespace
@@ -478,13 +480,17 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             move=lambda ident, name: (moves.append((ident, name)), state.update(name=name)), comment=lambda *args: None)
         with ExitStack() as stack:
             for name, value in {"Linear": lambda env: linear, "load_providers": lambda: {"hyperagent": {**self.spec, "label": "hyperagent"}},
-                "lane_prs": lambda *args, **kw: [], "fix_candidates": lambda *args: [], "requeue_verified": lambda *args: None,
+                "lane_prs": lambda *args, **kw: [], "fix_candidates": lambda *args: [], "requeue_verified": lambda *args, **kw: None,
                 "escalate_exhausted": lambda *args: None, "claim_red_pr": lambda *args: None, "claim_adoptable_pr": lambda *args: None,
                 "sweep_lane_prs": lambda *args: None, "in_flight_issues": lambda: frozenset(), "reexec": lambda *args: 0}.items():
                 stack.enter_context(patch.object(lane, name, value))
             stack.enter_context(patch.object(lane.disk_guard, "check", return_value={"admitted": True}))
             stack.enter_context(patch.object(lane.pr_events, "queued_prs", return_value=[]))
             stack.enter_context(patch.object(lane.pr_events, "claim_event_pr", return_value=None))
+            yield lane, state, moves
+
+    def test_worker_resumes_only_its_receipt_owned_current_in_progress_issue(self):
+        with self.worker_fixture() as (lane, state, moves):
             proof = self.spec.pop("verifiedRemote")
             self.assertEqual(lane.worker(self.host, "hyperagent"), 1)
             self.assertFalse(self.calls)
@@ -550,7 +556,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.approval = False
         self.run_entry()
         linear.get_issue = lambda ident: (self.issue, "In Progress")
-        self.assertIsNone(lane.pending_hyperagent_issue(self.host, self.spec, linear))
+        self.assertEqual(lane.pending_hyperagent_issue(self.host, self.spec, linear), self.issue)
 
     def test_existing_thread_read_failure_cannot_become_retryable_no_dispatch(self):
         from unittest.mock import patch
@@ -619,6 +625,253 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(self.lane.pending_hyperagent_issue(self.host, self.spec, linear), self.issue)
         self.assertEqual(self.run_entry()["verdict"], "verified-not-queued")
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_digest_remote_prs_never_enter_generic_adoption_or_red_repair(self):
+        from unittest.mock import patch
+        draft = {**self.pr, "isDraft": True, "mergeStateStatus": "DIRTY"}
+        dated = {**draft, "number": 9, "headRefName": "hyperagent/jov-9-20260930t123000"}
+        lane = self.lane
+        with patch.object(lane, "claimed_elsewhere", return_value=False), patch.object(lane, "post_claim"):
+            for provider in ("hyperagent", "devin"):
+                with self.subTest(provider=provider):
+                    self.assertIsNone(lane.claim_adoptable_pr(self.host, provider, [draft]))
+                    self.assertIsNone(lane.claim_red_pr(self.host, provider, [draft]))
+            self.assertEqual(lane.claim_adoptable_pr(self.host, "devin", [draft, dated]), dated)
+
+    def test_worker_terminal_known_mode_failure_moves_backlog_without_paid_dispatch(self):
+        from unittest.mock import patch
+        with self.worker_fixture() as (lane, state, moves), patch("runpy.run_path", return_value={"mcp_call": lambda *args: {"agents": []}}):
+            lane.worker(self.host, "hyperagent"); lane.worker(self.host, "hyperagent")
+            self.assertEqual(state["name"], "Backlog")
+            self.assertEqual(moves, [(self.issue.id, "In Progress"), (self.issue.id, "Backlog")])
+        self.assertFalse(self.calls)
+
+    def test_corrupt_candidate_and_empty_journal_do_not_block_owned_pending_issue(self):
+        from types import SimpleNamespace
+        from scripts.tests.test_lane_runner import issue
+        self.approval = True; self.run_entry()
+        ledger = self.host.state / "runs/ledger.jsonl"; good = json.loads(ledger.read_text().splitlines()[-1]); bad = issue("JOV-99")
+        ident = self.lane.execution_attempt.identity("linear-work", {"issue": bad.identifier, "outcome": "draft-pr"}, {"title": bad.title, "description": bad.description})
+        row = {**good, "issue": bad.identifier, "linearIssueId": bad.id, "execution": {**good["execution"], **ident}}
+        (self.host.state / "runs" / (ident["identityDigest"] + ".provider.jsonl")).write_text("")
+        linear = SimpleNamespace(get_issue=lambda ident: (bad if ident == bad.id else self.issue, "In Progress"))
+        for prior, binding in ((None, {}), ("bad", {}), (["bad"], {}), (row["execution"], "bad"), (row["execution"], ["bad"])):
+            with self.subTest(prior=prior, binding=binding):
+                chain = [{**row, "execution": prior}, {**row, "execution": None, "pendingBinding": binding}, good]
+                ledger.write_text("{broken\n[]\n" + "".join(json.dumps(r) + "\n" for r in ([row, good] if prior is None else chain)))
+                self.assertEqual(self.lane.pending_hyperagent_issue(self.host, self.spec, linear), self.issue)
+
+    def test_worker_filters_digest_github_events_before_generic_claim(self):
+        from unittest.mock import patch
+        with self.worker_fixture() as (lane, state, moves), patch.object(lane.pr_events, "queued_prs", return_value=[self.pr]), patch.object(lane.pr_events, "claim_event_pr", side_effect=lambda host, module, name, events: self.assertEqual(events, [])):
+            self.spec.pop("verifiedRemote"); lane.worker(self.host, "hyperagent")
+        self.assertFalse(self.calls)
+
+    def test_completed_held_remote_worker_records_repair_dependency_in_backlog(self):
+        from unittest.mock import patch
+        with self.worker_fixture() as (lane, state, moves), patch.object(lane, "adopt_pr", return_value={"verdict": "held", "pr": 7, "prUrl": self.pr["url"], "headSha": self.pr["headRefOid"], "reasons": ["diff-too-large:600"]}):
+            lane.worker(self.host, "hyperagent")
+            self.assertEqual(state["name"], "Backlog")
+            receipt = json.loads((self.host.state / "runs/ledger.jsonl").read_text().splitlines()[-1])
+            self.assertEqual(receipt["verdict"], "remote-repair-required")
+            self.assertEqual(receipt["dependencies"], ["automatic-hyper-repair-unavailable"])
+            self.assertEqual(receipt["reasons"], ["diff-too-large:600"])
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_completed_gate_timeout_retries_same_head_with_fresh_issue_sensitivity(self):
+        from unittest.mock import patch
+        gates = []
+        def gate(host, name, pr, *, sensitive=False):
+            gates.append(sensitive)
+            return {"verdict": "gate-timeout" if len(gates) == 1 else "verified-not-queued", "pr": 7, "prUrl": pr["url"], "headSha": pr["headRefOid"], "reasons": ["gate-timeout:900s:x1"] if len(gates) == 1 else []}
+        with self.worker_fixture() as (lane, state, moves), patch.object(lane, "adopt_pr", side_effect=gate):
+            lane.worker(self.host, "hyperagent"); self.issue.labels = ["Billing"]
+            lane.worker(self.host, "hyperagent")
+            self.assertEqual(state["name"], "Backlog")
+            receipt = json.loads((self.host.state / "runs/ledger.jsonl").read_text().splitlines()[-1])
+            self.assertEqual(receipt["dependencies"], ["automatic-guarded-review-budget-unavailable"])
+        self.assertEqual(gates, [False])
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_unauthenticated_digest_requeue_retains_entry_and_never_enqueues(self):
+        from unittest.mock import patch
+        path = self.host.state / "requeue.json"; path.write_text(json.dumps({"7": self.pr["headRefOid"]}))
+        with patch.object(self.lane, "sh") as command:
+            self.lane.requeue_verified(self.host, [self.pr])
+        command.assert_not_called()
+        self.assertEqual(json.loads(path.read_text()), {"7": self.pr["headRefOid"]})
+
+    def test_completed_verified_not_queued_retries_exact_enqueue_with_local_zero_spend_fence(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        self.run_entry(); path = self.host.state / "requeue.json"; path.write_text(json.dumps({"7": self.pr["headRefOid"]})); commands = []
+        def command(args, **kw):
+            commands.append(args)
+            return self.read(args, **kw) if args[:3] == ["gh", "pr", "view"] else SimpleNamespace(returncode=0, stdout="")
+        requeue = self.lane.requeue_verified
+        with self.worker_fixture() as (lane, state, moves), patch.object(lane, "sh", side_effect=command):
+            state["name"] = "In Progress"; linear = lane.Linear(None)
+            retry = lambda pr: lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, expected_pr=pr, enqueue=True)["verdict"] == "landing"
+            requeue(self.host, [self.pr], remote_retry=retry)
+            self.assertEqual(json.loads(path.read_text()), {})
+            self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue)["verdict"], "landing")
+        self.assertEqual(sum(args[:3] == ["gh", "pr", "merge"] for args in commands), 1)
+        merge = next(args for args in commands if args[:3] == ["gh", "pr", "merge"])
+        self.assertEqual(merge[merge.index("--match-head-commit") + 1], self.pr["headRefOid"])
+        rows = [json.loads(x) for x in (self.host.state / "runs/execution-attempts.jsonl").read_text().splitlines()]
+        local = [r for r in rows if r.get("owner", {}).get("tool") == "hyperagent-qualification"]
+        self.assertEqual(sum(r["event"] == "attempt_started" for r in local), 1)
+        reservations = [r["reservation"] for r in rows if r["identityDigest"] == local[0]["identityDigest"] and r["event"] == "boundary_admitted"]
+        self.assertEqual(reservations, [{"spend": 0, "mutations": 1}])
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_completed_context_rejects_foreign_changed_and_unfinished_provenance(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        self.run_entry(); lane = self.lane; linear = SimpleNamespace(get_issue=lambda ident: (self.issue, "In Progress"))
+        before = list(self.gates); original = self.pr.copy()
+        for field, value in (("headRefOid", "b" * 40), ("headRefName", "other"), ("body", ""), ("title", "other")):
+            with self.subTest(field=field):
+                self.pr[field] = value
+                self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, enqueue=True)["verdict"], "remote-held")
+                self.pr.update(original)
+        for target, value in (("owner", "foreign"), ("disabled", False), ("proof", False)):
+            with self.subTest(target=target):
+                with patch.object(lane, "HOST", value if target == "owner" else lane.HOST):
+                    old = self.spec.get("enabled", True); self.spec["enabled"] = value if target == "disabled" else old
+                    proof = self.spec["verifiedRemote"]["allInCap"]; self.spec["verifiedRemote"]["allInCap"] = value if target == "proof" else proof
+                    self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, enqueue=True)["verdict"], "remote-held")
+                    self.spec["enabled"] = old; self.spec["verifiedRemote"]["allInCap"] = proof
+        ledger = self.host.state / "runs/execution-attempts.jsonl"; rows = [json.loads(x) for x in ledger.read_text().splitlines()]
+        rows[-1]["result"] = rows[-1]["terminalState"] = "failed_unknown"; ledger.write_text("".join(json.dumps(r) + "\n" for r in rows))
+        self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, enqueue=True)["verdict"], "remote-held")
+        self.assertEqual(self.gates, before)
+
+    def test_completed_gate_continuation_is_bounded_and_preserves_original_journal(self):
+        from unittest.mock import patch
+        gate = {"verdict": "gate-timeout", "pr": 7, "prUrl": self.pr["url"], "headSha": self.pr["headRefOid"], "reasons": ["gate-timeout:900s:x1"]}
+        with self.worker_fixture() as (lane, state, moves), patch.object(lane, "adopt_pr", return_value=gate) as adoption:
+            lane.worker(self.host, "hyperagent")
+            for _ in range(lane.MAX_GATE_TIMEOUTS): lane.worker(self.host, "hyperagent")
+            self.assertEqual(state["name"], "Backlog")
+            self.assertEqual(adoption.call_count, 1 + lane.MAX_GATE_TIMEOUTS)
+            lane.worker(self.host, "hyperagent"); self.assertEqual(adoption.call_count, 1 + lane.MAX_GATE_TIMEOUTS)
+        journal = json.loads(next((self.host.state / "runs").glob("*.provider.jsonl")).read_text().splitlines()[-1])
+        self.assertEqual(journal["result"]["verdict"], "gate-timeout")
+        self.assertEqual(journal["completionResult"]["verdict"], "remote-repair-required")
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_unknown_qualification_outcome_never_regates_or_enqueues(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        self.run_entry(); lane = self.lane; linear = SimpleNamespace(get_issue=lambda ident: (self.issue, "In Progress"))
+        journal = next((self.host.state / "runs").glob("*.provider.jsonl")); state = json.loads(journal.read_text().splitlines()[-1])
+        state["completionIntent"] = {"operation": "enqueue", "head": self.pr["headRefOid"], "sensitive": False}; journal.write_text(json.dumps(state) + "\n")
+        with patch.object(lane, "adopt_pr") as gate:
+            self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, enqueue=True)["verdict"], "remote-held")
+            gate.assert_not_called()
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_shared_requeue_missing_lane_inventory_preserves_unknown_and_exact_digest(self):
+        from unittest.mock import patch
+        path = self.host.state / "requeue.json"
+        for live in (None, self.pr, {**self.pr, "state": "CLOSED"}, {**self.pr, "headRefOid": "b" * 40}):
+            with self.subTest(live=live):
+                path.write_text(json.dumps({"7": self.pr["headRefOid"]}))
+                with patch.object(self.lane, "reconcile_fix_target", return_value=live), patch.object(self.lane, "sh") as command:
+                    self.lane.requeue_verified(self.host, [])
+                    command.assert_not_called()
+                self.assertEqual(json.loads(path.read_text()), {"7": self.pr["headRefOid"]} if live is None or live == self.pr else {})
+
+    def test_legacy_completed_held_worker_handoff_and_known_gate_failure(self):
+        from unittest.mock import patch
+        for verdict in ("held", "failed", "skipped"):
+            with self.subTest(verdict=verdict):
+                self.setUp(); base = {"pr": 7, "prUrl": self.pr["url"], "headSha": self.pr["headRefOid"], "reasons": ["preserved-reason"]}
+                with self.worker_fixture() as (lane, state, moves), patch.object(lane, "adopt_pr", return_value={**base, "verdict": "held" if verdict == "held" else "gate-timeout"}):
+                    lane.worker(self.host, "hyperagent"); state["name"] = "In Progress"
+                    if verdict == "held":
+                        ledger = self.host.state / "runs/ledger.jsonl"; rows = ledger.read_text().splitlines(); row = json.loads(rows[-1]); row["verdict"] = "held"; row.pop("pendingBinding", None); rows[-1] = json.dumps(row); ledger.write_text("\n".join(rows) + "\n")
+                    with patch.object(lane, "adopt_pr", return_value={**base, "verdict": verdict}) as gate:
+                        lane.worker(self.host, "hyperagent")
+                        self.assertEqual(state["name"], "Backlog"); self.assertEqual(gate.call_count, 0 if verdict == "held" else 1)
+                    receipt = json.loads((self.host.state / "runs/ledger.jsonl").read_text().splitlines()[-1]); self.assertEqual(receipt["verdict"], "remote-repair-required")
+                    self.assertEqual(receipt["reasons"], ["preserved-reason"])
+                    if verdict != "held":
+                        self.assertEqual(receipt["qualificationExecution"]["result"], "failed_known")
+                        self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, lane.Linear(None), self.issue)["verdict"], "remote-held")
+                        state["name"] = "In Progress"
+                        self.assertEqual(lane.reconcile_hyperagent_completion(self.host, self.spec, lane.Linear(None), self.issue)["verdict"], "remote-repair-required")
+                self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_actual_gate_rejects_changed_head_before_enqueue(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        merges = []
+        def command(args, **kw):
+            if args[:3] == ["gh", "pr", "merge"]:
+                merges.append(args); return SimpleNamespace(returncode=1 if "--match-head-commit" in args else 0, stdout="")
+            return SimpleNamespace(returncode=0, stdout="1\t1\tscripts/test_example.py\n" if args[:3] == ["git", "diff", "--numstat"] else "")
+        with patch.object(self.lane, "sh", side_effect=command), patch.object(self.lane, "check_commands", return_value=[]):
+            result = self.lane.gate_pr(self.host, self.pr, self.host.state, None)
+        self.assertEqual(result["verdict"], "verified-not-queued")
+        self.assertEqual(merges[0][merges[0].index("--match-head-commit") + 1], self.pr["headRefOid"])
+
+    def test_queue_retry_requires_authenticated_current_gate_sensitivity(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        for escalation in ("Billing", "pr-label", "missing", "tampered", "pre-sensitive"):
+            with self.subTest(escalation=escalation):
+                self.setUp()
+                if escalation == "pre-sensitive": self.issue.labels = ["Billing"]
+                self.run_entry(); lane = self.lane; gates = []; queues = []
+                journal = next((self.host.state / "runs").glob("*.provider.jsonl")); state = json.loads(journal.read_text().splitlines()[-1])
+                if escalation == "Billing": self.issue.labels = ["Billing"]
+                if escalation == "pr-label": self.pr["labels"] = [{"name": lane.SENSITIVE_PR_LABEL}]
+                if escalation in ("missing", "tampered"):
+                    state["result"].pop("gateSensitive", None)
+                    if escalation == "tampered": state["result"]["gateSensitive"] = True
+                    journal.write_text(json.dumps(state) + "\n")
+                    if escalation == "missing":
+                        ledger = self.host.state / "runs/execution-attempts.jsonl"; rows = [json.loads(x) for x in ledger.read_text().splitlines()]; rows[-1].pop("gateSensitive", None); ledger.write_text("".join(json.dumps(r) + "\n" for r in rows))
+                def command(args, **kw):
+                    if args[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]): queues.append(args)
+                    return self.read(args, **kw) if args[:3] == ["gh", "pr", "view"] else SimpleNamespace(returncode=0, stdout="")
+                def gate(host, name, pr, *, sensitive=False):
+                    self.assertFalse(queues); gates.append(sensitive)
+                    return {"verdict": "verified-not-queued", "pr": 7, "prUrl": pr["url"], "headSha": pr["headRefOid"], "reasons": []}
+                linear = SimpleNamespace(get_issue=lambda ident: (self.issue, "In Progress"))
+                with patch.object(lane, "sh", side_effect=command), patch.object(lane, "adopt_pr", side_effect=gate):
+                    result = lane.reconcile_hyperagent_completion(self.host, self.spec, linear, self.issue, enqueue=True)
+                self.assertEqual(len(queues), 2 if escalation == "pre-sensitive" else 0)
+                self.assertEqual(result["verdict"], "landing" if escalation == "pre-sensitive" else "remote-held" if escalation == "tampered" else "verified-not-queued" if escalation == "missing" else "remote-repair-required")
+                self.assertEqual(gates, [False] if escalation == "missing" else [])
+                if escalation in ("Billing", "pr-label"): self.assertEqual(result["dependencies"], ["automatic-guarded-review-budget-unavailable"])
+                self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_actual_worker_preserves_retry_repair_disposition_without_second_run(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        for condition in ("Billing", "pr-label", "exhausted"):
+            with self.subTest(condition=condition):
+                self.setUp(); self.run_entry(); lane = self.lane; retry = lane.requeue_verified; comments = []; commands = []
+                if condition == "Billing": self.issue.labels = ["Billing"]
+                if condition == "pr-label": self.pr["labels"] = [{"name": lane.SENSITIVE_PR_LABEL}]
+                path = self.host.state / "requeue.json"; path.write_text(json.dumps({"7": self.pr["headRefOid"]}))
+                def command(args, **kw):
+                    commands.append(args)
+                    return self.read(args, **kw) if args[:3] == ["gh", "pr", "view"] else SimpleNamespace(returncode=1 if args[:3] == ["gh", "pr", "merge"] else 0, stdout="")
+                with self.worker_fixture() as (module, state, moves), patch.object(lane, "requeue_verified", retry), patch.object(lane, "lane_prs", return_value=[self.pr]), patch.object(lane, "sh", side_effect=command), patch.object(lane, "run_issue") as run, patch.object(lane, "adopt_pr") as gate:
+                    state["name"] = "In Progress"; lane.Linear(None).comment = lambda ident, text: comments.append(text)
+                    for _ in range(lane.MAX_FAILURES if condition == "exhausted" else 1): lane.worker(self.host, "hyperagent")
+                    self.assertEqual(state["name"], "Backlog"); run.assert_not_called(); gate.assert_not_called()
+                receipt = json.loads((self.host.state / "runs/ledger.jsonl").read_text().splitlines()[-1]); dependency = "automatic-hyper-repair-unavailable" if condition == "exhausted" else "automatic-guarded-review-budget-unavailable"
+                self.assertEqual(receipt["verdict"], "remote-repair-required"); self.assertEqual(receipt["issue"], self.issue.identifier)
+                self.assertEqual(receipt["dependencies"], [dependency]); self.assertIn(dependency, comments[-1]); self.assertFalse(any("queued;" in text for text in comments))
+                self.assertEqual(json.loads(path.read_text()), {"7": self.pr["headRefOid"]})
+                journal = json.loads(next((self.host.state / "runs").glob("*.provider.jsonl")).read_text().splitlines()[-1]); self.assertEqual(journal["completionResult"]["verdict"], "remote-repair-required")
+                self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+                if condition != "exhausted": self.assertFalse(any(args[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for args in commands))
 
 
 if __name__ == "__main__":
