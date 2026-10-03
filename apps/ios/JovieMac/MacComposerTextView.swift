@@ -55,7 +55,7 @@ struct MacComposerTextView: NSViewRepresentable {
     editor.delegate = nil
     editor.onCompositionEnded = nil
     editor.onWindowChanged = nil
-    editor.undoManager?.removeAllActions()
+    editor.draftUndoManager.removeAllActions()
   }
 
   @MainActor
@@ -93,6 +93,10 @@ struct MacComposerTextView: NSViewRepresentable {
       publish(editor)
     }
 
+    func undoManager(for view: NSTextView) -> UndoManager? {
+      (view as? MacComposerEditor)?.draftUndoManager
+    }
+
     func publish(_ editor: MacComposerEditor) {
       guard !isApplyingModel, let binding, binding.wrappedValue != editor.string else { return }
       binding.wrappedValue = editor.string
@@ -126,11 +130,9 @@ private final class MacComposerScrollView: NSScrollView {
 
 /// A dedicated native undo stack prevents a draft reset from clearing other controls.
 final class MacComposerEditor: NSTextView {
-  private let draftUndoManager = UndoManager()
+  let draftUndoManager = UndoManager()
   var onCompositionEnded: (() -> Void)?
   var onWindowChanged: (() -> Void)?
-
-  override var undoManager: UndoManager? { draftUndoManager }
 
   override func unmarkText() {
     super.unmarkText()
