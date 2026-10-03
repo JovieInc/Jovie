@@ -53,7 +53,7 @@ describe('POST /api/webhooks/sentry', () => {
     vi.resetModules();
   });
 
-  it('dedupes repeated resolutions without suppressing a regression inside the TTL', async () => {
+  it('releases a previous open-event lock on resolution and dedupes late resolution retries', async () => {
     vi.stubEnv('SUMMER_SENTRY_INTAKE_LIVE', 'true');
     const acquired = new Set<string>();
     mockAcquireRecentDispatch.mockImplementation(
@@ -61,6 +61,11 @@ describe('POST /api/webhooks/sentry', () => {
         if (acquired.has(key)) return { acquired: false, reason: 'duplicate' };
         acquired.add(key);
         return { acquired: true, reason: 'acquired' };
+      }
+    );
+    mockClearRecentDispatch.mockImplementation(
+      async (_source: string, key: string) => {
+        acquired.delete(key);
       }
     );
     mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
@@ -86,6 +91,8 @@ describe('POST /api/webhooks/sentry', () => {
           }) as never
         );
       };
+      expect((await postAction('created')).status).toBe(200);
+      expect(mockServerFetch).toHaveBeenCalledTimes(1);
       expect(await (await postAction('resolved')).json()).toMatchObject({
         resolved: true,
       });
@@ -93,10 +100,21 @@ describe('POST /api/webhooks/sentry', () => {
         deduplicated: true,
       });
       expect((await postAction('regressed')).status).toBe(200);
-      expect(mockServerFetch).toHaveBeenCalledTimes(1);
+      expect(mockServerFetch).toHaveBeenCalledTimes(2);
+      // Replayed resolution cannot clear the newly acquired regression lock.
+      expect(await (await postAction('resolved')).json()).toMatchObject({
+        deduplicated: true,
+      });
+      expect(await (await postAction('regressed')).json()).toMatchObject({
+        deduplicated: true,
+      });
+      expect(mockServerFetch).toHaveBeenCalledTimes(2);
       const keys = mockAcquireRecentDispatch.mock.calls.map(([, key]) => key);
-      expect(keys[0]).toBe(keys[1]);
-      expect(keys[0]).toBe(`${keys[2]}:resolved`);
+      expect(keys[0]).toBe(keys[3]);
+      expect(keys[1]).toBe(keys[2]);
+      expect(keys[1]).toBe(`${keys[0]}:resolved`);
+      expect(mockClearRecentDispatch).toHaveBeenCalledTimes(1);
+      expect(mockClearRecentDispatch).toHaveBeenCalledWith('sentry', keys[0]);
     } finally {
       vi.unstubAllEnvs();
     }
