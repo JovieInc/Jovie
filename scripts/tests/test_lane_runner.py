@@ -63,6 +63,17 @@ def publication_response(args):
     return ""
 
 
+def repair_target_page(pr, **overrides):
+    checks = [{"__typename": "CheckRun", **check} for check in pr.get("statusCheckRollup", [])]
+    live = {"state": "OPEN", "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
+            "mergeStateStatus": "BLOCKED", "reviewDecision": None,
+            **pr, "labels": {"pageInfo": {"hasNextPage": False}, "nodes": pr.get("labels", [])},
+            "commits": {"nodes": [{"commit": {"oid": pr["headRefOid"], "statusCheckRollup": {
+                "contexts": {"pageInfo": {"hasNextPage": False}, "nodes": checks}}}}]}, **overrides}
+    live.pop("statusCheckRollup", None)
+    return {"data": {"repository": {"pullRequest": live}}}
+
+
 class ContextManifestTest(unittest.TestCase):
     def test_repository_formatting_is_accepted_but_malformed_or_missing_contract_is_not(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -478,6 +489,10 @@ class FakeShell:
             out = json.dumps(self.prs)
         elif args[:3] == ["gh", "pr", "view"]:
             out = json.dumps({**self.prs[0], "state": "OPEN"})
+        elif args[:3] == ["gh", "api", "graphql"] and "query=" + lane.REPAIR_TARGET_QUERY in args:
+            number = int(next(value.removeprefix("number=") for value in args if value.startswith("number=")))
+            target = next(pr for pr in self.prs if pr["number"] == number)
+            out = json.dumps(repair_target_page(target))
         elif args[:2] == ["git", "diff"]:
             out = self.numstat
         elif args == ["git", "rev-parse", "HEAD"]:
@@ -1267,6 +1282,19 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_event_cleanup_waits_until_all_productive_selections_decline(self):
+        for chosen in ("event", "poll", "adopt", "issue", "idle"):
+            with self.subTest(chosen=chosen):
+                self.linear.issues = [issue("JOV-3")] if chosen == "issue" else []
+                with patch.object(lane.pr_events, "claim_event_pr", return_value={"number": 5} if chosen == "event" else None), \
+                     patch.object(lane, "claim_red_pr", return_value={"number": 5} if chosen == "poll" else None), \
+                     patch.object(lane, "claim_adoptable_pr", return_value=SimpleNamespace(pr={"number": 5}) if chosen == "adopt" else None), \
+                     patch.object(lane, "fix_red_pr"), patch.object(lane, "adopt_pr"), \
+                     patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}), \
+                     patch.object(lane.pr_events, "cleanup_one_event") as cleanup:
+                    lane.worker(self.host, "devin")
+                    self.assertEqual(cleanup.call_count, int(chosen == "idle"))
+
     def test_notification_error_releases_the_slot_even_while_traceback_is_retained(self):
         lane.run_issue = lambda *args: {"verdict": "landing", "prUrl": "u"}
         error = RuntimeError("notification unavailable")
@@ -2176,7 +2204,8 @@ class PreservedRecoveryTest(unittest.TestCase):
         head = self.git(self.host.repo, "rev-parse", "HEAD")
         self.git(self.host.repo, "update-ref", "refs/remotes/origin/devin/jov-1", head)
         self.pr = {"number": 5, "headRefName": "devin/jov-1", "headRefOid": head, "isDraft": True,
-                   "title": "repair", "state": "OPEN", "statusCheckRollup": []}
+                   "title": "repair", "state": "OPEN", "statusCheckRollup": [],
+                   "isInMergeQueue": False, "isCrossRepository": False}
         self.live, self.calls, self.active = dict(self.pr), [], ""
         real = lane.sh
         def shell(args, **kwargs):
@@ -2560,6 +2589,7 @@ class FixRedTest(unittest.TestCase):
 
     def pr(self, number=5, sha="h1", checks=None):
         return {"number": number, "title": "t", "headRefName": "devin/jov-1", "headRefOid": sha,
+                "isInMergeQueue": False, "isCrossRepository": False, "isDraft": False,
                 "statusCheckRollup": checks if checks is not None else [
                     {"name": "ci-fast (remaining)", "status": "COMPLETED", "conclusion": "FAILURE",
                      "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}]}
@@ -2636,7 +2666,7 @@ class FixRedTest(unittest.TestCase):
                 lane.require_fix_target(self.pr(), "after-agent", worktree=Path("repair"))
 
     def test_target_merging_after_checkout_cancels_before_install_and_preserves_source(self):
-        for terminal in ("MERGED", "CLOSED", "UNKNOWN", "SUPERSEDED"):
+        for terminal in ("MERGED", "CLOSED", "UNKNOWN", "SUPERSEDED", "QUEUED", "QUEUE_UNKNOWN"):
             with self.subTest(terminal=terminal), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
                 checked_out, calls = [], []
@@ -2645,6 +2675,8 @@ class FixRedTest(unittest.TestCase):
                         return {**pr, "state": "OPEN"}
                     if terminal == "UNKNOWN":
                         return None
+                    if terminal in ("QUEUED", "QUEUE_UNKNOWN"):
+                        return {**pr, "state": "OPEN", "isInMergeQueue": True if terminal == "QUEUED" else None}
                     return {**pr, "state": "OPEN" if terminal == "SUPERSEDED" else terminal,
                             "headRefOid": "other" if terminal == "SUPERSEDED" else pr["headRefOid"]}
                 def shell(args, **kwargs):
@@ -2806,10 +2838,10 @@ class FixRedTest(unittest.TestCase):
 
         def fake(args, **kw):
             calls.append(args)
-            payload = {"state": "MERGED", "mergedAt": "2026-09-30T17:42:50Z",
+            payload = {"number": 5, "state": "MERGED", "mergedAt": "2026-09-30T17:42:50Z",
                        "headRefName": "devin/jov-1", "headRefOid": "h1", "url": "https://x/pr/5",
                        "statusCheckRollup": []}
-            return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+            return SimpleNamespace(returncode=0, stdout=json.dumps(repair_target_page(payload)), stderr="")
         lane.sh = fake
         lane.run_agent = lambda *a, **kw: self.fail("a merged target must not start an agent")
         with tempfile.TemporaryDirectory() as tmp:
@@ -3464,7 +3496,8 @@ class GateSingleflightTest(unittest.TestCase):
                 def shell(args, **kwargs):
                     if fault == "checkout" and args == ["git", "rev-parse", "HEAD"]:
                         return SimpleNamespace(returncode=0, stdout="wrong", stderr="")
-                    if fault == "unreadable" and args[:3] == ["gh", "pr", "view"]:
+                    if fault == "unreadable" and args[:3] == ["gh", "api", "graphql"] \
+                            and f"query={lane.REPAIR_TARGET_QUERY}" in args:
                         return SimpleNamespace(returncode=1, stdout="", stderr="unavailable")
                     return self.fake(args, **kwargs)
                 with patch.object(lane, "sh", side_effect=shell):
@@ -3706,9 +3739,10 @@ class RequeueTest(unittest.TestCase):
             calls = []
             def fake_sh(cmd, **kwargs):
                 calls.append(cmd)
-                if cmd[:3] == ["gh", "pr", "view"]:
-                    return SimpleNamespace(returncode=0, stdout=json.dumps(
-                        {"number": int(cmd[3]), "headRefOid": "h2" if cmd[3] == "7" else "h1", "headRefName": "devin/jov-1", "state": "OPEN"}))
+                if cmd[:3] == ["gh", "api", "graphql"] and f"query={lane.REPAIR_TARGET_QUERY}" in cmd:
+                    number = int(next(arg.split("=", 1)[1] for arg in cmd if arg.startswith("number=")))
+                    return SimpleNamespace(returncode=0, stdout=json.dumps(repair_target_page(
+                        {"number": number, "headRefOid": "h2" if number == 7 else "h1", "headRefName": "devin/jov-1", "state": "OPEN"})))
                 # PR 6 is still rate-limited; everything else enqueues.
                 return SimpleNamespace(returncode=1 if cmd[1:4] == ["pr", "merge", "6"] else 0,
                                        stdout=publication_response(cmd), stderr="")
@@ -3771,8 +3805,289 @@ class RequeueTest(unittest.TestCase):
                 self.assertEqual(json.loads(path.read_text()), {"7": "abc"})
 
 
+
+class RepairQueueAuthorityTest(unittest.TestCase):
+    def target(self):
+        return {"number": 5, "headRefName": "devin/jov-1-20260926t0900", "headRefOid": "h1",
+                "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
+                "state": "OPEN", "labels": [], "statusCheckRollup": []}
+
+    def read(self, payload):
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=json.dumps(payload))) as command:
+            result = lane.reconcile_fix_target(self.target())
+            self.assertEqual(command.call_count, 1)
+            self.assertEqual(command.call_args.args[0][:3], ["gh", "api", "graphql"])
+            return result
+
+    def test_single_read_binds_ownership_checks_and_head(self):
+        target = self.target()
+        target["statusCheckRollup"] = [{"name": "ci", "status": "COMPLETED", "conclusion": "FAILURE"}]
+        result = self.read(repair_target_page(target))
+        self.assertIs(result["isInMergeQueue"], False)
+        self.assertEqual(result["statusCheckRollup"][0]["conclusion"], "FAILURE")
+        self.assertEqual(result["labels"], [])
+        page = repair_target_page(self.target())
+        page["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["statusCheckRollup"] = None
+        self.assertEqual(self.read(page)["statusCheckRollup"], [])
+
+    def test_incomplete_or_malformed_target_never_authorizes_repair(self):
+        mutations = [
+            lambda p: p.pop("isInMergeQueue"),
+            lambda p: p.update(isInMergeQueue=None),
+            lambda p: p.update(isInMergeQueue=0),
+            lambda p: p.update(isInMergeQueue="false"),
+            lambda p: p.pop("isCrossRepository"),
+            lambda p: p.update(number=6),
+            lambda p: p.update(state="UNKNOWN"),
+            lambda p: p.update(headRefOid=""),
+            lambda p: p.update(labels={"pageInfo": {"hasNextPage": True}, "nodes": []}),
+            lambda p: p.update(labels={"pageInfo": {"hasNextPage": False}, "nodes": [{}]}),
+            lambda p: p.update(commits={"nodes": []}),
+            lambda p: p["commits"]["nodes"][0]["commit"].update(oid="other-head"),
+            lambda p: p["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]["pageInfo"].update(hasNextPage=True),
+            lambda p: p["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"].update(nodes=[{"__typename": "Unknown"}]),
+            lambda p: p["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"].update(nodes=[None]),
+        ]
+        for mutate in mutations:
+            with self.subTest(mutation=mutations.index(mutate)):
+                page = repair_target_page(self.target());mutate(page["data"]["repository"]["pullRequest"])
+                self.assertIsNone(self.read(page))
+        self.assertIsNone(self.read({**repair_target_page(self.target()), "errors": [{"message": "partial"}]}))
+        for error in (OSError("unavailable"), subprocess.TimeoutExpired("gh", 30)):
+            with patch.object(lane, "sh", side_effect=error):
+                self.assertIsNone(lane.reconcile_fix_target(self.target()))
+
+    def test_terminal_evidence_survives_deleted_branch_connections(self):
+        for state in ("MERGED", "CLOSED"):
+            terminal = {"number": 5, "state": state, "commits": None, "labels": None}
+            self.assertEqual(self.read({"data": {"repository": {"pullRequest": terminal}}})["state"], state)
+
+    def test_check_union_preserves_pending_and_legacy_red_policy(self):
+        contexts = [
+            {"__typename": "CheckRun", "name": "required", "status": "IN_PROGRESS", "conclusion": None},
+            {"__typename": "StatusContext", "context": "legacy", "state": "ERROR", "targetUrl": ""},
+        ]
+        page = repair_target_page(self.target())
+        connection = page["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]
+        connection["nodes"] = contexts
+        live = self.read(page)
+        self.assertEqual(live["statusCheckRollup"], contexts)
+        self.assertIsNone(lane.red_pr([live], {}), "legacy ERROR does not expand existing CheckRun RED authority")
+        contexts[0].pop("conclusion")
+        self.assertIsNone(self.read(page), "missing conclusion is not explicit pending/null")
+
+    def test_failed_command_and_non_object_envelopes_refuse_authority(self):
+        for code, out in ((1, json.dumps(repair_target_page(self.target()))), (0, "not json"),
+                          (0, "[]"), (0, "null"), (0, '{"data":null}')):
+            with self.subTest(code=code, out=out), patch.object(lane, "sh", return_value=SimpleNamespace(returncode=code, stdout=out)):
+                self.assertIsNone(lane.reconcile_fix_target(self.target()))
+
+    def test_missing_fresh_decisions_never_inherit_stale_repair_reasons(self):
+        for key, old in (("mergeStateStatus", "DIRTY"), ("reviewDecision", "CHANGES_REQUESTED")):
+            target = {**self.target(), key: old};page = repair_target_page(target)
+            page["data"]["repository"]["pullRequest"].pop(key)
+            with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=json.dumps(page))):
+                self.assertIsNone(lane.reconcile_fix_target(target))
+
+    def test_queue_refusal_is_repair_only_and_precedes_self_push_exception(self):
+        for queued in (True, None):
+            live = {**self.target(), "isInMergeQueue": queued}
+            with patch.object(lane, "reconcile_fix_target", return_value=live):
+                self.assertEqual(lane.require_fix_target(self.target(), "before-gate"), live)
+                with self.assertRaises(lane.RepairStopped):
+                    lane.require_fix_target(self.target(), "before-install", repair=True)
+            with patch.object(lane, "reconcile_fix_target", return_value={**live, "headRefOid": "own-push"}), \
+                    patch.object(lane, "repair_created_head", return_value=True) as provenance:
+                with self.assertRaises(lane.RepairStopped):
+                    lane.require_fix_target(self.target(), "agent-running", worktree=Path("repair"), repair=True)
+                provenance.assert_not_called()
+
+    def test_queued_initial_target_has_no_execution_claim_checkout_install_or_provider(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            history = {"5": {"sha": "h1", "count": 1, "at": 1}}
+            (host.state / "fix-attempts.json").write_text(json.dumps(history))
+            with patch.object(lane, "reconcile_fix_target", return_value={**self.target(), "isInMergeQueue": True}), \
+                    patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "sh") as shell, \
+                    patch.object(lane, "install_dependencies") as install, patch.object(lane, "run_agent") as agent:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.target())
+                claim.assert_not_called();shell.assert_not_called();install.assert_not_called();agent.assert_not_called()
+            self.assertEqual(receipt["reasons"], ["target-pr-queued"])
+            self.assertNotIn("execution", receipt)
+            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["5"]["count"], 1)
+
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class EscalationQueueAuthorityTest(unittest.TestCase):
+    def run_case(self, fault, *, human_hold=False, top=False):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            pr = {"number": 7, "headRefOid": "head-A", "headRefName": "codex/jov-7648-20261003",
+                  "state": "OPEN", "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
+                  "mergeStateStatus": "DIRTY", "labels": [], "statusCheckRollup": []}
+            if human_hold:
+                pr.update(labels=[{"name": "hold"}], holdNote={"author": "itstimwhite",
+                          "body": "use computeRatePercent from @/lib/analytics/metrics and remove hold"})
+            live = json.loads(json.dumps(pr))
+            record = {"sha": "head-A", "pushedHead": "head-A", "count": lane.MAX_FIX_ATTEMPTS,
+                      "lane": "devin", "at": 1, "endedAt": 2, "reentry": {"keep": True},
+                      "priorEscalations": [{"rung": "retained"}], "escalations": [],
+                      "pendingEscalation": {"lane": "codex", "head": "head-A", "dossier": "existing authority",
+                                            "cls": "fixable-by-model" if human_hold else "needs-rebase",
+                                            "subtype": "human-hold" if human_hold else "semantic", "topRung": top}}
+            if fault == "pending-head": record["pendingEscalation"]["head"] = "head-B"
+            if fault == "malformed-dossier": record["pendingEscalation"]["dossier"] = {"invalid": True}
+            if fault == "empty-dossier": record["pendingEscalation"]["dossier"] = "  "
+            malformed_history = {"rungs-string": ("escalations", "bad"), "rungs-object": ("escalations", {"old": {"kind": "model"}}),
+                                 "rungs-mixed": ("escalations", [{"kind": "model"}, "bad"]),
+                                 "prior-string": ("priorEscalations", "bad"), "count-string": ("count", "bad"),
+                                 "count-bool": ("count", True), "count-negative": ("count", -1)}
+            if fault in malformed_history:
+                field, value = malformed_history[fault]; record[field] = value
+            if fault == "cached-queued": pr["isInMergeQueue"] = True
+            if fault == "cached-unknown": pr.pop("isInMergeQueue")
+            if fault == "active-recorded-head":
+                record.update(sha="old-local-head", at=1000); record.pop("endedAt")
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps({"7": record, "9": {"count": 1}}))
+            held = host.state / "held.json"
+            held.write_text("{}")
+            held_faults = {"legacy-secret": ["secret-like-file-changed:file"], "empty-diff": ["empty-diff"],
+                           "exhausted-secret": ["fix-exhausted", "secret-like-file-changed:file"],
+                           "exhausted-size": ["fix-exhausted", "diff-too-large:100"],
+                           "legacy-lockfile": ["lockfile-without-manifest"], "only-exhausted": ["fix-exhausted"]}
+            if fault in held_faults:
+                held.write_text(json.dumps({"7": {"sha": "head-A", "evidence": held_faults[fault]}}))
+            if fault == "declared-empty-diff":
+                held.write_text(json.dumps({"7": {"sha": "head-A", "reason": "empty-diff"}}))
+            summary = host.state / "escalation.json"
+            summary.write_text(json.dumps({"events": {"existing": {"status": "claimed"}}, "attempts": []}))
+            bad_summaries = {"summary-corrupt": "[", "summary-list": "[]", "summary-null": "null",
+                             "summary-attempts-null": '{"attempts":null}', "summary-attempts-string": '{"attempts":"bad"}'}
+            order = []
+            expected = json.loads(path.read_text())
+            summary_expected = json.loads(summary.read_text())
+
+            def mutate():
+                if fault in {"attempt-race", "pending-race", "unrelated-race", "late-CAS-race"}:
+                    current = json.loads(path.read_text())
+                    if fault == "pending-race": current["7"]["pendingEscalation"]["dossier"] = "new prescription"
+                    elif fault == "unrelated-race": current["10"] = {"count": 2, "keep": True}
+                    else: current["7"]["escalations"].append({"rung": "concurrent"})
+                    path.write_text(json.dumps(current)); expected.clear(); expected.update(current)
+                if fault in {"new-held", "changed-held-prescription"}:
+                    held.write_text(json.dumps({"7": lane.pr_events.held_record("head-A", ["diff-too-large:100"])}))
+                if fault == "corrupt-held": held.write_text("[")
+                if fault == "malformed-held": held.write_text("[]")
+                if fault == "revoked": lane.revoke_publication(host, branch=pr["headRefName"], reason="new-revocation")
+                if fault == "summary-race":
+                    current = json.loads(summary.read_text()); current["events"]["concurrent"] = {"keep": True}
+                    current["attempts"].append({"pr": 99})
+                    summary.write_text(json.dumps(current)); summary_expected.clear(); summary_expected.update(current)
+                if fault in bad_summaries: summary.write_text(bad_summaries[fault])
+
+            def owner(*args, **kwargs):
+                self.assertEqual(kwargs, {"timeout": 30}); order.append("owner")
+                return fault == "owner"
+
+            def target(_):
+                order.append("target")
+                if fault == "unreadable": return None
+                if fault == "queued": live["isInMergeQueue"] = True
+                if fault == "unknown": live["isInMergeQueue"] = None
+                if fault == "missing-queue": live.pop("isInMergeQueue")
+                if fault == "head": live["headRefOid"] = "head-B"
+                if fault == "branch": live["headRefName"] = "foreign/branch"
+                if fault == "fork": live["isCrossRepository"] = True
+                if fault == "closed": live["state"] = "CLOSED"
+                if fault == "merged": live["state"] = "MERGED"
+                if fault == "new-hold": live["labels"].append({"name": "tim-hold"})
+                if fault == "human-decision": live["labels"].append({"name": "needs-human"})
+                if fault == "changed-note": live["holdNote"] = {"body": "new human decision"}
+                if fault == "foreign-draft": live["isDraft"] = True
+                if fault in {"ready-green", "ready-pending"}:
+                    live.update(mergeStateStatus="CLEAN", statusCheckRollup=[{
+                        "name": "ci", "status": "COMPLETED" if fault == "ready-green" else "IN_PROGRESS",
+                        "conclusion": "SUCCESS" if fault == "ready-green" else None}])
+                if fault == "changed-class":
+                    live.update(mergeStateStatus="CLEAN", statusCheckRollup=[{
+                        "name": "ci", "status": "COMPLETED", "conclusion": "FAILURE"}])
+                if fault == "changed-subtype": live["conflictFiles"] = ["pnpm-lock.yaml"]
+                if fault != "late-CAS-race": mutate()
+                return live
+
+            if fault == "foreign-draft":
+                pr["headRefName"] = live["headRefName"] = "devin/jov-7648-20261003"
+            original_update = lane.update_json
+            original_replace = lane.os.replace
+
+            def replace(src, dst):
+                if Path(dst) == summary and fault == "summary-write-fails": raise OSError("fixture summary I/O failure")
+                return original_replace(src, dst)
+
+            def update(file, change):
+                if file == path and fault == "late-CAS-race": mutate()
+                return original_update(file, change)
+
+            with patch.object(lane, "claimed_elsewhere", side_effect=owner), \
+                 patch.object(lane, "reconcile_fix_target", side_effect=target), \
+                 patch.object(lane, "post_claim") as posted, patch.object(lane, "sh", side_effect=AssertionError("no external command")), \
+                 patch.object(lane, "load_providers", return_value={"codex": {"enabled": True}, "devin": {"enabled": True}}), \
+                 patch.object(lane, "update_json", side_effect=update), patch.object(lane.os, "replace", side_effect=replace), \
+                 patch.object(lane.time, "time", return_value=1000):
+                if fault == "summary-write-fails":
+                    with self.assertRaisesRegex(OSError, "summary I/O failure"):
+                        lane.claim_escalation_pr(host, "codex", [pr])
+                    selected = None
+                else: selected = lane.claim_escalation_pr(host, "codex", [pr])
+            charged = fault in {"none", "cached-unknown", "unrelated-race", "summary-race", "only-exhausted"}
+            after = json.loads(path.read_text())
+            self.assertEqual(bool(selected), charged, fault)
+            if charged:
+                updated = after.pop("7"); before = expected.pop("7")
+                self.assertEqual(after, expected)
+                for key, value in before.items():
+                    if key not in {"pendingEscalation", "escalations"}: self.assertEqual(updated[key], value, key)
+                self.assertNotIn("pendingEscalation", updated)
+                self.assertEqual(len(updated["escalations"]), 1)
+                self.assertEqual(updated["escalations"][0]["topRung"], top)
+                self.assertEqual(selected["liftHold"], human_hold)
+                self.assertEqual(selected["dossier"], "existing authority")
+                posted.assert_called_once_with(7, "head-A", "fix")
+                summary_expected["attempts"].append({"pr": 7, "at": 1000, "lane": "codex"})
+            elif fault == "summary-write-fails":
+                self.assertEqual(after["7"]["count"], record["count"])
+                self.assertEqual(len(after["7"]["escalations"]), 1)
+                self.assertNotIn("pendingEscalation", after["7"])
+                posted.assert_not_called()
+            else:
+                self.assertEqual(after, expected); posted.assert_not_called()
+            if fault in bad_summaries: self.assertEqual(summary.read_text(), bad_summaries[fault])
+            else: self.assertEqual(json.loads(summary.read_text()), summary_expected)
+            self.assertEqual(order, [] if fault in {"pending-head", "cached-queued", "malformed-dossier", "empty-dossier", *malformed_history} else
+                             ["owner"] if fault == "owner" else ["owner", "target"])
+
+    def test_refused_targets_retain_pending_history_and_claims(self):
+        for fault in ("pending-head", "cached-queued", "owner", "queued", "unknown", "missing-queue", "unreadable",
+                      "head", "branch", "fork", "closed", "merged", "new-hold", "human-decision", "foreign-draft",
+                      "active-recorded-head", "attempt-race", "pending-race", "late-CAS-race", "new-held",
+                      "corrupt-held", "malformed-held", "revoked", "legacy-secret", "empty-diff", "exhausted-secret",
+                      "exhausted-size", "legacy-lockfile", "declared-empty-diff", "ready-green", "ready-pending",
+                      "summary-corrupt", "summary-list", "summary-null", "summary-attempts-null", "summary-attempts-string",
+                      "summary-write-fails", "changed-class", "changed-subtype", "malformed-dossier", "empty-dossier",
+                      "rungs-string", "rungs-object", "rungs-mixed", "prior-string", "count-string", "count-bool", "count-negative"):
+            with self.subTest(fault=fault): self.run_case(fault)
+
+    def test_separate_rung_budget_and_concurrent_unrelated_history_survive(self):
+        for fault in ("none", "cached-unknown", "unrelated-race", "summary-race", "only-exhausted"):
+            with self.subTest(fault=fault): self.run_case(fault, top=True)
+
+    def test_prescribed_human_hold_does_not_authorize_new_preservation(self):
+        for fault in ("none", "new-hold", "changed-note", "changed-held-prescription", "human-decision"):
+            with self.subTest(fault=fault): self.run_case(fault, human_hold=True)
 
 
 class OnePrPerIssueTest(unittest.TestCase):
@@ -3781,6 +4096,7 @@ class OnePrPerIssueTest(unittest.TestCase):
 
     def pr(self, number, issue="jov-7", draft=True, state="BLOCKED", pushed_ago=0, lane_name="devin"):
         return {"number": number, "headRefName": f"{lane_name}/{issue}-20260927t0{number:05d}", "isDraft": draft,
+                "isInMergeQueue": False, "isCrossRepository": False,
                 "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago, "headRefOid": f"h{number}", "labels": []}
 
     def test_in_flight_reads_branches_and_markers_and_fails_closed(self):

@@ -235,6 +235,26 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertNotEqual(chosen["lane"], "hyperagent")
         self.assertNotIn("hyperagent", {spec and name for name, spec in catalog.items() if not spec.get("enabled", True)} & {chosen["lane"]})
 
+    def test_ha_ci_remediator_poke_is_gone(self):
+        needle = "ha-" + "ci-remediator-poke"
+        skip = {".git", "node_modules", ".next", "browse", "__pycache__", "dist"}
+        hits = []
+        for path in ROOT.rglob("*"):
+            if not path.is_file() or any(part in skip for part in path.parts):
+                continue
+            if path.suffix in {".pyc", ".png", ".woff", ".woff2", ".jpg", ".jpeg", ".webp", ".gif"}:
+                continue
+            if path.resolve() == Path(__file__).resolve():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue
+            if needle in text:
+                hits.append(str(path.relative_to(ROOT)))
+        self.assertEqual(hits, [])
+
+
 def linear_issue(identifier, fingerprint, *, state="unstarted", title="", description="",
                  created="2026-10-01T00:00:00Z", team="JOV", updated="2026-10-02T00:00:00Z"):
     name = "Todo" if state == "unstarted" else ("Done" if state == "completed" else state)

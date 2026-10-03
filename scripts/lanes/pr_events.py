@@ -290,12 +290,12 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
                        next="revalidated every sweep; goes stale when the dependency lands")
         elif holds:
             row.update(state="hold:" + sorted(holds)[0], next="explicit hold; rechecked every sweep")
+        elif pr.get("isInMergeQueue"):
+            row.update(state="queued", next="the merge queue lands or ejects it")
         elif live or number in labeled:
             kind = labeled.get(number) or live[0]
             row.update(state="advancing", reason=f"{PREFIX}{kind}",
                        next="a lane works the labeled event")
-        elif pr.get("isInMergeQueue"):
-            row.update(state="queued", next="the merge queue lands or ejects it")
         elif pr.get("mergeStateStatus") == "CLEAN" and not pr.get("isDraft"):
             row.update(state="ready", next="enroll in the merge queue")
         elif pr.get("rollup") in ("PENDING", "EXPECTED") or idle_s < ORPHAN_GRACE_S:
@@ -742,9 +742,10 @@ def queued_prs(lane, kinds) -> list[dict]:
     return prs
 
 
-def consume(lane, pr: dict, kinds=None) -> None:
+def consume(lane, pr: dict, kinds=None, *, timeout: float | None = None) -> None:
     for kind in kinds if kinds is not None else pr.get("eventKinds") or []:
-        lane.sh(["gh", "api", "-X", "DELETE", f"repos/{lane.REPO_SLUG}/issues/{pr['number']}/labels/{PREFIX}{kind}"])
+        lane.sh(["gh", "api", "-X", "DELETE", f"repos/{lane.REPO_SLUG}/issues/{pr['number']}/labels/{PREFIX}{kind}"],
+                **({"timeout": timeout} if timeout is not None else {}))
 
 
 def iso_ts(stamp: str | None) -> float | None:
@@ -775,6 +776,8 @@ def may_take(name: str, pr: dict, record: dict, order: list[str], now: float) ->
 def needs_work(lane, pr: dict) -> bool:
     """The PR's own state still backs its labels: conflicts and red checks are re-read, while a
     merge-queue removal or review feedback stands until a new head answers it."""
+    if pr.get("isInMergeQueue") is True:
+        return False
     kinds = set(pr.get("eventKinds") or [])
     if kinds & {"dequeued", "review", "stale"}:
         return True
@@ -883,15 +886,32 @@ def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: f
 
 
 def fresh_reentry(lane, pr: dict, record: dict) -> dict | None:
-    """Under the existing claim fence, a cached head cannot consume another head's exhaustion."""
-    if not record.get("count") or same_generation(record, pr.get("headRefOid")):
-        return pr
+    """Every selected repair needs fresh target ownership before any generation is charged."""
     live = lane.reconcile_fix_target(pr)
     if not live or live.get("state") != "OPEN" or live.get("headRefOid") != pr.get("headRefOid") \
-            or live.get("headRefName") != pr.get("headRefName") or live.get("isCrossRepository") \
+            or live.get("headRefName") != pr.get("headRefName") or live.get("isCrossRepository") is not False \
+            or live.get("isInMergeQueue") is not False \
             or {label.lower() for label in label_names(live)} & HOLD_LABELS:
         return None
     return live
+
+
+def current_repair_claim(host, lane, pr: dict, expected: dict, now: float | None = None) -> dict | None:
+    """Recheck local preservation after the last remote read, before the existing CAS."""
+    try:
+        paths = [host.state / name for name in ("fix-attempts.json", "held.json")]
+        attempts, held = [json.loads(path.read_text()) if path.exists() else {} for path in paths]
+        if not isinstance(attempts, dict) or not isinstance(held, dict):
+            return None
+        record, entry = attempts.get(str(pr["number"]), {}), held.get(str(pr["number"]), {})
+        if not isinstance(record, dict) or not isinstance(entry, dict) or record != expected:
+            return None
+        if preservation_reason(pr, record, lane.MAX_FIX_ATTEMPTS, held=entry,
+                               now=time.time() if now is None else now, allow_reentry=True):
+            return None
+        return entry
+    except (OSError, ValueError, TypeError):
+        return None
 
 
 def read_state(host, name: str) -> dict:
@@ -921,9 +941,9 @@ def queue_failure(lane, number: int, limit: int = 4000) -> str:
 
 def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = None) -> dict | None:
     """Under the claim lock: the first event-queued PR this lane may fix. Records the attempt,
-    posts the cross-host claim and consumes the labels. A label whose PR no longer needs work
-    (or is out of scope) is consumed; one on a spent head or a head a fix is still running on
-    stays, so the PR shows why it is waiting and the relay does not re-add it."""
+    posts the cross-host claim and consumes the labels. Resolved or out-of-scope labels wait
+    for bounded cleanup after productive selection declines. Spent and active heads retain
+    their signals, so the PR shows why it is waiting and the relay does not re-add them."""
     now = time.time() if now is None else now
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
@@ -933,13 +953,15 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
     order = cost_order(providers)
     disabled = set(providers) - set(order)
     for pr in sorted(prs, key=lambda item: item["number"]):
+        if pr.get("isInMergeQueue") is True:
+            continue  # Preserve events while native landing owns the target.
         record = attempts.get(str(pr["number"]), {})
         needs_repair = needs_work(lane, pr)
         if preservation_reason(pr, record, lane.MAX_FIX_ATTEMPTS, now=now, allow_reentry=needs_repair):
             continue
         if not in_scope(pr, "red", disabled) or not needs_repair:
-            consume(lane, pr)
-            continue
+            continue  # Cleanup runs only after both repair selectors and new work decline.
+
         if spent(record, pr["headRefOid"], lane.MAX_FIX_ATTEMPTS) or in_flight(record, pr, now):
             continue
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
@@ -947,18 +969,25 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
                 and str(pr["number"]) not in read_state(host, "synced.json"):
             continue  # the tick's no-model sync with main goes first
         if not fixable_hold(held.get(str(pr["number"])), pr["headRefOid"]):
-            consume(lane, pr)  # intake owns this head; the label must not keep queueing fixes
-            continue
+            continue  # A stronger preservation hold retains the source signal.
         if not may_take(name, pr, record, order, now) or lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
         pr = fresh_reentry(lane, pr, record)
-        if pr is None or not needs_work(lane, pr):
+        if pr is None or not in_scope(pr, "red", disabled) or not needs_work(lane, pr):
             continue
-        entry = held.get(str(pr["number"]), {})
+        if "dequeued" in (pr.get("eventKinds") or []):
+            failure = queue_failure(lane, pr["number"])
+            if lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+                continue
+            pr = fresh_reentry(lane, pr, record)
+            if pr is None or not in_scope(pr, "red", disabled) or not needs_work(lane, pr):
+                continue
+            pr = {**pr, "queueFailure": failure}
+        entry = current_repair_claim(host, lane, pr, record, now)
+        if entry is None:
+            continue
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
-        if "dequeued" in (pr.get("eventKinds") or []):
-            pr = {**pr, "queueFailure": queue_failure(lane, pr["number"])}
         if not charge_reentry(lane, path, pr, record, name, now):
             continue
         if PREFIX + EXHAUSTED in {label.lower() for label in label_names(pr)}:
@@ -967,6 +996,49 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         lane.post_claim(pr["number"], pr["headRefOid"], "fix")
         consume(lane, pr)
         return pr
+    return None
+
+
+def cleanup_one_event(host, lane, prs: list[dict], now: float | None = None) -> int | None:
+    """One bounded maintenance candidate after work selection; snapshots never grant writes.
+
+    Rotate with the existing scan TTL so a refused first row cannot starve later rows.
+    The caller retains claim.lock; this path never charges or grants re-entry. At most
+    three 30-second commands (owner, target, one deletion) bound maintenance per idle scan.
+    """
+    now = time.time() if now is None else now
+    try:
+        path = host.state / "fix-attempts.json"
+        attempts = json.loads(path.read_text()) if path.exists() else {}
+        if not isinstance(attempts, dict):
+            return None
+        providers = lane.load_providers()
+        disabled = set(providers) - set(cost_order(providers))
+        candidates = sorted((pr for pr in prs if pr.get("isInMergeQueue") is not True
+                             and set(pr.get("eventKinds") or []) & set(FIX_KINDS)
+                             and (not in_scope(pr, "red", disabled) or not needs_work(lane, pr))),
+                            key=lambda pr: pr["number"])
+        if not candidates:
+            return None
+        pr = candidates[int(now // getattr(lane, "CLAIM_SCAN_TTL_S", 60)) % len(candidates)]
+        record = attempts.get(str(pr["number"]), {})
+        if not isinstance(record, dict) or preservation_reason(pr, record, lane.MAX_FIX_ATTEMPTS, now=now):
+            return None
+        if lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix", timeout=30):
+            return None
+        live = fresh_reentry(lane, pr, record)
+        if live is None or (in_scope(live, "red", disabled) and needs_work(lane, live)):
+            return None
+        entry = current_repair_claim(host, lane, live, record, now)
+        if entry is None or preservation_reason(live, record, lane.MAX_FIX_ATTEMPTS, held=entry, now=now):
+            return None
+        kinds = [kind for kind in pr.get("eventKinds") or []
+                 if kind in FIX_KINDS and PREFIX + kind in label_names(live)]
+        if kinds:
+            consume(lane, live, kinds[:1], timeout=30)
+            return pr["number"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        return None
     return None
 
 
