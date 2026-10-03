@@ -119,4 +119,27 @@ describe('UnifiedTable column priority', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('keeps a caller from forcing a column back on when it does not fit', () => {
+    const resize = installObserver();
+    render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        columnVisibility={{ alerts: true }}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+
+    resize(500);
+    expect(
+      screen.queryByRole('columnheader', { name: 'Alerts' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('table-column-compacts')).toHaveTextContent(
+      'SMS'
+    );
+    vi.unstubAllGlobals();
+  });
 });
