@@ -31,6 +31,22 @@ function createReleaseListChain(rows: unknown[]) {
   return { from, where, orderBy, limit };
 }
 
+/**
+ * Chain for related-record reads (artist names, preview URLs):
+ * select().from().innerJoin().where().{orderBy|groupBy} resolving to rows.
+ */
+function createRelatedReadChain(rows: unknown[]) {
+  const terminal = Promise.resolve(rows);
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+  const self = () => chain;
+  chain.from = vi.fn().mockImplementation(self);
+  chain.innerJoin = vi.fn().mockImplementation(self);
+  chain.where = vi.fn().mockImplementation(self);
+  chain.orderBy = vi.fn().mockImplementation(() => terminal);
+  chain.groupBy = vi.fn().mockImplementation(() => terminal);
+  return chain;
+}
+
 describe('getReleasesForProfile deterministic bounded list (JOV-6272)', () => {
   beforeEach(() => {
     hoisted.selectMock.mockReset();
@@ -68,5 +84,50 @@ describe('getReleasesForProfile deterministic bounded list (JOV-6272)', () => {
     expect(chain.orderBy.mock.calls[0]).toHaveLength(2);
     expect(chain.limit).toHaveBeenCalledWith(200);
     expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps the primary preview url onto each lite release (JOV-6127)', async () => {
+    const releaseRows = [
+      {
+        id: 'rel-1',
+        title: 'Song',
+        slug: 'song',
+        releaseType: 'single',
+        releaseDate: new Date('2026-01-01'),
+        revealDate: null,
+        artworkUrl: null,
+      },
+      {
+        id: 'rel-2',
+        title: 'Song Two',
+        slug: 'song-two',
+        releaseType: 'single',
+        releaseDate: null,
+        revealDate: null,
+        artworkUrl: null,
+      },
+    ];
+    hoisted.selectMock
+      .mockImplementationOnce(() => createReleaseListChain(releaseRows))
+      .mockImplementationOnce(() => createRelatedReadChain([]))
+      .mockImplementationOnce(() =>
+        createRelatedReadChain([
+          {
+            releaseId: 'rel-1',
+            primaryPreviewUrl: 'https://cdn.example/preview-1.mp3',
+          },
+          { releaseId: 'rel-2', primaryPreviewUrl: null },
+        ])
+      );
+
+    const result = await getReleasesForProfileLite(PROFILE_ID);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]?.primaryPreviewUrl).toBe(
+      'https://cdn.example/preview-1.mp3'
+    );
+    expect(result[1]?.primaryPreviewUrl).toBeNull();
+    // One release read plus the two related-record reads.
+    expect(hoisted.selectMock).toHaveBeenCalledTimes(3);
   });
 });
