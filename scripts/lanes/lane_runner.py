@@ -46,6 +46,7 @@ import hyperagent_lane  # noqa: E402
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
+import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -89,6 +90,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
+              "scripts/tests/test_worktree_sweep.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
@@ -524,11 +526,68 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     return None
 
 
-def pool_rejections(issues: list[Issue]) -> dict[str, str]:
+# JOV-7708: files that concurrent PRs keep colliding on (31 of 66 open PRs were DIRTY on
+# 2026-10-03). While an open PR holds one, a new issue predicted to touch it waits.
+LANES_HARNESS = frozenset({"scripts/lanes/lane_runner.py", "scripts/lanes/hud.py", "scripts/lanes/doctor.py"})
+HOTSPOT_SEED = LANES_HARNESS | frozenset({
+    "apps/web/lib/flags/code-flags.ts",
+    "apps/web/lib/commands/registry.ts",
+    "apps/web/data/product-truth/registry.ts",
+    "apps/web/tests/node-environment-files.json",
+    "apps/web/tests/unit/design-system/destructive-red-drift.baseline.json",
+})
+# Without a file hint, the issue's workstream predicts its touch set. Symphony-throughput
+# work lands in the lanes harness, so that area runs one in-flight PR at a time.
+AREA_HOTSPOTS = {"symphony-throughput": LANES_HARNESS}
+PATH_HINT = re.compile(
+    r"(?<![\w/.-])[\w@()\[\].-]*(?:/[\w@()\[\].-]+)*\.(?:py|tsx?|mjs|cjs|jsx?|json|ya?ml|swift|sql|css)(?![\w/])")
+
+
+def predicted_touch(issue: Issue) -> frozenset[str]:
+    """Paths the issue names (title or description), else its workstream's hotspots."""
+    hints = frozenset(match.group(0) for match in PATH_HINT.finditer(f"{issue.title}\n{issue.description}"))
+    return hints or AREA_HOTSPOTS.get(workstreams.classify(issue.title, issue.labels), frozenset())
+
+
+def hotspot_holds(prs: list[dict]) -> dict[str, int]:
+    """{hotspot path: the oldest open PR touching it}. Hotspots are HOTSPOT_SEED plus any file
+    two or more open PRs touch. Parked PRs (held or repair-exhausted) hold nothing: they
+    rebuild from main once the active work lands."""
+    active = sorted((pr for pr in prs if not pr_is_terminal(pr)), key=lambda pr: pr.get("number") or 0)
+    touched = [(pr["number"], {entry.get("path") for entry in pr.get("files") or [] if entry.get("path")})
+               for pr in active]
+    seen: dict[str, int] = {}
+    for _, paths in touched:
+        for path in paths:
+            seen[path] = seen.get(path, 0) + 1
+    hot = HOTSPOT_SEED | {path for path, count in seen.items() if count >= 2}
+    holds: dict[str, int] = {}
+    for number, paths in touched:
+        for path in paths & hot:
+            holds.setdefault(path, number)
+    return holds
+
+
+def held_hotspot(touch: frozenset[str], holds: dict[str, int]) -> tuple[str, int] | None:
+    """The first held hotspot the predicted touch set hits. A hint may be a bare filename
+    or a repo-relative suffix (`lib/flags/code-flags.ts`)."""
+    for path in sorted(holds):
+        if any(path == hint or path.endswith("/" + hint.lstrip("./")) for hint in touch):
+            return path, holds[path]
+    return None
+
+
+def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None) -> dict[str, str]:
     """Pool-level admission (JOV-5555): exact normalized-title duplicates are one unit of
-    work. Non-canonical members are rejected; the canonical (oldest) one stays admissible."""
-    return {identifier: "duplicate-candidate:" + canonical
-            for identifier, canonical in workstreams.duplicate_of(issues).items()}
+    work. Non-canonical members are rejected; the canonical (oldest) one stays admissible.
+    JOV-7708: an issue whose predicted touch set hits a hotspot an open PR holds waits
+    (`hotspot-held:<path>#<pr>`) instead of opening a PR that will conflict."""
+    rejected = {identifier: "duplicate-candidate:" + canonical
+                for identifier, canonical in workstreams.duplicate_of(issues).items()}
+    for issue in issues:
+        if holds and issue.identifier not in rejected and (hit := held_hotspot(predicted_touch(issue), holds)):
+            rejected[issue.identifier] = f"hotspot-held:{hit[0]}#{hit[1]}"
+    return rejected
 
 
 def admission_order(issue: Issue, now: float) -> tuple:
@@ -551,17 +610,18 @@ def admission_order(issue: Issue, now: float) -> tuple:
 
 
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
-               in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
+               in_flight: frozenset[str] = frozenset(), provider: str | None = None,
+               holds: dict[str, int] | None = None) -> Issue | None:
     """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
     sustained stream of newer urgent work from starving older work. Excluded work,
-    3x failures, retry backoff, issues with an open lane PR, and duplicate candidates
-    (pool_rejections) remain ineligible.
+    3x failures, retry backoff, issues with an open lane PR, duplicate candidates and
+    issues aimed at a held hotspot (pool_rejections) remain ineligible.
     """
     now = time.time() if now is None else now
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
-    duplicates = pool_rejections(issues)
+    duplicates = pool_rejections(issues, holds)
     eligible = [issue for issue in issues
                 if issue.identifier not in duplicates
                 and admission_rejection(issue, failures, now, in_flight, provider) is None]
@@ -1789,6 +1849,48 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
          "costs": {"apiCalls": 1}, "mutationsPerformed": receipt.get("pr") and ["pull_request"] or [],
          "confidence": "high" if result == "succeeded" else "unknown", "dependencies": [name]},
         coordination=coordination)
+    with open(runs / "ledger.jsonl", "a") as ledger:
+        ledger.write(json.dumps(receipt) + "\n")
+    return receipt
+
+
+def run_brief(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
+    """JOV-7541 design/brief lane: one brief-only run on a detached checkout, no PR."""
+    run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-brief-{uuid.uuid4().hex[:6]}"
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    worktree = host.state / "worktrees" / run_id
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "model": spec.get("model"),
+               "kind": "design-brief", "issue": issue.identifier, "linearIssueId": issue.id,
+               "worktree": str(worktree), "startedAt": now_iso()}
+    with open(runs / f"{run_id}.log", "w") as log:
+        try:
+            require_disk(host, "brief-checkout")
+            sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
+            sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
+            brain_context = context_pack(issue)
+            prompt = design_gate.render_brief_prompt(issue, brain_context)
+            prompt_file = runs / f"{run_id}.prompt.md"
+            receipt["contextManifests"] = [write_agent_prompt(
+                prompt_file, prompt, "issue", name,
+                {"issue": json.dumps({"id": issue.id, "identifier": issue.identifier, "title": issue.title,
+                                      "description": issue.description}, sort_keys=True),
+                 "gbrain": brain_context, "branch": "design-brief"})]
+            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                                                       "cwd": str(worktree),
+                                                       "provider_receipt": str(runs / f"{run_id}.provider.jsonl")}),
+                              worktree, log, host.agent_timeout, guard=lambda: require_disk(host, "brief-running"))
+            brief = worktree / design_gate.BRIEF_FILE
+            receipt.update(agentExit=agent.returncode, **design_gate.publish_brief(
+                linear, issue, brief.read_text(errors="replace") if brief.exists() else ""))
+        except DiskAdmissionError as error:
+            receipt.update(verdict="disk-held", reasons=[str(error)])
+        except Exception as error:  # a broken run must still leave a receipt and free its issue
+            receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
+        finally:
+            (worktree / design_gate.BRIEF_FILE).unlink(missing_ok=True)
+            remove_worktree(host, worktree)
+    receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": None, "commit": None})
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -3733,6 +3835,17 @@ def in_flight_issues() -> frozenset[str] | None:
     return frozenset(keys)
 
 
+def open_hotspot_holds() -> dict[str, int]:
+    """hotspot_holds over every open PR's changed files. Unreadable GitHub admits without
+    hotspot gating ({}): this orders contended work, the in-flight read guards duplicates."""
+    def fetch():
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "200",
+                     "--json", "number,labels,files"])
+        return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
+    prs = shared("hotspot-files", CLAIM_SCAN_TTL_S, fetch)
+    return hotspot_holds(prs) if prs is not None else {}
+
+
 def is_green(pr: dict) -> bool:
     return not pr.get("isDraft") and pr.get("mergeStateStatus") in ("CLEAN", "HAS_HOOKS")
 
@@ -4102,9 +4215,11 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
         if labeled is None and in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
+            holds = open_hotspot_holds()
             issue = design_gate.pick_build_issue(
-                linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
-                provider=name, pick=pick_issue, linear=linear, repo=host.repo)
+                linear.lane_issues(spec["label"]), failures, in_flight=in_flight, provider=name,
+                pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, **kwargs),
+                linear=linear, repo=host.repo)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
             if issue:
@@ -4138,7 +4253,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         slot.release()
         return 0
     notify_issue_claim(linear, issue, name, spec)
-    receipt = run_issue(host, name, spec, linear, issue)
+    runner = run_brief if design_gate.wants_brief(issue, host.repo) else run_issue
+    receipt = runner(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
     note_event_outcome(host, issue, verdict)
     if verdict == "disk-held":
@@ -4187,6 +4303,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     if verdict in {"gate-in-progress", "gate-deferred", "gate-already-completed"}:
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} remains with its exact-head gate "
                                  f"({verdict}); no issue retry charged and no new certification claimed.")
+    elif verdict in ("brief-complete", "brief-incomplete"):
+        linear.move(issue.id, "Todo")  # complete: the next claim builds it; incomplete: gate holds it
     elif verdict == "not-shippable":
         linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}\n"
@@ -4243,6 +4361,11 @@ def dispatch(host: Host) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
     try:
         tick["disk"] = disk_guard.check(host)
+        try:
+            # Before admission: a critically full disk is exactly when the sweep must still run.
+            tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
+        except Exception as error:  # the sweep never takes dispatch down
+            tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
