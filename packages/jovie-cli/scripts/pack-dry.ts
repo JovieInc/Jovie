@@ -40,6 +40,14 @@ function isPackResult(value: unknown): value is readonly PackResult[] {
 }
 
 const PUBLIC_FIXTURES: Readonly<Record<string, PublicFixture>> = {
+  '/api/v1/creators/lookup?input=youtube%3Aaristake': {
+    body: JSON.stringify({
+      exists: false,
+      creator: { name: "Ari's Take", handle: 'aristake' },
+      jovie: null,
+    }),
+    type: 'application/json',
+  },
   '/api/v1/demo': {
     body: JSON.stringify({ artist: { username: 'demo' } }),
     type: 'application/json',
@@ -63,12 +71,18 @@ const PUBLIC_FIXTURES: Readonly<Record<string, PublicFixture>> = {
     type: 'application/json',
   },
   '/api/v1/unknown': {
-    body: JSON.stringify({ error: 'Artist not found' }),
+    body: JSON.stringify({
+      error: 'Artist not found',
+      code: 'ARTIST_NOT_FOUND',
+    }),
     status: 404,
     type: 'application/json',
   },
   '/api/v1/private': {
-    body: JSON.stringify({ error: 'Artist not found' }),
+    body: JSON.stringify({
+      error: 'Artist not found',
+      code: 'ARTIST_NOT_FOUND',
+    }),
     status: 404,
     type: 'application/json',
   },
@@ -358,6 +372,7 @@ async function main(): Promise<void> {
       { cwd: stagingRoot, maxBuffer: 10 * 1024 * 1024 }
     );
     for (const command of [
+      'creator lookup <input>',
       'artist get <username>',
       'artist llms <username>',
       'api openapi',
@@ -473,6 +488,19 @@ async function main(): Promise<void> {
     }
 
     const fixtureJourney = await withLocalPublicApi(async origin => {
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        [
+          'creator',
+          'lookup',
+          'youtube:aristake',
+          '--json',
+          '--base-url',
+          origin,
+        ],
+        `{\"exists\":false,\"creator\":{\"name\":\"Ari's Take\",\"handle\":\"aristake\"},\"jovie\":null}`
+      );
       await assertInstalledCommand(
         installedCli,
         installRoot,

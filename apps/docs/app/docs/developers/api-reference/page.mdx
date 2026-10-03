@@ -23,8 +23,8 @@ launchPath: false
 
 # API Reference
 
-Jovie currently publishes one public API: an anonymous, read-only JSON surface
-for artist profiles. The capability index at
+Jovie publishes an anonymous, read-only JSON surface for artist profiles and
+creator identity lookup. The capability index at
 `https://jov.ie/api/v1` is a stable, machine-verifiable 200 response. It does
 not enumerate artist handles or depend on a particular profile being live.
 
@@ -39,6 +39,9 @@ The human-oriented guide is [`https://jov.ie/developers`](https://jov.ie/develop
   document is stable and non-enumerating.
 - `GET https://jov.ie/api/v1/{username}` -- one public artist profile with
   public identity, releases, upcoming events, merch, and related links.
+- `GET https://jov.ie/api/v1/creators/lookup?input=...` -- resolve a YouTube
+  channel URL or `youtube:handle` to a matching Jovie profile, or return a
+  fresh extraction marked `exists:false`.
 - `GET https://jov.ie/api/v1/openapi.json` -- canonical OpenAPI 3.1 contract.
 - `GET https://jov.ie/openapi.json` -- equivalent conventional discovery URL.
 
@@ -49,9 +52,11 @@ not presented as a provisioned fixture:
 ```bash
 curl https://jov.ie/api/v1
 curl https://jov.ie/api/v1/{username}
+curl 'https://jov.ie/api/v1/creators/lookup?input=youtube:artist-handle'
 ```
 
-Unknown or non-public handles return JSON `404`.
+Unknown or non-public Jovie handles return JSON `404` with
+`code: "ARTIST_NOT_FOUND"`.
 
 ## Authentication and scope
 
@@ -62,10 +67,11 @@ sensitive information.
 
 ## Rate limits and response headers
 
-Only `GET /api/v1/{username}` consumes the public artist-profile bucket: 100
-requests per client IP in each fixed 60-second window. The bucket is durable
-across application instances through Redis. The static `/api/v1` capability
-index and the OpenAPI discovery routes do not consume this bucket.
+`GET /api/v1/{username}` and `GET /api/v1/creators/lookup` share the public
+artist-profile bucket: 100 requests per client IP in each fixed 60-second
+window. The bucket is durable across application instances through Redis. The
+static `/api/v1` capability index and the OpenAPI discovery routes do not
+consume this bucket.
 
 The index also returns a `versioning` object with the active `v1` identifier,
 the URL-versioning rules, and the policy URL, so an agent can discover the

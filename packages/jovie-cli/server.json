@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.JovieInc/jovie",
   "title": "Jovie",
-  "description": "Create a music artist's Jovie profile from a Spotify URL and read public artist data.",
+  "description": "Create artist profiles and resolve public creators by Jovie or YouTube identity.",
   "websiteUrl": "https://jov.ie/cli",
   "repository": {
     "url": "https://github.com/JovieInc/Jovie",

@@ -9,7 +9,8 @@ import {
 
 export function getPublicProfileDiscoveryExclusionResponse(
   identity: string | PublicProfileDiscoveryIdentity,
-  error = 'Artist not found'
+  error = 'Artist not found',
+  code?: string
 ): NextResponse | null {
   const resolved: PublicProfileDiscoveryIdentity =
     typeof identity === 'string' ? { handle: identity } : identity;
@@ -19,7 +20,7 @@ export function getPublicProfileDiscoveryExclusionResponse(
   }
 
   return NextResponse.json(
-    { error },
+    { error, ...(code ? { code } : {}) },
     { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
   );
 }

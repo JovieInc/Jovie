@@ -77,6 +77,9 @@ describe('MCP server', () => {
     expect(
       tools.find(tool => tool.name === 'get_artist')?.annotations
     ).toMatchObject({ readOnlyHint: true });
+    const lookup = tools.find(tool => tool.name === 'lookup_creator');
+    expect(lookup?.inputSchema.required).toEqual(['input']);
+    expect(lookup?.annotations.readOnlyHint).toBe(true);
   });
 
   it('calls a tool and returns structured content', async () => {

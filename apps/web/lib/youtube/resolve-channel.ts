@@ -24,6 +24,9 @@ export interface YouTubeResolvedChannel {
   readonly title: string;
   readonly handle: string | null;
   readonly uploadsPlaylistId: string;
+  readonly description: string | null;
+  readonly country: string | null;
+  readonly avatarUrl: string | null;
 }
 
 export interface YouTubeRecentVideo {
@@ -120,6 +123,9 @@ interface ChannelsListResponse {
     readonly snippet?: {
       readonly title?: string;
       readonly customUrl?: string;
+      readonly description?: string;
+      readonly country?: string;
+      readonly thumbnails?: ThumbnailSet;
     };
     readonly contentDetails?: {
       readonly relatedPlaylists?: { readonly uploads?: string };
@@ -207,6 +213,9 @@ export async function resolveYouTubeChannel(
     title: item.snippet?.title ?? item.id,
     handle: customUrl ? customUrl.replace(/^@/, '') : null,
     uploadsPlaylistId: uploads,
+    description: item.snippet?.description?.trim() || null,
+    country: item.snippet?.country?.trim() || null,
+    avatarUrl: bestThumbnail(item.snippet?.thumbnails) ?? null,
   };
 }
 

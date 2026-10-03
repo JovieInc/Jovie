@@ -6,12 +6,14 @@ import {
   type FetchImplementation,
   fetchArtist,
   fetchArtistLlms,
+  fetchCreatorLookup,
   fetchOpenApi,
   fetchSiteLlms,
   JovieInputError,
   normalizeBaseUrl,
   readResponseBody,
   reportIssue,
+  validateCreatorLookupInput,
   validateUsername,
 } from './client.js';
 
@@ -83,6 +85,30 @@ describe('Jovie public resource client', () => {
     });
     expect(calls[0].init?.headers).not.toHaveProperty('Authorization');
     expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('looks up a creator by an encoded platform identity', async () => {
+    const { calls, fetchImpl } = createFetch(
+      '{"exists":false,"creator":{"handle":"aristake"}}'
+    );
+
+    await expect(
+      fetchCreatorLookup(' youtube:aristake ', { fetchImpl })
+    ).resolves.toMatchObject({ exists: false });
+    expect(calls[0].input).toBe(
+      'https://jov.ie/api/v1/creators/lookup?input=youtube%3Aaristake'
+    );
+    expect(calls[0].init?.method).toBe('GET');
+    expect(calls[0].init?.headers).not.toHaveProperty('Authorization');
+  });
+
+  it('rejects an empty or control-character creator lookup locally', () => {
+    expect(validateCreatorLookupInput('youtube:aristake')).toBe(
+      'youtube:aristake'
+    );
+    for (const value of ['', '   ', 'youtube:ari\nmake']) {
+      expect(() => validateCreatorLookupInput(value)).toThrow(JovieInputError);
+    }
   });
 
   it('fetches the canonical OpenAPI contract', async () => {
@@ -355,6 +381,7 @@ describe('mutation and stable error contract', () => {
     expect(calls).toBe(1);
   });
   it.each([
+    [404, 'ARTIST_NOT_FOUND'],
     [429, 'RATE_LIMITED'],
     [503, 'RATE_LIMIT_UNAVAILABLE'],
   ])('preserves top-level API code on %s', async (status, code) => {

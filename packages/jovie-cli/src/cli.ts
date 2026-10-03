@@ -117,6 +117,7 @@ Options:
 
 Examples:
   jovie profile create https://open.spotify.com/artist/<id> --json
+  jovie creator lookup youtube:<handle> --json
   jovie artist get <username> --json
   npx -y @jovie/cli mcp
 `;

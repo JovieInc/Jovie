@@ -12,6 +12,7 @@ import {
   PUBLIC_ARTIST_API_REFERENCE_URL,
   PUBLIC_ARTIST_API_VERSION,
   PUBLIC_ARTIST_API_VERSIONING_POLICY,
+  PUBLIC_CREATOR_LOOKUP_API_URL,
 } from './contract';
 
 type JsonSchema = {
@@ -175,7 +176,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     title: 'Jovie Artist API',
     version: '1.0.0',
     description:
-      'Anonymous, read-only API for public Jovie profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; profile data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported. Versioning and deprecation policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. See the canonical policy page before any retirement. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
+      'Anonymous, read-only API for public Jovie profiles and platform-identity creator lookup. The stable /api/v1 capability index is a machine-verifiable 200 surface; profile data is served by GET /api/v1/{username}, and YouTube identities resolve through GET /api/v1/creators/lookup. No API key, OAuth token, or write endpoint is required or supported. Versioning and deprecation policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. See the canonical policy page before any retirement. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
     contact: { url: `${BASE_URL}/llms.txt` },
   },
   servers: [{ url: BASE_URL, description: 'Production API origin' }],
@@ -270,6 +271,88 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         },
       },
     },
+    '/api/v1/creators/lookup': {
+      get: {
+        operationId: 'lookupCreator',
+        summary: 'Resolve a creator from a verified platform identity',
+        description:
+          'Resolves a YouTube channel URL or explicit youtube:handle key to its official channel ID, then matches that identity to a public Jovie profile. When no profile matches, returns a fresh public extraction with exists:false.',
+        parameters: [
+          {
+            name: 'input',
+            in: 'query',
+            required: true,
+            schema: {
+              type: 'string',
+              examples: [
+                'youtube:artist-handle',
+                'https://www.youtube.com/@artist-handle',
+              ],
+            },
+            description:
+              'YouTube channel URL or explicit youtube:<handle-or-channel-id> value.',
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Matched Jovie profile or fresh creator extraction',
+            headers: API_PROFILE_HEADERS,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CreatorLookupResponse' },
+              },
+            },
+          },
+          '400': {
+            description: 'Unsupported or invalid creator lookup input',
+            headers: API_PROFILE_HEADERS,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CreatorLookupError' },
+              },
+            },
+          },
+          '404': {
+            description: 'Platform channel not found',
+            headers: API_PROFILE_HEADERS,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CreatorLookupError' },
+              },
+            },
+          },
+          '409': {
+            description: 'Platform identity is attached to multiple profiles',
+            headers: API_PROFILE_HEADERS,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CreatorLookupError' },
+              },
+            },
+          },
+          '429': {
+            description: 'Public artist read rate limit exceeded',
+            headers: API_THROTTLED_HEADERS,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RateLimitError' },
+              },
+            },
+          },
+          '503': {
+            description: 'Creator lookup temporarily unavailable',
+            headers: API_SERVICE_HEADERS,
+            content: {
+              'application/json': {
+                schema: {
+                  $ref: '#/components/schemas/CreatorLookupUnavailable',
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     schemas: {
@@ -323,6 +406,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
             required: [
               'index',
               'artistTemplate',
+              'creatorLookup',
               'openapi',
               'developers',
               'sitemap',
@@ -338,6 +422,11 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
                 format: 'uri-template',
                 examples: [PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL],
               },
+              creatorLookup: {
+                type: 'string',
+                format: 'uri',
+                examples: [PUBLIC_CREATOR_LOOKUP_API_URL],
+              },
               openapi: {
                 type: 'string',
                 format: 'uri',
@@ -349,9 +438,17 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           },
           _links: {
             type: 'object',
-            required: ['self', 'policy', 'openapi', 'developers', 'sitemap'],
+            required: [
+              'self',
+              'creatorLookup',
+              'policy',
+              'openapi',
+              'developers',
+              'sitemap',
+            ],
             properties: {
               self: { type: 'string', format: 'uri' },
+              creatorLookup: { type: 'string', format: 'uri' },
               policy: { type: 'string', format: 'uri' },
               openapi: { type: 'string', format: 'uri' },
               developers: { type: 'string', format: 'uri' },
@@ -428,6 +525,61 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
             items: { $ref: '#/components/schemas/MerchItem' },
           },
           _links: { $ref: '#/components/schemas/Links' },
+        },
+      },
+      CreatorLookupResponse: {
+        type: 'object',
+        required: ['exists', 'creator', 'jovie'],
+        properties: {
+          exists: { type: 'boolean' },
+          creator: {
+            type: 'object',
+            required: [
+              'name',
+              'handle',
+              'bio',
+              'location',
+              'avatarUrl',
+              'channel',
+              'links',
+            ],
+            properties: {
+              name: { type: 'string' },
+              handle: { type: 'string', nullable: true },
+              bio: { type: 'string', nullable: true },
+              location: { type: 'string', nullable: true },
+              avatarUrl: { type: 'string', format: 'uri', nullable: true },
+              channel: {
+                type: 'object',
+                required: ['platform', 'id', 'url'],
+                properties: {
+                  platform: { type: 'string', enum: ['youtube'] },
+                  id: { type: 'string' },
+                  url: { type: 'string', format: 'uri' },
+                },
+              },
+              links: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['platform', 'url'],
+                  properties: {
+                    platform: { type: 'string' },
+                    url: { type: 'string', format: 'uri' },
+                  },
+                },
+              },
+            },
+          },
+          jovie: {
+            type: 'object',
+            nullable: true,
+            properties: {
+              username: { type: 'string' },
+              profileUrl: { type: 'string', format: 'uri' },
+              apiUrl: { type: 'string', format: 'uri' },
+            },
+          },
         },
       },
       Artist: {
@@ -511,10 +663,36 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
       },
       Error: {
         type: 'object',
-        required: ['error'],
+        required: ['error', 'code'],
+        properties: {
+          error: { type: 'string', examples: ['Artist not found'] },
+          code: { type: 'string', enum: ['ARTIST_NOT_FOUND'] },
+        },
+      },
+      CreatorLookupError: {
+        type: 'object',
+        required: ['error', 'code'],
         properties: {
           error: { type: 'string' },
-          code: { type: 'string' },
+          code: {
+            type: 'string',
+            enum: [
+              'INVALID_CREATOR_LOOKUP',
+              'CREATOR_NOT_FOUND',
+              'CREATOR_LOOKUP_AMBIGUOUS',
+            ],
+          },
+        },
+      },
+      CreatorLookupUnavailable: {
+        type: 'object',
+        required: ['error', 'code'],
+        properties: {
+          error: { type: 'string' },
+          code: {
+            type: 'string',
+            enum: ['CREATOR_LOOKUP_UNAVAILABLE', 'RATE_LIMIT_UNAVAILABLE'],
+          },
         },
       },
       RateLimitError: {
