@@ -322,3 +322,248 @@ private final class ComposerHarness {
     window.close()
   }
 }
+
+@MainActor
+extension MacDevelopmentBoundaryTests {
+  func testSharedFactoryBootstrapsPersistedCustomerWindow() async throws {
+    let suite = "MacChatState.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let snapshot = macChatSnapshot(count: 45)
+    await ChatCache(defaults: defaults).store(snapshot, for: "customer", workspace: .jovie)
+    let freshCache = ChatCache(defaults: defaults)
+    let decoded = await freshCache.load(for: "customer", workspace: .jovie)
+    XCTAssertEqual(decoded, snapshot)
+    let identity = NativeChatIdentity(userID: "customer", ownership: nil, workspace: .jovie)
+    var expirations = 0
+    let repository = NativeChatRepositoryFactory.make(
+      identity: identity, apiBaseURL: try XCTUnwrap(URL(string: "https://api.example.invalid")),
+      webBaseURL: try XCTUnwrap(URL(string: "https://web.example.invalid")), cache: freshCache,
+      onSessionExpired: { _ in expirations += 1 }
+    )
+    XCTAssertEqual(repository.identity, identity)
+    XCTAssertTrue(repository.timeline.isEmpty)
+    XCTAssertEqual(expirations, 0)
+    await repository.bootstrap() // Customer hydration never dispatches a request.
+    XCTAssertEqual(repository.conversations, snapshot.conversations)
+    XCTAssertEqual(repository.activeConversationID, "thread")
+    XCTAssertEqual(repository.timeline.map(\.id), (5..<45).map { "message-\($0)" })
+    XCTAssertEqual(repository.timeline.first?.createdAt, "2026-01-01T00:00:05Z")
+    XCTAssertTrue(repository.hasMoreOlder)
+    XCTAssertEqual(repository.timeline.last?.turnId, "turn-44")
+    XCTAssertEqual(repository.timeline.last?.requiresWebHandoff, true)
+    XCTAssertEqual(repository.timeline.last?.handoffURL?.absoluteString, "https://web.example.invalid/app/chat/thread")
+    XCTAssertFalse(repository.sessionExpired)
+    XCTAssertEqual(expirations, 0)
+  }
+
+  func testSharedCacheIsolatesUsersWorkspacesRemovalAndLegacyFields() async throws {
+    let suite = "MacChatState.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let cache = ChatCache(defaults: defaults)
+    let customer = macChatSnapshot(count: 1), operatorSnapshot = macChatSnapshot(count: 2)
+    let secondUser = macChatSnapshot(count: 3)
+    await cache.store(customer, for: "first", workspace: .jovie)
+    await cache.store(operatorSnapshot, for: "first", workspace: .ovie)
+    await cache.store(secondUser, for: "second", workspace: .jovie)
+    let fresh = ChatCache(defaults: defaults)
+    let customerRead = await fresh.load(for: "first", workspace: .jovie)
+    let operatorRead = await fresh.load(for: "first", workspace: .ovie)
+    let secondRead = await fresh.load(for: "second", workspace: .jovie)
+    XCTAssertEqual(customerRead, customer)
+    XCTAssertEqual(operatorRead, operatorSnapshot)
+    XCTAssertEqual(secondRead, secondUser)
+    await cache.remove(for: "first", workspace: .jovie)
+    let afterRemoval = ChatCache(defaults: defaults)
+    let removed = await afterRemoval.load(for: "first", workspace: .jovie)
+    let keptWorkspace = await afterRemoval.load(for: "first", workspace: .ovie)
+    let keptUser = await afterRemoval.load(for: "second", workspace: .jovie)
+    XCTAssertNil(removed)
+    XCTAssertEqual(keptWorkspace, operatorSnapshot)
+    XCTAssertEqual(keptUser, secondUser)
+    var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(customer)) as? [String: Any])
+    legacy.removeValue(forKey: "activeConversationID")
+    legacy.removeValue(forKey: "hasMoreOlderByConversationID")
+    defaults.set(try JSONSerialization.data(withJSONObject: legacy), forKey: "ie.jov.Jovie.mobileChat.legacy")
+    let legacyRead = await ChatCache(defaults: defaults).load(for: "legacy", workspace: .jovie)
+    XCTAssertEqual(legacyRead?.messagesByConversationID, customer.messagesByConversationID)
+    XCTAssertNil(legacyRead?.activeConversationID)
+    XCTAssertNil(legacyRead?.hasMoreOlderByConversationID)
+  }
+
+  func testSharedResolverDonorDefaultsAndVoiceRecovery() async throws {
+    let suite = "MacChatState.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let cache = ChatCache(defaults: defaults), client = MacHeldChatClient()
+    let webURL = try XCTUnwrap(URL(string: "https://web.example.invalid"))
+    let identity = NativeChatIdentity(userID: "customer", ownership: nil, workspace: .jovie)
+    var created: [NativeChatIdentity] = []
+    let make: (NativeChatIdentity) -> ChatRepository = { identity in
+      created.append(identity)
+      return ChatRepository(client: client, cache: cache, userID: identity.userID, webBaseURL: webURL,
+                            workspace: identity.workspace, activityDonator: nil, identity: identity)
+    }
+    let original = make(identity)
+    XCTAssertTrue(ChatRepository.resolve(original, for: identity, create: make) === original)
+    XCTAssertEqual(created, [identity])
+    for replacement in [NativeChatIdentity(userID: "other", ownership: nil, workspace: .jovie),
+                        NativeChatIdentity(userID: "customer", ownership: nil, workspace: .ovie)] {
+      let resolved = ChatRepository.resolve(original, for: replacement, create: make)
+      XCTAssertFalse(resolved === original)
+      XCTAssertEqual(resolved.identity, replacement)
+      XCTAssertEqual(resolved.workspace, replacement.workspace)
+    }
+    XCTAssertEqual(created.count, 3)
+    XCTAssertNil(defaultConversationActivityDonator())
+    await original.openConversation("thread") // Explicit nil is a supported donor choice.
+    XCTAssertEqual(original.activeConversationID, "thread")
+    XCTAssertNil(original.lastErrorMessage)
+    let donor = MacConversationRecorder()
+    let donating = ChatRepository(client: client, cache: cache, userID: identity.userID,
+                                  webBaseURL: webURL, activityDonator: donor, identity: identity)
+    await donating.openConversation("thread")
+    XCTAssertEqual(donor.snapshot(), [.init(conversationID: "thread", title: "Shared thread")])
+    for transcript in [" \n", "  recovered memo \n"] {
+      let handoff = VoiceMemoActionDraft.shellHandoff(fromTranscript: transcript)
+      XCTAssertEqual(handoff.chatDraft, transcript.trimmingCharacters(in: .whitespacesAndNewlines))
+      XCTAssertNil(handoff.autoSendMessage)
+    }
+  }
+
+  func testSharedRepositoryStreamsBeforeEOFAndRejectsLateCanceledOrReplacedEvents() async throws {
+    for ending in MacStreamEnding.allCases {
+      let suite = "MacChatState.\(UUID().uuidString)"
+      let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+      defer { defaults.removePersistentDomain(forName: suite) }
+      let client = MacHeldChatClient()
+      let repository = ChatRepository(
+        client: client, cache: ChatCache(defaults: defaults), userID: "customer",
+        webBaseURL: try XCTUnwrap(URL(string: "https://web.example.invalid")), activityDonator: nil,
+        identity: NativeChatIdentity(userID: "customer", ownership: nil, workspace: .jovie)
+      )
+      let sending = Task {
+        await repository.send(text: "Question")
+        await client.ownerFinished()
+      }
+      let arrived = await client.waitForFlushOrFinish()
+      let beforeEOF = repository.timeline, wasSending = repository.isSending
+      let request = await client.request
+      switch ending {
+      case .complete: break
+      case .cancel: sending.cancel()
+      case .replaceSelection: repository.startNewConversation()
+      }
+      // Release and join even on failed arrival; no throwing assertion can strand this client.
+      await client.release()
+      await sending.value
+      XCTAssertTrue(arrived, "The send returned without reaching its flushed partial response")
+      XCTAssertTrue(wasSending)
+      XCTAssertEqual(beforeEOF.map(\.role), [.user, .assistant])
+      XCTAssertEqual(beforeEOF.first?.content, "Question")
+      XCTAssertEqual(beforeEOF.last?.content, "Partial")
+      XCTAssertEqual(beforeEOF.last?.status.isInFlight, true)
+      XCTAssertNotNil(request)
+      XCTAssertEqual(beforeEOF.last?.clientTurnId, request?.clientTurnId)
+      XCTAssertFalse(repository.isSending)
+      let saved = await ChatCache(defaults: defaults).load(for: "customer", workspace: .jovie)
+      switch ending {
+      case .complete, .cancel:
+        let canceled = ending == .cancel
+        XCTAssertEqual(repository.activeConversationID, "thread")
+        XCTAssertEqual(repository.timeline.last?.content, canceled ? "Partial" : "Finished")
+        XCTAssertEqual(repository.timeline.last?.status, canceled ? .canceled : .completed)
+        XCTAssertEqual(saved?.activeConversationID, "thread")
+        XCTAssertEqual(saved?.messagesByConversationID["thread"]?.count, 2)
+        XCTAssertEqual(saved?.messagesByConversationID["thread"]?.last?.content, canceled ? "Partial" : "Finished")
+        XCTAssertEqual(saved?.messagesByConversationID["thread"]?.last?.turnStatus, canceled ? "canceled" : "completed")
+      case .replaceSelection:
+        XCTAssertNil(repository.activeConversationID)
+        XCTAssertTrue(repository.timeline.isEmpty)
+        XCTAssertNil(saved)
+      }
+    }
+  }
+}
+
+private func macChatSnapshot(count: Int) -> CachedChatSnapshot {
+  let timestamp = "2026-01-01T00:00:00Z"
+  let messages = (0..<count).map { index in
+    MobileConversationMessage(id: "message-\(index)", role: "assistant", content: "Message \(index)",
+      clientMessageId: "client-\(index)", turnId: "turn-\(index)", turnStatus: "completed",
+      createdAt: String(format: "2026-01-01T00:00:%02dZ", index), requiresWebHandoff: index == count - 1)
+  }
+  return CachedChatSnapshot(conversations: ["other", "thread"].map {
+    MobileConversationSummary(id: $0, title: "Shared thread", createdAt: timestamp, updatedAt: timestamp,
+                              latestMessageRole: "assistant", latestTurnStatus: "completed")
+  }, messagesByConversationID: ["thread": messages], cachedAt: Date(timeIntervalSince1970: 1),
+     activeConversationID: "thread", hasMoreOlderByConversationID: ["thread": true])
+}
+
+private final class MacConversationRecorder: ConversationActivityDonating, @unchecked Sendable {
+  private let lock = NSLock()
+  private var donations: [ConversationUserActivity.Payload] = []
+  func donate(conversationID: String, title: String) {
+    lock.lock()
+    defer { lock.unlock() }
+    donations.append(.init(conversationID: conversationID, title: title))
+  }
+  func snapshot() -> [ConversationUserActivity.Payload] {
+    lock.lock()
+    defer { lock.unlock() }
+    return donations
+  }
+}
+
+private enum MacStreamEnding: CaseIterable { case complete, cancel, replaceSelection }
+
+private actor MacHeldChatClient: MobileChatClientProtocol {
+  private(set) var request: MobileChatTurnRequest?
+  private var arrival: Bool?
+  private var arrivalWaiter: CheckedContinuation<Bool, Never>?
+  private var released = false
+  private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+  func waitForFlushOrFinish() async -> Bool {
+    if let arrival { return arrival }
+    return await withCheckedContinuation { arrivalWaiter = $0 }
+  }
+  private func signalArrival(_ value: Bool) {
+    guard arrival == nil else { return }
+    arrival = value
+    arrivalWaiter?.resume(returning: value)
+    arrivalWaiter = nil
+  }
+  func ownerFinished() { signalArrival(false) }
+  func release() {
+    released = true
+    releaseWaiter?.resume()
+    releaseWaiter = nil
+  }
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] { [] }
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
+    MobileConversationDetailResponse(conversation: .init(id: id, title: " Shared thread ",
+      createdAt: "2026-01-01", updatedAt: "2026-01-01"), messages: [], hasMore: false)
+  }
+  func sendTurn(_ request: MobileChatTurnRequest,
+                onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?) async throws -> [MobileChatStreamEvent] {
+    try await sendTurn(request, onAuthorization: nil, onEvent: onEvent)
+  }
+  func sendTurn(_ request: MobileChatTurnRequest,
+                onAuthorization: (@MainActor @Sendable (NativeSessionOwnership?) async throws -> Void)?,
+                onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?) async throws -> [MobileChatStreamEvent] {
+    try await onAuthorization?(nil)
+    self.request = request
+    let turn = request.clientTurnId
+    await onEvent?(.turnReserved(conversationId: "thread", turnId: "turn", clientTurnId: turn))
+    await onEvent?(.assistantDelta(clientTurnId: turn, text: "Partial"))
+    await onEvent?(.turnState(clientTurnId: turn, state: "running", eveWorkId: nil))
+    signalArrival(true) // The real coalescer has synchronously flushed the delta.
+    if !released { await withCheckedContinuation { releaseWaiter = $0 } }
+    // Deliberately cancellation-insensitive: production guards must reject late events.
+    await onEvent?(.assistantDelta(clientTurnId: turn, text: " late"))
+    await onEvent?(.assistantCompleted(clientTurnId: turn, conversationId: "thread", turnId: "turn", text: "Finished"))
+    return []
+  }
+}
