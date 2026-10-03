@@ -47,6 +47,14 @@ protocol ConversationActivityDonating: Sendable {
   func donate(conversationID: String, title: String)
 }
 
+func defaultConversationActivityDonator() -> (any ConversationActivityDonating)? {
+  #if canImport(UIKit)
+  return LiveConversationActivityDonator()
+  #else
+  return nil
+  #endif
+}
+
 #if canImport(UIKit)
 import UIKit
 

@@ -545,17 +545,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:probe-and-autofix
     jobCount: 1
-  - name: HA CI remediator poke
-    path: .github/workflows/ha-ci-remediator-poke.yml
-    active: true
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:poke
-    jobCount: 1
   - name: Help Center Recertification
     path: .github/workflows/help-center-recertification.yml
     active: true
@@ -914,6 +903,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:learn
     jobCount: 1
+  - name: PR Review (shadow)
+    path: .github/workflows/pr-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:review
+    jobCount: 1
   - name: PR Size Guard Label Override
     path: .github/workflows/pr-size-guard-label-override.yml
     active: true
@@ -1265,6 +1265,7 @@ nodes:
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
+      - PR Review (shadow)
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
@@ -1476,6 +1477,9 @@ edges:
     type: workflow_run
   - from: PR Size Guard
     to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: Source Validation
+    to: PR Review (shadow)
     type: workflow_run
   - from: Staging Controller
     to: Production Controller

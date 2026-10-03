@@ -88,6 +88,12 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^packages\/auth-routing\//,
   ],
   [
+    'shared-release-channel',
+    'shared-contract',
+    PRODUCT_LANES,
+    /^packages\/release-channel-contracts\//,
+  ],
+  [
     // Lockfile-only churn (every dependabot group) changes the JS install
     // graph. The iOS lane is native xcodebuild with no causal path from it —
     // unlike the desktop lane, which bundles web output. Dropping ios here

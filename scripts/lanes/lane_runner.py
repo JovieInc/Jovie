@@ -1907,6 +1907,22 @@ def require_gate_authority(host: Host, pr: dict, stage: str, sensitive: bool) ->
     return live
 
 
+def require_gate_command_authority(host: Host, pr: dict, worktree: Path, stage: str, sensitive: bool) -> None:
+    """Waiting for a seat is not permission to run checks for stale authority."""
+    try:
+        if any(claimed_elsewhere(pr["number"], pr["headRefOid"], kind, timeout=30)
+               for kind in ("fix", "gate")):
+            raise RepairStopped("gate-owner-active-or-unavailable", None, stage)
+        live = require_gate_authority(host, pr, stage, sensitive)
+        head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
+        if head.returncode or head.stdout.strip() != pr["headRefOid"]:
+            raise RepairStopped("gate-checkout-head-mismatch", live, stage)
+    except (OSError, ValueError, TypeError, AttributeError, KeyError, subprocess.SubprocessError) as error:
+        # Only admission reads are normalized here. Gate-command timeouts and
+        # operator stops keep their existing charging and drain behavior.
+        raise RepairStopped(f"gate-authority-unavailable:{type(error).__name__}", None, stage) from error
+
+
 def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
     """Consecutive gate timeouts for this PR head; a new head resets the count."""
     path = host.state / "gate-timeouts.json"
@@ -1946,7 +1962,7 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
                     "gateResult": prior}
         if reason := gate_deferral(host, live):
             raise RepairStopped(reason, live, "before-gate")
-        result = _gate_pr(host, live, worktree, log, sensitive, claim)
+        result = _gate_pr(host, live, worktree, log, sensitive, claim, result=result)
         if result.get("verdict") in {"landing", "verified-not-queued", "held"}:
             proof = {**result, "schema": GATE_RESULT_SCHEMA, "completedAt": now_iso(),
                      "policyDigest": GATE_POLICY_DIGEST, "sensitive": sensitive}
@@ -1955,13 +1971,14 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
     except RepairStopped as error:
         return {**result, "verdict": "gate-deferred", "reasons": [str(error)], "stage": error.stage}
     except PublicationRevoked as error:
-        return {**result, "verdict": "revoked", "reasons": [str(error)], "revocation": error.receipt}
+        return {**result, "verdict": "revoked", "reasons": [str(error)], "revocation": error.receipt,
+                "stage": error.stage}
     finally:
         if owned:
             claim.lock.release()
 
 
-def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: GateClaim) -> dict:
+def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: GateClaim, *, result: dict) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     revoked = publication_revocation(host, pr.get("headRefName"))
     if revoked:
@@ -1980,8 +1997,8 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
     changes = parse_numstat(numstat)
     reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
     evidence = []
-    result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
-              "changedFiles": len(changes), "reasons": reasons}
+    # The caller retains this same receipt if a later authority read refuses.
+    result.update(changedFiles=len(changes), reasons=reasons)
     if not reasons:
         commands = check_commands([change.path for change in changes])
         seat = None
@@ -1990,6 +2007,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
             result["gateWaitS"] = round(waited)
         try:
             for command in commands:
+                require_gate_command_authority(host, pr, worktree, "before-gate-command", sensitive)
                 try:
                     ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True,
                              pass_fds=(claim.lock.handle.fileno(), seat.handle.fileno()))
@@ -2008,6 +2026,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
                     evidence += [line for line in log_tail(log).splitlines()
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
             if sensitive and not reasons:
+                require_gate_command_authority(host, pr, worktree, "before-sensitive-review", sensitive)
                 passed, review_reasons = sensitive_review(host, pr, worktree, log,
                     pass_fds=(claim.lock.handle.fileno(), *([seat.handle.fileno()] if seat else [])))
                 if not passed:
@@ -2156,7 +2175,7 @@ def update_json(path: Path, change) -> None:
 
 def gate_outcome(receipt: dict) -> dict:
     """Project gate evidence without importing the producer's enclosing run identity."""
-    fields = ("verdict", "pr", "prUrl", "headSha", "reasons", "changedFiles", "gateWaitS", "revocation",
+    fields = ("verdict", "pr", "prUrl", "headSha", "reasons", "changedFiles", "gateWaitS", "revocation", "stage",
               "gateSensitive", "dependencies", "next_action", "execution", "qualificationExecution",
               "sourceFencingToken", "remoteThreadId", "remoteAgentId", "modelSettingsProof", "adoptRunId")
     result = {key: receipt[key] for key in fields if key in receipt}
@@ -2246,12 +2265,12 @@ def requeue_verified(host: Host, prs: list[dict] | None, *, defer=None) -> dict 
 
 # ---------------------------------------------------------------- cross-host claims
 
-def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None) -> bool:
+def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None, *, timeout: float = 600) -> bool:
     """True when another host recorded a live claim for this exact head and kind on the PR.
     Local state files are per host; the PR's comments are the truth every host can see."""
     now = time.time() if now is None else now
     listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
-                 "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"])
+                 "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
     if listed.returncode != 0:
         return True  # fail closed: an unreadable claim list is not permission to take the head
     for line in (listed.stdout or "").splitlines():
@@ -2285,6 +2304,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
+        if pr.get("isInMergeQueue") is True:
+            continue  # Native landing owns this head; cached absence still needs a fresh claim read.
         # A held PR is Tim's/Summer's call: fixing it re-arms auto-merge and re-enqueues it
         # (#17541, 2026-09-28). The event path already skips holds via pr_events.in_scope.
         if pr_events.preservation_reason(pr, attempts.get(str(pr["number"]), {}), MAX_FIX_ATTEMPTS,
@@ -2588,6 +2609,256 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
         publish_verified(host, pr)
 
 
+def fetch_labeled_events(linear) -> list:
+    """The one label-filtered Linear read per tick, shared across workers via `shared`.
+
+    JOV and LYB issues labeled `remediation:<fingerprint>` come back together.
+    Callers must not issue a follow-up read per issue.
+    """
+    def fetch():
+        data = linear.gql(remediation.LABELED_EVENT_QUERY, {})
+        return (data.get("issues") or {}).get("nodes") or []
+
+    return shared("remediation-events", SUMMARY_TTL_S, fetch) or []
+
+
+def _apply_event_plan(linear, plan: dict) -> None:
+    """Writes only: reopen, one comment, one needs-human label. No extra reads."""
+    for row in plan.get("reopens") or []:
+        if not row.get("id") or not row.get("stateId"):
+            continue
+        try:
+            linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                       {"id": row["id"], "s": row["stateId"]})
+        except Exception:
+            pass
+    for row in plan.get("comments") or []:
+        if not row.get("id") or not row.get("body"):
+            continue
+        try:
+            linear.comment(row["id"], row["body"])
+        except Exception:
+            pass
+    for row in plan.get("labels") or []:
+        if not row.get("id"):
+            continue
+        try:
+            linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                       {"id": row["id"], "l": row["labelId"]})
+        except Exception:
+            pass
+
+
+def claim_remediation_events(host: Host, linear) -> dict:
+    """Claim every labeled remediation event. One cached read, then local planning."""
+    issues = fetch_labeled_events(linear)
+    providers = load_providers()
+    cooled = {name for name in providers if cooling(host, name)}
+
+    def healthy(_name, spec):
+        return provider_healthy(spec)
+
+    data = load_escalation(host)
+    plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
+                                           healthy=healthy, cooled=cooled)
+    _apply_event_plan(linear, plan)
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        current = load_escalation(host)
+        previous = current.get("events") or {}
+        merged = plan["events"]
+        for fingerprint, row in merged.items():
+            prior = previous.get(fingerprint) or {}
+            if not isinstance(prior, dict):
+                continue
+            # A worker can finish while this plan was being built. Keep that outcome.
+            if prior.get("status") in {"done", "exhausted"} and row.get("status") not in {"done", "exhausted"}:
+                row["status"] = prior["status"]
+                row["running"] = False
+                row["lane"] = prior.get("lane")
+                row["release"] = prior.get("release", False)
+            elif prior.get("release") and not row.get("release"):
+                row["release"] = True
+                row["running"] = False
+                row["lane"] = None
+                row["status"] = prior.get("status") or row.get("status")
+            elif prior.get("running") and not row.get("release"):
+                row["running"] = True
+                row["claimedAt"] = prior.get("claimedAt")
+                row["lane"] = prior.get("lane", row.get("lane"))
+                row["status"] = prior.get("status", row.get("status"))
+        current["events"] = merged
+        save_escalation(host, current)
+    finally:
+        lock.release()
+    summary = remediation.events_summary({"events": plan["events"]})
+    return {"eventsOpen": summary["eventsOpen"], "eventsClaimed": summary["eventsClaimed"],
+            "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"]}
+
+
+def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
+    """Take a fixable event this lane was assigned. No Linear read; state comes from the tick."""
+    data = load_escalation(host)
+    events = data.get("events") or {}
+    now = time.time()
+    for row in events.values():
+        if not isinstance(row, dict):
+            continue
+        if row.get("status") != "claimed" or row.get("lane") != name or row.get("running"):
+            continue
+        if not row.get("issueId"):
+            continue
+        row["running"] = True
+        row["claimedAt"] = now
+        row["release"] = False
+        save_escalation(host, data)
+        started = row.get("startedStateId")
+        if started:
+            try:
+                linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                           {"id": row["issueId"], "s": started})
+            except Exception:
+                pass
+        description = row.get("description") or ""
+        dossier = row.get("dossier") or ""
+        if dossier:
+            description = dossier + "\n\n" + description
+        return Issue(row["issueId"], row.get("identifier") or row["issueId"], row.get("title") or "",
+                     description, 2, now_iso(), list(row.get("labels") or []))
+    return None
+
+
+def note_event_outcome(host: Host, issue, verdict: str) -> None:
+    """Hand a labeled event back to the ladder after the lane run, without a Linear read."""
+    if issue is None or not getattr(issue, "id", None):
+        return
+    data = load_escalation(host)
+    events = data.get("events") or {}
+    changed = False
+    for row in events.values():
+        if not isinstance(row, dict) or row.get("issueId") != issue.id:
+            continue
+        row["running"] = False
+        if verdict == "provider-error":
+            row["lane"] = None
+            row["release"] = True
+            row["status"] = "claimed"
+        elif verdict in {"landing", "verified-not-queued"}:
+            row["status"] = "done"
+            row["release"] = False
+        elif verdict in {"not-shippable", "quarantined"}:
+            row["status"] = "exhausted"
+            row["lane"] = None
+            row["release"] = False
+        changed = True
+    if changed:
+        save_escalation(host, data)
+
+
+def claim_escalation_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
+    """Under claim.lock: validate a pending model rung before charging its separate budget."""
+    path = host.state / "fix-attempts.json"
+    try:
+        attempts = json.loads(path.read_text())
+        held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+        if not isinstance(attempts, dict) or not isinstance(held, dict):
+            return None
+    except (OSError, ValueError):
+        return None
+    providers = load_providers()
+    disabled = set(providers) - set(pr_events.cost_order(providers))
+    for key, record in attempts.items():
+        if not isinstance(record, dict):
+            continue
+        if type(record.get("count", 0)) is not int or record.get("count", 0) < 0 \
+                or any(field in record and (not isinstance(record[field], list)
+                       or any(not isinstance(row, dict) for row in record[field]))
+                       for field in ("escalations", "priorEscalations")):
+            continue  # Malformed accounting is not permission to reinterpret spent history.
+        pending = record.get("pendingEscalation") or {}
+        if not isinstance(pending, dict) or pending.get("lane") != name \
+                or not isinstance(pending.get("dossier"), str) or not pending["dossier"].strip():
+            continue
+        pr = next((item for item in prs if str(item.get("number")) == str(key)), None)
+        entry = held.get(key, {})
+        if pr is None or pending.get("head") not in (None, pr.get("headRefOid")) \
+                or not pr.get("headRefOid") or not pr.get("headRefName") \
+                or pr.get("isInMergeQueue") is True or not isinstance(entry, dict):
+            continue
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix", timeout=30):
+            continue
+        try:
+            live = require_fix_target(pr, "before-escalation-claim", repair=True)
+        except RepairStopped:
+            continue
+        owned = LANE_BRANCH.match(live.get("headRefName", ""))
+        if live.get("headRefName") != pr["headRefName"] or live.get("isCrossRepository") is not False \
+                or (live.get("isDraft") and not (owned and owned.group("lane") in {name, *disabled})):
+            continue
+        holds = {label.lower() for label in pr_events.label_names(live)} & pr_events.HOLD_LABELS
+        prior_holds = {label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS
+        # Exhaustion has its own authorized rung, but does not erase a stronger
+        # same-head hold (including legacy rows lacking normalized reason fields).
+        evidence = entry.get("evidence") or []
+        if not isinstance(evidence, list) or (entry.get("reason") is not None and not isinstance(entry["reason"], str)):
+            continue
+        evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
+        reason = entry.get("reason")
+        if not reason or reason == "fix-exhausted":
+            reason = pr_events.held_reason(evidence)[0]
+        policy_entry = {**entry, "evidence": evidence, "reason": reason}
+        action = next((action for _, code, action in pr_events.HELD_REASONS if code == reason), None)
+        if not pr_events.fixable_hold(policy_entry, live["headRefOid"]) \
+                or (entry.get("sha") == live["headRefOid"] and action and action not in pr_events.FIXABLE_ACTIONS):
+            continue
+        classified = remediation.classify_blocker(live, policy_entry, record)
+        if classified["cls"] not in {"fixable-by-model", "needs-rebase", "flaky-infra"} \
+                or classified.get("subtype") == "main-red" \
+                or pending.get("cls") != classified["cls"] or pending.get("subtype") != classified.get("subtype"):
+            continue
+        # Preserve the canonical prescribed-fix exception, never extending it to a
+        # new hold or altered prescription. Auxiliary holdNote is still cached.
+        if holds and (holds != prior_holds or pending.get("subtype") != "human-hold"
+                      or classified.get("subtype") != "human-hold"
+                      or live.get("holdNote") != pr.get("holdNote")):
+            continue
+        now = time.time()
+
+        def charge(current):
+            fresh_held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+            if not isinstance(current, dict) or current.get(key) != record \
+                    or not isinstance(fresh_held, dict) or fresh_held.get(key, {}) != entry \
+                    or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()) \
+                    or publication_revocation(host, live["headRefName"]):
+                raise RepairStopped("escalation-claim-changed", live, "before-escalation-charge")
+            updated = remediation.append_rung(record, rung="top-rung" if pending.get("topRung") else "escalate",
+                                              lane=name, cls=pending.get("cls") or "fixable-by-model", at=now,
+                                              head=live["headRefOid"], kind="model", top_rung=bool(pending.get("topRung")))
+            updated.pop("pendingEscalation", None)
+            current[key] = updated
+
+        charged = False
+
+        def summarize(data):
+            nonlocal charged
+            if not isinstance(data, dict) or not isinstance(data.get("attempts", []), list):
+                raise RepairStopped("escalation-summary-unavailable", live, "before-escalation-charge")
+            update_json(path, charge)
+            charged = True
+            data.setdefault("attempts", []).append({"pr": live["number"], "at": now, "lane": name})
+
+        try:
+            update_json(host.state / "escalation.json", summarize)
+        except (OSError, ValueError, TypeError, RepairStopped):
+            if charged:
+                raise  # Durable charge plus failed summary: stop this scan; never refund/reset.
+            continue
+        post_claim(live["number"], live["headRefOid"], "fix")
+        return {**live, "dossier": pending["dossier"],
+                "liftHold": pending.get("subtype") == "human-hold"}
+    return None
+
+
 def failure_excerpt(pr: dict, limit: int = 6000) -> str:
     """The failing jobs' own error lines, so the fixer works from evidence, not guesses."""
     parts = []
@@ -2653,8 +2924,9 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "",
         "## Contract",
         "- Fix the root cause on this branch; push to the same branch. Do not open a new PR.",
-        f"- Immediately before every install or push, read `gh pr view {pr['number']} --repo {REPO_SLUG} --json state`.",
-        "  If the target merged/closed or its state is unreadable, stop and preserve local changes; do not install or push.",
+        f"- Immediately before every install or push, use `gh api graphql` to read PR #{pr['number']} in {REPO_SLUG}:",
+        "  request state, headRefOid and isInMergeQueue. The pr view JSON command does not expose queue ownership.",
+        "  Continue only while OPEN with isInMergeQueue=false; otherwise stop and preserve local changes, without install or push.",
         "- Repo gates are real requirements (e.g. component-ship-gate needs tests + stories for",
         "  shipped UI components). Never skip, weaken or --no-verify a check.",
         "- If the failure is unrelated to this PR (broken main, infra), change nothing and end with",
@@ -2690,24 +2962,84 @@ def resolve_lockfile_conflict(worktree: Path, branch: str, log, *, guard=lambda:
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
+REPAIR_TARGET_FIELDS = """number title state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
+commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{__typename
+... on CheckRun{name status conclusion detailsUrl startedAt completedAt}
+... on StatusContext{context state targetUrl}}}}}}}"""
+REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+                       "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
-    """Read the target immediately before repair work; an unreadable target fails closed."""
+    """One fresh target read binds repair ownership and complete checks to the same head."""
     try:
-        viewed = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO_SLUG, "--json",
-                     "state,mergedAt,headRefName,headRefOid,url,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup,labels"], timeout=30)
-    except (OSError, subprocess.SubprocessError):
+        owner, name = REPO_SLUG.split("/")
+        number = pr["number"]
+        if type(number) is not int or number <= 0:
+            return None
+        viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
+                     "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"], timeout=30)
+        data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+        if not isinstance(data, dict) or data.get("errors"):
+            return None
+        return repair_target_node(pr, data["data"]["repository"]["pullRequest"])
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
         return None
+
+
+def repair_target_node(pr: dict, live) -> dict | None:
+    """Normalize one complete current target; missing authority never inherits cached values."""
     try:
-        live = json.loads(viewed.stdout) if viewed.returncode == 0 else None
-    except (TypeError, ValueError):
-        live = None
-    if not isinstance(live, dict) or str(live.get("state") or "").upper() not in {"OPEN", "CLOSED", "MERGED"}:
+        number = pr["number"]
+        if type(number) is not int or number <= 0:
+            return None
+        if (not isinstance(live, dict) or type(live.get("number")) is not int
+                or live["number"] != number or live.get("state") not in {"OPEN", "CLOSED", "MERGED"}):
+            return None
+        # Positive terminal evidence must still cancel work when a deleted branch
+        # has no current commit/check connection. It never admits execution.
+        if live["state"] != "OPEN":
+            return {**pr, **live}
+        if (any(not isinstance(live.get(field), str) or not live[field].strip()
+                for field in ("headRefOid", "headRefName", "mergeStateStatus"))
+                or any(type(live.get(field)) is not bool
+                       for field in ("isInMergeQueue", "isCrossRepository", "isDraft"))):
+            return None
+        if "reviewDecision" not in live or (live["reviewDecision"] is not None
+                and not isinstance(live["reviewDecision"], str)):
+            return None
+        labels = live["labels"]
+        if (labels["pageInfo"]["hasNextPage"] is not False or not isinstance(labels["nodes"], list)
+                or len(labels["nodes"]) > 100 or any(not isinstance(row, dict)
+                   or not isinstance(row.get("name"), str) or not row["name"].strip() for row in labels["nodes"])):
+            return None
+        commits = live["commits"]["nodes"]
+        if not isinstance(commits, list) or len(commits) != 1:
+            return None
+        commit = commits[0]["commit"]
+        if commit["oid"] != live["headRefOid"]:
+            return None
+        rollup, checks = commit["statusCheckRollup"], []
+        if rollup is not None:
+            contexts = rollup["contexts"]
+            if (contexts["pageInfo"]["hasNextPage"] is not False
+                    or not isinstance(contexts["nodes"], list) or len(contexts["nodes"]) > 100):
+                return None
+            checks = contexts["nodes"]
+            for check in checks:
+                kind = check["__typename"]
+                fields = ("name", "status") if kind == "CheckRun" else ("context", "state")
+                if (kind not in {"CheckRun", "StatusContext"}
+                        or any(not isinstance(check.get(field), str) or not check[field].strip() for field in fields)
+                        or (kind == "CheckRun" and ("conclusion" not in check
+                            or (check["conclusion"] is not None and not isinstance(check["conclusion"], str))))):
+                    return None
+        fresh = {**pr, **live, "labels": labels["nodes"], "statusCheckRollup": checks}
+        fresh.pop("commits", None)
+        return fresh
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
         return None
-    if str(live["state"]).upper() == "OPEN" and any(
-            not isinstance(live.get(field), str) or not live[field].strip()
-            for field in ("headRefOid", "headRefName")):
-        return None
-    return {**pr, **live}
 
 
 def fix_request_source(pr: dict) -> dict:
@@ -2772,13 +3104,16 @@ def repair_created_head(worktree: Path, head: str, *, allow_local_progress: bool
         for sha, action in [line.split("\0", 1)])
 
 
-def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None) -> dict:
+def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None, repair: bool = False) -> dict:
     live = reconcile_fix_target(pr)
     if live is None:
         raise RepairStopped("target-state-unavailable", live, stage)
     state = str(live.get("state") or "").upper()
     if state != "OPEN":
         raise RepairStopped("target-pr-merged" if state == "MERGED" else "target-pr-closed", live, stage)
+    if repair and live.get("isInMergeQueue") is not False:
+        reason = "target-pr-queued" if live.get("isInMergeQueue") is True else "target-queue-unavailable"
+        raise RepairStopped(reason, live, stage)
     if live.get("headRefOid") != pr["headRefOid"]:
         if worktree is None or not repair_created_head(worktree, live["headRefOid"],
                                                        allow_local_progress=stage == "agent-running"):
@@ -2973,14 +3308,12 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
                "startedAt": now_iso()}
-    live = reconcile_fix_target(pr)
     receipt["targetStateReads"] = 1
-    state = str((live or {}).get("state") or "").upper()
-    changed_head = state == "OPEN" and live.get("headRefOid") != pr["headRefOid"] if live else False
-    if live is None or state != "OPEN" or changed_head:
-        reason = "target-state-unavailable" if live is None else \
-            "target-pr-merged" if state == "MERGED" else \
-            "target-pr-closed" if state == "CLOSED" else "target-head-superseded"
+    try:
+        live = require_fix_target(pr, "before-execution-claim", repair=True)
+    except RepairStopped as error:
+        live, reason = error.live, str(error)
+        state = str((live or {}).get("state") or "").upper()
         verdict = "reconcile-unavailable" if live is None else "cancelled"
         receipt.update(
             verdict=verdict,
@@ -3056,7 +3389,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         try:
             def verify_target(target, stage, *, worktree=None):
                 receipt["targetStateReads"] += 1
-                live = require_fix_target(target, stage, worktree=worktree)
+                live = require_fix_target(target, stage, worktree=worktree, repair=True)
                 require_publishable(host, live.get("headRefName") or pr["headRefName"], stage)
                 return live
             require_disk(host, "repair-checkout")
@@ -3591,15 +3924,27 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
-    order, now = pr_events.cost_order(load_providers()), time.time()
+    providers = load_providers()
+    order, now = pr_events.cost_order(providers), time.time()
+    disabled = set(providers) - set(order)
     prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
         live = None if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix") else \
             pr_events.fresh_reentry(THIS, pr, attempts.get(str(pr["number"]), {}))
-        if live is not None and red_pr([live], attempts, held) is not None:
+        entry = pr_events.current_repair_claim(host, THIS, live, attempts.get(str(pr["number"]), {})) \
+            if live is not None else None
+        # Match the original lane_prs/repo_prs ownership after the fresh target read.
+        # Event scope has a separate branch vocabulary; it cannot narrow polling's
+        # recognized Hyperagent digest branches or admit another enabled lane's draft.
+        owned = LANE_BRANCH.match(live.get("headRefName", "")) if live is not None else None
+        in_scope = live is not None and (not live.get("isDraft") or
+                                        bool(owned and owned.group("lane") in {name, *disabled}))
+        if entry is not None and in_scope \
+                and red_pr([live], attempts, {str(pr["number"]): entry}) is not None:
             pr = live
+            held = {str(pr["number"]): entry}
             break
         prs = [other for other in prs if other["number"] != pr["number"]]
         pr = red_pr(prs, attempts, held)
@@ -3745,14 +4090,17 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         candidates = fix_candidates(name)
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
         escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-        red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
+        red = (pr_events.claim_event_pr(host, THIS, name, events)
+               or claim_escalation_pr(host, name, candidates)
+               or claim_red_pr(host, name, candidates))
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs, candidates)
-        issue = None
+        labeled = None if red or adopt else claim_labeled_event(host, name, linear)
+        issue = labeled
         sweep_lane_prs(host, name, linear)
-        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
-        in_flight = None if red or adopt or blocked else in_flight_issues()
-        if in_flight is not None:
+        in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
+        if labeled is None and in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = design_gate.pick_build_issue(
                 linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
@@ -3761,6 +4109,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
                 issue = None  # another host claimed it between our read and now
             if issue:
                 linear.move(issue.id, "In Progress")
+        if red is None and adopt is None and issue is None:
+            pr_events.cleanup_one_event(host, THIS, events)
     except LinearRateLimited:
         # A repair already chosen can proceed without another Linear read. An idle scan stops.
         issue = None
@@ -3790,6 +4140,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     notify_issue_claim(linear, issue, name, spec)
     receipt = run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
+    note_event_outcome(host, issue, verdict)
     if verdict == "disk-held":
         linear.move(issue.id, "Todo")
         slot.release()
@@ -3895,6 +4246,10 @@ def dispatch(host: Host) -> int:
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
+        try:
+            tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
+        except Exception as error:  # the label scan never takes worker spawn down
+            tick["remediationEventsError"] = f"{type(error).__name__}: {error}"[:200]
         for name, spec in load_providers().items():
             slots = host.slots(name, spec.get("slots", 1))
             # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
