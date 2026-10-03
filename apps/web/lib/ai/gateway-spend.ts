@@ -16,7 +16,11 @@ import { captureError } from '@/lib/error-tracking';
 
 /** Alert when one UTC day of Gateway spend exceeds this (summer-config#107). */
 export const AI_GATEWAY_DAILY_SPEND_ALERT_USD = 5;
-/** Alert when a model averages more input tokens per request than this. */
+/**
+ * Alert when a model averages more prompt tokens per request than this.
+ * The report's `inputTokens` excludes cached tokens, so prompt tokens are
+ * `inputTokens + cachedInputTokens`.
+ */
 export const AI_GATEWAY_INPUT_TOKENS_PER_REQUEST_ALERT = 150_000;
 /** The admin Costs row seeded in lib/admin/costs.ts. */
 export const AI_GATEWAY_COST_LABEL = 'Vercel AI Gateway';
@@ -29,28 +33,49 @@ export interface GatewaySpendLine {
   readonly key: string;
   readonly costUsd: number;
   readonly requests: number;
-  readonly inputTokensPerRequest: number | null;
+  /** (input + cached) / requests; null when the report has no token counts. */
+  readonly promptTokensPerRequest: number | null;
+  /** cached / (input + cached); null when there were no prompt tokens. */
+  readonly cacheShare: number | null;
 }
 
 export interface DailyGatewaySpend {
   readonly day: string;
   readonly totalUsd: number;
   readonly observed30dUsd: number;
+  /** Share of the day's prompt tokens served from the provider cache. */
+  readonly cacheShare: number | null;
   readonly byTag: readonly GatewaySpendLine[];
   readonly byModel: readonly GatewaySpendLine[];
   readonly alerts: readonly string[];
 }
 
+function promptTokens(row: GatewaySpendReportRow): number {
+  return (row.inputTokens ?? 0) + (row.cachedInputTokens ?? 0);
+}
+
+function cacheShareOf(rows: readonly GatewaySpendReportRow[]): number | null {
+  const prompt = rows.reduce((total, row) => total + promptTokens(row), 0);
+  if (prompt === 0) return null;
+  const cached = rows.reduce(
+    (total, row) => total + (row.cachedInputTokens ?? 0),
+    0
+  );
+  return cached / prompt;
+}
+
 function toLine(key: string, row: GatewaySpendReportRow): GatewaySpendLine {
   const requests = row.requestCount ?? 0;
+  const prompt = promptTokens(row);
   return {
     key,
     costUsd: row.totalCost,
     requests,
-    inputTokensPerRequest:
-      requests > 0 && row.inputTokens != null
-        ? Math.round(row.inputTokens / requests)
+    promptTokensPerRequest:
+      requests > 0 && (row.inputTokens != null || row.cachedInputTokens != null)
+        ? Math.round(prompt / requests)
         : null,
+    cacheShare: cacheShareOf([row]),
   };
 }
 
@@ -110,11 +135,11 @@ export async function getDailyGatewaySpend(
       );
     }
     if (
-      line.inputTokensPerRequest != null &&
-      line.inputTokensPerRequest > AI_GATEWAY_INPUT_TOKENS_PER_REQUEST_ALERT
+      line.promptTokensPerRequest != null &&
+      line.promptTokensPerRequest > AI_GATEWAY_INPUT_TOKENS_PER_REQUEST_ALERT
     ) {
       alerts.push(
-        `${line.key} averaged ${line.inputTokensPerRequest} input tokens/request on ${day}`
+        `${line.key} averaged ${line.promptTokensPerRequest} prompt tokens/request on ${day}`
       );
     }
   }
@@ -123,6 +148,7 @@ export async function getDailyGatewaySpend(
     day,
     totalUsd,
     observed30dUsd: sumCost(monthReport.results),
+    cacheShare: cacheShareOf(modelReport.results),
     byTag,
     byModel,
     alerts,
@@ -137,7 +163,11 @@ export function formatGatewaySpendNotes(spend: DailyGatewaySpend): string {
       line => `${line.key.slice('feature:'.length)} ${formatUsd(line.costUsd)}`
     )
     .join(', ');
-  return `Auto: ${spend.day} ${formatUsd(spend.totalUsd)}${top ? ` (${top})` : ''}. Alert over ${formatUsd(AI_GATEWAY_DAILY_SPEND_ALERT_USD)}/day.`;
+  const cache =
+    spend.cacheShare == null
+      ? ''
+      : ` Cache ${Math.round(spend.cacheShare * 100)}% of prompt tokens.`;
+  return `Auto: ${spend.day} ${formatUsd(spend.totalUsd)}${top ? ` (${top})` : ''}.${cache} Alert over ${formatUsd(AI_GATEWAY_DAILY_SPEND_ALERT_USD)}/day.`;
 }
 
 /**

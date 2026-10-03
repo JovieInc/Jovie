@@ -502,6 +502,7 @@ type UpsertIssue = (input: {
   title: string;
   description: string;
   priority: number;
+  reopenTerminal?: boolean;
 }) => Promise<{ ok: boolean; action?: string; reason?: string }>;
 
 async function linearUpsert(): Promise<UpsertIssue> {
@@ -539,6 +540,7 @@ export async function fileDefects(
         `Fingerprint: \`${defect.fingerprint}\``,
       ].join('\n'),
       priority: 3,
+      reopenTerminal: true,
     });
     console.log(
       `[marketing-cert] ${packet.subject.id} defect ${defect.fingerprint} -> ${result.ok ? ('action' in result ? result.action : 'ok') : result.reason}`

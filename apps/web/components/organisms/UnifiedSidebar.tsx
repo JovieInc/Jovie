@@ -32,6 +32,7 @@ import {
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -244,90 +245,99 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
+  const { inboxNavigation } = useDashboardData();
 
   return (
-    <div className='flex w-full items-center'>
-      {(() => {
-        if (isRouteSidebar) {
-          return (
-            <div className='flex w-full items-center gap-2'>
-              <Link
-                href={routeBackHref}
-                aria-label={routeBackLabel}
+    <div className='flex w-full items-center' data-sidebar-brand-row='true'>
+      <div className='min-w-0 flex-1'>
+        {(() => {
+          if (isRouteSidebar) {
+            return (
+              <div className='flex w-full items-center gap-2'>
+                <Link
+                  href={routeBackHref}
+                  aria-label={routeBackLabel}
+                  className={cn(
+                    'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                    'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                  )}
+                >
+                  <ArrowLeft
+                    className='size-3.5 text-sidebar-item-icon'
+                    aria-hidden='true'
+                  />
+                  <span className='truncate group-data-[collapsible=icon]:hidden'>
+                    {routeBackLabel}
+                  </span>
+                </Link>
+              </div>
+            );
+          }
+          if (isDemoRoute) {
+            return (
+              <div
                 className={cn(
-                  'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-                  'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                  'group-data-[collapsible=icon]:justify-center'
                 )}
               >
-                <ArrowLeft
-                  className='size-3.5 text-sidebar-item-icon'
-                  aria-hidden='true'
-                />
-                <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  {routeBackLabel}
-                </span>
-              </Link>
-            </div>
-          );
-        }
-        if (isDemoRoute) {
-          return (
-            <div
-              className={cn(
-                'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
-                'group-data-[collapsible=icon]:justify-center'
-              )}
-            >
-              <BrandLogo
-                size='chrome'
-                tone='auto'
-                rounded={false}
-                className='rounded-sm shrink-0'
-              />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                Demo
-              </span>
-            </div>
-          );
-        }
-        if (canSwitchWorkspaces) {
-          return (
-            <WorkspaceSelector
-              currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
-              workspaces={APP_SHELL_WORKSPACES}
-            />
-          );
-        }
-        if (hasMultipleIdentities && !isOperatorSection) {
-          return <IdentitySwitcher />;
-        }
-        // Clean header: the Jovie mark is the global "Ask Jovie" entry point
-        // (JOV-6569). OV skin keeps its static identity wordmark; user menu
-        // lives in the bottom Settings button.
-        return (
-          <div
-            className={cn(
-              'flex h-7 w-full items-center gap-1.5',
-              'group-data-[collapsible=icon]:justify-center'
-            )}
-          >
-            {variant === 'ov' ? (
-              <>
                 <BrandLogo
-                  size={24}
+                  size='chrome'
                   tone='auto'
-                  variant={variant}
                   rounded={false}
                   className='rounded-sm shrink-0'
                 />
-                <span>{BRAND_WORDMARKS[variant]}</span>
-              </>
-            ) : (
-              <AskJovieMark variant={variant} />
-            )}
-          </div>
-        );
-      })()}
+                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                  Demo
+                </span>
+              </div>
+            );
+          }
+          if (canSwitchWorkspaces) {
+            return (
+              <WorkspaceSelector
+                currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
+                workspaces={APP_SHELL_WORKSPACES}
+              />
+            );
+          }
+          if (hasMultipleIdentities && !isOperatorSection) {
+            return <IdentitySwitcher />;
+          }
+          // Clean header: the Jovie mark is the global "Ask Jovie" entry point
+          // (JOV-6569). OV skin keeps its static identity wordmark; user menu
+          // lives in the bottom Settings button.
+          return (
+            <div
+              className={cn(
+                'flex h-7 w-full items-center gap-1.5',
+                'group-data-[collapsible=icon]:justify-center'
+              )}
+            >
+              {variant === 'ov' ? (
+                <>
+                  <BrandLogo
+                    size={24}
+                    tone='auto'
+                    variant={variant}
+                    rounded={false}
+                    className='rounded-sm shrink-0'
+                  />
+                  <span>{BRAND_WORDMARKS[variant]}</span>
+                </>
+              ) : (
+                <AskJovieMark variant={variant} />
+              )}
+            </div>
+          );
+        })()}
+      </div>
+      {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
+        <>
+          <SidebarInboxLink availability={inboxNavigation} />
+          <HeaderSearchSurfaceFromContext compact />
+        </>
+      ) : null}
 
       {!isDesktop ? (
         <SidebarCollapseButton className='ml-auto shrink-0' />
@@ -442,8 +452,12 @@ export function UnifiedSidebar({
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (
-              <DashboardNav>
-                <HeaderSearchSurfaceFromContext calm />
+              <DashboardNav
+                headerOwnsInbox={!isDemoRoute && !isOperatorSection}
+              >
+                {isDemoRoute ? (
+                  <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
+                ) : null}
               </DashboardNav>
             )}
           </SidebarGroupContent>

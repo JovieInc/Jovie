@@ -256,6 +256,84 @@ describe('POST /api/changelog/subscribe', () => {
     expect(mockUpdateSet).not.toHaveBeenCalled();
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
+  it('enforces a per-address resend cooldown for pending confirmations', async () => {
+    // tokenExpiresAt is minted when the confirmation email is sent; a fresh
+    // expiry means the last send happened seconds ago.
+    mockSelectLimit.mockResolvedValue([
+      {
+        id: 'existing',
+        verified: false,
+        unsubscribedAt: null,
+        tokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    ]);
+
+    const { POST } = await import('@/app/api/changelog/subscribe/route');
+    const response = await POST(
+      buildRequest({
+        email: 'reader@example.com',
+        turnstileToken: 'token',
+      }) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({
+      error: 'Confirmation email was just sent. Please wait before resending.',
+      retryAfterSeconds: expect.any(Number),
+    });
+    expect(response.headers.get('Retry-After')).toBeTruthy();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('resends a confirmation once the per-address cooldown has elapsed', async () => {
+    mockSelectLimit.mockResolvedValue([
+      {
+        id: 'existing',
+        verified: false,
+        unsubscribedAt: null,
+        tokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000 - 61 * 1000),
+      },
+    ]);
+
+    const { POST } = await import('@/app/api/changelog/subscribe/route');
+    const response = await POST(
+      buildRequest({
+        email: 'reader@example.com',
+        turnstileToken: 'token',
+      }) as never
+    );
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      state: 'confirmation_required',
+    });
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('resends a confirmation when the previous link already expired', async () => {
+    mockSelectLimit.mockResolvedValue([
+      {
+        id: 'existing',
+        verified: false,
+        unsubscribedAt: null,
+        tokenExpiresAt: new Date(Date.now() - 60 * 1000),
+      },
+    ]);
+
+    const { POST } = await import('@/app/api/changelog/subscribe/route');
+    const response = await POST(
+      buildRequest({
+        email: 'reader@example.com',
+        turnstileToken: 'token',
+      }) as never
+    );
+
+    expect(response.status).toBe(201);
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+  });
+
   it('returns the subscribed state without writing or sending another confirmation', async () => {
     mockSelectLimit.mockResolvedValue([
       { id: 'existing', verified: true, unsubscribedAt: null },

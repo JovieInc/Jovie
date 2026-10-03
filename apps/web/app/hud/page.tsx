@@ -8,6 +8,7 @@ import { OperationalControlPanel } from '@/components/features/admin/Operational
 import { APP_ROUTES } from '@/constants/routes';
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
@@ -66,7 +67,11 @@ export default async function HudPage({
       density={tokenOk ? 'kiosk' : 'shell'}
       presentationMode={tokenOk ? 'token' : 'shell'}
       kioskToken={tokenOk ? kioskToken : null}
-      useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
+      initialFixtureAgentRuns={
+        env.HUD_AGENT_RUNS_FIXTURES === '1'
+          ? AGENT_OS_ADMIN_FIXTURE_ARTIFACTS
+          : undefined
+      }
       initialFunnel={funnel}
     />
   );

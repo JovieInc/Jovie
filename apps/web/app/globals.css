@@ -219,6 +219,30 @@ html[data-desktop-runtime="electron"]
   }
 }
 
+/* Headerless media routes retain a safe area below window controls. */
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:not(
+    :has([data-top-spacing-owner="shell-header"])
+  )
+  [data-app-shell-content-column="true"] {
+  padding-top: var(--electron-titlebar-height);
+}
+
+/* Settings now supplies the shared desktop header inside its route panel. */
+html[data-desktop-runtime="electron"]
+[data-app-shell-content-inset="true"]:has(
+  [data-testid="settings-shell-content"]
+) {
+  padding-top: 0;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-testid="settings-shell-content"]
+  > div {
+  padding-top: 0;
+  padding-inline: 0;
+}
+
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
   -webkit-app-region: drag;
 }
@@ -257,11 +281,13 @@ html[data-desktop-runtime="electron"]
   [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
+  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
 }
 
-/* Marketing pages use document scrolling rather than app-shell scroll panes.
+/* Public pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
+html:has([data-public-page-shell]),
 html:has(.system-b-marketing),
 html:has(.home-viewport) {
   height: auto;
@@ -269,6 +295,7 @@ html:has(.home-viewport) {
   overflow-y: auto;
   overscroll-behavior: auto;
 }
+body:has([data-public-page-shell]),
 body:has(.system-b-marketing),
 body:has(.home-viewport) {
   height: auto;

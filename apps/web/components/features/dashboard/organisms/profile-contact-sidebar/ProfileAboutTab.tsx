@@ -579,7 +579,7 @@ function PressPhotosSection({
           </p>
         )}
 
-      {uploadError && <p className='text-2xs text-danger'>{uploadError}</p>}
+      {uploadError && <p className='text-2xs text-error'>{uploadError}</p>}
 
       <input
         ref={fileInputRef}

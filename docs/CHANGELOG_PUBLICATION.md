@@ -15,6 +15,8 @@ Source Validation requires an explicit decision for customer-code PRs created fr
 
 Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs.
 Evidence uses bounded read-only checks on jov.ie or docs.jov.ie. Approve only claims the path actually proves; authenticated actions, payments and entitlements need their actual customer-path receipt, not marketing headlines.
+Optional `details` (up to 3 claim-mapped bullets, each at most 240 customer-safe characters) explain what changed and why it matters beyond the one-line outcome.
+Optional `action` (`{"label":"…","href":"…"}`, label at most 80 characters) gives the entry one next step. The destination must be an internal path or `https` on jov.ie/docs.jov.ie — a working example, setup, or help route a signed-out visitor can actually open. Unsafe or unverifiable destinations fail validation; omit `action` rather than linking a placeholder or the generic homepage.
 
 ## Release path
 

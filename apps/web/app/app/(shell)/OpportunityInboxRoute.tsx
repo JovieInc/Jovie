@@ -118,6 +118,7 @@ export async function OpportunityInboxRoute() {
 
   return (
     <OpportunityInboxPageClient
+      key={clerkUserId}
       inbox={inbox}
       initialLinks={initialLinks}
       connectedDSPs={connectedDSPs}

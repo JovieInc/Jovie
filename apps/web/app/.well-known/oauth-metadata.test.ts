@@ -78,6 +78,7 @@ describe('issuer discovery metadata', () => {
   });
 
   it('serves Ovie authorization-server metadata at the RFC 8414 path', async () => {
+    delete process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION;
     const origin = 'https://staging.jov.ie';
     const response = await getOvieAuthorizationServerMetadata(
       new Request(`${origin}${OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH}`)
@@ -92,16 +93,16 @@ describe('issuer discovery metadata', () => {
       issuer: `${origin}${OVIE_OAUTH_ISSUER_PATH}`,
       authorization_endpoint: `${origin}${OVIE_OAUTH_ISSUER_PATH}/authorize`,
       token_endpoint: `${origin}${OVIE_OAUTH_ISSUER_PATH}/token`,
+      registration_endpoint: `${origin}${OVIE_OAUTH_ISSUER_PATH}/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
       scopes_supported: [...OVIE_OAUTH_SCOPES],
     });
-    expect(body).not.toHaveProperty('registration_endpoint');
   });
 
-  it('advertises the Ovie registration endpoint only when the flag is on', async () => {
+  it('keeps the Ovie registration endpoint when the Better Auth flag is on', async () => {
     process.env.FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION = 'true';
     const origin = 'https://staging.jov.ie';
     const response = await getOvieAuthorizationServerMetadata(

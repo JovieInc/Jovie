@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { MobileWebScreen } from '@/components/marketing/device/DeviceScreen';
 import { cn } from '@/lib/utils';
 
 interface PhoneFrameProps {
@@ -6,42 +7,11 @@ interface PhoneFrameProps {
   readonly className?: string;
 }
 
+/** Bezel-free mobile web preview (device policy: deviceBezels.ts). */
 export function PhoneFrame({ children, className }: PhoneFrameProps) {
   return (
-    <div
-      className={cn(
-        'relative mx-auto flex h-148 w-71 flex-col items-center',
-        className
-      )}
-    >
-      <div
-        className='relative h-full w-full overflow-hidden rounded-[2rem] p-px'
-        style={{
-          backgroundColor:
-            'color-mix(in oklab, var(--linear-bg-surface-1) 92%, var(--linear-bg-page))',
-          boxShadow: [
-            '0 0 0 1px var(--linear-border-default)',
-            '0 0 0 3px rgba(255,255,255,0.015)',
-            '0 12px 34px rgba(0,0,0,0.34)',
-            '0 24px 56px rgba(0,0,0,0.2)',
-          ].join(', '),
-        }}
-      >
-        <div className='relative h-full w-full overflow-hidden rounded-[1.9rem] bg-page'>
-          {children}
-        </div>
-
-        <div
-          aria-hidden='true'
-          className='absolute bottom-2 left-1/2 -translate-x-1/2'
-          style={{
-            width: 120,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-          }}
-        />
-      </div>
+    <div className={cn('relative mx-auto w-71', className)}>
+      <MobileWebScreen>{children}</MobileWebScreen>
     </div>
   );
 }

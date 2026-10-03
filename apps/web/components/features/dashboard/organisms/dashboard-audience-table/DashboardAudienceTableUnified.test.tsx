@@ -49,5 +49,9 @@ describe('DashboardAudienceTableUnified', () => {
     );
 
     expect(screen.getByTestId('dashboard-audience-table')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Audience', hidden: true })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 });

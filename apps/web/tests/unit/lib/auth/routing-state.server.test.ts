@@ -199,9 +199,68 @@ describe('auth routing state store', () => {
         now: 2_000,
         createCodeChallenge: () => 'wrong_challenge',
       })
-    ).resolves.toEqual({ ok: false, reason: 'wrong_verifier' });
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'wrong_verifier',
+      exchangePhase: 'preconsume',
+    });
 
     expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
+  });
+
+  it.each(['wrong_state', 'wrong_client', 'expired', 'missing'] as const)(
+    'marks %s only when rejected before atomic consumption',
+    async reason => {
+      const { consumeStoredNativeExchangeCode } = await modulePromise;
+      const sealed = await createSealedNativeExchange();
+      hoisted.findVerificationValue.mockResolvedValue(
+        reason === 'missing' ? null : verification(sealed)
+      );
+      const result = await consumeStoredNativeExchangeCode({
+        client: reason === 'wrong_client' ? 'electron' : 'ios',
+        code: 'code_123',
+        state: reason === 'wrong_state' ? 'different' : 'state_123',
+        codeVerifier: 'verifier',
+        now: reason === 'expired' ? 302_000 : 2_000,
+        createCodeChallenge: () => 'challenge',
+      });
+      expect(result).toEqual({
+        ok: false,
+        reason,
+        exchangePhase: 'preconsume',
+      });
+      expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps a valid code usable after preliminary rejection', async () => {
+    const { consumeStoredNativeExchangeCode } = await modulePromise;
+    const sealed = await createSealedNativeExchange();
+    hoisted.findVerificationValue.mockResolvedValue(verification(sealed));
+    hoisted.consumeVerificationValue.mockResolvedValue(verification(sealed));
+    const input = {
+      client: 'ios' as const,
+      code: 'code_123',
+      state: 'state_123',
+      codeVerifier: 'verifier',
+      now: 2_000,
+      createCodeChallenge: () => 'challenge',
+    };
+    expect(
+      await consumeStoredNativeExchangeCode({ ...input, state: 'wrong' })
+    ).toEqual({
+      ok: false,
+      reason: 'wrong_state',
+      exchangePhase: 'preconsume',
+    });
+    expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
+    expect(await consumeStoredNativeExchangeCode(input)).toEqual({
+      ok: true,
+      userId: 'user_123',
+      returnTo: '/app',
+      ott: null,
+    });
+    expect(hoisted.consumeVerificationValue).toHaveBeenCalledTimes(1);
   });
 
   it('allows only one concurrent native exchange to succeed', async () => {
@@ -257,7 +316,11 @@ describe('auth routing state store', () => {
         now: 2_000,
         createCodeChallenge: () => 'challenge',
       })
-    ).resolves.toEqual({ ok: false, reason: 'missing' });
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'missing',
+      exchangePhase: 'preconsume',
+    });
     expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
   });
   describe('desktop handback', () => {

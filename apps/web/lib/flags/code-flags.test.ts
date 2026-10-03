@@ -7,6 +7,11 @@ describe('code flags', () => {
     delete process.env.FEATURE_CANVAS_GRAIN;
   });
 
+  it('keeps flag keys in alphabetical order so concurrent additions merge cleanly', () => {
+    const keys = Object.keys(CODE_FLAGS);
+    expect(keys).toEqual([...keys].sort());
+  });
+
   it('defaults to the registry value when no env override is set', () => {
     expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(CODE_FLAGS.CANVAS_GRAIN);
   });
@@ -14,5 +19,13 @@ describe('code flags', () => {
   it('honors FEATURE_<FLAG_NAME> env overrides', () => {
     process.env.FEATURE_CANVAS_GRAIN = 'false';
     expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(false);
+  });
+
+  it('keeps the auth offer summary off unless the env override is true', () => {
+    expect(CODE_FLAGS.AUTH_OFFER_SUMMARY).toBe(false);
+    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(false);
+    process.env.FEATURE_AUTH_OFFER_SUMMARY = 'true';
+    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(true);
+    delete process.env.FEATURE_AUTH_OFFER_SUMMARY;
   });
 });

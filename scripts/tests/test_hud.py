@@ -6,10 +6,13 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("hud", ROOT / "scripts/lanes/hud.py")
@@ -107,7 +110,7 @@ class RenderTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
         self.assertIn("JOV-6544   Audio browsing: verify and close intent prefetch", text)
-        self.assertIn("worker polling · claimable unknown (doctor unread)", text)
+        self.assertIn("worker polling · new issues unknown (doctor unread)", text)
         self.assertIn("codex  vacant · no worker", text)
         self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
@@ -152,7 +155,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("Linear HTTPError: 429", text)
         self.assertIn("PR list: RuntimeError: HTTP 504", text)
         self.assertIn("merge queue timeout", text)
-        self.assertIn("claimable unknown (doctor unread)", text)
+        self.assertIn("new issues unknown (doctor unread)", text)
         self.assertIn("FileNotFoundError: codex", text)
         self.assertIn("✓ nothing needs a human", text)
         self.assertNotIn("UNKNOWN", text)
@@ -168,24 +171,42 @@ class RenderTest(unittest.TestCase):
         feed = value["local"]["doctor"]
         feed.update(at=hud.utcnow().isoformat(), admission={
             "poolByProvider": {"devin": 0, "codex": 1},
+            "eligiblePoolByProvider": {"devin": 0, "codex": 1},
+            "newIssueBudgetByProvider": {"devin": {"used": 0, "cap": 8, "reason": "within-budget"},
+                                         "codex": {"used": 0, "cap": 6, "reason": "within-budget"}},
             "candidatePoolByProvider": {"devin": 8, "codex": 1},
             "rejectedByProvider": {"devin": {"excluded-label:type:epic": 5, "sensitive-text": 3}}})
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
-        self.assertIn("claimable 0/8 · excluded-label:type:epic 5, sensitive-text 3", text)
-        self.assertIn("CLAIMABLE devin", text)
+        self.assertIn("new issues 0 · eligible 0/8 · PRs 0/8 within-budget · excluded-label:type:epic 5, sensitive-text 3", text)
+        self.assertIn("NEW ISSUES devin", text)
         self.assertNotIn("pool 87", text)
         # An unrelated direct Linear read failure does not invalidate the fresh receipt.
         value["linear"] = {"ok": False, "error": "HTTP 429"}
-        self.assertIn("claimable 0/8", hud.pool_hint("devin", value["local"]))
+        self.assertIn("new issues 0 · eligible 0/8 · PRs 0/8 within-budget", hud.pool_hint("devin", value["local"]))
         feed["admission"]["error"] = "ownership unreadable"
-        self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (ownership unreadable)")
+        self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (ownership unreadable)")
         feed["admission"].pop("error")
-        self.assertEqual(hud.pool_hint("missing", value["local"]), "claimable unknown (admission unread)")
+        self.assertEqual(hud.pool_hint("missing", value["local"]), "new issues unknown (PR budget unread)")
         for stamp in ("2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z"):
             feed["at"] = stamp
-            self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (doctor stale)")
+            self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (doctor stale)")
         feed["at"] = "malformed"
-        self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (doctor unread)")
+        self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (doctor unread)")
+
+    def test_new_issue_hint_separates_eligibility_budget_and_unknown(self):
+        local = {"doctor": {"at": hud.utcnow().isoformat(), "admission": {
+            "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 25},
+            "eligiblePoolByProvider": {"codex": 7},
+            "newIssueBudgetByProvider": {"codex": {"used": 6, "cap": 6, "reason": "over-budget"}}}}}
+        hint = hud.pool_hint("codex", local)
+        self.assertIn("new issues 0", hint)
+        self.assertIn("eligible 7/25", hint)
+        self.assertIn("PRs 6/6 over-budget", hint)
+        local["doctor"]["admission"]["newIssueBudgetByProvider"]["codex"] = {
+            "used": None, "cap": 6, "reason": "pr-inventory-unavailable"}
+        self.assertEqual(hud.pool_hint("codex", local), "new issues unknown (PR inventory unread) · eligible 7/25")
+        local["doctor"]["admission"].pop("newIssueBudgetByProvider")
+        self.assertEqual(hud.pool_hint("codex", local), "new issues unknown (PR budget unread)")
 
     def test_clip_keeps_ansi_balanced_and_width_exact(self):
         colored = hud.rgb(hud.RED, "x" * 50)
@@ -193,6 +214,64 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(len(plain(hud.pad("ab", 5))), 5)
         self.assertEqual(hud.dur(5400), "1h30m")
         self.assertEqual(hud.dur(90000), "1d1h")
+
+
+class LedgerSchemaTest(unittest.TestCase):
+    """JOV-7497: receipts missing optional verdict/provider/kind metadata must render
+    as unclassified, not crash the display or be inferred as success."""
+
+    def host_with_ledger(self, receipts):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        (state / "runs").mkdir()
+        stamp = hud.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(state / "runs" / "ledger.jsonl", "w") as handle:
+            for receipt in receipts:
+                row = {"runId": receipt.get("runId", "x"), "endedAt": receipt.pop("endedAt", stamp), **receipt}
+                handle.write(json.dumps(row) + "\n")
+        return SimpleNamespace(state=state, slots=lambda _name, default: default, gate_slots=2)
+
+    def test_missing_and_null_verdicts_become_unclassified_not_a_crash(self):
+        host = self.host_with_ledger([
+            {"runId": "a", "provider": "devin"},  # no verdict key at all
+            {"runId": "b", "provider": "devin", "verdict": None},
+            {"runId": "c", "provider": "devin", "verdict": ""},
+            {"runId": "d", "provider": "devin", "verdict": {"nested": True}},
+            {"runId": "e", "provider": "devin", "verdict": "landing"},
+            {"runId": "f", "provider": "devin", "verdict": "failed"},
+        ])
+        local = hud.local_model(host)
+        self.assertEqual(local["ledger24h"], {"unclassified": 4, "landing": 1, "failed": 1})
+        self.assertEqual(local["runs24h"], 6)
+        # Raw receipts keep their original verdict metadata; only the count is classified.
+        self.assertIsNone(next(r for r in local["receipts24h"] if r["runId"] == "b")["verdict"])
+        self.assertNotIn("verdict", next(r for r in local["receipts24h"] if r["runId"] == "a"))
+        text = "\n".join(plain(line) for line in hud.render(model(local=local), 160, 45))
+        self.assertIn("unclassified 4", text)
+        self.assertIn("landing 1", text)
+
+    def test_null_and_missing_ended_at_do_not_crash_local_model(self):
+        host = self.host_with_ledger([
+            {"runId": "a", "provider": "devin", "verdict": "landing", "endedAt": None},
+            {"runId": "b", "provider": "devin"},
+        ])
+        local = hud.local_model(host)
+        self.assertEqual(local["runs24h"], 1)
+        self.assertEqual(local["ledger24h"], {"unclassified": 1})
+
+    def test_empty_ledger_reports_no_runs(self):
+        host = self.host_with_ledger([])
+        local = hud.local_model(host)
+        self.assertEqual(local["ledger24h"], {})
+        text = "\n".join(plain(line) for line in hud.render(model(local=local), 160, 45))
+        self.assertIn("24h verdicts: no runs", text)
+
+    def test_render_survives_non_string_ledger_keys(self):
+        broken = model()
+        broken["local"]["ledger24h"] = {None: 2, 5: 1, "landing": 3}
+        text = "\n".join(plain(line) for line in hud.render(broken, 160, 45))
+        self.assertIn("24h verdicts:", text)
 
 
 if __name__ == "__main__":

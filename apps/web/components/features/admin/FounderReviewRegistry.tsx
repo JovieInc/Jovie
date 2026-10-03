@@ -199,6 +199,7 @@ export function FounderReviewRegistry({
     items.find(item => item.readiness === 'ready')?.id ?? items[0]?.id ?? ''
   );
   const [drafts, setDrafts] = useState<ReviewDraftMap>({});
+  const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [note, setNote] = useState('');
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [pendingOutcome, setPendingOutcome] = useState<ReviewOutcome | null>(
@@ -215,18 +216,28 @@ export function FounderReviewRegistry({
     return map;
   }, [query.data]);
 
-  const persistDrafts = useCallback((next: ReviewDraftMap) => {
-    setDrafts(next);
-    try {
-      localStorage.setItem(LOCAL_DRAFT_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // The current screen remains usable when local persistence is blocked.
-    }
-  }, []);
+  const persistDrafts = useCallback(
+    (
+      update: ReviewDraftMap | ((current: ReviewDraftMap) => ReviewDraftMap)
+    ) => {
+      setDrafts(update);
+    },
+    []
+  );
 
   useEffect(() => {
     persistDrafts(loadReviewDrafts());
+    setDraftsLoaded(true);
   }, [persistDrafts]);
+
+  useEffect(() => {
+    if (!draftsLoaded) return;
+    try {
+      localStorage.setItem(LOCAL_DRAFT_STORAGE_KEY, JSON.stringify(drafts));
+    } catch {
+      // The current screen remains usable when local persistence is blocked.
+    }
+  }, [drafts, draftsLoaded]);
 
   // Prune drafts whose evidence digest no longer matches the item's packet or
   // that an authoritative server decision has superseded.
@@ -241,9 +252,15 @@ export function FounderReviewRegistry({
       );
     });
     if (stale.length === 0) return;
-    const next = { ...drafts };
-    for (const itemId of stale) delete next[itemId];
-    persistDrafts(next);
+    persistDrafts(current => {
+      const next = { ...current };
+      for (const itemId of stale) {
+        const item = itemById.get(itemId);
+        if (item && draftForItem(item, current, rowsBySubject) === undefined)
+          delete next[itemId];
+      }
+      return next;
+    });
   }, [drafts, items, rowsBySubject, persistDrafts]);
 
   const behaviorCount = useMemo(
@@ -300,7 +317,7 @@ export function FounderReviewRegistry({
         draftedAt: new Date().toISOString(),
         evidenceDigest: availability.evidenceDigest,
       };
-      persistDrafts({ ...drafts, [selected.id]: draft });
+      persistDrafts(current => ({ ...current, [selected.id]: draft }));
       setPendingOutcome(outcome);
       setDecisionError(null);
       try {
@@ -311,8 +328,10 @@ export function FounderReviewRegistry({
           notes: notes.length > 0 ? notes : null,
           actionId: crypto.randomUUID(),
         });
-        const { [selected.id]: _cleared, ...next } = drafts;
-        persistDrafts(next);
+        persistDrafts(current => {
+          const { [selected.id]: _cleared, ...next } = current;
+          return next;
+        });
         setNote('');
       } catch (error) {
         setDecisionError(getCertificationDecisionErrorMessage(error));
@@ -320,14 +339,16 @@ export function FounderReviewRegistry({
         setPendingOutcome(null);
       }
     },
-    [decision, drafts, note, persistDrafts, selected, selectedRow]
+    [decision, note, persistDrafts, selected, selectedRow]
   );
 
   const clearDraft = useCallback(() => {
     if (!selected) return;
-    const { [selected.id]: _removed, ...next } = drafts;
-    persistDrafts(next);
-  }, [drafts, persistDrafts, selected]);
+    persistDrafts(current => {
+      const { [selected.id]: _removed, ...next } = current;
+      return next;
+    });
+  }, [persistDrafts, selected]);
 
   const columns = useMemo<ColumnDef<FounderReviewItem, unknown>[]>(() => {
     const text = (

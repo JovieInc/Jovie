@@ -27,6 +27,7 @@ import { MemoryRateLimiter } from './memory-limiter';
 import { createRedisRateLimiter, isRedisAvailable } from './redis-limiter';
 import type {
   RateLimitConfig,
+  RateLimitReadResult,
   RateLimitResult,
   RateLimitStatus,
 } from './types';
@@ -233,6 +234,71 @@ export class RateLimiter {
       return { ...memoryResult, degraded: true, backend: 'memory' };
     }
     return { ...memoryResult, backend: 'memory' };
+  }
+
+  /**
+   * Read the enforcement bucket without consuming quota. A Redis outage cannot
+   * be represented by the unrelated local counter, even for advisory limiters.
+   * Keep the synchronous legacy getStatus API separate until callers migrate.
+   */
+  async readStatus(identifier: string): Promise<RateLimitReadResult> {
+    if (
+      this.storeKind === 'memory' ||
+      (!this.options.preferRedis && !this.failClosed)
+    ) {
+      const status = this.memoryLimiter.getStatus(identifier);
+      return {
+        available: true,
+        backend: 'memory',
+        limit: status.limit,
+        remaining: status.remaining,
+        // Memory counters only start a window on the first consumed request.
+        resetTime: status.remaining === status.limit ? null : status.resetTime,
+        observedAt: Date.now(),
+      };
+    }
+
+    if (!this.redisLimiter || isRedisCircuitOpen()) {
+      return { available: false, backend: 'unavailable' };
+    }
+
+    try {
+      const result = await withTimeout(
+        this.redisLimiter.getRemaining(identifier),
+        {
+          timeoutMs: REDIS_RATE_LIMIT_TIMEOUT_MS,
+          context: `rate-limit-read:${this.config.name}`,
+          timeoutMessage: `[RateLimit:${this.config.name}] Redis read timeout`,
+        }
+      );
+      if (
+        !Number.isFinite(result.limit) ||
+        result.limit < 0 ||
+        !Number.isFinite(result.remaining) ||
+        result.remaining < 0 ||
+        result.remaining > result.limit ||
+        !Number.isFinite(result.reset) ||
+        result.reset <= Date.now() ||
+        Number.isNaN(new Date(result.reset).getTime())
+      ) {
+        return { available: false, backend: 'unavailable' };
+      }
+      return {
+        available: true,
+        backend: 'redis',
+        limit: result.limit,
+        remaining: result.remaining,
+        resetTime: result.reset,
+        observedAt: Date.now(),
+      };
+    } catch (error) {
+      openRedisCircuit(error);
+      countRedisMetric('redis.rate_limit_failure', 1, {
+        failure_kind: classifyRedisFailure(error),
+        limiter: this.config.prefix,
+      });
+      return { available: false, backend: 'unavailable' };
+    }
   }
 
   /**

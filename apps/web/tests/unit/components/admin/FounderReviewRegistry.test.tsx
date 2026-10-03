@@ -13,6 +13,7 @@ import {
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import type { FounderReviewItem } from '@/lib/admin/founder-review-registry';
+import { fixtureRow } from '@/lib/ovie/certifications/fixtures';
 import type {
   OvieCertificationInventory,
   OvieCertificationRow,
@@ -82,12 +83,15 @@ function registryRow(
 ): OvieCertificationRow {
   const reviewReady = item.readiness === 'ready' && !('available' in overrides);
   return {
+    ...fixtureRow(item.id, {
+      domain: 'feature_registry',
+      surface: 'Feature Capability',
+    }),
     id: `feature_registry:${item.id}`,
     domain: 'feature_registry',
     surface: 'Feature Capability',
     subject: { id: item.id, kind: 'feature', title: item.title },
     state: reviewReady ? 'review_ready' : 'working',
-    tiers: {},
     evidence: [],
     blockers: [],
     staleFounderLock: false,
@@ -102,7 +106,7 @@ function registryRow(
       ...overrides,
     },
     source: null,
-  } as OvieCertificationRow;
+  };
 }
 
 function mockInventory(rows: readonly OvieCertificationRow[]) {
@@ -136,6 +140,7 @@ describe('FounderReviewRegistry', () => {
   afterEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    mocks.mutateAsync.mockReset();
     mockInventory(items.map(item => registryRow(item)));
   });
 
@@ -219,6 +224,88 @@ describe('FounderReviewRegistry', () => {
         { name: 'Certify For Taste' }
       )
     ).toBeDisabled();
+  });
+
+  it('does not restore another item draft discarded while a decision is pending', async () => {
+    const user = userEvent.setup();
+    const second = founderReviewItemFixture({
+      id: 'feature.second',
+      title: 'Second feature',
+      readiness: 'ready',
+    });
+    const registryItems = [items[0], second];
+    localStorage.setItem(
+      'ovie-founder-review-decisions-v1',
+      JSON.stringify({
+        [second.id]: {
+          outcome: 'needs-work',
+          note: 'Discard this draft',
+          draftedAt: '2026-10-02T00:00:00.000Z',
+          evidenceDigest: second.decisionEvidenceDigest,
+        },
+      })
+    );
+    let finish: (value: { row: OvieCertificationRow }) => void = () =>
+      undefined;
+    mocks.mutateAsync.mockReturnValueOnce(
+      new Promise<{ row: OvieCertificationRow }>(resolve => {
+        finish = resolve;
+      })
+    );
+    mockInventory(registryItems.map(item => registryRow(item)));
+    render(
+      <RightPanelProvider>
+        <FounderReviewRegistry kind='feature' items={registryItems} />
+        <MountedRightPanel />
+      </RightPanelProvider>
+    );
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    await user.click(within(rail).getByTestId('certify-review-item'));
+    await user.click(screen.getByTestId('founder-review-row-feature.second'));
+    await user.click(
+      within(
+        await screen.findByTestId('founder-review-detail-rail')
+      ).getByTestId('discard-review-draft')
+    );
+    expect(
+      JSON.parse(
+        localStorage.getItem('ovie-founder-review-decisions-v1') ?? '{}'
+      )
+    ).not.toHaveProperty(second.id);
+    finish({ row: registryRow(items[0]) });
+    await waitFor(() => expect(screen.queryByText('Recording…')).toBeNull());
+    expect(
+      JSON.parse(
+        localStorage.getItem('ovie-founder-review-decisions-v1') ?? '{}'
+      )
+    ).not.toHaveProperty(second.id);
+  });
+
+  it('keeps a ready filtered item selected during a pending decision without counting its draft as certified', async () => {
+    const user = userEvent.setup();
+    let finish: (value: { row: OvieCertificationRow }) => void = () =>
+      undefined;
+    mocks.mutateAsync.mockReturnValueOnce(
+      new Promise<{ row: OvieCertificationRow }>(resolve => {
+        finish = resolve;
+      })
+    );
+    mockInventory(items.map(item => registryRow(item)));
+    renderRegistry();
+    await user.click(screen.getByRole('tab', { name: 'Ready' }));
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    await user.click(within(rail).getByTestId('certify-review-item'));
+    expect(
+      screen.getByTestId('founder-review-row-feature.ready')
+    ).toBeVisible();
+    expect(rail).toHaveAccessibleName('Ready feature certification details');
+    expect(
+      within(screen.getByTestId('founder-review-row-feature.ready')).getByText(
+        'Draft · Certified'
+      )
+    ).toBeVisible();
+    finish({ row: registryRow(items[0]) });
+    await waitFor(() => expect(screen.queryByText('Recording…')).toBeNull());
   });
 
   it('keeps the draft and surfaces the server error when the decision write fails', async () => {

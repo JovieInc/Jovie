@@ -1714,6 +1714,12 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     );
     expect(WORKFLOW).toContain('expected-merge-manifest.json');
     expect(WORKFLOW).toContain('candidate-merge-manifest.json');
+    expect(WORKFLOW).toContain(
+      'git show "$BASE_HEAD:scripts/lib/blog-content-ci.mjs"'
+    );
+    expect(WORKFLOW).toContain(
+      'trusted-blog-content-ci.mjs:/workspace/scripts/lib/blog-content-ci.mjs:ro'
+    );
     expect(WORKFLOW).toContain('live_conflict_files');
     expect(WORKFLOW).toMatch(
       /cmp\s+--silent\s+"\$expected_manifest"\s+"\$candidate_manifest"/u

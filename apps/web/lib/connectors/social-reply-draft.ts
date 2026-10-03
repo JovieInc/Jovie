@@ -14,6 +14,10 @@
  */
 
 import { z } from 'zod';
+import {
+  socialInboxFeatureKeysForDraft,
+  socialInboxRankingSignalsSchema,
+} from './social-inbox-ranker';
 import { SOCIAL_REPLY_DRAFT_KIND } from './suggested-action-kinds';
 
 export const SOCIAL_REPLY_EXECUTION_STATES = [
@@ -69,6 +73,10 @@ export const socialReplyDraftPayloadSchema = z.object({
   /** The inbound message being replied to. */
   inboundText: z.string().trim().min(1).max(4_000),
   inboundAt: z.string().datetime(),
+  /** Provider/enrichment evidence for deterministic ROI ranking (JOV-5859). */
+  rankingSignals: socialInboxRankingSignalsSchema
+    .optional()
+    .transform(value => socialInboxRankingSignalsSchema.parse(value ?? {})),
   /** Current draft shown for approval. Replaced on each revision round. */
   draftedText: z.string().trim().min(1).max(4_000),
   sourceUrl: z.string().url().nullable().default(null),
@@ -90,6 +98,17 @@ export function parseSocialReplyDraft(
   if (kind !== SOCIAL_REPLY_DRAFT_KIND) return null;
   const parsed = socialReplyDraftPayloadSchema.safeParse(payload);
   return parsed.success ? parsed.data : null;
+}
+
+export function getSocialReplyRankingFeatureKeys(input: {
+  readonly id: string;
+  readonly kind: string;
+  readonly payload: unknown;
+}): readonly string[] {
+  const draft = parseSocialReplyDraft(input.kind, input.payload);
+  return draft
+    ? socialInboxFeatureKeysForDraft({ ...draft, id: input.id })
+    : [];
 }
 
 /**
