@@ -1,3 +1,4 @@
+/* eslint @next/next/no-img-element: "off" -- ImageResponse requires standard img */
 import { ImageResponse } from 'next/og';
 import { BASE_URL } from '@/constants/app';
 import { getProfileWithLinks } from '@/lib/services/profile';
@@ -31,7 +32,6 @@ function gradientCard(headline: string, subtitle: string) {
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'
@@ -101,7 +101,6 @@ function heroImage(
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={photoDataUrl}
         alt={`${name} profile`}
@@ -126,7 +125,6 @@ function heroImage(
       />
 
       {/* Jovie logo */}
-      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'
