@@ -12,6 +12,7 @@
 
 import { isPrivateHostname } from '@/lib/ingestion/avatar/network-safety';
 import { isSafeExternalHttpsUrl } from '@/lib/ingestion/flows/avatar-hosting';
+import { isCoreSocialHtmlHost } from '@/lib/ingestion/social-html-policy';
 import { logger } from '@/lib/utils/logger';
 import { sanitizeText } from './extract-bio-candidate';
 
@@ -212,6 +213,14 @@ function classifyContentType(response: Response): SafeFetchError | null {
 export async function safeFetchPublicHtml(
   rawUrl: string
 ): Promise<SafeFetchResult> {
+  try {
+    if (isCoreSocialHtmlHost(new URL(rawUrl).hostname)) {
+      return { ok: false, error: 'blocked_host' };
+    }
+  } catch {
+    // Invalid URLs fall through to the existing validator.
+  }
+
   const initialValidation = await validateUrlForFetch(rawUrl);
   if (!initialValidation.ok) return initialValidation;
 
@@ -259,6 +268,9 @@ export async function safeFetchPublicHtml(
 
         if (isAuthWallRedirectTarget(nextUrl)) {
           return { ok: false, error: 'auth_walled' };
+        }
+        if (isCoreSocialHtmlHost(nextUrl.hostname)) {
+          return { ok: false, error: 'blocked_host' };
         }
 
         redirects++;

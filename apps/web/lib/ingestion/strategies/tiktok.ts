@@ -4,6 +4,7 @@
  * Lightweight metadata-first extraction using OpenGraph tags.
  */
 
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import type { ExtractionResult } from '../types';
 import {
@@ -13,7 +14,6 @@ import {
   extractMetaContent,
   extractOpenGraphProfile,
   type FetchOptions,
-  fetchDocument,
   isUrlSafe,
   isValidHandle,
   normalizeHandle,
@@ -68,24 +68,14 @@ export function extractTikTokHandle(url: string): string | null {
 
 export async function fetchTikTokDocument(
   sourceUrl: string,
-  options?: FetchOptions
+  _options?: FetchOptions
 ): Promise<string> {
   const validated = validateTikTokUrl(sourceUrl);
   if (!validated) {
     throw new ExtractionError('Invalid TikTok profile URL', 'INVALID_URL');
   }
 
-  const { html } = await fetchDocument(validated, {
-    ...options,
-    timeoutMs: TIKTOK_CONFIG.defaultTimeoutMs,
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      ...options?.headers,
-    },
-    allowedHosts: TIKTOK_CONFIG.validHosts,
-  });
-
-  return html;
+  return disabledSocialHtmlDocument();
 }
 
 export function extractTikTok(html: string): ExtractionResult {

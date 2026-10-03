@@ -4,6 +4,7 @@
  * Lightweight metadata-first extraction using OpenGraph tags.
  */
 
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
 import type { ExtractionResult } from '../types';
 import {
   createExtractionResult,
@@ -12,7 +13,6 @@ import {
   extractMetaContent,
   extractOpenGraphProfile,
   type FetchOptions,
-  fetchDocument,
   type StrategyConfig,
   validatePlatformUrl,
 } from './base';
@@ -43,24 +43,14 @@ export function extractInstagramHandle(url: string): string | null {
 
 export async function fetchInstagramDocument(
   sourceUrl: string,
-  options?: FetchOptions
+  _options?: FetchOptions
 ): Promise<string> {
   const validated = validateInstagramUrl(sourceUrl);
   if (!validated) {
     throw new ExtractionError('Invalid Instagram profile URL', 'INVALID_URL');
   }
 
-  const { html } = await fetchDocument(validated, {
-    ...options,
-    timeoutMs: INSTAGRAM_CONFIG.defaultTimeoutMs,
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      ...options?.headers,
-    },
-    allowedHosts: INSTAGRAM_CONFIG.validHosts,
-  });
-
-  return html;
+  return disabledSocialHtmlDocument();
 }
 
 export function extractInstagram(html: string): ExtractionResult {

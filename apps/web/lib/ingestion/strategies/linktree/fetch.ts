@@ -1,40 +1,27 @@
 /**
- * Linktree Document Fetching
+ * Linktree document access.
  *
- * Handles fetching Linktree profile pages with proper error handling.
+ * Profile HTML is not fetched from Jovie servers.
  */
 
-import { ExtractionError, type FetchOptions, fetchDocument } from '../base';
-import { LINKTREE_CONFIG } from './config';
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
+import { ExtractionError } from '../base';
 import { validateLinktreeUrl } from './validation';
 
 /**
- * Fetches the HTML content of a Linktree profile.
- * Includes timeout, retries, and proper error handling.
+ * Linktree HTML is not fetched from Jovie servers. Invalid URLs still fail
+ * as invalid; every valid profile URL fails closed.
  *
- * @throws {ExtractionError} On fetch failure, timeout, or invalid response
+ * @throws {ExtractionError} INVALID_URL or SOCIAL_HTML_DISABLED
  */
 export async function fetchLinktreeDocument(
   sourceUrl: string,
-  timeoutMs = LINKTREE_CONFIG.defaultTimeoutMs
+  _timeoutMs?: number
 ): Promise<string> {
-  // Validate URL first
   const validatedUrl = validateLinktreeUrl(sourceUrl);
   if (!validatedUrl) {
     throw new ExtractionError('Invalid Linktree URL', 'INVALID_URL');
   }
 
-  const options: FetchOptions = {
-    timeoutMs,
-    maxRetries: 2,
-    userAgent: 'jovie-link-ingestion/1.0 (+https://jov.ie)',
-    headers: {
-      // Linktree may serve different content based on Accept header
-      Accept: 'text/html,application/xhtml+xml',
-    },
-    allowedHosts: LINKTREE_CONFIG.validHosts,
-  };
-
-  const result = await fetchDocument(validatedUrl, options);
-  return result.html;
+  return disabledSocialHtmlDocument();
 }
