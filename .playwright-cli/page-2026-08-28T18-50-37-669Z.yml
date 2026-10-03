@@ -1,0 +1,60 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - link [ref=e9] [cursor=pointer]:
+      - /url: https://stripe.com/
+    - generic [ref=e14]:
+      - main [ref=e20]:
+        - generic [ref=e22]:
+          - generic [ref=e23]: Sign in to your account
+          - generic [ref=e26]:
+            - generic:
+              - generic:
+                - generic [ref=e27]:
+                  - generic:
+                    - generic:
+                      - generic [ref=e28]: Email
+                      - generic [ref=e35]:
+                        - generic [ref=e36]: email input
+                        - textbox "email input" [active] [ref=e38]
+                - generic [ref=e41]:
+                  - generic [ref=e44]:
+                    - generic:
+                      - generic:
+                        - generic [ref=e47] [cursor=pointer]:
+                          - generic:
+                            - generic:
+                              - generic [ref=e48]: Password
+                              - link "Forgot your password?" [ref=e50]:
+                                - /url: /reset
+                        - generic [ref=e56]:
+                          - generic [ref=e57]: password input
+                          - textbox "password input" [ref=e59]
+                  - generic [ref=e65]:
+                    - generic [ref=e66]: Remember me on this device
+                    - checkbox "Remember me on this device" [checked] [ref=e69] [cursor=pointer]
+                - button "Sign in" [disabled] [ref=e74]
+                - generic [ref=e76]:
+                  - generic [ref=e77]:
+                    - separator [ref=e78]
+                    - generic [ref=e79]: Or sign in with
+                  - generic [ref=e81]:
+                    - button "Google" [ref=e85] [cursor=pointer]
+                    - button "Passkey" [ref=e94] [cursor=pointer]
+                    - button "SSO" [ref=e100] [cursor=pointer]
+      - generic [ref=e105]:
+        - text: New to Stripe?
+        - link "Create account" [ref=e106] [cursor=pointer]:
+          - /url: /register?redirect=%2Fproducts
+    - generic [ref=e111]:
+      - generic:
+        - generic:
+          - link "© Stripe" [ref=e113] [cursor=pointer]:
+            - /url: https://stripe.com/
+          - link "Privacy & terms" [ref=e116] [cursor=pointer]:
+            - /url: https://stripe.com/privacy
+  - generic:
+    - iframe
+  - generic:
+    - iframe
+  - generic:
+    - iframe
