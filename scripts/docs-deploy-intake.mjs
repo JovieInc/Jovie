@@ -23,6 +23,10 @@ export function docsShaOnMain(compareStatus) {
   return compareStatus === 'ahead' || compareStatus === 'identical';
 }
 
+/**
+ * @param {{ action: string, key: string }} plan
+ * @param {{ runId?: string, deploymentUrl?: string, fetchImpl?: typeof fetch }} [options]
+ */
 export async function applyDocsDeployPlan(
   plan,
   { runId, deploymentUrl, fetchImpl } = {}
@@ -87,7 +91,9 @@ async function main() {
     `https://api.github.com/repos/${repo}/compare/${deployment.sha}...main`,
     { headers }
   );
-  const compareBody = compare.ok ? await compare.json() : null;
+  const compareBody = /** @type {{ status?: string } | null} */ (
+    compare.ok ? await compare.json() : null
+  );
   const onMain = docsShaOnMain(compareBody?.status);
   const statuses = await fetch(
     `https://api.github.com/repos/${repo}/deployments/${deployment.id}/statuses?per_page=5`,

@@ -24,9 +24,8 @@ function nonempty(value) {
 }
 
 /**
- * @param {unknown} body
- * @param {string} label
- * @returns {string | null}
+ * @param {{ shortId?: unknown, issueId?: unknown }} incident
+ * @returns {string}
  */
 function sentryRecurrenceKey(incident) {
   const slug = String(incident?.shortId ?? '')
@@ -90,6 +89,8 @@ function fieldFromBody(body, label) {
  * @param {unknown} body
  * @returns {{
  *   issueId: string | null,
+ *   shortId: string | null,
+ *   linearIdentifier: string | null,
  *   fingerprint: string | null,
  *   environment: string | null,
  *   release: string | null,

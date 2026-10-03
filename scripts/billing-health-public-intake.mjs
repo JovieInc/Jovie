@@ -18,6 +18,10 @@ export function planBillingHealthPublic(status) {
   return { action: 'skip', key: BILLING_HEALTH_PUBLIC_KEY, status: code };
 }
 
+/**
+ * @param {{ action: string, key: string }} plan
+ * @param {{ runId?: string, fetchImpl?: typeof fetch }} [options]
+ */
 export async function applyBillingHealthPublicPlan(
   plan,
   { runId, fetchImpl } = {}

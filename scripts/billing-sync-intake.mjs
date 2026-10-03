@@ -42,6 +42,10 @@ export function planBillingSyncIntake({
   };
 }
 
+/**
+ * @param {{ action: string, key: string, reconciliationStale?: boolean, webhooksStuck?: boolean, unprocessedWebhooks?: number }} plan
+ * @param {{ runId?: string, fetchImpl?: typeof fetch }} [options]
+ */
 export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
   if (!remediationTriggersEnabled()) {
     return logRemediationDryRun({
