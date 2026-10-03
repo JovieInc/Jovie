@@ -344,4 +344,5 @@ jobs:
       - name: Rearm green victims of this merge group
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
         run: node scripts/merge-group-victim-rearm.mjs --event-path "$GITHUB_EVENT_PATH"

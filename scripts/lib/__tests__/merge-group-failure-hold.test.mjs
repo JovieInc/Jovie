@@ -18,6 +18,7 @@ import {
 } from '../../agent-context/check.mjs';
 import {
   applyMergeGroupFailure,
+  autoMergeWasNotArmed,
   classifyDequeueDenial,
   classifyMergeGroupFailure,
   enqueueWasRejected,
@@ -355,6 +356,10 @@ if (args[1] === 'graphql') {
   const query = args.find(arg => arg.startsWith('query=')) || '';
   if (query.includes('dequeuePullRequest')) {
     process.stderr.write('gh: Resource not accessible by integration\\n');
+    process.exit(1);
+  }
+  if (query.includes('disablePullRequestAutoMerge')) {
+    process.stderr.write("gh: Can't disable auto-merge for this pull request.\\n");
     process.exit(1);
   }
   const pr = query.includes('timelineItems')
@@ -968,6 +973,9 @@ describe('terminal failure hold application', () => {
 
   it('treats an already-removed pull request as a logged non-fatal dequeue', async () => {
     let reads = 0;
+    const disableAutoMerge = vi.fn(async () => {
+      throw new Error("Can't disable auto-merge for this pull request.");
+    });
     const result = await applyMergeGroupFailure(failureInput, {
       writeStatus: vi.fn(),
       readPullRequest: vi.fn(async () => {
@@ -987,9 +995,10 @@ describe('terminal failure hold application', () => {
       dequeuePullRequest: vi.fn(async () => {
         throw new Error('The pull request is not in the merge queue');
       }),
-      disableAutoMerge: vi.fn(),
+      disableAutoMerge,
     });
 
+    expect(disableAutoMerge).toHaveBeenCalledOnce();
     expect(result).toMatchObject({
       dequeued: false,
       dequeueOutcome: 'not-in-queue',
@@ -1037,5 +1046,107 @@ describe('terminal failure hold application', () => {
         disableAutoMerge: vi.fn(),
       })
     ).rejects.toThrow(/native queue intent/);
+  });
+});
+
+describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
+  // Replays #20354 on 2026-10-03: one unchanged head, an armed auto-merge
+  // that GitHub hides (autoMergeRequest null) while queued and just after the
+  // dequeue, and a queue that re-adds an armed CLEAN PR seconds later. Before
+  // the fix the hold never disabled auto-merge, so the head re-entered the
+  // queue 13 times and failed 8 holds.
+  const replay = async ({ failures }) => {
+    let armed = true;
+    let queued = true;
+    let enqueues = 1;
+    const statuses = [];
+    for (let attempt = 1; attempt <= failures && queued; attempt += 1) {
+      const runId = 1000 + attempt;
+      const receipt = await applyMergeGroupFailure(
+        {
+          ...failureInput,
+          failedSteps: ['Run structural ci-fast lane'],
+          run: {
+            ...failureInput.run,
+            id: runId,
+            html_url: `https://github.com/${REPOSITORY}/actions/runs/${runId}`,
+          },
+          statuses: structuredClone(statuses),
+        },
+        {
+          writeStatus: async written =>
+            statuses.unshift({
+              context: written.context,
+              state: written.state,
+              description: written.description,
+              creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+              target_url: written.targetUrl,
+            }),
+          readPullRequest: async () => ({
+            id: 'PR_20354',
+            state: 'OPEN',
+            headRefOid: SOURCE,
+            isInMergeQueue: queued,
+            mergeQueueEntry: queued ? { id: 'MQE' } : null,
+            autoMergeRequest: null, // GitHub's lagging read
+          }),
+          dequeuePullRequest: async () => {
+            queued = false;
+          },
+          disableAutoMerge: async () => {
+            if (!armed) {
+              throw new Error(
+                "Can't disable auto-merge for this pull request."
+              );
+            }
+            armed = false;
+          },
+        }
+      );
+      expect(receipt.sourceHeadSha).toBe(SOURCE);
+      // GitHub re-adds an armed, CLEAN pull request on its own.
+      if (armed) {
+        queued = true;
+        enqueues += 1;
+      }
+    }
+    return { enqueues, armed, statuses };
+  };
+
+  it('disables the hidden auto-merge so the same head never re-enters on its own', async () => {
+    const { enqueues, armed, statuses } = await replay({ failures: 13 });
+    expect(armed).toBe(false);
+    expect(enqueues).toBe(1);
+    // One failure, one hold: the loop never reaches a second merge group.
+    expect(statuses).toHaveLength(1);
+  });
+
+  it('still fails closed when disabling auto-merge hits a genuine error', async () => {
+    await expect(
+      applyMergeGroupFailure(failureInput, {
+        writeStatus: vi.fn(),
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(async () => {
+          throw new Error('Something went wrong while executing your query.');
+        }),
+      })
+    ).rejects.toThrow('Something went wrong');
+  });
+
+  it('recognizes only the not-armed answer as benign', () => {
+    expect(
+      autoMergeWasNotArmed(
+        new Error("Can't disable auto-merge for this pull request.")
+      )
+    ).toBe(true);
+    expect(autoMergeWasNotArmed(new Error('Bad credentials'))).toBe(false);
   });
 });
