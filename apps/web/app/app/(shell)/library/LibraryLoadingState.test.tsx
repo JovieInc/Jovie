@@ -21,7 +21,14 @@ function geometry(
     header,
     size,
     minSize,
-    meta,
+    meta:
+      meta && typeof meta === 'object'
+        ? Object.fromEntries(
+            Object.entries(meta as Record<string, unknown>).filter(
+              ([, value]) => typeof value !== 'function'
+            )
+          )
+        : meta,
   }));
 }
 
