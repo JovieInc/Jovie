@@ -1,0 +1,65 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e7]:
+          - heading "All artists" [level=1] [ref=e8]
+          - paragraph [ref=e9]: Discover public creator profiles across Jovie.
+        - generic [ref=e10]:
+          - generic [ref=e11]:
+            - paragraph [ref=e12]: "5"
+            - paragraph [ref=e13]: Public profiles
+            - paragraph [ref=e14]: Creator pages currently available to browse.
+          - generic [ref=e15]:
+            - paragraph [ref=e16]: Discover artists
+            - paragraph [ref=e17]: Browse creator pages, profile themes, and public fan experiences.
+          - generic [ref=e18]:
+            - paragraph [ref=e19]: Jump straight in
+            - paragraph [ref=e20]: Every card opens the artist's public profile in one click.
+      - generic [ref=e21]:
+        - link [ref=e23] [cursor=pointer]:
+          - /url: /crisrosa
+          - img "Default User" [ref=e26]
+          - generic [ref=e27]:
+            - heading "Cris Rosa" [level=2] [ref=e28]
+            - paragraph [ref=e29]: Public creator profile on Jovie.
+          - generic [ref=e30]: View profile
+        - link [ref=e34] [cursor=pointer]:
+          - /url: /sydneycallahan
+          - img "Default User" [ref=e37]
+          - generic [ref=e38]:
+            - heading "Sydney Callahan" [level=2] [ref=e39]
+            - paragraph [ref=e40]: Public creator profile on Jovie.
+          - generic [ref=e41]: View profile
+        - link [ref=e45] [cursor=pointer]:
+          - /url: /tim
+          - img "Ab6761610000e5ebbf20a0a1d3bbd4018b4853e6" [ref=e48]
+          - generic [ref=e49]:
+            - heading "Tim White" [level=2] [ref=e50]
+            - paragraph [ref=e51]: Public creator profile on Jovie.
+          - generic [ref=e52]: View profile
+        - link [ref=e56] [cursor=pointer]:
+          - /url: /ahmedgr
+          - img "Blushed Smiling Emoji Free Download Ios Emojis 02c51445 Ce08 444d 982c B43e58dfe73a" [ref=e59]
+          - generic [ref=e60]:
+            - heading "ahmed" [level=2] [ref=e61]
+            - paragraph [ref=e62]: hey this ahmed
+          - generic [ref=e63]: View profile
+        - link [ref=e67] [cursor=pointer]:
+          - /url: /timwhite1
+          - img "Default User" [ref=e70]
+          - generic [ref=e71]:
+            - heading "timwhite" [level=2] [ref=e72]
+            - paragraph [ref=e73]: Public creator profile on Jovie.
+          - generic [ref=e74]: View profile
+  - alert [ref=e77]
+  - complementary "Cookie Consent" [ref=e78]:
+    - generic [ref=e80]:
+      - paragraph [ref=e81]:
+        - text: Essential cookies keep Jovie working. Choose whether to allow analytics and marketing cookies.
+        - link "Privacy" [ref=e82] [cursor=pointer]:
+          - /url: /legal/privacy
+      - generic [ref=e84]:
+        - button "Reject all" [ref=e85]
+        - button "Accept all" [ref=e87]
+        - button "Customize" [ref=e89]
