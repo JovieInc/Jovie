@@ -561,7 +561,6 @@ export function applyProxyFromEnv(
 if (isEntrypoint(import.meta.url, process.argv[1])) {
   const argv = process.argv.slice(2);
   const onClosedPipe = closedPipeListener(code => process.exit(code));
-  process.stdout.on('error', onClosedPipe);
   process.stderr.on('error', onClosedPipe);
   const fatal = (error: unknown) => {
     reportFatal(argv, error);
