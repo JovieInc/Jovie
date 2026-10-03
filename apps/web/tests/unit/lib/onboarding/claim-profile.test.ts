@@ -118,6 +118,7 @@ vi.mock('@/lib/tasks/chat-work-record', () => ({
   ensureChatWorkRecord: vi.fn().mockResolvedValue(null),
 }));
 
+import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
 
 const HANDLE_UNIQUE_VIOLATION = new Error(
@@ -379,6 +380,60 @@ describe('materializeClaimedOnboardingProfile', () => {
         spotifyPopularity: 61,
         spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
       })
+    );
+  });
+
+  it('finishes the claim with Spotify fields when MusicFetch is vendor-unavailable', async () => {
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: 'spotify_1',
+        name: 'Luna Waves',
+        url: 'https://open.spotify.com/artist/spotify_1',
+        imageUrl: 'https://i.scdn.co/image/luna.jpg',
+        followers: 42_000,
+        popularity: 61,
+        genres: ['indie pop'],
+      },
+      handle: 'lunawaves',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    const vendorUnavailable = new Error('MusicFetch vendor unavailable');
+    vendorUnavailable.name = 'MusicfetchRequestError';
+    (vendorUnavailable as Error & { statusCode: number }).statusCode = 401;
+    mockFetchArtistBySpotifyUrl.mockRejectedValue(vendorUnavailable);
+
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    const [profileInsertValues] = queueProfileInsert({ id: 'profile_new' });
+    queuePostPersistWrites();
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).resolves.toEqual({
+      profileId: 'profile_new',
+      handle: 'lunawaves',
+      status: 'created',
+    });
+
+    expect(captureError).not.toHaveBeenCalled();
+    expect(profileInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatarUrl: 'https://i.scdn.co/image/luna.jpg',
+        displayName: 'Luna Waves',
+        isClaimed: true,
+        isPublic: true,
+        spotifyId: 'spotify_1',
+        spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
+      })
+    );
+    expect(profileInsertValues).toHaveBeenCalledWith(
+      expect.not.objectContaining({ bio: expect.any(String) })
     );
   });
 

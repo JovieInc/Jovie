@@ -544,7 +544,6 @@
   "tests/unit/app/root-layout-brand-chrome.test.ts",
   "tests/unit/app/root-layout-scripts.test.ts",
   "tests/unit/app/s-code-route.test.ts",
-  "tests/unit/app/settings-retargeting-shell.test.ts",
   "tests/unit/app/settings-route-error-guard.test.ts",
   "tests/unit/app/settings-scroll-mode.test.ts",
   "tests/unit/app/shared-table-motion-tokens.test.ts",

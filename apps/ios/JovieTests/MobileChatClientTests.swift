@@ -913,12 +913,13 @@ extension MobileChatClientTests {
     }
   }
 
-  @Test func ownedStreamCancellationAfterPublishingDoesNotBecomeInvalidResponse() async throws {
+  @Test(arguments: [true, false])
+  func ownedStreamCancellationAfterPublishingDoesNotBecomeInvalidResponse(trailingNewline: Bool) async throws {
     try await withNativeSessionTokenStoreTestIsolation {
       NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
       let preserved = NativeSessionTokenStore.captureSessionContext()
       MockChatURLProtocol.requestHandler = { request in
-        (makeResponse(for: request), RefreshRequest.stream.data + Data("\n".utf8))
+        (makeResponse(for: request), RefreshRequest.stream.data + (trailingNewline ? Data("\n".utf8) : Data()))
       }
       defer { MockChatURLProtocol.requestHandler = nil }
       let client = MobileChatClient(baseURL: URL(string: "https://jov.ie")!, session: makeSession(),
