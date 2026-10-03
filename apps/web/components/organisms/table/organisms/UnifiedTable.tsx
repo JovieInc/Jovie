@@ -28,6 +28,7 @@ import {
   type VisibilityState,
 } from '@/lib/tanstack-table';
 import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
+import { ColumnSnapMotion } from '../ColumnSnapMotion';
 import { columnPrioritySpecsFromDefs, readColumnId } from '../column-priority';
 import {
   type ColumnCompactItem,
@@ -420,7 +421,7 @@ function HiddenHeaderSortStatus({
  * />
  * ```
  */
-export function UnifiedTable<TData extends RowData>({
+function UnifiedTableContent<TData extends RowData>({
   data,
   columns,
   isLoading = false,
@@ -1006,5 +1007,15 @@ export function UnifiedTable<TData extends RowData>({
         </table>
       </div>
     </ColumnCompactProvider>
+  );
+}
+
+export function UnifiedTable<TData extends RowData>(
+  props: UnifiedTableProps<TData>
+) {
+  return (
+    <ColumnSnapMotion enabled={props.columnSnap ?? true}>
+      <UnifiedTableContent {...props} />
+    </ColumnSnapMotion>
   );
 }

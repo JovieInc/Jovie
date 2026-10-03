@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'motion/react';
+import { th as MotionTableHeader } from 'motion/react-m';
 import { Icon } from '@/components/atoms/Icon';
 import type { Header, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
@@ -98,7 +98,7 @@ export function TableHeaderCell<TData extends RowData>({
         ? undefined
         : header.getSize(),
   };
-  const HeaderCell = columnSnap ? motion.th : 'th';
+  const HeaderCell = columnSnap ? MotionTableHeader : 'th';
 
   return (
     <HeaderCell

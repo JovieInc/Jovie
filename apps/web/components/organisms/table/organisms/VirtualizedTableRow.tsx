@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'motion/react';
+import { td as MotionTableCell } from 'motion/react-m';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
 // @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
 import type { Row, RowData } from '@/lib/tanstack-table';
@@ -233,7 +233,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
         );
         if (columnSnap) {
           return (
-            <motion.td
+            <MotionTableCell
               key={cell.id}
               layout
               transition={columnSnapTransition(columnSnapOrder)}
@@ -243,7 +243,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
               style={cellStyle}
             >
               {cellContent}
-            </motion.td>
+            </MotionTableCell>
           );
         }
         return (
