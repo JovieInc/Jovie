@@ -989,13 +989,18 @@ class GapTest(unittest.TestCase):
     def test_open_prs_are_read_page_by_page(self):
         pages = iter([
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"},
-                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]}}]}}}},
+                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]},
+                                                                 "files": {"totalCount": 1, "nodes": [
+                                                                     {"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}]}}]}}}},
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
                                                       "nodes": [{"number": 2}]}}}},
         ])
         shell = Shell({("gh", "api", "graphql"): lambda args: next(pages)})
         prs = events.open_prs_state(fake_lane(shell))
         self.assertEqual([(p["number"], p["labels"], p["rollup"]) for p in prs], [(1, [{"name": "hold"}], None), (2, [], None)])
+        self.assertEqual(prs[0]["files"], [{"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}])
+        self.assertTrue(prs[0]["filesComplete"])
+        self.assertIn("files(first:100)", next(arg for arg in shell.calls[0] if arg.startswith("query=")))
         self.assertIn("cursor=c1", shell.calls[1])
 
     def test_fix_prompt_carries_stale_and_queue_log_and_lockfile_recipe(self):
@@ -1004,6 +1009,7 @@ class GapTest(unittest.TestCase):
         self.assertIn("boom", prompt)
         self.assertIn("no activity for 48 hours", prompt)
         self.assertIn("pnpm install --lockfile-only", prompt)
+        self.assertIn("Never hand-merge generated files", prompt)
 
 
 class RunnerHookTest(unittest.TestCase):

@@ -315,6 +315,7 @@ def promotion_line(metrics: dict) -> str:
     back = metrics["reenqueueMinutes"]
     intake = metrics["intake"]
     occupancy = metrics["occupancy"]
+    queue_per_merge = metrics.get("queueEntriesPerMerge")
     rate_color = GREEN if first is not None and first >= 0.9 else ORANGE
     return (rgb(FG, "PROMOTION 8h  ", bold=True)
             + rgb(rate_color, f"first-pass {'n/a' if first is None else f'{round(first * 100)}%'}")
@@ -322,7 +323,24 @@ def promotion_line(metrics: dict) -> str:
                        f" · open→enqueue p75 {metrics['openToFirstEnqueueMinutes']['p75']}m"
                        f" · opens/h {intake['opensPerHour']} vs merges/h {intake['mergesPerHour']}"
                        f" · CLEAN not queued {occupancy['cleanNotQueued']}"
-                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"))
+                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"
+                       f" · queue entries/merge {queue_per_merge if queue_per_merge is not None else 'n/a'}"))
+
+
+def file_overlap_line(summary: dict) -> str:
+    summary = summary or {}
+    pairs = summary.get("pairs") or []
+    metrics = summary.get("metrics") or {}
+    text = (rgb(FG, "FILE OVERLAP  ", bold=True)
+            + rgb(DIM, f"{summary.get('mode', 'enforce')} · active {len(pairs)}"
+                       f" · prevented {metrics.get('conflicts_prevented', 0)}"
+                       f" · flags {metrics.get('overlap_flags', 0)}"
+                       f" · rebases {metrics.get('rebases_caused_by_overlap', 0)}"))
+    if pairs:
+        pair = pairs[0]
+        files = ", ".join(pair.get("files") or [])
+        text += rgb(ORANGE, f" · {pair.get('first')} → {pair.get('later')} {pair.get('actionTaken')} {files}"[:100])
+    return text
 
 
 def system_model() -> dict:
@@ -589,6 +607,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                          f"{rgb(DIM, label + ' · ' + age(m['mergedAt'], now))}", width))
 
     lines.append(promotion_line(github.get("promotion")))
+    lines.append(file_overlap_line(local.get("doctor", {}).get("fileOverlap") or {}))
 
     # needs attention
     ledger = local["ledger24h"]
