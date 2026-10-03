@@ -432,7 +432,15 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
       },
       Artist: {
         type: 'object',
-        required: ['id', 'username', 'name', 'profileUrl'],
+        required: [
+          'id',
+          'username',
+          'name',
+          'profileUrl',
+          'creatorType',
+          'links',
+          'platformIds',
+        ],
         properties: {
           id: { type: 'string' },
           username: { type: 'string' },
@@ -445,6 +453,63 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           spotifyUrl: { type: 'string', format: 'uri', nullable: true },
           appleMusicUrl: { type: 'string', format: 'uri', nullable: true },
           youtubeUrl: { type: 'string', format: 'uri', nullable: true },
+          creatorType: {
+            type: 'string',
+            enum: ['artist', 'podcaster', 'influencer', 'creator'],
+          },
+          audience: {
+            $ref: '#/components/schemas/Audience',
+            nullable: true,
+          },
+          links: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ArtistLink' },
+          },
+          platformIds: { $ref: '#/components/schemas/PlatformIds' },
+        },
+      },
+      Audience: {
+        type: 'object',
+        required: ['platform', 'count', 'countText', 'observedAt'],
+        properties: {
+          platform: { type: 'string', enum: ['youtube', 'spotify'] },
+          count: { type: 'integer' },
+          countText: { type: 'string' },
+          observedAt: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+          },
+        },
+      },
+      ArtistLink: {
+        type: 'object',
+        required: ['platform', 'url'],
+        properties: {
+          platform: { type: 'string' },
+          url: { type: 'string', format: 'uri' },
+          displayText: { type: 'string', nullable: true },
+        },
+      },
+      PlatformIds: {
+        type: 'object',
+        required: [
+          'spotify',
+          'appleMusic',
+          'youtube',
+          'deezer',
+          'tidal',
+          'soundcloud',
+          'musicbrainz',
+        ],
+        properties: {
+          spotify: { type: 'string', nullable: true },
+          appleMusic: { type: 'string', nullable: true },
+          youtube: { type: 'string', nullable: true },
+          deezer: { type: 'string', nullable: true },
+          tidal: { type: 'string', nullable: true },
+          soundcloud: { type: 'string', nullable: true },
+          musicbrainz: { type: 'string', nullable: true },
         },
       },
       Release: {
