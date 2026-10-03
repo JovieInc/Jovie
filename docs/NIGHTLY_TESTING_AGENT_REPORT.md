@@ -3,18 +3,26 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/27411234883)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37095775571)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-06-12T11:31:02.768Z
+Generated: 2026-10-03T04:31:09.963Z
+Workflow conclusion: failure
+
+## Evidence warnings
+
+- Missing mutation report at /home/runner/work/Jovie/Jovie/apps/web/reports/mutation/mutation.json
 
 ## Suites
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 13741 | 13717 | 0 | 0 | 24 |
+| unit | 7307 | 7289 | 3 | 0 | 15 |
+| unit | 7653 | 7604 | 0 | 0 | 49 |
+| unit | 7596 | 7564 | 0 | 0 | 32 |
+| unit | 7650 | 7642 | 2 | 0 | 6 |
 
 ## Selected Targets
 
@@ -38,4 +46,8 @@ Generated: 2026-06-12T11:31:02.768Z
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| none | none | none | none |
+| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for f381bdbfdc835692a8d7fffc614d98fda1a7fec5: expected null not to be null |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-eD1KGU/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-Vzr8az/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | tests/unit/design-system/destructive-red-drift-ratchet.test.ts destructive/red drift ratchet (shrink-only, JOV-6773) > does not add new {text,bg,border,ring}-destructive usage beyond the baseline |  | {text,bg,border,ring}-destructive usage dropped to 113 (baseline 114). Great — lower the baseline to 113 in this PR so the ratchet locks in  |
+| unit | tests/unit/design-system/story-source-sha-ancestry.test.ts story receipt SHA ancestry > keeps every literal receipt ancestral and able to replay its story path |  | expected 3 to be 5 // Object.is equality |
