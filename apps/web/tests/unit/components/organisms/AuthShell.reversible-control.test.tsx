@@ -168,7 +168,7 @@ async function certifyLeftRail({
       if (via === 'pointer') {
         await user.click(toggle);
       } else {
-        fireEvent.keyDown(globalThis, { key: '[' });
+        fireEvent.keyDown(window, { key: '[' });
       }
     },
     assertContinuity: observation => {

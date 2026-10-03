@@ -175,7 +175,7 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
         if (via === 'pointer') {
           await user.click(currentToggle());
         } else {
-          fireEvent.keyDown(globalThis, { key: ']' });
+          fireEvent.keyDown(window, { key: ']' });
         }
       },
       assertContinuity: observation => {
