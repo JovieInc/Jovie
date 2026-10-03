@@ -475,6 +475,10 @@ jobs:
           marker_reason="$(jq -r '.reason' <<<"$marker_state_json")"
           case "$marker_state" in
             verified)
+              marker_deployment_id="$(jq -r '.deploymentId // ""' <<<"$marker_state_json")"
+              if [ "$marker_deployment_id" = "not-applicable" ]; then
+                node .github/scripts/assert-live-production-bind.mjs --main-sha "$EXPECTED_SHA"
+              fi
               echo "already_verified=true" >> "$GITHUB_OUTPUT"
               echo "::notice::Exact production generation $EXPECTED_SHA is already verified by its payload-bound historical attempt."
               exit 0
@@ -1349,6 +1353,9 @@ jobs:
           fi
 
           if [ "$RELEASE_LANE" = not_applicable ]; then
+            if [ "$RUN_WEB" != true ]; then
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
+            fi
             for result in \
               "${{ needs.production-release.result }}" \
               "${{ needs.ci-public-profile-smoke.result }}" \

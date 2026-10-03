@@ -2276,7 +2276,7 @@ jobs:
           fi
 
           for gate in \
-            "migrate-production:$migration_result" \
+            "migrate-production:${{ needs.migrate-production.result }}" \
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
             "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \
@@ -2284,6 +2284,9 @@ jobs:
             "production-oauth-gate:$oauth_result"; do
             name="${gate%%:*}"
             result="${gate#*:}"
+            if [ "$FULL_RUNTIME_PROOF" != true ] && [ "$name" = "migrate-production" ]; then
+              result="$migration_result"
+            fi
             if [ "$result" != "success" ]; then
               echo "::error::$name did not complete successfully ($result)."
               exit 1
