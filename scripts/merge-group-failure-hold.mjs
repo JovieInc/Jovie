@@ -293,7 +293,8 @@ function errorText(error) {
  */
 export function classifyDequeueDenial(error) {
   const text = errorText(error);
-  if (/resource not accessible by integration/i.test(text)) return 'inaccessible';
+  if (/resource not accessible by integration/i.test(text))
+    return 'inaccessible';
   if (
     /not in (?:the |a )?merge queue/i.test(text) ||
     /not in queue/i.test(text)

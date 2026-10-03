@@ -242,7 +242,9 @@ if (args[1] === 'graphql') {
       }
     );
     expect(execution.status, execution.stderr).toBe(0);
-    expect(execution.stderr).toContain('Resource not accessible by integration');
+    expect(execution.stderr).toContain(
+      'Resource not accessible by integration'
+    );
     const receipt = JSON.parse(execution.stdout);
     expect(receipt).toMatchObject({
       statusWritten: true,
