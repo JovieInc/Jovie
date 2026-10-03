@@ -294,6 +294,60 @@ describe('getCustomerRecovery', () => {
     expect(mocks.select).toHaveBeenCalledTimes(7);
   });
 
+  it.each([null, '', '  '])(
+    'omits audit reads when profile identifiers are unusable (%s)',
+    async identifier => {
+      mocks.getCanonicalContacts.mockResolvedValue({
+        contacts: [
+          {
+            dedupeKey: 'handle:missing-identifiers',
+            displayName: 'Missing identifiers',
+            email: null,
+            handle: null,
+            stage: 'lead',
+            overrideStage: null,
+            sources: ['creator_profile'],
+            certifiedAt: null,
+            activityAt: null,
+            userId: null,
+            creatorProfileId: 'profile-1',
+            leadId: null,
+            waitlistEntryId: null,
+          },
+        ],
+      });
+      installDbRows(
+        [
+          {
+            claimedAt: null,
+            isVerified: false,
+            ingestionStatus: 'idle',
+            lastIngestionError: null,
+            spotifyId: identifier,
+            spotifyUrl: null,
+            usernameNormalized: identifier,
+          },
+        ],
+        [],
+        [],
+        [],
+        [
+          {
+            type: 'another-customer',
+            result: 'failed',
+            failureReason: 'private synthetic evidence',
+            createdAt: new Date('2026-10-03T00:00:00Z'),
+          },
+        ]
+      );
+      const result = await getCustomerRecovery('missing-identifiers');
+      expect(result.error).toBeNull();
+      expect(result.dossier).not.toBeNull();
+      expect(result.dossier?.recentOperations).toEqual([]);
+      expect(mocks.select).toHaveBeenCalledTimes(4);
+    }
+  );
+
   it('reports contact failures as unavailable instead of no-match', async () => {
     const error = new Error('contacts unavailable');
     mocks.getCanonicalContacts.mockRejectedValue(error);

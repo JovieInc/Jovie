@@ -371,7 +371,13 @@ async function buildDossier(
   ]);
 
   const profile = profileRow[0] ?? null;
-  const recentOperations = profile
+  const auditUsername = profile?.usernameNormalized?.trim();
+  const auditSpotifyId = profile?.spotifyId?.trim();
+  const auditIdentity = or(
+    auditUsername ? eq(ingestAuditLogs.handle, auditUsername) : undefined,
+    auditSpotifyId ? eq(ingestAuditLogs.spotifyId, auditSpotifyId) : undefined
+  );
+  const recentOperations = auditIdentity
     ? await db
         .select({
           type: ingestAuditLogs.type,
@@ -380,16 +386,7 @@ async function buildDossier(
           createdAt: ingestAuditLogs.createdAt,
         })
         .from(ingestAuditLogs)
-        .where(
-          or(
-            ...(profile.usernameNormalized
-              ? [eq(ingestAuditLogs.handle, profile.usernameNormalized)]
-              : []),
-            ...(profile.spotifyId
-              ? [eq(ingestAuditLogs.spotifyId, profile.spotifyId)]
-              : [])
-          )
-        )
+        .where(auditIdentity)
         .orderBy(desc(ingestAuditLogs.createdAt))
         .limit(5)
     : [];
