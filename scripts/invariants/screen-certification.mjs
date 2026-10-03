@@ -219,6 +219,7 @@ web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|deskto
 web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile
 web.legal-cookies|web|legal-cookies|apps/web/app/(dynamic)/legal/cookies/|desktop,mobile
 web.legal-dmca|web|legal-dmca|apps/web/app/(dynamic)/legal/dmca/|desktop,mobile
+web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
