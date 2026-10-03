@@ -162,6 +162,9 @@ jobs:
             // the lanes remove it with their fix.
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
+            const currentMainSha = (await github.rest.git.getRef({
+              owner, repo, ref: 'heads/main',
+            })).data.object.sha;
             // Use the triggering PR for automatic wakes. Scanning every eligible PR
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
@@ -247,6 +250,7 @@ jobs:
               const failure = failurePolicy.revisionFailureDisposition({
                 statuses,
                 repository: `${owner}/${repo}`,
+                currentMainSha,
               });
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);

@@ -138,6 +138,25 @@ test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', ()
     ),
     false
   );
+  const recorded = 'e'.repeat(40);
+  const baseHold = {
+    ...revisionHold,
+    description: `class=base-branch;n=1;run=123;try=1;main=${recorded}`,
+  };
+  assert.equal(hasRevisionFailureHold([baseHold], 'o/r'), true);
+  assert.equal(hasRevisionFailureHold([baseHold], 'o/r', recorded), true);
+  assert.equal(
+    needsAutoMergeEnable(eligible, [baseHold], 'o/r', recorded),
+    false
+  );
+  assert.equal(
+    hasRevisionFailureHold([baseHold], 'o/r', 'f'.repeat(40)),
+    false
+  );
+  assert.equal(
+    needsAutoMergeEnable(eligible, [baseHold], 'o/r', 'f'.repeat(40)),
+    true
+  );
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {

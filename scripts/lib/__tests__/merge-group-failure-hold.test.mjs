@@ -321,6 +321,54 @@ describe('failure classification and revision-scoped suppression', () => {
     expect(classify('startup_failure')).toBe('transient-infrastructure');
   });
 
+  it('classifies an over-cap base separately from a PR that grew the capped file', () => {
+    const step = ['Evaluate repository instruction contracts'];
+    const text = 'CLAUDE.md: 6081 bytes exceeds 6000';
+    expect(classify('failure', step)).toBe('unclassified');
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: step,
+        annotationText: text,
+        changedFiles: ['apps/web/page.tsx'],
+      })
+    ).toBe('base-branch');
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: step,
+        annotationText: text,
+        changedFiles: ['CLAUDE.md'],
+      })
+    ).toBe('deterministic-source');
+  });
+
+  it('requeues a base-branch hold only after main moves', () => {
+    const recorded = 'e'.repeat(40);
+    const moved = 'f'.repeat(40);
+    const baseHold = status({
+      description: `class=base-branch;n=2;run=123;try=1;main=${recorded}`,
+    });
+    expect(disposition([baseHold])).toMatchObject({
+      action: 'block',
+      reason: 'base-branch-failure',
+    });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [baseHold],
+        currentMainSha: recorded,
+      })
+    ).toMatchObject({ action: 'block', reason: 'base-branch-failure' });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [baseHold],
+        currentMainSha: moved,
+      })
+    ).toMatchObject({ action: 'retry-once', reason: 'base-branch-resolved' });
+  });
+
   it('releases only an explicitly rejected enqueue, preserving ambiguous outcomes', () => {
     const rejected = {
       data: { enqueuePullRequest: null },
@@ -459,6 +507,41 @@ describe('terminal failure hold application', () => {
       dequeued: true,
       autoMergeDisabled: true,
     });
+  });
+
+  it('records a base-branch hold that can requeue after main moves', async () => {
+    const main = 'e'.repeat(40);
+    const writeStatus = vi.fn();
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: ['Evaluate repository instruction contracts'],
+        annotationText: 'CLAUDE.md: 6081 bytes exceeds 6000',
+        changedFiles: ['README.md'],
+        mainSha: main,
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(),
+      }
+    );
+    expect(result).toMatchObject({
+      classification: 'base-branch',
+      retryDisposition: 'requeue-after-base-moves',
+      mainSha: main,
+    });
+    expect(writeStatus.mock.calls[0][0].description).toBe(
+      `class=base-branch;n=1;run=123;try=1;main=${main}`
+    );
   });
 
   it('records the old revision but never mutates an already-new source head', async () => {

@@ -18,11 +18,21 @@ export const FAILURE_CLASSES = Object.freeze([
   'retryable-product',
   'transient-infrastructure',
   'unclassified',
+  'base-branch',
 ]);
 
 const SHA = /^[0-9a-f]{40}$/;
 const FAILURE_DESCRIPTION =
   /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=([1-9][0-9]*);run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
+const BASE_BRANCH_DESCRIPTION =
+  /^class=base-branch;n=([1-9][0-9]*);run=([1-9][0-9]*);try=([1-9][0-9]*);main=([0-9a-f]{40})$/;
+const AGENT_CONTEXT_BUDGET_FILES = new Set([
+  'CLAUDE.md',
+  'DESIGN.md',
+  'docs/agent-context/README.md',
+]);
+const BUDGET_EXCESS = /bytes exceeds \d+/;
+const INSTRUCTION_CONTRACT_STEP = 'Evaluate repository instruction contracts';
 const RETRY_DESCRIPTION =
   /^(spent|released):run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
 const INFRASTRUCTURE_STEP =
@@ -75,7 +85,34 @@ export function sourceHeadForRun(timeline, runCreatedAt) {
   fail('queue admission has no preceding exact source revision');
 }
 
-export function classifyMergeGroupFailure({ conclusion, failedSteps = [] }) {
+function parseFailureDescription(description) {
+  const base = BASE_BRANCH_DESCRIPTION.exec(description);
+  if (base) {
+    return {
+      classification: 'base-branch',
+      failureNumber: Number(base[1]),
+      runId: Number(base[2]),
+      runAttempt: Number(base[3]),
+      mainSha: base[4],
+    };
+  }
+  const match = FAILURE_DESCRIPTION.exec(description);
+  if (!match) return null;
+  return {
+    classification: match[1],
+    failureNumber: Number(match[2]),
+    runId: Number(match[3]),
+    runAttempt: Number(match[4]),
+    mainSha: null,
+  };
+}
+
+export function classifyMergeGroupFailure({
+  conclusion,
+  failedSteps = [],
+  annotationText = '',
+  changedFiles,
+} = {}) {
   if (!MERGE_GROUP_FAILURE_CONCLUSIONS.has(conclusion)) {
     fail(`unsupported terminal conclusion ${JSON.stringify(conclusion)}`);
   }
@@ -92,6 +129,17 @@ export function classifyMergeGroupFailure({ conclusion, failedSteps = [] }) {
     }
     if (steps.some(step => RETRYABLE_PRODUCT_FAILURE_STEPS.has(step))) {
       return 'retryable-product';
+    }
+    // A capped instruction file that is already over on the queue base fails
+    // every PR. That is repairable by moving main, not by holding the victim.
+    if (
+      steps.includes(INSTRUCTION_CONTRACT_STEP) &&
+      BUDGET_EXCESS.test(String(annotationText)) &&
+      Array.isArray(changedFiles)
+    ) {
+      return changedFiles.some(file => AGENT_CONTEXT_BUDGET_FILES.has(file))
+        ? 'deterministic-source'
+        : 'base-branch';
     }
     if (
       steps.length > 0 &&
@@ -132,20 +180,15 @@ export function parseTrustedFailureStatus(status, repository) {
   ) {
     return null;
   }
-  const description = String(status.description ?? '');
-  const match = FAILURE_DESCRIPTION.exec(description);
-  if (!match) return null;
+  const parsed = parseFailureDescription(String(status.description ?? ''));
+  if (!parsed) return null;
   const targetRunId = actionsRunId(
     status.target_url ?? status.targetUrl,
     repository
   );
-  const runId = Number(match[3]);
-  if (targetRunId !== runId) return null;
+  if (targetRunId !== parsed.runId) return null;
   return {
-    classification: match[1],
-    failureNumber: Number(match[2]),
-    runId,
-    runAttempt: Number(match[4]),
+    ...parsed,
     targetUrl: status.target_url ?? status.targetUrl,
   };
 }
@@ -182,7 +225,11 @@ export function parseTrustedRetryStatus(status, repository) {
 
 // The exact commit endpoint scopes failures: deterministic blocks immediately;
 // other failures receive one queue-authority retry.
-export function revisionFailureDisposition({ statuses, repository }) {
+export function revisionFailureDisposition({
+  statuses,
+  repository,
+  currentMainSha,
+}) {
   if (!Array.isArray(statuses)) fail('revision statuses are incomplete');
   const failures = statuses
     .map(status => parseTrustedFailureStatus(status, repository))
@@ -200,6 +247,15 @@ export function revisionFailureDisposition({ statuses, repository }) {
   if (failures.some(item => item.classification === 'deterministic-source')) {
     return result('block', 'deterministic-source-failure');
   }
+  if (latest.classification === 'base-branch') {
+    const resolved =
+      SHA.test(currentMainSha ?? '') &&
+      SHA.test(latest.mainSha ?? '') &&
+      currentMainSha !== latest.mainSha;
+    return resolved
+      ? result('retry-once', 'base-branch-resolved')
+      : result('block', 'base-branch-failure');
+  }
   if (latest.failureNumber >= 2) {
     return result('block', 'revision-retry-exhausted');
   }
@@ -213,8 +269,11 @@ export function revisionFailureDisposition({ statuses, repository }) {
     : result('retry-once', 'bounded-infrastructure-recovery');
 }
 
-function failureDescription({ classification, failureNumber, run }) {
-  return `class=${classification};n=${failureNumber};run=${run.id};try=${run.run_attempt}`;
+function failureDescription({ classification, failureNumber, run, mainSha }) {
+  const description = `class=${classification};n=${failureNumber};run=${run.id};try=${run.run_attempt}`;
+  return classification === 'base-branch'
+    ? `${description};main=${mainSha}`
+    : description;
 }
 
 /** Only consumes the trusted failure-hold job output, never PR-provided data. */
@@ -228,6 +287,8 @@ export function readFailureReceipt(raw, repository) {
     receipt.repository !== repository ||
     !SHA.test(receipt.sourceHeadSha ?? '') ||
     !FAILURE_CLASSES.includes(receipt.classification) ||
+    (receipt.classification === 'base-branch' &&
+      !SHA.test(receipt.mainSha ?? '')) ||
     ![
       receipt.prNumber,
       receipt.failureNumber,
@@ -252,6 +313,7 @@ export function failureReceiptStatus(raw, { repository, prNumber, headSha }) {
     description: failureDescription({
       classification: receipt.classification,
       failureNumber: receipt.failureNumber,
+      mainSha: receipt.mainSha,
       run: {
         id: receipt.workflowRunId,
         run_attempt: receipt.workflowRunAttempt,
@@ -358,7 +420,16 @@ function validateRun(run, repository) {
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 export async function applyMergeGroupFailure(
-  { repository, run, timeline, failedSteps, statuses },
+  {
+    repository,
+    run,
+    timeline,
+    failedSteps,
+    statuses,
+    annotationText = '',
+    changedFiles,
+    mainSha,
+  },
   { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
 ) {
   const front = validateRun(run, repository);
@@ -366,7 +437,13 @@ export async function applyMergeGroupFailure(
   const classification = classifyMergeGroupFailure({
     conclusion: run.conclusion,
     failedSteps,
+    annotationText,
+    changedFiles,
   });
+  const recordedMainSha = String(mainSha ?? '').toLowerCase();
+  if (classification === 'base-branch' && !SHA.test(recordedMainSha)) {
+    fail('current main sha is unavailable');
+  }
   const existing = revisionFailureDisposition({ statuses, repository });
   const duplicate = existing.failures.find(
     item => item.runId === run.id && item.runAttempt === run.run_attempt
@@ -378,6 +455,7 @@ export async function applyMergeGroupFailure(
     classification,
     failureNumber,
     run,
+    mainSha: recordedMainSha,
   });
   if (!duplicate) {
     await writeStatus({
@@ -447,10 +525,13 @@ export async function applyMergeGroupFailure(
     workflowRunAttempt: run.run_attempt,
     classification,
     failureNumber,
+    mainSha: classification === 'base-branch' ? recordedMainSha : null,
     retryDisposition:
-      classification === 'deterministic-source' || failureNumber >= 2
-        ? 'blocked-until-new-source-head'
-        : 'one-queue-authority-retry',
+      classification === 'base-branch'
+        ? 'requeue-after-base-moves'
+        : classification === 'deterministic-source' || failureNumber >= 2
+          ? 'blocked-until-new-source-head'
+          : 'one-queue-authority-retry',
     statusWritten: !duplicate,
     currentHeadSha:
       typeof current?.headRefOid === 'string'
@@ -536,6 +617,73 @@ function readPullRequest(repository, prNumber) {
   return pr;
 }
 
+function instructionContractEvidence(repository, run, jobs, baseSha) {
+  const failedJobs = jobs.filter(
+    job =>
+      Number.isSafeInteger(job?.id) &&
+      Array.isArray(job.steps) &&
+      job.steps.some(
+        step =>
+          step?.name === INSTRUCTION_CONTRACT_STEP &&
+          step?.conclusion === 'failure'
+      )
+  );
+  if (failedJobs.length === 0) return {};
+  const messages = [];
+  for (const job of failedJobs) {
+    try {
+      const notes = ghJson([
+        'api',
+        `repos/${repository}/check-runs/${job.id}/annotations`,
+      ]);
+      if (Array.isArray(notes)) {
+        for (const note of notes) {
+          if (typeof note?.message === 'string') messages.push(note.message);
+        }
+      }
+    } catch {
+      // Annotations are optional; the job log is the fallback.
+    }
+    if (!BUDGET_EXCESS.test(messages.join('\n'))) {
+      try {
+        messages.push(
+          gh([
+            'run',
+            'view',
+            String(run.id),
+            '--repo',
+            repository,
+            '--job',
+            String(job.id),
+            '--log',
+          ])
+        );
+      } catch {
+        // Missing logs leave the failure unclassified.
+      }
+    }
+  }
+  const annotationText = messages.join('\n');
+  if (!BUDGET_EXCESS.test(annotationText)) return { annotationText };
+  try {
+    const compare = ghJson([
+      'api',
+      `repos/${repository}/compare/${baseSha}...${String(run.head_sha).toLowerCase()}`,
+    ]);
+    if (!Array.isArray(compare.files) || compare.files.length >= 300) {
+      return { annotationText };
+    }
+    return {
+      annotationText,
+      changedFiles: compare.files
+        .map(file => file?.filename)
+        .filter(name => typeof name === 'string'),
+    };
+  } catch {
+    return { annotationText };
+  }
+}
+
 async function main(argv) {
   if (argv.length !== 2 || argv[0] !== '--event-path') {
     fail(
@@ -568,12 +716,39 @@ async function main(argv) {
           .map(step => step.name)
       : []
   );
+  const evidence = instructionContractEvidence(
+    repository,
+    run,
+    jobs,
+    front.baseSha
+  );
+  const preview = classifyMergeGroupFailure({
+    conclusion: run.conclusion,
+    failedSteps,
+    annotationText: evidence.annotationText,
+    changedFiles: evidence.changedFiles,
+  });
+  const mainSha =
+    preview === 'base-branch'
+      ? String(
+          ghJson(['api', `repos/${repository}/commits/main`]).sha ?? ''
+        ).toLowerCase()
+      : undefined;
   const sourceHeadSha = sourceHeadForRun(timeline, run.created_at);
   const statuses = restPages(
     `repos/${repository}/commits/${sourceHeadSha}/statuses`
   );
   const result = await applyMergeGroupFailure(
-    { repository, run, timeline, failedSteps, statuses },
+    {
+      repository,
+      run,
+      timeline,
+      failedSteps,
+      statuses,
+      annotationText: evidence.annotationText,
+      changedFiles: evidence.changedFiles,
+      mainSha,
+    },
     {
       writeStatus: async receipt =>
         gh([

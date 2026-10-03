@@ -31,6 +31,8 @@ const TRACKING_ISSUE_TITLE = 'Auto-merge stuck PRs — diagnostic tracker';
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 const FAILURE_DESCRIPTION =
   /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*$/;
+const BASE_BRANCH_DESCRIPTION =
+  /^class=base-branch;n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*;main=([0-9a-f]{40})$/;
 
 const GH_MAX_ATTEMPTS = 4;
 const TRANSIENT_GH_ERROR =
@@ -175,7 +177,7 @@ function listCommitStatuses(repo, sha) {
   throw new Error('Commit status pagination exceeded the safety limit.');
 }
 
-function hasRevisionFailureHold(statuses, repo) {
+function hasRevisionFailureHold(statuses, repo, currentMainSha = '') {
   const prefix = `https://github.com/${repo}/actions/runs/`;
   return statuses.some(status => {
     if (
@@ -185,6 +187,11 @@ function hasRevisionFailureHold(statuses, repo) {
       status.creator?.login !== 'jovie-bot[bot]'
     ) {
       return false;
+    }
+    const base = BASE_BRANCH_DESCRIPTION.exec(status.description ?? '');
+    if (base && status.target_url === `${prefix}${base[1]}`) {
+      // Hold only while main is still the revision that already violated the cap.
+      return !currentMainSha || currentMainSha === base[2];
     }
     const match = FAILURE_DESCRIPTION.exec(status.description ?? '');
     return Boolean(match && status.target_url === `${prefix}${match[2]}`);
@@ -364,7 +371,12 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
 // Pure: a PR needs the enable pass when it is open, not a draft, lives in
 // this repo (fork tokens are read-only), carries no blocking label, and has no
 // autoMergeRequest yet.
-function needsAutoMergeEnable(pr, statuses = [], repo = '') {
+function needsAutoMergeEnable(
+  pr,
+  statuses = [],
+  repo = '',
+  currentMainSha = ''
+) {
   const held = (pr.labels?.nodes ?? []).some(l =>
     BLOCKING_LABELS.has(l.name.toLowerCase())
   );
@@ -373,7 +385,7 @@ function needsAutoMergeEnable(pr, statuses = [], repo = '') {
     !pr.isCrossRepository &&
     !held &&
     !pr.autoMergeRequest &&
-    !hasRevisionFailureHold(statuses, repo)
+    !hasRevisionFailureHold(statuses, repo, currentMainSha)
   );
 }
 
@@ -382,13 +394,14 @@ function enableMissingAutoMerge(
   prs,
   dryRun,
   command = gh,
-  readStatuses = listCommitStatuses
+  readStatuses = listCommitStatuses,
+  currentMainSha = ''
 ) {
   for (const pr of prs) {
     if (pr.isDraft || pr.isCrossRepository || pr.autoMergeRequest) continue;
     if (!/^[a-f0-9]{40}$/.test(pr.headRefOid ?? '')) continue;
     const statuses = readStatuses(repo, pr.headRefOid);
-    if (!needsAutoMergeEnable(pr, statuses, repo)) continue;
+    if (!needsAutoMergeEnable(pr, statuses, repo, currentMainSha)) continue;
     if (dryRun) {
       console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
       continue;
@@ -421,10 +434,19 @@ function main() {
       opts.dryRun,
       gh
     );
+    let currentMainSha = '';
+    try {
+      currentMainSha = ghJson(['api', `repos/${opts.repo}/commits/main`]).sha;
+    } catch {
+      currentMainSha = '';
+    }
     enableMissingAutoMerge(
       opts.repo,
       opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
-      opts.dryRun
+      opts.dryRun,
+      gh,
+      listCommitStatuses,
+      currentMainSha
     );
   }
 
