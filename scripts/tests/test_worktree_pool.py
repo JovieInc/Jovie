@@ -73,6 +73,14 @@ class PoolTest(unittest.TestCase):
         self.assertEqual(calls, [["git", "worktree", "add", "-q", "-b", "feat/x", str(self.out / "w"), "main"]])
         self.assertEqual(git(self.out / "w", "branch", "--show-current"), "feat/x")
 
+    def test_a_failed_fresh_add_through_a_non_raising_sh_raises(self):
+        def sh(args, cwd=None, log=None):
+            return subprocess.run(args, cwd=cwd, capture_output=True, text=True)  # records, never raises
+        git(self.repo, "branch", "exists")
+        with self.assertRaises(subprocess.CalledProcessError):
+            pool_mod.take(self.repo, self.out / "w", "exists", "main", sh=sh, root=self.root)
+        self.assertFalse((self.out / "w").exists())
+
     def test_filled_slot_is_moved_to_dest_on_the_new_branch_at_the_latest_base(self):
         self.assertEqual(len([a for a in self.fill() if a.startswith("built")]), 1)
         (self.repo / "a.txt").write_text("two\n")

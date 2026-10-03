@@ -184,7 +184,11 @@ def take(repo: Path, dest: Path, branch: str | None, base: str = "origin/main", 
                     log.write(f"worktree-pool: discarding slot: {error}\n")
                 remove_worktree(repo, dest, log)
     args = ["git", "worktree", "add", "-q"] + (["-b", branch] if branch else ["--detach"]) + [str(dest), base]
-    (sh or (lambda a, cwd=None, log=None: run(a, cwd=cwd, log=log, timeout=600)))(args, cwd=repo, log=log)
+    result = (sh or (lambda a, cwd=None, log=None: run(a, cwd=cwd, log=log, timeout=600)))(args, cwd=repo, log=log)
+    # The lanes `sh` records and returns instead of raising; a failed add must not
+    # let the caller install into, and hand an agent, a directory that is not there.
+    if getattr(result, "returncode", 0):
+        raise subprocess.CalledProcessError(result.returncode, args, getattr(result, "stdout", ""))
     return "fresh"
 
 
