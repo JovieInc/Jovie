@@ -205,6 +205,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       kindOf('apps/web/app/app/(shell)/library/page.tsx'),
       'registered'
     );
+    assert.equal(
+      kindOf('apps/web/app/(dynamic)/playlists/page.tsx'),
+      'registered'
+    );
   });
 
   it('registers provider-host layouts that ship with start and public profile', () => {
