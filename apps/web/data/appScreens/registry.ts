@@ -302,7 +302,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/account/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
   'apps/web/app/app/(shell)/settings/analytics/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
   'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/audience/page.tsx',
   'apps/web/app/app/(shell)/settings/billing/page.tsx',
@@ -339,7 +338,6 @@ const LEGACY_SOURCES = new Set<string>([
 
 const ALIAS_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/profile/page.tsx',
@@ -391,7 +389,6 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/profile/page.tsx',
   'apps/web/app/app/(shell)/releases/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
@@ -535,10 +532,6 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
   'apps/web/app/app/(shell)/settings/admin/page.tsx': {
     conceptId: '/app/settings/artist-profile',
     redirectTo: '/app/settings/artist-profile',
-  },
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx': {
-    conceptId: '/app/settings/account',
-    redirectTo: '/app/settings/account',
   },
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx': {
     conceptId: '/app/settings/data-privacy',
