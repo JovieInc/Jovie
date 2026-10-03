@@ -140,10 +140,7 @@ export function ReleaseCountdown({
     const segments = getCompactCountdownSegments(timeLeft);
 
     return (
-      <div
-        className='flex items-baseline gap-2.5 tabular-nums'
-        data-testid='release-countdown'
-      >
+      <div className='flex items-baseline gap-2.5 tabular-nums'>
         {segments.map(segment => (
           <span key={segment.label}>
             <span className='text-xl font-bold tracking-[-0.03em] text-(--color-text-tooltip)'>
@@ -159,7 +156,7 @@ export function ReleaseCountdown({
   }
 
   return (
-    <div className='text-center' data-testid='release-countdown'>
+    <div className='text-center'>
       <p className='text-xs uppercase tracking-widest text-white/40'>{label}</p>
       <div className='mt-2 flex items-center justify-center gap-3'>
         {timeLeft.days > 0 && (
