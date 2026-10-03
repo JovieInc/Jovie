@@ -1854,6 +1854,48 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     return receipt
 
 
+def run_brief(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
+    """JOV-7541 design/brief lane: one brief-only run on a detached checkout, no PR."""
+    run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-brief-{uuid.uuid4().hex[:6]}"
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    worktree = host.state / "worktrees" / run_id
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "model": spec.get("model"),
+               "kind": "design-brief", "issue": issue.identifier, "linearIssueId": issue.id,
+               "worktree": str(worktree), "startedAt": now_iso()}
+    with open(runs / f"{run_id}.log", "w") as log:
+        try:
+            require_disk(host, "brief-checkout")
+            sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
+            sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
+            brain_context = context_pack(issue)
+            prompt = design_gate.render_brief_prompt(issue, brain_context)
+            prompt_file = runs / f"{run_id}.prompt.md"
+            receipt["contextManifests"] = [write_agent_prompt(
+                prompt_file, prompt, "issue", name,
+                {"issue": json.dumps({"id": issue.id, "identifier": issue.identifier, "title": issue.title,
+                                      "description": issue.description}, sort_keys=True),
+                 "gbrain": brain_context, "branch": "design-brief"})]
+            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                                                       "cwd": str(worktree),
+                                                       "provider_receipt": str(runs / f"{run_id}.provider.jsonl")}),
+                              worktree, log, host.agent_timeout, guard=lambda: require_disk(host, "brief-running"))
+            brief = worktree / design_gate.BRIEF_FILE
+            receipt.update(agentExit=agent.returncode, **design_gate.publish_brief(
+                linear, issue, brief.read_text(errors="replace") if brief.exists() else ""))
+        except DiskAdmissionError as error:
+            receipt.update(verdict="disk-held", reasons=[str(error)])
+        except Exception as error:  # a broken run must still leave a receipt and free its issue
+            receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
+        finally:
+            (worktree / design_gate.BRIEF_FILE).unlink(missing_ok=True)
+            remove_worktree(host, worktree)
+    receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": None, "commit": None})
+    with open(runs / "ledger.jsonl", "a") as ledger:
+        ledger.write(json.dumps(receipt) + "\n")
+    return receipt
+
+
 def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, started: float,
                     opened: bool = False, sensitive: bool = False) -> dict:
     """Independent of the agent's own claim: find its PR, re-derive the diff, run checks, then land."""
@@ -4211,7 +4253,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         slot.release()
         return 0
     notify_issue_claim(linear, issue, name, spec)
-    receipt = run_issue(host, name, spec, linear, issue)
+    runner = run_brief if design_gate.wants_brief(issue, host.repo) else run_issue
+    receipt = runner(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
     note_event_outcome(host, issue, verdict)
     if verdict == "disk-held":
@@ -4260,6 +4303,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     if verdict in {"gate-in-progress", "gate-deferred", "gate-already-completed"}:
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} remains with its exact-head gate "
                                  f"({verdict}); no issue retry charged and no new certification claimed.")
+    elif verdict in ("brief-complete", "brief-incomplete"):
+        linear.move(issue.id, "Todo")  # complete: the next claim builds it; incomplete: gate holds it
     elif verdict == "not-shippable":
         linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}\n"
