@@ -57,8 +57,22 @@
       "root-cause": {
         "input": 150000,
         "output": 60000
+      },
+      "review-verify": {
+        "input": 8000,
+        "output": 300
       }
-    }
+    },
+    "failure_cost_usd": {
+      "review": 5,
+      "review-verify": 5
+    },
+    "min_quality": {
+      "review-verify": 65
+    },
+    "min_samples": 5,
+    "prior_weight": 2,
+    "minute_value_usd": 0
   },
   "models": [
     {
@@ -234,7 +248,13 @@
       "quality": 65,
       "list_price_in": 0.2,
       "list_price_out": 1.5,
-      "capabilities": ["mechanical", "code", "review", "semantic"],
+      "capabilities": [
+        "mechanical",
+        "code",
+        "review",
+        "semantic",
+        "review-verify"
+      ],
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
       "executable_default": "/home/timwhite/.local/bin/hermes",
@@ -262,7 +282,16 @@
       ],
       "cooldown_seconds": 1800,
       "strengths": ["cheapest-capable-api", "post-included-fallback"],
-      "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"]
+      "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"],
+      "quality_by_capability": {
+        "review": 63.4,
+        "review-verify": 63.4
+      },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/glm-5.3-flash",
+        "https://www.datacamp.com/blog/glm-5-3-flash",
+        "https://www.together.ai/blog/glm-5-3-vs-glm-5-3-flash-on-deepswe-cost-coding-and-routing"
+      ]
     },
     {
       "id": "cursor-luna",
@@ -577,6 +606,80 @@
         "paid-gateway",
         "requires-hyperagent-cli",
         "most-expensive-hyperagent"
+      ]
+    },
+    {
+      "id": "gateway-deepseek-v4-flash",
+      "provider": "vercel-ai-gateway",
+      "model": "deepseek/deepseek-v4-flash",
+      "family": "deepseek",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 65,
+      "list_price_in": 0.06,
+      "list_price_out": 0.18,
+      "capabilities": ["review", "review-verify"],
+      "cost_tier": "gateway-budgeted-paid",
+      "strengths": ["cheapest-capable-api", "post-included-fallback"],
+      "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"],
+      "quality_by_capability": {
+        "review": 54.4,
+        "review-verify": 54.4
+      },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/deepseek-v4-flash",
+        "https://regolo.ai/deepseek-v4-1-flash-vs-v4-flash-which-open-weight-model-should-your-company-run/"
+      ],
+      "notes": "Disabled PR review ranking only; this does not restore a retired agent route."
+    },
+    {
+      "id": "gateway-deepseek-v4.1-flash",
+      "provider": "vercel-ai-gateway",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "family": "deepseek",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 65,
+      "list_price_in": 0.075,
+      "list_price_out": 0.3,
+      "capabilities": ["review", "review-verify"],
+      "cost_tier": "gateway-budgeted-paid",
+      "strengths": ["per-call-review-route"],
+      "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
+      "notes": "PR review kernel only. Peak list price; quality provisional until replay outcomes exist.",
+      "quality_by_capability": {
+        "review": 74.2,
+        "review-verify": 74.2
+      },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/deepseek-v4.1-flash",
+        "https://www.digitalapplied.com/blog/deepseek-v4-1-flash-pro-routing-prices-early-tests",
+        "https://flowtivity.ai/blog/deepseek-v4-1-flash-benchmarks/"
+      ]
+    },
+    {
+      "id": "gateway-glm-5.3",
+      "provider": "vercel-ai-gateway",
+      "model": "zai/glm-5.3",
+      "family": "glm",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 82,
+      "list_price_in": 0.5625,
+      "list_price_out": 1.8326,
+      "capabilities": ["review", "review-verify"],
+      "cost_tier": "gateway-budgeted-paid",
+      "strengths": ["per-call-review-route"],
+      "weaknesses": ["paid-gateway", "not-in-agent-route-chains"],
+      "notes": "PR review kernel only. Prices and quality mirror hyperagent-glm-5.3.",
+      "quality_by_capability": {
+        "review": 66.9,
+        "review-verify": 66.9
+      },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/glm-5.3",
+        "https://www.mindstudio.ai/blog/glm-5-3-coding-benchmarks",
+        "https://www.together.ai/blog/glm-5-3-vs-glm-5-3-flash-on-deepswe-cost-coding-and-routing"
       ]
     }
   ],
