@@ -313,6 +313,18 @@ describe('UnifiedSidebar library route', () => {
     ).toHaveAttribute('href', '/timwhite');
   });
 
+  it('renders the restored Referral door in the actual Settings rail', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.SETTINGS_REFERRAL,
+      section: 'settings',
+    });
+    expect(screen.getByRole('link', { name: 'Referral' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_REFERRAL
+    );
+    expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+  });
+
   it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {
     renderUnifiedSidebar({
       overrideContent: <span>Library-owned sidebar</span>,
@@ -426,6 +438,37 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the collapse toggle reachable while the brand row stages out (JOV-4522)', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    // In the 52px icon rail the brand cluster and header actions collapse on
+    // max-width while the toggle moves first and centers — before this the
+    // fixed-width chrome pushed it past the clipped rail edge.
+    const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
+    expect(toggle.className).toContain(
+      'group-data-[collapsible=icon]:order-first'
+    );
+    expect(toggle.className).toContain('group-data-[collapsible=icon]:mx-auto');
+
+    const brandRow = toggle.closest('[data-sidebar-brand-row]');
+    expect(brandRow).not.toBeNull();
+    const stagedCluster = brandRow?.querySelector(
+      '[data-sidebar-header-actions]'
+    );
+    expect(stagedCluster).not.toBeNull();
+    expect(stagedCluster?.className).toContain(
+      'group-data-[collapsible=icon]:max-w-0'
+    );
+    expect(stagedCluster?.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
+    );
   });
 
   it('turns the logo into a workspace selector for admins', () => {
