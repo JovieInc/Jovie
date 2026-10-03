@@ -203,6 +203,8 @@ const asset = {
   share: {
     shareUrl: 'https://jovie.link/tim/take-me-over',
   },
+// Story fixture. The share cell reads shareUrl; the rest of the asset
+// contract is not rendered here.
 } as unknown as LibraryReleaseAsset;
 
 function Frame({
