@@ -740,7 +740,7 @@ def test_conflict_handler_reserves_app_token_for_bounded_mutations() -> None:
     fleet = (
         REPO_ROOT / "scripts/pr-conflict-handler.mjs"
     ).read_text(encoding="utf-8")
-    assert "fetchOpenPrSummariesRest" in fleet
+    assert "fetchCompleteOpenPrSummariesRest" in fleet
     assert "hydrateOpenPrGraphqlMetadata" in fleet
     assert "hydrateOpenPrStatusContexts" in fleet
     assert "'pr',\n    'list'" not in fleet
