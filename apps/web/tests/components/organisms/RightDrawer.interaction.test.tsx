@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
@@ -228,8 +234,9 @@ describe('RightDrawer', () => {
     );
 
     const desktopAside = screen.getByLabelText('Responsive drawer');
+    // Shared shell rail-motion allocation contract (JOV-4522).
     expect(desktopAside).toHaveClass(
-      'transition-[width,opacity]',
+      'transition-[flex-basis,width,opacity,transform]',
       'opacity-100'
     );
     expect(desktopAside).not.toHaveClass('lg:border');
@@ -255,6 +262,66 @@ describe('RightDrawer', () => {
     );
 
     expect(drawer).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('keeps the panel visible through closing, then settles to inert closed geometry (JOV-4522)', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <RightDrawer isOpen={true} width={360} ariaLabel='Staged drawer'>
+          <p>Drawer content</p>
+        </RightDrawer>
+      );
+
+      const aside = screen.getByLabelText('Staged drawer');
+      expect(aside).toHaveAttribute('data-rail-phase', 'open');
+
+      rerender(
+        <RightDrawer isOpen={false} width={360} ariaLabel='Staged drawer'>
+          <p>Drawer content</p>
+        </RightDrawer>
+      );
+
+      // The exit stages: still `visible` while opacity/travel animate against
+      // the width give-back — not snapped to `invisible` at frame one.
+      expect(aside).toHaveAttribute('data-rail-phase', 'closing');
+      expect(aside).toHaveClass('visible');
+      expect(aside).toHaveClass('opacity-0');
+
+      act(() => {
+        vi.advanceTimersByTime(420);
+      });
+
+      expect(aside).toHaveAttribute('data-rail-phase', 'closed');
+      expect(aside).toHaveClass('invisible');
+
+      // Reopening mid-cycle reverses cleanly toward the latest state.
+      vi.advanceTimersByTime(0);
+      rerender(
+        <RightDrawer isOpen={true} width={360} ariaLabel='Staged drawer'>
+          <p>Drawer content</p>
+        </RightDrawer>
+      );
+      rerender(
+        <RightDrawer isOpen={false} width={360} ariaLabel='Staged drawer'>
+          <p>Drawer content</p>
+        </RightDrawer>
+      );
+      rerender(
+        <RightDrawer isOpen={true} width={360} ariaLabel='Staged drawer'>
+          <p>Drawer content</p>
+        </RightDrawer>
+      );
+      expect(aside).toHaveAttribute('data-rail-phase', 'opening');
+
+      act(() => {
+        vi.advanceTimersByTime(420);
+      });
+      expect(aside).toHaveAttribute('data-rail-phase', 'open');
+      expect(aside).toHaveClass('visible', 'opacity-100', 'translate-x-0');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps rendering children content while closed for transition safety', () => {
