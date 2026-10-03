@@ -1,4 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useChatFileAttachments } from '@/components/jovie/hooks/useChatFileAttachments';
 
@@ -36,6 +42,49 @@ function enterFileDrag(target: Element) {
 describe('useChatFileAttachments drag state (JOV-5413)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('keeps aggregate identity on unrelated renders but updates for pending files and quota', async () => {
+    const onError = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ disabled, fileUploadLimit }) =>
+        useChatFileAttachments({ onError, disabled, fileUploadLimit }),
+      { initialProps: { disabled: false, fileUploadLimit: 0 } }
+    );
+    const initial = result.current.aggregate;
+    const addFiles = result.current.addFiles;
+    rerender({ disabled: false, fileUploadLimit: 0 });
+    expect(result.current.aggregate).toBe(initial);
+    expect(result.current.addFiles).toBe(addFiles);
+    await act(async () =>
+      result.current.addFiles([
+        new File(['notes'], 'notes.txt', { type: 'text/plain' }),
+      ])
+    );
+    expect(result.current.aggregate).not.toBe(initial);
+    expect(result.current.aggregate).toMatchObject({
+      total: 1,
+      locked: 1,
+      done: 0,
+      overallPct: 0,
+    });
+    const pending = result.current.aggregate;
+    rerender({ disabled: true, fileUploadLimit: 2 });
+    expect(result.current.addFiles).not.toBe(addFiles);
+    await act(async () =>
+      result.current.addFiles([
+        new File(['other'], 'other.txt', { type: 'text/plain' }),
+      ])
+    );
+    expect(result.current.pendingFiles).toHaveLength(1);
+    expect(result.current.aggregate).toBe(pending);
+    act(() => result.current.clearFiles());
+    expect(result.current.aggregate).toMatchObject({
+      total: 0,
+      locked: 0,
+      done: 0,
+    });
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it('enters drag-over on file dragenter and clears on dragleave', () => {
