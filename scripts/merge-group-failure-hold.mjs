@@ -269,6 +269,41 @@ export function retryReleasedDescription(record) {
   return `released:run=${record.runId};try=${record.runAttempt}`;
 }
 
+function errorText(error) {
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return '';
+  return ['message', 'stderr', 'stdout']
+    .map(key => {
+      const value = error[key];
+      if (typeof value === 'string') return value;
+      if (value instanceof Uint8Array)
+        return Buffer.from(value).toString('utf8');
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * GitHub removes a PR when its merge_group run fails. The Jovie Bot token
+ * minted for this job does not include merge-queue write, so dequeuePullRequest
+ * answers "Resource not accessible by integration". An already-removed PR
+ * answers that it is not in the queue. Both are logged and non-fatal.
+ * @returns {'inaccessible' | 'not-in-queue' | null}
+ */
+export function classifyDequeueDenial(error) {
+  const text = errorText(error);
+  if (/resource not accessible by integration/i.test(text))
+    return 'inaccessible';
+  if (
+    /not in (?:the |a )?merge queue/i.test(text) ||
+    /not in queue/i.test(text)
+  ) {
+    return 'not-in-queue';
+  }
+  return null;
+}
+
 /** Only an explicit mutation rejection may release a reserved retry. */
 export function enqueueWasRejected(error) {
   if (!error || typeof error !== 'object') return false;
@@ -320,6 +355,8 @@ function validateRun(run, repository) {
 
 // Persist the exact-source failure before removing native merge intent. A new
 // head keeps the old receipt and receives no dequeue/disable mutation.
+// Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
+// GitHub already removes the PR when the merge_group run fails.
 export async function applyMergeGroupFailure(
   { repository, run, timeline, failedSteps, statuses },
   { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
@@ -355,14 +392,26 @@ export async function applyMergeGroupFailure(
   let current = await readPullRequest(front.prNumber);
   let dequeued = false;
   let autoMergeDisabled = false;
+  let dequeueOutcome = 'not-attempted';
   const currentMatches = () =>
     current?.state === 'OPEN' &&
     String(current?.headRefOid ?? '').toLowerCase() === sourceHeadSha;
   if (currentMatches() && current.isInMergeQueue && current.mergeQueueEntry) {
     current = await readPullRequest(front.prNumber);
     if (currentMatches() && current.isInMergeQueue && current.mergeQueueEntry) {
-      await dequeuePullRequest(current.id);
-      dequeued = true;
+      try {
+        await dequeuePullRequest(current.id);
+        dequeued = true;
+        dequeueOutcome = 'dequeued';
+      } catch (error) {
+        const denial = classifyDequeueDenial(error);
+        if (!denial) throw error;
+        dequeueOutcome = denial;
+        const detail = errorText(error).replace(/\s+/g, ' ').slice(0, 300);
+        console.error(
+          `::warning::merge-group-failure-hold dequeue ${denial}: ${detail}. GitHub removes a pull request when its merge_group run fails; the failure hold still persists.`
+        );
+      }
       current = await readPullRequest(front.prNumber);
     }
   }
@@ -374,11 +423,13 @@ export async function applyMergeGroupFailure(
       current = await readPullRequest(front.prNumber);
     }
   }
-  if (
+  const benignDequeue = dequeueOutcome !== 'not-attempted' && !dequeued;
+  const stillQueued =
     currentMatches() &&
-    (current.isInMergeQueue ||
-      current.mergeQueueEntry !== null ||
-      current.autoMergeRequest !== null)
+    (current.isInMergeQueue || current.mergeQueueEntry !== null);
+  if (
+    (stillQueued && !benignDequeue) ||
+    (currentMatches() && current.autoMergeRequest !== null)
   ) {
     fail(
       'exact source revision still has native queue intent after suppression'
@@ -407,6 +458,7 @@ export async function applyMergeGroupFailure(
         : null,
     exactHeadStillCurrent: currentMatches(),
     dequeued,
+    dequeueOutcome,
     autoMergeDisabled,
   };
 }

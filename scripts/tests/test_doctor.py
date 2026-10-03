@@ -808,5 +808,30 @@ class RunTest(unittest.TestCase):
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
 
 
+class DoctorLockTest(unittest.TestCase):
+    def test_flock_failure_closes_the_lock_fd_and_still_writes(self):
+        import fcntl
+        state = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(state, ignore_errors=True))
+        opened = []
+        real_open = open
+
+        def tracking_open(file, mode="r", *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if str(file).endswith("doctor.lock"):
+                opened.append(handle)
+            return handle
+
+        def fail_lock(handle, operation):
+            raise OSError("flock failed")
+
+        wrote = []
+        with mock.patch("builtins.open", tracking_open), mock.patch.object(fcntl, "flock", fail_lock):
+            doctor.locked_doctor_write(state, lambda: wrote.append("ok"))
+        self.assertEqual(wrote, ["ok"])
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(opened[0].closed)
+
+
 if __name__ == "__main__":
     unittest.main()

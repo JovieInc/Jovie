@@ -1731,7 +1731,15 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
         assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
-    assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production
+    assert (
+        "expected-sha: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}"
+        in production
+    )
+    source = (REPO_ROOT / ".github/scripts/staging-release-source.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "exactRun(ci, repository, CI_PATH, 'push')" in source
+    assert "ci.head_sha === completion.sha" in source
 
 
 def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:
