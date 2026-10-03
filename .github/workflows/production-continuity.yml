@@ -197,6 +197,28 @@ jobs:
           node scripts/backlog-orchestrator/delivery-state-machine.mjs \
             --event-file="$event_file"
 
+  remediation:
+    name: File production continuity remediation
+    needs: observe
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: File or resolve production-monitor-continuity
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-continuity
+          REMEDIATION_SOURCE: production-continuity.yml
+          REMEDIATION_CONCLUSION: ${{ (needs.observe.result != 'success' || needs.observe.outputs.status == 'unhealthy') && 'failure' || 'success' }}
+          REMEDIATION_DETAIL: ${{ needs.observe.outputs.incident_key }} ${{ needs.observe.outputs.incident_classes }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
   preserve-incident:
     name: Preserve production incident
     needs: [observe, founder-alert, agent-ingress]

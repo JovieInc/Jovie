@@ -2081,6 +2081,32 @@ jobs:
           exit 1
 
 
+  remediation-vercel-deploy:
+    name: File Vercel production deploy remediation
+    needs: [promote-production]
+    if: ${{ always() && inputs.release_mode == 'production' && needs.promote-production.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve production-monitor-vercel-deploy
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-vercel-deploy
+          REMEDIATION_SOURCE: production-release.yml
+          REMEDIATION_CONCLUSION: ${{ needs.promote-production.result == 'success' && 'success' || 'failure' }}
+          REMEDIATION_DETAIL: ${{ needs.promote-production.outputs.failure_subtype }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
   release-result:
     name: Production release result
     needs:
