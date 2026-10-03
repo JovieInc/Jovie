@@ -49,6 +49,142 @@ def providers():
     }
 
 
+class ClassifierFixtureTest(unittest.TestCase):
+    def test_stuck_pr_fixtures(self):
+        ready = pr(number=20079, statusCheckRollup=checks(39))
+        self.assertEqual(remediation.classify_blocker(ready, {"sha": "ed4d35e", "reason": "fix-exhausted"})["cls"], "ready")
+        self.assertEqual(remediation.classify_blocker(ready)["next_action"], "arm")
+
+        dirty = pr(number=20074, mergeStateStatus="DIRTY", labels=[{"name": "lane-fix-exhausted"}],
+                   conflictFiles=["src/a.ts", "src/b.ts"],
+                   reviewThreads=[{"resolved": False, "bot": True, "severity": "CRITICAL",
+                                   "body": "PublicationStorySchema id required", "author": "sentry[bot]"},
+                                  {"resolved": False, "bot": True, "severity": "HIGH",
+                                   "body": "summary-vs-bullet removed"}])
+        classified = remediation.classify_blocker(dirty)
+        self.assertEqual((classified["cls"], classified["subtype"]), ("needs-rebase", "semantic"))
+        self.assertTrue(any("bot review" in line for line in classified["evidence"]))
+
+        strategy = pr(number=20062, isDraft=True, labels=[{"name": "hold"}], files=["canon/strategy/theses.md"],
+                      reviewThreads=[{"resolved": False, "bot": True, "body": "supersededBy cycle"}])
+        self.assertEqual(remediation.classify_blocker(strategy)["cls"], "needs-human-decision")
+
+        rebase = pr(number=20035, mergeStateStatus="DIRTY",
+                    labels=[{"name": "lane-fix-conflict"}, {"name": "lane-fix-exhausted"}, {"name": "queue-poison"}])
+        self.assertEqual(remediation.classify_blocker(rebase)["cls"], "needs-rebase")
+
+        failing = pr(number=20020, isDraft=True, labels=[{"name": "lane-fix-red"}, {"name": "lane-fix-exhausted"}],
+                     statusCheckRollup=[{"name": "component-ship-gate", "status": "COMPLETED", "conclusion": "FAILURE",
+                                         "excerpt": "missing LibraryFilesPanel.stories.tsx"}])
+        fixable = remediation.classify_blocker(failing, None, {"count": 2, "pushed": False, "sha": HEAD})
+        self.assertEqual(fixable["cls"], "fixable-by-model")
+        self.assertTrue(any("did not move the head" in line for line in fixable["evidence"]))
+
+        waiting = pr(number=19776, mergeStateStatus="BLOCKED",
+                     labels=[{"name": "lane-fix-exhausted"}, {"name": "queue-poison"}],
+                     statusCheckRollup=checks(2) + [{"name": "Exact-head Coverage", "status": "IN_PROGRESS", "conclusion": ""}])
+        self.assertEqual(remediation.classify_blocker(waiting)["subtype"], "awaiting")
+
+        held = pr(number=18985, labels=[{"name": "hold"}, {"name": "queue-poison"}],
+                  holdNote={"author": "itstimwhite",
+                            "body": "use computeRatePercent from @/lib/analytics/metrics and remove hold"})
+        human = remediation.classify_blocker(held)
+        self.assertEqual((human["cls"], human["subtype"]), ("fixable-by-model", "human-hold"))
+
+    def test_lockfile_only_and_main_red_and_events(self):
+        lock = pr(mergeStateStatus="DIRTY", conflictFiles=["pnpm-lock.yaml"])
+        self.assertEqual(remediation.classify_blocker(lock)["subtype"], "lockfile-only")
+        overlap = pr(statusCheckRollup=[{"name": "CI", "status": "COMPLETED", "conclusion": "FAILURE"}])
+        main = [{"name": "CI", "conclusion": "FAILURE"}]
+        self.assertEqual(remediation.classify_blocker(overlap, main_rollup=main)["subtype"], "main-red")
+        event = remediation.classify_event({"source": "pr", "pr": overlap, "main_rollup": main})
+        self.assertEqual(event["cls"], "main-red")
+        self.assertEqual(remediation.classify_event({"source": "main-ci", "main_red": True, "evidence": {}})["cls"], "main-red")
+        scheduled = remediation.classify_event({"source": "schedule", "evidence": {"excerpt": "runner has been lost"}})
+        self.assertEqual(scheduled["cls"], "flaky-infra")
+        self.assertEqual(remediation.classify_event({"source": "deploy", "evidence": {"excerpt": "prod"}})["cls"],
+                         "fixable-by-model")
+        self.assertEqual(remediation.classify_event({"source": "sentry", "evidence": {}})["subtype"], "sentry")
+
+
+class RouterLadderTest(unittest.TestCase):
+    def test_disabled_lanes_including_hyperagent_are_never_chosen(self):
+        catalog = providers()
+        healthy = lambda name, spec: True
+        chosen = remediation.route_lane(catalog, healthy=healthy)
+        self.assertEqual(chosen["lane"], "devin")
+        nxt = remediation.failover(catalog, "devin", "provider-error", healthy=healthy)
+        self.assertEqual(nxt["to"], "codex")
+        self.assertEqual(nxt["reason"], "provider-error")
+        for reason in ("error", "404", "exhausted", "unhealthy"):
+            skipped = remediation.failover(catalog, "codex", reason, exclude={"devin"}, healthy=lambda name, spec: name != "codex")
+            self.assertNotIn(skipped["to"], {"hyperagent", "claude", "grok", "kimi", "codex"})
+            self.assertEqual(skipped["to"], "host-local")
+        self.assertIsNone(remediation.route_lane(
+            {name: spec for name, spec in catalog.items() if name != "host-local"},
+            exclude={"devin", "codex"}, healthy=healthy))
+
+    def test_escalation_picks_a_stronger_tier_then_one_top_rung(self):
+        catalog = providers()
+        healthy = lambda name, spec: True
+        first = remediation.select_escalation_lane(catalog, {"devin"}, healthy=healthy)
+        self.assertEqual((first["lane"], first["topRung"]), ("codex", False))
+        top = remediation.select_escalation_lane(catalog, {"devin", "codex", "host-local"}, healthy=healthy)
+        self.assertEqual((top["lane"], top["topRung"]), ("host-local", True))
+        self.assertIsNone(remediation.select_escalation_lane(
+            catalog, {"devin", "codex", "host-local"}, healthy=healthy, top_rung_used=True))
+
+    def test_deterministic_rungs_spend_no_model_and_caps_stop_the_ladder(self):
+        catalog = providers()
+        record = {}
+        classified = {"cls": "needs-rebase", "subtype": "semantic", "next_action": "update-branch"}
+        plan = remediation.plan_ladder(classified, record, catalog, NOW, HEAD)
+        self.assertEqual(plan["kind"], "deterministic")
+        record = remediation.append_rung(record, rung="update-branch", lane=None, cls="needs-rebase",
+                                         at=NOW, head=HEAD, kind="deterministic", ok=False)
+        self.assertEqual(record.get("count", 0), 0)
+        model = remediation.plan_ladder(classified, record, catalog, NOW, HEAD)
+        self.assertEqual(model["action"], "model")
+        record = remediation.append_rung(record, rung="escalate", lane="devin", cls="needs-rebase",
+                                         at=NOW - 10, head=HEAD, kind="model")
+        record = remediation.append_rung(record, rung="escalate", lane="codex", cls="needs-rebase",
+                                         at=NOW - 10, head=HEAD, kind="model")
+        blocked = remediation.plan_ladder(classified, record, catalog, NOW, HEAD)
+        self.assertEqual(blocked["reason"], "ladder-exhausted")
+        cooled = remediation.append_rung({}, rung="escalate", lane="devin", cls="fixable-by-model",
+                                         at=NOW - 10, head=HEAD, kind="model")
+        wait = remediation.plan_ladder({"cls": "fixable-by-model", "subtype": "check", "next_action": "escalate"},
+                                       cooled, catalog, NOW, HEAD)
+        self.assertEqual(wait["reason"], "cooldown")
+        prior = {"priorEscalations": [{"kind": "model", "head": "old", "at": 1}] * 4, "escalations": []}
+        self.assertEqual(remediation.caps_allow(prior, HEAD, NOW)[1], "ladder-exhausted")
+
+    def test_flag_defaults(self):
+        for name in ("LANES_ESCALATION", "LANES_ESCALATION_NOTIFY_TIM", "LANES_ESCALATION_LIFT_HUMAN_HOLDS"):
+            os.environ.pop(name, None)
+        self.assertTrue(remediation.escalation_enabled())
+        self.assertFalse(remediation.notify_tim())
+        self.assertFalse(remediation.lift_human_holds())
+        self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            plan = remediation.plan_ladder({"cls": "fixable-by-model", "subtype": "check", "next_action": "escalate"},
+                                           {}, providers(), NOW, HEAD)
+            self.assertEqual(plan["reason"], "escalation-disabled")
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+
+    def test_surface_and_hold_nag_dedupe(self):
+        body = remediation.surface_body(pr(number=9), {"cls": "needs-human-decision", "subtype": "hold",
+                                                       "evidence": ["wait"], "next_action": "tim-decides"}, "hold")
+        self.assertIn("symphony-surface pr=9", body)
+        self.assertTrue(remediation.already_surfaced([body], 9, HEAD))
+        self.assertFalse(remediation.already_surfaced([body], 9, "other"))
+        self.assertTrue(remediation.hold_nag_due({}, 9, HEAD, NOW))
+        self.assertFalse(remediation.hold_nag_due({"9": {"head": HEAD, "at": NOW - 10}}, 9, HEAD, NOW))
+        self.assertTrue(remediation.hold_nag_due({"9": {"head": HEAD, "at": NOW - remediation.HOLD_NAG_S - 1}}, 9, HEAD, NOW))
+
+
 class DoctorAndIntakeTest(unittest.TestCase):
     def test_doctor_blocks_count_classes_and_alert(self):
         snapshot = {"classified": [{"pr": 1, "cls": "ready"}, {"pr": 2, "cls": "needs-human-decision"}],
@@ -68,6 +204,39 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertEqual(remediation_report["failovers24h"], 1)
         self.assertIn("#3", remediation.alert_reason(report))
         self.assertIsNone(remediation.alert_reason(remediation.empty_escalation()))
+
+    def test_non_pr_events_fingerprint_and_claim_window(self):
+        deploy = remediation.non_pr_event("deployment_status", {
+            "deployment_status": {"state": "failure", "description": "boom", "created_at": "2026-10-02T00:00:00Z"},
+            "deployment": {"environment": "production", "sha": "abc"}})
+        self.assertEqual(deploy["source"], "deploy")
+        self.assertEqual(deploy["ws"], "release-deploy")
+        self.assertIsNone(remediation.non_pr_event("deployment_status", {"deployment_status": {"state": "success"}}))
+        sentry = remediation.non_pr_event("repository_dispatch", {"action": "sentry-issue",
+                                                                 "client_payload": {"issue_id": "99", "title": "x"}})
+        self.assertEqual(sentry["ws"], "reliability")
+        again = remediation.event_from_sentry({"issue_id": "99", "title": "x"})
+        self.assertEqual(sentry["fingerprint"], again["fingerprint"])
+        self.assertTrue(remediation.claim_open(NOW - 60, NOW))
+        self.assertFalse(remediation.claim_open(NOW - remediation.CLAIM_WINDOW_S - 1, NOW))
+        plan = remediation.linear_intake_plan(sentry)
+        self.assertIn("remediation", plan["labels"])
+        self.assertIn("agent-ready", plan["labels"])
+        self.assertIn("ws:reliability", plan["labels"])
+        self.assertIsNone(remediation.non_pr_event("workflow_run", {"workflow_run": {
+            "event": "pull_request", "conclusion": "failure", "pull_requests": [{"number": 1}]}}))
+
+    def test_registry_keeps_hyperagent_disabled(self):
+        catalog = json_providers()
+        self.assertFalse(catalog["hyperagent"]["enabled"])
+        self.assertFalse(catalog["grok"]["enabled"])
+        self.assertFalse(catalog["kimi"]["enabled"])
+        chosen = remediation.route_lane(catalog, healthy=lambda name, spec: True)
+        self.assertNotEqual(chosen["lane"], "hyperagent")
+        self.assertNotIn("hyperagent", {spec and name for name, spec in catalog.items() if not spec.get("enabled", True)} & {chosen["lane"]})
+def json_providers():
+    import json
+    return json.loads((ROOT / "scripts/lanes/providers.json").read_text())
 
 
 if __name__ == "__main__":

@@ -85,6 +85,12 @@ function sweep(pages: SeoSweepPage[], llmsTxt: string | null = null) {
 }
 
 describe('sweepTargets', () => {
+  it('certifies the live homepage while the retired /new alias stays a redirect', () => {
+    const paths = sweepTargets().map(target => target.pathname);
+    expect(paths).toContain('/');
+    expect(paths).not.toContain('/new');
+  });
+
   it('resolves wildcards, skips redirects, fixtures, inactive and duplicates', () => {
     const targets = sweepTargets([
       entry('/smart-links'),
