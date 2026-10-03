@@ -7,10 +7,17 @@ import {
   getRegistryEntry,
   getRegistryEntryByService,
 } from '@/lib/dsp-registry';
+import { env } from '@/lib/env-server';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import {
-  type ResolverOutput,
-  resolveJovieRelease,
-} from '@/lib/music-resolver/shadow';
+  type InHouseQuery,
+  type InHouseResolution,
+  resolveInHouse,
+} from '@/lib/music-resolver/in-house';
+import {
+  musicfetchNetworkAllowed,
+  noteMusicfetchHttpStatus,
+} from '@/lib/music-resolver/musicfetch-gate';
 import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import {
   MusicfetchRequestError,
@@ -349,67 +356,76 @@ interface MusicfetchFactsLookup {
   readonly unavailable: boolean;
 }
 
-function factsFromResolver(
-  resolved: ResolverOutput,
+function inHouseQuery(input: PrepareReleaseLaunchInput): InHouseQuery | null {
+  if (input.release_url) {
+    const parsed = new URL(input.release_url);
+    const appleTrackOnAlbumPage =
+      parsed.hostname === 'music.apple.com' && parsed.searchParams.has('i');
+    const album =
+      !appleTrackOnAlbumPage &&
+      /\/(?:album|albums)(?:\/|$)/i.test(parsed.pathname);
+    return album
+      ? { kind: 'album', url: input.release_url }
+      : { kind: 'track', url: input.release_url };
+  }
+  if (input.upc) return { kind: 'album', upc: input.upc };
+  return null;
+}
+
+function factsFromInHouse(
+  resolved: InHouseResolution,
   source: 'release_url' | 'upc',
   upc?: string
 ): ReleaseFacts | null {
   if (resolved.status !== 'resolved') return null;
   const links: Record<string, string> = {};
-  for (const [provider, url] of Object.entries(resolved.providers)) {
-    const entry = getRegistryEntry(provider);
+  for (const link of resolved.links) {
+    const entry = getRegistryEntry(link.provider);
     if (
       !entry?.showOnListenPage ||
-      !validateProviderUrl(url, provider as ProviderKey).valid ||
-      !isReleaseProviderUrl(url)
+      !validateProviderUrl(link.url, link.provider as ProviderKey).valid ||
+      !isReleaseProviderUrl(link.url)
     ) {
       continue;
     }
-    links[provider] = url;
+    links[link.provider] = link.url;
   }
-  const title = text(resolved.entity?.title);
-  const artistName = text(resolved.entity?.artist);
-  if (!title && !artistName && Object.keys(links).length === 0) return null;
+  if (Object.keys(links).length === 0 && !resolved.title) return null;
   return {
     source,
-    content_type: null,
-    title,
-    artist_name: artistName,
+    content_type: resolved.kind === 'album' ? 'album' : 'track',
+    title: text(resolved.title),
+    artist_name: text(resolved.artist),
     release_date: null,
     artwork_url: null,
-    upc:
-      digits(resolved.entity?.upc) ?? (source === 'upc' ? (upc ?? null) : null),
+    upc: digits(resolved.upc) ?? (source === 'upc' ? (upc ?? null) : null),
     dsp_links: links,
-    artists: artistName ? [{ name: artistName, ids: {} }] : [],
+    artists: text(resolved.artist)
+      ? [{ name: text(resolved.artist), ids: {} }]
+      : [],
   };
 }
 
-async function inHouseReleaseFacts(
+async function resolveAgentReleaseInHouse(
   input: PrepareReleaseLaunchInput
-): Promise<ReleaseFacts | null> {
-  if (input.release_url) {
-    const byUrl = factsFromResolver(
-      await resolveJovieRelease({
-        kind: 'url',
-        url: input.release_url,
-        territory: 'US',
-      }),
-      'release_url'
-    );
-    if (byUrl) return byUrl;
+): Promise<{
+  facts: ReleaseFacts | null;
+  outcome: 'resolved' | 'miss' | 'upstream';
+}> {
+  const query = inHouseQuery(input);
+  if (!query) return { facts: null, outcome: 'miss' };
+  const resolved = await resolveInHouse(query);
+  if (resolved.status === 'upstream_error') {
+    return { facts: null, outcome: 'upstream' };
   }
-  if (input.upc) {
-    return factsFromResolver(
-      await resolveJovieRelease({
-        kind: 'upc',
-        upc: input.upc,
-        territory: 'US',
-      }),
-      'upc',
-      input.upc
-    );
-  }
-  return null;
+  const facts = factsFromInHouse(
+    resolved,
+    input.release_url ? 'release_url' : 'upc',
+    input.upc
+  );
+  return facts
+    ? { facts, outcome: 'resolved' }
+    : { facts: null, outcome: 'miss' };
 }
 
 function musicfetchVendorDown(error: unknown): boolean {
@@ -446,6 +462,9 @@ async function musicfetchFacts(
       unavailable: false,
     };
   } catch (error) {
+    if (error instanceof MusicfetchRequestError) {
+      noteMusicfetchHttpStatus(error.statusCode ?? 0, error.message);
+    }
     if (musicfetchVendorDown(error)) {
       return { facts: null, unavailable: true };
     }
@@ -465,6 +484,44 @@ export async function resolveAgentRelease(
     ) {
       return { status: 'error', code: 'UNSUPPORTED_RELEASE', retryable: false };
     }
+    let inHouseAttempted = false;
+    if (input.release_url || input.upc) {
+      if (isCodeFlagEnabled('IN_HOUSE_RESOLVER')) {
+        inHouseAttempted = true;
+        const house = await resolveAgentReleaseInHouse(input);
+        if (house.facts) {
+          const facts = [house.facts];
+          if (input.release_metadata) {
+            const supplied = factsFromMetadata(input.release_metadata);
+            if (!supplied) {
+              return {
+                status: 'error',
+                code: 'INVALID_INPUT',
+                retryable: false,
+              };
+            }
+            facts.push(supplied);
+          }
+          return { status: 'resolved', facts };
+        }
+        if (!musicfetchNetworkAllowed() || !env.MUSICFETCH_API_TOKEN) {
+          return {
+            status: 'error',
+            code:
+              house.outcome === 'upstream'
+                ? 'UPSTREAM_FAILURE'
+                : 'RELEASE_NOT_FOUND',
+            retryable: false,
+          };
+        }
+      } else if (!musicfetchNetworkAllowed()) {
+        return {
+          status: 'error',
+          code: 'UPSTREAM_FAILURE',
+          retryable: false,
+        };
+      }
+    }
     const lookups: Array<Promise<MusicfetchFactsLookup>> = [];
     if (input.release_url)
       lookups.push(musicfetchFacts('/url', 'url', input.release_url));
@@ -480,10 +537,10 @@ export async function resolveAgentRelease(
     );
     const vendorUnavailable = lookupResults.some(result => result.unavailable);
     let resolvedInHouse = false;
-    if (vendorUnavailable && facts.length === 0) {
-      const inHouse = await inHouseReleaseFacts(input);
-      if (inHouse) {
-        facts.push(inHouse);
+    if (vendorUnavailable && facts.length === 0 && !inHouseAttempted) {
+      const house = await resolveAgentReleaseInHouse(input);
+      if (house.facts) {
+        facts.push(house.facts);
         resolvedInHouse = true;
       }
     }
@@ -499,8 +556,16 @@ export async function resolveAgentRelease(
     }
     return { status: 'error', code: 'RELEASE_NOT_FOUND', retryable: false };
   } catch (error) {
-    // Only a catalog miss says anything about the supplied release.
-    // Other provider failures stay on the provider path.
+    // Only a catalog miss says anything about the supplied release. Auth,
+    // subscription and request-contract failures belong to the provider path.
+    if (error instanceof MusicfetchRequestError && error.statusCode === 401) {
+      noteMusicfetchHttpStatus(401, error.message);
+      return {
+        status: 'error',
+        code: 'UPSTREAM_FAILURE',
+        retryable: false,
+      };
+    }
     const notFound =
       error instanceof MusicfetchRequestError && error.statusCode === 404;
     return {

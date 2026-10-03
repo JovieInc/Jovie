@@ -121,7 +121,7 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/billing/health` | GET | `auth` | Billing system health check |
+| `/api/billing/health` | GET | `public` liveness; detail is `admin` or `CRON_SECRET` | Anonymous callers get `{healthy, timestamp}` only. Full sync metrics require an admin session or `Authorization: Bearer ${CRON_SECRET}` |
 | `/api/billing/history` | GET | `auth` | Payment history |
 | `/api/billing/status` | GET | `auth` | Current subscription status |
 

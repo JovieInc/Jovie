@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -294,17 +295,132 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
     }
 
 
-def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
-    result = subprocess.run(
-        ["gh", "api", f"repos/{repo}/{endpoint}"],
-        check=True,
+_GITHUB_ETAG_RE = re.compile(r'^(?:W/)?"[0-9A-Fa-f]+"$')
+
+
+def _github_http_cache_dir() -> Path | None:
+    """Persistent conditional-GET cache. ``off`` disables it."""
+    raw = os.environ.get("FLEET_GATE_HTTP_CACHE")
+    if raw == "off":
+        return None
+    if raw:
+        return Path(raw)
+    workspace = os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")
+    return Path(workspace) / "state" / "gem-priority-gate" / "github-http-cache"
+
+
+def _github_cache_path(repo: str, endpoint: str) -> Path | None:
+    directory = _github_http_cache_dir()
+    if directory is None:
+        return None
+    digest = hashlib.sha256(f"{repo}\n{endpoint}".encode()).hexdigest()
+    return directory / digest
+
+
+def _read_github_cache(path: Path) -> tuple[str | None, dict[str, Any] | None]:
+    try:
+        etag = path.with_name(path.name + ".etag").read_text(encoding="utf-8").strip()
+        body = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not _GITHUB_ETAG_RE.fullmatch(etag) or not isinstance(body, dict):
+        return None, None
+    return etag, body
+
+
+def _write_github_cache(path: Path, etag: str, body: str) -> None:
+    if not _GITHUB_ETAG_RE.fullmatch(etag):
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(body, encoding="utf-8")
+    temporary.replace(path)
+    etag_path = path.with_name(path.name + ".etag")
+    etag_temporary = etag_path.with_name(etag_path.name + ".tmp")
+    etag_temporary.write_text(etag + "\n", encoding="utf-8")
+    etag_temporary.replace(etag_path)
+
+
+def _parse_gh_include(stdout: str) -> tuple[int | None, dict[str, str], str]:
+    if not stdout.startswith("HTTP/"):
+        return None, {}, stdout
+    separator = "\r\n\r\n" if "\r\n\r\n" in stdout else "\n\n"
+    head, _, body = stdout.partition(separator)
+    lines = head.splitlines()
+    try:
+        status = int(lines[0].split()[1])
+    except (IndexError, ValueError):
+        return None, {}, stdout
+    headers: dict[str, str] = {}
+    for line in lines[1:]:
+        key, sep, value = line.partition(":")
+        if sep:
+            headers[key.strip().lower()] = value.strip()
+    return status, headers, body
+
+
+def _gh_api(endpoint: str, etag: str | None) -> subprocess.CompletedProcess[str]:
+    command = ["gh", "api", "--include"]
+    if etag:
+        command.extend(["-H", f"If-None-Match: {etag}"])
+    command.append(endpoint)
+    return subprocess.run(
+        command,
+        check=False,
         capture_output=True,
         text=True,
         timeout=20,
     )
-    value = json.loads(result.stdout)
+
+
+def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
+    """Read one GitHub REST object, revalidating with If-None-Match.
+
+    A 304 does not count against the primary rate limit. The cached body is
+    the last 200 for that exact endpoint. A rejected or missing validator
+    refetches unconditionally.
+    """
+    return _gh_json(repo, endpoint, revalidate=True)
+
+
+def _gh_json(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
+    cache = _github_cache_path(repo, endpoint)
+    etag, cached = _read_github_cache(cache) if revalidate and cache is not None else (None, None)
+    result = _gh_api(f"repos/{repo}/{endpoint}", etag)
+    if result.returncode != 0 and "unknown flag" in result.stderr and "--include" in result.args:
+        fallback = subprocess.run(
+            ["gh", "api", f"repos/{repo}/{endpoint}"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        value = json.loads(fallback.stdout)
+        if not isinstance(value, dict):
+            raise ValueError("GitHub response was not an object")
+        return value
+    status, headers, body = _parse_gh_include(result.stdout)
+    if status == 304:
+        if cached is not None:
+            return cached
+        if revalidate:
+            return _gh_json(repo, endpoint, revalidate=False)
+        raise subprocess.CalledProcessError(
+            result.returncode or 1, result.args, result.stdout, result.stderr
+        )
+    if result.returncode != 0 or (status is not None and not 200 <= status < 300):
+        raise subprocess.CalledProcessError(
+            result.returncode or 1, result.args, result.stdout, result.stderr
+        )
+    payload = body if status is not None else result.stdout
+    value = json.loads(payload)
     if not isinstance(value, dict):
         raise ValueError("GitHub response was not an object")
+    if cache is not None and status is not None:
+        try:
+            _write_github_cache(cache, headers.get("etag", ""), payload)
+        except OSError:
+            pass
     return value
 
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import concurrent.futures
+import io
 import signal
 import threading
 import hashlib
@@ -17,6 +18,7 @@ import sys
 import tempfile
 import time
 import unittest
+from email.message import EmailMessage
 from unittest.mock import patch, Mock
 from datetime import datetime, timezone
 from pathlib import Path
@@ -178,6 +180,29 @@ class SelectionTest(unittest.TestCase):
             issue("JOV-4", priority=1),
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
+
+    def test_remediation_label_is_not_skipped_for_no_symphony(self):
+        self.assertIsNone(lane.pick_issue([issue("JOV-7540", labels=["no-symphony"])], {}))
+        picked = lane.pick_issue([
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]),
+            issue("JOV-7551", labels=["no-symphony", "remediation:billing-health"]),
+        ], {})
+        self.assertEqual(picked.identifier, "JOV-7540")
+        self.assertIsNone(lane.admission_rejection(
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000))
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation:router", "type:epic"]), {}, 10000),
+            "excluded-label:type:epic")
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation"]), {}, 10000),
+            "excluded-label:no-symphony")
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            self.assertEqual(lane.admission_rejection(
+                issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000),
+                "excluded-label:no-symphony")
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
 
     def test_issues_with_an_open_lane_pr_anywhere_are_skipped(self):
         picked = lane.pick_issue([issue("JOV-1", priority=1), issue("JOV-2", priority=2)], {},
@@ -715,6 +740,230 @@ class LinearClientTest(unittest.TestCase):
                 lane.Linear(env)
 
 
+class LinearRateLimitTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name)
+        previous = os.environ.get("LANES_STATE")
+        os.environ["LANES_STATE"] = str(self.state)
+        def restore_state():
+            if previous is None:
+                os.environ.pop("LANES_STATE", None)
+            else:
+                os.environ["LANES_STATE"] = previous
+        self.addCleanup(restore_state)
+        self.env = self.state / "linear.env"
+        self.env.write_text('export LINEAR_API_KEY="lin_api_test_secret"\n')
+        self.client = lane.Linear(self.env)
+        self.real_open = lane.urllib.request.urlopen
+        self.addCleanup(lambda: setattr(lane.urllib.request, "urlopen", self.real_open))
+
+    def headers(self, **extra):
+        message = EmailMessage()
+        message["X-RateLimit-Requests-Remaining"] = extra.pop("remaining", "100")
+        message["X-RateLimit-Requests-Limit"] = extra.pop("limit", "2500")
+        message["X-RateLimit-Requests-Reset"] = extra.pop("reset", "1730000000000")
+        for name, value in extra.items():
+            message[name] = value
+        return message
+
+    def response(self, payload, headers):
+        raw = json.dumps(payload).encode()
+
+        class Handle:
+            def read(self):
+                return raw
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        handle = Handle()
+        handle.headers = headers
+        return handle
+
+    def http_error(self, status, body, headers):
+        return lane.urllib.error.HTTPError(lane.LINEAR_API_URL, status, "limited", headers, io.BytesIO(body))
+
+    def test_429_and_400_ratelimited_open_a_hashed_cooldown(self):
+        bodies = {
+            429: b"",
+            400: json.dumps({"errors": [{"message": "slow", "extensions": {"code": "RATELIMITED"}}]}).encode(),
+        }
+        for status, body in bodies.items():
+            with self.subTest(status=status):
+                os.environ["LANES_STATE"] = str(self.state / str(status))
+                client = lane.Linear(self.env)
+                lane.urllib.request.urlopen = lambda request, timeout, status=status, body=body: (_ for _ in ()).throw(
+                    self.http_error(status, body, self.headers(remaining="0")))
+                with patch.object(lane.random, "random", return_value=0), self.assertRaises(lane.LinearRateLimited):
+                    client.gql("query", {})
+                path = lane.linear_cooldown_path(client.key)
+                record = json.loads(path.read_text())
+                self.assertEqual(path.name, hashlib.sha256(client.key.encode()).hexdigest() + ".json")
+                self.assertNotIn(client.key, path.read_text())
+                self.assertNotIn(client.key, str(path))
+                self.assertEqual(record["schema"], 1)
+                self.assertAlmostEqual(record["resetAt"] / 1000, time.time() + lane.LINEAR_RATE_LIMIT_BASE_S, delta=2)
+                budget = json.loads((Path(os.environ["LANES_STATE"]) / "api-budget.json").read_text())
+                self.assertEqual((budget["remaining"], budget["limit"]), (0, 2500))
+                self.assertIsNotNone(budget["rateLimitedAt"])
+
+    def test_cooldown_is_shared_across_workers_and_expires(self):
+        headers = self.headers(remaining="0")
+        headers["Retry-After"] = "90"
+        lane.urllib.request.urlopen = lambda request, timeout: (_ for _ in ()).throw(self.http_error(429, b"", headers))
+        with self.assertRaises(lane.LinearRateLimited):
+            self.client.gql("query", {})
+        calls = []
+        lane.urllib.request.urlopen = lambda request, timeout: calls.append(request) or self.response({"data": {"ok": True}}, self.headers())
+        other = lane.Linear(self.env)
+        with self.assertRaises(lane.LinearRateLimited) as caught:
+            other.gql("query", {})
+        self.assertEqual(calls, [], "a second worker must honor the cooldown file")
+        self.assertGreater(caught.exception.reset_at, time.time() + 60)
+        path = lane.linear_cooldown_path(self.client.key)
+        path.write_text(json.dumps({"schema": 1, "resetAt": int((time.time() - 5) * 1000)}))
+        self.assertEqual(other.gql("query", {})["ok"], True)
+        self.assertEqual(len(calls), 1)
+
+    def test_later_cooldown_is_kept_when_a_shorter_one_arrives(self):
+        long_headers = self.headers()
+        long_headers["Retry-After"] = "180"
+        short_headers = self.headers()
+        short_headers["Retry-After"] = "1"
+        with patch.object(lane.random, "random", return_value=0):
+            first = lane.publish_linear_cooldown(self.client.key, long_headers, now=1_000_000)
+            second = lane.publish_linear_cooldown(self.client.key, short_headers, now=1_000_010)
+        self.assertEqual(second, first)
+        self.assertGreater(first, 1_000_000 + 120)
+
+    def test_ordinary_400_does_not_cool_down(self):
+        body = json.dumps({"errors": [{"message": "nope", "extensions": {"code": "INPUT_ERROR"}}]}).encode()
+        lane.urllib.request.urlopen = lambda request, timeout: (_ for _ in ()).throw(
+            self.http_error(400, body, self.headers()))
+        with self.assertRaises(lane.urllib.error.HTTPError):
+            self.client.gql("query", {})
+        self.assertIsNone(lane.linear_cooldown_path(self.client.key) and lane.linear_cooldown_until(self.client.key))
+        self.assertFalse((self.state / "linear-cooldown").exists())
+
+    def test_budget_headers_reach_api_budget_and_doctor_json(self):
+        (self.state / "doctor.json").write_text(json.dumps({"schema": "keep-me", "alerts": []}))
+        lane.urllib.request.urlopen = lambda request, timeout: self.response(
+            {"data": {"ok": 1}}, self.headers(remaining="2400", limit="2500", reset="1730000000000"))
+        self.assertEqual(self.client.gql("query", {})["ok"], 1)
+        budget = json.loads((self.state / "api-budget.json").read_text())
+        self.assertEqual((budget["remaining"], budget["limit"], budget["reset"], budget["rateLimitedAt"]),
+                         (2400, 2500, 1730000000000, None))
+        doctor = json.loads((self.state / "doctor.json").read_text())
+        self.assertEqual(doctor["schema"], "keep-me")
+        self.assertEqual(doctor["linearBudget"]["remaining"], 2400)
+        report = {}
+        lane.doctor.apply_linear_budget(report, self.state)
+        self.assertEqual(report["linearBudget"]["limit"], 2500)
+        lane.doctor.apply_linear_budget(report, self.state / "missing")
+        self.assertEqual(report["linearBudget"]["limit"], 2500)
+
+    def test_failed_budget_write_never_raises(self):
+        lane.urllib.request.urlopen = lambda request, timeout: self.response({"data": {"ok": 1}}, self.headers())
+        with patch.object(lane, "_write_state_json", side_effect=OSError("read-only state dir")):
+            self.assertEqual(self.client.gql("query", {})["ok"], 1)
+        headers = self.headers(remaining="0")
+        lane.urllib.request.urlopen = lambda request, timeout: (_ for _ in ()).throw(self.http_error(429, b"", headers))
+        with patch.object(lane, "_write_state_json", side_effect=OSError("read-only state dir")):
+            with self.assertRaises(lane.LinearRateLimited):
+                self.client.gql("query", {})
+
+
+class ClaimScanCacheTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.saved = (lane.SHARED_CACHE_DIR, os.environ.pop("LANES_EXECUTION_BACKEND", None), lane.sh,
+                      lane.lane_prs, lane.repo_prs)
+        lane.SHARED_CACHE_DIR = Path(self.tmp.name)
+        self.clock = {"now": 1_700_000_000.0}
+        self.counts = {"issues": 0, "fix": 0, "flight": 0, "queued": 0}
+
+    def tearDown(self):
+        lane.SHARED_CACHE_DIR, backend, lane.sh, lane.lane_prs, lane.repo_prs = self.saved
+        if backend is None:
+            os.environ.pop("LANES_EXECUTION_BACKEND", None)
+        else:
+            os.environ["LANES_EXECUTION_BACKEND"] = backend
+        self.tmp.cleanup()
+
+    def test_cache_hits_within_ttl_and_refreshes_after_it(self):
+        self.assertLessEqual(lane.CLAIM_SCAN_TTL_S, 60)
+
+        def gql(query, variables):
+            self.counts["issues"] += 1
+            after = variables.get("after")
+            node = lambda n: {"id": f"i{n}", "identifier": f"JOV-{n}", "title": "t", "description": None,
+                              "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": []}}
+            if after is None:
+                return {"issues": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"}, "nodes": [node(1)]}}
+            return {"issues": {"pageInfo": {"hasNextPage": False, "endCursor": "c2"}, "nodes": [node(2)]}}
+
+        client = lane.Linear.__new__(lane.Linear)
+        client.gql = gql
+        lane.lane_prs = lambda name, providers=None, fields="": self.counts.__setitem__("fix", self.counts["fix"] + 1) or [
+            {"number": 1, "headRefName": "devin/jov-1-20260901", "isDraft": False}]
+        lane.repo_prs = lambda: []
+
+        def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
+            if "--search" in args:
+                self.counts["queued"] += 1
+            else:
+                self.counts["flight"] += 1
+            return SimpleNamespace(returncode=0, stdout="[]")
+        lane.sh = fake_sh
+
+        def read_all():
+            issues = client.lane_issues("codex")
+            fixes = lane.fix_candidates("codex")
+            flight = lane.in_flight_issues()
+            queued = lane.pr_events.queued_prs(lane, ("red",))
+            return issues, fixes, flight, queued
+
+        with patch.object(lane.time, "time", lambda: self.clock["now"]):
+            issues, fixes, flight, queued = read_all()
+            self.assertEqual([item.identifier for item in issues], ["JOV-1", "JOV-2"])
+            self.assertEqual(fixes[0]["number"], 1)
+            self.assertEqual(flight, frozenset())
+            self.assertEqual(queued, [])
+            self.assertEqual(self.counts, {"issues": 2, "fix": 1, "flight": 1, "queued": 1})
+            read_all()
+            self.assertEqual(self.counts, {"issues": 2, "fix": 1, "flight": 1, "queued": 1},
+                             "a second worker inside the TTL must not scan again")
+            self.clock["now"] += lane.CLAIM_SCAN_TTL_S + 1
+            read_all()
+            self.assertEqual(self.counts, {"issues": 4, "fix": 2, "flight": 2, "queued": 2})
+
+    def test_pagination_runs_only_as_the_cache_fill(self):
+        calls = []
+        client = lane.Linear.__new__(lane.Linear)
+        client.gql = lambda *args, **kwargs: calls.append(1)
+        saved = lane.shared
+
+        def cached(key, ttl, fetch):
+            self.assertEqual(key, "claim-lane-issues-codex")
+            self.assertLessEqual(ttl, 60)
+            self.assertEqual(calls, [], "pagination must not run before the cache fill")
+            return [{"id": "i", "identifier": "JOV-9", "title": "t", "description": "", "priority": 1,
+                     "created_at": "2026-09-01T00:00:00Z", "labels": ["codex"]}]
+        lane.shared = cached
+        try:
+            found = client.lane_issues("codex")
+        finally:
+            lane.shared = saved
+        self.assertEqual(calls, [])
+        self.assertEqual((found[0].identifier, found[0].labels), ("JOV-9", ["codex"]))
+
+
 class RunIssueTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
@@ -808,6 +1057,14 @@ class RunIssueTest(unittest.TestCase):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
         receipt = lane.run_issue(self.host, "devin", {"cmd": ["false"]}, FakeLinear([]), issue())
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
+
+    def test_hyperagent_without_actual_dispatch_proof_holds_before_any_provider_process(self):
+        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
+                                 FakeLinear([]), issue("JOV-6871"))
+        self.assertEqual(receipt["verdict"], "remote-held")
+        self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
+        self.assertNotIn("agentExit", receipt)
+        self.assertFalse((self.host.state / "worktrees").exists())
 
     def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
@@ -3226,7 +3483,7 @@ class OnePrPerIssueTest(unittest.TestCase):
 
     def pr(self, number, issue="jov-7", draft=True, state="BLOCKED", pushed_ago=0, lane_name="devin"):
         return {"number": number, "headRefName": f"{lane_name}/{issue}-20260927t0{number:05d}", "isDraft": draft,
-                "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago}
+                "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago, "headRefOid": f"h{number}", "labels": []}
 
     def test_in_flight_reads_branches_and_markers_and_fails_closed(self):
         saved = lane.sh
@@ -3294,6 +3551,91 @@ class OnePrPerIssueTest(unittest.TestCase):
         self.assertEqual(closed, ["1", "3", "4"])
         self.assertIn("superseded by #2", next(a for a in calls if a[:3] == ["gh", "pr", "close"])[-1])
         self.assertEqual(linear.moves, [("JOV-8", "Todo")])
+
+
+    def test_sweep_preserves_terminal_holds_and_active_repairs_before_any_close(self):
+        targets = [self.pr(1), self.pr(2, draft=False, state="CLEAN"),
+                   self.pr(3, issue="jov-8"), self.pr(4, issue="jov-9"),
+                   self.pr(5, issue="jov-10"), self.pr(6, issue="jov-11")]
+        targets[2]["labels"] = [{"name": "lane-fix-exhausted"}]
+        targets[3]["labels"] = [{"name": "Tim:Hold"}]
+        attempts = {"1": {"sha": "h1", "count": 2},
+                    "5": {"sha": "h5", "count": 1, "at": self.NOW - 1}}
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0,stdout="",stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            host=lane.Host(state=Path(tmp))
+            (host.state/"fix-attempts.json").write_text(json.dumps(attempts))
+            with patch.dict(sys.modules, {"lane_runner": SimpleNamespace()}), \
+                 patch.object(lane,"sh",side_effect=shell), patch.object(lane,"lane_prs",return_value=targets), \
+                 patch.object(lane,"last_pushes",return_value={p["number"]:self.NOW-lane.STALE_DRAFT_S-1 for p in targets}), \
+                 patch.object(lane,"claimed_elsewhere",side_effect=lambda n,*args:n==6):
+                lane.sweep_lane_prs(host,"devin",FakeLinear([]),now=self.NOW)
+            self.assertEqual(json.loads((host.state/"fix-attempts.json").read_text()),attempts)
+        self.assertFalse(any(c[:3]==["gh","pr","close"] for c in calls))
+
+    def test_red_selector_blocks_exhaustion_without_history_and_missing_head(self):
+        target={**self.pr(1),"mergeStateStatus":"DIRTY","labels":[{"name":"lane-fix-exhausted"}]}
+        self.assertIsNone(lane.red_pr([target],{}))
+        self.assertIsNone(lane.red_pr([{**target,"labels":[],"headRefOid":""}],{}))
+        history={"1":{"sha":"external-before","count":2,"endedAt":1}}
+        self.assertEqual(lane.red_pr([target],history),target,"a proven external dirty head still enters the existing claim path")
+
+
+    def test_red_claim_writes_linked_receipt_before_consuming_exhaustion(self):
+        target={**self.pr(1),"mergeStateStatus":"DIRTY","labels":[{"name":"lane-fix-exhausted"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            host=lane.Host(state=Path(tmp));path=host.state/"fix-attempts.json"
+            path.write_text(json.dumps({"1":{"sha":"h0","count":2,"endedAt":1}}))
+            calls=[]
+            def shell(args,**kwargs):
+                calls.append(args)
+                if args[-1].endswith("/lane-fix-exhausted"):
+                    receipt=json.loads(path.read_text())["1"]
+                    self.assertEqual(receipt["count"],1)
+                    self.assertEqual(receipt["reentry"]["fromGeneration"]["head"],"h0")
+                    self.assertEqual(receipt["reentry"]["toGeneration"]["head"],"h1")
+                return SimpleNamespace(returncode=0,stdout="",stderr="")
+            with patch.dict(sys.modules, {"lane_runner": SimpleNamespace()}), \
+                 patch.object(lane,"sh",side_effect=shell), patch.object(lane,"load_providers",return_value={"devin":{"slots":4}}), \
+                 patch.object(lane,"claimed_elsewhere",return_value=False), patch.object(lane,"post_claim"), \
+                 patch.object(lane,"reconcile_fix_target",side_effect=lambda pr:{**pr,"state":"OPEN"}):
+                self.assertEqual(lane.claim_red_pr(host,"devin",[target])["number"],1)
+            self.assertTrue(any(c[-1].endswith("/lane-fix-exhausted") for c in calls))
+
+
+    def test_red_claim_rejects_stale_head_or_unreadable_reentry_without_spending(self):
+        target={**self.pr(1),"headRefOid":"cached-h1","mergeStateStatus":"DIRTY", "labels":[{"name":"lane-fix-exhausted"}]}
+        history={"1":{"sha":"current-h2","count":2,"endedAt":1}}
+        for observed in [None,{**target,"headRefOid":"current-h2","state":"OPEN"},
+                         {**target,"state":"OPEN","labels":[{"name":"hold"}]}]:
+            with self.subTest(observed=observed), tempfile.TemporaryDirectory() as tmp:
+                host=lane.Host(state=Path(tmp));path=host.state/"fix-attempts.json";path.write_text(json.dumps(history))
+                with patch.object(lane,"load_providers",return_value={"devin":{"slots":4}}), \
+                     patch.object(lane,"claimed_elsewhere",return_value=False), patch.object(lane,"reconcile_fix_target",return_value=observed), \
+                     patch.object(lane,"sh") as writes,patch.object(lane,"post_claim") as claims:
+                    self.assertIsNone(lane.claim_red_pr(host,"devin",[target]))
+                self.assertEqual(json.loads(path.read_text()),history)
+                writes.assert_not_called();claims.assert_not_called()
+
+    def test_red_claim_rechecks_fresh_clean_state_before_spending(self):
+        target = {**self.pr(1), "mergeStateStatus": "DIRTY", "labels": [{"name": "lane-fix-exhausted"}]}
+        history = {"1": {"sha": "h0", "count": 2, "endedAt": 1}}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps(history))
+            live = {**target, "state": "OPEN", "mergeStateStatus": "CLEAN", "statusCheckRollup": []}
+            with patch.object(lane, "load_providers", return_value={"devin": {"slots": 4}}), \
+                 patch.object(lane, "claimed_elsewhere", return_value=False), \
+                 patch.object(lane, "reconcile_fix_target", return_value=live), \
+                 patch.object(lane, "sh") as writes, patch.object(lane, "post_claim") as claims:
+                self.assertIsNone(lane.claim_red_pr(host, "devin", [target]))
+            self.assertEqual(json.loads(path.read_text()), history)
+            writes.assert_not_called()
+            claims.assert_not_called()
 
 
 class LockfileConflictTest(unittest.TestCase):

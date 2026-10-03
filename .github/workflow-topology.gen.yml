@@ -238,9 +238,9 @@ nodes:
       - Agent Pipeline
       - Auto-Ready Agent Drafts
       - iOS CI
+      - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
-      - Production Controller
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -271,6 +271,18 @@ nodes:
     triggeringStateTransition:
       - issue_comment
     terminalReceipt: job:claude
+    jobCount: 1
+  - name: CODEOWNERS Path Drift
+    path: .github/workflows/codeowners-drift.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:drift
     jobCount: 1
   - name: CodeQL Security Analysis
     path: .github/workflows/codeql.yml
@@ -463,9 +475,9 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - pull_request_target
       - push
       - repository_dispatch
+      - schedule
       - workflow_dispatch
     terminalReceipt: job:assess
     jobCount: 2
@@ -514,7 +526,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
@@ -526,7 +539,8 @@ nodes:
     category: remediation-dispatch
     authoritativeProducer: Lane Fix Relay
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:probe-and-autofix
@@ -632,10 +646,12 @@ nodes:
       - remediation-dispatch
     allowedConsumers: []
     triggeringStateTransition:
+      - deployment_status
       - pull_request_review
       - pull_request_review_comment
       - pull_request_target
       - push
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:relay
@@ -727,8 +743,8 @@ nodes:
       - pull_request_target
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:enroll
-    jobCount: 2
+    terminalReceipt: job:rearm-green-victims
+    jobCount: 3
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -796,6 +812,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Lane Fix Relay
       - Test Flakiness Report
     triggeringStateTransition:
       - push
@@ -969,11 +986,12 @@ nodes:
       - Delivery Control Receipts
       - desktop-release
       - iOS TestFlight
+      - Lane Fix Relay
       - Production Release
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:publish-customer-changelog
-    jobCount: 9
+    jobCount: 10
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1010,6 +1028,18 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:find
+    jobCount: 1
+  - name: Remediation Sweep
+    path: .github/workflows/remediation-sweep.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:sweep
     jobCount: 1
   - name: Repository documentation shadow
     path: .github/workflows/repository-docs-shadow.yml
@@ -1233,6 +1263,7 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Production Controller
       - Production Release
     triggeringStateTransition:
       - workflow_run
@@ -1406,6 +1437,21 @@ edges:
   - from: PR Size Guard
     to: Lane Fix Relay
     type: workflow_run
+  - from: CI
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Golden Path Nightly
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Golden Path Prod Autofix
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Production Controller
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Changed-Evidence Test Suites
+    to: Lane Fix Relay
+    type: workflow_run
   - from: Source Validation
     to: Merge Queue Green Enroll
     type: workflow_run
@@ -1418,7 +1464,7 @@ edges:
   - from: PR Size Guard
     to: Merge Queue Green Enroll
     type: workflow_run
-  - from: CI
+  - from: Staging Controller
     to: Production Controller
     type: workflow_run
   - from: Production Controller
