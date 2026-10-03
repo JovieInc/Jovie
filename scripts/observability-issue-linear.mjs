@@ -16,6 +16,7 @@ export async function syncObservabilityLinearIssue({
     title,
     description: payload.body,
     priority: 2,
+    reopenTerminal: true,
     apiKey,
     fetchImpl,
   });

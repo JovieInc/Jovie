@@ -670,6 +670,30 @@ jobs:
                   "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
                   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
                 [ -n "$staging_artifact_id" ] && break
+                # A superseded staging generation never deploys, so its exact
+                # receipt can never exist. Its durable lineage receipt either
+                # rebinds this wait to the exact replacement SHA on this
+                # release lineage or proves this generation is stale.
+                lineage_report="$RUNNER_TEMP/staging-lineage-decision.txt"
+                if ! EXPECTED_SHA="$EXPECTED_SHA" REPOSITORY="$REPOSITORY" \
+                  STAGING_RECEIPT_SHA="$staging_receipt_sha" RUNNER_TEMP="$RUNNER_TEMP" \
+                  bash .github/scripts/staging-generation-lineage.sh > "$lineage_report"; then
+                  exit 1
+                fi
+                case "$(tail -n 1 "$lineage_report")" in
+                  "action=rebind replacement="*)
+                    staging_receipt_sha="$(tail -n 1 "$lineage_report")"
+                    staging_receipt_sha="${staging_receipt_sha#action=rebind replacement=}"
+                    staging_deployment_id=""
+                    staging_artifact_name="staging-deployment-${staging_receipt_sha}"
+                    ;;
+                  "action=yield") exit 0 ;;
+                  "action=wait") ;;
+                  *)
+                    echo "::error::Staging lineage decision was malformed."
+                    exit 1
+                    ;;
+                esac
                 [ "$attempt" -lt 150 ] && sleep 10
               done
               [[ "$staging_artifact_id" =~ ^[1-9][0-9]*$ ]] || {

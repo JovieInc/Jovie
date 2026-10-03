@@ -458,8 +458,12 @@ describe('marketing certification producer', () => {
         'failed'
       ),
     });
-    const calls: { fingerprint: string; title: string; description: string }[] =
-      [];
+    const calls: {
+      fingerprint: string;
+      title: string;
+      description: string;
+      reopenTerminal?: boolean;
+    }[] = [];
     const upsert = async (input: (typeof calls)[number]) => {
       calls.push(input);
       return { ok: true, action: 'created' };
@@ -479,6 +483,7 @@ describe('marketing certification producer', () => {
     expect(calls[0]).toMatchObject({
       fingerprint: 'marketing-cert:shell.footer:visual_proof',
       title: expect.stringContaining('shell.footer visual_proof'),
+      reopenTerminal: true,
     });
     expect(calls[0]?.description).toContain(SHA);
   });

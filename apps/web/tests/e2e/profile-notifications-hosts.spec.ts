@@ -122,13 +122,13 @@ test.describe('Profile Notifications Hosts', () => {
         height: breakpoint.height,
       });
 
-      await page.goto('/testartist/notifications', {
+      await page.goto('/dualipa/notifications', {
         waitUntil: 'domcontentloaded',
         timeout: 120_000,
       });
       await waitForHydration(page);
 
-      await expect(page).toHaveURL(/\/testartist\?mode=subscribe$/);
+      await expect(page).toHaveURL(/\/dualipa\?mode=subscribe$/);
       await expect(page.getByTestId('profile-compact-surface')).toBeVisible();
       await expect(
         page.locator(

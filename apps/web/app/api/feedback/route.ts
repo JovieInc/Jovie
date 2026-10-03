@@ -1,10 +1,12 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ASK_JOVIE_INTENTS } from '@/lib/ask-jovie/intent';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getSocialReplyRankingFeatureKeys } from '@/lib/connectors/social-reply-draft';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { createFeedbackItem } from '@/lib/feedback';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -29,6 +31,41 @@ export const runtime = 'nodejs';
 
 /** Max feedback body size: 16KB (message alone capped at 2000 chars). */
 const MAX_BODY_SIZE = 16 * 1024;
+
+async function loadSocialInboxFeatureKeys(input: {
+  readonly suggestedActionId?: string;
+  readonly userId?: string;
+}): Promise<readonly string[]> {
+  if (!input.suggestedActionId || !input.userId) return [];
+  try {
+    const [action] = await db
+      .select({
+        kind: suggestedActions.kind,
+        payload: suggestedActions.payload,
+      })
+      .from(suggestedActions)
+      .where(
+        and(
+          eq(suggestedActions.id, input.suggestedActionId),
+          eq(suggestedActions.userId, input.userId)
+        )
+      )
+      .limit(1);
+    return action
+      ? getSocialReplyRankingFeatureKeys({
+          id: input.suggestedActionId,
+          kind: action.kind,
+          payload: action.payload,
+        })
+      : [];
+  } catch (error) {
+    logger.warn('[api/feedback] unable to snapshot social ranking features', {
+      suggestedActionId: input.suggestedActionId,
+      error,
+    });
+    return [];
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -73,6 +110,10 @@ export async function POST(request: Request) {
           columns: { id: true, name: true },
         })
       : null;
+    const socialInboxFeatureKeys = await loadSocialInboxFeatureKeys({
+      suggestedActionId: parsed.data.suggestedActionId,
+      userId: userRecord?.id,
+    });
 
     const feedback = await createFeedbackItem({
       userId: userRecord?.id ?? null,
@@ -86,6 +127,9 @@ export async function POST(request: Request) {
           ? { suggestedActionId: parsed.data.suggestedActionId }
           : {}),
         ...(parsed.data.rating ? { rating: parsed.data.rating } : {}),
+        ...(socialInboxFeatureKeys.length > 0
+          ? { socialInboxFeatureKeys }
+          : {}),
         ...(parsed.data.intent ? { intent: parsed.data.intent } : {}),
       },
     });

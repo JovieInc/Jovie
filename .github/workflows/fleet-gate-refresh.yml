@@ -1,61 +1,98 @@
 name: Fleet Gate Refresh
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Protected Gem reads live state; pull_request_target checks out exact main, excluding candidate code.
+# necessary-trust-boundary: Protected Gem reads live state and checks out exact main, excluding candidate code.
 # revisit-trigger: Remove when Symphony emits this atomic receipt natively.
+# clock-class: production-liveness
 
-# Event-driven one-writer refresh for the canonical Gem receipt (JOV-5467:
-# the sole automatic issue-admission writer). Work pickup is owned by
-# upstream OpenAI Symphony polling Linear directly; the assess job below only
-# rereads the exact signed Linear event, applies the existing reconciler's
+# One-writer refresh for the canonical Gem receipt (JOV-5467: the sole
+# automatic issue-admission writer). Work pickup is owned by upstream OpenAI Symphony polling Linear directly.
+# The assess job below only rereads the exact signed Linear event, applies the existing reconciler's
 # Triage -> Todo/Backlog disposition, and wakes the already-running picker.
+#
+# pull_request_target / check_run / check_suite / status / workflow_run are
+# not consumed. PR activity was a dry run (it must not persist latest.json)
+# and a 2026-10-02 hour spawned 209 of those runs, cancelling every main
+# push before the receipt writer started. The gate rereads live main, so a
+# push to main persists immediately and the */5 clock rewrites observedAt
+# inside the 10-minute stale window. Path filters do not apply: any main
+# commit can change required checks. Runner Heartbeat remains the
+# workflow_dispatch backup.
 #
 # Rollback: one revert restores linear-triage-assessment.yml and removes its
 # repository_dispatch event from this file. Never run both writers.
 
 on:
-  pull_request_target:
-    types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]
   repository_dispatch:
-    # Signed JOV Triage events bridged by /api/webhooks/linear. Serialized with
-    # every other event under the single fleet-gate-event-refresh group below.
+    # Signed JOV Triage events bridged by /api/webhooks/linear. Keyed per
+    # issue so a receipt refresh cannot cancel an in-flight assessment.
     types: [linear_triage_assess]
   push:
     branches: [main]
+  schedule:
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: fleet-gate-event-refresh
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'repository_dispatch' && format('fleet-gate-triage-{0}', github.event.client_payload.issue_identifier) || 'fleet-gate-receipt' }}
+  cancel-in-progress: true
 
 jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
-    # Skip merged-close duplicates. Label events matter only when they change
-    # green-ready depth or a queue/area hold. Linear dispatch
-    # events are owned by the assess job below.
-    if: >-
-      github.event_name != 'repository_dispatch' &&
-      (github.event_name != 'pull_request_target' ||
-      github.event.action != 'closed' ||
-      github.event.pull_request.merged != true) &&
-      (
-        github.event_name != 'pull_request_target' ||
-        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
-        github.event.label.name == 'hold' ||
-        github.event.label.name == 'gated' ||
-        github.event.label.name == 'queue-deferred' ||
-        github.event.label.name == 'duplicate'
-      )
+    # Linear dispatch events are owned by the assess job below.
+    if: github.event_name != 'repository_dispatch'
     # The canonical receipt lives on the Gem host; exact-main gate code only.
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 8
     steps:
+      - name: Skip a schedule tick that just refreshed
+        id: debounce
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          skip="$(python3 - << 'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          if os.environ.get("EVENT_NAME") != "schedule":
+              print("false")
+              raise SystemExit
+          workspace = os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")
+          receipt = Path(workspace, "state", "gem-priority-gate", "latest.json")
+          try:
+              data = json.loads(receipt.read_text(encoding="utf-8"))
+              observed = datetime.fromisoformat(
+                  str(data.get("observedAt", "")).replace("Z", "+00:00")
+              )
+              sha = data.get("signals", {}).get("main", {}).get("sha")
+              age = (datetime.now(timezone.utc) - observed).total_seconds()
+              fresh = (
+                  data.get("schema") == "jovie-fleet-gate/v1"
+                  and isinstance(sha, str)
+                  and len(sha) == 40
+                  and 0 <= age < 120
+              )
+          except (OSError, ValueError, TypeError):
+              fresh = False
+          print("true" if fresh else "false")
+          PY
+          )"
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          if [[ "$skip" == "true" ]]; then
+            echo "Canonical receipt is under 120s old; schedule tick is a no-op."
+          fi
       - name: Generate read-only Jovie Bot token
         id: app-token
+        if: steps.debounce.outputs.skip != 'true'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
@@ -63,21 +100,24 @@ jobs:
           permission-contents: read
           permission-pull-requests: read
       - name: Checkout exact main gate code
+        if: steps.debounce.outputs.skip != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
       - name: Setup Node.js
+        if: steps.debounce.outputs.skip != 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - name: Refresh canonical receipt
         id: refresh
+        if: steps.debounce.outputs.skip != 'true'
         uses: ./.github/actions/evaluate-fleet-gate
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           # pull_request_target must not write live latest.json (clobbers Gem capacity
-          # when main gate is unfenced). Persist only on main push or dispatch.
+          # when main gate is unfenced). Push, schedule, and dispatch persist.
           dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}
 
       # Source PR/fork workflow definitions never execute their code here.
@@ -122,8 +162,7 @@ jobs:
   # by /api/webhooks/linear. This job rereads the exact current issue on Gem,
   # records its disposition, and wakes the lanes picker only after the existing
   # reconciler moves it to Todo. It does not select workers or bypass
-  # Summer/fleet gates. Per-issue ordering is provided by the shared
-  # fleet-gate-event-refresh concurrency group.
+  # Summer/fleet gates. Per-issue ordering is the fleet-gate-triage group.
   assess:
     name: Assess exact Linear Triage event
     if: github.event_name == 'repository_dispatch'

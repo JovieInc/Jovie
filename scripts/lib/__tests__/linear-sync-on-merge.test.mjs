@@ -317,6 +317,35 @@ describe('linear sync on merge', () => {
     );
   });
 
+  it('does not auto-close a remediation issue while the check is red', () => {
+    const issue = {
+      id: 'issue-red',
+      identifier: 'JOV-7206',
+      labels: ['remediation:golden-path-nightly'],
+      children: [],
+      hasChildren: false,
+    };
+    const mergingPull = {
+      number: 1,
+      url: 'https://github.com/JovieInc/Jovie/pull/1',
+      sha: 'abc',
+    };
+    const red = decideLinearCloseOnMerge({
+      issue,
+      pullRequests: [],
+      mergingPull,
+    });
+    expect(red.action).toBe('skip');
+    expect(red.comment).toContain('while the check is red');
+    const green = decideLinearCloseOnMerge({
+      issue,
+      pullRequests: [],
+      mergingPull,
+      checkGreen: true,
+    });
+    expect(green.action).toBe('close');
+  });
+
   it('keeps an escaped defect open for exact-build product and detector proof', () => {
     const decision = decideLinearCloseOnMerge({
       issue: {

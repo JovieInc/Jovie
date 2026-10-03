@@ -266,7 +266,7 @@ function DspMatchStrip({
 
   return (
     <fieldset
-      className='absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-white'
+      className='flex items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-white'
       data-testid='onboarding-dsp-match-strip'
       aria-label='Matched Music Services'
     >
@@ -361,7 +361,7 @@ export function OnboardingProfileRail({
           className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
           heroClassName={cn(
             'w-full rounded-3xl',
-            isInline ? 'min-h-114 p-4' : 'min-h-155 max-h-170 p-5'
+            isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 p-5'
           )}
           phoneFrameClassName={
             isInline ? 'h-105 w-50 sm:h-120 sm:w-57' : 'h-148 w-71'

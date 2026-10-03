@@ -55,9 +55,16 @@
     {
       "path": "/api/cron/voice-pipeline",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/artist-daily-snapshots",
+      "schedule": "15 9 * * *"
     }
   ],
   "functions": {
+    "app/api/internal/ovie/fleet/events/**/*": {
+      "maxDuration": 100
+    },
     "app/api/**/*": {
       "maxDuration": 30
     },

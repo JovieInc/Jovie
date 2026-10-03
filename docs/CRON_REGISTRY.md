@@ -24,6 +24,7 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 
 | Workflow | Schedule | Purpose | Source |
 |----------|----------|---------|--------|
+| `Fleet Gate Refresh` | `*/5 * * * *` UTC (production-liveness) + push to `main` + `workflow_dispatch` | Rewrites the canonical fleet receipt inside its 10-minute stale window. PR, check, and status events do not start this workflow. Runner Heartbeat's 10-minute dispatch remains the backup. | `.github/workflows/fleet-gate-refresh.yml` |
 | `Design Governance` | `17 8 * * 1` UTC | Weekly design-governance audit plus invariant-stewardship receipt. Also triggered by registry/evidence pushes to `main` and `founder-decision-recorded` / `invariant-enforcement-failed` repository events. Not a merge gate. | `.github/workflows/design-governance.yml` |
 | `CI Duration Ratchet` | `25 6 * * *` UTC + push to local-gate files on `main` | Measures rolling p95 of recent PR merge-gate CI runs and fails + Slack-alerts when p95 exceeds the committed baseline + margin. `dev-loop` job times every `.husky/pre-commit` rung + pre-push publication against budgets in `scripts/dev-loop-latency.mjs`. | `.github/workflows/ci-duration-ratchet.yml` |
 | `Shipping SLO Ratchet` | `13 7 * * *` UTC + manual | JOV-6783: rolling 7d p50/p95 across CI wall time (per required workflow event), merge-queue wait/ejection, PR lead time by lane, red→green remediation, production lag, and merges/day throughput vs the +8% WoW growth line and its second-order trend. >10% improvement held 3 days → draft ratchet PR on `docs/metrics/shipping-slo-baseline.json`; >20% regression/throughput drop or flat growth → deduped `slo-regression` issues. Commits `docs/metrics/shipping-slo-latest.json` so the Symphony lanes status gist (`scripts/lanes/doctor.py`) embeds the `slo` block. LLM-free. | `.github/workflows/shipping-slo.yml` |
@@ -35,7 +36,8 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `Actions Cache Supersede` | `11,41 * * * *` UTC | Deletes superseded `main` caches: keeps the newest per allowlisted family, drops `pnpm-node-modules-v1-*` and `-v2-*`. | `.github/workflows/actions-cache-supersede.yml` |
 | `M2 Revenue-Path Canary` | `37 6 * * *` UTC + Production Controller `workflow_run` + manual / `workflow_call` | Daily + deploy-hook money-path probe: signed-out → claim → $199 Pro checkout → activation. Timestamped receipt; Slack + Linear with repro on red. Distinct from Canary Health Gate uptime. | `.github/workflows/m2-revenue-path-canary.yml` |
 | `Marketing Certification Producer` | `41 4 * * *` UTC + push to marketing components/registry/tests on `main` + manual `all=true` | JOV-6928: posts machine certification evidence for the marketing registry to the production ledger. Pushes re-evaluate only entries whose source, declared tests or story changed; the daily run is the missed-event reconciliation heartbeat. Real defects upsert one fingerprinted Linear issue. | `.github/workflows/marketing-certification-producer.yml` |
-| `Golden Path Nightly` | `23 9 * * *` UTC (skip-if-unchanged) + manual | JOV-6920: dispatches the real-auth + Stripe test-mode Golden Path lane in `ci.yml` on `main` and files one fingerprinted P0 Linear issue on red. | `.github/workflows/golden-path-nightly.yml` |
+| `Golden Path Nightly` | `23 9 * * *` UTC (skip-if-unchanged) + manual | JOV-6920: dispatches the real-auth + Stripe test-mode Golden Path lane in `ci.yml` on `main` and files one fingerprinted P0 Linear issue on red. A red run reopens the existing issue into Todo. | `.github/workflows/golden-path-nightly.yml` |
+| `Remediation Sweep` | `11 8 * * *` UTC daily; `17 8 * * 1` UTC weekly + manual `dry_run` | JOV-7552: files or reopens fingerprinted Linear issues when a watched failure returns. Weekly: open-draft rollup. Daily: `lane-fix-exhausted` older than 24h, hold labels idle more than 7d, Summer receipt staleness, and Vercel production ERROR. Read-only on GitHub. The Vercel job skips with a warning when no read-only token secret is set. | `.github/workflows/remediation-sweep.yml` |
 | `Production Synthetic Monitoring` | `17 */6 * * *` UTC for deep browser synthetics; `47 7 * * *` UTC for Web AI health; manual | Existing front-door/auth/profile coverage plus one daily production Gateway turn for web chat, insights, pitches, titles, and packaging. Web AI failures emit a redacted receipt, Slack alert, and high-priority Linear bug signal with the founder allowlist name. | `.github/workflows/synthetic-monitoring.yml` |
 | `Summer Eve identity check` | `*/30 * * * *` UTC + `workflow_dispatch` + every pull request | Rejects a Summer per-deployment URL or deployment-id pin in source. On schedule, manual dispatch, and pull requests that touch the Summer bridge, confirms `https://summer.jov.ie/runtime/v1/identity` is source-bound production project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`. A Vercel readback runs only when `SUMMER_PIN_CHECK_VERCEL_TOKEN` is present. | `.github/workflows/summer-eve-pin.yml` |
 
@@ -71,8 +73,9 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
+| `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. YouTube Data API statistics when `YOUTUBE_DATA_API_KEY` is set; Wikimedia pageviews. Social HTML waits for isolated egress. |
 
-13 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
+`cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`. `apps/web/vercel.json` is the schedule source of truth.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
 
@@ -149,6 +152,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
 | `/api/cron/auth-signup-onboarding-canary` | 30s | Lightweight HTTP golden-path check: GET /signup, /signin, /start, POST /api/chat onboarding probe; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1871) | — |
+| `/api/cron/artist-daily-snapshots` | 300s | Append-only official-API snapshots for a capped batch of known artists. Default-off (`ARTIST_DAILY_SNAPSHOTS`). Social HTML is not fetched from core. Failures fingerprint as `remediation:artist-snapshots`. | — |
 
 ## LLM Model Usage in Web App Crons
 

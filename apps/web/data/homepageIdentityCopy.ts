@@ -8,13 +8,15 @@ export const HOMEPAGE_IDENTITY_COPY = {
   seo: {
     title: 'Jovie | Be found. Be understood.',
     description:
-      'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.',
+      'Claim your name. Jovie makes you easy to reach, for people and for agents.',
   },
   hero: {
     kicker: 'Jovie',
     headline: 'Be found. Be understood.',
+    // JOV-7581: do not claim web research here. profile-monitoring is
+    // internal-only and has no public marketing block.
     subhead:
-      'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.',
+      'Claim your name. Jovie makes you easy to reach, for people and for agents.',
     // Homepage conversion (EVENT 2026-09-28, Tim: link claim replaces the
     // JOV-5085 name search): claim jov.ie/you, then /start with the handle.
     claim: {

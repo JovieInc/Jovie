@@ -367,6 +367,7 @@ export function nextLink(header) {
  *   readonly mergingPull: { readonly number: number, readonly url: string, readonly sha: string },
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly scanComplete?: boolean,
+ *   readonly checkGreen?: boolean,
  * }} input
  * @returns {{ action: 'close' | 'skip', comment: string, blockingNumbers: number[] }}
  */
@@ -402,6 +403,14 @@ export function decideLinearCloseOnMerge(input) {
   if (input.scanComplete === false) {
     reasons.push(
       'The open pull request scan stopped before the last page, so the issue was left open.'
+    );
+  }
+  const remediationLabeled = (input.issue.labels ?? []).some(label =>
+    String(label).startsWith('remediation:')
+  );
+  if (remediationLabeled && input.checkGreen !== true) {
+    reasons.push(
+      'Fingerprinted remediation issues stay open while the check is red.'
     );
   }
   const lead = `Did not mark ${identifier} Done after ${input.mergingPull.url} merged (merge SHA: ${input.mergingPull.sha}).`;

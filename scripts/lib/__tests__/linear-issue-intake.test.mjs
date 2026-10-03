@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { upsertLinearIssueByTitleFingerprint } from '../linear-issue-intake.mjs';
+import {
+  remediationKey,
+  upsertLinearIssueByTitleFingerprint,
+} from '../linear-issue-intake.mjs';
 
 const fingerprint = 'obs-fp-abc123';
 const created = {
@@ -185,5 +188,125 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
     expect(
       JSON.parse(String(fetchImpl.mock.calls.at(-1)[1].body)).variables.input
     ).toEqual({ description: 'terminal remains closed' });
+  });
+
+  function linearFetch(routes) {
+    return vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      const hit = routes.find(route => payload.query.includes(route.key));
+      if (!hit) throw new Error(payload.query.slice(0, 60));
+      hit.seen?.(payload);
+      return new Response(JSON.stringify(hit.body));
+    });
+  }
+
+  it('reopens after Done and re-files the same remediation label', async () => {
+    const labelName = remediationKey(fingerprint);
+    expect(remediationKey(labelName)).toBe(labelName);
+    const team = {
+      states: {
+        nodes: [
+          { id: 'todo-state', name: 'Todo', type: 'unstarted' },
+          { id: 'backlog-state', name: 'Backlog', type: 'backlog' },
+        ],
+      },
+      labels: { nodes: [{ id: 'label-1', name: labelName }] },
+    };
+    const done = {
+      id: 'lin-1',
+      identifier: 'JOV-7206',
+      title: `Nightly failed (${fingerprint})`,
+      state: { type: 'completed' },
+      labels: { nodes: [{ id: 'label-other', name: 'devin' }] },
+    };
+    const byTitle = linearFetch([
+      {
+        key: 'FindIssueByFingerprint',
+        seen: payload => expect(payload.variables.labelName).toBe(labelName),
+        body: { data: { team, issues: { nodes: [done] } } },
+      },
+      {
+        key: 'issueUpdate',
+        body: {
+          data: { issueUpdate: { success: true, issue: { id: 'lin-1' } } },
+        },
+      },
+    ]);
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        fingerprint,
+        title: done.title,
+        description: 'still red',
+        createStateName: 'Todo',
+        reopenTerminal: true,
+        apiKey: 'lin-key',
+        fetchImpl: byTitle,
+      })
+    ).resolves.toMatchObject({ ok: true, reopened: true });
+    expect(
+      JSON.parse(String(byTitle.mock.calls[1][1].body)).variables.input
+    ).toEqual({
+      description: 'still red',
+      stateId: 'todo-state',
+      labelIds: ['label-other', 'label-1'],
+    });
+    const fp = 'remediation:flaky-test-filing';
+    const byLabel = linearFetch([
+      {
+        key: 'FindIssueByFingerprint',
+        body: {
+          data: {
+            team: { ...team, labels: { nodes: [{ id: 'lab', name: fp }] } },
+            issues: { nodes: [] },
+          },
+        },
+      },
+      {
+        key: 'FindIssueByRemediationLabel',
+        body: {
+          data: {
+            issues: {
+              nodes: [
+                {
+                  ...done,
+                  id: 'lin-2',
+                  identifier: 'JOV-6507',
+                  title: 'old title',
+                  labels: { nodes: [{ id: 'lab', name: fp }] },
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        key: 'issueUpdate',
+        body: {
+          data: {
+            issueUpdate: { success: true, issue: { identifier: 'JOV-6507' } },
+          },
+        },
+      },
+    ]);
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        fingerprint: fp,
+        title: `Flaky (${fp})`,
+        description: 'red again',
+        createStateName: 'Todo',
+        reopenTerminal: true,
+        apiKey: 'lin-key',
+        fetchImpl: byLabel,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      reopened: true,
+      identifier: 'JOV-6507',
+    });
+    expect(
+      byLabel.mock.calls.some(call =>
+        JSON.parse(String(call[1].body)).query.includes('issueCreate')
+      )
+    ).toBe(false);
   });
 });
