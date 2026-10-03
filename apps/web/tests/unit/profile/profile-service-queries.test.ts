@@ -90,6 +90,7 @@ const mockProfileData = {
   theme: {},
   profileViews: 42,
   genres: ['rock', 'indie'],
+  spotifyFollowers: 12345,
   spotifyPopularity: 65,
   createdAt: NOW,
   updatedAt: NOW,
