@@ -1224,7 +1224,7 @@ private let nativeAuthExpiryKey = "ie.jov.Jovie.nativeSession.expiresAt"
 private let nativeAuthFallbackKey = "ie.jov.Jovie.nativeSession.token"
 
 extension APIClientTests {
-  @Test(arguments: ["success", "same", "preserved", "preserved-same", "consumed", "empty", "readback", "mismatch",
+  @Test(arguments: ["success", "same", "preserved", "preserved-same", "consumed", "empty", "readback", "mismatch", "fractional-expiry",
                     "unreadable", "nil-data", "malformed", "orphan", "empty-user", "missing-expiry", "nan", "infinite", "expired"])
   func nativeAuthCommitClassifiesActualRawStorage(mode: String) async throws {
     try await withNativeAuthSecurityScript { io in
@@ -1251,7 +1251,14 @@ extension APIClientTests {
       io.configure(deleteStatus: preserved || invalid ? errSecInteractionNotAllowed : errSecSuccess,
         addStatus: preserved || ["consumed", "empty"].contains(mode) || invalid ? errSecDuplicateItem : errSecSuccess,
         reads: reads)
-      let proposed = mode == "same" || mode == "preserved-same" ? nativeAuthA : nativeAuthB
+      var proposed = mode == "same" || mode == "preserved-same" ? nativeAuthA : nativeAuthB
+      if mode == "fractional-expiry" {
+        proposed = NativeStoredSession(userID: "b", token: "b",
+          expiresAt: Date(timeIntervalSinceReferenceDate: 1_000_000_000.0.nextUp))
+      }
+      let expectedStored = NativeStoredSession(userID: proposed.userID, token: proposed.token,
+        expiresAt: Date(timeIntervalSince1970: proposed.expiresAt.timeIntervalSince1970))
+      if mode == "fractional-expiry" { #expect(expectedStored != proposed) }
       let attempt = NativeSessionTokenStore.beginAuthAttempt()
       let result = try #require(NativeSessionTokenStore.commit(attempt, session: proposed))
       let expected: NativeAuthResolution.Outcome = untouched || invalid || ["readback", "mismatch"].contains(mode)
@@ -1263,7 +1270,7 @@ extension APIClientTests {
       #expect(result.cleanupUserID == (mode == "consumed" ? "a" : nil))
       #expect(!NativeSessionTokenStore.hasPendingAuth)
       #expect(NativeSessionTokenStore.commit(attempt, session: proposed) == nil)
-      if expected == .persisted { #expect(NativeSessionTokenStore.load() == proposed) }
+      if expected == .persisted { #expect(NativeSessionTokenStore.load() == expectedStored) }
       else if expected == .preserved || untouched {
         #expect(NativeSessionTokenStore.requestAuthorization() == original)
       } else {

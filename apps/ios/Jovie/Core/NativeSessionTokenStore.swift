@@ -211,7 +211,8 @@ enum NativeSessionTokenStore {
 #if targetEnvironment(simulator)
       persisted = persisted || (write.added == errSecMissingEntitlement && after.backend == .fallback)
 #endif
-      if persisted, after.session == session {
+      if persisted, let stored = after.session, stored.userID == session.userID,
+         stored.token == session.token, after.expiry == session.expiresAt.timeIntervalSince1970 {
         advanceGenerationLocked()
         return resolveAuthLocked(.persisted, userID: nil)
       }
