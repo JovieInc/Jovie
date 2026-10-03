@@ -916,12 +916,14 @@ async function main() {
     baseURL: flags.storybookUrl,
     reducedMotion: 'reduce',
   });
-  const page = await context.newPage();
   const snapshots = [];
   const missingContracts = [];
   try {
     for (const story of stories) {
       for (const viewport of VIEWPORTS) {
+        // Release each story document before the next navigation. Retaining a
+        // single renderer through the entire catalog can exhaust Chromium.
+        const page = await context.newPage();
         try {
           const storySnapshots = await collectSnapshots(
             page,
@@ -939,6 +941,8 @@ async function main() {
             viewport: viewport.name,
             detail: error instanceof Error ? error.message : String(error),
           });
+        } finally {
+          await page.close();
         }
       }
     }
