@@ -360,8 +360,11 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
-        mainPlaneCenterX: mainPlaneBox.left + mainPlaneBox.width / 2,
         settingsShellTop: settingsShellBox?.top ?? null,
+        settingsShellCenterX:
+          settingsShellBox === undefined
+            ? null
+            : settingsShellBox.left + settingsShellBox.width / 2,
         settingsColumnTop: settingsColumnBox?.top ?? null,
         settingsColumnCenterX:
           settingsColumnBox === undefined
@@ -392,9 +395,11 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       expect(
         Math.abs(
           (geometry?.settingsColumnCenterX ?? 0) -
-            (geometry?.mainPlaneCenterX ?? 0)
+            (geometry?.settingsShellCenterX ?? 0)
         ),
-        `${route} centers its shared column in the post-sidebar main pane`
+        // The route pane, not the main plane: an open inspector (the
+        // artist-profile preview rail) is a sibling that narrows the pane.
+        `${route} centers its shared column in the settings route pane`
       ).toBeLessThanOrEqual(1);
       expect(
         (geometry?.settingsColumnTop ?? 0) - (geometry?.settingsShellTop ?? 0),
