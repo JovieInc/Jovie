@@ -134,6 +134,11 @@
 		FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D156B3220339CAB0DBE1DD /* SplashView.swift */; };
 		FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */; };
 		10CDA6A50000000000000001 /* MobileHomeDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CDA6A50000000000000002 /* MobileHomeDataStore.swift */; };
+		A07661000000000000000065 /* NativeAPIContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07661000000000000000064 /* NativeAPIContracts.swift */; };
+		A07661000000000000000067 /* ChatStateModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07661000000000000000066 /* ChatStateModels.swift */; };
+		A07661000000000000000069 /* MobileWorkspaceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07661000000000000000068 /* MobileWorkspaceMode.swift */; };
+		A0766100000000000000006B /* VoiceCaptureContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0766100000000000000006A /* VoiceCaptureContracts.swift */; };
+		A0766100000000000000006D /* NativeChatRepositoryFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0766100000000000000006C /* NativeChatRepositoryFactory.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -282,6 +287,11 @@
 		BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthCoordinator.swift; sourceTree = "<group>"; };
 		F4562819B40056163650929C /* JovieAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntentsTests.swift; sourceTree = "<group>"; };
 		10CDA6A50000000000000002 /* MobileHomeDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHomeDataStore.swift; sourceTree = "<group>"; };
+		A07661000000000000000064 /* NativeAPIContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIContracts.swift; sourceTree = "<group>"; };
+		A07661000000000000000066 /* ChatStateModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStateModels.swift; sourceTree = "<group>"; };
+		A07661000000000000000068 /* MobileWorkspaceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileWorkspaceMode.swift; sourceTree = "<group>"; };
+		A0766100000000000000006A /* VoiceCaptureContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCaptureContracts.swift; sourceTree = "<group>"; };
+		A0766100000000000000006C /* NativeChatRepositoryFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatRepositoryFactory.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -533,6 +543,11 @@
 			children = (
 				A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */,
 				9924B177AFB753A4C23A4098 /* APIClient.swift */,
+				A07661000000000000000064 /* NativeAPIContracts.swift */,
+				A07661000000000000000066 /* ChatStateModels.swift */,
+				A07661000000000000000068 /* MobileWorkspaceMode.swift */,
+				A0766100000000000000006A /* VoiceCaptureContracts.swift */,
+				A0766100000000000000006C /* NativeChatRepositoryFactory.swift */,
 				FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */,
 				A0J0V25490000000000000001 /* ChatCache.swift */,
 				A0J0V25490000000000000003 /* ChatRepository.swift */,
@@ -869,6 +884,11 @@
 				A0B10F000000000000000032 /* MetricKitReporter.swift in Sources */,
 				A0J0V36380000000000000006 /* AudienceHighlightsRepository.swift in Sources */,
 				E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */,
+				A07661000000000000000065 /* NativeAPIContracts.swift in Sources */,
+				A07661000000000000000067 /* ChatStateModels.swift in Sources */,
+				A07661000000000000000069 /* MobileWorkspaceMode.swift in Sources */,
+				A0766100000000000000006B /* VoiceCaptureContracts.swift in Sources */,
+				A0766100000000000000006D /* NativeChatRepositoryFactory.swift in Sources */,
 				49BA0DAF46944303A411D3C0 /* AuthTokenExchange.swift in Sources */,
 				A0J0V25490000000000000002 /* ChatCache.swift in Sources */,
 				A0J0V25490000000000000004 /* ChatRepository.swift in Sources */,
