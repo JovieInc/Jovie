@@ -16,7 +16,10 @@ import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GREEN_MARKER } from './remediation-signal.mjs';
-import { LIFECYCLE_STATES } from './validation-lifecycle.mjs';
+import {
+  formatValidationReceipt,
+  LIFECYCLE_STATES,
+} from './validation-lifecycle.mjs';
 import {
   createProductionFacts,
   fetchWithRetry,
@@ -837,11 +840,60 @@ export async function syncLinearIssueOnMerge(options = {}) {
   };
 }
 
+/**
+ * Record an owner receipt: `receipt --issue JOV-1 --kind outcome --status pass
+ * --sha <full sha> --evidence <url>`.
+ *
+ * @param {readonly string[]} args
+ * @param {{ fetchImpl?: HttpFetch, env?: NodeJS.ProcessEnv }} [options]
+ */
+export async function recordValidationReceipt(args, options = {}) {
+  const value = (/** @type {string} */ name) => {
+    const index = args.indexOf(name);
+    return index === -1 ? '' : String(args[index + 1] ?? '');
+  };
+  const body = formatValidationReceipt({
+    issue: value('--issue').toUpperCase(),
+    kind: value('--kind'),
+    status: /** @type {'pass' | 'fail'} */ (value('--status')),
+    sha: value('--sha'),
+    evidence: value('--evidence'),
+  });
+  const env = options.env ?? process.env;
+  const apiKey = env.LINEAR_API_KEY ?? '';
+  if (!apiKey)
+    throw new Error('LINEAR_API_KEY is required to record a receipt');
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const data = await linearGraphql(fetchImpl, apiKey, ISSUE_STATE_QUERY, {
+    issueId: value('--issue').toUpperCase(),
+  });
+  if (typeof data.issue?.id !== 'string') {
+    throw new Error(`Could not resolve ${value('--issue')}`);
+  }
+  const created = await linearGraphql(
+    fetchImpl,
+    apiKey,
+    `mutation AddValidationReceipt($issueId: String!, $body: String!) {
+      commentCreate(input: { issueId: $issueId, body: $body }) { success }
+    }`,
+    { issueId: data.issue.id, body }
+  );
+  if (created.commentCreate?.success !== true) {
+    throw new Error('Linear refused the validation receipt');
+  }
+  return body;
+}
+
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isDirectRun) {
-  syncLinearIssueOnMerge().catch(error => {
+  const [command, ...rest] = process.argv.slice(2);
+  const run =
+    command === 'receipt'
+      ? recordValidationReceipt(rest).then(body => console.log(body))
+      : syncLinearIssueOnMerge();
+  run.catch(error => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
     process.exitCode = 1;

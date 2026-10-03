@@ -8,6 +8,7 @@ import {
   listOpenPullRequests,
   parentHoldReason,
   pullRequestLinksIssue,
+  recordValidationReceipt,
   syncLinearIssueOnMerge,
 } from '../linear-sync-on-merge.mjs';
 import {
@@ -388,6 +389,52 @@ describe('linear sync on merge', () => {
     });
     expect(listed.complete).toBe(false);
     expect(listed.pulls[0].draft).toBe(true);
+  });
+
+  it('records an owner receipt through the CLI and refuses what it cannot record', async () => {
+    const args = [
+      '--issue',
+      'JOV-1',
+      '--kind',
+      'outcome',
+      '--status',
+      'pass',
+      '--sha',
+      MAIN[2],
+      '--evidence',
+      'https://example.test/outcome/1',
+    ];
+    const respond = data => async () => json({ data });
+    const env = { LINEAR_API_KEY: 'k' };
+    const body = await recordValidationReceipt(args, {
+      env,
+      fetchImpl: respond({
+        issue: { id: 'uuid-1' },
+        commentCreate: { success: true },
+      }),
+    });
+    expect(body).toContain('validation-receipt:v1');
+    await expect(recordValidationReceipt(args, { env: {} })).rejects.toThrow(
+      /LINEAR_API_KEY is required/
+    );
+    await expect(
+      recordValidationReceipt(args, {
+        env,
+        fetchImpl: respond({ issue: null }),
+      })
+    ).rejects.toThrow(/Could not resolve JOV-1/);
+    await expect(
+      recordValidationReceipt(args, {
+        env,
+        fetchImpl: respond({
+          issue: { id: 'uuid-1' },
+          commentCreate: { success: false },
+        }),
+      })
+    ).rejects.toThrow(/refused the validation receipt/);
+    await expect(
+      recordValidationReceipt(['--issue', 'JOV-1'], { env })
+    ).rejects.toThrow(/kind must be/);
   });
 
   it('delegates every lifecycle event to the script with its dependencies', () => {
