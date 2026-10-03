@@ -743,5 +743,17 @@ describe('linear sync on merge', () => {
     expect(workflow).toContain('sync_done:');
     expect(workflow).toContain('runs-on: ubuntu-latest');
     expect(workflow).not.toContain('issueUpdate');
+
+    const script = readFileSync(
+      resolve(import.meta.dirname, '../linear-sync-on-merge.mjs'),
+      'utf8'
+    );
+    const localImports = [
+      ...script.matchAll(/from '\.\/([a-z0-9-]+\.mjs)'/g),
+    ].map((match) => `scripts/lib/${match[1]}`);
+    expect(localImports.length).toBeGreaterThan(0);
+    for (const dependency of localImports) {
+      expect(workflow).toContain(dependency);
+    }
   });
 });
