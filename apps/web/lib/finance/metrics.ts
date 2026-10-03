@@ -153,14 +153,14 @@ function sumTx(
     if (t === null || t < fromMs || t >= toMs) continue;
     if (!pick(tx)) continue;
     const amount = toNumber(tx.amount) ?? 0;
-    // Income is negative amount; express as positive magnitude.
+    // Ledger amounts use bank convention: positive inflow, negative outflow.
     sum += amount < 0 ? -amount : amount;
   }
   return sum;
 }
 
-const isIncome = (tx: FinanceTransaction) => (toNumber(tx.amount) ?? 0) < 0;
-const isExpense = (tx: FinanceTransaction) => (toNumber(tx.amount) ?? 0) > 0;
+const isIncome = (tx: FinanceTransaction) => (toNumber(tx.amount) ?? 0) > 0;
+const isExpense = (tx: FinanceTransaction) => (toNumber(tx.amount) ?? 0) < 0;
 const isScope = (scope: MoneyScope) => (tx: FinanceTransaction) =>
   classifyTransactionScope(tx.category) === scope;
 
@@ -511,12 +511,12 @@ function buildTrend(
     const idx = Math.floor(t / MS_PER_DAY) - startDay;
     if (idx < 0 || idx >= dayCount) continue;
     const amount = toNumber(tx.amount) ?? 0;
-    if (amount < 0) {
-      income[idx] += -amount;
+    if (amount > 0) {
+      income[idx] += amount;
     } else if (classifyTransactionScope(tx.category) === 'creator') {
-      creator[idx] += amount;
+      creator[idx] += -amount;
     } else {
-      personal[idx] += amount;
+      personal[idx] += -amount;
     }
   }
 

@@ -153,8 +153,7 @@ export const CANONICAL_METRICS: Record<
   },
   subscribers: {
     label: 'Followers',
-    definition:
-      'Fans who opted in to notifications — your capturable audience.',
+    definition: 'People who opted in to notifications.',
     source:
       'notification_subscriptions: COUNT(*) WHERE creator_profile_id = :profileId AND created_at >= :startDate',
     valueType: 'count',
