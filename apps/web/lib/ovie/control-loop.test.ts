@@ -188,6 +188,200 @@ describe('reconcileControlLoop', () => {
     expect(state.founderDecision?.options.length).toBeGreaterThan(0);
   });
 
+  it.each([
+    ['decision', { decision: ' ' }],
+    ['why now', { whyNow: ' ' }],
+    ['blocked context', { blocked: ' ' }],
+    ['metric consequence', { expectedMetricEffect: ' ' }],
+    ['artifact identity', { artifactRef: ' ' }],
+    ['artifact revision', { artifactRevision: ' ' }],
+    ['empty evidence', { evidence: [] }],
+    ['blank evidence entry', { evidence: ['receipt', ' '] }],
+    ['empty options', { options: [] }],
+    [
+      'blank option identity',
+      { options: [{ id: ' ', label: 'Alpha', tradeoff: 'Proceed' }] },
+    ],
+    [
+      'blank option label',
+      { options: [{ id: 'approve', label: ' ', tradeoff: 'Proceed' }] },
+    ],
+    [
+      'missing option consequence',
+      { options: [{ id: 'approve', label: 'Alpha', tradeoff: ' ' }] },
+    ],
+    [
+      'duplicate option identities',
+      {
+        options: [
+          { id: 'approve', label: 'Alpha', tradeoff: 'Spend $500' },
+          { id: ' approve ', label: 'Bravo', tradeoff: 'Do not spend' },
+        ],
+      },
+    ],
+    [
+      'ambiguous duplicate labels',
+      {
+        options: [
+          { id: 'approve', label: 'Alpha', tradeoff: 'Spend $500' },
+          { id: 'reject', label: ' alpha ', tradeoff: 'Do not spend' },
+        ],
+      },
+    ],
+    ['blank default when supplied', { defaultIfSilent: ' ' }],
+    ['negative confidence', { confidence: -0.1 }],
+    ['confidence above one', { confidence: 1.1 }],
+    ['nonfinite confidence', { confidence: Number.POSITIVE_INFINITY }],
+    ['NaN confidence', { confidence: Number.NaN }],
+  ] satisfies [string, Partial<FounderDecisionPacket>][])(
+    'withholds an incomplete founder request with %s',
+    (_name, overrides) => {
+      const state = reconcileControlLoop({
+        objective: OBJECTIVE,
+        nowIso: NOW,
+        candidates: [
+          candidate('founder-only', {
+            requiresFounder: true,
+            summerCanAct: false,
+            decisionPacket: { ...packet(), ...overrides },
+          }),
+        ],
+      });
+      expect(state.bindingConstraintId).toBe('founder-only');
+      expect(state.founderDecision).toBeNull();
+      expect(state.pendingAutonomousConstraintIds).toEqual([]);
+    }
+  );
+
+  it.each([
+    { freshness: 'stale', confidence: 0 },
+    { freshness: 'unknown', confidence: 1 },
+  ] satisfies Partial<FounderDecisionPacket>[])(
+    'preserves explicit uncertainty without inventing fresh-only admission: %j',
+    overrides => {
+      const validPacket = { ...packet(), ...overrides, defaultIfSilent: null };
+      const state = reconcileControlLoop({
+        objective: OBJECTIVE,
+        nowIso: NOW,
+        candidates: [
+          candidate('founder-only', {
+            requiresFounder: true,
+            summerCanAct: false,
+            decisionPacket: validPacket,
+          }),
+        ],
+      });
+      expect(state.founderDecision).toBe(validPacket);
+    }
+  );
+
+  it.each([null, undefined])(
+    'withholds a founder boundary without a packet: %s',
+    decisionPacket => {
+      const state = reconcileControlLoop({
+        objective: OBJECTIVE,
+        nowIso: NOW,
+        candidates: [
+          candidate('founder-only', {
+            requiresFounder: true,
+            summerCanAct: false,
+            decisionPacket,
+          }),
+        ],
+      });
+      expect(state.bindingConstraintId).toBe('founder-only');
+      expect(state.founderDecision).toBeNull();
+    }
+  );
+
+  it.each([
+    { confidence: '0.7' },
+    { freshness: 'expired' },
+    { evidence: null },
+    { options: null },
+    { options: [null] },
+    { options: [{ id: 1, label: 'Alpha', tradeoff: 'Proceed' }] },
+  ])(
+    'withholds malformed serialized packet fields without throwing: %j',
+    overrides => {
+      const serializedPacket = JSON.parse(
+        JSON.stringify({ ...packet(), ...overrides })
+      ) as FounderDecisionPacket;
+      const state = reconcileControlLoop({
+        objective: OBJECTIVE,
+        nowIso: NOW,
+        candidates: [
+          candidate('founder-only', {
+            requiresFounder: true,
+            summerCanAct: false,
+            decisionPacket: serializedPacket,
+          }),
+        ],
+      });
+      expect(state.bindingConstraintId).toBe('founder-only');
+      expect(state.founderDecision).toBeNull();
+    }
+  );
+
+  it.each([false, true])(
+    'preserves a valid binding request alongside an invalid sibling (invalid first: %s)',
+    invalidFirst => {
+      const validPacket = { ...packet(), defaultIfSilent: null };
+      const valid = candidate('valid-founder', {
+        requiresFounder: true,
+        summerCanAct: false,
+        decisionPacket: validPacket,
+      });
+      const invalid = candidate('invalid-sibling', {
+        requiresFounder: true,
+        summerCanAct: false,
+        decisionPacket: { ...packet(), evidence: [] },
+        expectedImpact: 0,
+        urgency: 0,
+        informationGain: 0,
+        unblockValue: 0,
+      });
+      const state = reconcileControlLoop({
+        objective: OBJECTIVE,
+        nowIso: NOW,
+        candidates: invalidFirst ? [invalid, valid] : [valid, invalid],
+      });
+      expect(state.bindingConstraintId).toBe('valid-founder');
+      expect(state.founderDecision).toBe(validPacket);
+      expect(
+        state.constraints.find(item => item.id === 'invalid-sibling')?.status
+      ).toBe('secondary');
+    }
+  );
+
+  it('does not substitute another constraint when the binding request is incomplete', () => {
+    const state = reconcileControlLoop({
+      objective: OBJECTIVE,
+      nowIso: NOW,
+      candidates: [
+        candidate('invalid-binding', {
+          requiresFounder: true,
+          summerCanAct: false,
+          decisionPacket: { ...packet(), artifactRevision: '' },
+        }),
+        candidate('valid-secondary', {
+          requiresFounder: true,
+          summerCanAct: false,
+          decisionPacket: packet(),
+          expectedImpact: 0,
+          urgency: 0,
+          informationGain: 0,
+          unblockValue: 0,
+        }),
+      ],
+    });
+    expect(state.bindingConstraintId).toBe('invalid-binding');
+    expect(state.founderDecision).toBeNull();
+    expect(
+      state.constraints.filter(item => item.status === 'binding')
+    ).toHaveLength(1);
+  });
+
   it('transitions cleared constraints to guardrails and picks the next constraint', () => {
     const first = reconcileControlLoop({
       objective: OBJECTIVE,

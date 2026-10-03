@@ -34,8 +34,14 @@ def obs(**overrides):
             "gateTimeouts24h": 0, "failed24h": 0, "lastLandingAge": 600, "runs24h": 12, "busy": 3,
             "codex": {"count": 2, "available": ["a"], "accounts": {"a": {"resetsInS": 0}, "b": {"resetsInS": 900}}},
             "pool": 40, "linearError": None, "githubRemaining": 4000, "diskFreePct": 35.0,
+            "openPRCount": 0, "newIssueBudgetByProvider": {"devin": {"reason": "within-budget"}},
             "hudExpected": True, "hudBeatAge": 3}
     base.update(overrides)
+    if "codex" not in overrides:
+        base["codex"] = {"generatedAt": doctor.epoch_iso(base["now"]), "count": 2, "available": ["a"], "accounts": {
+            "a": {"available": True, "leased": False, "resetsInS": 0},
+            "b": {"available": False, "leased": False, "lastKind": "limit",
+                  "exhaustedUntil": doctor.epoch_iso(base["now"] + 900), "resetsInS": 900}}}
     return base
 
 
@@ -48,10 +54,17 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_escalation_alert_names_the_pr_and_class(self):
+        alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
+        self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
+        self.assertEqual(doctor.judge(obs(escalation={"surfaced": []})), {})
+
     def test_each_rule_names_its_cause(self):
         alerts = doctor.judge(obs(
             tick={"at": "x", "unhealthy": ["devin"], "error": "Boom"},
-            codex={"count": 2, "available": [], "accounts": {"a": {"resetsInS": 7200}, "b": {"resetsInS": 600}}},
+            codex={"generatedAt": doctor.epoch_iso(1_000_000), "count": 2, "available": [], "accounts": {
+                "a": {"available": False, "leased": False, "lastKind": "limit", "exhaustedUntil": doctor.epoch_iso(1_007_200)},
+                "b": {"available": False, "leased": False, "lastKind": "limit", "exhaustedUntil": doctor.epoch_iso(1_000_600)}}},
             gateTimeouts24h=5, failed24h=10, diskFreePct=4.0, githubRemaining=100, hudBeatAge=500,
             lastLandingAge=8 * 3600))
         self.assertEqual(set(alerts), {"tick-error", "provider-down:devin", "codex-all-banked", "no-landing",
@@ -133,10 +146,10 @@ class FakeTracker:
         self.opened.append((key, text))
         return f"id-{key}"
 
-    def reopen(self, issue_id, text):
+    def reopen(self, issue_id, text, key=None):
         self.reopened.append((issue_id, text))
 
-    def close(self, issue_id):
+    def close(self, issue_id, key=None):
         self.closed.append(issue_id)
 
     def contradict_invariant(self, event):
@@ -224,14 +237,23 @@ class ReconcileTest(unittest.TestCase):
                 self.calls = []
 
             def gql(self, query, variables):
-                self.calls.append(query)
+                self.calls.append((query, variables))
                 if "title:{eq:$t}" in query:
                     return {"issues": {"nodes": [{"id": "existing-1"}]}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}, {
+                            "id": "disk", "name": "remediation:disk-low"}]}}]}}
+                if "issueAddLabel" in query:
+                    return {"issueAddLabel": {"success": True}}
                 raise AssertionError("must not create when one exists")
         linear = FakeLinear()
         tracker = doctor.Tracker(linear, "gem")
         self.assertEqual(tracker.title("disk-low"), "Symphony doctor: disk-low (gem)")
         self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
+        added = [variables for query, variables in linear.calls if "issueAddLabel" in query]
+        self.assertEqual(added, [{"id": "existing-1", "l": "disk"}])
 
     def test_idle_codex_alert_opens_as_urgent(self):
         captured = []
@@ -243,12 +265,71 @@ class ReconcileTest(unittest.TestCase):
                 if "teams(filter" in query:
                     return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
                         "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
-                            "id": "symphony", "name": "symphony"}]}}]}}
+                            "id": "symphony", "name": "symphony"}, {
+                            "id": "idle", "name": "remediation:provider-idle-codex"}]}}]}}
                 captured.append(variables["i"])
                 return {"issueCreate": {"issue": {"id": "urgent", "identifier": "JOV-1"}}}
 
         self.assertEqual(doctor.Tracker(FakeLinear(), "gem").open("provider-idle:codex", "idle"), "urgent")
         self.assertEqual(captured[0]["priority"], 1)
+        self.assertEqual(captured[0]["labelIds"], ["symphony", "idle"])
+
+    def test_alert_label_is_created_on_open_reopen_and_close(self):
+        created = []
+        added = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}]}}]}}
+                if "issueLabelCreate" in query:
+                    created.append(variables["i"])
+                    return {"issueLabelCreate": {"issueLabel": {"id": "new-label", "name": variables["i"]["name"]}}}
+                if "issueAddLabel" in query:
+                    added.append(variables)
+                    return {"issueAddLabel": {"success": True}}
+                if "issueCreate" in query:
+                    return {"issueCreate": {"issue": {"id": "iss-1", "identifier": "JOV-1"}}}
+                raise AssertionError(query)
+
+            def move(self, issue_id, state):
+                return None
+
+            def comment(self, issue_id, text):
+                return None
+
+        tracker = doctor.Tracker(FakeLinear(), "gem")
+        self.assertEqual(tracker.open("provider-down:codex", "down"), "iss-1")
+        self.assertEqual(created, [{
+            "teamId": "team", "name": "remediation:provider-down-codex", "color": "#E5484D"}])
+        tracker.reopen("iss-1", "again", "provider-down:codex")
+        tracker.close("iss-1", "provider-down:codex")
+        self.assertEqual([row["l"] for row in added], ["new-label", "new-label"])
+        self.assertEqual(doctor.remediation.alert_key_slug("provider-down:codex"), "provider-down-codex")
+        self.assertEqual(doctor.remediation.remediation_label_for_alert("provider-down:codex"),
+                         "remediation:provider-down-codex")
+        self.assertIsNone(doctor.remediation.alert_key_slug("---"))
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            quiet = []
+
+            class OffLinear(FakeLinear):
+                def gql(self, query, variables):
+                    if "issueLabelCreate" in query or "issueAddLabel" in query:
+                        quiet.append(query)
+                    return super().gql(query, variables)
+
+            off = doctor.Tracker(OffLinear(), "gem")
+            self.assertEqual(off.open("disk-low", "low"), "iss-1")
+            off.reopen("iss-1", "again", "disk-low")
+            off.close("iss-1", "disk-low")
+            self.assertEqual(quiet, [])
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
 
     def test_new_condition_generation_reopens_completed_liveness_owner(self):
         class FakeLinear:
@@ -401,6 +482,20 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
         self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
 
+    def test_terminal_pr_backlog_is_its_own_idle_reason(self):
+        """JOV-7514: parked hold/exhausted PRs must not be reported as the active open-PR cap."""
+        host = type("Host", (), {"state": Path("/tmp")})()
+        lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+        seats = {"codex": {"running": 0, "slots": 3}}
+        parked = doctor.status_feed(host, lane, obs(
+            capacityByProvider=seats,
+            newIssueBudgetByProvider={"codex": {"reason": "terminal-pr-backlog"}}), {}, {})
+        active = doctor.status_feed(host, lane, obs(
+            capacityByProvider=seats,
+            newIssueBudgetByProvider={"codex": {"reason": "over-budget"}}), {}, {})
+        self.assertEqual(parked["throughput"]["providers"]["codex"]["idleReason"], "terminal-pr-backlog")
+        self.assertEqual(active["throughput"]["providers"]["codex"]["idleReason"], "open-pr-budget")
+
 
 
 class RunnablePoolTest(unittest.TestCase):
@@ -430,6 +525,7 @@ class RunnablePoolTest(unittest.TestCase):
                     mock.patch.object(lane, "Linear", return_value=tracker), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset({"JOV-OWNED"})), \
                     mock.patch.object(lane, "load_github_env"), \
+                    mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, [])), \
                     mock.patch.object(lane, "graphql_budget", return_value=None):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
                 self.assertEqual(observed["pool"], 2)
@@ -528,6 +624,143 @@ class SloFeedTest(unittest.TestCase):
                 self.assertEqual(doctor.fetch_slo(host, lane), snapshot)
 
 
+class AccountAttributionTest(unittest.TestCase):
+    NOW = 1_000_000
+
+    def report(self, **rows):
+        return {"generatedAt": doctor.epoch_iso(self.NOW), "count": len(rows),
+                "available": [], "accounts": rows}
+
+    def test_leased_is_not_exhausted_and_does_not_page_provider_down(self):
+        report = self.report(a={"available": True, "leased": True, "remainingPercent": 0})
+        attribution = doctor.codex_attribution(report, self.NOW)
+        self.assertEqual(attribution["state"], "leases-occupied")
+        self.assertEqual(attribution["quotaBanked"], 0)
+        alerts = doctor.judge(obs(codex=report, tick={"unhealthy": ["codex"]}))
+        self.assertNotIn("codex-all-banked", alerts)
+        self.assertNotIn("provider-down:codex", alerts)
+
+    def test_lease_occupancy_and_hold_kinds_remain_independent(self):
+        rows = {kind: {"available": False, "leased": True, "lastKind": kind,
+                       "exhaustedUntil": doctor.epoch_iso(self.NOW + 120)} for kind in ["auth", "rate", "limit", "ok"]}
+        result = doctor.codex_attribution(self.report(**rows), self.NOW)
+        self.assertEqual(result["state"], "cooldown")
+        self.assertEqual([result[k] for k in ["leased", "authCooldown", "rateCooldown", "quotaBanked", "unknownCooldown"]],
+                         [4, 1, 1, 1, 1])
+        self.assertNotIn("codex-all-banked", doctor.judge(obs(codex=self.report(**rows))))
+
+    def test_incomplete_stale_or_malformed_account_status_is_unknown(self):
+        valid = self.report(a={"available": True, "leased": True})
+        cases = [{}, {**valid, "count": 2}, {**valid, "count": True}, {**valid, "error": "probe failed"},
+                 {**valid, "generatedAt": doctor.epoch_iso(self.NOW - 121)},
+                 {**valid, "generatedAt": doctor.epoch_iso(self.NOW + 1)},
+                 {**valid, "generatedAt": {}},
+                 self.report(a={"available": False, "leased": True}),
+                 self.report(a={"available": True, "leased": 1}),
+                 self.report(a={"leased": False})]
+        for report in cases:
+            with self.subTest(report=report):
+                self.assertEqual(doctor.codex_attribution(report, self.NOW)["state"], "unknown")
+                self.assertNotIn("codex-all-banked", doctor.judge(obs(codex=report)))
+
+    def test_unknown_status_cannot_advance_idle_quota_timer_or_be_reported_empty(self):
+        for available in [[], ["stale-name"]]:
+            report = {"available": available}
+            observation = obs(codex=report, poolByProvider={"codex": 5},
+                              capacityByProvider={"codex": {"running": 0, "slots": 1}})
+            lane = SimpleNamespace(HOST="test", provider_throughput=throughput_stub)
+            feed = doctor.status_feed(SimpleNamespace(), lane, observation, {}, {},
+                                      {"idleQualifiedSince": {"codex": 1}})
+            metric = feed["throughput"]["providers"]["codex"]
+            self.assertEqual(metric["idleReason"], "account-status-unknown")
+            self.assertIsNone(metric["accountIdleSecondsWhileQualifiedWorkExists"])
+            self.assertIsNone(feed["codexAvailable"])
+            self.assertEqual(feed["_idleQualifiedSince"], {})
+
+    def test_unknown_status_cannot_advance_provider_idle_timer_or_alert(self):
+        for report in [{"available": ["stale-name"]},
+                       {**self.report(a={"available": True, "leased": False}),
+                        "generatedAt": doctor.epoch_iso(self.NOW - 121), "available": ["stale-name"]}]:
+            observation = obs(codex=report, poolByProvider={"codex": 5},
+                              capacityByProvider={"codex": {"running": 0, "slots": 1}},
+                              tick={"spawned": ["codex"], "unhealthy": []})
+            previous = {"providerIdleSince": {"codex": 1}}
+            self.assertFalse(doctor.provider_idle_with_qualified_work(observation, "codex"))
+            self.assertEqual(doctor.provider_idle_since(observation, previous), {})
+            self.assertNotIn("provider-idle:codex", doctor.judge(observation, previous))
+
+    def test_malformed_cooldown_kind_is_unknown_and_does_not_crash(self):
+        for kind in [[], {}, 1, True]:
+            report = self.report(a={"available": False, "leased": False, "lastKind": kind,
+                                    "exhaustedUntil": doctor.epoch_iso(self.NOW + 120)})
+            with self.subTest(kind=kind):
+                self.assertEqual(doctor.codex_attribution(report, self.NOW)["state"], "unknown")
+                self.assertNotIn("codex-all-banked", doctor.judge(obs(codex=report)))
+
+    def test_observe_uses_end_of_status_sample_clock_across_second_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "none")
+            lane = SimpleNamespace(HOST="test", load_providers=lambda: {}, load_github_env=lambda: None,
+                                   graphql_budget=lambda: None, Linear=mock.Mock(side_effect=OSError("no Linear")))
+            for generated, expected in [(1001, "leases-occupied"), (1002, "unknown")]:
+                report = {"generatedAt": doctor.epoch_iso(generated), "count": 1,
+                          "accounts": {"a": {"available": True, "leased": True}}}
+                with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+                        mock.patch.object(doctor.time, "time", side_effect=[1000.9, 1001.2]):
+                    observation = doctor.observe(host, lane, SimpleNamespace(status=lambda: report))
+                self.assertEqual(observation["codexAttribution"]["state"], expected)
+
+
+class AdmissionBackpressureTest(unittest.TestCase):
+    def test_doctor_uses_shared_budget_and_preserves_known_eligibility_on_partial_read_failure(self):
+        lane = load("lane_runner")
+        providers = {"devin": {"label": "devin", "slots": 4}, "codex": {"label": "codex", "slots": 3}}
+        issue = lane.Issue("id", "JOV-7", "Task", "", 1, "2026-01-01T00:00:00Z", [])
+        inventory = [{"number": n, "headRefName": f"codex/jov-{n}-20261002", "isDraft": True}
+                     for n in range(1, 7)]
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), linear_env=Path(tmp) / "none")
+            linear = mock.Mock()
+            linear.lane_issues.return_value = [issue]
+            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1", "LANES_SLOTS_DEVIN": "4", "LANES_SLOTS_CODEX": "3"}), \
+                    mock.patch.object(lane, "Linear", return_value=linear), \
+                    mock.patch.object(lane, "load_providers", return_value=providers), \
+                    mock.patch.object(lane, "load_github_env"), \
+                    mock.patch.object(lane, "in_flight_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "graphql_budget", return_value=None), \
+                    mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, inventory)):
+                observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
+                self.assertEqual(observed["eligiblePool"], 1)
+                self.assertEqual(observed["eligiblePoolByProvider"], {"devin": 1, "codex": 1})
+                self.assertEqual(observed["poolByProvider"], {"devin": 1, "codex": 0})
+                self.assertEqual(observed["pool"], 1, "provider union must not sum duplicate issues")
+                self.assertEqual(observed["newIssueBudgetByProvider"]["codex"], lane.new_issue_budget("codex", 3, inventory))
+                with mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, None if name == "codex" else [])):
+                    unknown = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
+                self.assertEqual(unknown["eligiblePool"], 1)
+                self.assertEqual(unknown["poolByProvider"], {"devin": 1, "codex": None})
+                self.assertIsNone(unknown["pool"])
+                self.assertIsNone(unknown["linearError"])
+                feed = doctor.status_feed(host, lane, unknown, {}, {})
+                self.assertIsNone(feed["admission"]["newIssuePool"])
+                self.assertEqual(feed["throughput"]["providers"]["codex"]["idleReason"], "pr-inventory-unavailable")
+
+    def test_empty_timer_cannot_survive_unknown_backpressure_or_maintenance(self):
+        for changes in [
+                {"openPRCount": None}, {"openPRCount": 1}, {"eligiblePool": None},
+                {"newIssueBudgetByProvider": {}},
+                {"newIssueBudgetByProvider": {"devin": {"reason": "over-budget"}}},
+                {"newIssueBudgetByProvider": {"devin": {"reason": "pr-inventory-unavailable"}}}]:
+            observation = obs(pool=0, eligiblePool=0, busy=0, **changes) if "eligiblePool" not in changes else obs(pool=0, busy=0, **changes)
+            with self.subTest(changes=changes), tempfile.TemporaryDirectory() as tmp:
+                host = SimpleNamespace(state=Path(tmp))
+                (host.state / "doctor.json").write_text(json.dumps({"poolEmptySince": 1}))
+                with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), mock.patch.object(doctor, "observe", return_value=observation):
+                    result = doctor.run(host, SimpleNamespace(HOST="test"), None, FakeTracker())
+                self.assertIsNone(result["poolEmptySince"])
+                self.assertNotIn("pool-empty", result["alerts"])
+
+
 class PublishTest(unittest.TestCase):
     def test_only_the_primary_host_publishes(self):
         saved = doctor.PRIMARY_FLAG
@@ -564,10 +797,40 @@ class RunTest(unittest.TestCase):
                 os.environ.pop("LANES_SELFTEST", None)
             self.assertIn("provider-down:devin", result["alerts"])
             self.assertIn("linear-down", result["alerts"])
+            self.assertEqual(result["eventsOpen"], 0)
+            self.assertEqual(result["eventsClaimed"], 0)
+            self.assertEqual(result["eventsHuman"], 0)
+            self.assertEqual(result["eventsExhausted"], 0)
+            self.assertEqual(result["byFingerprint"], {})
             written = json.loads((state / "doctor.json").read_text())
             self.assertEqual(set(written["alerts"]) >= {"provider-down:devin", "linear-down"}, True)
             self.assertEqual(written["conditions"]["linear-down"]["source"]["status"], "unknown")
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
+
+
+class DoctorLockTest(unittest.TestCase):
+    def test_flock_failure_closes_the_lock_fd_and_still_writes(self):
+        import fcntl
+        state = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(state, ignore_errors=True))
+        opened = []
+        real_open = open
+
+        def tracking_open(file, mode="r", *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if str(file).endswith("doctor.lock"):
+                opened.append(handle)
+            return handle
+
+        def fail_lock(handle, operation):
+            raise OSError("flock failed")
+
+        wrote = []
+        with mock.patch("builtins.open", tracking_open), mock.patch.object(fcntl, "flock", fail_lock):
+            doctor.locked_doctor_write(state, lambda: wrote.append("ok"))
+        self.assertEqual(wrote, ["ok"])
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(opened[0].closed)
 
 
 if __name__ == "__main__":

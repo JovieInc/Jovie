@@ -21,6 +21,57 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes the published CLI skill artifacts through the CLI web gate and rejects unknown skill paths', () => {
+    const receipt = classifyProductLanes([
+      'skills/jovie/SKILL.md',
+      'skills/jovie/README.md',
+      'skills/jovie/LICENSE',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    for (const path of [
+      'skills/other/SKILL.md',
+      'skills/jovie/setup.sh',
+      'skills/jovie/../private.md',
+      'skills/jovie/SKILL.md.extra',
+    ]) {
+      expect(() => classifyProductLanes([path])).toThrow(
+        ProductLaneClassificationError
+      );
+    }
+  });
+
+  it('records the bounded blog qualification without admitting mixed paths', () => {
+    const receipt = classifyProductLanes(
+      ['apps/web/content/blog/a-safe-article.md'],
+      { qualificationProfile: 'content-only' }
+    );
+
+    expect(receipt.qualificationProfile).toBe('content-only');
+    expect(receipt.requiredGates.web.tests).toContain(
+      'JOV-7396 publication contract'
+    );
+    expect(() =>
+      classifyProductLanes(
+        [
+          'apps/web/content/blog/a-safe-article.md',
+          'apps/web/lib/blog/getBlogPosts.ts',
+        ],
+        { qualificationProfile: 'content-only' }
+      )
+    ).toThrow('approved blog content paths');
+  });
+
+  it('builds and releases canonical changelog content through web while ordinary docs stay operational', () => {
+    expect(classifyProductLanes(['CHANGELOG.md']).selectedLanes).toEqual([
+      'web',
+    ]);
+    expect(
+      classifyProductLanes(['docs/changelog.md', 'README.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
   it('routes all canary OTP worker artifacts through the web gate and rejects unknown workers', () => {
     const receipt = classifyProductLanes([
       'workers/canary-otp/src/index.ts',
@@ -299,6 +350,26 @@ describe('product lane classifier', () => {
     }
   });
 
+  it('requires every product lane for release-channel contract files', () => {
+    for (const file of [
+      'index.ts',
+      'package.json',
+      'release-channel.test.ts',
+      'tsconfig.json',
+      'vitest.config.mts',
+    ]) {
+      expect(
+        classifyProductLanes([`packages/release-channel-contracts/${file}`])
+          .selectedLanes
+      ).toEqual(ALL);
+    }
+    expect(() =>
+      classifyProductLanes([
+        'packages/release-channel-contracts-extra/index.ts',
+      ])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('maps isolated, shared, and operations-only paths', () => {
     for (const [path, lanes] of /** @type {Array<[string, string[]]>} */ ([
       ['apps/ios/Jovie/App.swift', ['ios']],
@@ -317,6 +388,13 @@ describe('product lane classifier', () => {
     expect(
       classifyProductLanes(['packages/auth-routing/index.ts']).selectedLanes
     ).toEqual(ALL);
+    const releaseChannels = classifyProductLanes([
+      'packages/release-channel-contracts/index.ts',
+    ]);
+    expect(releaseChannels.selectedLanes).toEqual(ALL);
+    expect(
+      releaseChannels.requiredGates['cross-product'].tests.split(' && ')
+    ).toContain('pnpm --filter @jovie/release-channel-contracts test');
     expect(
       classifyProductLanes([
         '.github/workflows/ci.yml',

@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { NAVIGATION_DROP_OFF_MS } from '@/lib/tracking/navigation-telemetry';
 import {
   mockUsePathname,
   renderDashboardNav,
@@ -47,6 +48,7 @@ describe('Linear-scale density (founder lock 2026-09-25)', () => {
 
 describe('DashboardNav route warming', () => {
   afterEach(() => {
+    vi.useRealTimers();
     runtimeUpdateState.available = false;
     resetDashboardNavTestMocks();
   });
@@ -132,6 +134,45 @@ describe('DashboardNav route warming', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it.each(['Inbox', 'New Chat', 'Home'])(
+    'clears a stalled %s acknowledgment and accepts a retry without replacing the source content',
+    label => {
+      vi.useFakeTimers();
+      mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
+      renderDashboardNav({
+        renderFn: render,
+        children: <main data-testid='retained-route'>Source content</main>,
+      });
+      const link = screen.getByRole('link', { name: label });
+      link.addEventListener('click', event => event.preventDefault());
+      fireEvent.click(link);
+      expect(link).toHaveAttribute('aria-busy', 'true');
+
+      act(() => vi.advanceTimersByTime(NAVIGATION_DROP_OFF_MS));
+
+      expect(link).not.toHaveAttribute('aria-busy');
+      expect(link).not.toHaveAttribute('data-navigation-pending');
+      expect(screen.getByTestId('retained-route')).toHaveTextContent(
+        'Source content'
+      );
+      fireEvent.click(link);
+      expect(link).toHaveAttribute('aria-busy', 'true');
+    }
+  );
+
+  it('clears a pending acknowledgment immediately when connectivity is lost', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({ renderFn: render });
+    const link = screen.getByRole('link', { name: 'New Chat' });
+    link.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(link);
+    expect(link).toHaveAttribute('aria-busy', 'true');
+
+    act(() => globalThis.dispatchEvent(new Event('offline')));
+
+    expect(link).not.toHaveAttribute('aria-busy');
   });
 
   it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {

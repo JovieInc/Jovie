@@ -50,7 +50,25 @@ const SNAPSHOT: ChangelogParseResult = {
   ],
 };
 
-let currentSnapshot = SNAPSHOT;
+function reviewedSnapshot(
+  snapshot: ChangelogParseResult
+): ChangelogParseResult {
+  return {
+    ...snapshot,
+    releases: snapshot.releases.map(release => ({
+      ...release,
+      customerOutcomes: Object.fromEntries(
+        Object.values(release.sections)
+          .flat()
+          .map(text => [
+            text,
+            { availability: 'unverified' as const, prerequisites: [] },
+          ])
+      ),
+    })),
+  };
+}
+let currentSnapshot = reviewedSnapshot(SNAPSHOT);
 
 vi.mock('next/link', () => ({
   default: ({
@@ -68,7 +86,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/lib/changelog-source', () => ({
-  getChangelogSnapshot: async () => currentSnapshot,
+  getChangelogSnapshot: async () => reviewedSnapshot(currentSnapshot),
 }));
 
 vi.mock('@/components/marketing/changelog/ChangelogSubscribeColumn', () => ({
@@ -83,7 +101,7 @@ import ChangelogPage, { metadata } from './page';
 
 describe('public changelog page', () => {
   beforeEach(() => {
-    currentSnapshot = SNAPSHOT;
+    currentSnapshot = reviewedSnapshot(SNAPSHOT);
   });
   it('does not describe older empty slots as newer than a published daily update', async () => {
     currentSnapshot = {
@@ -130,7 +148,7 @@ describe('public changelog page', () => {
     expect(
       screen.getByLabelText('Subscribe To Changelog Updates')
     ).toBeVisible();
-    expect(screen.getAllByText('Product update')).toHaveLength(2);
+    expect(screen.queryByText('Product update')).not.toBeInTheDocument();
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {

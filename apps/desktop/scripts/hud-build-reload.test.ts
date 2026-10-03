@@ -90,6 +90,7 @@ const idleWindow = {
   focused: false,
   audible: false,
   hasUnsentInput: false,
+  workStateSafe: true,
   systemIdleSeconds: WEB_BUILD_RELOAD_IDLE_SECONDS,
 };
 
@@ -115,7 +116,11 @@ test('app windows reload for a new web build only when nobody is using them', ()
 });
 
 test('web build reload never drops unsent text or interrupts audio', () => {
-  for (const guard of [{ hasUnsentInput: true }, { audible: true }]) {
+  for (const guard of [
+    { hasUnsentInput: true },
+    { audible: true },
+    { workStateSafe: false },
+  ]) {
     expect(
       shouldReloadWindowForWebBuild({ ...idleWindow, visible: false, ...guard })
     ).toBe(false);

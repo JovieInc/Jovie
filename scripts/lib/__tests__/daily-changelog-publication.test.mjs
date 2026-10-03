@@ -21,6 +21,7 @@ const note = {
   visibility: 'public',
   releaseWorthy: true,
   text: 'Choose your profile link: Start with a name on the homepage.',
+  availability: { status: 'ga', prerequisites: [] },
   evidence: [{ url: 'https://jov.ie/', contains: 'Claim' }],
 };
 const body = value => `<!-- customer-changelog/v1 ${JSON.stringify(value)} -->`;
@@ -63,6 +64,45 @@ const input = overrides => ({
   ...overrides,
 });
 describe('customer release metadata', () => {
+  it.each([
+    'Codex shipper: safer dispatch.',
+    'PersistentAudioBar tests: align labels.',
+    'Update apps/web/lib/source.ts: faster imports.',
+  ])('excludes implementation copy at public intake: %s', text => {
+    expect(readCustomerNote(body({ ...note, text })).reason).toBe(
+      'failed-validation'
+    );
+  });
+  it('requires explicit rollout scope for new public notes and retains it in the publication receipt', () => {
+    const scope = {
+      status: 'limited',
+      prerequisites: ['Eligible artist profiles'],
+    };
+    const scoped = { ...note, availability: scope };
+    const result = planDailyPublication(
+      input({
+        candidates: [
+          candidate({ pr: { ...candidate().pr, body: body(scoped) } }),
+        ],
+      })
+    );
+    expect(result.result.receipt.stories[0].availability).toEqual(scope);
+    expect(
+      readCustomerNote(
+        body({
+          ...note,
+          availability: { status: 'limited', prerequisites: [] },
+        })
+      ).reason
+    ).toBe('failed-validation');
+    expect(
+      evaluateCustomerNoteContract({
+        files: ['apps/web/lib/profile.ts'],
+        createdAt: '2026-10-03T00:00:00Z',
+        body: body({ ...note, availability: undefined }),
+      })
+    ).toMatchObject({ passed: false, reason: 'missing-availability' });
+  });
   it('requires a public/internal decision for new customer code without reclassifying existing PRs', () => {
     const event = {
       files: ['apps/web/components/features/profile/Profile.tsx'],
@@ -125,6 +165,33 @@ describe('customer release metadata', () => {
       expect(readCustomerNote(body(value)).note).toBeUndefined();
     expect(readCustomerNote(body(note)).note).toEqual(note);
   });
+  it('accepts optional details and a first-party action destination', () => {
+    const value = {
+      ...note,
+      details: ['Fans opt in per artist; nothing is sent without a signup.'],
+      action: {
+        label: 'See it on a demo profile',
+        href: '/demo/showcase/tim-white-profile?mode=subscribe',
+      },
+    };
+    expect(readCustomerNote(body(value)).note).toEqual(value);
+  });
+  it.each([
+    { action: { label: 'Go', href: 'javascript:alert(1)' } },
+    { action: { label: 'Go', href: 'https://example.com/' } },
+    { action: { label: 'Go', href: '//jov.ie.evil.test' } },
+    { action: { label: 'x'.repeat(81), href: '/support' } },
+    { action: { label: 'Go' } },
+    { action: '/support' },
+    { details: ['<img src=x onerror=alert(1)>'] },
+    { details: ['Codex shipper hardening: safer dispatch.'] },
+    { details: ['a'.repeat(241)] },
+    { details: 'not-an-array' },
+  ])('rejects malformed details or an unsafe action: %o', patch => {
+    expect(readCustomerNote(body({ ...note, ...patch })).reason).toBe(
+      'failed-validation'
+    );
+  });
 });
 describe('source → published changelog', () => {
   it('defers a verified superseded public generation while malformed bindings still fail', () => {
@@ -160,6 +227,29 @@ describe('source → published changelog', () => {
     expect(release.sections.added).toEqual([note.text]);
     expect(release.date).toBe('2026-10-02');
     expect(plan.content).not.toContain('undefined');
+  });
+  it('carries note details and the action destination into the published story', () => {
+    const value = {
+      ...note,
+      details: ['Fans opt in per artist; nothing is sent without a signup.'],
+      action: {
+        label: 'See it on a demo profile',
+        href: '/demo/showcase/tim-white-profile?mode=subscribe',
+      },
+    };
+    const plan = planDailyPublication(
+      input({
+        candidates: [
+          candidate({ pr: { ...candidate().pr, body: body(value) } }),
+        ],
+      })
+    );
+    expect(plan.status).toBe('publish');
+    const story = plan.result.stories[0];
+    expect(story.bullets).toEqual([
+      'Fans opt in per artist; nothing is sent without a signup.',
+    ]);
+    expect(story.action).toEqual(value.action);
   });
   it('appends within one daily identity, preserves published copy and consumes each source once', () => {
     const first = planDailyPublication(input());

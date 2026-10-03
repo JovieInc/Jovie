@@ -116,6 +116,12 @@ describe('keyboard-shortcuts definitions', () => {
     it('uses the canonical calendar route for calendar navigation', () => {
       expect(NAV_SHORTCUTS.calendar.href).toBe(APP_ROUTES.CALENDAR);
     });
+
+    it('opens earnings on the profile pay tab', () => {
+      expect(NAV_SHORTCUTS.earnings.href).toBe(
+        `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+      );
+    });
   });
 
   describe('modifier shortcuts', () => {

@@ -171,7 +171,13 @@ export default async function ChangelogPage() {
           </aside>
 
           <div className='changelog-entries'>
-            <CustomerChangelogArchive months={months} />
+            <CustomerChangelogArchive
+              months={months}
+              technicalReleases={snapshot.releases.map(({ version, date }) => ({
+                version,
+                date,
+              }))}
+            />
           </div>
         </div>
       </MarketingContainer>

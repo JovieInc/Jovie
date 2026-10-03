@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
 import type { TimActionsResponse } from '@/lib/hud/linear-actions';
@@ -65,7 +66,9 @@ function TimActionRequiredStory({
   isLoading = false,
   response = defaultResponse,
   status = 200,
+  presentation = 'section',
 }: {
+  readonly presentation?: 'section' | 'page';
   readonly isLoading?: boolean;
   readonly response?: TimActionsResponse | null;
   readonly status?: number;
@@ -89,7 +92,7 @@ function TimActionRequiredStory({
 
   return (
     <div className='max-w-2xl'>
-      <TimActionRequiredSection />
+      <TimActionRequiredSection presentation={presentation} />
     </div>
   );
 }
@@ -144,4 +147,13 @@ export const NotConfigured: Story = {
 
 export const Loading: Story = {
   render: () => <TimActionRequiredStory isLoading />,
+};
+
+export const StandalonePage: Story = {
+  render: () => <TimActionRequiredStory presentation='page' />,
+};
+
+export const StandaloneLight: Story = {
+  ...StandalonePage,
+  parameters: { themes: { themeOverride: 'light' } },
 };

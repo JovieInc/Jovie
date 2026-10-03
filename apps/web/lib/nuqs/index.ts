@@ -127,6 +127,7 @@ export {
   audienceSortParser,
   audienceViewParser,
   audienceViews,
+  founderFunnelRangeParser,
   type ProfileMode,
   // Base parsers
   pageParser,

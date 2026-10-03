@@ -105,6 +105,48 @@ describe('dogfoodReceiptFromPlaywrightReport', () => {
     });
     expect(result.outcome).toBe('blocked');
   });
+
+  it('blocks skipped-only runs from certifying a required mission', () => {
+    const runs = Array.from({ length: 3 }, (_, index) =>
+      dogfoodReceiptFromPlaywrightReport(
+        CONTEXT,
+        { stats: { expected: 0, flaky: 0, skipped: 4, unexpected: 0 } },
+        {
+          completedAt: `2026-09-27T10:0${index + 1}:00.000Z`,
+          startedAt: STARTED,
+        }
+      )
+    );
+
+    expect(runs.map(run => run.outcome)).toEqual([
+      'blocked',
+      'blocked',
+      'blocked',
+    ]);
+    expect(runs[0]?.blocker).toBe('playwright mission ran no tests');
+    const evaluation = evaluateDogfoodReliability(
+      runs,
+      { commitSha: COMMIT_SHA, deploymentId: DEPLOYMENT_ID },
+      [CONTEXT.missionId]
+    );
+    expect(evaluation.machineCertifiable).toBe(false);
+    expect(evaluation.missions[0]?.status).toBe('unmet');
+    expect(evaluation.missions[0]?.reliableAgents).toEqual([]);
+  });
+
+  it.each([
+    { expected: 1, flaky: 0, unexpected: 0, outcome: 'passed' },
+    { expected: 0, flaky: 1, unexpected: 0, outcome: 'passed' },
+    { expected: 0, flaky: 0, unexpected: 1, outcome: 'failed' },
+  ])('preserves $outcome for executed tests alongside skips', stats => {
+    const result = dogfoodReceiptFromPlaywrightReport(CONTEXT, {
+      stats: { ...stats, skipped: 4 },
+    });
+    expect(result.outcome).toBe(stats.outcome);
+    expect(result.blocker).toBe(
+      stats.unexpected > 0 ? '1 unexpected playwright failure(s)' : null
+    );
+  });
 });
 
 describe('dogfoodReceiptFromCommandRun', () => {

@@ -139,3 +139,75 @@ test.describe('Exact marketing route screenshots', () => {
     }
   }
 });
+
+test.describe('Marketing auth-entry prefetch boundary', () => {
+  test.describe.configure({ retries: 0 });
+  for (const route of [
+    '/new',
+    '/voice',
+    '/support',
+    '/artist-profiles',
+    '/artist-notifications',
+    '/smart-links',
+    '/launch',
+    '/instant-merch',
+    '/waitlist/invite',
+  ]) {
+    test(`auth-entry waits for visitor intent on ${route}`, async ({
+      page,
+    }) => {
+      const speculativeAuthRequests: string[] = [];
+      const authRequestFailures: string[] = [];
+      page.on('request', request => {
+        const url = new URL(request.url());
+        if (
+          ['/signup', '/signin', '/start', '/app/chat', '/waitlist'].includes(
+            url.pathname
+          ) &&
+          request.headers()['next-router-prefetch'] === '1'
+        ) {
+          speculativeAuthRequests.push(url.pathname);
+        }
+      });
+      page.on('requestfailed', request => {
+        const url = new URL(request.url());
+        if (
+          ['/signup', '/signin', '/start', '/app/chat', '/waitlist'].includes(
+            url.pathname
+          )
+        ) {
+          authRequestFailures.push(
+            `${url.pathname} ${request.failure()?.errorText ?? 'unknown'}`
+          );
+        }
+      });
+      await page.setViewportSize(
+        ['/artist-profiles', '/instant-merch', '/waitlist/invite'].includes(
+          route
+        )
+          ? { width: 390, height: 844 }
+          : { width: 1440, height: 900 }
+      );
+      await page.goto(route, { waitUntil: 'domcontentloaded' });
+      const authLinks = page.locator(
+        'a[href="/signup"]:visible, a[href^="/signup?"]:visible, a[href="/signin"]:visible, a[href^="/signin?"]:visible, a[href="/start"]:visible, a[href^="/start?"]:visible, a[href="/app/chat"]:visible, a[href^="/app/chat?"]:visible, a[href="/waitlist"]:visible, a[href^="/waitlist?"]:visible'
+      );
+      expect(await authLinks.count(), `${route} auth actions`).toBeGreaterThan(
+        0
+      );
+      for (const authLink of await authLinks.all()) {
+        await authLink.scrollIntoViewIfNeeded();
+        await expect(authLink).toBeVisible();
+        await authLink.focus();
+        await authLink.hover();
+        await waitForSettle(page, 1_000);
+      }
+      expect(speculativeAuthRequests, `${route} speculative auth work`).toEqual(
+        []
+      );
+      expect(authRequestFailures, `${route} pre-intent auth failures`).toEqual(
+        []
+      );
+    });
+  }
+});

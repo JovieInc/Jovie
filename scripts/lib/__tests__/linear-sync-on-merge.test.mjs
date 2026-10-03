@@ -317,6 +317,61 @@ describe('linear sync on merge', () => {
     );
   });
 
+  it('does not auto-close a remediation issue while the check is red', () => {
+    const issue = {
+      id: 'issue-red',
+      identifier: 'JOV-7206',
+      labels: ['remediation:golden-path-nightly'],
+      children: [],
+      hasChildren: false,
+    };
+    const mergingPull = {
+      number: 1,
+      url: 'https://github.com/JovieInc/Jovie/pull/1',
+      sha: 'abc',
+    };
+    const red = decideLinearCloseOnMerge({
+      issue,
+      pullRequests: [],
+      mergingPull,
+    });
+    expect(red.action).toBe('skip');
+    expect(red.comment).toContain('while the check is red');
+    const green = decideLinearCloseOnMerge({
+      issue,
+      pullRequests: [],
+      mergingPull,
+      checkGreen: true,
+    });
+    expect(green.action).toBe('close');
+  });
+
+  it('keeps an escaped defect open for exact-build product and detector proof', () => {
+    const decision = decideLinearCloseOnMerge({
+      issue: {
+        id: 'issue-7200',
+        identifier: 'JOV-7200',
+        labels: ['escaped-defect'],
+        description: 'The product fix merged, but no deployment proof exists.',
+        comments: [],
+        children: [],
+        hasChildren: false,
+      },
+      pullRequests: [],
+      mergingPull: {
+        number: 19000,
+        url: 'https://github.com/JovieInc/Jovie/pull/19000',
+        sha: 'merged-is-not-deployed',
+      },
+    });
+
+    expect(decision.action).toBe('skip');
+    expect(decision.blockingNumbers).toEqual([]);
+    expect(decision.comment).toContain('Escaped defects stay open at merge');
+    expect(decision.comment).toContain('Closure evidence is incomplete');
+    expect(decision.comment).toContain('escaped-defect-closure:v1');
+  });
+
   it('does not close commissioning parent JOV-5853 when a child pull request merges', () => {
     expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-5853')).toBe(true);
     const decision = decideLinearCloseOnMerge({
@@ -688,5 +743,17 @@ describe('linear sync on merge', () => {
     expect(workflow).toContain('sync_done:');
     expect(workflow).toContain('runs-on: ubuntu-latest');
     expect(workflow).not.toContain('issueUpdate');
+
+    const script = readFileSync(
+      resolve(import.meta.dirname, '../linear-sync-on-merge.mjs'),
+      'utf8'
+    );
+    const localImports = [
+      ...script.matchAll(/from '\.\/([a-z0-9-]+\.mjs)'/g),
+    ].map(match => `scripts/lib/${match[1]}`);
+    expect(localImports.length).toBeGreaterThan(0);
+    for (const dependency of localImports) {
+      expect(workflow).toContain(dependency);
+    }
   });
 });

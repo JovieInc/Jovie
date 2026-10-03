@@ -602,7 +602,7 @@ test('workflow records inputs before build and binds inspected deployment before
   assert.ok(!job.includes('production-input-provenance/**'));
 });
 
-test('production controller waits longer for the staging receipt than staging takes and fits its job timeout', () => {
+test('production controller consumes completed staging evidence without racing a receipt timeout', () => {
   const workflow = readFileSync(
     resolve(
       fileURLToPath(import.meta.url),
@@ -610,18 +610,15 @@ test('production controller waits longer for the staging receipt than staging ta
     ),
     'utf8'
   );
-  const attempts = Number(
-    workflow.match(
-      /for attempt in \$\(seq 1 (\d+)\); do\n\s+receipt_main_sha/
-    )?.[1]
+  assert.match(workflow, /workflows: \[Staging Controller\]/);
+  assert.match(
+    workflow,
+    /run: node .github\/scripts\/staging-release-source.mjs/
   );
-  const job = workflow.slice(workflow.indexOf('  authorize-production:'));
-  const timeout = Number(job.match(/timeout-minutes: (\d+)/)?.[1]);
-  const waitMinutes = (attempts * 10) / 60;
-  // Staging took ~20 min end to end on 2026-09-29; a 10 min wait failed valid releases.
-  assert.ok(waitMinutes >= 20, `wait ${waitMinutes}m`);
-  assert.ok(
-    timeout >= waitMinutes + 5,
-    `timeout ${timeout}m vs wait ${waitMinutes}m`
+  assert.match(
+    workflow,
+    /EXACT_STAGING_ARTIFACT_ID: \$\{\{ needs.release-source.outputs.staging_artifact_id \}\}/
   );
+  assert.match(workflow, /staging_artifact_id="\$EXACT_STAGING_ARTIFACT_ID"/);
+  assert.doesNotMatch(workflow, /for attempt in \$\(seq 1 150\)/);
 });

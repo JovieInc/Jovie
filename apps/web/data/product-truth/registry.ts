@@ -434,6 +434,58 @@ export const PRODUCT_CAPABILITIES = {
     },
   },
   /**
+   * Agent-readable profile summary. Every indexable public profile serves
+   * plain text at `/{username}/llms.txt`
+   * (`apps/web/app/[username]/llms.txt/route.ts`; covered by
+   * `apps/web/tests/unit/profile/artist-llms-txt-route.test.ts`). Live in
+   * production as `text/plain` with entity identity, claim and verification
+   * status, location, genres, and stream links. No feature flag. The
+   * screenshot registry has no scenario for a text response.
+   */
+  'agent-readable-profile-summary': {
+    maturity: 'general_availability',
+    publication: 'public',
+    access: 'open',
+    entitlementKeys: [],
+    evidence: {
+      captureScenarios: [],
+      routes: ['/{username}/llms.txt'],
+    },
+    marketing: {
+      audience: 'general',
+      supportedJobs: ['machine-readable public profile summary'],
+      proofAuthorized: true,
+      contentRevision: '2026-09-16',
+    },
+  },
+  /**
+   * Public Ask on profiles. `AskJovieWidget`
+   * (`apps/web/components/features/ask-jovie/AskJovieWidget.tsx`, tests in
+   * `AskJovieWidget.test.tsx`) mounts for anonymous visitors from
+   * `apps/web/app/[username]/page.tsx` and posts to
+   * `apps/web/app/api/profile/[username]/ask/route.ts` (route tests alongside
+   * that file). No feature flag; the page omits it only when
+   * `PUBLIC_NOAUTH_SMOKE=1`. The launcher is in the production profile HTML.
+   * Golden-path keyframe `anonymous-chat` drives `/start` onboarding, not
+   * this widget, and no screenshot scenario id covers the launcher.
+   */
+  'public-ask': {
+    maturity: 'general_availability',
+    publication: 'public',
+    access: 'open',
+    entitlementKeys: [],
+    evidence: {
+      captureScenarios: [],
+      routes: ['/{username}', '/api/profile/{username}/ask'],
+    },
+    marketing: {
+      audience: 'general',
+      supportedJobs: ['anonymous Ask on a public profile'],
+      proofAuthorized: true,
+      contentRevision: '2026-09-30',
+    },
+  },
+  /**
    * Selective reach ("Send less. Matter more.", JOV-6299). The copy line is
    * founder-approved, but presenting it as working Jovie behavior is gated on
    * certified segments, real preview/approval/scheduling/send paths, consent
@@ -674,6 +726,22 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
     nonMarketing: 'OAuth dynamic client registration kill switch',
+  },
+  CHATGPT_APP_DIRECTORY_MCP: {
+    nonMarketing:
+      'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+  },
+  IN_HOUSE_RESOLVER: {
+    nonMarketing:
+      'JOV-7323 cross-DSP resolver cutover; MusicFetch stays a dormant fallback',
+  },
+  AUTH_OFFER_SUMMARY: {
+    nonMarketing:
+      'auth offer recap; default off; no price, trial, or entitlement change',
+  },
+  INVESTOR_PORTAL_YC_DECK: {
+    nonMarketing:
+      'investor brief section order; default off until founder design approval',
   },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 

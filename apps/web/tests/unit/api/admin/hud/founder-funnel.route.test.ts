@@ -32,6 +32,7 @@ describe('GET /api/admin/hud/founder-funnel', () => {
       timeRange: '30d',
       biggestDropOffKey: null,
       errors: ['connection refused'],
+      definitionVersion: 'founder-funnel.v2',
       stages: [
         {
           key: 'onboarding_chats',
@@ -40,6 +41,8 @@ describe('GET /api/admin/hud/founder-funnel', () => {
           count: 0,
           conversionRate: null,
           dropOff: null,
+          identifiable: false,
+          drillDownHref: null,
         },
       ],
     });

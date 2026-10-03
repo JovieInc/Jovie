@@ -9,6 +9,7 @@ import {
   Home,
   IdCard,
   Keyboard,
+  Link2,
   Lock,
   LogOut,
   MessageCircle,
@@ -26,7 +27,7 @@ import {
   UserCircle,
   X,
 } from 'lucide-react';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildArtistProfilePayRoute } from '@/constants/routes';
 // Unicode glyphs via String.fromCodePoint so they survive encoding-unaware
 // pipelines (CI, bundlers, proxies) without producing mojibake.
 export const GLYPH_CMD = String.fromCodePoint(0x2318);
@@ -223,6 +224,18 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
+    id: 'nav-links',
+    label: 'Go to links',
+    keys: 'G then K',
+    category: 'navigation',
+    icon: Link2,
+    href: APP_ROUTES.LINKS,
+    isSequential: true,
+    firstKey: 'g',
+    secondKey: 'k',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
+  },
+  {
     id: 'nav-calendar',
     label: 'Go to calendar',
     keys: 'G then L',
@@ -252,7 +265,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then E',
     category: 'navigation',
     icon: Banknote,
-    href: APP_ROUTES.EARNINGS,
+    href: buildArtistProfilePayRoute(),
     isSequential: true,
     firstKey: 'g',
     secondKey: 'e',
@@ -419,6 +432,7 @@ export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   'artist-profile': KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   library: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
+  links: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-links')!,
   calendar: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-calendar')!,
   earnings: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-earnings')!,
   chat: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-chat')!,

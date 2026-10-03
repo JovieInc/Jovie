@@ -42,6 +42,14 @@ export interface DailyPost {
   readonly entries: readonly DailyPostEntry[];
 }
 
+/** Consolidated changelog query across products, apps and repositories. */
+export interface ChangelogFilter {
+  readonly product?: string;
+  readonly app?: ReleaseApp;
+  readonly repository?: string;
+  readonly localDate?: string;
+}
+
 export interface ReleaseCommunicationsAdapter {
   ingest(event: VerifiedMergeEvent): Promise<DailyPost>;
   getDailyPost(input: {
@@ -49,6 +57,12 @@ export interface ReleaseCommunicationsAdapter {
     app?: ReleaseApp;
     localDate: string;
   }): Promise<DailyPost | null>;
+  /**
+   * Consolidated changelog: daily posts matching the filter, newest first.
+   * `repository`/`app` also scope the returned entries so a source filter
+   * only reports that source's merges.
+   */
+  listChangelog(filter: ChangelogFilter): Promise<readonly DailyPost[]>;
   dismissPost(input: { postId: string; userId: string }): Promise<void>;
   isPostDismissed(input: { postId: string; userId: string }): Promise<boolean>;
 }
@@ -141,6 +155,26 @@ export class InMemoryReleaseCommunicationsAdapter
           (!input.app || post.app === input.app)
       ) ?? null
     );
+  }
+
+  async listChangelog(filter: ChangelogFilter): Promise<readonly DailyPost[]> {
+    return [...this.posts.values()]
+      .filter(
+        post =>
+          (!filter.product || post.product === filter.product) &&
+          (!filter.app || post.app === filter.app) &&
+          (!filter.localDate || post.localDate === filter.localDate)
+      )
+      .map(post => ({
+        ...post,
+        entries: post.entries.filter(
+          entry =>
+            (!filter.repository || entry.repository === filter.repository) &&
+            (!filter.app || entry.app === filter.app)
+        ),
+      }))
+      .filter(post => post.entries.length > 0 || !filter.repository)
+      .sort((a, b) => b.localDate.localeCompare(a.localDate));
   }
 
   async dismissPost(input: { postId: string; userId: string }): Promise<void> {

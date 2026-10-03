@@ -45,6 +45,9 @@ describe('PublicPageShell', () => {
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.publicPage
     );
+    expect(container.firstElementChild).toHaveAttribute(
+      'data-public-page-shell'
+    );
     const main = document.getElementById('main-content');
     expect(main).toBeInTheDocument();
     expect(main).toHaveTextContent('route content');

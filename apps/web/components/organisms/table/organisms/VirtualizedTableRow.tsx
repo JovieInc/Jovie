@@ -7,6 +7,7 @@ import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
 import { TABLE_CELL_CONTENT_CLASSNAME } from '../atoms/TableCell';
+import { usePrimaryColumnCompacts } from '../column-priority-context';
 import { presets, rowState, tableAlignment } from '../table.styles';
 
 /**
@@ -90,6 +91,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
   Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
   const rowData = row.original as TData;
   const isRowSelected = (row.getIsSelected?.() ?? false) || isSelected;
+  const { primaryId, node: compactNode } = usePrimaryColumnCompacts(rowData);
 
   // Keep a ref to the forwarded onContextMenu so we can compose it without
   // breaking memoisation of handleContextMenu.
@@ -185,6 +187,8 @@ function VirtualizedTableRowComponent<TData extends RowData>({
         const meta = cell.column.columnDef.meta;
         const metaClassName = meta?.className;
         const align = meta?.align ?? 'left';
+        const showCompacts =
+          compactNode != null && cell.column.id === primaryId;
         return (
           <td
             key={cell.id}
@@ -205,11 +209,19 @@ function VirtualizedTableRowComponent<TData extends RowData>({
             <div
               className={cn(
                 TABLE_CELL_CONTENT_CLASSNAME,
-                meta?.cellContentClassName
+                meta?.cellContentClassName,
+                showCompacts && 'flex items-center gap-2'
               )}
               data-table-cell-content='stable'
             >
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              {showCompacts ? (
+                <div className='min-w-0 flex-1 overflow-hidden'>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </div>
+              ) : (
+                flexRender(cell.column.columnDef.cell, cell.getContext())
+              )}
+              {showCompacts ? compactNode : null}
             </div>
           </td>
         );

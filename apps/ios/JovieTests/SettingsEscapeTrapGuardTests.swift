@@ -126,3 +126,76 @@ struct SettingsStyleGuardTests {
     #expect(SettingsExternalURL.terms?.absoluteString == "https://jov.ie/legal/terms")
   }
 }
+
+// JOV-7534: Settings reports Apple-controlled release provenance (App Store vs
+// TestFlight) and exact commit identity; it never implies an in-app channel
+// switch is possible.
+struct ReleaseChannelGuardTests {
+  @Test func provenanceDerivationMatchesAppleReceiptNames() {
+    #expect(AppBuildInfo.provenance(receiptName: "receipt", isDebugBuild: false) == .appStore)
+    #expect(AppBuildInfo.provenance(receiptName: "sandboxReceipt", isDebugBuild: false) == .testFlight)
+    #expect(AppBuildInfo.provenance(receiptName: nil, isDebugBuild: false) == .unknown)
+    #expect(AppBuildInfo.provenance(receiptName: "unexpected", isDebugBuild: false) == .unknown)
+  }
+
+  @Test func provenanceDisplayNamesAreHonest() {
+    #expect(AppDistributionProvenance.appStore.displayName == "App Store")
+    #expect(AppDistributionProvenance.testFlight.displayName == "TestFlight")
+    #expect(AppDistributionProvenance.development.displayName == "Development")
+    #expect(AppDistributionProvenance.unknown.displayName == "Unknown")
+  }
+
+  @Test func shortCommitOnlyTruncatesLongSHAs() {
+    let long = AppBuildInfo(
+      version: "1.0", build: "1", provenance: .testFlight,
+      commit: "d12f22983e2ec0a4ea2a3b411708a181633b6a2c"
+    )
+    #expect(long.shortCommit == "d12f229")
+    let short = AppBuildInfo(version: "1.0", build: "1", provenance: .appStore, commit: "abc123")
+    #expect(short.shortCommit == "abc123")
+    let none = AppBuildInfo(version: "1.0", build: "1", provenance: .development, commit: nil)
+    #expect(none.shortCommit == nil)
+  }
+
+  @Test(arguments: [nil, "abc123", "d12f22983e2ec0a4ea2a3b411708a181633b6a2c"] as [String?])
+  func commitDetailsStayOnTheAdminSurface(commit: String?) {
+    let info = AppBuildInfo(version: "1.0", build: "1", provenance: .appStore, commit: commit)
+    #expect(info.displayedCommit(isAdmin: false) == nil)
+    #expect(info.displayedCommit(isAdmin: true) == info.shortCommit)
+    #expect(info.version == "1.0")
+    #expect(info.build == "1")
+    #expect(info.channel == .stable)
+  }
+
+  @Test func currentBuildInfoCarriesProvenance() {
+    #if DEBUG
+      #expect(AppBuildInfo.current().provenance == .development)
+      #expect(AppBuildInfo.current().channel == nil)
+    #endif
+  }
+
+  @Test func settingsSourceExposesProvenanceAndAdminOnlyTestFlightEntry() throws {
+    let url = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Settings/SettingsView.swift")
+    let source = try String(contentsOf: url, encoding: .utf8)
+
+    #expect(source.contains("LabeledContent(\"Channel\", value: channel.displayName)"))
+    #expect(source.contains("settings-release-channel"))
+    #expect(source.contains("settings-build-commit"))
+    #expect(source.contains("buildInfo.displayedCommit(isAdmin: showsWorkspaceSwitch)"))
+    #expect(source.contains("https://testflight.apple.com"))
+    // Admin gate + Apple-controlled install surface; no in-app channel toggle.
+    #expect(source.contains("showsWorkspaceSwitch, buildInfo.provenance != .testFlight"))
+    #expect(source.contains("settings-open-testflight"))
+    #expect(!source.contains("switchChannel"))
+    #expect(!source.contains("Join Beta"))
+    #expect(!source.contains("appStoreReceiptURL?.lastPathComponent == \"sandboxReceipt\""),
+            "Channel derivation must stay inside AppBuildInfo.provenance(receiptName:isDebugBuild:).")
+  }
+
+  @Test func testflightURLOpensAppleEnrollmentSurface() {
+    #expect(SettingsExternalURL.testflight?.absoluteString == "https://testflight.apple.com")
+  }
+}

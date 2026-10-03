@@ -17,6 +17,7 @@ export const APP_ROUTES = {
   LEGACY_DASHBOARD: '/app/dashboard',
   /** Legacy earnings path. Keep for old bookmarks; use EARNINGS for canonical entry. */
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
+  /** Legacy links path. Keep for old bookmarks; use LINKS for navigation. */
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
   /** Legacy audience path. Keep as a redirect source only. */
@@ -47,6 +48,8 @@ export const APP_ROUTES = {
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   LIBRARY: '/app/library',
+  /** Canonical user-facing smart-link workspace (JOV-7160). */
+  LINKS: '/app/links',
   /** Legacy Tracks path. Keep as a redirect source only — Tracks folded into Library (JOV-4846). */
   LEGACY_TRACKS: '/app/tracks',
   TASKS: '/app/tasks',
@@ -77,8 +80,6 @@ export const APP_ROUTES = {
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_ANALYTICS: '/app/settings/analytics',
   SETTINGS_ADMIN: '/app/settings/admin',
-  SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
-  SETTINGS_REFERRAL: '/app/settings/referral',
   /** @deprecated Use SETTINGS_DATA_PRIVACY instead */
   SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 
@@ -318,6 +319,11 @@ export function buildReleaseTasksRoute(releaseId: string): string {
 
 export function buildReleaseDownloadsRoute(releaseId: string): string {
   return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/downloads`;
+}
+
+/** Earnings settings live on the profile pay tab. Shortcuts should open this, not the legacy earnings redirect. */
+export function buildArtistProfilePayRoute(): string {
+  return `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`;
 }
 
 export function buildLibraryViewRoute(

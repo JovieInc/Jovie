@@ -59,7 +59,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -150,7 +150,7 @@
     ".claude/rules/ios.md": {
       "owner": "@itstimwhite",
       "claim": "The hard-invariant table is implemented by the existing iOS lint.",
-      "documentSha256": "8672105de5e42eeac1d930649e6457f31f2628ecffa38a3dd911cf83f5743bd5",
+      "documentSha256": "575fd3bc9e10fd68ab624b374accd15510cce7c821aab7af5552a9f72382b81f",
       "sources": [
         {
           "path": "scripts/ios-best-practices-lint.sh",
@@ -171,13 +171,18 @@
     },
     ".claude/rules/macos.md": {
       "owner": "@itstimwhite",
-      "claim": "Mac product and MenuMonitor boundaries follow the existing Mac stack decision.",
-      "documentSha256": "329d5f19f996470e2c0a4e7a433e3c53aa55157f8f29c29881c8d1dd250e71c0",
+      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
+      "documentSha256": "3e478342371997f9537a7194222b21221735e6ea564eee3651fb3dd9319945f9",
       "sources": [
         {
           "path": "docs/macos/swift-control-invariants.md",
           "section": "## Current Mac stack",
-          "sha256": "516475b30c09a62fa0c1bfce77ef84327508677a547dd4af1b96e23273056cb9"
+          "sha256": "5c14a12977081c02bc0e7f8e6e8ca8fc9725cb20c9e604827324398d2cafdae6"
+        },
+        {
+          "path": "docs/macos/ADR-swift-native-mac.md",
+          "section": "## Decision",
+          "sha256": "46bb06e4e265a3540909db29274e4bfeb64fc6a5732cbe610d927d577962b501"
         }
       ]
     },
@@ -211,7 +216,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -219,7 +224,7 @@
     ".claude/rules/release.md": {
       "owner": "@itstimwhite",
       "claim": "Draft publication and exact-head qualification are separate canonical phases.",
-      "documentSha256": "543f67bef47e2aa7d757759145aa530ea82072c65b383480075cf83bec6dd20c",
+      "documentSha256": "650a00c3a586814b757200e8b62652b33975f6602f88e393f6ba8e8d6dd4633b",
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
@@ -246,7 +251,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -334,7 +339,7 @@
     "CLAUDE.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router implements the company constitution without replacing it.",
-      "documentSha256": "1b75c23c85e8d0b7431ff336dfa6211d9ef2f5e49649963530500ff0081222ec",
+      "documentSha256": "8a34aa0ffe385bdc1ee2872e0f6a22df21d6a860dfcb224d2c150e951e7dcafa",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
@@ -394,7 +399,7 @@
     "docs/AI_AGENT_GUIDE.md": {
       "owner": "@itstimwhite",
       "claim": "API inventory uses Better Auth per the canonical auth rule; inventories are not runtime certification.",
-      "documentSha256": "a72ff588f03a09c0abe10824f09192d5865f2b087f697ba8d0355397c1ed436e",
+      "documentSha256": "44b4060ada4b5abc02f735ecc934446d295edf72cbd3c55dfa922fb4763ccf77",
       "sources": [
         {
           "path": ".claude/rules/auth.md",
