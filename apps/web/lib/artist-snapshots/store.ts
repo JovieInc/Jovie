@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, inArray, or } from 'drizzle-orm';
 import type {
   ArtistSnapshotCandidate,
   ArtistSnapshotSourceName,
@@ -49,7 +49,7 @@ function firstMusicBrainzId(ids: readonly (string | null)[]): string | null {
 
 export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
   async listCandidates(limit, day) {
-    const lastSnapshotDay = sql<string | null>`(
+    const lastSnapshotDay = drizzleSql<string | null>`(
       select max(${artistDailySnapshots.snapshotDay})
       from ${artistDailySnapshots}
       where ${artistDailySnapshots.creatorProfileId} = ${creatorProfiles.id}
@@ -65,16 +65,16 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
         and(
           eq(creatorProfiles.creatorType, 'artist'),
           or(
-            sql`${creatorProfiles.youtubeUrl} is not null`,
-            sql`${creatorProfiles.musicbrainzId} is not null`,
-            sql`exists (
+            drizzleSql`${creatorProfiles.youtubeUrl} is not null`,
+            drizzleSql`${creatorProfiles.musicbrainzId} is not null`,
+            drizzleSql`exists (
               select 1 from ${socialLinks}
               where ${socialLinks.creatorProfileId} = ${creatorProfiles.id}
                 and ${socialLinks.platform} in ('instagram', 'youtube')
                 and ${socialLinks.isActive} = true
                 and ${socialLinks.state} = 'active'
             )`,
-            sql`exists (
+            drizzleSql`exists (
               select 1 from ${artists}
               where ${artists.creatorProfileId} = ${creatorProfiles.id}
                 and ${artists.musicbrainzId} is not null
@@ -82,7 +82,10 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
           )
         )
       )
-      .orderBy(sql`${lastSnapshotDay} asc nulls first`, asc(creatorProfiles.id))
+      .orderBy(
+        drizzleSql`${lastSnapshotDay} asc nulls first`,
+        asc(creatorProfiles.id)
+      )
       .limit(limit);
     if (profiles.length === 0) return [];
     const ids = profiles.map(profile => profile.id);
@@ -111,7 +114,7 @@ export const drizzleArtistSnapshotStore: ArtistSnapshotStore = {
         .where(
           and(
             inArray(artists.creatorProfileId, ids),
-            sql`${artists.musicbrainzId} is not null`
+            drizzleSql`${artists.musicbrainzId} is not null`
           )
         ),
       db
