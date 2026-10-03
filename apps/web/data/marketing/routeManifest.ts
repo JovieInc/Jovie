@@ -299,35 +299,23 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/new/page.tsx',
     recipeId: 'homepage',
-    renderedSections: [
-      ...approvedBindings(
-        'components/marketing/homepage-v2/HomepageV2Route.tsx',
-        'hero',
-        'logo-cloud',
-        'feature-split',
-        'feature-split',
-        'feature-split',
-        'spec-wall',
-        'social-proof'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx',
-        'pricing',
-        'tier-cards-recommended'
-      ),
-      ...approvedBindings(
-        'components/marketing/homepage-v2/HomepageV2Route.tsx',
-        'cta'
-      ),
-    ],
+    renderedSections: [],
     bindingEvidence: {
-      status: 'verified',
-      source: 'route audit 2026-07-11',
+      status: 'unverified',
+      source: 'https://github.com/JovieInc/Jovie/pull/20188',
+      notes:
+        'Retired homepage-v2 alias redirects to /. It renders no recipe sections; homepage evidence belongs to the live / route.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.2.0',
     url: '/new',
     aliasOf: '/',
+    noindex: true,
+    healthCheck: {
+      path: '/new',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
+    },
   },
   {
     glob: '(marketing)/pricing/page.tsx',

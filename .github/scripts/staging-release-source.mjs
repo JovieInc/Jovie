@@ -18,6 +18,40 @@ const ID = /^[1-9][0-9]*$/;
 function requireEvidence(condition, reason) {
   if (!condition) throw new Error(reason);
 }
+// Completed runs may retain artifacts across reruns. Read every bounded page;
+// incomplete, changing, or duplicated listings never authorize production.
+export function completeRunListing(api, route, key, reason) {
+  const first = api(route);
+  const total = first?.total_count;
+  requireEvidence(
+    Number.isSafeInteger(total) && total >= 0 && total <= 1000,
+    reason
+  );
+  const rows = [];
+  const seen = new Set();
+  for (let page = 1; page <= Math.max(1, Math.ceil(total / 100)); page++) {
+    const listing = page === 1 ? first : api(`${route}&page=${page}`);
+    const items = listing?.[key];
+    requireEvidence(
+      listing?.total_count === total &&
+        Array.isArray(items) &&
+        items.length === Math.min(100, total - rows.length),
+      reason
+    );
+    for (const item of items) {
+      const id = String(item?.id);
+      requireEvidence(
+        ID.test(id) && !seen.has(id),
+        `${reason}: ambiguous identifiers`
+      );
+      seen.add(id);
+      rows.push(item);
+    }
+  }
+  requireEvidence(rows.length === total, reason);
+  return { total_count: total, [key]: rows };
+}
+
 function exactRun(run, repository, path, event) {
   return (
     run &&
@@ -70,12 +104,10 @@ export function resolveStagingReleaseSource({
       stage.head_sha === trigger.head_sha,
     'staging attempt mismatch'
   );
-  const listing = api(
-    `repos/${repository}/actions/runs/${trigger.id}/artifacts?per_page=100`
-  );
-  requireEvidence(
-    Array.isArray(listing?.artifacts) &&
-      listing.total_count === listing.artifacts.length,
+  const listing = completeRunListing(
+    api,
+    `repos/${repository}/actions/runs/${trigger.id}/artifacts?per_page=100`,
+    'artifacts',
     'incomplete staging artifact listing'
   );
   const select = name => {
@@ -171,8 +203,11 @@ export function resolveStagingReleaseSource({
         ),
       'staging deployment producer attempt mismatch'
     );
-    const jobs = api(
-      `repos/${repository}/actions/runs/${trigger.id}/attempts/${receipt.controllerRunAttempt}/jobs?per_page=100`
+    const jobs = completeRunListing(
+      api,
+      `repos/${repository}/actions/runs/${trigger.id}/attempts/${receipt.controllerRunAttempt}/jobs?per_page=100`,
+      'jobs',
+      'staging deployment producer job listing mismatch'
     );
     requireEvidence(
       Array.isArray(jobs?.jobs) &&

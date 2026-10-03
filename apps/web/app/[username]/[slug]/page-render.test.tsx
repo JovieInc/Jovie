@@ -175,9 +175,8 @@ describe('release rendering by publication phase', () => {
     expect(mocks.unreleased).toHaveBeenCalledWith(
       expect.objectContaining({
         release: expect.objectContaining({
-          id: 'release-1',
-          hasSpotify: true,
-          hasAppleMusic: false,
+          slug: content.slug,
+          title: content.title,
         }),
       }),
       undefined
