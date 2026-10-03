@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
 import {
@@ -3260,9 +3261,254 @@ describe('PR targets main (no stacked bases)', () => {
     expect(workflow).toMatch(/^on:\n  pull_request:\n    types:/m);
     expect(workflow).not.toMatch(/branches:\s*\[main/);
     expect(workflow).toContain('merge_group:');
-    expect(workflow).toContain('"$base" != "main"');
+    expect(workflow).toContain("live.base.ref !== 'main'");
     expect(workflow).toContain('PRs must target main');
     expect(workflow).toContain('Retarget the pull request base to main');
+  });
+
+  const parsed =
+    /** @type {{ jobs: Record<string, { steps: { uses: string, with: { script: string } }[] }>, permissions: Record<string, string> }} */ (
+      load(workflow)
+    );
+  const guard = parsed.jobs['pr-targets-main'].steps[0];
+  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+  const execute = new AsyncFunction(
+    'context',
+    'github',
+    'core',
+    guard.with.script
+  );
+  const head = '396a3116a3d237f8d433e0803c2001debf371637';
+  const repository = { full_name: 'JovieInc/Jovie' };
+
+  function fixture({
+    eventBase = 'main',
+    liveBase = 'main',
+    headRepo = repository,
+  } = {}) {
+    const context = {
+      eventName: 'pull_request',
+      repo: { owner: 'JovieInc', repo: 'Jovie' },
+      payload: {
+        pull_request: {
+          number: 20317,
+          head: { sha: head, repo: headRepo },
+          base: { ref: eventBase, repo: repository },
+        },
+      },
+    };
+    const live = {
+      number: 20317,
+      state: 'open',
+      head: { sha: head, repo: headRepo },
+      base: { ref: liveBase, repo: repository },
+    };
+    const requests = [];
+    const messages = [];
+    const github = {
+      rest: {
+        pulls: {
+          get: async request => {
+            requests.push(request);
+            return { data: live };
+          },
+        },
+      },
+    };
+    const core = { info: message => messages.push(message) };
+    return { context, live, github, core, requests, messages };
+  }
+
+  it('accepts the current main base when the queued event still names the landed parent', async () => {
+    const f = fixture({
+      eventBase: 'codex/pr-drain-native-scanner-runtime-recovered',
+    });
+    await execute(f.context, f.github, f.core);
+    expect(f.requests).toEqual([
+      {
+        owner: 'JovieInc',
+        repo: 'Jovie',
+        pull_number: 20317,
+        headers: { 'Cache-Control': 'no-cache' },
+      },
+    ]);
+    expect(f.messages).toEqual([`PR #20317 targets main at ${head}`]);
+  });
+
+  it('rejects a current stacked base even when the old event names main', async () => {
+    const f = fixture({ liveBase: 'codex/other-parent' });
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow(
+      'PRs must target main'
+    );
+    expect(f.messages).toEqual([]);
+  });
+
+  it.each([
+    [
+      'changed head',
+      live => {
+        live.head.sha = 'a'.repeat(40);
+      },
+    ],
+    [
+      'closed PR',
+      live => {
+        live.state = 'closed';
+      },
+    ],
+    [
+      'wrong PR',
+      live => {
+        live.number = 20318;
+      },
+    ],
+    [
+      'foreign base repository',
+      live => {
+        live.base.repo = { full_name: 'other/Jovie' };
+      },
+    ],
+    [
+      'changed head repository',
+      live => {
+        live.head.repo = { full_name: 'other/Jovie' };
+      },
+    ],
+    [
+      'missing base',
+      live => {
+        delete live.base;
+      },
+    ],
+    [
+      'missing head',
+      live => {
+        delete live.head;
+      },
+    ],
+  ])('rejects %s before issuing a passing receipt', async (_name, change) => {
+    const f = fixture();
+    change(f.live);
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow(
+      'PR source identity changed'
+    );
+    expect(f.messages).toEqual([]);
+  });
+
+  it('preserves fork-policy ownership with a read-only guard and no source checkout', async () => {
+    const f = fixture({ headRepo: { full_name: 'contributor/Jovie' } });
+    await execute(f.context, f.github, f.core);
+    expect(f.messages).toHaveLength(1);
+    expect(parsed.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+    });
+    expect(parsed.jobs['pr-targets-main'].steps).toHaveLength(1);
+    expect(guard.uses).toMatch(/^actions\/github-script@[0-9a-f]{40}$/);
+    expect(guard.with.script).not.toContain('${{');
+  });
+
+  it.each([
+    [
+      'malformed head',
+      context => {
+        context.payload.pull_request.head.sha = 'short';
+      },
+    ],
+    [
+      'missing PR',
+      context => {
+        delete context.payload.pull_request;
+      },
+    ],
+    [
+      'invalid number',
+      context => {
+        context.payload.pull_request.number = 0;
+      },
+    ],
+    [
+      'unsupported event',
+      context => {
+        context.eventName = 'workflow_dispatch';
+      },
+    ],
+    [
+      'foreign repository',
+      context => {
+        context.repo.owner = 'other';
+      },
+    ],
+  ])('rejects %s without requesting PR metadata', async (_name, change) => {
+    const f = fixture();
+    change(f.context);
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow();
+    expect(f.requests).toEqual([]);
+    expect(f.messages).toEqual([]);
+  });
+
+  it('fails closed when GitHub cannot return current metadata', async () => {
+    const f = fixture();
+    f.github.rest.pulls.get = async () => {
+      throw new Error('GitHub unavailable');
+    };
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow(
+      'GitHub unavailable'
+    );
+    expect(f.messages).toEqual([]);
+  });
+
+  it('accepts an authenticated main merge group without a PR lookup', async () => {
+    const f = fixture();
+    await execute(
+      {
+        ...f.context,
+        eventName: 'merge_group',
+        payload: {
+          merge_group: {
+            base_ref: 'refs/heads/main',
+            base_sha: 'b'.repeat(40),
+            head_sha: head,
+          },
+        },
+      },
+      f.github,
+      f.core
+    );
+    expect(f.requests).toEqual([]);
+    expect(f.messages).toEqual(['Merge group targets main']);
+  });
+
+  it.each([
+    [
+      'feature base',
+      {
+        base_ref: 'refs/heads/feature',
+        base_sha: 'b'.repeat(40),
+        head_sha: head,
+      },
+    ],
+    ['missing group', undefined],
+    ['missing base SHA', { base_ref: 'refs/heads/main', head_sha: head }],
+    [
+      'missing head SHA',
+      { base_ref: 'refs/heads/main', base_sha: 'b'.repeat(40) },
+    ],
+  ])('rejects a merge group with %s', async (_name, group) => {
+    const f = fixture();
+    await expect(
+      execute(
+        {
+          ...f.context,
+          eventName: 'merge_group',
+          payload: { merge_group: group },
+        },
+        f.github,
+        f.core
+      )
+    ).rejects.toThrow('Merge group must target main');
+    expect(f.requests).toEqual([]);
+    expect(f.messages).toEqual([]);
   });
 });
 
