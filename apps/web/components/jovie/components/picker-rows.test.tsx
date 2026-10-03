@@ -36,3 +36,36 @@ describe('picker-rows action items', () => {
     expect(onCommit).toHaveBeenCalledWith(0);
   });
 });
+
+describe('picker-rows nav items', () => {
+  it('resolves the Video icon for nav rows', () => {
+    const item = {
+      kind: 'nav' as const,
+      nav: {
+        kind: 'nav' as const,
+        id: 'go-youtube-revival',
+        label: 'YouTube revival queue',
+        description: 'Review and revive back-catalog YouTube videos.',
+        iconName: 'Video',
+        surfaces: [],
+        href: '/app/youtube',
+      },
+    };
+
+    const { container } = render(
+      <PickerRow
+        item={item}
+        index={0}
+        isActive={false}
+        onMouseEnter={vi.fn()}
+        onCommit={vi.fn()}
+      />
+    );
+
+    expect(container.querySelector('svg.lucide-video')).not.toBeNull();
+    expect(
+      screen.getByRole('option', { name: /YouTube revival queue/ })
+    ).toBeInTheDocument();
+    expect(pickerItemKey(item)).toBe('nav:go-youtube-revival');
+  });
+});
