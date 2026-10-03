@@ -1305,8 +1305,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:limiter-store-health
-    jobCount: 3
+    terminalReceipt: job:docs-deploy-jovie
+    jobCount: 6
   - name: Taste Classifier
     path: .github/workflows/taste-classifier.yml
     active: false
