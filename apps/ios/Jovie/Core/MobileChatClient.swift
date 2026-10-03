@@ -344,44 +344,13 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     from bytes: URLSession.AsyncBytes,
     onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
   ) async throws -> [MobileChatStreamEvent] {
-    var leftover = Data()
-    var events: [MobileChatStreamEvent] = []
-    var batch = Data()
-    batch.reserveCapacity(256)
+    let events: [MobileChatStreamEvent]
 
     do {
-      for try await byte in bytes {
-        if isOwned { try Task.checkCancellation() }
-        batch.append(byte)
-        guard byte == UInt8(ascii: "\n") else { continue }
-        try await publish(
-          MobileChatNDJSONParser.consume(
-            chunk: batch,
-            leftover: &leftover,
-            baseURL: baseURL
-          ),
-          into: &events,
-          onEvent: onEvent
-        )
-        batch.removeAll(keepingCapacity: true)
-      }
-
-      if isOwned { try Task.checkCancellation() }
-      if !batch.isEmpty {
-        try await publish(
-          MobileChatNDJSONParser.consume(
-            chunk: batch,
-            leftover: &leftover,
-            baseURL: baseURL
-          ),
-          into: &events,
-          onEvent: onEvent
-        )
-      }
-
-      try await publish(
-        MobileChatNDJSONParser.finish(leftover: &leftover, baseURL: baseURL),
-        into: &events,
+      events = try await MobileChatNDJSONReader.read(
+        from: bytes,
+        baseURL: baseURL,
+        checkingTaskCancellation: isOwned,
         onEvent: onEvent
       )
     } catch let error as MobileChatClientError {
@@ -400,18 +369,5 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     return events
-  }
-
-  private func publish(
-    _ parsed: [MobileChatStreamEvent],
-    into events: inout [MobileChatStreamEvent],
-    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
-  ) async {
-    for event in parsed {
-      events.append(event)
-      if let onEvent {
-        await onEvent(event)
-      }
-    }
   }
 }

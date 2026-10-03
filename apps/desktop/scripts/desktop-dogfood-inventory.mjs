@@ -195,7 +195,6 @@ const settingsRoutes = [
   ['data-privacy', 'Data and Privacy', '/app/settings/data-privacy'],
   ['delete-account', 'Delete Account', '/app/settings/delete-account'],
   ['connectors', 'Connections', '/app/settings/connectors'],
-  ['retargeting-ads', 'Retargeting Ads', '/app/settings/retargeting-ads'],
   ['billing', 'Billing', '/app/settings/billing'],
   ['usage', 'Usage', '/app/settings/usage'],
   ['payments', 'Payments', '/app/settings/payments'],

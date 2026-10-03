@@ -129,6 +129,30 @@ final class PushNotificationManager: PushNotificationCoordinating {
     finishDeactivation(operation: operation, ownership: context.ownership)
   }
 
+  func deactivate(for claim: NativeSessionCleanupClaim) async {
+    let operation = UUID()
+    var accepted: NativeSessionContext?
+    var token: String?
+    NativeSessionTokenStore.performIfCurrent(claim) { context in
+      guard context.authorization == nil || ownership == nil || ownership == context.ownership else { return }
+      epoch = operation
+      shouldRegister = false
+      ownership = context.ownership
+      token = defaults.string(forKey: Self.storedTokenKey)
+      accepted = context
+    }
+    guard let accepted else { return }
+    if let authorization = accepted.authorization, let token, let apiClient {
+      try? await apiClient.unregisterPushDevice(token: token, authorization: authorization)
+    }
+    NativeSessionTokenStore.performIfCurrent(claim) { _ in
+      // The store lock is already held: do not call isCurrent here.
+      guard epoch == operation, ownership == accepted.ownership else { return }
+      system.unregister()
+      defaults.removeObject(forKey: Self.storedTokenKey)
+    }
+  }
+
   private func finishDeactivation(operation: UUID, ownership: NativeSessionOwnership) {
     guard isCurrent(operation: operation, ownership: ownership) else { return }
     system.unregister()
@@ -278,7 +302,7 @@ struct JovieApp: App {
             isSignInUnavailable: launchAuthErrorMessage != nil,
             authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
-            onLogout: { await appState.signOut() },
+            onLogout: { _ = await appState.signOut() },
             onAuthReturn: { _ in },
             onAuthError: { _ in }
           )
@@ -293,7 +317,7 @@ struct JovieApp: App {
             isSignInUnavailable: launchAuthErrorMessage != nil,
             authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
-            onLogout: { await appState.signOut() },
+            onLogout: { _ = await appState.signOut() },
             onAuthReturn: { _ in },
             onAuthError: { _ in }
           )
