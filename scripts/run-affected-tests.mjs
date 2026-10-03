@@ -1058,6 +1058,7 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
+  '.github/workflow-topology.gen.yml',
   '.claude/rules/linear.md',
   '.github/MERGE_QUEUE.md',
   '.github/workflows/README.md',
