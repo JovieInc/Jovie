@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
+import { showToEntityCard } from '@/components/organisms/entity-card/adapters';
 import { TourModePanel } from './TourModePanel';
 
 vi.mock('next/navigation', () => ({
@@ -62,6 +63,24 @@ function makeTourDate(
 }
 
 describe('TourModePanel', () => {
+  it('shows the venue calendar day, matching the entity card (#18351)', () => {
+    // 8pm PT on Jul 28 is Jul 29 in UTC.
+    const show = makeTourDate({
+      startDate: '2030-07-29T03:00:00.000Z',
+      timezone: 'America/Los_Angeles',
+    });
+    render(<TourModePanel artist={PROFILE_STORY_ARTIST} tourDates={[show]} />);
+
+    const list = screen.getByTestId('tour-drawer-list');
+    expect(list).toHaveTextContent('Jul');
+    expect(list).toHaveTextContent('28');
+    expect(list).not.toHaveTextContent('29');
+
+    const pill = showToEntityCard(show).datePill;
+    expect(pill?.month).toBe('Jul');
+    expect(pill?.day).toBe('28');
+  });
+
   it('renders the upcoming show list with ticket links when dates exist', () => {
     render(
       <TourModePanel

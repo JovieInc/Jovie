@@ -203,6 +203,8 @@ interface ProfileCompactSurfaceProps {
   readonly onTogglePref?: (key: NotificationContentType) => void;
   readonly onUnsubscribe?: () => void;
   readonly isUnsubscribing?: boolean;
+  /** Opens the latest release's credits from the profile menu. */
+  readonly onOpenReleaseCredits?: () => void;
   readonly onManageNotifications?: () => void;
   readonly onRegisterReveal?: (reveal: () => void) => void;
   readonly onRevealNotifications?: () => void;
@@ -301,6 +303,7 @@ export function ProfileCompactSurface({
   onTogglePref = () => {},
   onUnsubscribe = () => {},
   isUnsubscribing = false,
+  onOpenReleaseCredits,
   onManageNotifications,
   onRegisterReveal,
   onRevealNotifications,
@@ -829,6 +832,7 @@ export function ProfileCompactSurface({
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
           releases={releases}
+          onOpenReleaseCredits={onOpenReleaseCredits}
         />
       ) : null}
     </div>

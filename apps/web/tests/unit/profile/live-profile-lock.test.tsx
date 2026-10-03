@@ -238,7 +238,13 @@ describe('live public profile lock', () => {
       expect(compact.getByRole('button', { name: label })).toBeInTheDocument();
     }
 
-    fireEvent.click(compact.getByRole('button', { name: 'Release credits' }));
+    expect(
+      compact.queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+    fireEvent.click(compact.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Release credits' })
+    );
     expect(
       await screen.findByRole('heading', { name: 'Credits' })
     ).toBeInTheDocument();

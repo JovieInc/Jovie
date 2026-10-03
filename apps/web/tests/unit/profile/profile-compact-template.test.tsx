@@ -700,7 +700,7 @@ describe('ProfileCompactTemplate', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the release credits drawer from the profile credits trigger', async () => {
+  it('opens the release credits drawer from the profile menu', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -726,7 +726,19 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    // #18351 regression: no bare trigger may sit in the compact shell above
+    // the banner, where it pushed the surface down and clipped its bottom.
+    const shell = screen.getByTestId('profile-compact-shell');
+    expect(
+      within(shell).queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+
+    // The profile menu drawer (mocked here) owns the credits entry.
+    const drawerProps = mockProfileUnifiedDrawer.mock.lastCall?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toEqual(expect.any(Function));
+    act(() => drawerProps.onOpenReleaseCredits?.());
 
     const drawer = await screen.findByRole('dialog', { name: 'Credits' });
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
@@ -747,6 +759,10 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.queryByRole('button', { name: 'Release credits' })
     ).toBeNull();
+    const drawerProps = mockProfileUnifiedDrawer.mock.lastCall?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toBeUndefined();
   });
 
   it('keeps the identity header without a portrait image when a profile has no real photo', () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { ListMusic } from 'lucide-react';
 import { PROFILE_DRAWER_MENU_ITEM_CLASS } from '../profile-drawer-classes';
 import { PROFILE_VIEW_REGISTRY, type ProfileViewKey } from './registry';
 
@@ -35,6 +36,8 @@ export interface MenuViewProps {
   readonly hasTourDates: boolean;
   readonly hasTip: boolean;
   readonly hasContacts: boolean;
+  /** Opens the latest release's credits; the entry is hidden when absent. */
+  readonly onOpenReleaseCredits?: () => void;
 }
 
 /**
@@ -51,6 +54,7 @@ export function MenuView({
   hasTourDates,
   hasTip,
   hasContacts,
+  onOpenReleaseCredits,
 }: MenuViewProps) {
   const visibility = {
     hasReleases,
@@ -79,6 +83,17 @@ export function MenuView({
           </button>
         );
       })}
+      {onOpenReleaseCredits ? (
+        <button
+          type='button'
+          role='menuitem'
+          className={PROFILE_DRAWER_MENU_ITEM_CLASS}
+          onClick={onOpenReleaseCredits}
+        >
+          <ListMusic className={ICON_CLASS} />
+          Release credits
+        </button>
+      ) : null}
     </div>
   );
 }

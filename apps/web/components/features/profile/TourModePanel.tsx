@@ -14,6 +14,7 @@ import {
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
+import { formatEventDateParts } from '@/lib/events/date';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
@@ -56,29 +57,29 @@ function getTicketStatusLabel(
   return 'No Tickets';
 }
 
-function toDisplayDate(value: string) {
-  const parsed = new Date(value);
-
+// Same venue-calendar-day formatter as the entity cards, so a show's pill
+// and its list row never disagree across a UTC day boundary.
+function toDisplayDate(value: string, timezone: string | null) {
+  const parts = formatEventDateParts({ startDate: value, timezone });
   return {
-    month: new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      timeZone: 'UTC',
-    }).format(parsed),
-    day: new Intl.DateTimeFormat('en-US', {
-      day: '2-digit',
-      timeZone: 'UTC',
-    }).format(parsed),
+    month: parts?.month ?? 'Soon',
+    day: parts?.day.padStart(2, '0') ?? '--',
   };
 }
 
 function DateBox({
   date,
+  timezone,
   featured: _featured,
 }: Readonly<{
   readonly date: string;
+  readonly timezone: string | null;
   readonly featured: boolean;
 }>) {
-  const displayDate = useMemo(() => toDisplayDate(date), [date]);
+  const displayDate = useMemo(
+    () => toDisplayDate(date, timezone),
+    [date, timezone]
+  );
 
   return (
     <div className='flex w-11 shrink-0 flex-col items-center justify-center'>
@@ -124,7 +125,11 @@ function TourDateRow({
         item.date.ticketStatus === 'cancelled' && 'opacity-50'
       )}
     >
-      <DateBox date={item.date.startDate} featured={false} />
+      <DateBox
+        date={item.date.startDate}
+        timezone={item.date.timezone}
+        featured={false}
+      />
 
       <div className='min-w-0'>
         <p className='min-w-0 truncate text-mid font-medium tracking-[-0.03em] text-(--color-text-tooltip)'>

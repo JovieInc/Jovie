@@ -889,11 +889,6 @@ export function ProfileCompactTemplate({
             data-interactive-ready={isHydrated ? 'true' : undefined}
             data-public-profile-nav={publicProfileNavIds}
           >
-            {visibleReleaseCredits.length > 0 ? (
-              <button type='button' onClick={() => setCreditsOpen(true)}>
-                Release credits
-              </button>
-            ) : null}
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
@@ -953,6 +948,11 @@ export function ProfileCompactTemplate({
                 onTogglePref={handleTogglePref}
                 onUnsubscribe={handleUnsubscribe}
                 isUnsubscribing={unsubMutation.isPending}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
                 onManageNotifications={() => {
                   clearCloseResetTimer();
                   setRequestedMode('subscribe');
