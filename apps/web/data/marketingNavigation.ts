@@ -96,6 +96,21 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
   },
 ] as const satisfies readonly MarketingNavFlyoutLink[]);
 
+export function getMarketingToolsFlyoutLinks(
+  genericCreatorNav = false
+): readonly MarketingNavFlyoutLink[] {
+  if (!genericCreatorNav) return MARKETING_TOOLS_FLYOUT_LINKS;
+  return MARKETING_TOOLS_FLYOUT_LINKS.map(link =>
+    link.href === APP_ROUTES.SMART_LINKS
+      ? {
+          ...link,
+          label: 'Smart Links',
+          description: 'Share your work with one link. Example: a release.',
+        }
+      : link
+  );
+}
+
 const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
@@ -163,6 +178,43 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
     links: eligibleLinks(column.links),
   }));
 
+function genericFooterLabel(label: string): string {
+  switch (label) {
+    case 'Music Smart Links':
+      return 'Smart Links';
+    case 'Fan Capture':
+      return 'Audience Capture';
+    case 'Fan Reactivation':
+      return 'Audience Reactivation';
+    default:
+      return label;
+  }
+}
+
+/**
+ * JOV-7580. Flag off returns the current Music column. Flag on renames that
+ * column to Customers, adds Artists, and uses audience wording. Href targets
+ * stay the same.
+ */
+export function getMarketingFooterColumns(
+  genericCreatorNav = false
+): readonly MarketingFooterColumn[] {
+  if (!genericCreatorNav) return MARKETING_FOOTER_COLUMNS;
+  return MARKETING_FOOTER_COLUMNS.map(column => {
+    if (column.title !== 'Music') return column;
+    return {
+      title: 'Customers',
+      links: eligibleLinks([
+        { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
+        ...column.links.map(link => ({
+          ...link,
+          label: genericFooterLabel(link.label),
+        })),
+      ]),
+    };
+  });
+}
+
 /**
  * Commercial pages for the flagged site-footer refresh.
  * Every href is an existing public route. Count stays between 4 and 6.
@@ -182,6 +234,27 @@ export const PUBLIC_COMMERCIAL_FOOTER_COLUMN: MarketingFooterColumn = {
   title: 'Product',
   links: PUBLIC_COMMERCIAL_FOOTER_LINKS,
 };
+
+export function getPublicCommercialFooterLinks(
+  genericCreatorNav = false
+): readonly MarketingFooterLink[] {
+  if (!genericCreatorNav) return PUBLIC_COMMERCIAL_FOOTER_LINKS;
+  return PUBLIC_COMMERCIAL_FOOTER_LINKS.map(link =>
+    link.label === 'Music Smart Links'
+      ? { ...link, label: 'Smart Links' }
+      : link
+  );
+}
+
+export function getPublicCommercialFooterColumn(
+  genericCreatorNav = false
+): MarketingFooterColumn {
+  if (!genericCreatorNav) return PUBLIC_COMMERCIAL_FOOTER_COLUMN;
+  return {
+    title: PUBLIC_COMMERCIAL_FOOTER_COLUMN.title,
+    links: getPublicCommercialFooterLinks(true),
+  };
+}
 
 export const MARKETING_LEGAL_LINKS: readonly MarketingFooterLink[] = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
