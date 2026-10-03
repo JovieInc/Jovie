@@ -7,7 +7,8 @@ No login or API key is required.
 
 ## Install
 
-Requires Node.js 22.13 or newer (tested on 22, 24, and 26). Install an exact public release globally from npm:
+Requires Node.js 24.21 or newer (tested on 24 and 26; Node 22.13+ also runs,
+without proxy support). Install an exact public release globally from npm:
 
 ```sh
 npm install --global @jovie/cli@26.9.16
