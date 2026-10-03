@@ -25,10 +25,12 @@ function Harness({
   onSortChange,
   initialSort,
   semanticOnlyActions = false,
+  columnSnap = false,
 }: {
   onSortChange?: () => void;
   initialSort?: { id: string; desc: boolean }[];
   semanticOnlyActions?: boolean;
+  columnSnap?: boolean;
 }) {
   const columns: ColumnDef<Row, any>[] = [
     columnHelper.accessor('title', {
@@ -65,6 +67,7 @@ function Harness({
       <UnifiedTableHeader
         headerGroups={table.getHeaderGroups()}
         caption='Test table'
+        columnSnap={columnSnap}
       />
     </table>
   );
@@ -76,6 +79,14 @@ describe('UnifiedTableHeader', () => {
     expect(screen.getByText('Title')).toBeInTheDocument();
     expect(screen.getByText('Count')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
+  });
+
+  it('snaps header cells with the body when column snap is on', () => {
+    render(<Harness columnSnap />);
+    expect(screen.getAllByRole('columnheader')[0]).toHaveAttribute(
+      'data-column-snap',
+      'on'
+    );
   });
 
   it('renders a screen reader caption when provided', () => {

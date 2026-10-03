@@ -388,29 +388,3 @@ def public_block(state_dir) -> dict:
     history = state.get("history") if isinstance(state.get("history"), list) else []
     return {"mode": state.get("mode") or mode(), "lanes": lanes, "history": history[-10:],
             "throughputBrake": _obj(state.get("throughputBrake"))}
-def record_linear_budget(state_dir, headers, status: int, raw: bytes) -> None:
-    """Write ``api-budget.json`` as #20141 schema 1. Callers swallow errors from this function."""
-    path, previous = Path(state_dir) / "api-budget.json", _obj(_read_json(Path(state_dir) / "api-budget.json")); fresh = {"remaining": None, "limit": None, "reset": None}
-    groups = (("X-RateLimit-Requests-Remaining", "X-RateLimit-Requests-Limit", "X-RateLimit-Requests-Reset"),
-              ("X-RateLimit-Complexity-Remaining", "X-RateLimit-Complexity-Limit", "X-RateLimit-Complexity-Reset"))
-    readable = headers is not None and hasattr(headers, "get")
-    for names in groups:
-        nums = tuple(_budget_int(headers.get(name)) if readable and headers.get(name) not in (None, "") else None for name in names)
-        if any(num is not None for num in nums):
-            fresh = dict(zip(("remaining", "limit", "reset"), nums)); break
-    limited = status == 429
-    if status == 400 and raw:
-        try: payload = json.loads(raw.decode())
-        except (UnicodeDecodeError, ValueError): payload = None
-        errors = payload.get("errors") if isinstance(payload, dict) else None
-        limited = limited or bool(isinstance(errors, list) and any(isinstance(item, dict) and _obj(item.get("extensions")).get("code") == "RATELIMITED" for item in errors))
-    if not limited and all(value is None for value in fresh.values()): return
-    def keep(key, legacy):
-        return fresh[key] if fresh[key] is not None else _budget_int(previous.get(key) if key in previous else previous.get(legacy))
-    now = time.time(); prior = previous.get("rateLimitedAt") if "rateLimitedAt" in previous else None
-    if "rateLimitedAt" not in previous:
-        legacy_at = _epoch(previous.get("linearRateLimitedAt")); prior = None if legacy_at is None else _iso(legacy_at)
-    elif isinstance(prior, (int, float)) and not isinstance(prior, bool):
-        prior = _iso(float(prior))
-    _atomic_json(path, {"schema": 1, "remaining": keep("remaining", "linearRemaining"), "limit": keep("limit", "linearLimit"),
-                        "reset": keep("reset", "linearReset"), "rateLimitedAt": _iso(now) if limited else prior, "observedAt": _iso(now)})

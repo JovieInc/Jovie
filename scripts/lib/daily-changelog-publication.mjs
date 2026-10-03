@@ -139,6 +139,28 @@ export function evaluateCustomerNoteContract({ files, body, createdAt }) {
   };
 }
 
+/**
+ * workflow_run controllers run at main's head when they start, not at the
+ * deployed SHA, so the run head may be a strict descendant of marker.sha
+ * (same binding as production-marker-state headBinds). `compare` is GitHub's
+ * `compare/{marker.sha}...{run.head_sha}` response.
+ */
+export function isTrustedControllerRun(run, marker, compare) {
+  if (
+    run?.path !== '.github/workflows/production-controller.yml' ||
+    run?.head_branch !== 'main' ||
+    run?.event !== 'workflow_run' ||
+    !SHA_RE.test(marker?.sha ?? '') ||
+    !SHA_RE.test(run?.head_sha ?? '')
+  )
+    return false;
+  if (run.head_sha === marker.sha) return true;
+  return (
+    compare?.status === 'ahead' &&
+    compare?.merge_base_commit?.sha === marker.sha
+  );
+}
+
 /** A retained verified marker AND an exact fresh public readback are required. */
 export function assertPublicationBinding(marker, buildInfo, controller) {
   if (

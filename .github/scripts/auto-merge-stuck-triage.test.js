@@ -1,8 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const { readFileSync } = require('node:fs');
+const { load } = require('js-yaml');
 
 const {
   COMMENT_MARKER,
+  gh,
+  isTransientGhError,
   buildCommentBody,
   buildIssueBody,
   diagnoseStuckPr,
@@ -136,6 +141,116 @@ test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', ()
     ),
     false
   );
+  const recorded = 'e'.repeat(40);
+  const baseHold = {
+    ...revisionHold,
+    description: `class=base-branch;n=1;run=123;try=1;main=${recorded}`,
+  };
+  assert.equal(hasRevisionFailureHold([baseHold], 'o/r'), true);
+  assert.equal(hasRevisionFailureHold([baseHold], 'o/r', recorded), true);
+  assert.equal(
+    needsAutoMergeEnable(eligible, [baseHold], 'o/r', recorded),
+    false
+  );
+  assert.equal(hasRevisionFailureHold([baseHold], 'o/r', 'f'.repeat(40)), true);
+  assert.equal(
+    needsAutoMergeEnable(eligible, [baseHold], 'o/r', 'f'.repeat(40)),
+    false
+  );
+});
+
+test('generic enable consumers leave a moved-base retry to queue authority', () => {
+  const baseHold = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    description: `class=base-branch;n=1;run=123;try=1;main=${'e'.repeat(40)}`,
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    target_url: 'https://github.com/o/r/actions/runs/123',
+  };
+  const spent = {
+    ...baseHold,
+    context: 'jovie-queue-failure-retry/v1',
+    description: 'spent:run=123;try=1',
+  };
+  const calls = [];
+  enableMissingAutoMerge(
+    'o/r',
+    [{ ...basePr, autoMergeRequest: null }],
+    false,
+    args => calls.push(args),
+    () => [spent, baseHold],
+    'f'.repeat(40)
+  );
+  assert.deepEqual(calls, []);
+});
+
+test('actual auto-merge workflow filter recognizes both trusted hold forms', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/auto-merge-default.yml', 'utf8')
+  );
+  const step = Object.values(workflow.jobs)
+    .flatMap(job => job.steps ?? [])
+    .find(step => step.name === 'Enable auto-merge');
+  const filter = /'\n\s*(any\([\s\S]*?)\n\s*' <<<"\$STATUS_PAGES"/.exec(
+    step.run
+  )?.[1];
+  assert.ok(filter, 'execute the real hold filter, not a copied predicate');
+  const base = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    target_url: 'https://github.com/o/r/actions/runs/123',
+  };
+  for (const main of ['', 'e'.repeat(40), 'f'.repeat(40)]) {
+    for (const description of [
+      'class=deterministic-source;n=1;run=123;try=1',
+      `class=base-branch;n=1;run=123;try=1;main=${'e'.repeat(40)}`,
+    ]) {
+      const held = spawnSync(
+        'jq',
+        [
+          '-e',
+          '--arg',
+          'context',
+          base.context,
+          '--arg',
+          'prefix',
+          'https://github.com/o/r/actions/runs/',
+          '--arg',
+          'mainsha',
+          main,
+          filter,
+        ],
+        {
+          input: JSON.stringify([[{ ...base, description }]]),
+          encoding: 'utf8',
+        }
+      );
+      assert.equal(
+        held.status,
+        0,
+        `${description}: ${held.stdout}${held.stderr}`
+      );
+    }
+  }
+  const unheld = spawnSync(
+    'jq',
+    [
+      '-e',
+      '--arg',
+      'context',
+      base.context,
+      '--arg',
+      'prefix',
+      'https://github.com/o/r/actions/runs/',
+      '--arg',
+      'mainsha',
+      '',
+      filter,
+    ],
+    { input: '[[]]', encoding: 'utf8' }
+  );
+  assert.equal(unheld.status, 1);
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {
@@ -210,4 +325,58 @@ test('enable pass skips missing heads and preserves an exact-head revision hold'
   );
   assert.deepEqual(reads, [['o/r', pr.headRefOid]]);
   assert.deepEqual(calls, []);
+});
+
+test('gh retries transient HTTP 5xx then succeeds', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    if (calls < 3) {
+      const err = new Error('Command failed: gh api graphql');
+      err.stderr = 'gh: HTTP 502\n';
+      err.stdout = '<html>502 Bad Gateway</html>';
+      throw err;
+    }
+    return '{"ok":true}';
+  };
+  const out = gh(['api', 'graphql'], { exec, sleep: () => {} });
+  assert.equal(out, '{"ok":true}');
+  assert.equal(calls, 3);
+});
+
+test('gh does not retry non-transient failures', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    const err = new Error('Command failed: gh api repos/o/r');
+    err.stderr = 'gh: HTTP 404: Not Found\n';
+    throw err;
+  };
+  assert.throws(() => gh(['api', 'repos/o/r'], { exec, sleep: () => {} }));
+  assert.equal(calls, 1);
+});
+
+test('gh gives up after the attempt cap on persistent 5xx', () => {
+  let calls = 0;
+  const exec = () => {
+    calls += 1;
+    const err = new Error('Command failed: gh api graphql');
+    err.stderr = 'gh: HTTP 503\n';
+    throw err;
+  };
+  assert.throws(() => gh(['api', 'graphql'], { exec, sleep: () => {} }));
+  assert.equal(calls, 4);
+});
+
+test('isTransientGhError only matches transient shapes', () => {
+  const mk = (stderr, stdout = '') =>
+    Object.assign(new Error('fail'), { stderr, stdout });
+  assert.equal(isTransientGhError(mk('gh: HTTP 502\n')), true);
+  assert.equal(isTransientGhError(mk('gh: HTTP 500\n')), true);
+  assert.equal(isTransientGhError(mk('connection reset by peer\n')), true);
+  assert.equal(isTransientGhError(mk('gh: HTTP 404: Not Found\n')), false);
+  assert.equal(
+    isTransientGhError(mk('gh: HTTP 401: Bad credentials\n')),
+    false
+  );
 });

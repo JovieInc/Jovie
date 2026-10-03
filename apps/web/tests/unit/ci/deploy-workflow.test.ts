@@ -10,7 +10,28 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+
+type CheckoutStep = {
+  uses?: string;
+  with?: { ref?: string; 'persist-credentials'?: boolean };
+};
+
+function assertAuthorizedCheckouts(workflow: string) {
+  const parsed = parseYaml(workflow) as {
+    jobs: Record<string, { steps?: CheckoutStep[] }>;
+  };
+  const checkouts = Object.values(parsed.jobs).flatMap(job =>
+    (job.steps ?? []).filter(step => step.uses?.startsWith('actions/checkout'))
+  );
+  expect(checkouts.length).toBeGreaterThan(0);
+  for (const step of checkouts) {
+    expect(step.uses).toMatch(/^actions\/checkout@[a-f0-9]{40}$/);
+    expect(step.with?.ref).toBe('${{ inputs.expected_sha }}');
+    expect(step.with?.['persist-credentials']).toBe(false);
+  }
+}
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -631,7 +652,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(ciTrigger).toContain('branches: [main]');
     expect(ciTrigger).not.toContain('paths-ignore:');
     expect(controllerTrigger).toContain('workflow_run:');
-    expect(controllerTrigger).toContain('workflows: [CI]');
+    expect(controllerTrigger).toContain('workflows: [Staging Controller]');
     expect(controllerTrigger).toContain('types: [completed]');
     expect(controllerTrigger).toContain('branches: [main]');
     expect(controllerTrigger).not.toContain('paths-ignore:');
@@ -5089,10 +5110,42 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(9);
-    expect(
-      reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(9);
+    assertAuthorizedCheckouts(reusable);
+  });
+
+  it('admits additional authorized jobs and rejects each unsafe checkout independently', () => {
+    const safe = {
+      uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+      with: { ref: '${{ inputs.expected_sha }}', 'persist-credentials': false },
+    };
+    const jobs = Object.fromEntries(
+      Array.from({ length: 10 }, (_, index) => [
+        `authorized-${index}`,
+        { steps: [structuredClone(safe)] },
+      ])
+    );
+    expect(() =>
+      assertAuthorizedCheckouts(stringifyYaml({ jobs }))
+    ).not.toThrow();
+    for (const unsafe of [
+      { ...safe, with: { ...safe.with, ref: 'main' } },
+      { ...safe, with: { 'persist-credentials': false } },
+      { ...safe, with: { ...safe.with, 'persist-credentials': true } },
+      { ...safe, uses: 'actions/checkout@v7' },
+    ]) {
+      expect(() =>
+        assertAuthorizedCheckouts(
+          stringifyYaml({
+            jobs: { ...jobs, final: { steps: [unsafe] } },
+          })
+        )
+      ).toThrow();
+    }
+    expect(() =>
+      assertAuthorizedCheckouts(
+        stringifyYaml({ jobs: { empty: { steps: [] } } })
+      )
+    ).toThrow();
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {
@@ -5275,7 +5328,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).toContain('polling-exception:');
     expect(health).toContain('safety net only');
     expect(controller).toContain(
-      'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
+      'run-name: Production Controller ${{ github.event.workflow_run.display_title }}'
+    );
+    const staging = readFileSync(
+      resolve(repoRoot, '.github/workflows/staging-controller.yml'),
+      'utf8'
+    );
+    expect(staging).toContain(
+      'run-name: ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}'
     );
     expect(controller).toContain('actions/workflows/production-controller.yml');
     expect(health).toContain('actions/workflows/production-controller.yml');

@@ -231,25 +231,38 @@ class AutoscaleTest(unittest.TestCase):
             (root / "api-budget.json").write_text(json.dumps({"linearRemaining": 1800, "linearLimit": 2500, "linearRateLimitedAt": NOW - 100})); legacy = A.collect(root, {}, NOW); self.assertEqual((legacy["linearRemaining"], legacy["linearLimit"]), (1800, 2500)); self.assertAlmostEqual(legacy["linearRateLimitedAt"], NOW - 100, delta=1)
             self.assertIn("devin", collected["cooling"]); self.assertGreater(NOW - collected["cooldownAt"]["devin"], A.MULTIPLICATIVE_WINDOW_S)
             (root / "doctor.json").write_text("{")
-            self.assertFalse(A.collect(root, {}, NOW)["doctorFresh"]); env_file = root / "linear.env"; env_file.write_text("LINEAR_API_KEY=test\n"); client = lane.Linear(env_file); client.state = root / "state"; headers = {"X-RateLimit-Requests-Remaining": "1800", "X-RateLimit-Requests-Limit": "2500", "X-RateLimit-Requests-Reset": "99"}
-            with patch.object(lane.urllib.request, "urlopen", return_value=_Body(b'{"data": {"ok": 1}}', headers)):
-                self.assertEqual(client.gql("q", {}), {"ok": 1})
-            saved = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((saved["schema"], saved["remaining"], saved["limit"], saved["reset"], saved["rateLimitedAt"]), (1, 1800, 2500, 99, None)); self.assertRegex(saved["observedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"); self.assertNotIn("linearRemaining", saved); body = json.dumps({"errors": [{"message": "limited", "extensions": {"code": "RATELIMITED"}}]}).encode(); error = urllib.error.HTTPError("https://api.linear.app/graphql", 400, "bad", None, io.BytesIO(body))
-            with patch.object(lane.urllib.request, "urlopen", side_effect=error):
-                with self.assertRaises(urllib.error.HTTPError):
-                    client.gql("q", {})
-            limited_budget = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((limited_budget["remaining"], limited_budget["limit"]), (1800, 2500)); self.assertRegex(limited_budget["rateLimitedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"); self.assertNotIn("linearRateLimitedAt", limited_budget); parsed_limit = A.collect(client.state, {}, time.time()); self.assertAlmostEqual(parsed_limit["linearRateLimitedAt"], time.time(), delta=5)
-            A.record_linear_budget(client.state, {"X-RateLimit-Requests-Remaining": "1000"}, 200, b""); partial = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((partial["schema"], partial["remaining"], partial["limit"], partial["reset"]), (1, 1000, 2500, 99)); self.assertRegex(partial["rateLimitedAt"], r"Z$")
-            A.record_linear_budget(client.state, {"X-RateLimit-Requests-Remaining": "10", "X-RateLimit-Requests-Limit": "2500", "X-RateLimit-Complexity-Remaining": "1"}, 429, b""); throttled = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((throttled["remaining"], throttled["limit"]), (10, 2500)); self.assertRegex(throttled["rateLimitedAt"], r"Z$")
-            with patch.object(lane.autoscale, "record_linear_budget", side_effect=RuntimeError("disk")), \
-                    patch.object(lane.urllib.request, "urlopen", return_value=_Body(b'{"data": {"ok": 1}}')):
-                self.assertEqual(client.gql("q", {}), {"ok": 1})
-            limited = urllib.error.HTTPError("https://api.linear.app/graphql", 400, "bad", None,
-                                              io.BytesIO(b'{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'))
-            with patch.object(lane.autoscale, "record_linear_budget", side_effect=RuntimeError("disk")), \
-                    patch.object(lane.urllib.request, "urlopen", side_effect=limited):
-                with self.assertRaises(urllib.error.HTTPError):
-                    client.gql("q", {})
+            self.assertFalse(A.collect(root, {}, NOW)["doctorFresh"]);
+            env_file = root / "linear.env"
+            env_file.write_text("LINEAR_API_KEY=test\n")
+            client = lane.Linear(env_file)
+            state = root / "state"
+            headers = {"X-RateLimit-Requests-Remaining": "1800", "X-RateLimit-Requests-Limit": "2500", "X-RateLimit-Requests-Reset": "99"}
+            # Consume Main's budget receipt and preserve its actual cooldown behavior.
+            with patch.object(lane, "lane_state_dir", return_value=state):
+                with patch.object(lane.urllib.request, "urlopen", return_value=_Body(b'{"data": {"ok": 1}}', headers)):
+                    self.assertEqual(client.gql("q", {}), {"ok": 1})
+                saved = json.loads((state / "api-budget.json").read_text())
+                self.assertEqual((saved["schema"], saved["remaining"], saved["limit"], saved["reset"], saved["rateLimitedAt"]), (1, 1800, 2500, 99, None))
+                self.assertNotIn("linearRemaining", saved)
+                self.assertRegex(saved["observedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+                body = json.dumps({"errors": [{"message": "limited", "extensions": {"code": "RATELIMITED"}}]}).encode()
+                error = urllib.error.HTTPError("https://api.linear.app/graphql", 400, "bad", None, io.BytesIO(body))
+                with patch.object(lane.urllib.request, "urlopen", side_effect=error):
+                    with self.assertRaises(lane.LinearRateLimited):
+                        client.gql("q", {})
+                limited = json.loads((state / "api-budget.json").read_text())
+                self.assertEqual((limited["remaining"], limited["limit"]), (1800, 2500))
+                self.assertRegex(limited["rateLimitedAt"], r"Z$")
+                self.assertAlmostEqual(A.collect(state, {}, time.time())["linearRateLimitedAt"], time.time(), delta=5)
+                self.assertGreater(lane.linear_cooldown_until(client.key), time.time())
+                lane.record_linear_budget({"X-RateLimit-Requests-Remaining": "1000"}, rate_limited=False)
+                partial = json.loads((state / "api-budget.json").read_text())
+                self.assertEqual((partial["schema"], partial["remaining"], partial["limit"], partial["reset"]), (1, 1000, 2500, 99))
+                self.assertEqual(partial["rateLimitedAt"], limited["rateLimitedAt"])
+                with patch.object(lane.urllib.request, "urlopen") as request:
+                    with self.assertRaises(lane.LinearRateLimited):
+                        client.gql("q", {})
+                    request.assert_not_called()
     def test_dispatch_worker_doctor_and_hud(self):
         spawned = []
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):

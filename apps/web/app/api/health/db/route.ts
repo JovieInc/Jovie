@@ -9,6 +9,11 @@ import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
+import {
   createRateLimitHeaders,
   getClientIP,
   healthLimiter,
@@ -47,7 +52,6 @@ interface HealthResponse {
 export async function GET(request: Request) {
   const databaseUrlOk = Boolean(env.DATABASE_URL);
   const now = new Date().toISOString();
-  const config = getDbConfig();
 
   // Rate limiting check
   const clientIP = getClientIP(request);
@@ -70,16 +74,25 @@ export async function GET(request: Request) {
         status: 429,
         headers: {
           ...HEALTH_CHECK_CONFIG.cacheHeaders,
+          ...HEALTH_DETAIL_HEADERS,
           ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );
   }
 
+  const authorized = await canReadHealthDetail(request, '/api/health/db');
+  const rateHeaders = createRateLimitHeaders(rateLimitResult);
+
   // Validate database environment
   const dbValidation = validateDatabaseEnvironment();
 
   if (!databaseUrlOk || !dbValidation.valid) {
+    if (!authorized) {
+      return publicHealthLiveness(false, rateHeaders);
+    }
+
+    const config = getDbConfig();
     const body: HealthResponse = {
       service: 'db',
       status: 'error',
@@ -106,14 +119,21 @@ export async function GET(request: Request) {
       status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeaders(rateLimitResult),
+        ...HEALTH_DETAIL_HEADERS,
+        ...rateHeaders,
       },
     });
   }
 
-  // Use the enhanced database health check with retry logic
+  // Connectivity is the liveness signal. Pool, config, and breaker stats
+  // stay on the authorized body.
   const healthResult = await checkDbHealth();
 
+  if (!authorized) {
+    return publicHealthLiveness(healthResult.healthy, rateHeaders);
+  }
+
+  const config = getDbConfig();
   const body: HealthResponse = {
     service: 'db',
     status: healthResult.healthy ? 'ok' : 'error',
@@ -162,7 +182,8 @@ export async function GET(request: Request) {
       : HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
     headers: {
       ...HEALTH_CHECK_CONFIG.cacheHeaders,
-      ...createRateLimitHeaders(rateLimitResult),
+      ...HEALTH_DETAIL_HEADERS,
+      ...rateHeaders,
     },
   });
 }
