@@ -12,8 +12,10 @@
  */
 
 import { APP_ROUTES } from '@/constants/routes';
+import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
+import { isDiscoverabilityFlagEnabled } from '@/lib/flags/discoverability-flags';
 
 /**
  * Backend chat tools that are deliberately NOT exposed as user-visible
@@ -212,10 +214,26 @@ function nav(
   };
 }
 
-// Nav entries mirror the primary dashboard sidebar (`dashboard-nav/config.ts`)
-// so cmd+k stays in lockstep with the visible chrome — when the sidebar adds
-// a route, this list should follow.
-export const COMMANDS: readonly Command[] = [
+export interface CommandDiscoverability {
+  readonly youtubeWorkspaceNav?: boolean;
+  readonly jovieWorkNav?: boolean;
+}
+
+export function buildCommands(
+  discoverability: CommandDiscoverability = {}
+): readonly Command[] {
+  const showYouTube =
+    discoverability.youtubeWorkspaceNav ??
+    isDiscoverabilityFlagEnabled('YOUTUBE_WORKSPACE_NAV');
+  const showJovieWork =
+    discoverability.jovieWorkNav ??
+    isDiscoverabilityFlagEnabled('JOVIE_WORK_NAV');
+
+  // Nav entries mirror the primary dashboard sidebar (`dashboard-nav/config.ts`)
+  // so cmd+k stays in lockstep with the visible chrome — when the sidebar adds
+  // a route, this list should follow. Calendar and Tasks stay here after JOV-7305
+  // removed them from the rail.
+  return [
   skill(
     'generateAlbumArt',
     'Generate album art',
@@ -239,13 +257,13 @@ export const COMMANDS: readonly Command[] = [
   skill(
     'proposeSocialLink',
     'Add social link',
-    'Add a social profile URL to your artist profile.',
+    'Add a social profile URL to your profile.',
     'Link'
   ),
   skill(
     'proposeSocialLinkRemoval',
     'Remove social link',
-    'Remove a social link from your artist profile.',
+    'Remove a social link from your profile.',
     'Link2Off'
   ),
   skill(
@@ -263,10 +281,31 @@ export const COMMANDS: readonly Command[] = [
   ),
   nav(
     'go-presence',
-    'Presence',
-    'Monitor artist profiles, public pages, and search visibility.',
+    PRODUCT_ONTOLOGY.identity.label,
+    PRODUCT_ONTOLOGY.identity.definition,
     'Waypoints',
     APP_ROUTES.PRESENCE
+  ),
+  nav(
+    'go-work',
+    PRODUCT_ONTOLOGY.work.label,
+    PRODUCT_ONTOLOGY.work.definition,
+    'Layers',
+    PRODUCT_ONTOLOGY.work.canonicalRoute
+  ),
+  nav(
+    'go-audience',
+    'Audience',
+    'People who visited, subscribed, or are in your contacts.',
+    'Users',
+    APP_ROUTES.CONTACTS_AUDIENCE
+  ),
+  nav(
+    'go-links',
+    'Links',
+    'Open the links workspace. Shortcut G then K.',
+    'Link',
+    APP_ROUTES.LINKS
   ),
   nav(
     'go-connections',
@@ -285,7 +324,7 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-releases',
     'Releases',
-    'Manage your release catalog and smart links.',
+    'Open the releases view of your work.',
     'Music',
     APP_ROUTES.RELEASES
   ),
@@ -304,13 +343,45 @@ export const COMMANDS: readonly Command[] = [
     APP_ROUTES.TASKS
   ),
   nav(
+    'go-tour-dates',
+    'Tour dates',
+    'Manage show dates. Shortcut G then O.',
+    'CalendarDays',
+    APP_ROUTES.TOUR_DATES
+  ),
+  nav(
     'go-settings',
     'Settings',
-    'Account, billing, and artist settings.',
+    'Account, billing, and profile settings.',
     'Settings',
     APP_ROUTES.SETTINGS
   ),
-];
+  ...(showYouTube
+    ? [
+        nav(
+          'go-youtube',
+          'YouTube',
+          'Channel ledger and revival queue.',
+          'Monitor',
+          APP_ROUTES.YOUTUBE_REVIVAL
+        ),
+      ]
+    : []),
+  ...(showJovieWork
+    ? [
+        nav(
+          'go-jovie-work',
+          'Jovie Did This',
+          'Autonomous work on your profile.',
+          'Sparkles',
+          APP_ROUTES.JOVIE_WORK
+        ),
+      ]
+    : []),
+  ];
+}
+
+export const COMMANDS: readonly Command[] = buildCommands();
 
 export function commandsForSurface(surface: CommandSurface): Command[] {
   return COMMANDS.filter(c => c.surfaces.includes(surface));
