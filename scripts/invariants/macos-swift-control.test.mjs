@@ -116,7 +116,9 @@ describe('Mac Swift-control invariants (Swift-native ADR, supersedes JOV-5359)',
     const entitlements = read('apps/ios/JovieMac/JovieMac.entitlements');
     assert.match(entitlements, /webcredentials:jov\.ie/);
     // No unregistered WKWebView bridge: the ADR bridge register is empty.
-    const macSwift = walkFiles('apps/ios/JovieMac', abs => abs.endsWith('.swift'));
+    const macSwift = walkFiles('apps/ios/JovieMac', abs =>
+      abs.endsWith('.swift')
+    );
     assert.ok(macSwift.length > 0);
     for (const file of macSwift) {
       assert.doesNotMatch(read(file), /\bWKWebView\b/);

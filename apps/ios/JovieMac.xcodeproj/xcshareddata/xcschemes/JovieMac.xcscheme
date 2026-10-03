@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "38AB63CEE9E7118FAD3BB16B"
+               BlueprintIdentifier = "4F9B6898D108E150275D3D39"
                BuildableName = "JovieMac.app"
                BlueprintName = "JovieMac"
                ReferencedContainer = "container:JovieMac.xcodeproj">
@@ -28,7 +28,7 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "0942B468F6743893EADE672A"
+               BlueprintIdentifier = "E90A2270771297A2C2DB0DF8"
                BuildableName = "JovieMacTests.xctest"
                BlueprintName = "JovieMacTests"
                ReferencedContainer = "container:JovieMac.xcodeproj">
@@ -46,7 +46,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "0942B468F6743893EADE672A"
+               BlueprintIdentifier = "E90A2270771297A2C2DB0DF8"
                BuildableName = "JovieMacTests.xctest"
                BlueprintName = "JovieMacTests"
                ReferencedContainer = "container:JovieMac.xcodeproj">

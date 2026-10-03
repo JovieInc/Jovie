@@ -72,12 +72,26 @@ end
 
 FileUtils.rm_rf(PROJECT_PATH)
 project = Xcodeproj::Project.new(PROJECT_PATH)
+# Swift-only project: replace the gem's Objective-C/Clang template settings
+# with the few that matter, shared by every target.
+project.build_configurations.each do |config|
+  debug = config.name == 'Debug'
+  config.build_settings = COMMON_SETTINGS.merge(
+    'SDKROOT' => 'macosx',
+    'ENABLE_TESTABILITY' => debug ? 'YES' : 'NO',
+    'ONLY_ACTIVE_ARCH' => debug ? 'YES' : 'NO',
+    'SWIFT_OPTIMIZATION_LEVEL' => debug ? '-Onone' : '-O',
+    'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => debug ? 'DEBUG' : '',
+    'DEBUG_INFORMATION_FORMAT' => debug ? 'dwarf' : 'dwarf-with-dsym'
+  )
+end
 
 app = project.new_target(:application, 'JovieMac', :osx, DEPLOYMENT_TARGET)
 add_files(project, app, SHARED_SOURCES + MAC_SOURCES, :source_build_phase)
 add_files(project, app, MAC_RESOURCES, :resources_build_phase)
+app.frameworks_build_phase.files.each(&:remove_from_project)
 app.build_configurations.each do |config|
-  config.build_settings.merge!(COMMON_SETTINGS)
+  config.build_settings = {}
   config.build_settings.merge!(
     'PRODUCT_NAME' => 'JovieMac',
     'PRODUCT_MODULE_NAME' => 'JovieMac',
@@ -94,8 +108,9 @@ end
 tests = project.new_target(:unit_test_bundle, 'JovieMacTests', :osx, DEPLOYMENT_TARGET)
 add_files(project, tests, TEST_SOURCES, :source_build_phase)
 tests.add_dependency(app)
+tests.frameworks_build_phase.files.each(&:remove_from_project)
 tests.build_configurations.each do |config|
-  config.build_settings.merge!(COMMON_SETTINGS)
+  config.build_settings = {}
   config.build_settings.merge!(
     'PRODUCT_NAME' => 'JovieMacTests',
     'PRODUCT_BUNDLE_IDENTIFIER' => 'ie.jov.JovieMacTests',
@@ -104,6 +119,9 @@ tests.build_configurations.each do |config|
     'BUNDLE_LOADER' => '$(TEST_HOST)'
   )
 end
+
+# The template links Cocoa.framework; SwiftUI imports its own frameworks.
+project.frameworks_group.children.dup.each(&:remove_from_project)
 
 %w[Jovie JovieMac JovieMacTests].each do |name|
   group = project.main_group[name]

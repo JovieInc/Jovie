@@ -59,7 +59,7 @@
   {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "7d5ed17b77c0285b0796444697a5e73e842480586af55437c4479603027a02f2"
+    "bodySha256": "bfefd210173650b0c1e8246d7e82719bc5ca5f07387a69348473be5b3deba917"
   },
   {
     "file": ".claude/rules/linear.md",
@@ -72,8 +72,13 @@
   },
   {
     "file": ".claude/rules/macos.md",
-    "paths": ["apps/desktop/**", "apps/macos/**", "docs/macos/**"],
-    "bodySha256": "86546e550894071822f0230039e2f3190f5665f961fba2178a3e1e0a539c6b7d"
+    "paths": [
+      "apps/desktop/**",
+      "apps/macos/**",
+      "apps/ios/JovieMac/**",
+      "docs/macos/**"
+    ],
+    "bodySha256": "165b4ed8d285810dbbe291910ca7f7012577dd1e4cd1cfd7bf13b498799b6974"
   },
   {
     "file": ".claude/rules/motion.md",
