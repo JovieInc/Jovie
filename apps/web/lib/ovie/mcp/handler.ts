@@ -38,6 +38,16 @@ export async function handleOvieMcpRequest(input: {
     };
   }
 
+  if (
+    input.principal.isAdmin !== true ||
+    !input.principal.scopes.includes('ovie:read')
+  ) {
+    return {
+      status: 403,
+      body: rpcError(parsed.id, -32001, 'operator access required'),
+    };
+  }
+
   try {
     return await dispatchAuthenticated(parsed, input.principal, store);
   } catch (error) {

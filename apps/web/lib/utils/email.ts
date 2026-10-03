@@ -73,12 +73,9 @@ export function getEmailSendBlockReason(email: string): string | null {
 // ============================================================================
 // Internal / test account detection
 //
-// Company reads (e.g. Summer revenue + cohorts, JOV-6673) must only count real
-// external customers. Team inboxes live on jov.ie (and any configured admin
-// domain); seeded QA/E2E/demo accounts use recognizable local parts. Keep the
-// JS classifier and INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN in sync — the SQL copy
-// is a POSIX ERE used by Postgres `~*` queries where per-row JS filtering
-// would break aggregate counts.
+// Company reads must only exclude confirmed internal or test identities.
+// Known internal/QA domains, reserved test domains and explicit historical
+// test tags are shared by JS and SQL. External mailbox names are ambiguous.
 // ============================================================================
 
 /**
@@ -100,23 +97,8 @@ const INTERNAL_ACCOUNT_EMAIL_DOMAINS = [
  */
 const DOGFOOD_ACCOUNT_EMAIL_DOMAINS = ['test.jovie.com'] as const;
 
-/**
- * Local-part prefixes used by seeded QA/E2E accounts. Written as a POSIX-safe
- * alternation so the same source can drive both the JS RegExp below and the
- * SQL pattern (`auth[-_]?qa` covers both `auth-qa` and `auth_qa`).
- */
-const TEST_ACCOUNT_LOCAL_PART_PREFIXES =
-  '(e2e|browse|auth[-_]?qa|qa|smoke|staging|test|demo|dogfood|seed|fixture|autotest)';
-
-const TEST_ACCOUNT_LOCAL_PART_PATTERN = new RegExp(
-  `^${TEST_ACCOUNT_LOCAL_PART_PREFIXES}([-_.+]|$)`
-);
-
 /** Clerk test-address tag, e.g. browse+clerk_test@jov.ie */
 const CLERK_TEST_TAG_PATTERN = /\+clerk_test(\+|$)/;
-
-/** Seeded demo personas, e.g. dualipa-public@jov.ie */
-const DEMO_PLACEHOLDER_LOCAL_PART_PATTERN = /-public$/;
 
 /**
  * POSIX ERE equivalent of `isInternalOrTestAccountEmail` for use in Postgres
@@ -135,19 +117,10 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
   '@(.*\\.)?(example\\.(com|net|org)|invalid|localhost|test)$',
   // Clerk test-address tag anywhere in the local part
   `^[^@]*\\+clerk_test(\\+[^@]*)?@`,
-  // Demo placeholder personas: *-public@…
-  '^[^@]+-public@',
-  // Known test/QA local-part prefixes on any domain (separator or bare local)
-  `^${TEST_ACCOUNT_LOCAL_PART_PREFIXES}([-_.+][^@]*)?@`,
 ].join('|');
 
-/**
- * True when the email belongs to an internal or test/demo account rather than
- * a real external customer: team domains (jov.ie, admin domain), dogfood/QA
- * mailbox domains (test.jovie.com), reserved test domains, Clerk `+clerk_test`
- * tags, `*-public` demo placeholders, and seeded QA local-part prefixes (e2e,
- * browse, qa, auth-qa, smoke, staging, test, demo, dogfood, seed, fixture,
- * autotest).
+/** Confirmed internal/test domain or explicit historical test-address tag.
+ * Null, unknown and name-only hints remain customer eligible.
  */
 export function isInternalOrTestAccountEmail(
   email: string | null | undefined
@@ -171,9 +144,7 @@ export function isInternalOrTestAccountEmail(
 
   if (isReservedTestEmailDomain(domain)) return true;
 
-  return (
-    TEST_ACCOUNT_LOCAL_PART_PATTERN.test(localPart) ||
-    CLERK_TEST_TAG_PATTERN.test(localPart) ||
-    DEMO_PLACEHOLDER_LOCAL_PART_PATTERN.test(localPart)
-  );
+  // A suggestive name (qa, demo, dogfood, *-public, etc.) is not evidence
+  // that an external customer is a fixture. Preserve ambiguous accounts.
+  return CLERK_TEST_TAG_PATTERN.test(localPart);
 }

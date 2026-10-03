@@ -760,26 +760,72 @@ describe('Ovie MCP handler', () => {
     });
   });
 
-  it('lets authenticated non-founders read org state', async () => {
+  it.each(OVIE_MCP_TOOLS)(
+    'denies non-founder operating tool %s before store reads',
+    async name => {
+      const store = new MemoryOperatingStore();
+      const read = vi.spyOn(store, 'listDecisions');
+      const result = await handleOvieMcpRequest({
+        principal: user,
+        store,
+        body: rpc('tools/call', { name, arguments: {} }),
+      });
+      expect(result.status).toBe(403);
+      expect(read).not.toHaveBeenCalled();
+      expect(JSON.stringify(result.body)).not.toContain('session_handoff');
+    }
+  );
+
+  it.each(['initialize', 'tools/list'])(
+    'denies consumer discovery via %s',
+    async method => {
+      expect(
+        (await handleOvieMcpRequest({ principal: user, body: rpc(method) }))
+          .status
+      ).toBe(403);
+    }
+  );
+
+  it('preserves authorized org reads and denies read-only principal writes', async () => {
+    const reader = { ...founder, scopes: ['ovie:read'] as const };
     const result = await handleOvieMcpRequest({
-      principal: user,
-      body: rpc('tools/call', {
-        name: 'get_org_state',
-        arguments: { query: 'what is blocked?' },
-      }),
+      principal: reader,
+      body: rpc('tools/call', { name: 'get_org_state', arguments: {} }),
     });
     expect(result.status).toBe(200);
-    const body = toolResult<{
-      identity: string;
-      uncertified_launch_critical: Array<{ id: string }>;
-      session_handoff: { decisions: string[]; initiatives: unknown[] };
-    }>(result.body);
-    expect(body.identity).toBe('summer');
-    expect(body.uncertified_launch_critical.length).toBeGreaterThan(0);
-    expect(body.session_handoff).toMatchObject({
-      decisions: expect.any(Array),
-      initiatives: expect.any(Array),
-    });
+    expect(toolResult<{ identity: string }>(result.body).identity).toBe(
+      'summer'
+    );
+    expect(
+      (
+        await handleOvieMcpRequest({
+          principal: reader,
+          body: rpc('tools/call', {
+            name: 'record_decision',
+            arguments: { decided: 'x' },
+          }),
+        })
+      ).status
+    ).toBe(403);
+  });
+
+  it('denies absent scopes and unknown capabilities', async () => {
+    expect(
+      (
+        await handleOvieMcpRequest({
+          principal: { ...founder, scopes: [] },
+          body: rpc('initialize'),
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await handleOvieMcpRequest({
+          principal: founder,
+          body: rpc('tools/call', { name: 'unknown', arguments: {} }),
+        })
+      ).status
+    ).toBe(403);
   });
 
   it('returns a four-pass certification spec without executing money paths', async () => {

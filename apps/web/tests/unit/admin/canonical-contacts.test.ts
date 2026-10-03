@@ -13,6 +13,7 @@ const TABLES = vi.hoisted(() => ({
 
 const state = vi.hoisted(() => ({
   rowsByTable: new Map<object, unknown[]>(),
+  readsByTable: new Map<object, unknown[][]>(),
   inserts: [] as { table: object; values: unknown }[],
   updates: [] as { table: object; values: unknown }[],
   tableExists: true,
@@ -32,7 +33,12 @@ vi.mock('@/lib/db', () => ({
   doesTableExist: vi.fn(async () => state.tableExists),
   db: {
     select: () => ({
-      from: (table: object) => thenable(state.rowsByTable.get(table) ?? []),
+      from: (table: object) =>
+        thenable(
+          state.readsByTable.get(table)?.shift() ??
+            state.rowsByTable.get(table) ??
+            []
+        ),
     }),
     insert: (table: object) => ({
       values: (values: unknown) => {
@@ -73,11 +79,13 @@ vi.mock('@/lib/db/schema/contacts', () => ({
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 import {
+  getCanonicalContactByKey,
   getCanonicalContactMetrics,
   getCanonicalContacts,
   getContactStageTimeline,
   setCanonicalContactStage,
 } from '@/lib/admin/contacts';
+import { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
 
 const NOW = new Date('2026-09-28T00:00:00Z');
 
@@ -122,12 +130,154 @@ function seed(rows: {
 
 beforeEach(() => {
   state.rowsByTable.clear();
+  state.readsByTable.clear();
   state.inserts.length = 0;
   state.updates.length = 0;
   state.tableExists = true;
 });
 
 describe('canonical contacts read model (JOV-6888)', () => {
+  it('recognizes explicitly provisioned Better Auth test identity on an external mailbox', async () => {
+    const email = 'ordinary@artist-label.co';
+    seed({
+      users: [
+        userRow({
+          email,
+          betterAuthUserId: getDeterministicTestBetterAuthUserId(email),
+          userStatus: 'active',
+        }),
+      ],
+    });
+    expect((await getCanonicalContacts()).metrics.total).toBe(0);
+  });
+
+  it('resolves older linked QA owners outside the source window', async () => {
+    seed({
+      profiles: [
+        profileRow({ userId: 'old-qa', usernameNormalized: 'recent-profile' }),
+      ],
+    });
+    state.readsByTable.set(TABLES.users, [
+      [],
+      [userRow({ id: 'old-qa', email: 'old@test.jovie.com' })],
+    ]);
+    expect((await getCanonicalContacts()).total).toBe(0);
+  });
+
+  it('resolves older linked QA waitlist identities outside the source window', async () => {
+    seed({
+      profiles: [
+        profileRow({
+          waitlistEntryId: 'old-qa',
+          usernameNormalized: 'recent-profile',
+        }),
+      ],
+    });
+    state.readsByTable.set(TABLES.waitlistEntries, [
+      [],
+      [waitlistRow({ id: 'old-qa', emailNormalized: 'old@test.jovie.com' })],
+    ]);
+    expect((await getCanonicalContacts()).metrics.total).toBe(0);
+  });
+
+  it('excludes an identity corrected to a known test domain', async () => {
+    seed({
+      users: [
+        userRow({ email: 'artist@artist-label.co', userStatus: 'active' }),
+      ],
+      contacts: [
+        {
+          dedupeKey: 'email:artist@artist-label.co',
+          emailNormalized: 'qa@test.jovie.com',
+          stage: 'paying',
+        },
+      ],
+    });
+    expect((await getCanonicalContacts()).metrics.total).toBe(0);
+  });
+  it('excludes QA and linked alternate identities before list, metrics and exact lookup', async () => {
+    seed({
+      users: [
+        userRow({
+          id: 'qa-owner',
+          email: 'owner@test.jovie.com',
+          userStatus: 'active',
+        }),
+        userRow({
+          id: 'real-owner',
+          email: 'dogfood@artist-label.co',
+          userStatus: 'active',
+        }),
+      ],
+      profiles: [
+        profileRow({
+          id: 'qa-profile',
+          userId: 'qa-owner',
+          usernameNormalized: 'qa-profile',
+          claimedAt: NOW,
+        }),
+      ],
+      leads: [
+        leadRow({
+          id: 'qa-lead',
+          creatorProfileId: 'qa-profile',
+          contactEmail: 'alternate@artist-label.co',
+          handle: 'alternate',
+          paidAt: NOW,
+        }),
+      ],
+      waitlist: [
+        waitlistRow({
+          emailNormalized: 'owner@test.jovie.com',
+          status: 'approved',
+        }),
+      ],
+      contacts: [
+        {
+          dedupeKey: 'email:owner@test.jovie.com',
+          emailNormalized: 'renamed@artist-label.co',
+          stage: 'paying',
+        },
+      ],
+    });
+    const result = await getCanonicalContacts();
+    expect(result.contacts.map(row => row.email)).toEqual([
+      'dogfood@artist-label.co',
+    ]);
+    expect(result.metrics.total).toBe(1);
+    expect(result.metrics.paying).toBe(0);
+    expect((await getCanonicalContacts({ search: 'alternate' })).total).toBe(0);
+    expect(
+      await getCanonicalContactByKey('email:alternate@artist-label.co')
+    ).toBeNull();
+    expect(state.inserts).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it('does not infer test status from external names, missing email or entitlement grants', async () => {
+    seed({
+      users: [
+        userRow({
+          id: 'real',
+          email: 'demo@artist-label.co',
+          name: 'QA Dogfood',
+          isPro: true,
+          userStatus: 'active',
+        }),
+      ],
+      profiles: [
+        profileRow({
+          id: 'unclassified',
+          usernameNormalized: 'fixture-public',
+          displayName: 'Test Person',
+        }),
+      ],
+    });
+    const result = await getCanonicalContacts();
+    expect(result.total).toBe(2);
+    expect(result.metrics.total).toBe(2);
+    expect(result.metrics.paying).toBe(0);
+  });
   it('merges sources by dedupe key and reports one funnel of metrics', async () => {
     seed({
       waitlist: [
@@ -164,7 +314,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       leads: [
         leadRow({
           displayName: 'Grace Hopper',
-          contactEmail: 'grace@example.com',
+          contactEmail: 'grace@customer-label.co',
           handle: 'grace',
           status: 'new',
           outreachStatus: 'sent',
@@ -195,14 +345,14 @@ describe('canonical contacts read model (JOV-6888)', () => {
       waitlist: [
         waitlistRow({
           fullName: 'Alan',
-          emailNormalized: 'alan@example.com',
+          emailNormalized: 'alan@customer-label.co',
           status: 'waitlisted',
           waitlistedAt: NOW,
         }),
       ],
       contacts: [
         {
-          dedupeKey: 'email:alan@example.com',
+          dedupeKey: 'email:alan@customer-label.co',
           stage: 'certified',
           certifiedAt: new Date('2026-09-01T00:00:00Z'),
         },
@@ -222,7 +372,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       users: [
         userRow({
           name: 'Newer Person',
-          email: 'newer@example.com',
+          email: 'newer@customer-label.co',
           userStatus: 'active',
           createdAt: new Date('2026-09-02T00:00:00Z'),
           updatedAt: new Date('2026-09-03T00:00:00Z'),
@@ -230,7 +380,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
         userRow({
           id: 'u2',
           name: 'Older Person',
-          email: 'older@example.com',
+          email: 'older@customer-label.co',
           userStatus: 'active',
           createdAt: new Date('2026-09-01T00:00:00Z'),
           updatedAt: new Date('2026-09-01T00:00:00Z'),
@@ -240,11 +390,11 @@ describe('canonical contacts read model (JOV-6888)', () => {
 
     const pageOne = await getCanonicalContacts({ page: 1, pageSize: 1 });
     expect(pageOne.total).toBe(2);
-    expect(pageOne.contacts[0].email).toBe('newer@example.com');
+    expect(pageOne.contacts[0].email).toBe('newer@customer-label.co');
 
     const searched = await getCanonicalContacts({ search: 'older' });
     expect(searched.total).toBe(1);
-    expect(searched.contacts[0].email).toBe('older@example.com');
+    expect(searched.contacts[0].email).toBe('older@customer-label.co');
 
     const filtered = await getCanonicalContacts({ stage: 'paying' });
     expect(filtered.total).toBe(0);
@@ -286,7 +436,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       waitlist: [
         waitlistRow({
           fullName: 'Solo',
-          emailNormalized: 'solo@example.com',
+          emailNormalized: 'solo@customer-label.co',
           status: 'waitlisted',
           waitlistedAt: NOW,
         }),
@@ -302,17 +452,23 @@ describe('setCanonicalContactStage', () => {
   it('inserts a new contact and appends transition provenance', async () => {
     seed({});
     const result = await setCanonicalContactStage({
-      dedupeKey: 'email:new@example.com',
+      dedupeKey: 'email:new@customer-label.co',
       toStage: 'certified',
       actorUserId: 'admin-1',
       actorType: 'founder',
       reason: 'manual review',
-      identity: { displayName: 'New', emailNormalized: 'new@example.com' },
+      identity: {
+        displayName: 'New',
+        emailNormalized: 'new@customer-label.co',
+      },
     });
     expect(result).toEqual({ ok: true, stage: 'certified' });
     expect(
       state.inserts.find(i => i.table === TABLES.contacts)?.values
-    ).toMatchObject({ dedupeKey: 'email:new@example.com', stage: 'certified' });
+    ).toMatchObject({
+      dedupeKey: 'email:new@customer-label.co',
+      stage: 'certified',
+    });
     expect(
       state.inserts.find(i => i.table === TABLES.contactStageTransitions)
         ?.values

@@ -41,6 +41,11 @@ export const OVIE_WRITE_TOOLS = [
 
 /** Read-only operating detail that is still founder-private. */
 export const OVIE_FOUNDER_TOOLS = [
+  'get_org_state',
+  'get_initiative',
+  'get_feature_state',
+  'search_gbrain',
+  'get_gbrain_page',
   'get_invariant_stewardship',
   'get_workflow_capture',
   'get_proof_brief',

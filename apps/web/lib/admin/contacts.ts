@@ -1,6 +1,8 @@
 import 'server-only';
 
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
+import { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
+import { customerContactSources } from '@/lib/contacts/customer-sources';
 import {
   type CanonicalContactRow,
   type CanonicalContactSourceRow,
@@ -226,6 +228,7 @@ function leadSourceRow(
 
 type UserRow = {
   id: string;
+  betterAuthUserId: string | null;
   name: string | null;
   email: string | null;
   userStatus: string | null;
@@ -355,6 +358,7 @@ async function collectSourceRows(): Promise<CanonicalContactSourceRow[]> {
     db
       .select({
         id: users.id,
+        betterAuthUserId: users.betterAuthUserId,
         name: users.name,
         email: users.email,
         userStatus: users.userStatus,
@@ -387,12 +391,38 @@ async function collectSourceRows(): Promise<CanonicalContactSourceRow[]> {
       .limit(SOURCE_SCAN_LIMIT),
   ]);
 
+  // Resolve linked identities even when they fall outside the source scan
+  // window. Otherwise an older QA owner can reappear as a newer profile/lead.
+  const knownUserIds = new Set(userRows.map(row => row.id));
+  const missingUserIds = [
+    ...new Set([
+      ...profileRows.map(row => row.userId),
+      ...leadRows.map(row => row.signupUserId),
+    ]),
+  ].filter((id): id is string => id != null && !knownUserIds.has(id));
+  const knownWaitlistIds = new Set(waitlistRows.map(row => row.id));
+  const missingWaitlistIds = [
+    ...new Set(profileRows.map(row => row.waitlistEntryId)),
+  ].filter((id): id is string => id != null && !knownWaitlistIds.has(id));
+  const [linkedUsers, linkedWaitlist] = await Promise.all([
+    missingUserIds.length
+      ? db.select().from(users).where(inArray(users.id, missingUserIds))
+      : Promise.resolve([]),
+    missingWaitlistIds.length
+      ? db
+          .select()
+          .from(waitlistEntries)
+          .where(inArray(waitlistEntries.id, missingWaitlistIds))
+      : Promise.resolve([]),
+  ]);
+  const identityUsers = [...userRows, ...linkedUsers];
+  const identityWaitlist = [...waitlistRows, ...linkedWaitlist];
   const rows: CanonicalContactSourceRow[] = [];
 
   // Cross-source identity hints: a profile or lead linked to a user/waitlist
   // row should dedupe onto that person's email key instead of its own handle.
-  const emailByUserId = mapEmails(userRows, u => [u.id, u.email]);
-  const emailByWaitlistEntryId = mapEmails(waitlistRows, e => [
+  const emailByUserId = mapEmails(identityUsers, u => [u.id, u.email]);
+  const emailByWaitlistEntryId = mapEmails(identityWaitlist, e => [
     e.id,
     e.emailNormalized,
   ]);
@@ -408,7 +438,18 @@ async function collectSourceRows(): Promise<CanonicalContactSourceRow[]> {
       .filter(nonNull)
   );
 
-  return rows;
+  const excludedUserIds = new Set(
+    identityUsers
+      .filter(
+        user =>
+          isInternalOrTestAccountEmail(user.email) ||
+          (user.email != null &&
+            user.betterAuthUserId ===
+              getDeterministicTestBetterAuthUserId(user.email))
+      )
+      .map(user => user.id)
+  );
+  return customerContactSources(rows, excludedUserIds);
 }
 
 async function getContactOverrides(): Promise<Map<string, ContactOverrideRow>> {
@@ -480,7 +521,7 @@ export async function getCanonicalContactByKey(
     const all = await buildCanonicalContacts();
     return all.find(row => row.dedupeKey === dedupeKey) ?? null;
   } catch (error) {
-    captureError('Error loading canonical contact', error, { dedupeKey });
+    captureError('Error loading canonical contact', error);
     return null;
   }
 }
@@ -490,7 +531,9 @@ async function buildCanonicalContacts(): Promise<CanonicalContactListRow[]> {
     collectSourceRows(),
     getContactOverrides(),
   ]);
-  return applyOverrides(mergeCanonicalContacts(sourceRows), overrides);
+  return applyOverrides(mergeCanonicalContacts(sourceRows), overrides).filter(
+    row => !isInternalOrTestAccountEmail(row.email)
+  );
 }
 
 function matchesSearch(row: CanonicalContactListRow, search: string): boolean {

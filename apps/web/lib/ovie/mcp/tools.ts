@@ -75,10 +75,13 @@ export function authorizeOvieMcpTool(
   if (!principal.authenticated) {
     return { ok: false, status: 401, message: 'authentication required' };
   }
+  if (!(OVIE_MCP_TOOLS as readonly string[]).includes(tool)) {
+    return { ok: false, status: 403, message: 'unknown operating capability' };
+  }
   if (isOvieWriteTool(tool) || isOvieFounderTool(tool)) {
     const gate = authorizeSummerControl({
       authenticated: principal.authenticated,
-      isAdmin: principal.isAdmin,
+      isAdmin: principal.isAdmin === true,
     });
     if (!gate.ok) {
       return {
@@ -89,6 +92,10 @@ export function authorizeOvieMcpTool(
           : 'founder authorization required for operating detail',
       };
     }
+  }
+  const requiredScope = isOvieWriteTool(tool) ? 'ovie:write' : 'ovie:read';
+  if (!principal.scopes.includes(requiredScope)) {
+    return { ok: false, status: 403, message: 'operating scope required' };
   }
   return { ok: true };
 }

@@ -42,11 +42,8 @@ describe('isInternalOrTestAccountEmail', () => {
     ['browse+clerk_test@jov.ie', 'clerk test tag'],
     ['someone+clerk_test@gmail.com', 'clerk test tag on external domain'],
     ['e2e-42@jov.ie', 'e2e prefix'],
-    ['e2e@anything.dev', 'bare e2e local part'],
     ['browse-admin+clerk_test@jov.ie', 'browse prefix with tag'],
     ['auth-qa-1@jov.ie', 'auth-qa prefix'],
-    ['smoke-run@qa.vendor.io', 'smoke prefix on any domain'],
-    ['staging-check@corp.net', 'staging prefix'],
     ['test-signup@example.org', 'test prefix + reserved domain'],
     ['demo@jov.ie', 'demo local part'],
     ['dualipa-public@jov.ie', 'demo placeholder suffix'],
@@ -54,13 +51,18 @@ describe('isInternalOrTestAccountEmail', () => {
     ['auth-surface-qa+clerk_test@test.jovie.com', 'dogfood QA domain'],
     ['money-referrer-123@test.jovie.com', 'e2e dogfood email'],
     ['anyone@staging.test.jovie.com', 'dogfood subdomain'],
-    ['dogfood-tim@gmail.com', 'dogfood local part on external domain'],
   ])('excludes %s (%s)', email => {
     expect(isInternalOrTestAccountEmail(email)).toBe(true);
   });
 
   it.each([
     ['artist@band.com'],
+    ['dogfood-tim@gmail.com'],
+    ['e2e@anything.dev'],
+    ['smoke-run@qa.vendor.io'],
+    ['staging-check@corp.net'],
+    ['demo@label.co'],
+    ['artist-public@label.co'],
     ['fan.name@gmail.com'],
     ['latest.music@outlook.com'],
     ['contestant@exampled.com'],
@@ -83,17 +85,20 @@ describe('isInternalOrTestAccountEmail', () => {
     ['money-referrer-123@test.jovie.com'],
     ['anyone@staging.test.jovie.com'],
     ['e2e-42@jov.ie'],
-    ['dogfood-tim@gmail.com'],
     ['dualipa-public@jov.ie'],
     ['seeded@data.test'],
   ])('SQL pattern excludes %s', email => {
     expect(sqlPattern.test(email.toLowerCase())).toBe(true);
   });
 
-  it.each([['artist@band.com'], ['fan.name@gmail.com'], ['quality@band.com']])(
-    'SQL pattern keeps %s external',
-    email => {
-      expect(sqlPattern.test(email.toLowerCase())).toBe(false);
-    }
-  );
+  it.each([
+    ['artist@band.com'],
+    ['fan.name@gmail.com'],
+    ['quality@band.com'],
+    ['dogfood-tim@gmail.com'],
+    ['demo@label.co'],
+    ['artist-public@label.co'],
+  ])('SQL pattern keeps %s external', email => {
+    expect(sqlPattern.test(email.toLowerCase())).toBe(false);
+  });
 });
