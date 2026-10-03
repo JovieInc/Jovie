@@ -1,4 +1,6 @@
+import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,6 +8,11 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { RailToggleButton } from '@/components/atoms/RailToggleButton';
+import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
+import { TableMetaProvider } from '@/contexts/TableMetaContext';
+import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
+import { detectReversibleControl } from '@/tests/utils/reversible-control-detector';
 
 /**
  * JOV-7150 regression fixture: the profile rail must never carry open into
@@ -35,6 +42,26 @@ function renderShell(scope: string) {
     <PreviewPanelProvider scope={scope}>
       <RailProbe />
     </PreviewPanelProvider>
+  );
+}
+
+function ReversibleRightRailProbe() {
+  const { isOpen, toggle } = usePreviewPanelState();
+  return (
+    <>
+      <RailToggleButton
+        side='right'
+        open={isOpen}
+        openLabel='Hide details rail'
+        closedLabel='Show details rail'
+        onToggle={toggle}
+        dataTestId='reversible-right-rail-toggle'
+      />
+      <RightDrawer isOpen={isOpen} width={360} ariaLabel='Details rail'>
+        <button type='button'>Rail action</button>
+      </RightDrawer>
+      <RightRailKeyboardHandler />
+    </>
   );
 }
 
@@ -116,5 +143,56 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
       </PreviewPanelProvider>
     );
     expect(screen.getByTestId('rail-data').textContent).toBe('none');
+  });
+
+  it('certifies repeated cycles on the composed right rail and drawer', async () => {
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider>
+        <TableMetaProvider>
+          <PreviewPanelProvider scope='app-shell'>
+            <ReversibleRightRailProbe />
+          </PreviewPanelProvider>
+        </TableMetaProvider>
+      </TooltipProvider>
+    );
+
+    const currentToggle = () =>
+      screen.getByTestId('reversible-right-rail-toggle');
+    currentToggle().focus();
+
+    await detectReversibleControl({
+      name: 'composed preview right rail',
+      states: ['closed', 'open'],
+      observe: () => ({
+        state:
+          currentToggle().getAttribute('aria-expanded') === 'true'
+            ? 'open'
+            : 'closed',
+      }),
+      activate: async via => {
+        currentToggle().focus();
+        if (via === 'pointer') {
+          await user.click(currentToggle());
+        } else {
+          fireEvent.keyDown(globalThis, { key: ']' });
+        }
+      },
+      assertContinuity: observation => {
+        const expanded = String(observation.state === 'open');
+        expect(currentToggle()).toHaveAttribute('aria-expanded', expanded);
+        expect(currentToggle()).toHaveAttribute('aria-pressed', expanded);
+        expect(currentToggle()).toHaveAccessibleName(
+          observation.state === 'open'
+            ? 'Hide details rail'
+            : 'Show details rail'
+        );
+        expect(currentToggle()).toHaveFocus();
+        expect(screen.getByLabelText('Details rail')).toHaveAttribute(
+          'aria-hidden',
+          String(observation.state === 'closed')
+        );
+      },
+    });
   });
 });
