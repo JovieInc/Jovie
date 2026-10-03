@@ -323,6 +323,24 @@ jobs:
           save_merge_group_workspace: 'true'
       - name: Revalidate published workspace receipt
         run: node scripts/lib/ci-dependency-workspace.mjs validate
+      - name: Measure actual installed combined dependency graph
+        run: node .github/scripts/dependency-parity-evidence.mjs write
+      - name: Compare verified constituent dependency digests
+        if: ${{ vars.DEPENDENCY_PARITY_ENFORCED == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPENDENCY_PARITY_ENFORCED: ${{ vars.DEPENDENCY_PARITY_ENFORCED }}
+        run: node .github/scripts/dependency-parity-evidence.mjs compare
+      - name: Preserve combined dependency evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-digest-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.merge_group.head_sha }}
+          path: |
+            dep-digest.json
+            dep-parity.json
+          if-no-files-found: error
+          retention-days: 14
 
   # Successful root for every CI event, with one-shot proof only for push:main.
   # Queue-proven SHAs reuse their exact merge_group gate and skip every duplicate
