@@ -307,8 +307,13 @@ case "$DRAIN_PROMOTION_MODE" in
           .productionUnboundRepairAdmission.mainSha == null and
           .productionUnboundRepairAdmission.deployedSha == null
         end) and
+<<<<<<< HEAD
         (.productionUnboundRepairAdmission.maxConcurrent | type == "number") and
         (.productionUnboundRepairAdmission.maxConcurrent | IN(range(1;11))) and
+=======
+        # JOV-5913: unbound repair concurrency is seat-derived (1..8), never pinned to 1.
+        (.productionUnboundRepairAdmission.maxConcurrent | type == "number" and . == floor and . >= 1 and . <= 8) and
+>>>>>>> 23e274af5 (fix(hermes): scale unbound-repair concurrency by live fallback OAuth seats (JOV-5913))
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
         .closureAdmission.authority == "Summer" and
