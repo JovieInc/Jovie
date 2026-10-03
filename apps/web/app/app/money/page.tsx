@@ -30,9 +30,15 @@ export default async function MoneyPage() {
     if (isUnauthorizedSessionError(error)) {
       redirect(APP_ROUTES.SIGNIN);
     }
-    await captureError('Money overview failed to load', error, {
-      route: 'app/money',
-    });
+    // Database failures can carry SQL, parameters and financial values.
+    // Emit a stable operational error without the raw exception or its cause.
+    await captureError(
+      'Money overview failed to load',
+      new Error('Money overview unavailable'),
+      {
+        route: 'app/money',
+      }
+    );
   }
 
   return <MoneyOverviewClient overview={overview} />;

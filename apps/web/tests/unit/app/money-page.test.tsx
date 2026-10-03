@@ -29,10 +29,23 @@ describe('Money page authorization (JOV-4618)', () => {
   });
 
   it('renders an error surface without leaking payload on other failures', async () => {
-    mocks.getMoneyOverview.mockRejectedValue(new Error('db down'));
+    const failure = Object.assign(new Error('db down account_balance=91823'), {
+      query: 'SELECT balance WHERE owner_id=private',
+      params: ['private'],
+    });
+    mocks.getMoneyOverview.mockRejectedValue(failure);
     const el = await MoneyPage();
     const html = renderToStaticMarkup(el);
     expect(html).toContain('money-error');
     expect(html).not.toContain('db down');
+    expect(mocks.captureError).toHaveBeenCalledOnce();
+    const args = mocks.captureError.mock.calls[0];
+    expect(args[1]).not.toBe(failure);
+    expect(args[1]).toBeInstanceOf(Error);
+    expect(args[1].message).toBe('Money overview unavailable');
+    expect(args[1].cause).toBeUndefined();
+    expect(args[1].query).toBeUndefined();
+    expect(args[1].params).toBeUndefined();
+    expect(args[2]).toEqual({ route: 'app/money' });
   });
 });
