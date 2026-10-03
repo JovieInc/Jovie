@@ -8,6 +8,7 @@ import {
   filterProfileWorkspaceRows,
   getConnectionPrimaryAction,
   getConnectionStatus,
+  isPresenceSearchProviderAvailable,
   selectPresenceReviewRows,
   sortProfileWorkspaceRows,
   summarizeProfileWorkspaceRows,
@@ -301,5 +302,41 @@ describe('connections workspace helpers', () => {
       label: 'Not Measured',
       needsAttention: false,
     });
+  });
+});
+
+describe('isPresenceSearchProviderAvailable', () => {
+  it('treats a provider that was never switched on as not measured, not an outage', () => {
+    expect(isPresenceSearchProviderAvailable(undefined)).toBe(true);
+    expect(
+      isPresenceSearchProviderAvailable({
+        enabled: false,
+        disabledReason: null,
+      })
+    ).toBe(true);
+    expect(
+      getConnectionStatus(
+        surface({ rank: null, lastObservedAt: null }),
+        isPresenceSearchProviderAvailable({
+          enabled: false,
+          disabledReason: null,
+        })
+      ).label
+    ).toBe('Not Measured');
+  });
+
+  it('reports unavailable only after the health gate trips', () => {
+    const tripped = {
+      enabled: false,
+      disabledReason: 'two_consecutive_failures:http_500',
+    };
+    expect(isPresenceSearchProviderAvailable(tripped)).toBe(false);
+    expect(
+      getConnectionStatus(surface(), isPresenceSearchProviderAvailable(tripped))
+        .label
+    ).toBe('Search Unavailable');
+    expect(
+      isPresenceSearchProviderAvailable({ enabled: true, disabledReason: null })
+    ).toBe(true);
   });
 });

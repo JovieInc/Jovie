@@ -400,3 +400,17 @@ export function getPresenceSignals(
 
   return [...signals].sort((left, right) => left.sortOrder - right.sortOrder);
 }
+
+/**
+ * Search is "unavailable" only when the provider health gate tripped. A
+ * provider that has never been switched on has simply not measured anything
+ * yet, so rows read as Not Measured instead of a wall of outages.
+ */
+export function isPresenceSearchProviderAvailable(
+  health:
+    | { readonly enabled: boolean; readonly disabledReason: string | null }
+    | undefined
+): boolean {
+  if (!health) return true;
+  return health.enabled || health.disabledReason === null;
+}

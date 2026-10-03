@@ -31,6 +31,7 @@ import {
   resolveIdentityPhoto,
 } from '@/lib/profile-surfaces/presence-identity';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
+import { isPresenceSearchProviderAvailable } from '@/lib/profile-surfaces/workspace';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 import type { SettingsConnectorState } from '../settings/connectors/connectors-data';
 
@@ -244,7 +245,10 @@ export async function loadProfilesWorkspaceData(input: {
           )
         ),
       db
-        .select({ enabled: profileSearchProviderHealth.enabled })
+        .select({
+          enabled: profileSearchProviderHealth.enabled,
+          disabledReason: profileSearchProviderHealth.disabledReason,
+        })
         .from(profileSearchProviderHealth)
         .where(eq(profileSearchProviderHealth.provider, 'google_serpapi'))
         .limit(1),
@@ -434,6 +438,6 @@ export async function loadProfilesWorkspaceData(input: {
         : qualifiedResults / currentResults.length,
     bestJovieRank: surfaceRows.find(row => row.kind === 'jovie')?.rank ?? null,
     lastObservedAt: latestRun?.fetchedAt?.toISOString() ?? null,
-    providerAvailable: providerHealth[0]?.enabled === true,
+    providerAvailable: isPresenceSearchProviderAvailable(providerHealth[0]),
   };
 }
