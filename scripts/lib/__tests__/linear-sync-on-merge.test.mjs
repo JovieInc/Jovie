@@ -346,7 +346,7 @@ describe('linear sync on merge', () => {
     expect(green.action).toBe('close');
   });
 
-  it('keeps an escaped defect open for exact-build product and detector proof', () => {
+  it('moves an escaped defect to Validating for exact-build product and detector proof', () => {
     const decision = decideLinearCloseOnMerge({
       issue: {
         id: 'issue-7200',
@@ -365,11 +365,95 @@ describe('linear sync on merge', () => {
       },
     });
 
-    expect(decision.action).toBe('skip');
+    expect(decision.action).toBe('validate');
     expect(decision.blockingNumbers).toEqual([]);
+    expect(decision.comment).toContain('Moved JOV-7200 to Validating');
     expect(decision.comment).toContain('Escaped defects stay open at merge');
     expect(decision.comment).toContain('Closure evidence is incomplete');
     expect(decision.comment).toContain('escaped-defect-closure:v1');
+  });
+
+  it('moves the real escaped-defect merge path to Validating and never Done', async () => {
+    const calls = [];
+    const result = await syncLinearIssueOnMerge({
+      env: {
+        LINEAR_API_KEY: 'lin_test',
+        GITHUB_TOKEN: 'gh_test',
+        GITHUB_REPOSITORY: 'JovieInc/Jovie',
+        PR_NUMBER: '19546',
+        PR_URL: 'https://github.com/JovieInc/Jovie/pull/19546',
+        PR_BODY:
+          '<!-- linear-issue-id:issue-7207 -->\n<!-- linear-issue-identifier:JOV-7207 -->',
+        HEAD_REF: 'codex/jov-7207-sidebar-repair',
+        MERGE_SHA,
+      },
+      log: () => {},
+      fetchImpl: async (url, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        calls.push({
+          query: body.query ?? 'GitHub',
+          variables: body.variables,
+        });
+        if (String(url).includes('api.github.com')) {
+          return {
+            ok: true,
+            headers: { get: () => '' },
+            json: async () => [],
+          };
+        }
+        if (body.query.includes('IssueDoneState')) {
+          return {
+            ok: true,
+            json: async () => ({
+              data: {
+                issue: {
+                  id: 'issue-7207',
+                  identifier: 'JOV-7207',
+                  title: 'Sidebar works only in one state',
+                  description: 'The product repair merged.',
+                  labels: { nodes: [{ name: 'escaped-defect' }] },
+                  comments: { nodes: [] },
+                  children: { nodes: [] },
+                  team: {
+                    states: {
+                      nodes: [
+                        {
+                          id: 'validating-id',
+                          name: 'Validating',
+                          type: 'started',
+                        },
+                        { id: 'done-id', name: 'Done', type: 'completed' },
+                      ],
+                    },
+                  },
+                },
+              },
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              issueUpdate: { success: true },
+              commentCreate: { success: true },
+            },
+          }),
+        };
+      },
+    });
+
+    expect(result.action).toBe('validate');
+    const update = calls.find(call =>
+      String(call.query).includes('SetIssueValidating')
+    );
+    expect(update?.variables).toEqual({
+      issueId: 'issue-7207',
+      stateId: 'validating-id',
+    });
+    expect(
+      calls.some(call => String(call.query).includes('SetIssueDone'))
+    ).toBe(false);
   });
 
   it('does not close commissioning parent JOV-5853 when a child pull request merges', () => {
