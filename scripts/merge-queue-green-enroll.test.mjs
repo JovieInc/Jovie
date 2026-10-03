@@ -220,7 +220,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   );
   assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
   assert.equal(token.with['permission-actions'], 'read');
-  assert.equal(token.with['permission-contents'], 'read');
+  assert.equal(token.with['permission-contents'], 'write');
   assert.equal(token.with['permission-pull-requests'], 'write');
   assert.equal(token.with['permission-statuses'], 'write');
   assert.equal(token.with['permission-merge-queues'], undefined);
