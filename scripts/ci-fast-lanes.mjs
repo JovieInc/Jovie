@@ -2099,6 +2099,7 @@ export async function runStructural(opts = {}) {
       ? ['pnpm invariants:check']
       : [];
   const operationsParts = [
+    'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-source.mjs --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/staging-release-source.test.mjs',
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
