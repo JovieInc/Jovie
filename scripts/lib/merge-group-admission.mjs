@@ -428,18 +428,25 @@ function requireTimingBound(value, field, maximum) {
   }
 }
 
-// Quota exhaustion says nothing about the combined head, so it waits within
-// the admission budget instead of failing a valid group.
-export function isRateLimitError(error) {
+// Quota exhaustion, a per-request timeout or a GitHub 5xx says nothing about
+// the combined head, so it waits within the admission budget instead of
+// failing a valid group.
+export function isTransientApiError(error) {
   if (!(error instanceof MergeGroupAdmissionError)) return false;
   if (error.status === 403 || error.status === 429) {
     return RATE_LIMIT_PATTERN.test(error.message);
   }
+  if (error.status === 502 || error.status === 503 || error.status === 504) {
+    return true;
+  }
   return (
     error.status === null &&
-    /^live merge queue GraphQL returned errors: .*rate limit/i.test(
+    (/^live merge queue GraphQL returned errors: .*rate limit/i.test(
       error.message
-    )
+    ) ||
+      /^GitHub API request failed for \S+: The operation was aborted due to timeout$/.test(
+        error.message
+      ))
   );
 }
 
@@ -602,8 +609,8 @@ export async function waitForMergeGroupAdmission({
     try {
       outcome = await poll();
     } catch (error) {
-      if (!isRateLimitError(error)) throw error;
-      outcome = `GitHub API rate-limited (${
+      if (!isTransientApiError(error)) throw error;
+      outcome = `GitHub API unavailable (${
         error instanceof Error ? error.message : String(error)
       })`;
     }

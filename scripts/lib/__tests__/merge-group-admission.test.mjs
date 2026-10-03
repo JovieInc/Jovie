@@ -8,7 +8,7 @@ import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
-  isRateLimitError,
+  isTransientApiError,
   MERGE_GROUP_ADMISSION_WAIT_MS,
   MergeGroupAdmissionError,
   normalizeLiveQueueEntriesPage,
@@ -839,7 +839,9 @@ describe('merge-group admission evidence', () => {
 
     expect(result.admitted).toBe(true);
     expect(elapsed).toBe(30);
-    expect(statuses.filter(s => /rate-limited/.test(s))).toHaveLength(2);
+    expect(statuses.filter(s => /GitHub API unavailable/.test(s))).toHaveLength(
+      2
+    );
   });
 
   it('fails at the deadline when the quota never recovers', async () => {
@@ -864,16 +866,16 @@ describe('merge-group admission evidence', () => {
           elapsed += delayMs;
         },
       })
-    ).rejects.toThrow(/within 6ms \(still pending: GitHub API rate-limited/);
+    ).rejects.toThrow(/within 6ms \(still pending: GitHub API unavailable/);
   });
 
-  it('treats only GitHub rate-limit signatures as retryable', () => {
+  it('treats only rate-limit, timeout and gateway signatures as retryable', () => {
     const graphqlLimit = new MergeGroupAdmissionError(
       'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.'
     );
-    expect(isRateLimitError(graphqlLimit)).toBe(true);
+    expect(isTransientApiError(graphqlLimit)).toBe(true);
     expect(
-      isRateLimitError(
+      isTransientApiError(
         new MergeGroupAdmissionError(
           'GitHub API 429 for /x: secondary rate limit',
           {
@@ -883,7 +885,7 @@ describe('merge-group admission evidence', () => {
       )
     ).toBe(true);
     expect(
-      isRateLimitError(
+      isTransientApiError(
         new MergeGroupAdmissionError(
           'GitHub API 403 for /x: Resource not accessible',
           {
@@ -893,20 +895,54 @@ describe('merge-group admission evidence', () => {
       )
     ).toBe(false);
     expect(
-      isRateLimitError(
+      isTransientApiError(
         new MergeGroupAdmissionError(
           'live merge queue GraphQL returned errors: Not found'
         )
       )
     ).toBe(false);
     expect(
-      isRateLimitError(
+      isTransientApiError(
         new MergeGroupAdmissionError(
           'PR Size Guard completed with rate limit failure'
         )
       )
     ).toBe(false);
-    expect(isRateLimitError(new Error('API rate limit exceeded'))).toBe(false);
+    expect(isTransientApiError(new Error('API rate limit exceeded'))).toBe(
+      false
+    );
+    // Run 37156957426 (2026-10-03 22:02Z) failed a valid group on a 10 s abort.
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API request failed for /graphql: The operation was aborted due to timeout'
+        )
+      )
+    ).toBe(true);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API 502 for /graphql: Bad Gateway',
+          {
+            status: 502,
+          }
+        )
+      )
+    ).toBe(true);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API request failed for /graphql: getaddrinfo ENOTFOUND'
+        )
+      )
+    ).toBe(false);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError('GitHub API 500 for /graphql: boom', {
+          status: 500,
+        })
+      )
+    ).toBe(false);
   });
 
   it('defaults to a multi-minute admission budget', () => {
