@@ -379,7 +379,10 @@ export function RightDrawer({
         'transition-[width,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',
         isOpen
           ? 'visible opacity-100'
-          : 'opacity-0 pointer-events-none invisible',
+          : // Below lg this branch only renders before hydration resolves the
+            // mobile overlay; a closed in-flow rail there would hold space the
+            // fixed overlay then releases, shifting the page under it.
+            'opacity-0 pointer-events-none invisible max-lg:hidden',
         className
       )}
       style={{

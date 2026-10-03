@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { sha256 as sha256Bytes } from '@noble/hashes/sha2.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
 export const JOVIE_CERTIFICATION_CONTRACT = 'jovie.certification/v1' as const;
 
@@ -370,9 +371,8 @@ function stableSerialize(value: StableValue): string {
 }
 
 function sha256(value: StableValue): string {
-  return `sha256:${createHash('sha256')
-    .update(stableSerialize(value))
-    .digest('hex')}`;
+  // Isomorphic so certification fixtures also render in browser stories.
+  return `sha256:${bytesToHex(sha256Bytes(utf8ToBytes(stableSerialize(value))))}`;
 }
 
 function receiptDigestInput(
