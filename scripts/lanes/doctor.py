@@ -401,8 +401,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
     stale_briefs = (obs.get("designGate") or {}).get("stale") or []
     if stale_briefs:
-        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held over 24h "
-                                        f"({', '.join(stale_briefs[:5])}); the brief-auto escape did not fire")
+        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
+                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")

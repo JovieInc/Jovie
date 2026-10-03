@@ -733,7 +733,9 @@ def apply_to_pool(qualified_by_provider: dict, rejected: dict, read_text=None,
     matching the rest of the admission census. Ungated issues are unchanged.
     `ageHistogram` buckets every issue still carrying `needs-design-brief`
     by time since its first hold; `stale` lists those held past
-    HOLD_ALERT_S, which the anti-stall rules should make impossible.
+    HOLD_ALERT_S. An admitted-but-unclaimed issue still carrying the label
+    lands here too, so staleness means "no build claim", not "the escape
+    did not fire".
     """
     now = time.time() if now is None else now
     census = empty_census()
