@@ -155,7 +155,7 @@ describe('DashboardNav', () => {
 
   it('gives Home sole current-page ownership at the shell root', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
-    const { getByRole } = renderDashboardNav({
+    renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
@@ -171,7 +171,7 @@ describe('DashboardNav', () => {
   });
 
   it('keeps Inbox visible when availability is unknown', () => {
-    const { getByRole } = renderDashboardNav({
+    renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'unknown', pendingCount: null },
