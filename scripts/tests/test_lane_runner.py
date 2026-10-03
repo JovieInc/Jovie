@@ -9,6 +9,7 @@ import importlib.util
 import concurrent.futures
 import io
 import signal
+import shutil
 import threading
 import hashlib
 import json
@@ -49,8 +50,17 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels
 
 def gate_proof(head, verdict="landing", sensitive=False):
     return {"schema": lane.GATE_RESULT_SCHEMA, "headSha": head, "verdict": verdict,
-            "completedAt": "2026-10-02T18:00:00Z", "policyDigest": lane.GATE_POLICY_DIGEST,
+            "completedAt": lane.now_iso(), "policyDigest": lane.GATE_POLICY_DIGEST,
             "sensitive": sensitive, "reasons": []}
+
+
+def publication_response(args):
+    if len(args) > 1 and Path(args[1]).name == "source_admission.mjs":
+        return json.dumps({"schema": "jovie-source-admission/v1", "allowed": True, "blockers": [],
+                           "prNumber": int(args[-2]), "headSha": args[-1]})
+    if "check-reenroll" in args:
+        return json.dumps({"number": int(args[-1]), "reenrollable": True})
+    return ""
 
 
 class ContextManifestTest(unittest.TestCase):
@@ -461,7 +471,7 @@ class FakeShell:
 
     def __call__(self, args, cwd=None, timeout=600, env=None, log=None, stream=False, pass_fds=()):
         self.calls.append(args)
-        out, code = "", 0
+        out, code = publication_response(args), 0
         if any(token in args for token in getattr(self, "hanging", ())):
             raise subprocess.TimeoutExpired(args, timeout)
         if args[:3] == ["gh", "pr", "list"]:
@@ -515,7 +525,8 @@ class VerifyAndLandTest(unittest.TestCase):
                 update(path, change)
             with patch.object(lane, "sh", side_effect=fake), patch.object(lane, "update_json", side_effect=synchronized):
                 result = lane.gate_pr(host, self.pr, Path("/tmp"), None)
-            self.assertEqual(result["verdict"], "verified-not-queued"); self.assertEqual(observed, [False])
+            self.assertEqual(result["verdict"], "verified-not-queued")
+            self.assertTrue(observed); self.assertFalse(any(observed))
             self.assertEqual(json.loads(path.read_text()), {"9": "concurrent", "7": self.pr["headRefOid"]})
 
     def test_failing_check_holds_the_pr_as_draft(self):
@@ -1280,7 +1291,7 @@ class WorkerTest(unittest.TestCase):
         lane.pr_events.queued_prs = lambda module, kinds: []
         lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
         lane.claim_red_pr = lambda host, name, prs=None: None
-        lane.claim_adoptable_pr = lambda host, name, prs: None
+        lane.claim_adoptable_pr = lambda host, name, prs, repair_candidates=None: None
         lane.lane_prs = lambda name, fields="": []
         lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, lane.lane_prs(name, fields=lane.LIGHT_PR_FIELDS))
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
@@ -1409,7 +1420,7 @@ class WorkerTest(unittest.TestCase):
 
     def test_late_remote_drafts_are_adopted_and_gated(self):
         adopted = []
-        lane.claim_adoptable_pr = lambda host, name, prs: SimpleNamespace(pr={"number": 8})
+        lane.claim_adoptable_pr = lambda host, name, prs, repair_candidates=None: SimpleNamespace(pr={"number": 8})
         lane.adopt_pr = lambda host, name, pr, **kwargs: adopted.append(pr["number"])
         lane.worker(self.host, "devin")
         self.assertEqual((adopted, self.linear.moves), ([8], []))
@@ -1853,7 +1864,7 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
             self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in fake.calls))
         self.assertIsInstance(started, float)
 
-    def test_requeue_verified_drops_revoked_entries_without_enrolling(self):
+    def test_requeue_verified_preserves_revoked_entries_without_enrolling(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             lane.revoke_publication(host, branch="devin/jov-1", reason="run-stopped")
@@ -1864,7 +1875,7 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
             lane.requeue_verified(host, [{"number": 7, "headRefOid": "abc",
                                           "headRefName": "devin/jov-1"}])
             self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in fake.calls))
-            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
+            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"7": "abc"})
 
 
 class DispatchTest(unittest.TestCase):
@@ -2709,7 +2720,7 @@ class FixRedTest(unittest.TestCase):
         self.assertIn("conflicts with main", prompt)
         self.assertIn("renumber yours", prompt)
 
-    def test_a_pushed_fix_re_arms_auto_merge_for_ready_prs(self):
+    def test_a_pushed_fix_records_pending_intent_without_publishing_unverified_head(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
         lane.failure_excerpt = lambda pr: ""
         calls = []
@@ -2729,10 +2740,19 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
-                lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {**self.pr(), "isDraft": False})
+                attempts = host.state / "fix-attempts.json"
+                attempts.write_text(json.dumps({"5": {"sha": "h1", "count": 2, "at": time.time() - 1}}))
+                with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)):
+                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {**self.pr(), "isDraft": False})
+                self.assertEqual(receipt["verdict"], "fix-pushed")
+                self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "h9"})
+                record = json.loads(attempts.read_text())["5"]
+                self.assertEqual((record["count"], record["pushedHead"], record["repairRunId"]),
+                                 (2, "h9", receipt["runId"]))
+                self.assertFalse((host.state / "verified.json").exists())
             finally:
                 lane.sh, lane.failure_excerpt = real, real_excerpt
-        self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+        self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in calls))
 
     def test_a_pr_merged_before_its_fix_run_installs_nothing_and_records_cancellation(self):
         real_sh, real_agent = lane.sh, lane.run_agent
@@ -2766,7 +2786,7 @@ class FixRedTest(unittest.TestCase):
         self.assertFalse(any(cmd and cmd[0] in {"git", "pnpm"} for cmd in calls),
                          "a merged target performs zero checkout, install, or push work")
 
-    def test_a_lockfile_only_conflict_skips_the_agent_and_re_arms(self):
+    def test_a_lockfile_only_conflict_skips_the_agent_and_records_gate_intent(self):
         real, real_resolve, real_agent = lane.sh, lane.resolve_lockfile_conflict, lane.run_agent
         lane.resolve_lockfile_conflict = lambda worktree, branch, log, **kwargs: True
         lane.run_agent = lambda *a, **k: self.fail("a lockfile-only conflict needs no model")
@@ -2787,11 +2807,13 @@ class FixRedTest(unittest.TestCase):
             try:
                 receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
                                           {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+                pending = json.loads((host.state / "requeue.json").read_text())
             finally:
                 lane.sh, lane.resolve_lockfile_conflict, lane.run_agent = real, real_resolve, real_agent
         self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "lockfile-regenerated"))
         self.assertNotIn(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], calls)
-        self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+        self.assertEqual(pending, {"5": "h9"})
+        self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in calls))
 
     def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
         real = lane.sh
@@ -3214,13 +3236,46 @@ class UpdateTest(unittest.TestCase):
             old_env = os.environ.get("LANES_SELFTEST")
             os.environ["LANES_SELFTEST"] = "1"
             try:
+                # Reproduce the old updater's archive contract: its selector carries
+                # only the HUD extra. New release tests must refuse that incomplete
+                # bundle and leave the prior running release intact.
+                legacy = host.state / "releases/legacy/scripts/lanes"
+                legacy.mkdir(parents=True)
+                (legacy / ".tree").write_text("legacy")
+                (host.state / "current").symlink_to(legacy)
+                with patch.object(lane, "RELEASE_EXTRAS", ["scripts/promotion-loss-metrics.mjs"]), \
+                     patch.object(lane, "LANE_TESTS", [p for p in lane.LANE_TESTS
+                                                     if p != "scripts/tests/test_lane_source_admission.py"]):
+                    self.assertEqual(lane.update(host), 1)
+                self.assertEqual((host.state / "current").resolve(), legacy)
                 self.assertEqual(lane.update(host), 0)
                 current = (host.state / "current").resolve()
                 self.assertTrue((current / "lane_runner.py").exists())
                 self.assertTrue((current.parent / "promotion-loss-metrics.mjs").exists())  # HUD PROMOTION line
+                manifest = json.loads((current / ".release.json").read_text())
+                self.assertEqual(manifest["bundleDigest"], (current / ".bundle").read_text())
+                self.assertEqual(manifest["objects"]["scripts/lanes"], (current / ".tree").read_text())
+                for name in lane.RELEASE_EXTRAS:
+                    self.assertTrue((current.parents[1] / name).exists(), name)
                 # A running worker's release is never removed or rewritten by a no-op update.
                 self.assertEqual(lane.update(host), 0)
                 self.assertEqual((host.state / "current").resolve(), current)
+                (clone / "unrelated.txt").write_text("unrelated main change")
+                self.git("add", "unrelated.txt", cwd=clone)
+                self.git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "unrelated", cwd=clone)
+                self.git("push", "-q", "origin", "HEAD:main", cwd=clone)
+                self.assertEqual(lane.update(host), 0)
+                self.assertEqual((host.state / "current").resolve(), current)
+                policy = clone / "scripts/lib/source-admission-policy.mjs"
+                policy.write_text(policy.read_text() + "\n// policy-only activation regression\n")
+                self.git("add", str(policy), cwd=clone)
+                self.git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "policy", cwd=clone)
+                self.git("push", "-q", "origin", "HEAD:main", cwd=clone)
+                self.assertEqual(lane.update(host), 0)
+                newer = (host.state / "current").resolve()
+                self.assertNotEqual(newer, current, "policy-only change must activate a new bundle")
+                self.assertTrue(current.exists(), "existing workers retain their old immutable bundle")
+                self.assertEqual((newer.parent / "lib/source-admission-policy.mjs").read_text(), policy.read_text())
             finally:
                 if old_env is None:
                     os.environ.pop("LANES_SELFTEST", None)
@@ -3235,6 +3290,8 @@ class UpdateBackoffTest(unittest.TestCase):
             host.state.mkdir()
             real = lane.sh
             lane.sh = lambda cmd, **k: SimpleNamespace(returncode=0, stderr="", stdout="t1\n" if "rev-parse" in cmd else "")
+            identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40})
+            identity.start()
             try:
                 refused = host.state / "update-refused.json"
                 refused.write_text(json.dumps({"tree": "t1", "at": time.time(), "why": "self-test timeout"}))
@@ -3245,6 +3302,7 @@ class UpdateBackoffTest(unittest.TestCase):
                     lane.install_release(host)
                 self.assertTrue((host.state / "releases").exists())
             finally:
+                identity.stop()
                 lane.sh = real
 
 
@@ -3255,6 +3313,35 @@ class GateSingleflightTest(unittest.TestCase):
         self.host = lane.Host(state=Path(self.tmp.name))
         self.pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-1", "isDraft": True}
         self.fake = FakeShell([self.pr])
+
+    def test_ended_manual_repair_before_final_ledger_can_gate_without_new_attempt(self):
+        target = {**self.pr, "headRefName": "tim/manual-repair", "isDraft": False, "state": "OPEN"}
+        before = {**target, "headRefOid": "old"}
+        path = self.host.state / "fix-attempts.json"
+        path.write_text(json.dumps({"7": {"sha": "old", "count": 2, "at": time.time() - 1}}))
+        (self.host.state / "requeue.json").write_text(json.dumps({"7": "abc"}))
+        lane.end_local_fix_attempt(self.host, before, {"verdict": "fix-pushed", "headAfter": "abc",
+            "runId": "producing-repair", "branch": target["headRefName"], "headBefore": "old"})
+        history = json.loads(path.read_text())
+        self.assertFalse((self.host.state / "runs/ledger.jsonl").exists(), "exercise completion/ledger crash gap")
+        with patch.object(lane, "claimed_elsewhere", return_value=False), patch.object(lane, "post_claim"), \
+             patch.object(lane, "sh", self.fake), \
+             patch.object(lane, "reconcile_fix_target", return_value=target):
+            self.assertIsNone(lane.claim_adoptable_pr(self.host, "devin", [], []), "existing inventory bounds selection")
+            owner = lane.Locked(self.host.state / "locks/repair-pr-7.lock", blocking=False)
+            try:
+                self.assertIsNone(lane.claim_adoptable_pr(self.host, "devin", [], [target]))
+            finally:
+                owner.release()
+            claim = lane.claim_adoptable_pr(self.host, "devin", [], [target])
+            self.assertIsNotNone(claim)
+            try:
+                self.assertEqual(lane.gate_pr(self.host, target, Path("/tmp"), None, claim=claim)["verdict"], "landing")
+            finally:
+                claim.lock.release()
+        self.assertEqual(self.fake.calls.count(lane.CANONICAL_GATE), 1)
+        self.assertFalse(any(call[:3] == ["gh", "pr", "ready"] for call in self.fake.calls))
+        self.assertEqual(json.loads(path.read_text()), history, "promotion does not restore repair attempts")
 
     def test_claim_is_not_proof_and_live_reservation_skips_to_next_pr(self):
         with patch.object(lane, "claimed_elsewhere", return_value=False), patch.object(lane, "post_claim"):
@@ -3391,7 +3478,7 @@ class GateSingleflightTest(unittest.TestCase):
                     posted.assert_not_called()
                 self.assertEqual(json.loads((host.state / "verified.json").read_text()), {"7": "abc"})
 
-    def test_authority_changed_during_ready_cannot_enqueue_or_record_proof(self):
+    def test_authority_changed_during_ready_cannot_enqueue_despite_completed_gate_proof(self):
         for change in ("sensitive", "revoked", "held"):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp))
@@ -3407,8 +3494,11 @@ class GateSingleflightTest(unittest.TestCase):
                 with patch.object(lane, "reconcile_fix_target", side_effect=lambda _pr: dict(live)), \
                      patch.object(lane, "sh", side_effect=shell):
                     result = lane.gate_pr(host, self.pr, Path("/tmp"), None)
-                self.assertEqual(result["verdict"], "revoked" if change == "revoked" else "gate-deferred")
-                self.assertFalse((host.state / "verified.json").exists())
+                self.assertEqual(result["verdict"], "verified-not-queued")
+                self.assertTrue(result["promotion"].startswith("held:"))
+                proof = json.loads((host.state / "verified.json").read_text())["7:abc"]
+                self.assertEqual(proof["verdict"], "verified-not-queued")
+                self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"7": "abc"})
                 self.assertFalse(any(c[:3] == ["gh", "pr", "merge"] for c in self.fake.calls))
 
     def test_successful_final_repair_push_may_receive_its_first_gate_without_resetting_budget(self):
@@ -3543,32 +3633,40 @@ class RequeueTest(unittest.TestCase):
     def test_partial_inventory_retains_unknown_and_reconciles_exact_publishable_head(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
-            pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-3-retry"}
+            pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-3-retry", "isDraft": True}
+            (host.state / "verified.json").write_text(json.dumps({"5:head-A": gate_proof("head-A")}))
             for live in (None, {**pr, "state": "CLOSED"}, {**pr, "headRefOid": "head-B"}, pr):
-                with self.subTest(live=live), patch.object(lane, "reconcile_fix_target", return_value=live), patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0)) as command:
+                with self.subTest(live=live), patch.object(lane, "reconcile_fix_target", return_value=live), \
+                        patch.object(lane, "claimed_elsewhere", return_value=False), \
+                        patch.object(lane, "source_publication_authority", return_value=None), \
+                        patch.object(lane, "sh", side_effect=lambda cmd, **kwargs: SimpleNamespace(returncode=0, stdout=json.dumps({"number": 5, "reenrollable": True}))) as command:
                     path.write_text(json.dumps({"5": "head-A"})); lane.requeue_verified(host, [])
                     self.assertEqual(json.loads(path.read_text()), {"5": "head-A"} if live is None else {})
                     if live == pr:
-                        self.assertEqual(command.call_args_list, [unittest.mock.call(["gh", "pr", "ready", "5", "--repo", lane.REPO_SLUG]), unittest.mock.call(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "head-A"])])
+                        self.assertEqual([call.args[0] for call in command.call_args_list if call.args[0][0] == "gh"], [
+                            ["gh", "pr", "ready", "5", "--repo", lane.REPO_SLUG],
+                            ["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "head-A"]])
                     else: command.assert_not_called()
             lane.revoke_publication(host, branch=pr["headRefName"], reason="run-stopped")
             with patch.object(lane, "reconcile_fix_target", return_value=pr), patch.object(lane, "sh") as command:
                 path.write_text(json.dumps({"5": "head-A"})); lane.requeue_verified(host, []); command.assert_not_called()
-                self.assertEqual(json.loads(path.read_text()), {})
+                self.assertEqual(json.loads(path.read_text()), {"5": "head-A"})
 
     def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             path = host.state / "requeue.json"
             path.write_text(json.dumps({"5": "h1", "6": "h1", "7": "h1"}))
+            (host.state / "verified.json").write_text(json.dumps({f"{n}:h1": gate_proof("h1") for n in (5, 6)}))
             calls = []
             def fake_sh(cmd, **kwargs):
                 calls.append(cmd)
                 if cmd[:3] == ["gh", "pr", "view"]:
                     return SimpleNamespace(returncode=0, stdout=json.dumps(
-                        {"number": int(cmd[3]), "headRefOid": "h1", "headRefName": "devin/jov-1", "state": "OPEN"}))
+                        {"number": int(cmd[3]), "headRefOid": "h2" if cmd[3] == "7" else "h1", "headRefName": "devin/jov-1", "state": "OPEN"}))
                 # PR 6 is still rate-limited; everything else enqueues.
-                return SimpleNamespace(returncode=1 if cmd[1:4] == ["pr", "merge", "6"] else 0, stdout="", stderr="")
+                return SimpleNamespace(returncode=1 if cmd[1:4] == ["pr", "merge", "6"] else 0,
+                                       stdout=publication_response(cmd), stderr="")
             real, lane.sh = lane.sh, fake_sh
             try:
                 lane.requeue_verified(host, [{"number": 5, "headRefOid": "h1"}, {"number": 6, "headRefOid": "h1"},
@@ -3576,7 +3674,7 @@ class RequeueTest(unittest.TestCase):
             finally:
                 lane.sh = real
             self.assertEqual(json.loads(path.read_text()), {"6": "h1"})
-            self.assertNotIn("7", [c[3] for c in calls])
+            self.assertNotIn("7", [c[3] for c in calls if c[:3] == ["gh", "pr", "merge"]])
             self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "h1"], calls)
 
 
@@ -3585,14 +3683,18 @@ class RequeueTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
             path.write_text(json.dumps({"5": "head-A"})); live = {"head": "head-A"}; queued = []
+            (host.state / "verified.json").write_text(json.dumps({"5:head-A": gate_proof("head-A")}))
             def command(cmd, **kwargs):
                 if cmd[:3] == ["gh", "pr", "ready"]: live["head"] = "head-B"
                 pin = cmd[cmd.index("--match-head-commit") + 1] if "--match-head-commit" in cmd else None
                 rejected = cmd[:3] == ["gh", "pr", "merge"] and pin != live["head"] and pin is not None
                 if cmd[:3] == ["gh", "pr", "merge"] and not rejected: queued.append(live["head"])
                 return SimpleNamespace(returncode=int(rejected), stdout="", stderr="")
-            pr = {"number": 5, "headRefOid": "head-A", "headRefName": "devin/jov-5", "state": "OPEN"}
-            with patch.object(lane, "sh", side_effect=command), patch.object(lane, "reconcile_fix_target", side_effect=lambda _pr: {**pr, "headRefOid": live["head"]}):
+            pr = {"number": 5, "headRefOid": "head-A", "headRefName": "devin/jov-5", "state": "OPEN", "isDraft": True}
+            with patch.object(lane, "sh", side_effect=command), \
+                    patch.object(lane, "claimed_elsewhere", return_value=False), \
+                    patch.object(lane, "source_publication_authority", return_value=None), \
+                    patch.object(lane, "reconcile_fix_target", side_effect=lambda _pr: {**pr, "headRefOid": live["head"]}):
                 lane.requeue_verified(host, [pr])
             self.assertEqual(live["head"], "head-B"); self.assertEqual(queued, [])
             self.assertEqual(json.loads(path.read_text()), {"5": "head-A"})
@@ -3600,7 +3702,8 @@ class RequeueTest(unittest.TestCase):
         for change in ("revoked", "sensitive", "head", "unreadable", "held"):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp))
-                pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-1", "state": "OPEN"}
+                pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-1", "state": "OPEN", "isDraft": True}
+                (host.state / "verified.json").write_text(json.dumps({"7:abc": gate_proof("abc")}))
                 path = host.state / "requeue.json"
                 path.write_text(json.dumps({"7": "abc"}))
                 live = dict(pr)
@@ -3909,6 +4012,24 @@ class GateOutcomeTest(unittest.TestCase):
 
 
 class DeferredRequeueTest(unittest.TestCase):
+    def test_mixed_deferred_scan_never_publishes_or_refreshes_under_claim_lock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "requeue.json"
+            rows = {"5": "head-A", "6": "head-A", "9": "unknown"}
+            path.write_text(json.dumps(rows))
+            prs = [{"number": n, "headRefOid": "head-A", "state": "OPEN"} for n in (5, 6)]
+            with patch.object(lane, "publish_verified") as publish, \
+                    patch.object(lane, "reconcile_fix_target") as refresh:
+                claim = lane.Locked(host.state / "claim.lock", blocking=True)
+                try:
+                    self.assertEqual(lane.requeue_verified(host, prs, defer=lambda pr: pr["number"] == 6), prs[1])
+                    self.assertIsNone(lane.requeue_verified(host, prs, defer=lambda pr: False))
+                finally:
+                    claim.release()
+                publish.assert_not_called(); refresh.assert_not_called()
+            self.assertEqual(json.loads(path.read_text()), rows)
+
     def test_unrecognized_branch_retains_the_exact_retry_without_crashing(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
@@ -4056,15 +4177,22 @@ class TimerInstallerNodePathTests(unittest.TestCase):
 
                 stub("node", "#!/bin/sh\nprintf 'v24.21.0\\n'\n")
                 stub("uname", f"#!/bin/sh\nprintf '{platform}\\n'\n")
-                stub("git", "#!/bin/sh\nprintf '" + "b" * 40 + "\\n'\n")
+                stub("git", "#!/bin/sh\nprintf '" + "c" * 40 + "\\n'\n")
                 for name in ("systemctl", "launchctl"):
                     stub(name, f'#!/bin/sh\nprintf "{name} %s\\n" "$*" >> "$INSTALL_COMMAND_LOG"\n')
                 stub("python3", '''#!/usr/bin/python3
-import os, pathlib, sys
+import os, pathlib, sys, json
+if sys.argv[1] == '-c':
+    code = sys.argv[2]
+    sys.argv = [sys.argv[0], *sys.argv[3:]]
+    exec(code, {'__name__': '__main__'})
+    sys.exit(0)
 state = pathlib.Path(os.environ['LANES_STATE'])
 current = state / 'current'
 current.mkdir(parents=True, exist_ok=True)
 (current / '.tree').write_text('a' * 40)
+(current / '.release.json').write_text(json.dumps({'sourceCommit': 'b' * 40, 'objects': {'scripts/lanes': 'a' * 40}}))
+(current / '.release.json').write_text(json.dumps({'sourceCommit': 'c' * 40, 'objects': {'scripts/lanes': 'a' * 40}}))
 with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
     log.write('python3 ' + ' '.join(sys.argv[1:]) + '\\n')
 ''')
@@ -4090,6 +4218,283 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                 self.assertIn("codex_lane.py reconcile --if-due 3600", tick)
                 self.assertIn("lane_runner.py dispatch", tick)
                 log = commands.read_text()
-                self.assertIn("install-receipt --source-commit " + "b" * 40, log)
+                self.assertIn("install-receipt --source-commit " + "c" * 40, log)
+                self.assertNotIn("install-receipt --source-commit " + "b" * 40, log)
                 self.assertIn("--source-tree " + "a" * 40, log)
                 self.assertIn("--cadence 3600", log)
+
+
+class TerminalPublicationTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name))
+        self.pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-7-20261002t0000",
+                   "state": "OPEN", "isDraft": True, "mergeStateStatus": "CLEAN", "labels": []}
+        self.live = dict(self.pr)
+        self.calls = []
+        def shell(cmd, **kwargs):
+            self.calls.append(cmd)
+            return SimpleNamespace(returncode=0, stdout=publication_response(cmd), stderr="")
+        for patcher in [patch.object(lane, "sh", side_effect=shell),
+                        patch.object(lane, "reconcile_fix_target", side_effect=lambda _: dict(self.live) if self.live else None),
+                        patch.object(lane, "claimed_elsewhere", return_value=False)]:
+            patcher.start(); self.addCleanup(patcher.stop)
+
+    def proof(self, record=None):
+        (self.host.state / "verified.json").write_text(json.dumps({"7:abc": gate_proof("abc") if record is None else record}))
+
+    def test_policy_reads_release_inventory_lock_and_cleanup_preserves_concurrent_head(self):
+        self.proof()
+        path = self.host.state / "requeue.json"
+        path.write_text(json.dumps({"7": "abc"}))
+        observed = []
+        def policy(pr, **kwargs):
+            claim = lane.Locked(self.host.state / "claim.lock", blocking=False)
+            try:
+                self.assertTrue(claim.held, "canonical policy must run outside the inventory lock")
+                if not kwargs["before_ready"]:
+                    lane.update_json(path, lambda rows: rows.update({"7": "new-head", "9": "other-writer"}))
+                observed.append(kwargs["before_ready"])
+            finally:
+                claim.release()
+            return None
+        with patch.object(lane, "source_publication_authority", side_effect=policy):
+            lane.requeue_verified(self.host, [self.pr])
+        self.assertEqual(observed, [True, False])
+        self.assertEqual(json.loads(path.read_text()), {"7": "new-head", "9": "other-writer"})
+
+    def test_failure_hold_or_queue_history_refusal_cannot_be_overridden_by_terminal_proof(self):
+        self.proof()
+        for stage in ("source", "history"):
+            calls = []
+            def shell(cmd, **kwargs):
+                calls.append(cmd)
+                out = publication_response(cmd)
+                code = 0
+                if stage == "source" and Path(cmd[1]).name == "source_admission.mjs":
+                    out = json.dumps({"schema": "jovie-source-admission/v1", "prNumber": 7,
+                                      "headSha": "abc", "allowed": False,
+                                      "blockers": ["tombstone:jovie-queue-failure-hold/v1"]})
+                    code = 1
+                if "check-reenroll" in cmd:
+                    self.assertEqual(kwargs["env"]["REPO"], lane.REPO_SLUG)
+                    out = json.dumps({"number": 7, "reenrollable": False})
+                    code = 1
+                return SimpleNamespace(returncode=code, stdout=out, stderr="")
+            with self.subTest(stage=stage), patch.dict(os.environ, {"REPO": "wrong/repository"}), \
+                    patch.object(lane, "sh", side_effect=shell):
+                self.assertTrue(lane.publish_verified(self.host, self.pr).startswith("held:"))
+            self.assertFalse(any(c[:3] == ["gh", "pr", "merge"] for c in calls))
+            self.assertEqual(json.loads((self.host.state / "requeue.json").read_text()), {"7": "abc"})
+
+    def test_missing_claim_time_held_wrong_head_policy_or_incomplete_proof_never_publishes(self):
+        invalid = [None, "abc", gate_proof("abc", "held"), gate_proof("wrong"),
+                   {**gate_proof("abc"), "policyDigest": "old"}]
+        invalid += [{**gate_proof("abc"), "completedAt": value} for value in [None, 123, "bad", "2999-01-01T00:00:00Z"]]
+        for proof in invalid:
+            with self.subTest(proof=proof):
+                path = self.host.state / "verified.json"
+                if proof is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    self.proof(proof)
+                self.assertEqual(lane.publish_verified(self.host, self.pr), "held:gate-proof")
+                self.assertEqual(self.calls, [])
+                self.assertFalse((self.host.state / "requeue.json").exists())
+                claim = lane.reserve_gate(self.host, self.pr)
+                self.assertIsNotNone(claim)
+                claim.lock.release()
+
+    def test_active_gate_and_foreign_owner_cannot_publish_even_with_terminal_proof(self):
+        self.proof()
+        claim = lane.reserve_gate(self.host, self.pr)
+        try:
+            self.assertEqual(lane.publish_verified(self.host, self.pr), "held:gate-active")
+        finally:
+            claim.lock.release()
+        with patch.object(lane, "claimed_elsewhere", return_value=True):
+            self.assertEqual(lane.publish_verified(self.host, self.pr), "held:publication-owner-active")
+        self.assertEqual(self.calls, [])
+
+    def test_sensitive_proof_is_required_and_non_draft_skips_ready(self):
+        self.proof()
+        self.live.update(isDraft=False, labels=[{"name": lane.SENSITIVE_PR_LABEL}])
+        self.assertTrue(lane.publish_verified(self.host, self.pr).startswith("held:"))
+        self.assertEqual(self.calls, [])
+        self.proof(gate_proof("abc", sensitive=True))
+        self.assertEqual(lane.publish_verified(self.host, self.pr), "landing")
+        writes = [c for c in self.calls if c[0] == "gh"]
+        self.assertEqual([c[:3] for c in writes], [["gh", "pr", "merge"]])
+        self.assertEqual(writes[0][-2:], ["--match-head-commit", "abc"])
+
+    def test_failed_ready_retains_intent_and_head_move_during_ready_cannot_enqueue(self):
+        self.proof()
+        def failed_ready(cmd, **kwargs):
+            return SimpleNamespace(returncode=1 if cmd[:3] == ["gh", "pr", "ready"] else 0,
+                                   stdout=publication_response(cmd), stderr="failed")
+        with patch.object(lane, "sh", side_effect=failed_ready) as shell:
+            self.assertEqual(lane.publish_verified(self.host, self.pr), "held:ready-failed")
+            self.assertEqual(sum(c.args[0][:3] == ["gh", "pr", "ready"] for c in shell.call_args_list), 1)
+        self.assertEqual(json.loads((self.host.state / "requeue.json").read_text()), {"7": "abc"})
+        def move(cmd, **kwargs):
+            self.calls.append(cmd)
+            if cmd[:3] == ["gh", "pr", "ready"]:
+                self.live["headRefOid"] = "new"
+            return SimpleNamespace(returncode=0,stdout=publication_response(cmd),stderr="")
+        with patch.object(lane, "sh", side_effect=move):
+            self.assertTrue(lane.publish_verified(self.host, self.pr).startswith("held:"))
+        self.assertFalse(any(c[:3] == ["gh", "pr", "merge"] for c in self.calls))
+
+    def test_partial_or_unreadable_inventory_retains_pending_but_positive_closed_cleans_it(self):
+        path = self.host.state / "requeue.json"
+        path.write_text(json.dumps({"7": "abc", "8": "other"}))
+        self.live.clear()
+        lane.requeue_verified(self.host, None)
+        self.assertEqual(json.loads(path.read_text()), {"7": "abc", "8": "other"})
+        with patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: {**pr,"state":"MERGED"} if pr["number"]==7 else None):
+            lane.requeue_verified(self.host, [])
+        self.assertEqual(json.loads(path.read_text()), {"8": "other"})
+        self.assertEqual(self.calls, [])
+
+    def test_confirmed_enqueue_does_not_erase_concurrently_changed_pending_head(self):
+        self.proof()
+        path = self.host.state / "requeue.json"
+        def shell(cmd, **kwargs):
+            if cmd[:3] == ["gh", "pr", "merge"]:
+                lane.update_json(path, lambda pending: pending.update({"7":"new", "9":"untouched"}))
+            return SimpleNamespace(returncode=0,stdout=publication_response(cmd),stderr="")
+        with patch.object(lane,"sh",side_effect=shell):
+            self.assertEqual(lane.publish_verified(self.host, self.pr), "landing")
+        self.assertEqual(json.loads(path.read_text()), {"7":"new", "9":"untouched"})
+
+    def test_invalid_terminal_timestamp_and_pending_non_draft_stay_adoptable(self):
+        for value in [None, 123, "bad", "2999-01-01T00:00:00Z"]:
+            proof = {**gate_proof("abc"), "completedAt": value}
+            self.assertEqual(lane.unverified_pr([self.pr], {"7:abc":proof}), self.pr)
+        ready = {**self.pr, "isDraft":False}
+        self.assertEqual(lane.unverified_pr([ready], {}, {"7":"abc"}), ready)
+        self.assertIsNone(lane.unverified_pr([ready], {}, {"7":"old"}))
+        self.assertIsNone(lane.unverified_pr([{**ready,"headRefName":"tim/manual"}], {}, {"7":"abc"}))
+
+    def test_canonical_denials_and_incomplete_receipts_cannot_borrow_terminal_proof(self):
+        self.proof()
+        allowed = json.loads(publication_response(['node', 'source_admission.mjs', '7', 'abc']))
+        cases = [(1, {**allowed, 'allowed': False, 'blockers': ['tombstone:jovie-queue-failure-hold/v1']}),
+                 (0, {**allowed, 'headSha': 'other'}), (0, {**allowed, 'prNumber': 8}),
+                 (1, allowed), (0, {**allowed, 'allowed': False}), (0, {**allowed, 'allowed': 1}), (0, {}), (0, [])]
+        for code, receipt in cases:
+            with self.subTest(receipt=receipt):
+                def shell(cmd, **kwargs):
+                    self.calls.append(cmd)
+                    return SimpleNamespace(returncode=code, stdout=json.dumps(receipt), stderr='')
+                self.calls.clear()
+                with patch.object(lane, 'sh', side_effect=shell):
+                    self.assertTrue(lane.publish_verified(self.host, self.pr).startswith('held:source-admission'))
+                self.assertFalse(any(c[0] == 'gh' for c in self.calls))
+
+    def test_draft_only_is_allowed_only_before_ready_and_queue_repository_is_pinned(self):
+        self.proof()
+        def shell(cmd, **kwargs):
+            self.calls.append(cmd)
+            output, code = publication_response(cmd), 0
+            if Path(cmd[1]).name == 'source_admission.mjs' and self.live['isDraft']:
+                output = json.dumps({'schema': 'jovie-source-admission/v1', 'prNumber': 7,
+                                     'headSha': 'abc', 'allowed': False, 'blockers': ['draft']})
+                code = 1
+            if cmd[:3] == ['gh', 'pr', 'ready']:
+                self.live['isDraft'] = False
+            if 'check-reenroll' in cmd:
+                self.assertEqual(kwargs['env']['REPO'], lane.REPO_SLUG)
+            return SimpleNamespace(returncode=code, stdout=output, stderr='')
+        with patch.dict(os.environ, {'REPO': 'wrong/repository'}), patch.object(lane, 'sh', side_effect=shell):
+            self.assertEqual(lane.publish_verified(self.host, self.pr), 'landing')
+        for after_ready in (False, True):
+            result = SimpleNamespace(returncode=1, stdout=json.dumps({'schema': 'jovie-source-admission/v1',
+                'prNumber': 7, 'headSha': 'abc', 'allowed': False, 'blockers': ['draft']}))
+            with patch.object(lane, 'sh', return_value=result):
+                self.assertIsNotNone(lane.source_publication_authority(self.live, before_ready=after_ready))
+
+    def test_local_stop_during_slow_policy_or_history_read_prevents_the_next_write(self):
+        for phase in ('source_admission.mjs', 'check-reenroll'):
+            with self.subTest(phase=phase):
+                self.proof()
+                self.calls.clear()
+                self.live['labels'] = []
+                def shell(cmd, **kwargs):
+                    self.calls.append(cmd)
+                    if phase in cmd or Path(cmd[1]).name == phase:
+                        self.live['labels'] = [{'name': 'tim-hold'}]
+                    return SimpleNamespace(returncode=0, stdout=publication_response(cmd), stderr='')
+                with patch.object(lane, 'sh', side_effect=shell):
+                    self.assertTrue(lane.publish_verified(self.host, self.pr).startswith('held:'))
+                self.assertFalse(any(c[:3] == ['gh', 'pr', 'merge'] for c in self.calls))
+                if phase == 'source_admission.mjs':
+                    self.assertFalse(any(c[0] == 'gh' for c in self.calls))
+
+
+class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_legacy_archive_cannot_activate_without_canonical_policy_dependencies(self):
+        # Kept in the legacy selector so an old updater cannot skip this check.
+        for path in lane.RELEASE_EXTRAS:
+            self.assertTrue((ROOT / path).is_file(), path)
+        result = subprocess.run(['node', str(ROOT / 'scripts/lanes/source_admission.mjs')],
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(json.loads(result.stdout)['blockers'], ['evidence-unavailable'])
+
+
+class BundledAdmissionTest(unittest.TestCase):
+    def test_transport_keeps_canonical_holds_pagination_and_fail_closed_reads(self):
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "Node is required by the managed lane release")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shim = root / "gh"
+            shim.write_text("#!" + sys.executable + "\n" + '''import json, os, sys
+case = os.environ['ADMISSION_CASE']
+path = sys.argv[-1]
+assert sys.argv[1:5] == ['api', '--method', 'GET', '--include']
+assert not os.environ.get('GH_TOKEN') and not os.environ.get('GITHUB_TOKEN')
+with open(os.environ['ADMISSION_LOG'], 'a') as log: log.write(path + '\\n')
+if case == 'failed-read': sys.exit(1)
+headers = 'HTTP/2.0 200 OK\\r\\nContent-Type: application/json'
+hold = {'context': 'jovie-queue-failure-hold/v1', 'state': 'success',
+        'description': 'class=deterministic-source;n=1;run=123;try=1',
+        'creator': {'type': 'Bot', 'login': 'jovie-bot[bot]'},
+        'target_url': 'https://github.com/JovieInc/Jovie/actions/runs/123'}
+if '/statuses?' in path:
+    data = [hold] if case == 'revision-hold' or (case == 'later-page-hold' and '&page=2' in path) else []
+    if case == 'later-page-hold' and '&page=1' in path:
+        headers += '\\r\\nlInK: <https://api.github.com' + path.replace('&page=1', '&page=2') + '>; rel="next"'
+elif '/files?' in path: data = [{'filename': 'scripts/lanes/lane_runner.py'}]
+elif '/reviews?' in path: data = []
+else:
+    data = {'number': 5, 'title': 'repair controller', 'body': 'releaseWorthy: false',
+            'state': 'open', 'draft': case == 'draft-only', 'labels': [], 'mergeable': True,
+            'head': {'sha': 'a' * 40, 'ref': 'codex/repair', 'repo': {'fork': False}},
+            'base': {'ref': 'main'}, 'changed_files': 1}
+if case == 'missing-headers': print(json.dumps(data)); sys.exit(0)
+if case == 'bad-json': print(headers + '\\r\\n\\r\\nnot-json'); sys.exit(0)
+if case == 'ambiguous-header': headers += '\\r\\ncontent-type: other'
+print(headers + '\\r\\n\\r\\n' + json.dumps(data))
+''')
+            shim.chmod(0o755)
+            env = {k: v for k, v in os.environ.items() if k not in ("GH_TOKEN", "GITHUB_TOKEN")}
+            env.update(PATH=str(root) + os.pathsep + env.get("PATH", ""), ADMISSION_LOG=str(root / "requests"))
+            for case, blocker in [("allowed", None), ("draft-only", "draft"),
+                                  ("revision-hold", "tombstone:jovie-queue-failure-hold/v1"),
+                                  ("later-page-hold", "tombstone:jovie-queue-failure-hold/v1"),
+                                  ("failed-read", "evidence-unavailable"), ("missing-headers", "evidence-unavailable"),
+                                  ("bad-json", "evidence-unavailable"), ("ambiguous-header", "evidence-unavailable")]:
+                with self.subTest(case=case):
+                    result = subprocess.run([node, str(ROOT / "scripts/lanes/source_admission.mjs"),
+                                             "JovieInc/Jovie", "5", ("a" * 40)], cwd=root,
+                                            env={**env, "ADMISSION_CASE": case}, text=True, capture_output=True, timeout=30)
+                    receipt = json.loads(result.stdout)
+                    self.assertEqual(receipt["allowed"], blocker is None, result.stderr)
+                    self.assertEqual(result.returncode, 0 if blocker is None else 1)
+                    self.assertEqual(receipt["blockers"], [] if blocker is None else [blocker])
+                    if blocker != "evidence-unavailable":
+                        self.assertEqual((receipt["headSha"], receipt["prNumber"]), (("a" * 40), 5))
+            self.assertIn("page=2", (root / "requests").read_text())
