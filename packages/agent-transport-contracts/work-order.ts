@@ -481,9 +481,13 @@ export function reconcileGate(input: {
   return { gate: input.gate, status, orders, staleResults };
 }
 
-/** Stable marker callers search for before creating a transport record. */
+/**
+ * Stable marker callers search for before creating a transport record. Hashed
+ * so Linear cannot auto-link issue IDs inside an idempotency key.
+ */
 export function dispatchMarker(order: SealedWorkOrder): string {
-  return `<!-- jovie-work-order:${order.idempotencyKey}:r${order.revision} -->`;
+  const key = createHash('sha256').update(order.idempotencyKey).digest('hex');
+  return `<!-- jovie-work-order:${key.slice(0, 16)}:r${order.revision} -->`;
 }
 
 /** Linear is the store: orders live in issue bodies, results in comments. */
