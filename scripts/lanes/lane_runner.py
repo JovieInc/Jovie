@@ -1854,14 +1854,31 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     return receipt
 
 
+def brief_retry_lane(host: Host, name: str, spec: dict) -> tuple[str, dict]:
+    """JOV-7717: the frontier retry runs on the frontier lane when it is usable."""
+    frontier = design_gate.BRIEF_RETRY_PROVIDER
+    catalog = load_providers()
+    candidate = catalog.get(frontier)
+    if (name != frontier and candidate and candidate.get("enabled", True)
+            and not cooling(host, frontier) and provider_healthy(candidate)):
+        return frontier, candidate
+    return name, spec
+
+
 def run_brief(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
-    """JOV-7541 design/brief lane: one brief-only run on a detached checkout, no PR."""
+    """JOV-7541 design/brief lane: one brief-only run on a detached checkout, no PR.
+
+    The second run for an issue is the frontier retry (JOV-7717); after it the
+    gate admits the issue as `brief-auto`, so a brief never blocks for good."""
+    retry = design_gate.brief_retry(issue)
+    if retry:
+        name, spec = brief_retry_lane(host, name, spec)
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-brief-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
     worktree = host.state / "worktrees" / run_id
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "model": spec.get("model"),
-               "kind": "design-brief", "issue": issue.identifier, "linearIssueId": issue.id,
+               "kind": "design-brief", "briefRetry": retry, "issue": issue.identifier, "linearIssueId": issue.id,
                "worktree": str(worktree), "startedAt": now_iso()}
     with open(runs / f"{run_id}.log", "w") as log:
         try:
@@ -1869,7 +1886,8 @@ def run_brief(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
             brain_context = context_pack(issue)
-            prompt = design_gate.render_brief_prompt(issue, brain_context)
+            prompt = design_gate.render_brief_prompt(
+                issue, brain_context, retry=retry, missing=design_gate.build_admission(issue)["missing"])
             prompt_file = runs / f"{run_id}.prompt.md"
             receipt["contextManifests"] = [write_agent_prompt(
                 prompt_file, prompt, "issue", name,
@@ -1882,7 +1900,7 @@ def run_brief(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                               worktree, log, host.agent_timeout, guard=lambda: require_disk(host, "brief-running"))
             brief = worktree / design_gate.BRIEF_FILE
             receipt.update(agentExit=agent.returncode, **design_gate.publish_brief(
-                linear, issue, brief.read_text(errors="replace") if brief.exists() else ""))
+                linear, issue, brief.read_text(errors="replace") if brief.exists() else "", retry=retry))
         except DiskAdmissionError as error:
             receipt.update(verdict="disk-held", reasons=[str(error)])
         except Exception as error:  # a broken run must still leave a receipt and free its issue

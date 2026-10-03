@@ -54,6 +54,11 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_design_brief_held_past_24h_alerts(self):
+        alerts = doctor.judge(obs(designGate={"stale": ["JOV-3"]}))
+        self.assertIn("JOV-3", alerts["design-brief-stale"])
+        self.assertEqual(doctor.judge(obs(designGate={"stale": []})), {})
+
     def test_escalation_alert_names_the_pr_and_class(self):
         alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
         self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
