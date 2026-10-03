@@ -478,22 +478,34 @@ export function UnifiedTable<TData extends RowData>({
   );
 
   // Columns that declare a priority lay themselves out from this container.
-  // A caller-supplied columnVisibility stays in control (Audience measures
-  // its own shell so it can keep the historical table min widths).
+  // A caller can hide more columns. Priority only hides; it does not force a
+  // column back on. Audience still passes its shell measurement so the
+  // historical floors stay put before this container is measured.
   const prioritySpecs = useMemo(
     () => columnPrioritySpecsFromDefs(columns),
     [columns]
   );
-  const autoColumnPriority =
-    columnVisibility === undefined &&
-    prioritySpecs.some(column => column.priority != null);
+  const hasColumnPriority = prioritySpecs.some(
+    column => column.priority != null
+  );
   const autoLayout = useColumnPriorityLayout(
     prioritySpecs,
-    autoColumnPriority ? scrollRoot : null
+    hasColumnPriority ? scrollRoot : null
   );
-  const effectiveColumnVisibility = autoColumnPriority
-    ? autoLayout.visibility
-    : columnVisibility;
+  const effectiveColumnVisibility = useMemo(() => {
+    if (!hasColumnPriority) return columnVisibility;
+    if (columnVisibility == null && autoLayout.hiddenIds.length === 0) {
+      return autoLayout.visibility;
+    }
+    const merged: VisibilityState = { ...(columnVisibility ?? {}) };
+    for (const id of autoLayout.hiddenIds) merged[id] = false;
+    return merged;
+  }, [
+    autoLayout.hiddenIds,
+    autoLayout.visibility,
+    columnVisibility,
+    hasColumnPriority,
+  ]);
   const columnCompacts = useMemo(() => {
     const primaryColumn = columns.find(column => column.meta?.primary === true);
     const primaryId = primaryColumn

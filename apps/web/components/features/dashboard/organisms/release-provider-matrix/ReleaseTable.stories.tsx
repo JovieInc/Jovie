@@ -57,6 +57,42 @@ export const Default: Story = {
   },
 };
 
+export const Wide: Story = {
+  args: Default.args,
+  render: args => (
+    <div style={{ width: 1100 }}>
+      <p className='px-4 py-2 text-2xs text-tertiary-token tabular-nums'>
+        1100px container
+      </p>
+      <ReleaseTable {...args} />
+    </div>
+  ),
+};
+
+export const PanelOpen: Story = {
+  args: Default.args,
+  render: args => (
+    <div style={{ width: 532 }}>
+      <p className='px-4 py-2 text-2xs text-tertiary-token tabular-nums'>
+        532px container
+      </p>
+      <ReleaseTable {...args} />
+    </div>
+  ),
+};
+
+export const Narrow: Story = {
+  args: Default.args,
+  render: args => (
+    <div style={{ width: 400 }}>
+      <p className='px-4 py-2 text-2xs text-tertiary-token tabular-nums'>
+        400px container
+      </p>
+      <ReleaseTable {...args} />
+    </div>
+  ),
+};
+
 export const Empty: Story = {
   args: {
     releases: [],
