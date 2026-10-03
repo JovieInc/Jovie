@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
-import { APP_ROUTES } from '@/constants/routes';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { APP_ROUTES } from '@/constants/routes';
 
 const redirectMock = vi.hoisted(() => vi.fn());
 
