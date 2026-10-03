@@ -426,7 +426,7 @@ test('fork approval must be current human collaborator latest opinionated state'
   input.reviews = [review('APPROVED'), review('DISMISSED', 2)];
   assert.equal(evaluateSourceAdmission(input).allowed, false);
 });
-test('base-branch hold blocks until main moves past the failing revision', () => {
+test('generic admission preserves base holds and their provenance after main moves', () => {
   const input = fixture();
   const recorded = 'a'.repeat(40);
   input.statuses = [tombstone('jovie-queue-failure-hold/v1')];
@@ -439,7 +439,25 @@ test('base-branch hold blocks until main moves past the failing revision', () =>
   input.currentMainSha = recorded;
   assert.equal(evaluateSourceAdmission(input).allowed, false);
   input.currentMainSha = 'b'.repeat(40);
-  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  for (const currentMainSha of ['', 'invalid', 'b'.repeat(40)]) {
+    input.currentMainSha = currentMainSha;
+    assert.equal(evaluateSourceAdmission(input).allowed, false);
+  }
+  input.statuses[0].creator = null;
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone-provenance-unavailable'
+    )
+  );
+  input.statuses[0].creator = { type: 'Bot', login: 'jovie-bot[bot]' };
+  input.statuses[0].target_url =
+    'https://github.com/JovieInc/Jovie/actions/runs/999';
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone-provenance-unavailable'
+    )
+  );
 });
 test('pre-land changelog collision preserves existing release branch exception', () => {
   const input = fixture();
@@ -486,9 +504,7 @@ function requester(input, change = () => {}) {
         ? input.reviews
         : path.includes('/statuses?')
           ? input.statuses
-          : path.includes('/commits/main')
-            ? { sha: 'c'.repeat(40) }
-            : input.pr;
+          : input.pr;
     const response = { data: structuredClone(data), link: null };
     change(path, response, calls);
     return response;
@@ -506,13 +522,12 @@ test('runtime fetch pins status endpoint, preserves deadline and rechecks metada
   const mock = requester(fixture());
   const result = await runSourceAdmission({ ...args, request: mock.request });
   assert.equal(result.allowed, true);
-  assert.equal(mock.calls.length, 6);
+  assert.equal(mock.calls.length, 5);
   assert.ok(
     mock.calls.some(call => call.path.includes(`/commits/${head}/statuses`))
   );
   assert.ok(mock.calls.every(call => call.options.deadlineMs === 12345));
-  assert.equal(mock.calls.at(-2).path, '/repos/JovieInc/Jovie/pulls/7');
-  assert.equal(mock.calls.at(-1).path, '/repos/JovieInc/Jovie/commits/main');
+  assert.equal(mock.calls.at(-1).path, '/repos/JovieInc/Jovie/pulls/7');
 });
 test('late hold blocks and concurrent push cannot inherit earlier evidence', async () => {
   for (const mutate of [

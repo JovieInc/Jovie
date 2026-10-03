@@ -177,7 +177,7 @@ function listCommitStatuses(repo, sha) {
   throw new Error('Commit status pagination exceeded the safety limit.');
 }
 
-function hasRevisionFailureHold(statuses, repo, currentMainSha = '') {
+function hasRevisionFailureHold(statuses, repo) {
   const prefix = `https://github.com/${repo}/actions/runs/`;
   return statuses.some(status => {
     if (
@@ -190,8 +190,8 @@ function hasRevisionFailureHold(statuses, repo, currentMainSha = '') {
     }
     const base = BASE_BRANCH_DESCRIPTION.exec(status.description ?? '');
     if (base && status.target_url === `${prefix}${base[1]}`) {
-      // Hold only while main is still the revision that already violated the cap.
-      return !currentMainSha || currentMainSha === base[2];
+      // Only queue enrollment may reserve the bounded retry after main moves.
+      return true;
     }
     const match = FAILURE_DESCRIPTION.exec(status.description ?? '');
     return Boolean(match && status.target_url === `${prefix}${match[2]}`);
@@ -371,12 +371,7 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
 // Pure: a PR needs the enable pass when it is open, not a draft, lives in
 // this repo (fork tokens are read-only), carries no blocking label, and has no
 // autoMergeRequest yet.
-function needsAutoMergeEnable(
-  pr,
-  statuses = [],
-  repo = '',
-  currentMainSha = ''
-) {
+function needsAutoMergeEnable(pr, statuses = [], repo = '') {
   const held = (pr.labels?.nodes ?? []).some(l =>
     BLOCKING_LABELS.has(l.name.toLowerCase())
   );
@@ -385,7 +380,7 @@ function needsAutoMergeEnable(
     !pr.isCrossRepository &&
     !held &&
     !pr.autoMergeRequest &&
-    !hasRevisionFailureHold(statuses, repo, currentMainSha)
+    !hasRevisionFailureHold(statuses, repo)
   );
 }
 
@@ -394,14 +389,13 @@ function enableMissingAutoMerge(
   prs,
   dryRun,
   command = gh,
-  readStatuses = listCommitStatuses,
-  currentMainSha = ''
+  readStatuses = listCommitStatuses
 ) {
   for (const pr of prs) {
     if (pr.isDraft || pr.isCrossRepository || pr.autoMergeRequest) continue;
     if (!/^[a-f0-9]{40}$/.test(pr.headRefOid ?? '')) continue;
     const statuses = readStatuses(repo, pr.headRefOid);
-    if (!needsAutoMergeEnable(pr, statuses, repo, currentMainSha)) continue;
+    if (!needsAutoMergeEnable(pr, statuses, repo)) continue;
     if (dryRun) {
       console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
       continue;
@@ -434,19 +428,10 @@ function main() {
       opts.dryRun,
       gh
     );
-    let currentMainSha = '';
-    try {
-      currentMainSha = ghJson(['api', `repos/${opts.repo}/commits/main`]).sha;
-    } catch {
-      currentMainSha = '';
-    }
     enableMissingAutoMerge(
       opts.repo,
       opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
-      opts.dryRun,
-      gh,
-      listCommitStatuses,
-      currentMainSha
+      opts.dryRun
     );
   }
 

@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const { readFileSync } = require('node:fs');
+const { load } = require('js-yaml');
 
 const {
   COMMENT_MARKER,
@@ -149,14 +152,105 @@ test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', ()
     needsAutoMergeEnable(eligible, [baseHold], 'o/r', recorded),
     false
   );
-  assert.equal(
-    hasRevisionFailureHold([baseHold], 'o/r', 'f'.repeat(40)),
-    false
-  );
+  assert.equal(hasRevisionFailureHold([baseHold], 'o/r', 'f'.repeat(40)), true);
   assert.equal(
     needsAutoMergeEnable(eligible, [baseHold], 'o/r', 'f'.repeat(40)),
-    true
+    false
   );
+});
+
+test('generic enable consumers leave a moved-base retry to queue authority', () => {
+  const baseHold = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    description: `class=base-branch;n=1;run=123;try=1;main=${'e'.repeat(40)}`,
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    target_url: 'https://github.com/o/r/actions/runs/123',
+  };
+  const spent = {
+    ...baseHold,
+    context: 'jovie-queue-failure-retry/v1',
+    description: 'spent:run=123;try=1',
+  };
+  const calls = [];
+  enableMissingAutoMerge(
+    'o/r',
+    [{ ...basePr, autoMergeRequest: null }],
+    false,
+    args => calls.push(args),
+    () => [spent, baseHold],
+    'f'.repeat(40)
+  );
+  assert.deepEqual(calls, []);
+});
+
+test('actual auto-merge workflow filter recognizes both trusted hold forms', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/auto-merge-default.yml', 'utf8')
+  );
+  const step = Object.values(workflow.jobs)
+    .flatMap(job => job.steps ?? [])
+    .find(step => step.name === 'Enable auto-merge');
+  const filter = /'\n\s*(any\([\s\S]*?)\n\s*' <<<"\$STATUS_PAGES"/.exec(
+    step.run
+  )?.[1];
+  assert.ok(filter, 'execute the real hold filter, not a copied predicate');
+  const base = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    target_url: 'https://github.com/o/r/actions/runs/123',
+  };
+  for (const main of ['', 'e'.repeat(40), 'f'.repeat(40)]) {
+    for (const description of [
+      'class=deterministic-source;n=1;run=123;try=1',
+      `class=base-branch;n=1;run=123;try=1;main=${'e'.repeat(40)}`,
+    ]) {
+      const held = spawnSync(
+        'jq',
+        [
+          '-e',
+          '--arg',
+          'context',
+          base.context,
+          '--arg',
+          'prefix',
+          'https://github.com/o/r/actions/runs/',
+          '--arg',
+          'mainsha',
+          main,
+          filter,
+        ],
+        {
+          input: JSON.stringify([[{ ...base, description }]]),
+          encoding: 'utf8',
+        }
+      );
+      assert.equal(
+        held.status,
+        0,
+        `${description}: ${held.stdout}${held.stderr}`
+      );
+    }
+  }
+  const unheld = spawnSync(
+    'jq',
+    [
+      '-e',
+      '--arg',
+      'context',
+      base.context,
+      '--arg',
+      'prefix',
+      'https://github.com/o/r/actions/runs/',
+      '--arg',
+      'mainsha',
+      '',
+      filter,
+    ],
+    { input: '[[]]', encoding: 'utf8' }
+  );
+  assert.equal(unheld.status, 1);
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {

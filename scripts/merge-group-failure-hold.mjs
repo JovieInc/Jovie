@@ -31,8 +31,13 @@ const AGENT_CONTEXT_BUDGET_FILES = new Set([
   'DESIGN.md',
   'docs/agent-context/README.md',
 ]);
-const BUDGET_EXCESS = /bytes exceeds \d+/;
+const RUNNER_EXIT_FAILURE = 'Process completed with exit code 1.';
 const INSTRUCTION_CONTRACT_STEP = 'Evaluate repository instruction contracts';
+const INSTRUCTION_FAILURE_SUMMARIES = new Set([
+  INSTRUCTION_CONTRACT_STEP,
+  'Join exact lane results',
+  'Evaluate combined-head checks',
+]);
 const RETRY_DESCRIPTION =
   /^(spent|released):run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
 const INFRASTRUCTURE_STEP =
@@ -107,6 +112,49 @@ function parseFailureDescription(description) {
   };
 }
 
+function hasOnlyBudgetErrors(text) {
+  const errors = String(text ?? '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  let budgetFound = false;
+  for (const error of errors) {
+    if (error === RUNNER_EXIT_FAILURE) continue;
+    const match = /^([^:]+): ([1-9][0-9]*) bytes exceeds ([1-9][0-9]*)$/.exec(
+      error
+    );
+    if (!match || !AGENT_CONTEXT_BUDGET_FILES.has(match[1])) return false;
+    const size = Number(match[2]);
+    const limit = Number(match[3]);
+    if (
+      !Number.isSafeInteger(size) ||
+      !Number.isSafeInteger(limit) ||
+      size <= limit
+    )
+      return false;
+    budgetFound = true;
+  }
+  return budgetFound;
+}
+
+function instructionErrorsFromLog(log) {
+  const errors = [];
+  for (const line of log.split('\n')) {
+    // gh prefixes job logs with tab-separated job/step names and timestamps.
+    const body = line.replace(
+      /^(?:[^\t]*\t[^\t]*\t)?(?:\d{4}-\d{2}-\d{2}T[\d:.]+Z\s+)?/,
+      ''
+    );
+    const record = /^(?:::error::|##\[error\])(.*)$/.exec(body);
+    if (record) {
+      if (!record[1].trim()) return null;
+      errors.push(record[1].trim());
+    } else if (/^(?:::error|##\[error)/.test(body)) return null;
+  }
+  // A partial log cannot prove all errors; require the failed step's terminal wrapper.
+  return errors.includes(RUNNER_EXIT_FAILURE) ? errors : null;
+}
+
 /** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[] }} [input] */
 export function classifyMergeGroupFailure({
   conclusion,
@@ -135,7 +183,8 @@ export function classifyMergeGroupFailure({
     // every PR. That is repairable by moving main, not by holding the victim.
     if (
       steps.includes(INSTRUCTION_CONTRACT_STEP) &&
-      BUDGET_EXCESS.test(String(annotationText)) &&
+      steps.every(step => INSTRUCTION_FAILURE_SUMMARIES.has(step)) &&
+      hasOnlyBudgetErrors(annotationText) &&
       Array.isArray(changedFiles)
     ) {
       return changedFiles.some(file => AGENT_CONTEXT_BUDGET_FILES.has(file))
@@ -254,11 +303,9 @@ export function revisionFailureDisposition({
       SHA.test(currentMainSha ?? '') &&
       SHA.test(latest.mainSha ?? '') &&
       currentMainSha !== latest.mainSha;
-    return resolved
-      ? result('retry-once', 'base-branch-resolved')
-      : result('block', 'base-branch-failure');
+    if (!resolved) return result('block', 'base-branch-failure');
   }
-  if (latest.failureNumber >= 2) {
+  if (latest.classification !== 'base-branch' && latest.failureNumber >= 2) {
     return result('block', 'revision-retry-exhausted');
   }
   // Newest statuses win: a proven rejection releases only its reservation.
@@ -268,7 +315,12 @@ export function revisionFailureDisposition({
   );
   return latestRetry && !latestRetry.released
     ? result('block', 'revision-retry-spent')
-    : result('retry-once', 'bounded-infrastructure-recovery');
+    : result(
+        'retry-once',
+        latest.classification === 'base-branch'
+          ? 'base-branch-resolved'
+          : 'bounded-infrastructure-recovery'
+      );
 }
 
 function failureDescription({ classification, failureNumber, run, mainSha }) {
@@ -626,8 +678,7 @@ function readPullRequest(repository, prNumber) {
 function instructionContractEvidence(repository, run, jobs, baseSha) {
   const failedJobs = jobs.filter(
     job =>
-      Number.isSafeInteger(job?.id) &&
-      Array.isArray(job.steps) &&
+      Array.isArray(job?.steps) &&
       job.steps.some(
         step =>
           step?.name === INSTRUCTION_CONTRACT_STEP &&
@@ -637,22 +688,32 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
   if (failedJobs.length === 0) return {};
   const messages = [];
   for (const job of failedJobs) {
+    if (!Number.isSafeInteger(job.id) || job.id < 1) return {};
+    let errors;
     try {
-      const notes = ghJson([
-        'api',
-        `repos/${repository}/check-runs/${job.id}/annotations`,
-      ]);
-      if (Array.isArray(notes)) {
-        for (const note of notes) {
-          if (typeof note?.message === 'string') messages.push(note.message);
-        }
-      }
+      const checkRunId = String(job.check_run_url ?? '').match(
+        /\/check-runs\/([1-9][0-9]*)$/
+      )?.[1];
+      if (!checkRunId) throw new Error('check-run identity unavailable');
+      const notes = restPages(
+        `repos/${repository}/check-runs/${checkRunId}/annotations`
+      );
+      if (
+        notes.some(
+          note =>
+            note?.annotation_level !== 'failure' ||
+            typeof note.message !== 'string' ||
+            !note.message.trim()
+        )
+      )
+        return {};
+      errors = notes.map(note => note.message);
     } catch {
-      // Annotations are optional; the job log is the fallback.
+      // Missing or incomplete annotations require the complete job log instead.
     }
-    if (!BUDGET_EXCESS.test(messages.join('\n'))) {
+    if (!errors?.length) {
       try {
-        messages.push(
+        errors = instructionErrorsFromLog(
           gh([
             'run',
             'view',
@@ -668,9 +729,10 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
         // Missing logs leave the failure unclassified.
       }
     }
+    if (!errors || !hasOnlyBudgetErrors(errors.join('\n'))) return {};
+    messages.push(...errors);
   }
   const annotationText = messages.join('\n');
-  if (!BUDGET_EXCESS.test(annotationText)) return { annotationText };
   try {
     const compare = ghJson([
       'api',

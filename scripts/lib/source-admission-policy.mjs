@@ -78,7 +78,6 @@ export function evaluateLinearReferencePolicy({ title, body }) {
  * @property {AdmissionReview[]} [reviews]
  * @property {AdmissionStatus[]} [statuses]
  * @property {boolean} [complete]
- * @property {string} [currentMainSha]
  *
  * @typedef {{allowed: boolean, blockers?: string[]}} AdmissionDecision
  * @typedef {{repository: string, prNumber: number, expectedHead: string, token?: string}} AdmissionRequest
@@ -98,7 +97,6 @@ export function evaluateSourceAdmission({
   reviews,
   statuses,
   complete = false,
-  currentMainSha,
 } = {}) {
   const blockers = [];
   const result = () => ({
@@ -188,13 +186,6 @@ export function evaluateSourceAdmission({
             status.description
           )
         : null;
-    if (
-      baseBranchMatch &&
-      typeof currentMainSha === 'string' &&
-      currentMainSha !== baseBranchMatch[2]
-    ) {
-      continue;
-    }
     const matchedFailure = failureMatch ?? baseBranchMatch;
     const description =
       matchedFailure !== null ||
@@ -286,11 +277,6 @@ export async function runSourceAdmission({
     throw new Error('PR identity changed during evidence read');
   if (prResponse.data?.head?.sha !== finalPr?.head?.sha)
     throw new Error('head changed during evidence read');
-  const currentMainSha = (
-    await request(`/repos/${repository}/commits/main`, options)
-  ).data?.sha;
-  if (!/^[0-9a-f]{40}$/.test(currentMainSha ?? ''))
-    throw new Error('current main sha is unavailable');
   return evaluateSourceAdmission({
     repository,
     expectedHead,
@@ -299,7 +285,6 @@ export async function runSourceAdmission({
     reviews,
     statuses,
     complete: true,
-    currentMainSha,
   });
 }
 
