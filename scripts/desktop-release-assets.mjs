@@ -123,8 +123,58 @@ export function selectRecoverableStagingDraft(releases) {
   return release;
 }
 
-export async function fetchRecoverableStagingDraft(
+export function selectRecoverableProductionDraft(releases, { releaseSha, version }) {
+  const spec = releaseSpec('production', version);
+  invariant(SHA_PATTERN.test(releaseSha), 'Production draft target is malformed.');
+  invariant(Array.isArray(releases), 'GitHub releases are malformed.');
+  invariant(
+    !releases.some(release => release?.tag_name === spec.tag),
+    'Production release tag exists outside exact-tag lookup.'
+  );
+  const candidates = releases.filter(
+    release =>
+      UNTAGGED_RELEASE_PATTERN.test(release?.tag_name || '') &&
+      release.name === version &&
+      release.target_commitish === releaseSha
+  );
+  invariant(
+    candidates.length <= 1,
+    'Multiple recoverable production drafts exist.'
+  );
+  const release = candidates[0] || null;
+  if (!release) return null;
+  invariant(
+    Number.isInteger(release.id) && release.id > 0,
+    'Recoverable production draft ID is malformed.'
+  );
+  invariant(
+    release.draft === true &&
+      release.prerelease === false &&
+      release.published_at === null,
+    'Recoverable production release must be a private stable draft.'
+  );
+  invariant(
+    Array.isArray(release.assets) && release.assets.length === 0,
+    'Recoverable production draft must be empty.'
+  );
+  return release;
+}
+
+export async function fetchRecoverableStagingDraft(request, options) {
+  return fetchRecoverableDraft(request, selectRecoverableStagingDraft, options);
+}
+
+export async function fetchRecoverableProductionDraft(request, identity, options) {
+  return fetchRecoverableDraft(
+    request,
+    releases => selectRecoverableProductionDraft(releases, identity),
+    options
+  );
+}
+
+async function fetchRecoverableDraft(
   request,
+  selectDraft,
   { maxPages = MAX_RELEASE_PAGES, pageSize = RELEASE_PAGE_SIZE } = {}
 ) {
   invariant(typeof request === 'function', 'GitHub request is missing.');
@@ -146,7 +196,7 @@ export async function fetchRecoverableStagingDraft(
     );
     releases.push(...batch);
     if (batch.length < pageSize) {
-      return selectRecoverableStagingDraft(releases);
+      return selectDraft(releases);
     }
   }
   throw new Error(
@@ -666,6 +716,13 @@ class GitHubClient {
     );
   }
 
+  async recoverableProductionDraft(identity) {
+    return fetchRecoverableProductionDraft(
+      path => this.request(`/repos/${this.repository}/releases${path}`),
+      identity
+    );
+  }
+
   async releaseById(releaseId) {
     return this.request(`/repos/${this.repository}/releases/${releaseId}`);
   }
@@ -954,6 +1011,9 @@ export async function prepare({
 }) {
   const spec = releaseSpec(environment, version);
   let release = await client.releaseOrDraftByTag(spec.tag, true);
+  if (environment === 'production' && !release) {
+    release = await client.recoverableProductionDraft({ releaseSha, version });
+  }
   if (environment === 'staging') {
     assertStagingVersionTransition({ installedVersion, version });
     if (!release) {
@@ -997,7 +1057,13 @@ export async function prepare({
 
   if (!release) {
     release = await client.createDraft({ environment, releaseSha, version });
-  } else if (release.target_commitish !== releaseSha) {
+  } else if (
+    release.target_commitish !== releaseSha &&
+    !(
+      environment === 'production' &&
+      UNTAGGED_RELEASE_PATTERN.test(release.tag_name || '')
+    )
+  ) {
     invariant(
       release.draft === true &&
         Array.isArray(release.assets) &&
@@ -1005,6 +1071,34 @@ export async function prepare({
       'A non-empty or public release cannot be retargeted.'
     );
     release = await client.retargetEmptyDraft(release.id, releaseSha);
+  }
+  if (
+    environment === 'production' &&
+    UNTAGGED_RELEASE_PATTERN.test(release.tag_name || '')
+  ) {
+    const identity = { releaseSha, version };
+    invariant(
+      selectRecoverableProductionDraft([release], identity) === release,
+      'Production placeholder identity does not match the authorized release.'
+    );
+    const releaseId = release.id;
+    release = await client.releaseById(releaseId);
+    invariant(release?.id === releaseId, 'Production draft readback ID changed.');
+    invariant(
+      selectRecoverableProductionDraft([release], identity) === release,
+      'Production placeholder identity changed before metadata repair.'
+    );
+    await updateRelease(client, release, environment, releaseSha, version);
+    release = await client.releaseById(releaseId);
+    invariant(release?.id === releaseId, 'Production draft readback ID changed.');
+    invariant(
+      Array.isArray(release.assets) && release.assets.length === 0,
+      'Recovered production draft is not empty.'
+    );
+    invariant(
+      release.published_at === null,
+      'Recovered production draft has a publication timestamp.'
+    );
   }
   validateReleaseEnvelope({
     environment,

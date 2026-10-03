@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import * as desktopReleaseAssetsModule from './desktop-release-assets.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -2119,4 +2120,187 @@ esac
   const outputs = await readFile(join(root, 'output.txt'), 'utf8');
   assert.match(outputs, /^should_release=false$/m);
   assert.doesNotMatch(outputs, /^should_(release|stamp)=true$/m);
+});
+
+
+const { fetchRecoverableProductionDraft, selectRecoverableProductionDraft } =
+  desktopReleaseAssetsModule;
+const productionDraftIdentity = {
+  releaseSha: '43414c7da0e53f1b47cda7e562c2b43de4c386f7',
+  version: '26.10.0',
+};
+function recoverableProductionDraft(overrides = {}) {
+  return {
+    id: 401449487,
+    name: productionDraftIdentity.version,
+    tag_name: 'untagged-4342acff1e28ec4b6d16',
+    target_commitish: productionDraftIdentity.releaseSha,
+    draft: true,
+    prerelease: false,
+    published_at: null,
+    assets: [],
+    ...overrides,
+  };
+}
+
+function productionRecoveryClient({ orphan = recoverableProductionDraft(), created,
+  beforeRead, afterRead } = {}) {
+  const calls = [];
+  const candidate = orphan || created;
+  let reads = 0;
+  const client = {
+    releaseOrDraftByTag: async () => null,
+    recoverableProductionDraft: async identity => {
+      calls.push({ recover: identity });
+      return orphan;
+    },
+    createDraft: async identity => {
+      calls.push({ create: identity });
+      assert.equal(orphan, null, 'existing draft must prevent creation');
+      return created;
+    },
+    releaseById: async id => {
+      calls.push(`read:${id}`);
+      reads += 1;
+      return reads === 1 ? beforeRead || candidate : afterRead || {
+        ...candidate, ...releaseMetadataUpdate({ environment: 'production',
+          ...productionDraftIdentity }),
+      };
+    },
+    updateReleaseMetadata: async metadata => { calls.push({ update: metadata }); },
+  };
+  return { client, calls };
+}
+const prepareProduction = client => prepare({ client, environment: 'production',
+  ...productionDraftIdentity });
+
+test('production recovery selects the exact version and authorized SHA only', () => {
+  const current = recoverableProductionDraft();
+  const stale = recoverableProductionDraft({ id: 401429954,
+    tag_name: 'untagged-57ac7d815fe2ae2c7388',
+    target_commitish: '85315d5284974a15cceae681cb15d213bb656840' });
+  const snapshot = structuredClone(stale);
+  assert.equal(selectRecoverableProductionDraft([stale, current], productionDraftIdentity), current);
+  assert.equal(selectRecoverableProductionDraft([stale], productionDraftIdentity), null);
+  assert.equal(selectRecoverableProductionDraft([recoverableProductionDraft({ name: '26.9.16' })], productionDraftIdentity), null);
+  assert.deepEqual(stale, snapshot);
+  assert.throws(() => selectRecoverableProductionDraft([], { ...productionDraftIdentity,
+    releaseSha: '43414c7' }), /target is malformed/);
+});
+
+test('production recovery rejects ambiguous unsafe or overlooked exact-tag drafts', () => {
+  assert.throws(() => selectRecoverableProductionDraft([recoverableProductionDraft(),
+    recoverableProductionDraft({ id: 2 })], productionDraftIdentity), /Multiple recoverable/);
+  for (const unsafe of [{ id: 0 }, { draft: false }, { prerelease: true },
+    { published_at: '2026-10-02T00:00:00Z' }, { assets: null },
+    { assets: [{ id: 1 }] }]) {
+    assert.throws(() => selectRecoverableProductionDraft([recoverableProductionDraft(unsafe)],
+      productionDraftIdentity), /ID is malformed|private stable draft|must be empty/);
+  }
+  assert.throws(() => selectRecoverableProductionDraft([recoverableProductionDraft({
+    tag_name: 'v26.10.0' })], productionDraftIdentity), /outside exact-tag lookup/);
+});
+
+test('production inventory checks later-page ambiguity and refuses an incomplete scan', async () => {
+  const first = recoverableProductionDraft();
+  const calls = [];
+  const pages = [[first, { tag_name: 'v1.0.0' }], [recoverableProductionDraft({ id: 2 })]];
+  await assert.rejects(fetchRecoverableProductionDraft(async path => {
+    calls.push(path); return pages[calls.length - 1];
+  }, productionDraftIdentity, { pageSize: 2, maxPages: 2 }), /Multiple recoverable/);
+  assert.deepEqual(calls, ['?per_page=2&page=1', '?per_page=2&page=2']);
+  await assert.rejects(fetchRecoverableProductionDraft(async () => [first],
+    productionDraftIdentity, { pageSize: 1, maxPages: 2 }), /2-page safety bound/);
+  for (const batch of [null, [first, first, first]]) {
+    await assert.rejects(fetchRecoverableProductionDraft(async () => batch,
+      productionDraftIdentity, { pageSize: 2 }), /malformed|exceeds the requested size/);
+  }
+});
+
+test('prepare recovers an existing production placeholder without creating or publishing', async () => {
+  const { client, calls } = productionRecoveryClient();
+  await prepareProduction(client);
+  assert.deepEqual(calls, [{ recover: productionDraftIdentity }, 'read:401449487',
+    { update: { environment: 'production', releaseId: 401449487,
+      ...productionDraftIdentity } }, 'read:401449487']);
+});
+
+test('prepare normalizes a first-created production placeholder with the same strict checks', async () => {
+  const { client, calls } = productionRecoveryClient({ orphan: null,
+    created: recoverableProductionDraft() });
+  await prepareProduction(client);
+  assert.deepEqual(calls, [{ recover: productionDraftIdentity },
+    { create: { environment: 'production', ...productionDraftIdentity } },
+    'read:401449487', { update: { environment: 'production', releaseId: 401449487,
+      ...productionDraftIdentity } }, 'read:401449487']);
+});
+
+test('prepare rejects unsafe placeholder identity before any metadata change', async () => {
+  for (const overrides of [{ id: 0 }, { name: '26.9.16' },
+    { target_commitish: 'b'.repeat(40) }, { draft: false }, { prerelease: true },
+    { published_at: '2026-10-02T00:00:00Z' }, { assets: [{ id: 1 }] }]) {
+    const { client, calls } = productionRecoveryClient({ orphan: recoverableProductionDraft(overrides) });
+    await assert.rejects(prepareProduction(client));
+    assert.equal(calls.some(call => call.update || call.create), false);
+  }
+});
+
+test('prepare rechecks production draft ID ownership privacy and emptiness before PATCH', async () => {
+  for (const overrides of [{ id: 2 }, { name: '26.9.16' },
+    { target_commitish: 'b'.repeat(40) }, { draft: false }, { prerelease: true },
+    { published_at: '2026-10-02T00:00:00Z' }, { assets: [{ id: 1 }] }]) {
+    const { client, calls } = productionRecoveryClient({ beforeRead: recoverableProductionDraft(overrides) });
+    await assert.rejects(prepareProduction(client));
+    assert.deepEqual(calls, [{ recover: productionDraftIdentity }, 'read:401449487']);
+  }
+});
+
+test('prepare retains exact production envelope after metadata repair even if the API keeps a placeholder', async () => {
+  const repaired = { ...recoverableProductionDraft(), tag_name: 'v26.10.0' };
+  for (const overrides of [{ id: 2 }, { tag_name: 'untagged-4342acff1e28ec4b6d16' },
+    { tag_name: 'v26.9.16' }, { name: '26.9.16' }, { target_commitish: 'b'.repeat(40) },
+    { draft: false }, { prerelease: true }, { published_at: '2026-10-02T00:00:00Z' },
+    { assets: [{ id: 1 }] }]) {
+    const { client, calls } = productionRecoveryClient({ afterRead: { ...repaired, ...overrides } });
+    await assert.rejects(prepareProduction(client), /ID changed|tag is not exact|title is not exact|target is not the authorized commit|must remain private|prerelease state is not exact|not empty|publication timestamp/);
+    assert.equal(calls.filter(call => call.update).length, 1);
+    assert.equal(calls.some(call => call.create), false);
+  }
+});
+
+
+test('production recovery scans complete inventory before selecting the current draft', async () => {
+  const current = recoverableProductionDraft();
+  const stale = recoverableProductionDraft({ id: 401429954,
+    target_commitish: '85315d5284974a15cceae681cb15d213bb656840' });
+  const calls = [];
+  const result = await fetchRecoverableProductionDraft(async path => {
+    calls.push(path);
+    return calls.length === 1 ? [stale] : [];
+  }, productionDraftIdentity, { pageSize: 1, maxPages: 2 });
+  assert.equal(result, null);
+  assert.deepEqual(calls, ['?per_page=1&page=1', '?per_page=1&page=2']);
+  assert.equal(await fetchRecoverableProductionDraft(async () => [stale, current],
+    productionDraftIdentity), current);
+});
+
+test('production metadata or readback errors propagate without a second mutation attempt', async () => {
+  for (const failure of ['before-read', 'update', 'after-read']) {
+    const { client, calls } = productionRecoveryClient();
+    const error = new Error(`injected ${failure}`);
+    const read = client.releaseById;
+    let reads = 0;
+    client.releaseById = async id => {
+      reads += 1;
+      if ((failure === 'before-read' && reads === 1) ||
+          (failure === 'after-read' && reads === 2)) throw error;
+      return read(id);
+    };
+    if (failure === 'update') client.updateReleaseMetadata = async metadata => {
+      calls.push({ update: metadata }); throw error;
+    };
+    await assert.rejects(prepareProduction(client), actual => actual === error);
+    assert.equal(calls.filter(call => call.update).length, failure === 'before-read' ? 0 : 1);
+    assert.equal(calls.some(call => call.create), false);
+  }
 });

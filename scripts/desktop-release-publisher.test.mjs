@@ -111,6 +111,7 @@ function fakeClient({
     throw new Error(`Release not found: ${tag}`);
   };
   client.recoverableStagingDraft = async () => null;
+  client.recoverableProductionDraft = async () => null;
   client.createDraft = async ({ environment, releaseSha, version }) => {
     client.release = {
       ...releaseFixture(environment, version, releaseSha),
