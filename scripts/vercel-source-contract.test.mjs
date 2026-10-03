@@ -81,6 +81,7 @@ describe('Vercel source contract', () => {
   it('uploads every module and proof asset the docs build reads', () => {
     const modules = docsBuildModules();
     assert.ok(modules.includes('apps/docs/scripts/validate-articles.mjs'));
+    assert.ok(modules.includes('apps/docs/scripts/materialize-proof.mjs'));
     assert.ok(modules.includes('apps/docs/lib/article-registry.mjs'));
     assert.ok(modules.includes('docs/FEATURE_REGISTRY.md'));
     assert.ok(modules.includes('apps/web/constants/routes.ts'));

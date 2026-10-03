@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
-    "prebuild": "pnpm run validate:articles",
+    "prebuild": "node scripts/materialize-proof.mjs && pnpm run validate:articles",
     "build": "next build",
     "postbuild": "node scripts/build-pagefind.mjs",
     "start": "next start",
