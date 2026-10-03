@@ -1,0 +1,10 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20260930T230336Z-PR19734-devin-fix-c21153",
+ "pr": 19734,
+ "issue": null,
+ "reason": [
+  "agent-running:disk-critical"
+ ],
+ "at": "2026-10-01T00:19:41Z"
+}
