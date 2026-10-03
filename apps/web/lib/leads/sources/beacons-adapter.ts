@@ -10,7 +10,7 @@ import {
   fetchBeaconsDocument,
   isBeaconsUrl,
 } from '@/lib/ingestion/strategies/beacons';
-import { searchWebWithStatus } from '@/lib/leads/google-cse';
+import { searchGoogleCSEWithStatus } from '@/lib/leads/google-cse';
 import type { QualificationResult } from '@/lib/leads/qualify';
 import type { DiscoverySourceAdapter } from './types';
 
@@ -110,7 +110,7 @@ export class BeaconsDiscoveryAdapter implements DiscoverySourceAdapter {
   async discover(settings: { keywords: string[] }): Promise<string[]> {
     const [firstKeyword] = settings.keywords;
     if (!firstKeyword) return [];
-    const outcome = await searchWebWithStatus(firstKeyword, 1);
+    const outcome = await searchGoogleCSEWithStatus(firstKeyword, 1);
     if (outcome.status !== 'ok') return [];
     return outcome.results.map(result => result.link).filter(isBeaconsUrl);
   }

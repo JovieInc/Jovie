@@ -46,9 +46,6 @@ test('subscription execution strips API keys, provider routes and code-loading h
     HOME: '/home/scanner',
     CODEX_HOME: '/home/scanner/.codex',
     LC_ALL: 'C',
-    HTTPS_PROXY: 'http://proxy:8080',
-    NODE_EXTRA_CA_CERTS: '/trusted/runtime-ca.pem',
-    CODEX_EXEC_SERVER_PROXY_PRIVATE_IPS_VIA_UPSTREAM: '1',
     OPENAI_API_KEY: 'blocked',
     AI_GATEWAY_API_KEY: 'blocked',
     ANTHROPIC_AUTH_TOKEN: 'blocked',
@@ -65,9 +62,6 @@ test('subscription execution strips API keys, provider routes and code-loading h
     HOME: '/home/scanner',
     CODEX_HOME: '/home/scanner/.codex',
     LC_ALL: 'C',
-    HTTPS_PROXY: 'http://proxy:8080',
-    NODE_EXTRA_CA_CERTS: '/trusted/runtime-ca.pem',
-    CODEX_EXEC_SERVER_PROXY_PRIVATE_IPS_VIA_UPSTREAM: '1',
   });
 });
 

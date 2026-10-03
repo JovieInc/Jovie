@@ -183,13 +183,11 @@ struct LiveRootContainer: View {
 
   @MainActor
   private func handleLogout() async {
-    guard let completion = await appState.signOut() else { return }
-    NativeSessionTokenStore.performIfCurrent(completion) {
-      biometricLockState = .unlocked
-      isPrivacyShieldVisible = false
-      backgroundedAt = nil
-      canRenderRoot = true
-    }
+    await appState.signOut()
+    biometricLockState = .unlocked
+    isPrivacyShieldVisible = false
+    backgroundedAt = nil
+    canRenderRoot = true
   }
 
   @MainActor

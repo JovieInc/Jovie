@@ -19,16 +19,6 @@ const run = new AsyncFunction(
   script
 );
 const sha = 'a'.repeat(40);
-test('both native queue mutation clients request repository contents write', () => {
-  for (const job of [
-    workflow.jobs['hold-failed-revision'],
-    workflow.jobs.enroll,
-  ]) {
-    const token = job.steps.find(step => step.id === 'app-token');
-    assert.equal(token.with['permission-contents'], 'write');
-    assert.equal(token.with['permission-pull-requests'], 'write');
-  }
-});
 const candidate = number => ({
   number,
   draft: false,
@@ -221,7 +211,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   );
   assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
   assert.equal(token.with['permission-actions'], 'read');
-  assert.equal(token.with['permission-contents'], 'write');
+  assert.equal(token.with['permission-contents'], 'read');
   assert.equal(token.with['permission-pull-requests'], 'write');
   assert.equal(token.with['permission-statuses'], 'write');
   assert.equal(token.with['permission-merge-queues'], undefined);

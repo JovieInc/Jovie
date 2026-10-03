@@ -5,7 +5,6 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { env } from '@/lib/env';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
-import { searchWebWithStatus } from '@/lib/leads/google-cse';
 import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import {
   developmentOnlyForbiddenJson,
@@ -38,13 +37,13 @@ function checkEnvVars() {
       present: !!env.INSTANTLY_CAMPAIGN_ID,
       required: true,
     },
-    SERPAPI_API_KEY: {
-      present: !!env.SERPAPI_API_KEY,
-      required: false,
+    GOOGLE_CSE_API_KEY: {
+      present: !!env.GOOGLE_CSE_API_KEY,
+      required: true,
     },
-    EXA_API_KEY: {
-      present: !!env.EXA_API_KEY,
-      required: false,
+    GOOGLE_CSE_ENGINE_ID: {
+      present: !!env.GOOGLE_CSE_ENGINE_ID,
+      required: true,
     },
     SPOTIFY_CLIENT_ID: {
       present: !!env.SPOTIFY_CLIENT_ID,
@@ -59,9 +58,6 @@ function checkEnvVars() {
   const missingRequired = Object.entries(vars)
     .filter(([, v]) => v.required && !v.present)
     .map(([k]) => k);
-  if (!env.SERPAPI_API_KEY && !env.EXA_API_KEY) {
-    missingRequired.push('SERPAPI_API_KEY or EXA_API_KEY');
-  }
 
   return { vars, missingRequired };
 }
@@ -121,27 +117,53 @@ async function probeInstantly(): Promise<ConnectivityResult> {
   }
 }
 
-async function probeSearchProvider(): Promise<ConnectivityResult> {
+async function probeGoogleCSE(): Promise<ConnectivityResult> {
+  const apiKey = env.GOOGLE_CSE_API_KEY;
+  const engineId = env.GOOGLE_CSE_ENGINE_ID;
+  if (!apiKey || !engineId) {
+    return {
+      ok: false,
+      latencyMs: 0,
+      skipped: true,
+      error: 'Missing GOOGLE_CSE_API_KEY or GOOGLE_CSE_ENGINE_ID',
+    };
+  }
+
   const start = Date.now();
   try {
-    const outcome = await searchWebWithStatus('music artist', 1);
+    const url = new URL('https://www.googleapis.com/customsearch/v1');
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('cx', engineId);
+    url.searchParams.set('q', 'test');
+    url.searchParams.set('num', '1');
+
+    const res = await serverFetch(url.toString(), {
+      timeoutMs: 10_000,
+      context: 'Google CSE connectivity probe',
+      retry: {
+        maxRetries: 1,
+        baseDelayMs: 300,
+      },
+    });
     const latencyMs = Date.now() - start;
 
-    if (
-      outcome.status === 'ok' ||
-      outcome.status === 'empty' ||
-      outcome.status === 'quota_exceeded'
-    ) {
-      return { ok: true, latencyMs };
-    }
-
+    // 429 = quota exhausted but key is valid
+    if (res.ok || res.status === 429) return { ok: true, latencyMs };
+    const text = await res.text().catch(() => '');
     return {
       ok: false,
       latencyMs,
-      ...(outcome.status === 'not_configured' ? { skipped: true } : {}),
-      error: outcome.error ?? `Search provider returned ${outcome.status}`,
+      error: `HTTP ${res.status}: ${text.slice(0, 200)}`,
     };
   } catch (err) {
+    if (err instanceof ServerFetchTimeoutError) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - start,
+        error: err.message,
+      };
+    }
+
     return {
       ok: false,
       latencyMs: Date.now() - start,
@@ -280,10 +302,10 @@ export async function GET() {
     const environment = checkEnvVars();
 
     // Run connectivity probes and pipeline stats in parallel
-    const [instantly, search, spotify, pipeline, recentFailures] =
+    const [instantly, googleCse, spotify, pipeline, recentFailures] =
       await Promise.all([
         probeInstantly(),
-        probeSearchProvider(),
+        probeGoogleCSE(),
         probeSpotify(),
         getPipelineStats(),
         getRecentFailures(),
@@ -293,7 +315,7 @@ export async function GET() {
       {
         timestamp: new Date().toISOString(),
         environment,
-        connectivity: { instantly, search, spotify },
+        connectivity: { instantly, googleCse, spotify },
         pipeline,
         recentFailures,
       },

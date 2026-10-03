@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { captureWarning } from '@/lib/error-tracking';
-import { searchWeb } from '@/lib/leads/google-cse';
+import { searchGoogleCSE } from '@/lib/leads/google-cse';
 import {
   type FeaturedPlaylistFallbackCandidate,
   normalizeSpotifyPlaylistUrl,
@@ -96,8 +96,8 @@ export async function discoverThisIsPlaylistCandidate(input: {
 
   for (const queryTemplate of PLAYLIST_QUERY_TEMPLATES) {
     const query = queryTemplate.replace('{artistName}', safeArtistName);
-    const searchResults = await searchWeb(query, 1).catch(async error => {
-      await captureWarning('Web search discovery failed', error, {
+    const searchResults = await searchGoogleCSE(query, 1).catch(async error => {
+      await captureWarning('Google CSE discovery failed', error, {
         query,
         route: 'featured-playlist-fallback-discovery',
       });

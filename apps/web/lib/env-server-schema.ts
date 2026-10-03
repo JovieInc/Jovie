@@ -431,7 +431,8 @@ export const ServerEnvSchema = z.object({
 
   // Search APIs (lead discovery)
   SERPAPI_API_KEY: z.string().optional(),
-  EXA_API_KEY: z.string().optional(),
+  GOOGLE_CSE_API_KEY: z.string().optional(),
+  GOOGLE_CSE_ENGINE_ID: z.string().optional(),
 
   // Jovie Marketing Pixels (for retargeting Jovie visitors)
   JOVIE_FACEBOOK_PIXEL_ID: z.string().optional(),
@@ -699,7 +700,8 @@ export const ENV_KEYS = [
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
   'SERPAPI_API_KEY',
-  'EXA_API_KEY',
+  'GOOGLE_CSE_API_KEY',
+  'GOOGLE_CSE_ENGINE_ID',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',
   'JOVIE_GOOGLE_MEASUREMENT_ID',

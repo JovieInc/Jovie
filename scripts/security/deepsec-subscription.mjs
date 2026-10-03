@@ -14,23 +14,6 @@ const ALLOWED_ENV = new Set([
   'LANG',
   'CODEX_HOME',
   'TMPDIR',
-  // Preserve the managed runtime's transport and TLS trust; API keys and
-  // provider overrides remain excluded from native subscription execution.
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'ALL_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'all_proxy',
-  'no_proxy',
-  'NODE_EXTRA_CA_CERTS',
-  'CODEX_PROXY_CERT',
-  'SSL_CERT_FILE',
-  'SSL_CERT_DIR',
-  'REQUESTS_CA_BUNDLE',
-  'CURL_CA_BUNDLE',
-  'CODEX_EXEC_SERVER_PROXY_PRIVATE_IPS_VIA_UPSTREAM',
 ]);
 
 export function subscriptionEnvironment(environment) {

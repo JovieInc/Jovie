@@ -545,6 +545,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:probe-and-autofix
     jobCount: 1
+  - name: HA CI remediator poke
+    path: .github/workflows/ha-ci-remediator-poke.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:poke
+    jobCount: 1
   - name: Help Center Recertification
     path: .github/workflows/help-center-recertification.yml
     active: true

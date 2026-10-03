@@ -44,17 +44,6 @@ struct NativeSessionContext: Equatable, Sendable {
   let authorization: NativeRequestAuthorization?
 }
 
-/// One cleanup may follow rotation/expiry, but never a later explicit intent.
-struct NativeSessionCleanupClaim: Equatable, Sendable {
-  fileprivate let context: NativeSessionContext
-  fileprivate let intent: UUID
-}
-
-struct NativeSessionCleanupCompletion: Equatable, Sendable {
-  let ownership: NativeSessionOwnership
-  fileprivate let intent: UUID
-}
-
 struct NativeSessionExpiryReceipt: Equatable, Sendable {
   let ownership: NativeSessionOwnership
   let userID: String?
@@ -74,7 +63,6 @@ enum NativeSessionTokenStore {
     let lock = NSLock()
     var generation = UUID()
     var bearerRevision = UUID()
-    var intent = UUID()
     var expiryReceipt: NativeSessionExpiryReceipt?
   }
 
@@ -88,7 +76,6 @@ enum NativeSessionTokenStore {
 
   static func save(token: String, userID: String, expiresAt: Date) {
     withLock {
-      state.intent = UUID()
       state.generation = UUID()
       state.bearerRevision = UUID()
       state.expiryReceipt = nil
@@ -238,75 +225,16 @@ enum NativeSessionTokenStore {
   /// Also captures an empty store's generation so delayed local cleanup cannot
   /// adopt a login that appears after capture.
   static func captureSessionContext() -> NativeSessionContext {
-    withLock { captureSessionContextLocked() }
-  }
-
-  private static func captureSessionContextLocked() -> NativeSessionContext {
-    let session = loadLocked()
-    return NativeSessionContext(
-      ownership: NativeSessionOwnership(generation: state.generation),
-      authorization: session.map {
-        NativeRequestAuthorization(
-          session: $0, generation: state.generation, bearerRevision: state.bearerRevision
-        )
-      }
-    )
-  }
-
-  static func claimCleanup(invalidatingAuthIntent: Bool = false) -> NativeSessionCleanupClaim {
     withLock {
-      if invalidatingAuthIntent { state.intent = UUID() }
-      return NativeSessionCleanupClaim(context: captureSessionContextLocked(), intent: state.intent)
-    }
-  }
-
-  private static func isCurrentLocked(_ claim: NativeSessionCleanupClaim) -> Bool {
-    state.intent == claim.intent && (
-      state.generation == claim.context.ownership.generation ||
-        currentReceiptLocked()?.originalGeneration == claim.context.ownership.generation
-    )
-  }
-
-  /// A valid empty context differs from a superseded claim (nil).
-  static func captureSessionContext(for claim: NativeSessionCleanupClaim) -> NativeSessionContext? {
-    withLock {
-      guard isCurrentLocked(claim) else { return nil }
-      return captureSessionContextLocked()
-    }
-  }
-
-  /// Synchronous mutations only; the closure must not re-enter the store.
-  @discardableResult
-  static func performIfCurrent(
-    _ claim: NativeSessionCleanupClaim, _ operation: (NativeSessionContext) -> Void
-  ) -> Bool {
-    withLock {
-      guard isCurrentLocked(claim) else { return false }
-      operation(captureSessionContextLocked())
-      return true
-    }
-  }
-
-  static func completeCleanup(_ claim: NativeSessionCleanupClaim) -> NativeSessionCleanupCompletion? {
-    withLock {
-      guard isCurrentLocked(claim) else { return nil }
-      // Even initially empty claims advance generation and discard receipt lineage.
-      clearLocked()
-      return NativeSessionCleanupCompletion(
-        ownership: NativeSessionOwnership(generation: state.generation), intent: state.intent
+      let session = loadLocked()
+      return NativeSessionContext(
+        ownership: NativeSessionOwnership(generation: state.generation),
+        authorization: session.map {
+          NativeRequestAuthorization(
+            session: $0, generation: state.generation, bearerRevision: state.bearerRevision
+          )
+        }
       )
-    }
-  }
-
-  @discardableResult
-  static func performIfCurrent(
-    _ completion: NativeSessionCleanupCompletion, _ operation: () -> Void
-  ) -> Bool {
-    withLock {
-      guard state.intent == completion.intent,
-            state.generation == completion.ownership.generation else { return false }
-      operation()
-      return true
     }
   }
 
@@ -378,10 +306,7 @@ enum NativeSessionTokenStore {
   }
 
   static func clear() {
-    withLock {
-      state.intent = UUID()
-      clearLocked()
-    }
+    withLock { clearLocked() }
   }
 
   private static func clearLocked() {
@@ -507,7 +432,6 @@ enum NativeSessionRevocationResult: Equatable, Sendable {
 
 protocol NativeSessionRevoking: Sendable {
   func revokeCurrentSession() async -> NativeSessionRevocationResult
-  func revokeSession(authorizedBy authorization: NativeRequestAuthorization?) async -> NativeSessionRevocationResult
 }
 
 /// Revokes the Better Auth session represented by the native bearer token.
@@ -532,16 +456,14 @@ struct NativeSessionRevoker: NativeSessionRevoking, Sendable {
   }
 
   func revokeCurrentSession() async -> NativeSessionRevocationResult {
-    let token = try? await tokenProvider.bearerToken(forceRefresh: false)
-    return await revokeSession(authorizedBy: token.map { NativeRequestAuthorization(unmanagedBearerToken: $0) })
-  }
+    guard let token = try? await tokenProvider.bearerToken(forceRefresh: false) else {
+      return .noSession
+    }
 
-  func revokeSession(authorizedBy authorization: NativeRequestAuthorization?) async -> NativeSessionRevocationResult {
-    guard let authorization else { return .noSession }
     var request = URLRequest(url: baseURL.appending(path: "/api/auth/sign-out"))
     request.httpMethod = "POST"
     request.timeoutInterval = requestTimeout
-    request.setValue("Bearer \(authorization.bearerToken)", forHTTPHeaderField: "Authorization")
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
     do {
       let (_, response) = try await session.data(for: request)

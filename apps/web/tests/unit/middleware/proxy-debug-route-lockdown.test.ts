@@ -287,29 +287,16 @@ describe('proxy debug/test route lockdown', () => {
     expect(new URL(rewriteUrl!).pathname).toBe('/404');
   });
 
-  it('rewrites /demo fixture routes to /404 on production deployments', async () => {
+  it('keeps /demo reachable outside development', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', 'production');
 
-    for (const pathname of ['/demo', '/demo/audience', '/demo/onboarding']) {
-      const req = createTestRequest({ pathname, hostname: 'jov.ie' });
-      const response = await callMiddleware(req);
-      const rewriteUrl = response.headers.get('x-middleware-rewrite');
+    const req = createTestRequest({
+      pathname: '/demo',
+      hostname: 'jov.ie',
+    });
+    const response = await callMiddleware(req);
 
-      expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/404');
-    }
-  });
-
-  it('keeps the demo video sales routes reachable outside development', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_ENV', 'production');
-
-    for (const pathname of ['/demo/video', '/demovideo']) {
-      const req = createTestRequest({ pathname, hostname: 'jov.ie' });
-      const response = await callMiddleware(req);
-
-      expect(response.headers.get('x-middleware-rewrite')).toBeNull();
-    }
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
   });
 });

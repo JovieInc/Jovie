@@ -10,7 +10,7 @@ const {
   returningMock,
   extractLinktreeHandleMock,
   isLinktreeUrlMock,
-  searchWebMock,
+  searchGoogleCSEMock,
   setMock,
   updateMock,
   valuesMock,
@@ -18,7 +18,7 @@ const {
   pipelineLogMock,
   pipelineWarnMock,
 } = vi.hoisted(() => {
-  const searchWebMock = vi.fn();
+  const searchGoogleCSEMock = vi.fn();
   const captureErrorMock = vi.fn();
   const isLinktreeUrlMock = vi.fn();
   const extractLinktreeHandleMock = vi.fn();
@@ -44,7 +44,7 @@ const {
   return {
     extractLinktreeHandleMock,
     isLinktreeUrlMock,
-    searchWebMock,
+    searchGoogleCSEMock,
     captureErrorMock,
     executeMock,
     returningMock,
@@ -60,12 +60,12 @@ const {
 });
 
 vi.mock('@/lib/leads/google-cse', () => ({
-  searchWebWithStatus: searchWebMock,
+  searchGoogleCSEWithStatus: searchGoogleCSEMock,
 }));
 
 const okOutcome = (results: unknown[]) => ({
   status: 'ok' as const,
-  provider: 'exa' as const,
+  provider: 'google_cse' as const,
   results,
   error: null,
 });
@@ -135,7 +135,7 @@ const defaultKeyword = {
 
 describe('runDiscovery', () => {
   beforeEach(() => {
-    searchWebMock.mockReset();
+    searchGoogleCSEMock.mockReset();
     captureErrorMock.mockReset();
     isLinktreeUrlMock.mockReset();
     extractLinktreeHandleMock.mockReset();
@@ -164,7 +164,7 @@ describe('runDiscovery', () => {
       (url: string) => url.split('/').at(-1) ?? null
     );
 
-    searchWebMock.mockResolvedValue(
+    searchGoogleCSEMock.mockResolvedValue(
       okOutcome([
         { link: 'https://linktr.ee/artist-one' },
         { link: 'https://linktr.ee/artist-one' },
@@ -222,7 +222,7 @@ describe('runDiscovery', () => {
     isLinktreeUrlMock.mockReturnValue(false);
     extractLinktreeHandleMock.mockReturnValue(null);
 
-    searchWebMock.mockResolvedValue(
+    searchGoogleCSEMock.mockResolvedValue(
       okOutcome([
         { link: 'https://example.com/a' },
         { link: 'https://example.com/b' },
@@ -250,7 +250,7 @@ describe('runDiscovery', () => {
       (url: string) => url.split('/').at(-1) ?? null
     );
 
-    searchWebMock.mockResolvedValue(
+    searchGoogleCSEMock.mockResolvedValue(
       okOutcome([
         { link: 'https://linktr.ee/artist-three' },
         { link: 'https://linktr.ee/artist-four' },
@@ -281,9 +281,9 @@ describe('runDiscovery', () => {
     expect(captureErrorMock).not.toHaveBeenCalled();
   });
 
-  it('passes searchOffset to the web search provider for pagination', async () => {
+  it('passes searchOffset to Google CSE for pagination', async () => {
     isLinktreeUrlMock.mockReturnValue(false);
-    searchWebMock.mockResolvedValue(okOutcome([]));
+    searchGoogleCSEMock.mockResolvedValue(okOutcome([]));
 
     const { runDiscovery } = await import('@/lib/leads/discovery');
 
@@ -291,13 +291,13 @@ describe('runDiscovery', () => {
       { ...defaultKeyword, searchOffset: 21 },
     ]);
 
-    expect(searchWebMock).toHaveBeenCalledWith(defaultKeyword.query, 21);
+    expect(searchGoogleCSEMock).toHaveBeenCalledWith(defaultKeyword.query, 21);
     expect(result.diagnostics[0]?.searchOffset).toBe(21);
   });
 
   it('resets searchOffset to 1 when results are less than 10', async () => {
     isLinktreeUrlMock.mockReturnValue(false);
-    searchWebMock.mockResolvedValue(
+    searchGoogleCSEMock.mockResolvedValue(
       okOutcome(
         Array.from({ length: 5 }, (_, i) => ({
           link: `https://example.com/${i}`,
@@ -347,7 +347,7 @@ describe('runDiscovery', () => {
   });
 
   it('captures errors per keyword and includes them in diagnostics', async () => {
-    searchWebMock.mockRejectedValue(new Error('Network error'));
+    searchGoogleCSEMock.mockRejectedValue(new Error('Network error'));
 
     const { runDiscovery } = await import('@/lib/leads/discovery');
 
@@ -369,9 +369,9 @@ describe('runDiscovery', () => {
   });
 
   it('does not treat provider failure as exhaustion or reset pagination', async () => {
-    searchWebMock.mockResolvedValue({
+    searchGoogleCSEMock.mockResolvedValue({
       status: 'quota_exceeded',
-      provider: 'exa',
+      provider: 'google_cse',
       results: [],
       error: 'Daily Limit Exceeded',
     });
@@ -402,7 +402,7 @@ describe('runDiscovery', () => {
   });
 
   it('does not bill unconfigured providers as queries and stops the run', async () => {
-    searchWebMock.mockResolvedValue({
+    searchGoogleCSEMock.mockResolvedValue({
       status: 'not_configured',
       provider: 'none',
       results: [],
@@ -422,6 +422,6 @@ describe('runDiscovery', () => {
       providerStatus: 'not_configured',
       error: 'missing env: SERPAPI_API_KEY',
     });
-    expect(searchWebMock).toHaveBeenCalledTimes(1);
+    expect(searchGoogleCSEMock).toHaveBeenCalledTimes(1);
   });
 });

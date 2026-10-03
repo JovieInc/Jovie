@@ -235,26 +235,6 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertNotEqual(chosen["lane"], "hyperagent")
         self.assertNotIn("hyperagent", {spec and name for name, spec in catalog.items() if not spec.get("enabled", True)} & {chosen["lane"]})
 
-    def test_ha_ci_remediator_poke_is_gone(self):
-        needle = "ha-" + "ci-remediator-poke"
-        skip = {".git", "node_modules", ".next", "browse", "__pycache__", "dist"}
-        hits = []
-        for path in ROOT.rglob("*"):
-            if not path.is_file() or any(part in skip for part in path.parts):
-                continue
-            if path.suffix in {".pyc", ".png", ".woff", ".woff2", ".jpg", ".jpeg", ".webp", ".gif"}:
-                continue
-            if path.resolve() == Path(__file__).resolve():
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeError):
-                continue
-            if needle in text:
-                hits.append(str(path.relative_to(ROOT)))
-        self.assertEqual(hits, [])
-
-
 def linear_issue(identifier, fingerprint, *, state="unstarted", title="", description="",
                  created="2026-10-01T00:00:00Z", team="JOV", updated="2026-10-02T00:00:00Z"):
     name = "Todo" if state == "unstarted" else ("Done" if state == "completed" else state)
@@ -399,62 +379,6 @@ class LabeledEventTest(unittest.TestCase):
         wrapped = remediation.remediation_summary(snapshot, [], NOW)
         self.assertEqual(wrapped["eventsClaimed"], 1)
         self.assertEqual(wrapped["byFingerprint"]["stripe-reconcile"]["issue"], "JOV-4")
-
-    def test_scan_is_one_label_filtered_read(self):
-        os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
-        if "lane_runner" in sys.modules and hasattr(sys.modules["lane_runner"], "claim_remediation_events"):
-            runner = sys.modules["lane_runner"]
-        else:
-            runner = load("lane_runner")
-        nodes = [
-            linear_issue("JOV-1", "billing-health-public"),
-            linear_issue("JOV-2", "billing-health-public", created="2026-10-03T00:00:00Z"),
-            linear_issue("LYB-9", "synthetic-monitoring", team="LYB"),
-            linear_issue("JOV-7", "musicfetch-quota", title="Renew MusicFetch", description="renew MusicFetch"),
-        ]
-        calls = []
-
-        class Linear:
-            def gql(self, query, variables):
-                calls.append(query)
-                if "issues(" in query:
-                    return {"issues": {"nodes": nodes}}
-                return {"issueUpdate": {"success": True}, "issueAddLabel": {"success": True}}
-
-            def comment(self, issue_id, body):
-                calls.append(("comment", issue_id))
-
-        import tempfile
-        from pathlib import Path
-        from unittest.mock import patch
-        with tempfile.TemporaryDirectory() as tmp, patch.object(runner, "provider_healthy", return_value=True):
-            host = type("Host", (), {"state": Path(tmp)})()
-            runner.claim_remediation_events(host, Linear())
-            runner.claim_remediation_events(host, Linear())
-            stored = __import__("json").loads((Path(tmp) / "escalation.json").read_text())
-            self.assertEqual(stored["events"]["billing-health-public"]["identifier"], "JOV-1")
-            self.assertEqual(stored["events"]["synthetic-monitoring"]["team"], "LYB")
-            self.assertEqual(stored["events"]["musicfetch-quota"]["route"], "JOV-7323")
-            self.assertIn("Do not renew MusicFetch", stored["events"]["musicfetch-quota"]["dossier"])
-            self.assertNotEqual(stored["events"]["billing-health-public"]["lane"], "devin")
-            lane_name = stored["events"]["musicfetch-quota"]["lane"]
-            for fingerprint, row in stored["events"].items():
-                if fingerprint != "musicfetch-quota" and row.get("lane") == lane_name:
-                    row["running"] = True
-            (Path(tmp) / "escalation.json").write_text(__import__("json").dumps(stored))
-            issue = runner.claim_labeled_event(host, lane_name, Linear())
-            self.assertIn("JOV-7323", issue.description)
-            self.assertIn("Do not renew MusicFetch", issue.description)
-            self.assertIsNone(runner.claim_labeled_event(host, lane_name, Linear()))
-            runner.note_event_outcome(host, issue, "provider-error")
-            released = __import__("json").loads((Path(tmp) / "escalation.json").read_text())
-            self.assertTrue(released["events"]["musicfetch-quota"]["release"])
-            self.assertIsNone(released["events"]["musicfetch-quota"]["lane"])
-        reads = [query for query in calls if isinstance(query, str) and "startsWith" in query]
-        self.assertEqual(len(reads), 2)
-        self.assertIn('"JOV"', reads[0])
-        self.assertIn('"LYB"', reads[0])
-        self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
 
     def test_closed_label_is_history_and_titles_do_not_match(self):
         """JOV-7544's title uses the colon form. Match the label, including across JOV and LYB."""

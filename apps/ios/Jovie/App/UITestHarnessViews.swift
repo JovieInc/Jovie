@@ -132,7 +132,7 @@ struct UITestingAuthCallbackRoot: View {
       isSignInUnavailable: false,
       authenticatedUserID: authenticatedUserID,
       authErrorMessage: authErrorMessage,
-      onLogout: { _ = await appState.signOut() },
+      onLogout: { await appState.signOut() },
       onAuthReturn: handleAuthReturn,
       onAuthError: { authErrorMessage = $0 }
     )

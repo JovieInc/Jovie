@@ -44,71 +44,6 @@ extension MobileChatClientProtocol {
   }
 }
 
-struct NativeChatAuthorization: Sendable {
-  private let tokenProvider: TokenProviding
-  private let identity: NativeChatIdentity?
-  var isOwned: Bool { identity?.ownership != nil }
-
-  init(tokenProvider: TokenProviding, identity: NativeChatIdentity?) {
-    self.tokenProvider = tokenProvider
-    self.identity = identity
-  }
-
-  func requestAuthorization(
-    forceRefresh: Bool, authorizationOverride: NativeRequestAuthorization?
-  ) async throws -> NativeRequestAuthorization {
-    let authorization: NativeRequestAuthorization
-    if isOwned { try Task.checkCancellation() }
-    if let authorizationOverride {
-      authorization = authorizationOverride
-    } else if let identity, let ownership = identity.ownership {
-      authorization = try await tokenProvider.ownedRequestAuthorization(for: identity.userID, ifOwnedBy: ownership)
-    } else {
-      authorization = try await tokenProvider.requestAuthorization(forceRefresh: forceRefresh)
-    }
-    return authorization
-  }
-
-  func bearerToken(for authorization: NativeRequestAuthorization) -> String {
-    authorization.bearerToken
-  }
-
-  func ownership(for authorization: NativeRequestAuthorization) -> NativeSessionOwnership? {
-    authorization.ownership
-  }
-
-  func validateDispatch(_ authorization: NativeRequestAuthorization) throws {
-    guard let identity, let ownership = identity.ownership else { return }
-    try Task.checkCancellation()
-    if authorization.isManaged {
-      guard authorization.ownership == ownership else { throw NativeSessionRequestError.superseded }
-    }
-    // The immutable login also fences unmanaged providers; never adopt its newer bearer.
-    _ = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: ownership, for: identity.userID)
-  }
-
-  func retryAuthorizationOrTerminal(
-    _ authorization: NativeRequestAuthorization, retried: Bool
-  ) async throws -> NativeRequestAuthorization {
-    if isOwned, authorization.isManaged {
-      return try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorization, allowRetry: !retried)
-    }
-    do {
-      guard !retried else { throw APIClientError.missingToken }
-      return NativeRequestAuthorization(
-        unmanagedBearerToken: try await tokenProvider.refreshedBearerToken(after: authorization.bearerToken)
-      )
-    } catch APIClientError.missingToken {
-      if !isOwned { NativeSessionTokenStore.clear() }
-      throw MobileChatClientError.requestFailed(statusCode: 401)
-    }
-  }
-
-  func acceptSuccessfulResponse(_ response: URLResponse, authorizedBy authorization: NativeRequestAuthorization) {
-    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
-  }
-}
-
 struct MobileChatClient: MobileChatClientProtocol, Sendable {
   private struct AuthorizedRequest {
     var request: URLRequest
@@ -117,12 +52,13 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
 
   private let baseURL: URL
   private let session: URLSession
-  private let authorizer: NativeChatAuthorization
+  private let tokenProvider: TokenProviding
   private let decoder: JSONDecoder
   private let encoder: JSONEncoder
   private let requestTimeout: TimeInterval
   private let workspace: MobileWorkspaceMode
-  private var isOwned: Bool { authorizer.isOwned }
+  private let identity: NativeChatIdentity?
+  private var isOwned: Bool { identity?.ownership != nil }
 
   init(
     baseURL: URL,
@@ -134,11 +70,12 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   ) {
     self.baseURL = baseURL
     self.session = session
-    self.authorizer = NativeChatAuthorization(tokenProvider: tokenProvider, identity: identity)
+    self.tokenProvider = tokenProvider
     self.decoder = JSONDecoder()
     self.encoder = JSONEncoder()
     self.requestTimeout = requestTimeout
     self.workspace = identity?.workspace ?? workspace
+    self.identity = identity
   }
 
   func listConversations(limit: Int = 20) async throws -> [MobileConversationSummary] {
@@ -206,8 +143,8 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     urlRequest.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
     urlRequest.httpBody = try encoder.encode(request)
 
-    try await onAuthorization?(authorizer.ownership(for: authorized.authorization))
-    try authorizer.validateDispatch(authorized.authorization)
+    try await onAuthorization?(authorized.authorization.ownership)
+    try validateDispatch(authorized.authorization)
     let (bytes, response) = try await performBytes(for: urlRequest)
 
     guard let httpResponse = response as? HTTPURLResponse else {
@@ -215,7 +152,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401 {
-      let retry = try await authorizer.retryAuthorizationOrTerminal(authorized.authorization, retried: forceRefresh)
+      let retry = try await retryAuthorizationOrTerminal(authorized.authorization, retried: forceRefresh)
       return try await sendTurn(
         request, forceRefresh: true, onAuthorization: onAuthorization,
         onEvent: onEvent, authorizationOverride: retry
@@ -226,7 +163,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
       throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    authorizer.acceptSuccessfulResponse(response, authorizedBy: authorized.authorization)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: authorized.authorization)
     return try await readStreamEvents(from: bytes, onEvent: onEvent)
   }
 
@@ -251,7 +188,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
     urlRequest.httpBody = try encoder.encode(request)
 
-    try authorizer.validateDispatch(authorized.authorization)
+    try validateDispatch(authorized.authorization)
     let (data, response) = try await performData(for: urlRequest)
 
     guard let httpResponse = response as? HTTPURLResponse else {
@@ -259,14 +196,14 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401 {
-      let retry = try await authorizer.retryAuthorizationOrTerminal(authorized.authorization, retried: forceRefresh)
+      let retry = try await retryAuthorizationOrTerminal(authorized.authorization, retried: forceRefresh)
       return try await submitEyesFreeCapture(request, forceRefresh: true, authorizationOverride: retry)
     }
 
     if (200 ... 409).contains(httpResponse.statusCode),
        let decoded = try? decoder.decode(EyesFreeCaptureAPIResponse.self, from: data)
     {
-      authorizer.acceptSuccessfulResponse(response, authorizedBy: authorized.authorization)
+      NativeSessionTokenStore.refresh(from: response, authorizedBy: authorized.authorization)
       if isOwned { try Task.checkCancellation() }
       return decoded
     }
@@ -301,22 +238,55 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     forceRefresh: Bool = false,
     authorizationOverride: NativeRequestAuthorization? = nil
   ) async throws -> AuthorizedRequest {
-    let authorization = try await authorizer.requestAuthorization(
-      forceRefresh: forceRefresh, authorizationOverride: authorizationOverride
-    )
+    let authorization: NativeRequestAuthorization
+    if isOwned { try Task.checkCancellation() }
+    if let authorizationOverride {
+      authorization = authorizationOverride
+    } else if let identity, let ownership = identity.ownership {
+      authorization = try await tokenProvider.ownedRequestAuthorization(for: identity.userID, ifOwnedBy: ownership)
+    } else {
+      authorization = try await tokenProvider.requestAuthorization(forceRefresh: forceRefresh)
+    }
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.timeoutInterval = requestTimeout
-    request.setValue("Bearer \(authorizer.bearerToken(for: authorization))", forHTTPHeaderField: "Authorization")
+    request.setValue("Bearer \(authorization.bearerToken)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     return AuthorizedRequest(request: request, authorization: authorization)
+  }
+
+  private func validateDispatch(_ authorization: NativeRequestAuthorization) throws {
+    guard let identity, let ownership = identity.ownership else { return }
+    try Task.checkCancellation()
+    if authorization.isManaged {
+      guard authorization.ownership == ownership else { throw NativeSessionRequestError.superseded }
+    }
+    // The immutable login also fences unmanaged providers; never adopt its newer bearer.
+    _ = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: ownership, for: identity.userID)
+  }
+
+  private func retryAuthorizationOrTerminal(
+    _ authorization: NativeRequestAuthorization, retried: Bool
+  ) async throws -> NativeRequestAuthorization {
+    if isOwned, authorization.isManaged {
+      return try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorization, allowRetry: !retried)
+    }
+    do {
+      guard !retried else { throw APIClientError.missingToken }
+      return NativeRequestAuthorization(
+        unmanagedBearerToken: try await tokenProvider.refreshedBearerToken(after: authorization.bearerToken)
+      )
+    } catch APIClientError.missingToken {
+      if !isOwned { NativeSessionTokenStore.clear() }
+      throw MobileChatClientError.requestFailed(statusCode: 401)
+    }
   }
 
   private func sendJSON<Response: Decodable>(
     request: AuthorizedRequest,
     forceRefresh: Bool
   ) async throws -> Response {
-    try authorizer.validateDispatch(request.authorization)
+    try validateDispatch(request.authorization)
     let (data, response) = try await performData(for: request.request)
 
     guard let httpResponse = response as? HTTPURLResponse else {
@@ -324,9 +294,9 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401 {
-      let retry = try await authorizer.retryAuthorizationOrTerminal(request.authorization, retried: forceRefresh)
+      let retry = try await retryAuthorizationOrTerminal(request.authorization, retried: forceRefresh)
       var refreshed = request.request
-      refreshed.setValue("Bearer \(authorizer.bearerToken(for: retry))", forHTTPHeaderField: "Authorization")
+      refreshed.setValue("Bearer \(retry.bearerToken)", forHTTPHeaderField: "Authorization")
       return try await sendJSON(
         request: AuthorizedRequest(request: refreshed, authorization: retry), forceRefresh: true
       )
@@ -336,7 +306,7 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
       throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
-    authorizer.acceptSuccessfulResponse(response, authorizedBy: request.authorization)
+    NativeSessionTokenStore.refresh(from: response, authorizedBy: request.authorization)
 
     if isOwned { try Task.checkCancellation() }
     do {

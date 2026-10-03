@@ -18,7 +18,7 @@ import { recordLeadFunnelEvent } from './funnel-events';
 import {
   type SearchOutcome,
   type SearchStatus,
-  searchWebWithStatus,
+  searchGoogleCSEWithStatus,
 } from './google-cse';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
@@ -124,10 +124,10 @@ async function insertCandidates(
 }
 
 /**
- * Search providers support startIndex 1..91 (pages 1-10, 10 results each).
- * After 91, reset to 1 to start the cycle over.
+ * Google CSE free tier supports startIndex 1..91 (pages 1-10, 10 results each).
+ * After 91 we reset to 1 to start the cycle over.
  */
-const SEARCH_MAX_START_INDEX = 91;
+const GOOGLE_CSE_MAX_START_INDEX = 91;
 
 /**
  * Resets the daily query budget if the reset time has passed (or was never set).
@@ -316,7 +316,7 @@ async function deduplicateSearchResults(
 }
 
 /**
- * Runs one discovery cycle: picks keywords, searches the web, inserts new leads.
+ * Runs one discovery cycle: picks keywords, searches Google CSE, inserts new leads.
  * Respects daily query budget and rotates through keywords via lastDiscoveryQueryIndex.
  */
 export async function runDiscovery(
@@ -392,7 +392,10 @@ export async function runDiscovery(
     let stopRun = false;
 
     try {
-      const outcome = await searchWebWithStatus(keyword.query, currentOffset);
+      const outcome = await searchGoogleCSEWithStatus(
+        keyword.query,
+        currentOffset
+      );
       const results = outcome.results;
       diagnostic.providerStatus = outcome.status;
       diagnostic.rawResultCount = results.length;
@@ -447,7 +450,7 @@ export async function runDiscovery(
         // or exceeded max, reset to page 1.
         const nextOffset = currentOffset + 10;
         const newSearchOffset =
-          results.length < 10 || nextOffset > SEARCH_MAX_START_INDEX
+          results.length < 10 || nextOffset > GOOGLE_CSE_MAX_START_INDEX
             ? 1
             : nextOffset;
 

@@ -2,7 +2,7 @@ import {
   extractLinktreeHandle,
   isLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
-import { searchWeb } from '@/lib/leads/google-cse';
+import { searchGoogleCSE } from '@/lib/leads/google-cse';
 import { qualifyLead } from '@/lib/leads/qualify';
 import type { DiscoverySourceAdapter } from './types';
 
@@ -12,7 +12,7 @@ export class LinktreeDiscoveryAdapter implements DiscoverySourceAdapter {
   async discover(settings: { keywords: string[] }): Promise<string[]> {
     const [firstKeyword] = settings.keywords;
     if (!firstKeyword) return [];
-    const results = await searchWeb(firstKeyword, 1);
+    const results = await searchGoogleCSE(firstKeyword, 1);
     return results.map(result => result.link);
   }
 
