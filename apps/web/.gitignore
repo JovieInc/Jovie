@@ -32,3 +32,4 @@ linear-compare-output/
 public/robots.txt
 public/sitemap*.xml
 .gstack/
+/.swc
