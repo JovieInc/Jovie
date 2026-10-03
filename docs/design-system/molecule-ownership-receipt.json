@@ -26,7 +26,6 @@
       "consumers": [
         "apps/web/app/app/(shell)/settings/artist-profile/ArtistProfileContent.tsx",
         "apps/web/app/app/(shell)/settings/connectors/ConnectorsClient.tsx",
-        "apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx",
         "apps/web/app/app/(shell)/settings/touring/TouringContent.tsx",
         "apps/web/components/features/admin/OperationalControlPanel.tsx",
         "apps/web/components/features/admin/WaitlistSettingsPanel.tsx",

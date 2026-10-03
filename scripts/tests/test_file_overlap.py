@@ -70,6 +70,20 @@ class IncidentPolicyTest(unittest.TestCase):
 
 
 class PredictionAndAdmissionTest(unittest.TestCase):
+    def test_real_worker_module_records_overlap_in_the_existing_ledger(self):
+        import lane_runner
+        issue = SimpleNamespace(identifier="JOV-9", title="Lane change", labels=[],
+                                description="Edit `scripts/lanes/lane_runner.py`.")
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            host = SimpleNamespace(state=Path(tmp))
+            result = overlap.admission_decisions(host, lane_runner, issue,
+                [pr(20139, [changed("scripts/lanes/lane_runner.py")])], [], workstreams.classify)
+            self.assertFalse(result["allowed"])
+            records = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
+            self.assertEqual(records[0]["kind"], "file-overlap-admission")
+            self.assertEqual(records[0]["prs"], [20139])
+
     def test_declared_paths_win_then_workstream_map_is_fallback(self):
         declared = SimpleNamespace(identifier="JOV-1", title="Change lanes", labels=[],
                                    description="Touch `scripts/lanes/doctor.py` only.")
@@ -92,6 +106,7 @@ class PredictionAndAdmissionTest(unittest.TestCase):
                 result = overlap.admission_decisions(host, lane, issue, [existing], [], workstreams.classify)
             self.assertFalse(result["allowed"])
             self.assertEqual(result["decisions"][0]["actionTaken"], "block")
+            rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
             self.assertEqual(rows[0]["prs"], [20139])
             state = overlap.read_state(host.state)
             self.assertEqual(state["metrics"]["conflicts_prevented"], 1)
@@ -143,6 +158,7 @@ class SequencingTest(unittest.TestCase):
             self.assertEqual(second["released"], 1)
             self.assertTrue(any("labels[]=lane-fix-dequeued" in call for args in calls for call in args))
             self.assertEqual(second["metrics"]["rebases_caused_by_overlap"], 1)
+            ledger = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
             self.assertEqual([row["kind"] for row in ledger],
                              ["file-overlap-sequence", "file-overlap-release"])
             written = json.loads((host.state / "file-overlap.json").read_text())

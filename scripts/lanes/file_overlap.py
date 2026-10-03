@@ -13,6 +13,7 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+import pr_events
 
 HOT_FILES = frozenset({
     "scripts/lanes/lane_runner.py",
@@ -274,7 +275,7 @@ def _key(decision: dict) -> str:
 
 
 def _ledger(lane, host, decision: dict, kind: str) -> None:
-    lane.ledger(host, {"schema": "jovie-file-overlap/v1", "kind": kind, "at": now_iso(),
+    pr_events.ledger(host, {"schema": "jovie-file-overlap/v1", "kind": kind, "at": now_iso(),
                        "prs": [number for number in (decision.get("firstPr"), decision.get("laterPr")) if number],
                        "files": decision.get("files") or [], "actionTaken": decision.get("actionTaken"),
                        "policyAction": decision.get("policyAction"),

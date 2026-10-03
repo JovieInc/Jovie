@@ -212,7 +212,7 @@
       "tier": "combined-integration",
       "mergeGate": true,
       "gateStage": "merge-group",
-      "nextLocalCommand": "pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test",
+      "nextLocalCommand": "pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test",
       "remediation": "A shared contract must name affected products, pass each selected product lane, and pass the model-free shared-contract suites."
     },
     {

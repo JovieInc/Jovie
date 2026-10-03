@@ -34,7 +34,7 @@ export function SettingsSmsAccessSection({
   return (
     <SettingsPanel
       title='SMS Notifications'
-      description='Let fans opt in to text alerts when you release new music.'
+      description='Let your audience opt in to text alerts when you publish.'
       actions={statusPill}
     >
       <div className='px-4 py-4 sm:px-5'>
@@ -45,15 +45,17 @@ export function SettingsSmsAccessSection({
           <div className='flex-1'>
             {smsSubscriberCount === 0 ? (
               <p className='text-sm text-secondary-token'>
-                No SMS subscribers yet. Fans can sign up on your profile page.
+                No SMS subscribers yet. People can sign up on your profile page.
               </p>
             ) : (
               <p className='text-sm text-secondary-token'>
                 <span className='font-semibold text-primary-token'>
                   {smsSubscriberCount}
                 </span>{' '}
-                {smsSubscriberCount === 1 ? 'fan has' : 'fans have'} signed up
-                for text alerts.
+                {smsSubscriberCount === 1
+                  ? 'subscriber has'
+                  : 'subscribers have'}{' '}
+                signed up for text alerts.
               </p>
             )}
             <div className='mt-3'>

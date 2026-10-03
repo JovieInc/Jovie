@@ -30,7 +30,7 @@ export const MUSIC_EVENTS_ROUTE = APP_ROUTES.TOUR_DATES;
  * Display labels for merch_design_lane. Enum values and print artwork stay.
  */
 export const MERCH_LANE_LABELS = {
-  band_tour_uniform: 'Tour uniform',
+  band_tour_uniform: 'Signature uniform',
   fashion_graphic_item: 'Graphic item',
   artist_world_artifact: 'Identity artifact',
 } as const satisfies Record<MerchDesignLane, string>;
@@ -44,3 +44,15 @@ export const SPOTIFY_RELATED_SECTION_TITLE = 'Fans Also Like';
 
 /** Jovie label for the same idea outside Spotify's UI. */
 export const RELATED_CREATORS_LABEL = 'Related creators';
+
+/**
+ * Music-sourced variant. Only correct when the recommendation source is
+ * music (genres, music links, or streaming stats) — everything else stays
+ * "Related creators".
+ */
+export const RELATED_ARTISTS_LABEL = 'Related artists';
+
+/** Pick the recommendation label that matches the source of the work. */
+export function relatedSubjectsLabel(isMusicSource: boolean): string {
+  return isMusicSource ? RELATED_ARTISTS_LABEL : RELATED_CREATORS_LABEL;
+}

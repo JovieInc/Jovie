@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import JovieKit
 
 /// Terminal chat auth: missing token or a 401 after retry. Not a transport outage.
@@ -13,6 +14,12 @@ func isTerminalChatAuthFailure(_ error: Error) -> Bool {
     return true
   }
   return false
+}
+
+struct NativeChatIdentity: Equatable, Sendable {
+  let userID: String
+  let ownership: NativeSessionOwnership?
+  let workspace: MobileWorkspaceMode
 }
 
 @MainActor
@@ -30,12 +37,15 @@ final class ChatRepository {
   private(set) var lastErrorMessage: String?
   private var olderCursor: String?
   private var sendGeneration = 0
+  private var selectionRevision = 0
 
   private let client: MobileChatClientProtocol
-  private let cache: ChatCache
+  private let cache: any ChatCaching
   private let userID: String
   private let webBaseURL: URL
   let workspace: MobileWorkspaceMode
+  let identity: NativeChatIdentity
+  private let onSessionExpired: @MainActor (NativeSessionExpiryReceipt) async -> Void
   private let activityDonator: (any ConversationActivityDonating)?
 
   /// Set by `seedTimelineForUITesting`. When `true`, network-backed methods
@@ -46,25 +56,70 @@ final class ChatRepository {
   /// appear, so this can't be solved by the call site alone.
   private var isFixtureSeeded = false
   private var sendTask: Task<Void, Never>?
+  private var pendingRetries: Set<RetryKey> = []
+
+  private struct RetryKey: Hashable {
+    let clientTurnId: String
+    let selection: Int
+  }
+
+  private struct RetryTarget {
+    let key: RetryKey
+    let userItem: MobileChatTimelineItem
+  }
 
   init(
     client: MobileChatClientProtocol,
-    cache: ChatCache,
+    cache: any ChatCaching,
     userID: String,
     webBaseURL: URL,
     workspace: MobileWorkspaceMode = .jovie,
-    activityDonator: (any ConversationActivityDonating)? = LiveConversationActivityDonator()
+    activityDonator: (any ConversationActivityDonating)? = defaultConversationActivityDonator(),
+    identity: NativeChatIdentity? = nil,
+    onSessionExpired: @escaping @MainActor (NativeSessionExpiryReceipt) async -> Void = { _ in }
   ) {
     self.client = client
     self.cache = cache
-    self.userID = userID
+    self.userID = identity?.userID ?? userID
     self.webBaseURL = webBaseURL
-    self.workspace = workspace
+    self.workspace = identity?.workspace ?? workspace
+    self.identity = identity ?? NativeChatIdentity(userID: userID, ownership: nil, workspace: workspace)
+    self.onSessionExpired = onSessionExpired
     self.activityDonator = activityDonator
+  }
+
+  static func resolve(_ current: ChatRepository?, for identity: NativeChatIdentity,
+                      create: (NativeChatIdentity) -> ChatRepository) -> ChatRepository {
+    if let current, current.identity == identity { return current }
+    return create(identity)
+  }
+
+  private func checkOwnership() throws {
+    if let ownership = identity.ownership {
+      _ = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: ownership, for: userID)
+    }
+  }
+
+  private var ownerIsCurrent: Bool {
+    identity.ownership.map(NativeSessionTokenStore.isCurrent) ?? true
+  }
+
+  private func acceptsCompletion(_ error: Error? = nil, allowingCancellation: Bool = false) async -> Bool {
+    // The receipt survives replacement, selection changes, and task cancellation.
+    if let native = error as? NativeSessionRequestError {
+      if case let .expired(receipt) = native { await onSessionExpired(receipt) }
+      return false
+    }
+    do { try checkOwnership() } catch {
+      if case let NativeSessionRequestError.expired(receipt) = error { await onSessionExpired(receipt) }
+      return false
+    }
+    return allowingCancellation || !(Task.isCancelled || error is CancellationError)
   }
 
   func bootstrap() async {
     await hydrateFromCache()
+    guard await acceptsCompletion() else { return }
     if workspace == .ovie {
       if activeConversationID == nil { await refreshConversations() }
       else { await openConversation(activeConversationID!) }
@@ -77,28 +132,33 @@ final class ChatRepository {
   }
 
   func refreshConversations() async {
-    guard !isFixtureSeeded else { return }
+    guard !isFixtureSeeded, await acceptsCompletion() else { return }
 
     isLoadingConversations = true
     defer { isLoadingConversations = false }
 
     do {
       let fetched = try await client.listConversations(limit: 20)
+      guard await acceptsCompletion() else { return }
       conversations = fetched
       isOffline = false
       lastErrorMessage = nil
-      await persistCache()
+      guard await persistCache() else { return }
       if workspace == .ovie, activeConversationID == nil, let first = fetched.first {
         await openConversation(first.id)
       }
     } catch {
+      guard await acceptsCompletion(error) else { return }
       await hydrateFromCache()
+      guard await acceptsCompletion() else { return }
       applyFailure(error)
     }
   }
 
   func openConversation(_ conversationID: String) async {
+    guard await acceptsCompletion() else { return }
     let isSwitchingThread = activeConversationID != conversationID
+    if isSwitchingThread { selectionRevision += 1 }
     activeConversationID = conversationID
 
     // Paint cached history before the network round trip so a thread switch
@@ -107,6 +167,7 @@ final class ChatRepository {
     // the new conversation id. Re-opening the already-active thread keeps the
     // live timeline (it may hold an in-flight turn the cache has not seen).
     if isSwitchingThread, !(await hydrateConversationFromCache(conversationID)) {
+      guard await acceptsCompletion(), activeConversationID == conversationID else { return }
       timeline = []
       hasMoreOlder = false
       olderCursor = nil
@@ -118,11 +179,12 @@ final class ChatRepository {
         limit: ChatTranscriptWindow.initialMessageLimit,
         before: nil
       )
-      await persistCache(
+      guard await acceptsCompletion() else { return }
+      guard await persistCache(
         messages: detail.messages,
         conversationID: conversationID,
         hasMoreOlder: detail.hasMore
-      )
+      ) else { return }
       // The user may have moved on while this fetch was in flight; never paint
       // a stale thread over the one they are looking at now.
       guard activeConversationID == conversationID else { return }
@@ -137,10 +199,11 @@ final class ChatRepository {
         title: detail.conversation.title
       )
     } catch {
-      guard activeConversationID == conversationID else { return }
+      guard await acceptsCompletion(error), activeConversationID == conversationID else { return }
       if timeline.isEmpty {
         await hydrateConversationFromCache(conversationID)
       }
+      guard await acceptsCompletion(), activeConversationID == conversationID else { return }
       applyFailure(error)
       donateConversationActivity(
         conversationID: conversationID,
@@ -150,6 +213,7 @@ final class ChatRepository {
   }
 
   func loadOlderMessages() async {
+    guard await acceptsCompletion() else { return }
     guard
       hasMoreOlder,
       !isLoadingOlder,
@@ -167,17 +231,19 @@ final class ChatRepository {
         limit: ChatTranscriptWindow.initialMessageLimit,
         before: olderCursor
       )
-      guard activeConversationID == conversationID else { return }
+      guard await acceptsCompletion(), activeConversationID == conversationID else { return }
       prependFetchedWindow(detail.messages, hasMore: detail.hasMore)
       isOffline = false
       lastErrorMessage = nil
       await persistCache()
     } catch {
+      guard await acceptsCompletion(error), activeConversationID == conversationID else { return }
       applyFailure(error)
     }
   }
 
   func startNewConversation() {
+    selectionRevision += 1
     activeConversationID = nil
     timeline = []
     hasMoreOlder = false
@@ -205,8 +271,15 @@ final class ChatRepository {
   }
 
   func send(text: String) async {
+    await send(text: text, retrying: nil)
+  }
+
+  private func send(text: String, retrying target: RetryTarget?) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
+    guard !trimmed.isEmpty, await acceptsCompletion() else { return }
+    if let target {
+      guard target.key.selection == selectionRevision, timeline.contains(target.userItem) else { return }
+    }
 
     let wasSending = isSending
     sendGeneration += 1
@@ -216,16 +289,125 @@ final class ChatRepository {
       interruptInFlightAssistantRows()
     }
 
+    let selection = selectionRevision
     let task = Task { [weak self] in
-      _ = await self?.performSend(text: trimmed, generation: generation)
+      _ = await self?.performSend(text: trimmed, generation: generation, selection: selection, retrying: target)
     }
     sendTask = task
-    await task.value
+    await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
   }
 
-  private func performSend(text: String, generation: Int) async {
+  private func performSend(text: String, generation: Int, selection: Int, retrying target: RetryTarget?) async {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
+    let context = SendContext()
+
+    isSending = true
+    defer {
+      context.acceptingEvents = false
+      if generation == sendGeneration {
+        isSending = false
+      }
+    }
+
+    // The client publishes one event per NDJSON line, so raw chunk cadence
+    // would otherwise drive one timeline mutation (and one assistant-row
+    // re-parse) per token. Coalesce deltas to a bounded rate (JOV-5874).
+    let coalescer = MobileChatStreamCoalescer { [weak self] batch in
+      guard let self, context.acceptingEvents, context.authorization != .notAcquired,
+            self.sendTask?.isCancelled != true, self.ownerIsCurrent,
+            selection == self.selectionRevision else { return }
+      self.applyIfCurrent(
+        generation: generation,
+        events: batch,
+        clientTurnId: clientTurnId
+      )
+    }
+
+    do {
+      try Task.checkCancellation()
+      // Apply each NDJSON event as it arrives so tokens paint before the
+      // body finishes. Do not refetch list/detail here — those GETs can
+      // replace this timeline and mark a successful turn offline.
+      _ = try await client.sendTurn(
+        MobileChatTurnRequest(
+          conversationId: activeConversationID,
+          clientTurnId: clientTurnId,
+          clientMessageId: clientMessageId,
+          text: text,
+          source: "typed",
+          chatMode: workspace.chatMode
+        ), onAuthorization: { [self] owner in
+        try Task.checkCancellation()
+        try checkOwnership()
+        guard generation == sendGeneration, selection == selectionRevision,
+              owner == nil || identity.ownership == nil || owner == identity.ownership else {
+          throw NativeSessionRequestError.superseded
+        }
+        if context.authorization == .notAcquired {
+          if let target {
+            guard target.key.selection == selectionRevision, timeline.contains(target.userItem) else {
+              throw NativeSessionRequestError.superseded
+            }
+            // Keep the original pair until this replacement is actually admitted.
+            timeline.removeAll { $0.clientTurnId == target.key.clientTurnId }
+          }
+          context.authorization = owner.map(SendAuthorization.managed) ?? .unmanaged
+          appendOptimisticTurn(text: text, clientTurnId: clientTurnId)
+        }
+      }, onEvent: { event in
+        await coalescer.ingest(event)
+      })
+      try Task.checkCancellation()
+      guard await acceptsCompletion(), generation == sendGeneration, selection == selectionRevision else {
+        context.acceptingEvents = false
+        return
+      }
+      coalescer.flush()
+      context.acceptingEvents = false
+      if assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true {
+        markAssistantFailed(
+          clientTurnId: clientTurnId,
+          message: "Summer did not confirm a terminal state for this turn."
+        )
+      }
+      isOffline = false
+      if assistantStatus(clientTurnId: clientTurnId) != .failed,
+         assistantStatus(clientTurnId: clientTurnId) != .canceled
+      {
+        lastErrorMessage = nil
+      }
+      await persistCache(generation: generation, selection: selection)
+    } catch {
+      // Stop the timer sink before any awaited expiry delivery or cleanup.
+      context.acceptingEvents = false
+      guard await acceptsCompletion(error, allowingCancellation: true), generation == sendGeneration, selection == selectionRevision else { return }
+      guard context.authorization != .notAcquired else { return }
+      if Task.isCancelled || error is CancellationError {
+        // A nil fixture callback never grants managed cancellation persistence.
+        if let expected = identity.ownership, context.authorization != .managed(expected) { return }
+        markAssistantCanceled(clientTurnId: clientTurnId)
+        await persistCache(generation: generation, selection: selection, allowingCancellation: true)
+      } else {
+        context.acceptingEvents = true
+        coalescer.flush()
+        context.acceptingEvents = false
+        applySendFailure(error, clientTurnId: clientTurnId)
+        await persistCache(generation: generation, selection: selection)
+      }
+    }
+  }
+
+  private enum SendAuthorization: Equatable {
+    case notAcquired, unmanaged, managed(NativeSessionOwnership)
+  }
+
+  @MainActor private final class SendContext {
+    var authorization = SendAuthorization.notAcquired
+    var acceptingEvents = true
+  }
+
+  private func appendOptimisticTurn(text: String, clientTurnId: String) {
     // Stamp once here (not in persistCache) so the cached createdAt stays
     // stable across rewrites and restart pagination uses it as-is.
     let sentAt = ISO8601DateFormatter().string(from: Date())
@@ -254,70 +436,6 @@ final class ChatRepository {
       )
     )
 
-    isSending = true
-    defer {
-      if generation == sendGeneration {
-        isSending = false
-      }
-    }
-
-    // The client publishes one event per NDJSON line, so raw chunk cadence
-    // would otherwise drive one timeline mutation (and one assistant-row
-    // re-parse) per token. Coalesce deltas to a bounded rate (JOV-5874).
-    let coalescer = MobileChatStreamCoalescer { [weak self] batch in
-      self?.applyIfCurrent(
-        generation: generation,
-        events: batch,
-        clientTurnId: clientTurnId
-      )
-    }
-
-    do {
-      try Task.checkCancellation()
-      // Apply each NDJSON event as it arrives so tokens paint before the
-      // body finishes. Do not refetch list/detail here — those GETs can
-      // replace this timeline and mark a successful turn offline.
-      _ = try await client.sendTurn(
-        MobileChatTurnRequest(
-          conversationId: activeConversationID,
-          clientTurnId: clientTurnId,
-          clientMessageId: clientMessageId,
-          text: text,
-          source: "typed",
-          chatMode: workspace.chatMode
-        )
-      ) { event in
-        await coalescer.ingest(event)
-      }
-      coalescer.flush()
-
-      guard generation == sendGeneration else { return }
-
-      if Task.isCancelled {
-        markAssistantCanceled(clientTurnId: clientTurnId)
-      } else if assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true {
-        markAssistantFailed(
-          clientTurnId: clientTurnId,
-          message: "Summer did not confirm a terminal state for this turn."
-        )
-      }
-      isOffline = false
-      if assistantStatus(clientTurnId: clientTurnId) != .failed,
-         assistantStatus(clientTurnId: clientTurnId) != .canceled
-      {
-        lastErrorMessage = nil
-      }
-      await persistCache()
-    } catch is CancellationError {
-      guard generation == sendGeneration else { return }
-      markAssistantCanceled(clientTurnId: clientTurnId)
-      await persistCache()
-    } catch {
-      coalescer.flush()
-      guard generation == sendGeneration else { return }
-      applySendFailure(error, clientTurnId: clientTurnId)
-      await persistCache()
-    }
   }
 
   @discardableResult
@@ -326,6 +444,7 @@ final class ChatRepository {
     destination: EyesFreeCaptureDestination,
     idempotencyKey: String
   ) async -> String {
+    guard await acceptsCompletion() else { return "" }
     let trimmed = VoiceMemoActionDraft.make(fromTranscript: transcript)
     guard VoiceMemoActionDraft.isReady(trimmed), !isSending else {
       return EyesFreeCaptureGate.transcriptionEmpty.message
@@ -359,8 +478,11 @@ final class ChatRepository {
       )
     )
 
+    sendGeneration += 1
+    let generation = sendGeneration
+    let selection = selectionRevision
     isSending = true
-    defer { isSending = false }
+    defer { if generation == sendGeneration { isSending = false } }
 
     do {
       let response = try await client.submitEyesFreeCapture(
@@ -371,32 +493,42 @@ final class ChatRepository {
           clientMessageId: clientMessageId
         )
       )
+      guard await acceptsCompletion(allowingCancellation: true), generation == sendGeneration, selection == selectionRevision else { return "" }
+      try Task.checkCancellation()
       let failed = ["failed", "forbidden", "unavailable"].contains(response.status)
       applyEyesFreeResponse(response, clientTurnId: idempotencyKey, failed: failed)
       isOffline = response.status == "failed"
       if !failed { lastErrorMessage = nil }
-      await persistCache()
+      guard await persistCache(generation: generation, selection: selection), generation == sendGeneration, selection == selectionRevision else { return "" }
       return response.readback
     } catch {
+      guard await acceptsCompletion(error, allowingCancellation: true), generation == sendGeneration, selection == selectionRevision else { return "" }
+      if Task.isCancelled || error is CancellationError {
+        markAssistantCanceled(clientTurnId: idempotencyKey)
+        await persistCache(generation: generation, selection: selection, allowingCancellation: true)
+        return ""
+      }
       applySendFailure(error, clientTurnId: idempotencyKey)
-      await persistCache()
+      guard await persistCache(generation: generation, selection: selection), generation == sendGeneration, selection == selectionRevision else { return "" }
       return lastErrorMessage ?? EyesFreeCaptureGate.retryMessage
     }
   }
 
   func retry(clientTurnId: String) async {
-    guard let userItem = timeline.first(where: {
+    let key = RetryKey(clientTurnId: clientTurnId, selection: selectionRevision)
+    guard !pendingRetries.contains(key), let userItem = timeline.first(where: {
       $0.clientTurnId == clientTurnId && $0.role == .user
     }) else {
       return
     }
 
-    timeline.removeAll { $0.clientTurnId == clientTurnId }
-    await send(text: userItem.content)
+    pendingRetries.insert(key)
+    defer { pendingRetries.remove(key) }
+    await send(text: userItem.content, retrying: RetryTarget(key: key, userItem: userItem))
   }
 
   private func applyFailure(_ error: Error) {
-    if isTerminalChatAuthFailure(error) {
+    if identity.ownership == nil, isTerminalChatAuthFailure(error) {
       sessionExpired = true
       isOffline = false
       lastErrorMessage = nil
@@ -408,7 +540,7 @@ final class ChatRepository {
   }
 
   private func applySendFailure(_ error: Error, clientTurnId: String) {
-    if isTerminalChatAuthFailure(error) {
+    if identity.ownership == nil, isTerminalChatAuthFailure(error) {
       if assistantStatus(clientTurnId: clientTurnId) != .completed {
         markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
       }
@@ -594,7 +726,8 @@ final class ChatRepository {
   }
 
   private func hydrateFromCache() async {
-    guard let snapshot = await cache.load(for: userID, workspace: workspace) else { return }
+    guard let snapshot = await cache.load(for: userID, workspace: workspace),
+          await acceptsCompletion() else { return }
     conversations = snapshot.conversations
     let conversationID = activeConversationID ?? snapshot.activeConversationID ?? snapshot.conversations.first?.id
     activeConversationID = conversationID
@@ -621,7 +754,8 @@ final class ChatRepository {
     } else {
       loaded = await cache.load(for: userID, workspace: workspace)
     }
-    guard let cachedMessages = loaded?.messagesByConversationID[conversationID] else {
+    guard await acceptsCompletion(), activeConversationID == conversationID,
+          let cachedMessages = loaded?.messagesByConversationID[conversationID] else {
       return false
     }
     applyFetchedWindow(
@@ -669,12 +803,19 @@ final class ChatRepository {
     }
   }
 
+  @discardableResult
   private func persistCache(
     messages: [MobileConversationMessage]? = nil,
     conversationID: String? = nil,
-    hasMoreOlder: Bool? = nil
-  ) async {
+    hasMoreOlder: Bool? = nil,
+    generation: Int? = nil,
+    selection: Int? = nil,
+    allowingCancellation: Bool = false
+  ) async -> Bool {
     let existing = await cache.load(for: userID, workspace: workspace)
+    guard await acceptsCompletion(allowingCancellation: allowingCancellation),
+          generation == nil || generation == sendGeneration,
+          selection == nil || selection == selectionRevision else { return false }
     var messagesByConversationID = existing?.messagesByConversationID ?? [:]
     var hasMoreOlderByConversationID = existing?.hasMoreOlderByConversationID ?? [:]
 
@@ -698,7 +839,17 @@ final class ChatRepository {
       activeConversationID: activeConversationID,
       hasMoreOlderByConversationID: hasMoreOlderByConversationID
     )
-    await cache.store(snapshot, for: userID, workspace: workspace)
+    if let ownership = identity.ownership {
+      guard await cache.store(snapshot, for: userID, workspace: workspace, ifOwnedBy: ownership) else {
+        _ = await acceptsCompletion(allowingCancellation: allowingCancellation)
+        return false
+      }
+    } else {
+      await cache.store(snapshot, for: userID, workspace: workspace)
+    }
+    return await acceptsCompletion(allowingCancellation: allowingCancellation)
+      && (generation == nil || generation == sendGeneration)
+      && (selection == nil || selection == selectionRevision)
   }
 
   private func timelineItem(from message: MobileConversationMessage) -> MobileChatTimelineItem {

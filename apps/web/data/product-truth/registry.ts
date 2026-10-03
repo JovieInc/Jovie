@@ -718,6 +718,9 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
   },
+  VISIBILITY_AUDIT_OFFER: {
+    nonMarketing: 'hidden until the flag and a Stripe Payment Link are set',
+  },
   NEW_RELEASE_PAGE: { nonMarketing: 'UI layout toggle' },
   CANVAS_GRAIN: { nonMarketing: 'UI visual treatment' },
   CYAN_FOCUS_GLOW: { nonMarketing: 'UI visual treatment' },
@@ -730,6 +733,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CHATGPT_APP_DIRECTORY_MCP: {
     nonMarketing:
       'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+  },
+  IN_HOUSE_RESOLVER: {
+    nonMarketing:
+      'JOV-7323 cross-DSP resolver cutover; MusicFetch stays a dormant fallback',
   },
   AUTH_OFFER_SUMMARY: {
     nonMarketing:
