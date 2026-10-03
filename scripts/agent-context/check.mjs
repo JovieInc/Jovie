@@ -14,6 +14,9 @@ export const references = [
   'docs/agent-context/RESULTS.md',
   'docs/design-system/DETAILS.md',
 ];
+export function emitBudgetErrors(errors, write = console.error) {
+  for (const error of errors) write(`::error::${error}`);
+}
 export function evaluate(root) {
   const errors = [];
   const sizes = {};
@@ -67,6 +70,7 @@ if (
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
   const result = evaluate(process.cwd());
+  emitBudgetErrors(result.errors);
   console.log(JSON.stringify(result, null, 2));
   process.exitCode = result.ok ? 0 : 1;
 }

@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { parseTrustedFailureStatus } from './merge-group-failure-hold.mjs';
 
 export const REPO = 'JovieInc/Jovie';
 const MINUTE_MS = 60_000;
@@ -114,6 +115,28 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
   }
   const multi = Object.entries(byKey).filter(([, count]) => count > 1);
   const mergeGroupRuns = runs.filter(run => run.event === 'merge_group');
+  const heldRevisions = prs
+    .map(pr => ({
+      number: pr.number,
+      receipts: Array.isArray(pr.failureReceipts) ? pr.failureReceipts : [],
+    }))
+    .filter(pr => pr.receipts.length > 0);
+  const deterministicFailureRecurrence = heldRevisions.reduce((total, pr) => {
+    if (
+      !pr.receipts.some(
+        receipt => receipt.classification === 'deterministic-source'
+      )
+    ) {
+      return total;
+    }
+    return (
+      total +
+      Math.max(
+        0,
+        Math.max(...pr.receipts.map(receipt => receipt.failureNumber)) - 1
+      )
+    );
+  }, 0);
   const minutesBy = event => {
     const timed = runs.filter(
       run => run.event === event && run.minutes != null
@@ -146,6 +169,8 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
       mergeGroupRunsPerMergedPr: merged.length
         ? Math.round((mergeGroupRuns.length / merged.length) * 100) / 100
         : null,
+      revisionFailureHolds: heldRevisions.length,
+      deterministicFailureRecurrence,
     },
     occupancy: {
       inQueue: openPrs.filter(pr => pr.isInMergeQueue).length,
@@ -212,6 +237,7 @@ export function renderMarkdown(m) {
     `| Merge-group first-pass rate | ${pct} (${m.firstPass.merged}/${m.firstPass.resolvedEntries} entries) |`,
     `| Queue removals by reason | ${reasons} |`,
     `| merge_group CI runs (failed) / per merged PR | ${m.ejections.mergeGroupRuns} (${m.ejections.mergeGroupFailed}) / ${fmt(m.ejections.mergeGroupRunsPerMergedPr)} |`,
+    `| Revision failure holds / deterministic same-head recurrence | ${m.ejections.revisionFailureHolds} / ${m.ejections.deterministicFailureRecurrence} |`,
     `| Queue now: entries / max build · CLEAN PRs not queued | ${m.occupancy.inQueue} / ${fmt(m.occupancy.maxEntriesToBuild)} · ${m.occupancy.cleanNotQueued} |`,
     `| Ejection → re-enqueue min p50/p75 (n, still waiting) | ${fmt(m.reenqueueMinutes.p50)} / ${fmt(m.reenqueueMinutes.p75)} (${m.reenqueueMinutes.n}, ${m.reenqueueMinutes.pending}) |`,
     `| Open → first enqueue min p50/p75 (n) | ${fmt(m.openToFirstEnqueueMinutes.p50)} / ${fmt(m.openToFirstEnqueueMinutes.p75)} (${m.openToFirstEnqueueMinutes.n}) |`,
@@ -252,7 +278,10 @@ const QUEUE_EVENTS = `timelineItems(first: 100, itemTypes: [ADDED_TO_MERGE_QUEUE
   nodes { __typename
     ... on AddedToMergeQueueEvent { createdAt }
     ... on RemovedFromMergeQueueEvent { createdAt reason }
-    ... on MergedEvent { createdAt } } }`;
+    ... on MergedEvent { createdAt } } }
+  commits(last: 1) { nodes { commit { status { contexts {
+    context state description targetUrl creator { __typename login }
+  } } } } }`;
 
 function collect({ since, until, runnerMinutes }) {
   const [owner, name] = REPO.split('/');
@@ -264,7 +293,13 @@ function collect({ since, until, runnerMinutes }) {
       nodes { ... on PullRequest { number title headRefName state createdAt mergedAt ${QUEUE_EVENTS} } } } }`,
     { q: `repo:${REPO} is:pr base:main updated:>=${sinceIso}` },
     data => data.search
-  ).map(pr => ({ ...pr, events: toEvents(pr.timelineItems.nodes) }));
+  ).map(pr => ({
+    ...pr,
+    events: toEvents(pr.timelineItems.nodes),
+    failureReceipts: (pr.commits?.nodes?.[0]?.commit?.status?.contexts ?? [])
+      .map(status => parseTrustedFailureStatus(status, REPO))
+      .filter(Boolean),
+  }));
   const openPrs = graphqlPages(
     `query($owner: String!, $name: String!, $cursor: String) { repository(owner: $owner, name: $name) {
       pullRequests(states: OPEN, baseRefName: "main", first: 100, after: $cursor) {

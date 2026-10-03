@@ -110,7 +110,7 @@ class RenderTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
         self.assertIn("JOV-6544   Audio browsing: verify and close intent prefetch", text)
-        self.assertIn("worker polling · claimable unknown (doctor unread)", text)
+        self.assertIn("worker polling · new issues unknown (doctor unread)", text)
         self.assertIn("codex  vacant · no worker", text)
         self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
@@ -155,7 +155,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("Linear HTTPError: 429", text)
         self.assertIn("PR list: RuntimeError: HTTP 504", text)
         self.assertIn("merge queue timeout", text)
-        self.assertIn("claimable unknown (doctor unread)", text)
+        self.assertIn("new issues unknown (doctor unread)", text)
         self.assertIn("FileNotFoundError: codex", text)
         self.assertIn("✓ nothing needs a human", text)
         self.assertNotIn("UNKNOWN", text)
@@ -171,24 +171,42 @@ class RenderTest(unittest.TestCase):
         feed = value["local"]["doctor"]
         feed.update(at=hud.utcnow().isoformat(), admission={
             "poolByProvider": {"devin": 0, "codex": 1},
+            "eligiblePoolByProvider": {"devin": 0, "codex": 1},
+            "newIssueBudgetByProvider": {"devin": {"used": 0, "cap": 8, "reason": "within-budget"},
+                                         "codex": {"used": 0, "cap": 6, "reason": "within-budget"}},
             "candidatePoolByProvider": {"devin": 8, "codex": 1},
             "rejectedByProvider": {"devin": {"excluded-label:type:epic": 5, "sensitive-text": 3}}})
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
-        self.assertIn("claimable 0/8 · excluded-label:type:epic 5, sensitive-text 3", text)
-        self.assertIn("CLAIMABLE devin", text)
+        self.assertIn("new issues 0 · eligible 0/8 · PRs 0/8 within-budget · excluded-label:type:epic 5, sensitive-text 3", text)
+        self.assertIn("NEW ISSUES devin", text)
         self.assertNotIn("pool 87", text)
         # An unrelated direct Linear read failure does not invalidate the fresh receipt.
         value["linear"] = {"ok": False, "error": "HTTP 429"}
-        self.assertIn("claimable 0/8", hud.pool_hint("devin", value["local"]))
+        self.assertIn("new issues 0 · eligible 0/8 · PRs 0/8 within-budget", hud.pool_hint("devin", value["local"]))
         feed["admission"]["error"] = "ownership unreadable"
-        self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (ownership unreadable)")
+        self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (ownership unreadable)")
         feed["admission"].pop("error")
-        self.assertEqual(hud.pool_hint("missing", value["local"]), "claimable unknown (admission unread)")
+        self.assertEqual(hud.pool_hint("missing", value["local"]), "new issues unknown (PR budget unread)")
         for stamp in ("2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z"):
             feed["at"] = stamp
-            self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (doctor stale)")
+            self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (doctor stale)")
         feed["at"] = "malformed"
-        self.assertEqual(hud.pool_hint("devin", value["local"]), "claimable unknown (doctor unread)")
+        self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (doctor unread)")
+
+    def test_new_issue_hint_separates_eligibility_budget_and_unknown(self):
+        local = {"doctor": {"at": hud.utcnow().isoformat(), "admission": {
+            "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 25},
+            "eligiblePoolByProvider": {"codex": 7},
+            "newIssueBudgetByProvider": {"codex": {"used": 6, "cap": 6, "reason": "over-budget"}}}}}
+        hint = hud.pool_hint("codex", local)
+        self.assertIn("new issues 0", hint)
+        self.assertIn("eligible 7/25", hint)
+        self.assertIn("PRs 6/6 over-budget", hint)
+        local["doctor"]["admission"]["newIssueBudgetByProvider"]["codex"] = {
+            "used": None, "cap": 6, "reason": "pr-inventory-unavailable"}
+        self.assertEqual(hud.pool_hint("codex", local), "new issues unknown (PR inventory unread) · eligible 7/25")
+        local["doctor"]["admission"].pop("newIssueBudgetByProvider")
+        self.assertEqual(hud.pool_hint("codex", local), "new issues unknown (PR budget unread)")
 
     def test_clip_keeps_ansi_balanced_and_width_exact(self):
         colored = hud.rgb(hud.RED, "x" * 50)

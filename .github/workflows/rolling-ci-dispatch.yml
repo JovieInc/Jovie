@@ -63,6 +63,7 @@ jobs:
             scripts/lib/fx-remediation-lane.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/changed-test-coverage.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
@@ -543,6 +544,7 @@ jobs:
             scripts/lib/rolling-ci-dispatch.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/changed-test-coverage.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
           sparse-checkout-cone-mode: false
       - name: Download immutable patch artifact
@@ -829,6 +831,7 @@ jobs:
             scripts/invariants/latency-sensitive-execution-allowlist.json
             scripts/invariants/registry.mjs
             scripts/design-conformance-paths.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
@@ -943,6 +946,7 @@ jobs:
             scripts/lib/fx-remediation-lane.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/changed-test-coverage.mjs
+            scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false

@@ -4,6 +4,7 @@ import type { CSSProperties, ElementType, ReactNode } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
@@ -287,7 +288,7 @@ function MarketingHeroCtaLink({
     >
       <LinkComponent
         href={cta.href}
-        prefetch={cta.prefetch}
+        prefetch={resolveMarketingAuthPrefetch(cta.href, cta.prefetch)}
         data-testid={cta.testId}
         data-primary-action={intent === 'primary' ? 'true' : undefined}
         data-cta-sign-up={cta.signUp ? 'true' : undefined}

@@ -71,6 +71,8 @@ const nextConfig = {
       'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',
       'content/**/*',
+      // Blog catalog validation checks these assets with fs.access at request time.
+      'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
@@ -274,6 +276,25 @@ const nextConfig = {
         // Public deployment identity receipt — must never inherit API s-maxage.
         source: '/api/health/:path*',
         headers: healthNoStoreHeaders,
+      },
+      {
+        // `:path*` does not match the exact root. Keep failure and liveness
+        // bodies out of the public CDN cache. Vary stays on this exact rule
+        // so build-info and redis keep the shared health header block.
+        source: '/api/health',
+        headers: [
+          ...healthNoStoreHeaders,
+          { key: 'Vary', value: 'Authorization, Cookie' },
+        ],
+      },
+      {
+        // Billing sync detail is credentialed. A public s-maxage would let
+        // the CDN replay an authorized body to anonymous callers (JOV-7557).
+        source: '/api/billing/health',
+        headers: [
+          ...healthNoStoreHeaders,
+          { key: 'Vary', value: 'Authorization, Cookie' },
+        ],
       },
       // Homepage is content-negotiated (HTML vs Markdown). Do not mark it
       // immutable: a year-long HTML object cannot safely mix with Accept.
@@ -758,6 +779,9 @@ const nextConfig = {
       '@dnd-kit/utilities',
       'framer-motion',
       'motion',
+      // Motion's React entry declares full motion aliases beside wildcard
+      // exports. Resolve named helpers to their leaves before bundling.
+      'motion/react',
       'zod',
       '@tanstack/react-table',
       '@tanstack/react-virtual',

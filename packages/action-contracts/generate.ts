@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
 
+import { FLEET_ACTION_IDS } from './actions/fleet';
 import { resolvedActionCapabilitySchema } from './descriptor';
 import { actionErrorSchema } from './errors';
 import { actionInvocationSchema, actionResultSchema } from './invocation';
@@ -95,10 +96,11 @@ function buildOpenApiDocument() {
       post: {
         operationId: `invoke_${action.id.replace('.', '_')}`,
         summary: `Invoke ${action.id}`,
-        description:
-          'Canonical invocation endpoint. Phase 3 (dispatcher); not implemented in the foundation slice.',
+        description: FLEET_ACTION_IDS.includes(action.id as never)
+          ? 'Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.'
+          : 'Canonical invocation endpoint. Phase 3 (dispatcher); not implemented in the foundation slice.',
         'x-jovie-phase': 'dispatcher',
-        'x-jovie-implemented': false,
+        'x-jovie-implemented': FLEET_ACTION_IDS.includes(action.id as never),
         requestBody: {
           required: true,
           content: {

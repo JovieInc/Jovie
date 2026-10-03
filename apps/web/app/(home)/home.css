@@ -760,10 +760,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: rgb(255 255 255 / 0.58);
 }
 
+/* No border: the phone preview is the surface; a bordered stage around it
+   is nested decorative carding (ui.md). */
 .homepage-spotlight-stage {
   min-height: clamp(33rem, 55vw, 45rem);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.055);
   border-radius: 1.25rem;
   background:
     radial-gradient(
@@ -5242,21 +5243,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: 100%;
   max-width: 15rem;
   padding: var(--space-1);
-}
-
-.homepage-artist-profile-preview .ap-phone-frame {
-  border-color: var(--system-b-app-frame-seam);
-  background: var(--system-b-bg-surface-0);
-  box-shadow: none;
-}
-
-.homepage-artist-profile-preview .ap-phone-frame__overlay {
-  background: none;
-}
-
-.homepage-artist-profile-preview .ap-phone-frame__notch {
-  background: var(--system-b-cinematic-black);
-  box-shadow: none;
 }
 
 .homepage-artist-profile-preview__screen {

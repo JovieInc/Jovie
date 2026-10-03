@@ -505,6 +505,9 @@ jobs:
       # JOV-5960: selects the source-lane visual snapshot compare on homepage
       # PRs so a skipped compare can never read as green there.
       run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
+      # Marketing surfaces select the rendered DOM invariant certification
+      # (route-dom-certification.spec.ts) in the same compare job.
+      run_marketing_dom: ${{ steps.homepage-visual.outputs.run_marketing_dom || 'false' }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
@@ -512,6 +515,10 @@ jobs:
       run_web: ${{ steps.detect.outputs.run_web || 'false' }}
       run_operations: ${{ steps.detect.outputs.run_operations || 'false' }}
       run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}
+      blog_content_only: ${{ steps.blog-detect.outputs.blog_content_only || 'false' }}
+      blog_qualification_profile: ${{ steps.blog-detect.outputs.blog_qualification_profile || 'full' }}
+      blog_changed_posts_json: ${{ steps.blog-detect.outputs.blog_changed_posts_json || '[]' }}
+      blog_selected_checks_json: ${{ steps.blog-detect.outputs.blog_selected_checks_json || '["applicable-broader-qualification"]' }}
       selected_lanes: ${{ steps.detect.outputs.selected_lanes || 'none' }}
       shared_contract_impact: ${{ steps.detect.outputs.shared_contract_impact || 'none' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
@@ -520,6 +527,7 @@ jobs:
       # The resolver may replace the event base with the live-main merge-base
       # for coalesced heads. Downstream exact-diff gates must use this same SHA.
       path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha || '' }}
+      path_diff_head_sha: ${{ steps.detect.outputs.path_diff_head_sha || '' }}
       run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}
       # Missing selector output fails closed. Only exact source-PR evidence may
       # bypass the multi-gigabyte dependency bootstrap in ci-fast typecheck.
@@ -715,6 +723,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
+            printf '### Qualification classification\n\nManual dispatch requires full qualification across all product lanes.\n' >> "$GITHUB_STEP_SUMMARY"
             PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
             mkdir -p "$PRODUCT_LANE_DIR"
             git ls-files > "$PRODUCT_LANE_DIR/changed-paths.txt"
@@ -749,6 +758,10 @@ jobs:
           PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
           mkdir -p "$PRODUCT_LANE_DIR"
           printf '%s\n' "$CHANGED_FILES" > "$PRODUCT_LANE_DIR/changed-paths.txt"
+          CLASSIFICATION_BASE_SHA=$(git rev-parse --verify "${CLASSIFICATION_BASE_REF}^{commit}")
+          CLASSIFICATION_HEAD_SHA=$(git rev-parse --verify "${CLASSIFICATION_HEAD_REF}^{commit}")
+          echo "path_diff_base_sha=$CLASSIFICATION_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "path_diff_head_sha=$CLASSIFICATION_HEAD_SHA" >> "$GITHUB_OUTPUT"
           TRUSTED_PRODUCT_LANE_CLASSIFIER="$PRODUCT_LANE_DIR/product-lane-classifier.mjs"
           git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs" \
             > "$TRUSTED_PRODUCT_LANE_CLASSIFIER"
@@ -759,15 +772,6 @@ jobs:
             --json-out "$PRODUCT_LANE_DIR/receipt.json" \
             --summary-out "$PRODUCT_LANE_DIR/summary.md" \
             --github-output "$GITHUB_OUTPUT"
-          jq \
-            --arg sha "$GITHUB_SHA" \
-            --arg run_id "$GITHUB_RUN_ID" \
-            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
-            '. + {provenance: {sha: $sha, runId: $run_id, runAttempt: $run_attempt}}' \
-            "$PRODUCT_LANE_DIR/receipt.json" > "$PRODUCT_LANE_DIR/sealed.json"
-          mv "$PRODUCT_LANE_DIR/sealed.json" "$PRODUCT_LANE_DIR/receipt.json"
-          cat "$PRODUCT_LANE_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
-
           TEST_PERFORMANCE_PATTERN='^apps/web/scripts/test-performance-(guard\.ts|profiler(\.test)?\.ts)$'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PERFORMANCE_PATTERN"; then
             echo "run_test_performance=true" >> "$GITHUB_OUTPUT"
@@ -927,6 +931,54 @@ jobs:
 
           emit_ci_lanes
 
+      - name: Classify blog qualification and seal intake receipts
+        id: blog-detect
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
+        shell: bash
+        env:
+          BASE_SHA: ${{ steps.detect.outputs.path_diff_base_sha }}
+          HEAD_SHA: ${{ steps.detect.outputs.path_diff_head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          root="$RUNNER_TEMP/product-lane-classification"
+          blog_receipt="$root/blog-content-receipt.json"
+          trusted_blog="$root/blog-content-ci.mjs"
+          if git cat-file -e "${BASE_SHA}:scripts/lib/blog-content-ci.mjs" 2>/dev/null; then
+            git show "${BASE_SHA}:scripts/lib/blog-content-ci.mjs" > "$trusted_blog"
+            node "$trusted_blog" \
+              --base "$BASE_SHA" --head "$HEAD_SHA" --policy-ref "$BASE_SHA" \
+              --json-out "$blog_receipt" --github-output "$GITHUB_OUTPUT"
+          else
+            jq -n --arg base "$BASE_SHA" --arg head "$HEAD_SHA" \
+              '{schema:"jovie-blog-content-ci/v1",profile:"full",contentOnly:false,baseSha:$base,headSha:$head,changedPaths:[],changes:[],changedPostSlugs:[],removedPostSlugs:[],changedAssets:[],affectedOutputs:[],selectedChecks:["applicable-broader-qualification"],rejections:[{status:null,path:null,oldPath:null,reason:"trusted-classifier-unavailable"}]}' \
+              > "$blog_receipt"
+            {
+              echo "blog_content_only=false"
+              echo "blog_qualification_profile=full"
+              echo "blog_changed_posts_json=[]"
+              echo 'blog_selected_checks_json=["applicable-broader-qualification"]'
+            } >> "$GITHUB_OUTPUT"
+          fi
+          profile=$(jq -er '.profile | select(. == "full" or . == "content-only")' "$blog_receipt")
+          trusted_product="$root/product-lane-classifier.mjs"
+          git show "${BASE_SHA}:scripts/lib/product-lane-classifier.mjs" > "$trusted_product"
+          node "$trusted_product" \
+            --files-from "$root/changed-paths.txt" \
+            --base-ref "$BASE_SHA" --head-ref "$HEAD_SHA" \
+            --qualification-profile "$profile" \
+            --json-out "$root/receipt.json" --summary-out "$root/summary.md"
+          for receipt in receipt.json blog-content-receipt.json; do
+            jq --arg sha "$GITHUB_SHA" --arg run_id "$GITHUB_RUN_ID" \
+              --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+              '. + {provenance: {sha: $sha, runId: $run_id, runAttempt: $run_attempt}}' \
+              "$root/$receipt" > "$root/sealed.json"
+            mv "$root/sealed.json" "$root/$receipt"
+          done
+          cat "$root/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n### Blog content qualification\n\n- Profile: `%s`\n- Receipt: `blog-content-receipt.json`\n' \
+            "$profile" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Detect web coverage applicability
         id: coverage-detect
         shell: bash
@@ -967,13 +1019,21 @@ jobs:
           else
             echo "run_homepage_visual=false" >> "$GITHUB_OUTPUT"
           fi
+          MARKETING_DOM_PATTERN='^(\.github/workflows/ci\.yml|apps/web/app/\((marketing|home)\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(marketing|site|homepage|features/home|molecules/PhoneFrame)|apps/web/data/|apps/web/styles/|apps/web/public/(product-screenshots|device-bezels)/|apps/web/tests/e2e/utils/(route-dom|image-contrast)-detector\.ts|apps/web/tests/product-screenshots/route-dom-|apps/web/playwright\.config\.screenshots\.ts|packages/ui/)'
+          if grep -q -E "$MARKETING_DOM_PATTERN" "$CHANGED_PATHS"; then
+            echo "run_marketing_dom=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_marketing_dom=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Preserve intake product-lane receipt
         if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/product-lane-classification/receipt.json
+          path: |
+            ${{ runner.temp }}/product-lane-classification/receipt.json
+            ${{ runner.temp }}/product-lane-classification/blog-content-receipt.json
           if-no-files-found: error
           retention-days: 30
 
@@ -1349,7 +1409,8 @@ jobs:
         (github.event_name == 'merge_group' &&
         needs.ci-merge-group-workspace.result == 'success') ||
         (github.event_name == 'pull_request' &&
-        needs.ci-path-changes.outputs.run_homepage_visual == 'true')
+        (needs.ci-path-changes.outputs.run_homepage_visual == 'true' ||
+        needs.ci-path-changes.outputs.run_marketing_dom == 'true'))
       )
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -1376,11 +1437,11 @@ jobs:
       - name: Validate snapshot inventory and workflow contract
         run: node scripts/visual-snapshot-compare.mjs compare
       - uses: ./.github/actions/setup-node-pnpm
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         with:
           reuse_merge_group_workspace: 'true'
       - uses: ./.github/actions/setup-playwright
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
       # The build below spent 3.2 of its ~4.2 min in a cold Turbopack compile
       # (PR run 36197543391). Restore the Build + Layout Turbopack cache that
       # only trusted push-to-main runs write; this job never saves it. The path
@@ -1388,10 +1449,10 @@ jobs:
       # this job's own inputs and env, so the rendered output is unchanged.
       - name: Resolve Next build cache hour
         id: next-build-cache-hour
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
       - name: Restore Next build cache (read-only)
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache/turbopack
@@ -1400,7 +1461,7 @@ jobs:
             ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
             ${{ runner.os }}-next-build-web-v1-
       - name: Build homepage for rendered snapshot compare
-        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: pnpm turbo build --filter=@jovie/web
         env:
           # Still reads the restored cache but skips persisting it (13-55s of
@@ -1483,8 +1544,56 @@ jobs:
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: user_test
+      # Rendered marketing design invariants (route DOM detector: nested
+      # surfaces, stranded copy, heading hierarchy, clipped headings,
+      # misaligned stacks, orphans, layout shift, placeholder copy, contrast)
+      # block the merge queue. Taste kinds ratchet via
+      # route-dom-marketing-baseline.json; other kinds are zero-tolerance.
+      - name: Certify marketing route DOM invariants
+        if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        run: |
+          set -euo pipefail
+          cd apps/web
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found; marketing DOM certification cannot start."
+            exit 1
+          fi
+          export HOSTNAME=localhost
+          PORT=3230 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/marketing-dom-server.log" 2>&1 &
+          SERVER_PID=$!
+          for _attempt in $(seq 1 30); do
+            curl -sf http://localhost:3230 > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://localhost:3230 > /dev/null || { cat "$RUNNER_TEMP/marketing-dom-server.log"; exit 1; }
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts \
+              --config=playwright.config.screenshots.ts --project=screenshots \
+              --workers=1 --retries=0 --reporter=line \
+              -g 'deliberate-red|certifies every marketing route'
+        env:
+          BASE_URL: http://localhost:3230
+          CI: 'true'
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          ROUTE_DOM_CERTIFICATION_SCOPE: marketing
+          ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: test-results/route-dom-certification
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          CLERK_SECRET_KEY: sk_test_mock
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
       - name: Upload homepage visual failure evidence
-        if: ${{ failure() && needs.ci-path-changes.outputs.run_homepage_visual == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        if: ${{ failure() && (needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2843,7 +2952,8 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.run_web == 'true'
+          needs.ci-path-changes.outputs.run_web == 'true' &&
+          needs.ci-path-changes.outputs.blog_content_only != 'true'
         ) ||
         (
           github.event_name == 'push' &&
@@ -3029,7 +3139,8 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.run_web == 'true'
+          needs.ci-path-changes.outputs.run_web == 'true' &&
+          needs.ci-path-changes.outputs.blog_content_only != 'true'
         ) ||
         (
           github.event_name == 'push' &&
@@ -3086,7 +3197,8 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.run_web == 'true'
+          needs.ci-path-changes.outputs.run_web == 'true' &&
+          needs.ci-path-changes.outputs.blog_content_only != 'true'
         ) ||
         (
           github.event_name == 'push' &&
@@ -3129,7 +3241,8 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.run_web == 'true'
+          needs.ci-path-changes.outputs.run_web == 'true' &&
+          needs.ci-path-changes.outputs.blog_content_only != 'true'
         ) ||
         (
           github.event_name == 'push' &&
@@ -3435,11 +3548,12 @@ jobs:
           pnpm --filter @jovie/auth-routing test
           pnpm --filter @jovie/action-contracts test
           pnpm --filter @jovie/audio-contracts test
+          pnpm --filter @jovie/release-channel-contracts test
 
   ci-product-lane-receipt:
     name: Product Lane Receipt
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
+      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-blog-content, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3460,6 +3574,7 @@ jobs:
       - name: Join exact lane results
         env:
           FAST: ${{ needs.ci-fast.result }}
+          BLOG: ${{ needs.ci-blog-content.result }}
           WEB_UNIT: ${{ needs.ci-unit-tests.result }}
           WEB_BUILD: ${{ needs.ci-build-layout.result }}
           WEB_OVIE: ${{ needs.ci-build-ovie.result }}
@@ -3473,14 +3588,20 @@ jobs:
           RUN_MAC: ${{ needs.ci-path-changes.outputs.run_macos }}
           RUN_OPERATIONS: ${{ needs.ci-path-changes.outputs.run_operations }}
           RUN_CROSS: ${{ needs.ci-path-changes.outputs.run_cross_product }}
+          BLOG_CONTENT_ONLY: ${{ needs.ci-path-changes.outputs.blog_content_only }}
         run: |
           set -euo pipefail
           lane_result() { [ "$1" = true ] && printf '%s' "$2" || printf skipped; }
           root="$RUNNER_TEMP/product-lane-receipt"
+          if [[ "$GITHUB_EVENT_NAME" == merge_group && "$BLOG_CONTENT_ONLY" == true ]]; then
+            web_results="[\"$BLOG\",\"$FAST\"]"
+          else
+            web_results="[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE_TYPECHECK")\",\"$(lane_result "$RUN_WEB" "$WEB_STORYBOOK")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]"
+          fi
           jq -n \
             --argjson ios "[\"$(lane_result "$RUN_IOS" "$IOS")\",\"$(lane_result "$RUN_IOS" "$FAST")\"]" \
             --argjson mac "[\"$(lane_result "$RUN_MAC" "$MAC")\",\"$(lane_result "$RUN_MAC" "$FAST")\"]" \
-            --argjson web "[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE_TYPECHECK")\",\"$(lane_result "$RUN_WEB" "$WEB_STORYBOOK")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]" \
+            --argjson web "$web_results" \
             --argjson operations "[\"$(lane_result "$RUN_OPERATIONS" "$FAST")\"]" \
             --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
             --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
@@ -4870,6 +4991,115 @@ jobs:
   # Replaces the previous Playwright-based test that was flaky due to
   # dynamic content assertions, hydration timing, and excessive retries.
 
+  ci-blog-content:
+    name: Blog Content Qualification
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.ci-path-changes.outputs.blog_content_only == 'true' &&
+      (
+        github.event_name == 'pull_request' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-merge-group-workspace.result == 'success' &&
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/blog-content-qualification
+      - name: Verify exact selected plan
+        env:
+          BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ \
+            > "$RUNNER_TEMP/blog-content-qualification/qualification-started-at.txt"
+          date +%s > "$RUNNER_TEMP/blog-content-qualification/qualification-started-epoch.txt"
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git cat-file -e "${BASE_SHA}^{commit}"
+          node scripts/run-affected-tests.mjs --base "$BASE_SHA" --dry-run \
+            > "$RUNNER_TEMP/blog-content-qualification/plan.json"
+          jq -e '.mode == "selected" and .blogCandidateBuild == true' \
+            "$RUNNER_TEMP/blog-content-qualification/plan.json" >/dev/null
+      - name: Run publication and agent-certification contracts
+        run: >-
+          pnpm --filter @jovie/web exec vitest run
+          tests/unit/lib/blog/publication.test.ts
+          scripts/marketing-factory/blog-adapter.test.ts
+          --maxWorkers 2
+      - name: Build the exact rendered candidate
+        id: candidate-build
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+        run: |
+          set -euo pipefail
+          started=$(date +%s)
+          pnpm turbo build --filter=@jovie/web
+          for required in \
+            apps/web/.next/BUILD_ID \
+            apps/web/.next/standalone/apps/web/server.js; do
+            test -f "$required" || { echo "::error::Candidate build omitted $required"; exit 1; }
+          done
+          echo "seconds=$(($(date +%s) - started))" >> "$GITHUB_OUTPUT"
+      - name: Record qualification latency receipt
+        if: ${{ always() && !cancelled() }}
+        env:
+          BUILD_SECONDS: ${{ steps.candidate-build.outputs.seconds || '0' }}
+          SELECTED_CHECKS: ${{ needs.ci-path-changes.outputs.blog_selected_checks_json }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/blog-content-qualification"
+          started_at=$(cat "$root/qualification-started-at.txt")
+          started_epoch=$(cat "$root/qualification-started-epoch.txt")
+          ended_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          ended_epoch=$(date +%s)
+          candidate_created_at=$(git show -s --format=%cI "$GITHUB_SHA")
+          jq -n \
+            --arg candidate_sha "$GITHUB_SHA" \
+            --arg candidate_created_at "$candidate_created_at" \
+            --arg qualification_started_at "$started_at" \
+            --arg qualification_ended_at "$ended_at" \
+            --argjson selected_checks "$SELECTED_CHECKS" \
+            --argjson retries "$((GITHUB_RUN_ATTEMPT - 1))" \
+            --argjson runner_seconds "$((ended_epoch - started_epoch))" \
+            --argjson build_seconds "$BUILD_SECONDS" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --slurpfile classification "$root/blog-content-receipt.json" \
+            '{schema:"jovie-blog-content-qualification/v1",candidateSha:$candidate_sha,candidateCreatedAt:$candidate_created_at,qualificationStartedAt:$qualification_started_at,qualificationEndedAt:$qualification_ended_at,queueEnteredAt:null,queueWaitSeconds:null,deployedAt:null,confirmedLiveAt:null,selectedChecks:$selected_checks,retries:$retries,cost:{runnerSeconds:$runner_seconds,buildSeconds:$build_seconds},runUrl:$run_url,classification:$classification[0]}' \
+            > "$root/qualification-receipt.json"
+          cat "$root/qualification-receipt.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve blog qualification receipt
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: blog-content-qualification-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/blog-content-qualification/qualification-receipt.json
+            ${{ runner.temp }}/blog-content-qualification/plan.json
+          if-no-files-found: error
+          retention-days: 30
+
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
@@ -4888,7 +5118,8 @@ jobs:
       (
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.run_web == 'true'
+          needs.ci-path-changes.outputs.run_web == 'true' &&
+          needs.ci-path-changes.outputs.blog_content_only != 'true'
         ) ||
         (
           github.event_name == 'push' &&
@@ -5049,6 +5280,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true' && matrix.shard == '7/14'
         continue-on-error: true
         env:
+          VITEST_JUNIT_OUTPUT_FILE: test-report.quarantine.junit.xml
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -5083,8 +5315,10 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'
         run: pnpm turbo test --filter=@jovie/ui
 
-      - name: Preserve failed unit-shard diagnosis
-        if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+      - name: Preserve completed unit-shard diagnosis
+        # Successful retries are evidence too; cancellation cannot certify a
+        # completed execution. Keep the existing artifact identity for readers.
+        if: ${{ always() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
@@ -5928,6 +6162,9 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          # Flaky retries leave error-context.md. Scan and redact it; do not
+          # classify it as unknown-binary after a passing Playwright run.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -5936,6 +6173,7 @@ jobs:
           name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 3
 
   ci-golden-path:
@@ -6175,6 +6413,7 @@ jobs:
           name: golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             apps/web/test-results/
+            !apps/web/test-results/**/*.png
           retention-days: 3
 
       - name: Upload golden-path visual review evidence
@@ -6537,6 +6776,9 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
+          # Failed attempts leave error-context.md. Redact it before the
+          # producer stages evidence; the failure upload scans the same files.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -6571,6 +6813,7 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
           SENTRY_RELEASE: ${{ github.sha }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
           cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
@@ -6581,6 +6824,7 @@ jobs:
         with:
           name: ${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 7
 
   ci-test-performance:
@@ -6853,6 +7097,7 @@ jobs:
         ci-merge-group-admission,
         ci-risk-classifier,
         ci-fast,
+        ci-blog-content,
         ci-unit-tests,
         ci-exact-head-coverage,
         ci-build-layout,
@@ -6891,6 +7136,7 @@ jobs:
           ADMISSION_REPLACEMENT_HEAD="${{ needs.ci-merge-group-admission.outputs.replacement_combined_head }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
+          BLOG_RESULT="${{ needs.ci-blog-content.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
@@ -6906,6 +7152,7 @@ jobs:
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
+          RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           DATABASE_CERTIFICATION_RESULT="${{ needs.neon-db.result }}"
           DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
@@ -6913,6 +7160,7 @@ jobs:
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
+          BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
           RUN_MACOS="${{ needs.ci-path-changes.outputs.run_macos }}"
           RUN_CROSS_PRODUCT="${{ needs.ci-path-changes.outputs.run_cross_product }}"
@@ -6942,6 +7190,7 @@ jobs:
             echo "| Replacement combined head | ${ADMISSION_REPLACEMENT_HEAD:-none} |"
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
+            echo "| Blog Content Qualification | $BLOG_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
             echo "| Exact-head Coverage | $COVERAGE_RESULT |"
             echo "| Build + Layout | $BUILD_LAYOUT_RESULT |"
@@ -6996,6 +7245,17 @@ jobs:
             [ "$LANE_RECEIPT_RESULT" = skipped ] || { echo "::error::No-op receipt must skip."; exit 1; }
           elif [[ "$LANE_RECEIPT_RESULT" != success ]]; then
             echo "::error::Final product-lane receipt did not pass ($LANE_RECEIPT_RESULT)."
+            exit 1
+          fi
+
+          if [[ "$BLOG_CONTENT_ONLY" == true ]]; then
+            RUN_WEB=false
+            [[ "$BLOG_RESULT" == success ]] || {
+              echo "::error::Blog Content Qualification did not pass for the selected combined head ($BLOG_RESULT)."
+              exit 1
+            }
+          elif [[ "$BLOG_RESULT" != skipped ]]; then
+            echo "::error::Blog Content Qualification ran without content-only selection ($BLOG_RESULT)."
             exit 1
           fi
 
@@ -7060,7 +7320,7 @@ jobs:
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -7071,6 +7331,7 @@ jobs:
           set -euo pipefail
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
+          BLOG_RESULT="${{ needs.ci-blog-content.result }}"
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
@@ -7079,6 +7340,8 @@ jobs:
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
+          BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
+          RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
 
           {
             echo "### PR Ready"
@@ -7089,11 +7352,12 @@ jobs:
             echo "| --- | --- | --- |"
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
+            echo "| Blog Content Qualification | $BLOG_RESULT | \`node scripts/run-affected-tests.mjs --base origin/main\` |"
             echo "| Exact-head Coverage | $COVERAGE_RESULT | \`pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
-            echo "| Visual Snapshot Compare (homepage PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
+            echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
             echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
@@ -7120,6 +7384,14 @@ jobs:
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
             exit 1
           fi
+          if [[ "$BLOG_CONTENT_ONLY" == true && "$BLOG_RESULT" != success ]]; then
+            echo "❌ Blog Content Qualification did not pass (result: $BLOG_RESULT)"
+            exit 1
+          fi
+          if [[ "$BLOG_CONTENT_ONLY" != true && "$BLOG_RESULT" != skipped ]]; then
+            echo "❌ Blog Content Qualification ran without content-only selection (result: $BLOG_RESULT)"
+            exit 1
+          fi
           if [[ "$COVERAGE_RESULT" != "success" ]]; then
             echo "❌ Exact-head Coverage did not pass (result: $COVERAGE_RESULT)"
             exit 1
@@ -7129,6 +7401,10 @@ jobs:
           # source lane and skipped is not green (JOV-5960).
           if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
             echo "❌ Visual Snapshot Compare did not pass on a homepage PR; skipped is not green (JOV-5960) (result: $VISUAL_COMPARE_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
+            echo "❌ Marketing DOM invariant certification did not pass on a marketing PR; skipped is not green (result: $VISUAL_COMPARE_RESULT)"
             exit 1
           fi
 
@@ -7655,6 +7931,7 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
@@ -7663,6 +7940,7 @@ jobs:
           name: smoke-required-report-${{ github.run_id }}
           path: |
             apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 3
 
   # Homepage smoke is a blocking probe of the immutable production deployment.

@@ -2,6 +2,7 @@
   "version": 1,
   "claims": {
     "about.founder.live-shows": "e9c4580a41e91f05",
+    "capability.agent-readable-profile-summary.machine-readable-public-profile-summary": "64f47d54705a5197",
     "capability.app-download.install-the-jovie-app": "969bc5ee07c13d24",
     "capability.artist-notifications.audience-reactivation": "02e8a8b71562a6de",
     "capability.artist-notifications.opt-in-fan-notifications": "dbf126463ef55ea5",
@@ -16,6 +17,7 @@
     "capability.jovie-card.in-person-profile-sharing": "e5546ae3321ede8a",
     "capability.pay.access-label": "19a61fbe34938fac",
     "capability.pay.artist-payment-surface": "062552e36ff9dd6f",
+    "capability.public-ask.anonymous-ask-on-a-public-profile": "11e8a483890b71f2",
     "capability.public-profile.claimable-public-profile-page": "5abd8fbfc38fe438",
     "capability.release-launch.release-launch-planning": "8afbe903005f070f",
     "capability.selective-reach.relevance-scoped-update-delivery": "2e435764158951ff",
@@ -80,6 +82,7 @@
   },
   "capabilities": {
     "about.founder.live-shows": "artist-profiles",
+    "capability.agent-readable-profile-summary.machine-readable-public-profile-summary": "agent-readable-profile-summary",
     "capability.app-download.install-the-jovie-app": "app-download",
     "capability.artist-notifications.audience-reactivation": "artist-notifications",
     "capability.artist-notifications.opt-in-fan-notifications": "artist-notifications",
@@ -94,6 +97,7 @@
     "capability.jovie-card.in-person-profile-sharing": "jovie-card",
     "capability.pay.access-label": "pay",
     "capability.pay.artist-payment-surface": "pay",
+    "capability.public-ask.anonymous-ask-on-a-public-profile": "public-ask",
     "capability.public-profile.claimable-public-profile-page": "public-profile",
     "capability.release-launch.release-launch-planning": "release-launch",
     "capability.selective-reach.relevance-scoped-update-delivery": "selective-reach",

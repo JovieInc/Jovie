@@ -1,0 +1,95 @@
+{
+  "schema": "jovie.always-on-inbound/v1",
+  "issue": "JOV-7407",
+  "trackingKey": "LAUNCH-AUDIENCE-2026-10-01/always-on-inbound",
+  "ownsArticleQualification": false,
+  "articleQualificationOwner": "JOV-7397",
+  "queue": {
+    "maxActiveCandidates": 3,
+    "emptyIsValid": true,
+    "reusesExistingBacklog": true,
+    "speculativeLinearTasks": false
+  },
+  "readerStreams": [
+    "customer-problem-solving",
+    "launch-tutorial",
+    "engineering-oss-research",
+    "creator-release-discovery"
+  ],
+  "decisions": [
+    "create",
+    "update-or-merge",
+    "distribute-again",
+    "refresh",
+    "defer",
+    "reject",
+    "no-public-action"
+  ],
+  "adapters": {
+    "demand": {
+      "active": ["customer-question"],
+      "allowed": [
+        "search-console-observation",
+        "customer-question",
+        "failed-public-agent-task",
+        "support-pattern"
+      ]
+    },
+    "release": {
+      "active": ["verified-release-record"],
+      "allowed": [
+        "verified-release-record",
+        "oss-release",
+        "engineering-result",
+        "third-party-coverage",
+        "rights-cleared-research"
+      ]
+    }
+  },
+  "triggerPolicy": {
+    "primary": "event-driven",
+    "periodicLlmCrawl": false,
+    "materialEventClasses": [
+      "demand-signal-new-or-changed",
+      "release-verified",
+      "freshness-deadline-reached",
+      "delivery-failed"
+    ],
+    "scheduledReconciliation": {
+      "daily": { "authorized": true, "kind": "cheap-existing-governor" },
+      "weeklyReprioritization": { "authorized": true, "bounded": true }
+    },
+    "clockIsNotDiscovery": true
+  },
+  "freshness": {
+    "demandSignalMaxAgeDays": 30,
+    "releaseEvidenceMaxAgeDays": 90,
+    "staleDisablesDependentDecisions": true
+  },
+  "boundaries": {
+    "searchConsoleContract": "JOV-4957",
+    "engineeringPublication": "JOV-5475",
+    "changelogDelivery": ["JOV-5786", "JOV-5790"],
+    "ossReadiness": "JOV-6558",
+    "markdownPublication": "JOV-7396",
+    "articleCertification": "JOV-7397",
+    "revenueGate": "JOV-7329"
+  },
+  "approvalGates": {
+    "engineeringCopy": "explicit-approval-required",
+    "sensitiveClaims": "explicit-approval-required",
+    "newOutboundSends": "explicit-approval-required",
+    "publicationCohorts": "explicit-approval-required"
+  },
+  "measurement": {
+    "separateFunnels": ["discovery", "answer-accuracy", "agent-actions"],
+    "crawlerRequestsAreNotCitations": true,
+    "citationsAreNotReferrals": true,
+    "impressionsAreNotRevenue": true,
+    "newDashboardRequired": false
+  },
+  "confidentiality": {
+    "privateSourceRecordsSeparateFromPublicArtifacts": true,
+    "demandSignalsAreEvidenceNotPermission": true
+  }
+}

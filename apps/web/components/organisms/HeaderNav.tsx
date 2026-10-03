@@ -13,6 +13,7 @@ import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
@@ -151,7 +152,9 @@ function PublicAuthActions({
         variant='ghost'
         className='focus-ring-themed shrink-0 whitespace-nowrap'
       >
-        <Link href={APP_ROUTES.SIGNIN}>Log in</Link>
+        <Link href={APP_ROUTES.SIGNIN} prefetch={false}>
+          Log in
+        </Link>
       </Button>
       <HeaderPrimaryAuthLink href={publicCta.href} label={publicCta.label} />
     </div>
@@ -176,7 +179,9 @@ function HeaderPrimaryAuthLink({
       variant='primary'
       className={cn('focus-ring-themed shrink-0 whitespace-nowrap', className)}
     >
-      <Link href={href}>{label}</Link>
+      <Link href={href} prefetch={resolveMarketingAuthPrefetch(href)}>
+        {label}
+      </Link>
     </Button>
   );
 }
@@ -203,6 +208,7 @@ function GlassAuthActions({
       ) : null}
       <Link
         href={APP_ROUTES.SIGNIN}
+        prefetch={false}
         className='marketing-glass-header__text-link focus-ring-themed'
       >
         Log in

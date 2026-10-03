@@ -14,6 +14,7 @@ import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env-server';
 import {
   isMusicfetchInvalidServicesError,
+  isMusicfetchVendorUnavailable,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
   musicfetchRequest,
@@ -138,7 +139,15 @@ function handleMusicfetchLookupError(error: unknown, spotifyUrl: string): null {
       message: error.message,
     });
 
-    if (error.statusCode === 400 && !isMusicfetchInvalidServicesError(error)) {
+    const errorDetail = error.details ?? error.message;
+    const isInactiveSubscription =
+      error.statusCode === 401 &&
+      errorDetail.toLowerCase().includes('subscription not active');
+
+    if (
+      isInactiveSubscription ||
+      (error.statusCode === 400 && !isMusicfetchInvalidServicesError(error))
+    ) {
       return null;
     }
 
@@ -203,6 +212,10 @@ export async function fetchArtistBySpotifyUrl(
         span.setStatus({ code: 1, message: 'ok' });
         return data.result;
       } catch (error) {
+        if (isMusicfetchVendorUnavailable(error)) {
+          span.setStatus({ code: 1, message: 'unavailable' });
+          return null;
+        }
         span.setStatus({ code: 2, message: 'error' });
         return handleMusicfetchLookupError(error, spotifyUrl);
       }

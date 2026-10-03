@@ -100,7 +100,12 @@ export const PROFILE_MATRIX_ROUTES: readonly ProfileMatrixRoute[] = [
   },
   {
     id: 'notifications-legacy',
-    path: `/${TIP_HANDLE}/notifications`,
+    // `/notifications` redirects to `?mode=subscribe`. The subscribe card only
+    // mounts when the profile is claimed (`allowFanCapture`). `testartist` is
+    // the unclaimed tipping fixture, so that redirect stays on Home and the
+    // card never appears — the wait fails before any overflow check. Use the
+    // same claimed music handle as the subscribe route.
+    path: `/${MUSIC_HANDLE}/notifications`,
     expectedActiveTab: 'profile',
     readySelectors: ['[data-testid="profile-primary-tab-subscribe"]'],
     showsBottomTabBar: true,
