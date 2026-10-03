@@ -741,6 +741,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request_target
+      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
@@ -901,6 +902,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:prepare
     jobCount: 2
+  - name: PR Review Learn
+    path: .github/workflows/pr-review-learn.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:learn
+    jobCount: 1
   - name: PR Size Guard Label Override
     path: .github/workflows/pr-size-guard-label-override.yml
     active: true

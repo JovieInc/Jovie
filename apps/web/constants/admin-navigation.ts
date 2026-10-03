@@ -40,8 +40,11 @@ export type AdminWorkspaceId =
   | 'ops'
   | 'shipping'
   | 'people'
+  | 'interviews'
   | 'growth'
   | 'platform_connections'
+  | 'playlists'
+  | 'presence'
   | 'activity'
   | 'investors'
   | 'feature_registry'
@@ -75,7 +78,10 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'certifications',
   'shipping',
   'people',
+  'interviews',
   'platform_connections',
+  'playlists',
+  'presence',
   'activity',
   'investors',
   'feature_registry',
@@ -153,10 +159,31 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
+    id: 'interviews',
+    label: 'Interviews',
+    href: APP_ROUTES.ADMIN_INTERVIEWS,
+    description: 'Review post-onboarding interview transcripts and summaries',
+    section: 'utilities',
+  },
+  {
     id: 'platform_connections',
     label: 'Platform Connections',
     href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
     description: 'Spotify publisher and playlist generation controls',
+    section: 'utilities',
+  },
+  {
+    id: 'playlists',
+    label: 'Playlists',
+    href: APP_ROUTES.ADMIN_PLAYLISTS,
+    description: 'Review and publish generated playlists',
+    section: 'utilities',
+  },
+  {
+    id: 'presence',
+    label: 'Presence',
+    href: APP_ROUTES.ADMIN_PRESENCE,
+    description: 'Inspect indexing, SEO, copy, and Lighthouse health',
     section: 'utilities',
   },
   {
