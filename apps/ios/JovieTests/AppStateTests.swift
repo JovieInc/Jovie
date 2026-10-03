@@ -3430,6 +3430,7 @@ extension AppStateTests {
   func profileExpiryFinishesActualCleanupBeforeCancellingItsOwnHandle(kind: String, replaceDuringCleanup: Bool) async throws {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
       let original = try saveSession()
+      let originalOwnership = try #require(original.ownership)
       let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
       defer { caches.cleanup(); push.cleanup() }
       await caches.seed()
@@ -3447,9 +3448,9 @@ extension AppStateTests {
         chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop,
         captureProfileLoadCurrentness: { userID in
           if kind == "legacy" { return .unmanaged() }
-          if kind == "retired-receipt" && NativeSessionTokenStore.canContinueProfileLoad(ownedBy: original.ownership) {
+          if kind == "retired-receipt" && NativeSessionTokenStore.canContinueProfileLoad(ownedBy: originalOwnership) {
             captures += 1
-            return ProfileLoadContext(ownership: original.ownership, canContinue: captures == 1 ? { oldCurrent } : { true })
+            return ProfileLoadContext(ownership: originalOwnership, canContinue: captures == 1 ? { oldCurrent } : { true })
           }
           return .live(for: userID)
         })
