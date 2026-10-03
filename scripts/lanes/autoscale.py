@@ -262,7 +262,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
         effective, reason, blockers, want = current, "hold:steady", [], False; lane_ready = changed is None or now - changed >= interval
         host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
-        # TODO(JOV-7587): merge-queue brake plugs in here, with the safety brakes (brainstorm only; do not scale on throughput). Signals: merged/hour vs opened/hour, queue p50 wait, entries per merge.
+        # JOV-7587: scale-up above the configured base is held until the merge-queue brake lands. Signals: merged/hour vs opened/hour, queue p50 wait, entries per merge.
         if multi:
             effective, reason, blockers, up, idle = max(MIN_SLOTS, math.ceil(current / 2)), multi, [multi], 0, 0
         elif additive:
@@ -312,8 +312,9 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             row.update(lastReason="hold:host-ceiling", blockers=["host-ceiling"])
     for name, row in rows.items():
         base = row["base"]
-        if base > 0 and fresh and unknown and row["effective"] > base:
-            row.update(effective=base, lastReason="hold:" + unknown, blockers=[unknown], upStreak=0)
+        if base > 0 and row["effective"] > base:
+            token = unknown if fresh and unknown else "scale-up-held"
+            row.update(effective=base, lastReason="hold:" + token, blockers=[token], upStreak=0)
         before = _int(_obj(prev_lanes.get(name)).get("effective")); before = base if before is None else before
         if row["effective"] != before:
             row["lastChangeAt"], host_last = now, now

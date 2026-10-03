@@ -270,9 +270,9 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
-`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. A lane
-gains one slot after 30 qualifying ticks (work waiting, healthy, budgets and
-headroom all holding) and loses one after 30 idle ticks, floor `ceil(base/2)`.
+`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. Scale-up
+above today's base is held until the JOV-7587 merge-queue brake lands; scale-down
+still drops one slot after 30 idle ticks, floor `ceil(base/2)`.
 `SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
 divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
 disk or memory emergencies cut immediately and ignore that cooldown. Tim set
