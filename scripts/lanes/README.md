@@ -17,6 +17,7 @@ The harness, not the model, owns:
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
@@ -175,7 +176,12 @@ Gaps closed after the first week (no PR may sit unowned):
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
   drafts receive `repair`, or `hold:dependency` while a named dependency is open.
   A landed dependency releases repair; it never grants authority to discard the branch.
-  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement. Every
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement, with one
+  exception (v5, JOV-7708): an agent-owned PR parked by `lane-fix-exhausted` or `queue-poison`
+  for more than 48h (measured from the label's latest `labeled` event) is closed with a
+  reason, its branch kept, and its issue moved to Todo + `agent-ready` with a rebuild-from-main
+  note, unless the issue is done or another open PR carries it. Holds, the merge queue and live
+  repair claims preserve it; `LANES_PARKED_RETIRE=0` turns it off (`retire_parked()`). Every
   close path re-reads the live source head, state, complete labels, fork and queue status;
   revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,

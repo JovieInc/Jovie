@@ -524,11 +524,68 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     return None
 
 
-def pool_rejections(issues: list[Issue]) -> dict[str, str]:
+# JOV-7708: files that concurrent PRs keep colliding on (31 of 66 open PRs were DIRTY on
+# 2026-10-03). While an open PR holds one, a new issue predicted to touch it waits.
+LANES_HARNESS = frozenset({"scripts/lanes/lane_runner.py", "scripts/lanes/hud.py", "scripts/lanes/doctor.py"})
+HOTSPOT_SEED = LANES_HARNESS | frozenset({
+    "apps/web/lib/flags/code-flags.ts",
+    "apps/web/lib/commands/registry.ts",
+    "apps/web/data/product-truth/registry.ts",
+    "apps/web/tests/node-environment-files.json",
+    "apps/web/tests/unit/design-system/destructive-red-drift.baseline.json",
+})
+# Without a file hint, the issue's workstream predicts its touch set. Symphony-throughput
+# work lands in the lanes harness, so that area runs one in-flight PR at a time.
+AREA_HOTSPOTS = {"symphony-throughput": LANES_HARNESS}
+PATH_HINT = re.compile(
+    r"(?<![\w/.-])[\w@()\[\].-]*(?:/[\w@()\[\].-]+)*\.(?:py|tsx?|mjs|cjs|jsx?|json|ya?ml|swift|sql|css)(?![\w/])")
+
+
+def predicted_touch(issue: Issue) -> frozenset[str]:
+    """Paths the issue names (title or description), else its workstream's hotspots."""
+    hints = frozenset(match.group(0) for match in PATH_HINT.finditer(f"{issue.title}\n{issue.description}"))
+    return hints or AREA_HOTSPOTS.get(workstreams.classify(issue.title, issue.labels), frozenset())
+
+
+def hotspot_holds(prs: list[dict]) -> dict[str, int]:
+    """{hotspot path: the oldest open PR touching it}. Hotspots are HOTSPOT_SEED plus any file
+    two or more open PRs touch. Parked PRs (held or repair-exhausted) hold nothing: they
+    rebuild from main once the active work lands."""
+    active = sorted((pr for pr in prs if not pr_is_terminal(pr)), key=lambda pr: pr.get("number") or 0)
+    touched = [(pr["number"], {entry.get("path") for entry in pr.get("files") or [] if entry.get("path")})
+               for pr in active]
+    seen: dict[str, int] = {}
+    for _, paths in touched:
+        for path in paths:
+            seen[path] = seen.get(path, 0) + 1
+    hot = HOTSPOT_SEED | {path for path, count in seen.items() if count >= 2}
+    holds: dict[str, int] = {}
+    for number, paths in touched:
+        for path in paths & hot:
+            holds.setdefault(path, number)
+    return holds
+
+
+def held_hotspot(touch: frozenset[str], holds: dict[str, int]) -> tuple[str, int] | None:
+    """The first held hotspot the predicted touch set hits. A hint may be a bare filename
+    or a repo-relative suffix (`lib/flags/code-flags.ts`)."""
+    for path in sorted(holds):
+        if any(path == hint or path.endswith("/" + hint.lstrip("./")) for hint in touch):
+            return path, holds[path]
+    return None
+
+
+def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None) -> dict[str, str]:
     """Pool-level admission (JOV-5555): exact normalized-title duplicates are one unit of
-    work. Non-canonical members are rejected; the canonical (oldest) one stays admissible."""
-    return {identifier: "duplicate-candidate:" + canonical
-            for identifier, canonical in workstreams.duplicate_of(issues).items()}
+    work. Non-canonical members are rejected; the canonical (oldest) one stays admissible.
+    JOV-7708: an issue whose predicted touch set hits a hotspot an open PR holds waits
+    (`hotspot-held:<path>#<pr>`) instead of opening a PR that will conflict."""
+    rejected = {identifier: "duplicate-candidate:" + canonical
+                for identifier, canonical in workstreams.duplicate_of(issues).items()}
+    for issue in issues:
+        if holds and issue.identifier not in rejected and (hit := held_hotspot(predicted_touch(issue), holds)):
+            rejected[issue.identifier] = f"hotspot-held:{hit[0]}#{hit[1]}"
+    return rejected
 
 
 def admission_order(issue: Issue, now: float) -> tuple:
@@ -551,17 +608,18 @@ def admission_order(issue: Issue, now: float) -> tuple:
 
 
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
-               in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
+               in_flight: frozenset[str] = frozenset(), provider: str | None = None,
+               holds: dict[str, int] | None = None) -> Issue | None:
     """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
     sustained stream of newer urgent work from starving older work. Excluded work,
-    3x failures, retry backoff, issues with an open lane PR, and duplicate candidates
-    (pool_rejections) remain ineligible.
+    3x failures, retry backoff, issues with an open lane PR, duplicate candidates and
+    issues aimed at a held hotspot (pool_rejections) remain ineligible.
     """
     now = time.time() if now is None else now
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
-    duplicates = pool_rejections(issues)
+    duplicates = pool_rejections(issues, holds)
     eligible = [issue for issue in issues
                 if issue.identifier not in duplicates
                 and admission_rejection(issue, failures, now, in_flight, provider) is None]
@@ -3733,6 +3791,17 @@ def in_flight_issues() -> frozenset[str] | None:
     return frozenset(keys)
 
 
+def open_hotspot_holds() -> dict[str, int]:
+    """hotspot_holds over every open PR's changed files. Unreadable GitHub admits without
+    hotspot gating ({}): this orders contended work, the in-flight read guards duplicates."""
+    def fetch():
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "200",
+                     "--json", "number,labels,files"])
+        return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
+    prs = shared("hotspot-files", CLAIM_SCAN_TTL_S, fetch)
+    return hotspot_holds(prs) if prs is not None else {}
+
+
 def is_green(pr: dict) -> bool:
     return not pr.get("isDraft") and pr.get("mergeStateStatus") in ("CLEAN", "HAS_HOOKS")
 
@@ -4102,9 +4171,11 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
         if labeled is None and in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
+            holds = open_hotspot_holds()
             issue = design_gate.pick_build_issue(
-                linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
-                provider=name, pick=pick_issue, linear=linear, repo=host.repo)
+                linear.lane_issues(spec["label"]), failures, in_flight=in_flight, provider=name,
+                pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, **kwargs),
+                linear=linear, repo=host.repo)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
             if issue:
