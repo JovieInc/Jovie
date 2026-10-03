@@ -72,6 +72,18 @@ describe('DashboardNav route warming', () => {
       screen.queryByRole('link', { name: 'Inbox' })
     ).not.toBeInTheDocument();
     expect(destinations()).toEqual(retained);
+    expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
+  });
+
+  it('keeps the divider when a search surface precedes navigation actions', () => {
+    renderDashboardNav({
+      renderFn: render,
+      navChildren: <button type='button'>Search</button>,
+    });
+    expect(screen.getByRole('button', { name: 'Search' })).toBeVisible();
+    expect(
+      document.querySelector('[data-sidebar-search-divider]')
+    ).toBeInTheDocument();
   });
 
   it('fully prefetches every canonical dynamic customer route', () => {

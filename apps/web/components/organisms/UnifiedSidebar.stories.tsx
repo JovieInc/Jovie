@@ -8,6 +8,7 @@ import { withSignedInSession } from '@/.storybook/signed-in-session';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
@@ -136,6 +137,17 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Dashboard: Story = {};
+
+export const LegacyAdmin: Story = {
+  args: { section: 'admin' },
+  parameters: {
+    nextjs: { navigation: { pathname: APP_ROUTES.LEGACY_ADMIN } },
+  },
+};
+
+export const Demo: Story = {
+  parameters: { nextjs: { navigation: { pathname: APP_ROUTES.DEMO } } },
+};
 
 export const Settings: Story = {
   args: {

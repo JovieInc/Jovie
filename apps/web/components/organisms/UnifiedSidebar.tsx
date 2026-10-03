@@ -452,7 +452,9 @@ export function UnifiedSidebar({
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (
-              <DashboardNav headerOwnsInbox={!isDemoRoute}>
+              <DashboardNav
+                headerOwnsInbox={!isDemoRoute && !isOperatorSection}
+              >
                 {isDemoRoute ? (
                   <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
                 ) : null}

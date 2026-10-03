@@ -263,10 +263,17 @@ async function collectSnapshots(
   const storyUrl = new URL(`${storybookUrl}/iframe.html`);
   storyUrl.searchParams.set('id', story.id);
   storyUrl.searchParams.set('viewMode', 'story');
+  // The evaluator owns the mandatory WCAG scan below. Keep Storybook's
+  // automatic addon scan from sharing and resetting that same axe instance.
+  storyUrl.searchParams.set('globals', 'a11y.manual:!true');
   await page.goto(storyUrl.toString(), {
     // Storybook keeps a development websocket open, so network-idle is not a
     // meaningful readiness signal. The certified component root below is.
     waitUntil: 'domcontentloaded',
+    timeout: 120_000,
+  });
+  await page.locator('#storybook-root > *').first().waitFor({
+    state: 'attached',
     timeout: 120_000,
   });
   await page

@@ -448,7 +448,13 @@ export function DashboardNav({
               className='mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5 group-data-[collapsible=icon]:hidden'
             >
               {searchSurface}
-              <span aria-hidden='true' className='h-4 w-px bg-subtle' />
+              {searchSurface ? (
+                <span
+                  aria-hidden='true'
+                  data-sidebar-search-divider
+                  className='h-4 w-px bg-subtle'
+                />
+              ) : null}
               {headerOwnsInbox ? null : (
                 <Link
                   href={APP_ROUTES.DASHBOARD}

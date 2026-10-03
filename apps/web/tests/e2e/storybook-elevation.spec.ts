@@ -638,6 +638,66 @@ test.describe('central runtime notifications', () => {
 });
 
 test.describe('sidebar attention and Settings header', () => {
+  test('legacy admin keeps its fallback Inbox link', async ({ page }) => {
+    await openStory(page, 'organisms-unifiedsidebar--legacy-admin', 'light');
+    await expect(
+      page.getByRole('link', { name: 'Inbox', exact: true })
+    ).toHaveAttribute('href', '/app');
+    await expect(page.locator('[data-sidebar-search-divider]')).toHaveCount(0);
+  });
+
+  test('mobile brand actions leave the collapse control at the row edge', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 760 });
+    await openStory(page, 'organisms-unifiedsidebar--dashboard', 'light');
+    const mobile = page.getByRole('dialog');
+    const row = mobile.locator('[data-sidebar-brand-row]');
+    const collapse = mobile.getByRole('button', {
+      name: 'Collapse sidebar',
+      exact: true,
+    });
+    const search = mobile.getByRole('button', {
+      name: 'Search Jovie',
+      exact: true,
+    });
+    await expect(collapse).toBeVisible();
+    const bounds = (await row.boundingBox())!;
+    const control = (await collapse.boundingBox())!;
+    const action = (await search.boundingBox())!;
+    expect(
+      Math.abs(bounds.x + bounds.width - control.x - control.width)
+    ).toBeLessThanOrEqual(2);
+    expect(control.x).toBeGreaterThanOrEqual(action.x + action.width);
+  });
+
+  test('demo search fills the space preceding its divider and actions', async ({
+    page,
+  }) => {
+    await openStory(page, 'organisms-unifiedsidebar--demo', 'light');
+    const slot = page.locator('[data-sidebar-search-slot]');
+    const search = page.getByRole('button', {
+      name: 'Search Jovie',
+      exact: true,
+    });
+    const divider = page.locator('[data-sidebar-search-divider]');
+    await expect(search).toBeVisible();
+    await expect(divider).toBeVisible();
+    const shell = (await slot.boundingBox())!;
+    const trigger = (await search.boundingBox())!;
+    const line = (await divider.boundingBox())!;
+    const gap = await slot.evaluate(el =>
+      Number.parseFloat(getComputedStyle(el).columnGap)
+    );
+    expect(trigger.width).toBeGreaterThan(shell.width / 2);
+    expect(
+      Math.abs(line.x - trigger.x - trigger.width - gap)
+    ).toBeLessThanOrEqual(2);
+    await expect(
+      page.getByRole('link', { name: 'Inbox', exact: true })
+    ).toBeVisible();
+  });
+
   test('headerless media routes retain a window-control safe area', async ({
     page,
   }) => {
