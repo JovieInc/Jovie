@@ -1,0 +1,10 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20260930T222150Z-PR19719-devin-fix-64508b",
+ "pr": 19719,
+ "issue": null,
+ "reason": [
+  "target-state-unavailable"
+ ],
+ "at": "2026-09-30T22:59:13Z"
+}
