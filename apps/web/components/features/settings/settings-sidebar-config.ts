@@ -149,7 +149,7 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
         admission: {
           userJob:
             'Review connected services, permissions and scopes; repair access',
-          scope: 'workspace',
+          scope: 'account',
           roles: ['status', 'consent', 'account-control'],
           canonicalRoute: APP_ROUTES.SETTINGS_CONNECTORS,
           screenRationale:

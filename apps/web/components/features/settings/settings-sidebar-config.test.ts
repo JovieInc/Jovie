@@ -187,6 +187,7 @@ describe('settings decision admission', () => {
   });
 
   it('preserves consent, account controls and meaningful manual overrides', () => {
+    expect(getSettingsAdmission('connections').scope).toBe('account');
     const items = SETTINGS_SIDEBAR_GROUPS.flatMap(group => group.items);
     expect(
       items.find(item => item.id === 'connections')?.admission.roles
