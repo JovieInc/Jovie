@@ -296,6 +296,15 @@ export function validClosure(identifier, deployedSha) {
       detectorRef: 'https://example.test/detector/1',
       coveredClass: 'profile primary actions at narrow widths',
       deliberateRedRef: 'https://example.test/red/1',
+      learningCompiler: {
+        issue: 'JOV-7084',
+        outputRef: 'https://example.test/learning/1',
+      },
+      verification: {
+        status: 'live-verified',
+        evidenceRef: 'https://example.test/detector-live/1',
+        verifiedAt: '2026-10-03T11:10:00Z',
+      },
     },
     remediation: { mode: 'not-automatic' },
   })}\n-->`;
