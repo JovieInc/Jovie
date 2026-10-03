@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -20,6 +21,12 @@ const workflow = readFileSync(
 );
 const script = workflow
   .split('        run: |\n')[2]
+  .split('\n      - ')[0]
+  .split('\n')
+  .map(line => line.replace(/^ {10}/, ''))
+  .join('\n');
+const fetchReceiptScript = workflow
+  .split('        run: |\n')[1]
   .split('\n      - ')[0]
   .split('\n')
   .map(line => line.replace(/^ {10}/, ''))
@@ -211,5 +218,92 @@ else process.exit(2);
     expect(result.stdout).toContain(
       'Current main CI attempt sealed no product-lane release receipt'
     );
+  });
+});
+
+describe('Staging Controller sealed receipt fetch', () => {
+  function fetchReceipt(artifacts) {
+    const root = mkdtempSync(join(tmpdir(), 'staging-receipt-fetch-'));
+    roots.push(root);
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    // Mirrors real `gh api` parsing: exactly `api <endpoint> --jq <expr>`;
+    // jq-style flags like `--arg` are rejected with "accepts 1 arg(s)".
+    const gh = join(bin, 'gh');
+    writeFileSync(
+      gh,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] !== 'api' ||
+    !(args.length === 2 ||
+      (args.length === 4 && args[2] === '--jq'))) {
+  console.error('accepts 1 arg(s), received ' + (args.length - 1));
+  process.exit(1);
+}
+const endpoint = args[1];
+if (endpoint.includes('/actions/artifacts?')) {
+  const name = new URLSearchParams(endpoint.split('?')[1]).get('name');
+  if (name !== process.env.RECEIPT_NAME) process.exit(2);
+  const artifacts = JSON.parse(process.env.ARTIFACTS_JSON).artifacts;
+  // Equivalent of: [.artifacts[] | select(.expired == false)]
+  //   | sort_by(.id) | last | .id // empty
+  const active = artifacts.filter(a => a.expired === false)
+    .sort((a, b) => a.id - b.id);
+  console.log(active.length ? String(active[active.length - 1].id) : '');
+} else if (endpoint ===
+  'repos/JovieInc/Jovie/actions/artifacts/8/zip') {
+  process.stdout.write('zip-bytes');
+} else process.exit(2);
+`
+    );
+    chmodSync(gh, 0o755);
+    const unzip = join(bin, 'unzip');
+    writeFileSync(
+      unzip,
+      `#!/usr/bin/env bash
+dir="\${@: -1}"
+printf '%s' '{}' > "$dir/release.json"
+`
+    );
+    chmodSync(unzip, 0o755);
+    const receiptName = `product-lane-release-${sourceSha}-1`;
+    const result = spawnSync('bash', ['-c', fetchReceiptScript], {
+      encoding: 'utf8',
+      timeout: 5000,
+      env: {
+        ...process.env,
+        PATH: `${bin}${delimiter}${process.env.PATH}`,
+        RUNNER_TEMP: root,
+        REPOSITORY: 'JovieInc/Jovie',
+        EXPECTED_SHA: sourceSha,
+        SOURCE_CI_RUN_ID: '100',
+        SOURCE_CI_RUN_ATTEMPT: '1',
+        RECEIPT_NAME: receiptName,
+        ARTIFACTS_JSON: JSON.stringify({ artifacts }),
+      },
+    });
+    return {
+      result,
+      receiptPath: join(root, 'product-lane-release', 'release.json'),
+    };
+  }
+
+  it('fetches the newest unexpired sealed receipt via a name-filtered api call', () => {
+    const receiptName = `product-lane-release-${sourceSha}-1`;
+    const { result, receiptPath } = fetchReceipt([
+      { id: 5, name: receiptName, expired: false },
+      { id: 9, name: receiptName, expired: true },
+      { id: 8, name: receiptName, expired: false },
+    ]);
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(readFileSync(receiptPath, 'utf8'))).toEqual({});
+  });
+
+  it('proceeds without a receipt when the attempt sealed none', () => {
+    const { result, receiptPath } = fetchReceipt([]);
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(existsSync(receiptPath)).toBe(false);
   });
 });

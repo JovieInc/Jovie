@@ -2411,3 +2411,251 @@ extension ChatRepositoryTests {
     }
   }
 }
+
+extension ChatRepositoryTests {
+  @Test(arguments: ["failed", "canceled"],
+        ["cancel-before", "replace-before", "reject-before", "cancel-held", "replace-held", "reject-held"])
+  func retryKeepsOriginalRowsUntilAdmission(status: String, stage: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let h = try OwnedChatHarness(); defer { h.cleanup() }
+      let snapshot = retryAdmissionSnapshot(status)
+      await h.cache.store(snapshot, for: "same-user")
+      let gate = ProfileLoadGate()
+      let held = stage.hasSuffix("held")
+      let client = RetryAdmissionClient(h.authorization, before: held ? [0: gate] : [:])
+      if stage.hasPrefix("reject") { await client.reject(with: MobileChatClientError.transportFailed(code: -1009)) }
+      let repository = h.repository(client)
+      await repository.bootstrap()
+      let original = repository.timeline
+      if stage == "replace-before" { h.replace() }
+      let task = Task {
+        if stage == "cancel-before" { withUnsafeCurrentTask { $0?.cancel() } }
+        await repository.retry(clientTurnId: "original")
+        await gate.ownerFinished()
+      }
+      let entered = await gate.waitUntilEntered()
+      let whileHeld = repository.timeline
+      if stage == "cancel-held" { task.cancel() }
+      if stage == "replace-held" { h.replace() }
+      await gate.complete(true); await task.value
+      let warm = await h.cache.load(for: "same-user")
+      let disk = await ChatCache(defaults: h.defaults).load(for: "same-user")
+      #expect(entered == held)
+      #expect(whileHeld == original && repository.timeline == original)
+      #expect(warm == snapshot && disk == snapshot)
+      #expect(await client.requests.isEmpty)
+      #expect(await client.attempts == (stage == "cancel-before" || stage == "replace-before" ? 0 : 1))
+      #expect(!repository.isSending && !repository.isOffline && repository.lastErrorMessage == nil)
+      if stage == "cancel-held" {
+        // A rejected attempt releases its duplicate reservation for a later valid retry.
+        await repository.retry(clientTurnId: "original")
+        #expect(await client.requests.count == 1)
+        #expect(repository.timeline.count == 2 && repository.timeline.first?.clientTurnId != "original")
+      }
+    }
+  }
+
+  @Test(arguments: ["thread", "draft", "round-trip", "same-thread"])
+  func heldRetryCannotDeleteRowsAfterSelectionOrContentReplacement(change: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let h = try OwnedChatHarness(); defer { h.cleanup() }
+      await h.cache.store(retryAdmissionSnapshot("failed"), for: "same-user")
+      let gate = ProfileLoadGate()
+      let client = RetryAdmissionClient(h.authorization, before: [0: gate])
+      let repository = h.repository(client)
+      await repository.bootstrap()
+      let original = repository.timeline
+      let task = Task { await repository.retry(clientTurnId: "original"); await gate.ownerFinished() }
+      let entered = await gate.waitUntilEntered()
+      let beforeChange = repository.timeline
+      if change == "thread" { await repository.openConversation("thread-b") }
+      else if change == "same-thread" { await repository.openConversation("thread") }
+      else {
+        repository.startNewConversation()
+        if change == "round-trip" { await repository.bootstrap() }
+      }
+      let selected = repository.timeline
+      let activeID = repository.activeConversationID
+      let cache = await h.cache.load(for: "same-user")
+      await gate.complete(true); await task.value
+      #expect(entered && beforeChange == original)
+      #expect(await client.requests.isEmpty)
+      #expect(repository.timeline == selected && repository.activeConversationID == activeID)
+      #expect(await h.cache.load(for: "same-user") == cache)
+      #expect(await ChatCache(defaults: h.defaults).load(for: "same-user") == cache)
+      #expect(!repository.isSending && !repository.isOffline && repository.lastErrorMessage == nil)
+      if change == "same-thread" { #expect(repository.timeline.first?.content == "Replacement user row") }
+      if change == "round-trip" { #expect(repository.timeline == original) }
+    }
+  }
+
+  @Test(arguments: ["failed", "canceled"])
+  func duplicateRetryAdmitsOneFreshTurnAndAuthorizationCallbackIsIdempotent(status: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let h = try OwnedChatHarness(); defer { h.cleanup() }
+      await h.cache.store(retryAdmissionSnapshot(status), for: "same-user")
+      let firstGate = ProfileLoadGate(), duplicateGate = ProfileLoadGate()
+      let client = RetryAdmissionClient(h.authorization, before: [0: firstGate, 1: duplicateGate])
+      let repository = h.repository(client)
+      await repository.bootstrap()
+      let original = repository.timeline
+      let first = Task { await repository.retry(clientTurnId: "original"); await firstGate.ownerFinished() }
+      let firstEntered = await firstGate.waitUntilEntered()
+      let duplicate = Task { await repository.retry(clientTurnId: "original"); await duplicateGate.ownerFinished() }
+      let duplicateEntered = await duplicateGate.waitUntilEntered()
+      let heldRows = repository.timeline
+      await firstGate.complete(true); await duplicateGate.complete(true)
+      await first.value; await duplicate.value
+      let requests = await client.requests
+      let turnID = try #require(requests.first?.clientTurnId)
+      #expect(firstEntered && !duplicateEntered)
+      #expect(heldRows == original)
+      #expect(await client.attempts == 1)
+      #expect(requests.count == 1 && requests.first?.text == "Retry me")
+      #expect(turnID != "original")
+      #expect(repository.timeline.count == 2)
+      #expect(repository.timeline.allSatisfy { $0.clientTurnId == turnID })
+      #expect(repository.timeline.first?.content == "Retry me")
+      #expect(repository.timeline.last?.content == "answer-0" && repository.timeline.last?.status == .completed)
+      #expect(!repository.isSending)
+      let warm = await h.cache.load(for: "same-user")
+      let disk = await ChatCache(defaults: h.defaults).load(for: "same-user")
+      #expect(warm == disk)
+      #expect(warm?.messagesByConversationID["thread"]?.map(\.clientMessageId) == [turnID, turnID])
+    }
+  }
+
+  @Test func retryOfAnotherFailedTurnStillInterruptsAnActiveSend() async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let h = try OwnedChatHarness(); defer { h.cleanup() }
+      await h.cache.store(retryAdmissionSnapshot("failed"), for: "same-user")
+      let sendingGate = ProfileLoadGate(), retryGate = ProfileLoadGate()
+      let client = RetryAdmissionClient(h.authorization, before: [1: retryGate], after: [0: sendingGate])
+      let cache = HeldChatCache(h.cache)
+      let repository = h.repository(client, cache: cache)
+      await repository.bootstrap()
+      let original = repository.timeline
+      let sending = Task { await repository.send(text: "Another turn"); await sendingGate.ownerFinished() }
+      let sendEntered = await sendingGate.waitUntilEntered()
+      let retry = Task { await repository.retry(clientTurnId: "original"); await retryGate.ownerFinished() }
+      let retryEntered = await retryGate.waitUntilEntered()
+      let beforeAdmission = repository.timeline
+      await sendingGate.complete(true); await sending.value
+      let stillSending = repository.isSending
+      let writesBeforeAdmission = await cache.writes
+      await retryGate.complete(true); await retry.value
+      let requests = await client.requests
+      #expect(sendEntered && retryEntered && stillSending)
+      #expect(Array(beforeAdmission.prefix(2)) == original)
+      #expect(beforeAdmission.last?.status == .completed && beforeAdmission.last?.content == "painted-0")
+      let writesAfterAdmission = await cache.writes
+      #expect(writesBeforeAdmission == 0 && writesAfterAdmission == 1)
+      #expect(requests.map(\.text) == ["Another turn", "Retry me"])
+      #expect(Set(requests.map(\.clientTurnId)).count == 2)
+      #expect(repository.timeline.count == 4 && !repository.timeline.contains { $0.clientTurnId == "original" })
+      let interrupted = repository.timeline.dropFirst().first
+      #expect(interrupted?.content == "painted-0" && interrupted?.status == .completed)
+      #expect(repository.timeline.last?.content == "answer-1" && repository.timeline.last?.status == .completed)
+      #expect(!repository.isSending && !repository.isOffline && repository.lastErrorMessage == nil)
+      let warm = await h.cache.load(for: "same-user")
+      let disk = await ChatCache(defaults: h.defaults).load(for: "same-user")
+      #expect(warm == disk)
+      #expect(warm?.messagesByConversationID["thread"]?.count == 4)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func rejectedRetryDeliversExpiryBeforeCancellationAndSelectionGuards(newDraft: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let h = try OwnedChatHarness(); defer { h.cleanup() }
+      let snapshot = retryAdmissionSnapshot("failed")
+      await h.cache.store(snapshot, for: "same-user")
+      let gate = ProfileLoadGate()
+      let client = RetryAdmissionClient(h.authorization, before: [0: gate])
+      var receipts: [NativeSessionExpiryReceipt] = []
+      let repository = h.repository(client) { receipts.append($0) }
+      await repository.bootstrap()
+      let original = repository.timeline
+      let task = Task { await repository.retry(clientTurnId: "original"); await gate.ownerFinished() }
+      let entered = await gate.waitUntilEntered()
+      let beforeExpiry = repository.timeline
+      let receipt: NativeSessionExpiryReceipt
+      do {
+        receipt = try nativeExpiryReceipt {
+          try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: h.authorization, allowRetry: false)
+        }
+      } catch {
+        await gate.complete(true); await task.value
+        throw error
+      }
+      await client.reject(with: NativeSessionRequestError.expired(receipt))
+      task.cancel()
+      if newDraft { repository.startNewConversation() }
+      await gate.complete(true); await task.value
+      #expect(entered && beforeExpiry == original)
+      #expect(receipts == [receipt])
+      #expect(await client.requests.isEmpty)
+      #expect(repository.timeline == (newDraft ? [] : original))
+      #expect(await h.cache.load(for: "same-user") == snapshot)
+      #expect(await ChatCache(defaults: h.defaults).load(for: "same-user") == snapshot)
+      #expect(!repository.isSending && !repository.isOffline && repository.lastErrorMessage == nil)
+    }
+  }
+}
+
+private func retryAdmissionSnapshot(_ status: String, userText: String = "Retry me") -> CachedChatSnapshot {
+  let messages = [
+    MobileConversationMessage(id: "original-user", role: "user", content: userText,
+      clientMessageId: "original", turnId: "old-turn", turnStatus: "completed",
+      createdAt: "2026-01-01T00:00:00Z", requiresWebHandoff: false),
+    MobileConversationMessage(id: "original-assistant", role: "assistant", content: "Original answer",
+      clientMessageId: "original", turnId: "old-turn", turnStatus: status,
+      createdAt: "2026-01-01T00:00:01Z", requiresWebHandoff: false),
+  ]
+  return CachedChatSnapshot(conversations: [], messagesByConversationID: ["thread": messages],
+    cachedAt: Date(timeIntervalSince1970: 1), activeConversationID: "thread")
+}
+
+// Each attempted call has a distinct, completion-aware gate. An incorrect duplicate
+// can enter its own gate without overwriting the first call's continuation.
+private actor RetryAdmissionClient: MobileChatClientProtocol {
+  let authorization: NativeRequestAuthorization
+  let before: [Int: ProfileLoadGate]
+  let after: [Int: ProfileLoadGate]
+  var attempts = 0
+  var requests: [MobileChatTurnRequest] = []
+  private var rejection: Error?
+  init(_ authorization: NativeRequestAuthorization, before: [Int: ProfileLoadGate] = [:],
+       after: [Int: ProfileLoadGate] = [:]) {
+    self.authorization = authorization; self.before = before; self.after = after
+  }
+  func reject(with error: Error) { rejection = error }
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] { [] }
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
+    MobileConversationDetailResponse(conversation: MobileConversationRecord(id: id, title: "Replacement",
+      createdAt: "2026-01-01", updatedAt: "2026-01-01"),
+      messages: retryAdmissionSnapshot("failed", userText: "Replacement user row").messagesByConversationID["thread"]!,
+      hasMore: false)
+  }
+  func sendTurn(_ request: MobileChatTurnRequest,
+                onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?) async throws -> [MobileChatStreamEvent] {
+    try await sendTurn(request, onAuthorization: nil, onEvent: onEvent)
+  }
+  func sendTurn(_ request: MobileChatTurnRequest,
+                onAuthorization: (@MainActor @Sendable (NativeSessionOwnership?) async throws -> Void)?,
+                onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?) async throws -> [MobileChatStreamEvent] {
+    let index = attempts; attempts += 1
+    if let gate = before[index] { _ = await gate.wait() }
+    if let rejection { throw rejection }
+    try await onAuthorization?(authorization.ownership)
+    try await onAuthorization?(authorization.ownership)
+    requests.append(request)
+    await onEvent?(.turnReserved(conversationId: "thread", turnId: "turn-\(index)", clientTurnId: request.clientTurnId))
+    await onEvent?(.assistantDelta(clientTurnId: request.clientTurnId, text: "painted-\(index)"))
+    await onEvent?(.turnState(clientTurnId: request.clientTurnId, state: "streaming", eveWorkId: nil))
+    if let gate = after[index] { _ = await gate.wait() }
+    await onEvent?(.assistantCompleted(clientTurnId: request.clientTurnId, conversationId: "thread",
+      turnId: "turn-\(index)", text: "answer-\(index)"))
+    return []
+  }
+}

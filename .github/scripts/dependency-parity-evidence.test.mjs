@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -249,6 +250,7 @@ test('malformed graph hashes, receipts and incomplete member collections fail cl
 
 test('writer measures installed package bytes rather than declared versions and binds real git HEAD', () => {
   const root = mkdtempSync(join(tmpdir(), 'dependency-writer-test-')),
+    receipts = mkdtempSync(join(tmpdir(), 'dependency-receipt-test-')),
     oldCwd = process.cwd();
   try {
     const installed = join(root, 'node_modules', 'js-yaml');
@@ -291,6 +293,7 @@ test('writer measures installed package bytes rather than declared versions and 
       GITHUB_EVENT_PATH: eventPath,
       GITHUB_RUN_ID: '123',
       GITHUB_RUN_ATTEMPT: '2',
+      DEPENDENCY_PARITY_RECEIPT_DIR: receipts,
     };
     const execute = (command, args, options) =>
       command === 'pnpm'
@@ -307,9 +310,11 @@ test('writer measures installed package bytes rather than declared versions and 
     assert.equal(value.headSha, headSha);
     assert.equal(value.runAttempt, 2);
     assert.equal(
-      JSON.parse(readFileSync('dep-digest.json', 'utf8')).resolvedDigest,
+      JSON.parse(readFileSync(join(receipts, 'dep-digest.json'), 'utf8'))
+        .resolvedDigest,
       value.resolvedDigest
     );
+    assert.ok(!existsSync(join(root, 'dep-digest.json')));
     assert.throws(() => writeDependencyDigest(environment, execute), /EEXIST/);
     writeFileSync(
       eventPath,
@@ -330,6 +335,7 @@ test('writer measures installed package bytes rather than declared versions and 
   } finally {
     process.chdir(oldCwd);
     rmSync(root, { recursive: true, force: true });
+    rmSync(receipts, { recursive: true, force: true });
   }
 });
 

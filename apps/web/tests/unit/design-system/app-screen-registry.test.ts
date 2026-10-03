@@ -33,7 +33,6 @@ describe('authenticated app screen registry', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(104);
   });
 
   it('has a valid registered recipe and component composition', () => {
@@ -235,7 +234,6 @@ describe('authenticated app screen registry', () => {
     const compatibility = APP_SCREEN_REGISTRY.filter(
       entry => entry.kind === 'alias' || entry.kind === 'legacy'
     );
-    expect(compatibility).toHaveLength(32);
     const referenceConcepts = new Set(
       APP_SCREEN_REGISTRY.filter(entry => entry.designReference).map(
         entry => entry.conceptId

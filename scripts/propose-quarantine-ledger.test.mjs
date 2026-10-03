@@ -8,11 +8,80 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { buildQuarantineEvidence } from '../.github/scripts/collect-quarantine-evidence.mjs';
 import { proposeQuarantineLedger } from './propose-quarantine-ledger.mjs';
+
+test('the commissioned recovery writer cannot slow or supersede the hot report', () => {
+  const { load } = createRequire(import.meta.url)('js-yaml');
+  const fast = load(
+    readFileSync('.github/workflows/test-flakiness-report.yml', 'utf8')
+  );
+  const recovery = load(
+    readFileSync('.github/workflows/quarantine-recovery.yml', 'utf8')
+  );
+  assert.equal(fast.on.workflow_run.branches[0], 'main');
+  assert.equal(fast.concurrency['cancel-in-progress'], true);
+  assert.ok(!JSON.stringify(fast).includes('collect-quarantine-evidence.mjs'));
+  assert.ok(!recovery.on.pull_request && !recovery.on.push);
+  assert.deepEqual(recovery.on.workflow_run.workflows, ['CI']);
+  assert.deepEqual(recovery.on.workflow_run.types, ['completed']);
+  assert.equal(recovery.concurrency['cancel-in-progress'], false);
+  assert.deepEqual(recovery.permissions, { contents: 'read', actions: 'read' });
+  const job = recovery.jobs['recover-quarantine'];
+  assert.equal(
+    job.if,
+    "${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' && github.event_name != 'workflow_run' }}"
+  );
+  const checkout = job.steps.find(step =>
+    step.uses?.startsWith('actions/checkout@')
+  );
+  assert.equal(checkout.with.ref, 'main');
+  assert.equal(checkout.with['persist-credentials'], false);
+  const collect = job.steps.find(step => step.id === 'collect');
+  assert.equal(collect.env.GH_TOKEN, '${{ github.token }}');
+  const intake = job.steps.find(step => step.id === 'intake');
+  assert.ok(intake.if.includes("steps.collect.outcome == 'success'"));
+  assert.ok(intake.if.includes("steps.analyze.outcome == 'success'"));
+  const token = job.steps.find(step => step.id === 'proposal-token');
+  assert.ok(token.if.includes("steps.intake.outcome == 'success'"));
+  assert.deepEqual(
+    Object.keys(token.with)
+      .filter(key => key.startsWith('permission-'))
+      .sort(),
+    ['permission-contents', 'permission-pull-requests']
+  );
+  const writer = job.steps.find(
+    step => step.run === 'node scripts/propose-quarantine-ledger.mjs'
+  );
+  assert.ok(writer.if.includes("steps.intake.outcome == 'success'"));
+  assert.ok(writer.if.includes("steps.proposal-token.outcome == 'success'"));
+  const publisher = recovery.jobs['publish-queue-results'];
+  for (const guard of [
+    "vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true'",
+    "github.event_name == 'workflow_run'",
+    'github.event.workflow_run.workflow_id == 178737329',
+    "github.event.workflow_run.event == 'merge_group'",
+    'github.event.workflow_run.head_repository.full_name == github.repository',
+  ])
+    assert.ok(publisher.if.includes(guard));
+  assert.deepEqual(publisher.permissions, {
+    contents: 'read',
+    actions: 'read',
+  });
+  const upload = publisher.steps.find(step =>
+    step.uses?.startsWith('codecov/test-results-action@')
+  );
+  assert.equal(upload.if, "${{ steps.reports.outputs.upload == 'true' }}");
+  assert.equal(
+    upload.with.override_commit,
+    '${{ steps.reports.outputs.head_sha }}'
+  );
+  assert.ok(!JSON.stringify(publisher).includes('create-github-app-token'));
+});
 
 const roots = [];
 afterEach(() => {

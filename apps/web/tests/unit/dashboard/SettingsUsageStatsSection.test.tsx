@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { SettingsUsageStatsSection } from '../../../components/features/dashboard/organisms/SettingsUsageStatsSection';
@@ -39,7 +40,10 @@ describe('SettingsUsageStatsSection', () => {
     });
 
     render(<SettingsUsageStatsSection />);
-    expect(screen.getByTestId('settings-usage-panel')).toHaveClass('min-h-96');
+    expect(screen.getByTestId('settings-usage-panel')).toHaveClass(
+      'min-h-64',
+      'sm:min-h-56'
+    );
   });
 
   it('renders empty and error states without changing panel geometry', () => {
@@ -50,7 +54,10 @@ describe('SettingsUsageStatsSection', () => {
     });
     const { rerender } = render(<SettingsUsageStatsSection />);
     expect(screen.getByText('No usage recorded')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-usage-panel')).toHaveClass('min-h-96');
+    expect(screen.getByTestId('settings-usage-panel')).toHaveClass(
+      'min-h-64',
+      'sm:min-h-56'
+    );
 
     mockUseChatUsageQuery.mockReturnValue({
       data: undefined,
@@ -59,7 +66,150 @@ describe('SettingsUsageStatsSection', () => {
     });
     rerender(<SettingsUsageStatsSection />);
     expect(screen.getByText('Usage unavailable')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-usage-panel')).toHaveClass('min-h-96');
+    expect(screen.getByTestId('settings-usage-panel')).toHaveClass(
+      'min-h-64',
+      'sm:min-h-56'
+    );
+  });
+
+  it('keeps Retry available and focused after a failed keyboard retry', async () => {
+    const user = userEvent.setup();
+    let rejectRetry!: (reason: Error) => void;
+    const refetch = vi.fn(
+      () =>
+        new Promise((_, reject) => {
+          rejectRetry = reject;
+        })
+    );
+    mockUseChatUsageQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('Offline'),
+      refetch,
+    });
+    render(<SettingsUsageStatsSection />);
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    retry.focus();
+    await user.keyboard('{Enter}');
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Retrying…' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(retry).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.getByText('Checking your latest usage…')).toBeVisible();
+    expect(screen.queryByText('No usage recorded')).not.toBeInTheDocument();
+    await act(async () => rejectRetry(new Error('Still offline')));
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+    expect(retry).toHaveFocus();
+    expect(screen.getByRole('alert')).toHaveTextContent('Usage unavailable');
+  });
+
+  it('focuses the verified usage result after Retry succeeds', async () => {
+    const user = userEvent.setup();
+    let resolveRetry!: (result: { data: ChatUsageData; error: null }) => void;
+    const refetch = vi.fn(
+      () =>
+        new Promise<{ data: ChatUsageData; error: null }>(resolve => {
+          resolveRetry = resolve;
+        })
+    );
+    mockUseChatUsageQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('Unavailable'),
+      refetch,
+    });
+    const view = render(<SettingsUsageStatsSection />);
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    mockUseChatUsageQuery.mockReturnValue({
+      data: baseUsage,
+      isLoading: false,
+      error: null,
+      refetch,
+    });
+    await act(async () => resolveRetry({ data: baseUsage, error: null }));
+    view.rerender(<SettingsUsageStatsSection />);
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Weekly Usage' })).toHaveFocus()
+    );
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '11');
+    expect(
+      screen.queryByRole('button', { name: /retry/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('preserves focus outside the panel when Retry completes', async () => {
+    const user = userEvent.setup();
+    let resolveRetry!: (result: { data: ChatUsageData; error: null }) => void;
+    const refetch = vi.fn(
+      () =>
+        new Promise<{ data: ChatUsageData; error: null }>(resolve => {
+          resolveRetry = resolve;
+        })
+    );
+    mockUseChatUsageQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('Offline'),
+      refetch,
+    });
+    const content = (
+      <>
+        <SettingsUsageStatsSection />
+        <button type='button'>Next Setting</button>
+      </>
+    );
+    const view = render(content);
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Next Setting' })).toHaveFocus();
+    mockUseChatUsageQuery.mockReturnValue({
+      data: baseUsage,
+      isLoading: false,
+      error: null,
+      refetch,
+    });
+    await act(async () => resolveRetry({ data: baseUsage, error: null }));
+    view.rerender(
+      <>
+        <SettingsUsageStatsSection />
+        <button type='button'>Next Setting</button>
+      </>
+    );
+    expect(screen.getByRole('button', { name: 'Next Setting' })).toHaveFocus();
+    expect(
+      screen.getByRole('region', { name: 'Weekly Usage' })
+    ).not.toHaveFocus();
+  });
+
+  it('does not move focus when a failed retry later recovers in the background', async () => {
+    const user = userEvent.setup();
+    const error = new Error('Still unavailable');
+    const refetch = vi.fn().mockResolvedValue({ data: undefined, error });
+    mockUseChatUsageQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error,
+      refetch,
+    });
+    const view = render(<SettingsUsageStatsSection />);
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
+
+    mockUseChatUsageQuery.mockReturnValue({
+      data: baseUsage,
+      isLoading: false,
+      error: null,
+      refetch,
+    });
+    view.rerender(<SettingsUsageStatsSection />);
+    expect(
+      screen.getByRole('region', { name: 'Weekly Usage' })
+    ).not.toHaveFocus();
   });
 
   it('renders exactly one healthy weekly meter', () => {
@@ -85,8 +235,9 @@ describe('SettingsUsageStatsSection', () => {
         .getByTestId('usage-meter-track')
         .querySelectorAll('[data-threshold]')
     ).toHaveLength(1);
-    expect(screen.getByText('Within Weekly Limit')).toHaveClass(
-      'border-success/25'
+    expect(screen.getByText('Within Weekly Limit')).toHaveAttribute(
+      'data-variant',
+      'outline'
     );
   });
 
@@ -129,8 +280,9 @@ describe('SettingsUsageStatsSection', () => {
     expect(track.querySelector('[data-threshold="warning"]')).toHaveStyle({
       left: '20%',
     });
-    expect(screen.getByText('Near Weekly Limit')).toHaveClass(
-      'border-warning/25'
+    expect(screen.getByText('Near Weekly Limit')).toHaveAttribute(
+      'data-variant',
+      'outline'
     );
     expect(screen.getByRole('link', { name: /view plans/i })).toHaveAttribute(
       'href',
@@ -154,10 +306,9 @@ describe('SettingsUsageStatsSection', () => {
     expect(
       screen.getByText("You've reached this week's chat limit")
     ).toBeInTheDocument();
-    expect(screen.getByText('Weekly Limit Reached')).toHaveClass(
-      'border-error/25',
-      'bg-error/10',
-      'text-error'
+    expect(screen.getByText('Weekly Limit Reached')).toHaveAttribute(
+      'data-variant',
+      'outline'
     );
     const meter = screen.getByRole('progressbar', {
       name: 'Weekly Messages remaining',

@@ -72,6 +72,7 @@ interface HealthCheckResult {
     activeSubscriptionsInStripe: number;
     recentWebhookCount: number;
     unprocessedWebhookCount: number;
+    oldestUnprocessedWebhookAt: string | null;
     lastReconciliationAt: string | null;
     lastBillingEventAt: string | null;
   };
@@ -156,7 +157,12 @@ export async function GET(request: Request) {
 
       // Count stuck (unprocessed) webhooks older than 30 minutes
       db
-        .select({ count: drizzleSql<number>`count(*)` })
+        .select({
+          count: drizzleSql<number>`count(*)`,
+          oldestCreatedAt: drizzleSql<
+            Date | string | null
+          >`min(${stripeWebhookEvents.createdAt})`,
+        })
         .from(stripeWebhookEvents)
         .where(
           and(
@@ -197,6 +203,8 @@ export async function GET(request: Request) {
     // Parse results
     const recentWebhookCount = Number(recentWebhooks[0]?.count ?? 0);
     const unprocessedWebhookCount = Number(stuckWebhooks[0]?.count ?? 0);
+    const oldestUnprocessedWebhookAt =
+      stuckWebhooks[0]?.oldestCreatedAt ?? null;
     const proUsersInDb = Number(proUserCount[0]?.count ?? 0);
     const lastReconciliationAt = lastReconciliation[0]?.createdAt ?? null;
     const lastBillingEventAt = lastBillingEvent[0]?.lastBillingEventAt ?? null;
@@ -239,6 +247,9 @@ export async function GET(request: Request) {
         activeSubscriptionsInStripe: stripeSubscriptionCount,
         recentWebhookCount,
         unprocessedWebhookCount,
+        oldestUnprocessedWebhookAt: toISOStringOrNull(
+          oldestUnprocessedWebhookAt
+        ),
         lastReconciliationAt: toISOStringOrNull(lastReconciliationAt),
         lastBillingEventAt: toISOStringOrNull(lastBillingEventAt),
       },
