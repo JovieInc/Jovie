@@ -511,6 +511,23 @@ finally:
 PY
 }
 
+remove_rollback_transaction() {
+  ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import os, pathlib, shutil, sys
+root = pathlib.Path(sys.argv[1])
+target = pathlib.Path(os.environ["ROLLBACK_DIR"])
+if target != root / "promotion-transaction":
+    raise SystemExit(1)
+if target.exists():
+    shutil.rmtree(target)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
 backup_target() {
   local key="$1" target="$2"
   if [ -e "$target" ] || [ -L "$target" ]; then
@@ -570,7 +587,13 @@ cleanup() {
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
   if [ "$promotion_complete" -eq 1 ] || { [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; }; then
-    [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
+    if [ -n "$rollback_dir" ]; then
+      if clear_promotion_hold; then
+        remove_rollback_transaction
+      else
+        rollback_restart_verified=0
+      fi
+    fi
   fi
   if [ -n "$candidate_tmp" ]; then
     chmod -R u+w "$candidate_tmp" >/dev/null 2>&1 || true
@@ -631,7 +654,7 @@ PY
     official_stopped_for_promotion=0
   fi
   clear_promotion_hold
-  rm -rf "$rollback_dir"
+  remove_rollback_transaction
   rollback_dir=""
   promotion_started=0
   echo "RECOVERED_INCOMPLETE_PROMOTION"

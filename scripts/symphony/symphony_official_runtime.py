@@ -84,6 +84,7 @@ DEFAULT_DEAD_LETTER_DIR = (
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
+RUNTIME_OUTPUT_QUEUE_MAX_LINES = 256
 DEFAULT_SHUTDOWN_GRACE_SECONDS = 10.0
 MAX_SHUTDOWN_GRACE_SECONDS = 12.0
 ISSUE_DEAD_LETTER_SCHEMA = "symphony-issue-dead-letter/v1"
@@ -1398,6 +1399,13 @@ def run_official_binary_once(
         except (OSError, PermissionError):
             pass
 
+    def root_target() -> list[int]:
+        # Once Popen has observed the root exit, only a pidfd can safely refer
+        # to that numeric PID; without one it may already have been recycled.
+        if process.pid in pidfds or process.poll() is None:
+            return [process.pid]
+        return []
+
     def descendant_pids() -> list[int]:
         try:
             if pathlib.Path("/proc").is_dir():
@@ -1439,11 +1447,12 @@ def run_official_binary_once(
     def signal_tree(signum: int) -> None:
         known_descendants.update(descendant_pids())
         targets = list(known_descendants)
-        for pid in [process.pid, *targets]:
+        roots = root_target()
+        for pid in [*roots, *targets]:
             remember(pid)
-        for pid in [process.pid, *targets]:
+        for pid in [*roots, *targets]:
             send(pid, signal.SIGCONT)
-        for pid in [*reversed(targets), process.pid]:
+        for pid in [*reversed(targets), *roots]:
             send(pid, signum)
 
     def terminate_tree() -> None:
@@ -1451,7 +1460,7 @@ def run_official_binary_once(
         if termination_complete:
             return
         known_descendants.update(descendant_pids())
-        targets = [process.pid, *known_descendants]
+        targets = [*root_target(), *known_descendants]
         signal_tree(signal.SIGTERM)
         deadline = time.monotonic() + shutdown_grace
         alive = targets
@@ -1463,7 +1472,7 @@ def run_official_binary_once(
                 remember(pid)
                 send(pid, signal.SIGCONT)
                 send(pid, signal.SIGTERM)
-            targets = [process.pid, *known_descendants]
+            targets = [*root_target(), *known_descendants]
             alive = []
             for pid in targets:
                 try:
@@ -1482,7 +1491,7 @@ def run_official_binary_once(
                 break
             time.sleep(0.02)
         known_descendants.update(descendant_pids())
-        for pid in [process.pid, *known_descendants]:
+        for pid in [*root_target(), *known_descendants]:
             remember(pid)
             send(pid, signal.SIGKILL)
         try:
@@ -1530,12 +1539,24 @@ def run_official_binary_once(
     # Pin the launched root before any wait/reap can make its numeric PID
     # available for reuse.
     remember(process.pid)
-    output_lines: queue.Queue[str] = queue.Queue()
+    if sys.platform.startswith("linux") and (
+        process.pid not in pidfds or not hasattr(signal, "pidfd_send_signal")
+    ):
+        if process.poll() is None:
+            process.terminate()
+        process.wait(timeout=2)
+        raise RuntimeError("Linux root pidfd support is required")
+    output_lines: queue.Queue[tuple[bool, str]] = queue.Queue(
+        maxsize=RUNTIME_OUTPUT_QUEUE_MAX_LINES
+    )
 
     def read_output() -> None:
-        assert process.stdout is not None
-        for output_line in process.stdout:
-            output_lines.put(output_line)
+        try:
+            assert process.stdout is not None
+            for output_line in process.stdout:
+                output_lines.put((False, output_line))
+        finally:
+            output_lines.put((True, ""))
 
     output_reader = threading.Thread(target=read_output, daemon=True)
     output_reader.start()
@@ -1549,14 +1570,19 @@ def run_official_binary_once(
     last_closure_check = 0.0
     try:
         while True:
-            if shutdown.is_set():
-                break
+            # Descendants can keep inherited stdout continuously readable after
+            # the scheduler exits. Observe root completion on every iteration,
+            # then drain the finite remaining output through the reader's EOF.
+            if process.poll() is not None:
+                terminate_tree()
             try:
-                line = output_lines.get(timeout=0.1)
+                eof, line = output_lines.get(timeout=0.1)
             except queue.Empty:
                 if process.poll() is not None:
-                    break
+                    terminate_tree()
                 continue
+            if eof:
+                break
             print(line, end="", flush=True)
             classification = classify_linear_log_line(line)
             if classification and write_rate_limit_gate(gate_file, classification):
@@ -1587,6 +1613,7 @@ def run_official_binary_once(
                     _pause_child_for_closure_hold(
                         process, closure, verdict, max_gate_sleep_seconds, shutdown
                     )
+        output_reader.join()
         returncode = process.wait()
         terminate_tree()
     finally:
