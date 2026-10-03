@@ -194,6 +194,33 @@ test('rejects dirty, foreign, symlinked and stale-head source before any scanner
   }
 });
 
+test('rejects ignored dependencies in the isolated source before scanner admission', async () => {
+  const f = fixture();
+  writeFileSync(join(f.input.sourceRoot, '.gitignore'), 'node_modules/\n');
+  f.git(['add', '.gitignore']);
+  f.git([
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.test',
+    'commit',
+    '--quiet',
+    '-m',
+    'ignore dependencies',
+  ]);
+  f.input.headSha = f.git(['rev-parse', 'HEAD']);
+  mkdirSync(join(f.input.sourceRoot, 'node_modules'));
+  writeFileSync(
+    join(f.input.sourceRoot, 'node_modules', 'untracked.js'),
+    'mutable tool code'
+  );
+  await assert.rejects(
+    runNativeSubscriptionScan(f.input, { execute: f.execute }),
+    /clean exact-head source/
+  );
+  assert.equal(f.calls.length, 0);
+});
+
 test('rejects retained or symlinked scanner workspaces rather than mixing stale findings', async () => {
   for (const linked of [false, true]) {
     const f = fixture();

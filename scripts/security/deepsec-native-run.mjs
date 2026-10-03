@@ -47,17 +47,18 @@ export function boundedNativeCommand(
       try {
         process.kill(-child.pid, 'SIGKILL');
       } catch (failure) {
-        if (failure.code !== 'ESRCH') error = failure;
+        if (failure.code !== 'ESRCH') error ??= failure;
       }
     };
     const timer = setTimeout(() => {
-      error = new Error('native command timed out');
+      error ??= new Error('native command timed out');
       killGroup();
     }, timeoutMs);
     const collect = target => chunk => {
       bytes += chunk.length;
       if (bytes > maxOutputBytes) {
-        error = new Error('native command output exceeded its bound');
+        error ??= new Error('native command output exceeded its bound');
+        clearTimeout(timer);
         killGroup();
         return;
       }
@@ -67,7 +68,7 @@ export function boundedNativeCommand(
     child.stdout.on('data', collect('stdout'));
     child.stderr.on('data', collect('stderr'));
     child.on('error', failure => {
-      error = failure;
+      error ??= failure;
     });
     child.on('close', (status, signal) => {
       clearTimeout(timer);
@@ -104,6 +105,8 @@ export function nativeSourceState(sourceRoot, files) {
   )
     throw new Error('same-repository source checkout required');
   const headSha = git(sourceRoot, ['rev-parse', '--verify', 'HEAD']);
+  // Dependencies and scanner tools belong outside this fresh source clone.
+  // Ignored files could otherwise alter what the agent reads at this SHA.
   const changes = git(sourceRoot, [
     'status',
     '--porcelain=v1',
