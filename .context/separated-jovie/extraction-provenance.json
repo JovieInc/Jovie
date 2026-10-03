@@ -1,0 +1,198 @@
+{
+  "schema": "jovie.agent-extraction/v1",
+  "identity": "jovie",
+  "sourceRepository": "JovieInc/Jovie",
+  "sourceCommit": "92a5cc830f24f69977140f45d4dac4e565ff2223",
+  "transformationInputs": {
+    "vitest.config.ts": {
+      "sha256": "e5fe4839c5d089648f28f61d141c00e27bf0094c83c50e5e8484cdde4f98e8ca"
+    },
+    "scripts/materialize-app.mjs": {
+      "sha256": "278544f3dc3e163c98792dc4d4608481db31a5ebc52d713417c1220402436cc1"
+    },
+    "scripts/templates/select-identity.ts": {
+      "sha256": "2dc165274bb80b5557df040a06a51df5a6f6551d14b0890c35be300981386f81"
+    },
+    "scripts/templates/application-boundary.ts": {
+      "sha256": "b5d0be7ca4ca3bde80e8a7e47029c8b7e239dcf8bf964419711cc6b308bd2c0b"
+    },
+    "scripts/templates/application-boundary.test.ts": {
+      "sha256": "676cc7b3970beaa93d7f31ef9972ca91dc40a270f969c75fd476707cba025bc7"
+    },
+    "../../packages/agent-transport-contracts/index.ts": {
+      "sha256": "bdb0bbaa34538df3e1308d2fd64a41b4c1142e26717f0077efd9c7efe1c999a0"
+    },
+    "../../packages/agent-transport-contracts/package.json": {
+      "sha256": "994955e2b593b693917aa040e604c1957f6a1d4c19d54b9326910fb78a1d264f"
+    }
+  },
+  "sourceWorktreeStatus": "",
+  "sourcePaths": {
+    "scripts/check-built-app.mjs": {
+      "sha256": "6dfad3b3d61982e2a9c230960f04d1377faee2fe30fcd1f71dd8b0026b087ee7"
+    },
+    "package.json": {
+      "sha256": "4387265526b999bb071d98e73ea90d9f2acc54c9ed1729201b29e6fcd9e6e603"
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "e0aeb208b264770d6f5fce0653d686520771d719d96ebf657ac0a47bdd2d6b3a"
+    },
+    "tsconfig.json": {
+      "sha256": "b97f0f41d7a899775614d9dd5c8ed6498d335dd55299296efe4c2e5cf00f0ece"
+    },
+    ".gitignore": {
+      "sha256": "92cf8ca41834acadb1cfa6b39d17ecc65046d9abff3cb2f45392bb0aeb14e14e"
+    },
+    "agent/channels/photon.ts": {
+      "sha256": "b428fd1c206006fd8de42cd2b33ca0e7d6ba660a71e23db202f9f255de39b5c9"
+    },
+    "agent/lib/imessage-allowlist.ts": {
+      "sha256": "39f6ca72fc817a7e9333c3aecf2b0c02bf8154649551031eae3b2c4f1956ca66"
+    },
+    "scripts/jovie-release.mjs": {
+      "sha256": "675c14947da12f5c33b7f842245c5592e61c20e0be6fa019232c9e575a2e40a1"
+    },
+    "tests/jovie-release.test.ts": {
+      "sha256": "2aa299ec23aa01631b89c8f6b258c66a962631959a1cc0c0b350a16810b0d201"
+    },
+    "agent/channels/eve.ts": {
+      "sha256": "6a361eb54110895f8f696e1abe48cf9d78b20c6281e97f807965ce9f5eaddb20"
+    },
+    "agent/tools/jovie_capability_manifest.ts": {
+      "sha256": "b428055bf2ee2ba088af9484faa51a2e38e3f6d676f8f7a4e3c5998793c160bf"
+    },
+    "agent/skills/jovie-action-boundary.md": {
+      "sha256": "6249013997e930b2ac1ec0350a4a268307218a8ed796c8ee1c7acf7128cc6e38"
+    },
+    "tests/eve-channel-auth-contract.test.ts": {
+      "sha256": "320a556b24d7f4079c03a7c5caa3be0cc97e6dcc5332eb837c40dfbc022ab6c7"
+    },
+    "tests/jovie_capability_manifest.test.ts": {
+      "sha256": "85d691c5656ba9e096098aefd42fb2312acd86dc45725016803e62e77165b806"
+    },
+    "identities/jovie/instructions.md": {
+      "sha256": "2a6a584b19f7b198ff6d71ac9246749fcac39033bb684771d8cad4e065b7d468"
+    }
+  },
+  "files": {
+    "scripts/check-built-app.mjs": {
+      "sha256": "6dfad3b3d61982e2a9c230960f04d1377faee2fe30fcd1f71dd8b0026b087ee7"
+    },
+    "package.json": {
+      "sha256": "4cc77e42c249901f6c1d13c72f42bc86e73ccd46e61d06972a21cc3256fbeb56"
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "e0aeb208b264770d6f5fce0653d686520771d719d96ebf657ac0a47bdd2d6b3a"
+    },
+    "tsconfig.json": {
+      "sha256": "b97f0f41d7a899775614d9dd5c8ed6498d335dd55299296efe4c2e5cf00f0ece"
+    },
+    ".gitignore": {
+      "sha256": "92cf8ca41834acadb1cfa6b39d17ecc65046d9abff3cb2f45392bb0aeb14e14e"
+    },
+    "agent/channels/photon.ts": {
+      "sha256": "b428fd1c206006fd8de42cd2b33ca0e7d6ba660a71e23db202f9f255de39b5c9"
+    },
+    "agent/lib/imessage-allowlist.ts": {
+      "sha256": "39f6ca72fc817a7e9333c3aecf2b0c02bf8154649551031eae3b2c4f1956ca66"
+    },
+    "scripts/jovie-release.mjs": {
+      "sha256": "675c14947da12f5c33b7f842245c5592e61c20e0be6fa019232c9e575a2e40a1"
+    },
+    "tests/jovie-release.test.ts": {
+      "sha256": "2aa299ec23aa01631b89c8f6b258c66a962631959a1cc0c0b350a16810b0d201"
+    },
+    "agent/channels/eve.ts": {
+      "sha256": "6a361eb54110895f8f696e1abe48cf9d78b20c6281e97f807965ce9f5eaddb20"
+    },
+    "agent/tools/jovie_capability_manifest.ts": {
+      "sha256": "b428055bf2ee2ba088af9484faa51a2e38e3f6d676f8f7a4e3c5998793c160bf"
+    },
+    "agent/skills/jovie-action-boundary.md": {
+      "sha256": "6249013997e930b2ac1ec0350a4a268307218a8ed796c8ee1c7acf7128cc6e38"
+    },
+    "tests/eve-channel-auth-contract.test.ts": {
+      "sha256": "320a556b24d7f4079c03a7c5caa3be0cc97e6dcc5332eb837c40dfbc022ab6c7"
+    },
+    "tests/jovie_capability_manifest.test.ts": {
+      "sha256": "85d691c5656ba9e096098aefd42fb2312acd86dc45725016803e62e77165b806"
+    },
+    "identities/jovie/instructions.md": {
+      "sha256": "2a6a584b19f7b198ff6d71ac9246749fcac39033bb684771d8cad4e065b7d468"
+    },
+    "agent/runtime-identity.ts": {
+      "sha256": "c99a56fe5e4ebf98fb49cbad32a428b36286420a4641b4670ae73664bfc5a617"
+    },
+    "agent/agent.ts": {
+      "sha256": "5da6a71afe73f3bf9cda70db80c8b4e6334680fa76968611faada1bbf8e04e0d"
+    },
+    "agent/channels/runtime-health.ts": {
+      "sha256": "e783e62c159ee09c3483c70ddcdb61e0c136f4368ed692224373afceb6f52161"
+    },
+    "agent/identity-instructions.ts": {
+      "sha256": "0d9e3cd5d27bcdcf173d724d5bd6aaa03fe9075b981a89369de426889f3ca66a"
+    },
+    "agent/instructions.md": {
+      "sha256": "2a6a584b19f7b198ff6d71ac9246749fcac39033bb684771d8cad4e065b7d468"
+    },
+    "agent/select-identity.ts": {
+      "sha256": "2dc165274bb80b5557df040a06a51df5a6f6551d14b0890c35be300981386f81"
+    },
+    "agent/lib/application-boundary.ts": {
+      "sha256": "b5d0be7ca4ca3bde80e8a7e47029c8b7e239dcf8bf964419711cc6b308bd2c0b"
+    },
+    "agent/tools/agent.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/ask_question.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/bash.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/read_file.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/write_file.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/todo.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/web_fetch.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/web_search.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/load_skill.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/connection_search.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/task_update.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/tools/task_cancel.ts": {
+      "sha256": "f25f2616fe8ea8b280c699abbe5f43d492bc251c0c8fcb9e2c6d572c3bb64618"
+    },
+    "agent/channels/home.ts": {
+      "sha256": "2da4c241addba90400003c513f8682b8d5440a21eb56c86e6f4584f6c25f4c8b"
+    },
+    "vitest.config.ts": {
+      "sha256": "c84341604324ab62f320a3fcdfefb491d54e2a81a61fd8d9ebe25b3dc3bf8621"
+    },
+    "tests/application-boundary.test.ts": {
+      "sha256": "676cc7b3970beaa93d7f31ef9972ca91dc40a270f969c75fd476707cba025bc7"
+    },
+    "AGENTS.md": {
+      "sha256": "78c831e50e69c40477dfb90441e7eb83f59050574766921495f6d36a406f6bbc"
+    }
+  },
+  "contracts": {
+    "shadow": "jovie.ovie-summer-shadow.event/v1",
+    "commercial": "jovie.summer-commercial.snapshot/v1"
+  },
+  "status": "prepared-not-commissioned"
+}

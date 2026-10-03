@@ -1,0 +1,40 @@
+{
+  "name": "@jovie/jovie-agent",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=24"
+  },
+  "imports": {
+    "#*": "./agent/*",
+    "#evals/*": "./evals/*"
+  },
+  "scripts": {
+    "build": "eve build",
+    "dev": "eve dev",
+    "start": "eve start",
+    "test": "vitest run --config vitest.config.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage",
+    "typecheck": "tsc --noEmit",
+    "release": "node scripts/jovie-release.mjs",
+    "test:built": "node scripts/check-built-app.mjs jovie"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@vercel/blob": "2.8.0",
+    "ai": "7.0.58",
+    "braintrust": "3.25.0",
+    "eve": "0.47.7",
+    "just-bash": "3.4.2",
+    "microsandbox": "0.6.16",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@vitest/coverage-v8": "4.1.10",
+    "typescript": "6.0.3",
+    "vercel": "56.3.2",
+    "vitest": "4.1.10"
+  },
+  "private": true
+}
