@@ -1983,6 +1983,18 @@ class DispatchTest(unittest.TestCase):
                 shell.assert_not_called()
                 tick = json.loads((host.state / "tick.json").read_text())
                 self.assertFalse(tick["disk"]["admitted"])
+
+    def test_critical_disk_still_starts_the_worktree_sweep(self):
+        # JOV-7704: admission denial must not also deny the cleanup that would end it.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(lane.disk_guard, "free_pct", return_value=4.0), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="spawned") as sweep, \
+                patch.object(lane.doctor, "run"):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.dispatch(host), 1)
+            sweep.assert_called_once_with(host.state, host.repo, 4.0)
+            self.assertEqual(json.loads((host.state / "tick.json").read_text())["worktreeSweep"], "spawned")
+
     def test_spawns_one_worker_per_slot_without_cleanup_on_the_dispatch_tick(self):
         saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
                  lane.disk_guard.check)
