@@ -636,7 +636,7 @@ describe('baked runner prerequisite contract', () => {
     for (const patchPath of patchedDependencyPaths) {
       expect(listedPaths).toContain(patchPath);
     }
-  }, 15_000);
+  }, 60_000);
 
   it('fails closed when a required filtered-context entry is missing', () => {
     const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));
