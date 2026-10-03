@@ -4,36 +4,33 @@ import {
   validateSitemapXml,
 } from '@/lib/seo/guardrail-check';
 
+const AI_CRAWLER_RULES = [
+  'OAI-SearchBot',
+  'ChatGPT-User',
+  'GPTBot',
+  'Claude-SearchBot',
+  'Claude-Web',
+  'ClaudeBot',
+  'Anthropic-AI',
+  'Applebot-Extended',
+  'PerplexityBot',
+  'Google-Extended',
+]
+  .map(
+    crawler => `User-agent: ${crawler}
+Allow: /
+Allow: /llms.txt
+Disallow: /app/
+`
+  )
+  .join('\n');
+
 const PRODUCTION_ROBOTS = `User-agent: *
 Allow: /
 Disallow: /app/
 Disallow: /api/
 
-User-agent: GPTBot
-Allow: /
-Allow: /llms.txt
-Disallow: /app/
-
-User-agent: ChatGPT-User
-Allow: /
-Allow: /llms.txt
-Disallow: /app/
-
-User-agent: Claude-Web
-Allow: /
-Allow: /llms.txt
-Disallow: /app/
-
-User-agent: PerplexityBot
-Allow: /
-Allow: /llms.txt
-Disallow: /app/
-
-User-agent: Google-Extended
-Allow: /
-Allow: /llms.txt
-Disallow: /app/
-
+${AI_CRAWLER_RULES}
 Sitemap: https://jov.ie/sitemap.xml
 Host: https://jov.ie
 `;
@@ -148,6 +145,56 @@ Sitemap: https://jov.ie/sitemap.xml
     expect(result.ok).toBe(false);
     expect(result.errors.map(error => error.code)).toContain(
       'robots.missing-ai-crawler'
+    );
+  });
+
+  it('a training-token grant does not satisfy the AI search requirement', () => {
+    // GPTBot (training) is allowed but OAI-SearchBot / Claude-SearchBot
+    // (search) have no rules — a classic crawler-purpose mixup.
+    const trainingOnly = `User-agent: *
+Allow: /
+Disallow: /app/
+
+User-agent: GPTBot
+Allow: /
+Disallow: /app/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /app/
+
+User-agent: Claude-Web
+Allow: /
+Disallow: /app/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /app/
+
+Sitemap: https://jov.ie/sitemap.xml
+`;
+    const result = validateRobotsTxt(trainingOnly);
+    expect(result.ok).toBe(false);
+    const searchErrors = result.errors.filter(
+      error => error.code === 'robots.missing-search-crawler'
+    );
+    expect(searchErrors.map(error => error.message).join(' ')).toContain(
+      'OAI-SearchBot'
+    );
+    expect(searchErrors.map(error => error.message).join(' ')).toContain(
+      'Claude-SearchBot'
+    );
+  });
+
+  it('fails when an AI search crawler is globally disallowed', () => {
+    const blocked = PRODUCTION_ROBOTS.replace(
+      'User-agent: OAI-SearchBot\nAllow: /\nAllow: /llms.txt\nDisallow: /app/',
+      'User-agent: OAI-SearchBot\nDisallow: /'
+    );
+    const result = validateRobotsTxt(blocked);
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(error => error.code)).toContain(
+      'robots.search-crawler-blocked'
     );
   });
 });

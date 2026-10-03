@@ -36,6 +36,12 @@ import type {
 import { JOVIE_CERTIFICATION_CONTRACT } from '@/lib/agent-os/certification';
 import { isRenderFixturePathname } from '@/lib/render-fixture-policy';
 import {
+  auditCohortMetadata,
+  auditLlmsTxtStructure,
+  auditRobotsTxt,
+  cohortPageMeta,
+} from '@/lib/seo/agent-site-readiness';
+import {
   auditGeo,
   auditOrphans,
   type GeoPageFamily,
@@ -46,6 +52,7 @@ import {
 } from '@/lib/seo/geo-certification';
 import {
   certifyPage,
+  type ExtractedSeoHead,
   extractSeoHead,
   SEO_CERTIFICATION_CONTRACT,
   type SeoCheck,
@@ -196,6 +203,8 @@ export interface SeoSweepInput {
   readonly now: Date;
   /** llms.txt body from the same build, when available. */
   readonly llmsTxt: string | null;
+  /** robots.txt body from the same build, when available. */
+  readonly robotsTxt?: string | null;
   readonly isSiblingPath?: (pathname: string) => boolean;
   readonly siteOrigin?: string;
 }
@@ -254,6 +263,112 @@ function seoReceiptsWithDigest(
   );
 }
 
+function finalizeResult(
+  target: SeoSweepTarget,
+  source: string,
+  html: string | null,
+  certification: SeoPageCertification,
+  artifact: Record<string, unknown>,
+  input: SeoSweepInput,
+  /** Site-file pseudo-routes are not shaped like pages; skip the page schema. */
+  pageArtifact = true
+): SeoSweepRouteResult {
+  const parsedArtifact = pageArtifact
+    ? FactorySeoAgentSchema.safeParse(artifact)
+    : null;
+  const schemaIssues =
+    parsedArtifact === null || parsedArtifact.success
+      ? []
+      : parsedArtifact.error.issues.map(
+          issue => `${issue.path.join('.') || 'artifact'}: ${issue.message}`
+        );
+  const receipts = seoReceiptsWithDigest(
+    certification,
+    input.sourceSha,
+    input.runRef
+  );
+  const failedChecks = certification.checks.filter(
+    check => check.status === 'failed'
+  );
+  const scored = certification.checks.filter(check => check.status !== 'warn');
+  const stageReceipt = applyStagePassedBit(
+    {
+      schema: 'jovie.factory-receipt/v1',
+      pageId: `route:${target.pathname}`,
+      stage: 'seo-agent',
+      attempt: 1,
+      inputDigest: sha256(html ?? ''),
+      outputDigest: sha256(JSON.stringify(artifact)),
+      producer: null,
+      evaluators: [
+        {
+          id: 'seo-certify',
+          family: FACTORY_CERTIFIER_HARNESS,
+          kind: 'deterministic',
+          verdict: failedChecks.length === 0 ? 'pass' : 'fail',
+          score:
+            scored.length === 0
+              ? 0
+              : (scored.length - failedChecks.length) / scored.length,
+          rubricVersion: SEO_CERTIFICATION_CONTRACT,
+        },
+      ],
+      invariantsPassed: certification.checks
+        .filter(check => check.status !== 'failed')
+        .map(check => `${check.dimension}:${check.id}`),
+      invariantsFailed: [
+        ...failedChecks.map(check => `${check.dimension}:${check.id}`),
+        ...(schemaIssues.length > 0 ? ['seo-agent-artifact-schema'] : []),
+      ],
+      at: input.now.toISOString(),
+    },
+    { certifier: FACTORY_CERTIFIER_HARNESS }
+  );
+
+  const packet: CertificationReviewPacket = {
+    contract: JOVIE_CERTIFICATION_CONTRACT,
+    subject: {
+      id: `marketing-route:${target.pathname}`,
+      kind: pageArtifact ? 'marketing-route' : 'site-file',
+      title: target.pathname,
+    },
+    source: input.sourceSha
+      ? {
+          repository: 'JovieInc/Jovie',
+          ref: 'main',
+          sha: input.sourceSha,
+          paths: [source],
+          digest: html === null ? null : sha256(html),
+        }
+      : null,
+    canonicalReferences: [],
+    invariantEvaluation: receipts,
+    testsCoverage: [],
+    visualProof: [],
+    requiredVariants: [],
+    itemMedia: [],
+  };
+
+  return {
+    target,
+    certification,
+    packet,
+    stageReceipt,
+    artifact: { value: artifact, schemaIssues },
+  };
+}
+
+/** Site-file pseudo-target for `/llms.txt` and `/robots.txt` results. */
+function siteTarget(pathname: string): SeoSweepTarget {
+  return {
+    pathname,
+    manifestUrl: pathname,
+    recipeId: undefined,
+    inSitemap: false,
+    family: 'other',
+  };
+}
+
 export function certifySweep(input: SeoSweepInput): SeoSweepRouteResult[] {
   const siteOrigin = input.siteOrigin ?? SEO_CERTIFY_SITE_ORIGIN;
   const isSiblingPath = input.isSiblingPath ?? siblingPathMatcher();
@@ -269,7 +384,24 @@ export function certifySweep(input: SeoSweepInput): SeoSweepRouteResult[] {
     siteOrigin
   );
 
-  return input.pages.map(page => {
+  // Heads are shared between the per-page checks and the cohort pass.
+  const heads = new Map(
+    rendered.map(page => [page.target.pathname, extractSeoHead(page.html)])
+  );
+  const cohortFindings = auditCohortMetadata(
+    rendered
+      .filter(page => page.status === 200)
+      .map(page =>
+        cohortPageMeta(
+          page.target.pathname,
+          heads.get(page.target.pathname) as ExtractedSeoHead,
+          page.target.inSitemap,
+          page.target.recordContract !== undefined
+        )
+      )
+  );
+
+  const results = input.pages.map(page => {
     const { target } = page;
     const url = new URL(target.pathname, siteOrigin).toString();
     let certification: SeoPageCertification;
@@ -281,7 +413,7 @@ export function certifySweep(input: SeoSweepInput): SeoSweepRouteResult[] {
         { url, status: page.status, html: page.html },
         { siteOrigin, inSitemap: target.inSitemap }
       );
-      const head = extractSeoHead(page.html);
+      const head = heads.get(target.pathname) as ExtractedSeoHead;
       const geoContext = {
         pathname: target.pathname,
         family: target.family,
@@ -298,9 +430,11 @@ export function certifySweep(input: SeoSweepInput): SeoSweepRouteResult[] {
                 : []),
             ]
           : [];
+      const cohortCheck = cohortFindings.get(target.pathname);
       const checks = [
         ...base.checks,
         ...geoChecks,
+        ...(cohortCheck ? [cohortCheck] : []),
         ...(target.recordContract
           ? [auditRecordCopyScope(target.recordContract, head)]
           : []),
@@ -323,90 +457,62 @@ export function certifySweep(input: SeoSweepInput): SeoSweepRouteResult[] {
         llmsEntry: llmsListsPath(input.llmsTxt, target.pathname, siteOrigin),
       };
     }
-
-    const parsedArtifact = FactorySeoAgentSchema.safeParse(artifact);
-    const schemaIssues = parsedArtifact.success
-      ? []
-      : parsedArtifact.error.issues.map(
-          issue => `${issue.path.join('.') || 'artifact'}: ${issue.message}`
-        );
-    const receipts = seoReceiptsWithDigest(
-      certification,
-      input.sourceSha,
-      input.runRef
-    );
-    const failedChecks = certification.checks.filter(
-      check => check.status === 'failed'
-    );
-    const scored = certification.checks.filter(
-      check => check.status !== 'warn'
-    );
-    const stageReceipt = applyStagePassedBit(
-      {
-        schema: 'jovie.factory-receipt/v1',
-        pageId: `route:${target.pathname}`,
-        stage: 'seo-agent',
-        attempt: 1,
-        inputDigest: sha256(page.html ?? ''),
-        outputDigest: sha256(JSON.stringify(artifact)),
-        producer: null,
-        evaluators: [
-          {
-            id: 'seo-certify',
-            family: FACTORY_CERTIFIER_HARNESS,
-            kind: 'deterministic',
-            verdict: failedChecks.length === 0 ? 'pass' : 'fail',
-            score:
-              scored.length === 0
-                ? 0
-                : (scored.length - failedChecks.length) / scored.length,
-            rubricVersion: SEO_CERTIFICATION_CONTRACT,
-          },
-        ],
-        invariantsPassed: certification.checks
-          .filter(check => check.status !== 'failed')
-          .map(check => `${check.dimension}:${check.id}`),
-        invariantsFailed: [
-          ...failedChecks.map(check => `${check.dimension}:${check.id}`),
-          ...(schemaIssues.length > 0 ? ['seo-agent-artifact-schema'] : []),
-        ],
-        at: input.now.toISOString(),
-      },
-      { certifier: FACTORY_CERTIFIER_HARNESS }
-    );
-
-    const packet: CertificationReviewPacket = {
-      contract: JOVIE_CERTIFICATION_CONTRACT,
-      subject: {
-        id: `marketing-route:${target.pathname}`,
-        kind: 'marketing-route',
-        title: target.pathname,
-      },
-      source: input.sourceSha
-        ? {
-            repository: 'JovieInc/Jovie',
-            ref: 'main',
-            sha: input.sourceSha,
-            paths: [page.source],
-            digest: page.html === null ? null : sha256(page.html),
-          }
-        : null,
-      canonicalReferences: [],
-      invariantEvaluation: receipts,
-      testsCoverage: [],
-      visualProof: [],
-      requiredVariants: [],
-      itemMedia: [],
-    };
-
-    return {
+    return finalizeResult(
       target,
+      page.source,
+      page.html,
       certification,
-      packet,
-      stageReceipt,
-      artifact: { value: artifact, schemaIssues },
-    };
+      artifact,
+      input
+    );
   });
+
+  // Site-level files ride the same receipts/baseline as pseudo-routes
+  // (JOV-7259): `/llms.txt` structure and `robots.txt` crawler purpose.
+  if (input.llmsTxt !== null && input.llmsTxt !== undefined) {
+    const target = siteTarget('/llms.txt');
+    const checks = auditLlmsTxtStructure(input.llmsTxt);
+    results.push(
+      finalizeResult(
+        target,
+        'llms.txt.body',
+        input.llmsTxt,
+        {
+          url: new URL(target.pathname, siteOrigin).toString(),
+          pathname: target.pathname,
+          surface: 'marketing',
+          passed: checks.every(item => item.status !== 'failed'),
+          checks,
+        },
+        { pageId: target.pathname, scope: 'site' },
+        input,
+        false
+      )
+    );
+  }
+  if (input.robotsTxt !== null && input.robotsTxt !== undefined) {
+    const target = siteTarget('/robots.txt');
+    const checks = auditRobotsTxt(input.robotsTxt);
+    results.push(
+      finalizeResult(
+        target,
+        'robots.txt.body',
+        input.robotsTxt,
+        {
+          url: new URL(target.pathname, siteOrigin).toString(),
+          pathname: target.pathname,
+          surface: 'marketing',
+          passed: checks.every(item => item.status !== 'failed'),
+          checks,
+        },
+        { pageId: target.pathname, scope: 'site' },
+        input,
+        false
+      )
+    );
+  }
+
+  return results;
 }
 
 // ---------------------------------------------------------------------------

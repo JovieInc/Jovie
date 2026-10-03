@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { auditLlmsTxtStructure } from '@/lib/seo/agent-site-readiness';
 
 vi.mock('@/constants/app', () => ({
   APP_NAME: 'Jovie',
@@ -24,11 +25,13 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('https://jov.ie/developers');
     expect(body).toContain('https://jov.ie/cli');
     expect(body).toContain('npm install --global @jovie/cli');
-    expect(body).toContain('**Jovie API docs**: https://jov.ie/developers');
-    expect(body).toContain('**Jovie OpenAPI 3.1 spec**');
+    expect(body).toContain('[Jovie API docs](https://jov.ie/developers)');
+    expect(body).toContain(
+      '[Jovie OpenAPI 3.1 spec](https://jov.ie/openapi.json)'
+    );
     expect(body).toContain('active v1 lifecycle boundary');
     expect(body).toContain(
-      '**API versioning and deprecation policy**: https://jov.ie/api-versioning'
+      '[API versioning and deprecation policy](https://jov.ie/api-versioning)'
     );
     expect(body).toContain('https://jov.ie/{username}/llms.txt');
     expect(body).toContain('https://jov.ie/{username}/{slug}');
@@ -39,7 +42,7 @@ describe('GET /llms.txt', () => {
       'General public writes or OAuth — the public artist API and anonymous MCP tools are read-only; owner-only MCP tools require authenticated profile ownership and explicit confirmation for writes'
     );
     expect(body).toContain(
-      '**Founder-only Ovie control**: https://jov.ie/api/ovie/mcp — OAuth 2.1 MCP with scopes `ovie:read, ovie:write`; not public artist API access'
+      '[Founder-only Ovie control](https://jov.ie/api/ovie/mcp) — OAuth 2.1 MCP with scopes `ovie:read, ovie:write`; not public artist API access'
     );
     expect(body).toContain(
       'https://jov.ie/.well-known/oauth-protected-resource/api/ovie/mcp'
@@ -47,6 +50,14 @@ describe('GET /llms.txt', () => {
     expect(body).toContain(
       'https://jov.ie/.well-known/oauth-authorization-server/api/ovie/oauth'
     );
+  });
+
+  it('satisfies the seo:certify llms.txt structure audit (JOV-7259)', async () => {
+    const body = await GET().text();
+    const failed = auditLlmsTxtStructure(body).filter(
+      check => check.status === 'failed'
+    );
+    expect(failed).toEqual([]);
   });
 
   it('keeps public developer access read-only and does not invent extra surfaces', async () => {

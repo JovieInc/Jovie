@@ -274,6 +274,93 @@ describe('certifySweep', () => {
     expect(validateStageReceipt(result?.stageReceipt)).toEqual([]);
   });
 
+  it('audits llms.txt and robots.txt as site pseudo-routes (JOV-7259)', () => {
+    const results = certifySweep({
+      pages: [
+        {
+          target: target('/smart-links'),
+          html: html('/smart-links', GOOD_BODY, PRODUCT_LD),
+          status: 200,
+          source: 'x',
+        },
+      ],
+      sourceSha: SHA,
+      runRef: 'test-run',
+      now: NOW,
+      llmsTxt:
+        '# Jovie\n\n> one product for presence\n\n## Pages\n\n- [Smart links](https://jov.ie/smart-links)\n',
+      robotsTxt:
+        'User-agent: *\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nSitemap: https://jov.ie/sitemap.xml\n',
+      isSiblingPath: () => false,
+    });
+    const llms = results.find(result => result.target.pathname === '/llms.txt');
+    expect(llms?.certification.passed).toBe(true);
+    expect(llms?.certification.checks.map(check => check.id)).toEqual([
+      'llms-txt-h1',
+      'llms-txt-summary',
+      'llms-txt-links',
+    ]);
+    expect(llms?.packet.subject.kind).toBe('site-file');
+
+    const robots = results.find(
+      result => result.target.pathname === '/robots.txt'
+    );
+    const searchCheck = robots?.certification.checks.find(
+      check => check.id === 'robots-search-crawlers'
+    );
+    // Only one of five search crawlers has a rule → site evidence fails.
+    expect(searchCheck?.status).toBe('failed');
+    expect(robots?.certification.passed).toBe(false);
+    expect(
+      robots?.certification.checks.find(
+        check => check.id === 'robots-training-tokens'
+      )?.status
+    ).toBe('warn');
+  });
+
+  it('flags cohort-templated titles, failing record pages (JOV-7259)', () => {
+    const contract = getPageRecordContracts().find(
+      c => c.recordId === 'solutions.artists'
+    ) as PageRecordPageContract;
+    const results = certifySweep({
+      pages: [
+        {
+          target: { ...target('/solutions/artists'), recordContract: contract },
+          html: html('/solutions/artists', GOOD_BODY, PRODUCT_LD),
+          status: 200,
+          source: 'x',
+        },
+        {
+          target: target('/voice'),
+          html: html('/voice', GOOD_BODY, PRODUCT_LD),
+          status: 200,
+          source: 'x',
+        },
+      ],
+      sourceSha: SHA,
+      runRef: 'test-run',
+      now: NOW,
+      llmsTxt: null,
+    });
+    // Both pages render the same title/description from the html() fixture.
+    const recordPage = results.find(
+      result => result.target.pathname === '/solutions/artists'
+    );
+    const handPage = results.find(
+      result => result.target.pathname === '/voice'
+    );
+    expect(
+      recordPage?.certification.checks.find(
+        check => check.id === 'templated-metadata'
+      )?.status
+    ).toBe('failed');
+    expect(
+      handPage?.certification.checks.find(
+        check => check.id === 'templated-metadata'
+      )?.status
+    ).toBe('warn');
+  });
+
   it('skips GEO for pages outside the sitemap', () => {
     const [result] = sweep([
       {

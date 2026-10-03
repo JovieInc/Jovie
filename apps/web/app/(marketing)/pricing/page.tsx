@@ -56,12 +56,19 @@ const pricingSchemaValidUntil = new Date(
   .toISOString()
   .slice(0, 10);
 
+/** Offer.url must be an absolute http(s) URL; mailto CTAs point at /pricing. */
+function offerUrl(ctaHref: string): string {
+  if (ctaHref.startsWith('/')) return new URL(ctaHref, BASE_URL).toString();
+  if (ctaHref.startsWith('mailto:')) return `${BASE_URL}/pricing`;
+  return ctaHref;
+}
+
 function getPublicOfferSchema(plan: MarketingPricingPlan) {
   const claim = getPublicPriceClaim(plan.id);
   if (claim.priceUsd === null) {
     return {
       '@type': 'Offer',
-      url: claim.ctaHref,
+      url: offerUrl(claim.ctaHref),
       availability: 'https://schema.org/LimitedAvailability',
     };
   }
@@ -70,7 +77,7 @@ function getPublicOfferSchema(plan: MarketingPricingPlan) {
     '@type': 'Offer',
     price: String(claim.priceUsd),
     priceCurrency: 'USD',
-    url: claim.ctaHref,
+    url: offerUrl(claim.ctaHref),
     ...(claim.priceUsd > 0 && {
       priceValidUntil: pricingSchemaValidUntil,
       billingIncrement: 'P1M',

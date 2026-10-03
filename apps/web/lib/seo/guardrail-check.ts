@@ -5,12 +5,33 @@
  * Unit-tested so robots/sitemap regressions cannot slip past deploy gates.
  */
 
-export const REQUIRED_AI_CRAWLERS = [
-  'GPTBot',
+/**
+ * Crawler tokens by purpose (JOV-7259). AI *search* crawlers index pages for
+ * answer-engine citation; training/control tokens govern model training or
+ * feature use. Granting a training token access is not search citability —
+ * the two classes are checked separately so a policy that allows GPTBot but
+ * omits OAI-SearchBot still fails the search requirement.
+ */
+export const AI_SEARCH_CRAWLERS = [
+  'OAI-SearchBot',
   'ChatGPT-User',
+  'Claude-SearchBot',
   'Claude-Web',
   'PerplexityBot',
+] as const;
+
+/** Training and feature-control tokens Jovie chooses to keep allowed. */
+export const AI_TRAINING_TOKENS = [
+  'GPTBot',
+  'ClaudeBot',
+  'Anthropic-AI',
   'Google-Extended',
+  'Applebot-Extended',
+] as const;
+
+export const REQUIRED_AI_CRAWLERS = [
+  ...AI_SEARCH_CRAWLERS,
+  ...AI_TRAINING_TOKENS,
 ] as const;
 
 export interface SeoGuardrailFinding {
@@ -48,7 +69,7 @@ function result(errors: SeoGuardrailFinding[]): SeoGuardrailResult {
   return { ok: errors.length === 0, errors };
 }
 
-interface ParsedRobotsRule {
+export interface ParsedRobotsRule {
   readonly userAgents: readonly string[];
   readonly allow: readonly string[];
   readonly disallow: readonly string[];
@@ -82,7 +103,7 @@ function referencesSitemap(content: string): boolean {
   return false;
 }
 
-function parseRobotsRules(content: string): ParsedRobotsRule[] {
+export function parseRobotsRules(content: string): ParsedRobotsRule[] {
   const rules: ParsedRobotsRule[] = [];
   let currentAgents: string[] = [];
   let currentAllow: string[] = [];
@@ -172,13 +193,40 @@ export function validateRobotsTxt(content: string): SeoGuardrailResult {
     );
   }
 
-  for (const crawler of REQUIRED_AI_CRAWLERS) {
+  for (const crawler of AI_SEARCH_CRAWLERS) {
+    const crawlerRule = rules.find(rule => rule.userAgents.includes(crawler));
+    if (!crawlerRule) {
+      errors.push(
+        failure(
+          'robots.missing-search-crawler',
+          `robots.txt is missing an explicit rule for ${crawler}; AI search citability requires it (a training token does not count).`,
+          AI_CRAWLER_REMEDIATION
+        )
+      );
+      continue;
+    }
+
+    if (
+      crawlerRule.disallow.includes('/') &&
+      !crawlerRule.allow.includes('/')
+    ) {
+      errors.push(
+        failure(
+          'robots.search-crawler-blocked',
+          `robots.txt globally blocks AI search crawler ${crawler} with Disallow: /.`,
+          AI_CRAWLER_REMEDIATION
+        )
+      );
+    }
+  }
+
+  for (const crawler of AI_TRAINING_TOKENS) {
     const crawlerRule = rules.find(rule => rule.userAgents.includes(crawler));
     if (!crawlerRule) {
       errors.push(
         failure(
           'robots.missing-ai-crawler',
-          `robots.txt is missing an explicit rule for ${crawler}.`,
+          `robots.txt is missing an explicit rule for ${crawler} (training/control token; keep the declared policy explicit).`,
           AI_CRAWLER_REMEDIATION
         )
       );

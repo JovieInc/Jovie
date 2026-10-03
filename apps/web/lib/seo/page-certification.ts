@@ -78,7 +78,11 @@ export interface ExtractedSeoHead {
   readonly jsonLdTypes: readonly string[];
   /** Every `@type` at any depth, e.g. an Offer nested in `mainEntity`. */
   readonly jsonLdNestedTypes: readonly string[];
+  /** Parsed JSON-LD documents (roots only; `@graph` stays nested inside). */
+  readonly jsonLdDocuments: readonly unknown[];
   readonly jsonLdErrors: number;
+  /** `href` of a `<link rel="alternate" type="text/markdown">`, when present. */
+  readonly markdownAlternate: string | null;
   readonly h1Count: number;
   readonly visibleText: string;
 }
@@ -278,10 +282,12 @@ function collectNestedJsonLdTypes(node: unknown, types: string[]): void {
 function jsonLdBlocks(html: string): {
   types: string[];
   nestedTypes: string[];
+  documents: unknown[];
   errors: number;
 } {
   const types: string[] = [];
   const nestedTypes: string[] = [];
+  const documents: unknown[] = [];
   let errors = 0;
   const lower = html.toLowerCase();
   let cursor = lower.indexOf('<script');
@@ -293,6 +299,7 @@ function jsonLdBlocks(html: string): {
     if (attributes.type?.toLowerCase() === 'application/ld+json') {
       try {
         const parsed: unknown = JSON.parse(html.slice(start + 1, end));
+        documents.push(parsed);
         collectJsonLdTypes(parsed, types);
         collectNestedJsonLdTypes(parsed, nestedTypes);
       } catch {
@@ -301,7 +308,7 @@ function jsonLdBlocks(html: string): {
     }
     cursor = lower.indexOf('<script', end);
   }
-  return { types, nestedTypes, errors };
+  return { types, nestedTypes, documents, errors };
 }
 
 export function extractSeoHead(html: string): ExtractedSeoHead {
@@ -312,6 +319,11 @@ export function extractSeoHead(html: string): ExtractedSeoHead {
     link.rel?.toLowerCase().split(/\s+/).includes('canonical')
   );
   const jsonLd = jsonLdBlocks(html);
+  const markdownAlternate = links.find(
+    link =>
+      link.rel?.toLowerCase().split(/\s+/).includes('alternate') &&
+      link.type?.toLowerCase().split(';')[0]?.trim() === 'text/markdown'
+  );
   return {
     lang: findTags(html, 'html')[0]?.lang?.trim() || null,
     title: titleText ? decodeEntities(titleText).trim() || null : null,
@@ -330,7 +342,9 @@ export function extractSeoHead(html: string): ExtractedSeoHead {
       .map(link => ({ lang: link.hreflang ?? '', href: link.href ?? '' })),
     jsonLdTypes: jsonLd.types,
     jsonLdNestedTypes: [...new Set(jsonLd.nestedTypes)],
+    jsonLdDocuments: jsonLd.documents,
     jsonLdErrors: jsonLd.errors,
+    markdownAlternate: markdownAlternate?.href?.trim() || null,
     h1Count: findTags(html, 'h1').length,
     visibleText: extractVisibleText(html),
   };
@@ -651,6 +665,234 @@ export function auditTechnicalSeo(
   return checks;
 }
 
+// ---------------------------------------------------------------------------
+// JSON-LD property validation + rendered-copy parity (JOV-7259)
+// Deterministic subset of the claude-seo rubric: parse-ability and type
+// presence were already covered by `structured-data`; these checks cover what
+// the graph actually claims.
+// ---------------------------------------------------------------------------
+
+/** Node types whose `name`/`description` must mirror the rendered metadata. */
+const JSONLD_PAGE_ENTITY_TYPES = new Set([
+  'WebPage',
+  'AboutPage',
+  'ContactPage',
+  'CollectionPage',
+  'FAQPage',
+  'Article',
+  'BlogPosting',
+  'NewsArticle',
+  'TechArticle',
+]);
+
+/** Properties a node of this type must carry wherever it appears. */
+const JSONLD_REQUIRED_PROPS: Readonly<Record<string, readonly string[]>> = {
+  Offer: ['url'],
+  Product: ['name'],
+  ItemList: ['itemListElement'],
+  BreadcrumbList: ['itemListElement'],
+  FAQPage: ['mainEntity'],
+};
+
+interface JsonLdNodeEntry {
+  readonly node: Record<string, unknown>;
+  readonly path: string;
+}
+
+function* walkJsonLd(node: unknown, path: string): Generator<JsonLdNodeEntry> {
+  if (Array.isArray(node)) {
+    for (const [index, item] of node.entries())
+      yield* walkJsonLd(item, `${path}[${index}]`);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  const record = node as Record<string, unknown>;
+  yield { node: record, path };
+  for (const [key, value] of Object.entries(record)) {
+    if (key === '@context') continue;
+    yield* walkJsonLd(value, `${path}.${key}`);
+  }
+}
+
+function nodeTypes(node: Record<string, unknown>): string[] {
+  const type = node['@type'];
+  if (typeof type === 'string') return [type];
+  if (Array.isArray(type))
+    return type.filter((item): item is string => typeof item === 'string');
+  return [];
+}
+
+/** Root-level entities: the document itself, or each `@graph` member. */
+function graphMembers(document: unknown): JsonLdNodeEntry[] {
+  if (!document || typeof document !== 'object' || Array.isArray(document))
+    return [];
+  const record = document as Record<string, unknown>;
+  const graph = record['@graph'];
+  if (Array.isArray(graph)) {
+    return graph.flatMap((member, index) =>
+      member && typeof member === 'object' && !Array.isArray(member)
+        ? [
+            {
+              node: member as Record<string, unknown>,
+              path: `@graph[${index}]`,
+            },
+          ]
+        : []
+    );
+  }
+  return [{ node: record, path: '$' }];
+}
+
+function normalizeForParity(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function parityMatch(claim: string, rendered: string | null): boolean {
+  if (!rendered) return false;
+  const a = normalizeForParity(claim);
+  const b = normalizeForParity(rendered);
+  return a.length > 0 && (a.includes(b) || b.includes(a));
+}
+
+export function auditJsonLdSemantics(head: ExtractedSeoHead): SeoCheck[] {
+  if (head.jsonLdDocuments.length === 0) return [];
+  const checks: SeoCheck[] = [];
+
+  // A typed node is the unit schema.org consumers resolve. A member without
+  // @type, or a doc that is neither typed nor a @graph container, is invalid.
+  const untyped: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    if (!document || typeof document !== 'object' || Array.isArray(document)) {
+      untyped.push('$');
+      continue;
+    }
+    const record = document as Record<string, unknown>;
+    if (!('@graph' in record) && nodeTypes(record).length === 0)
+      untyped.push('$');
+    for (const member of graphMembers(document)) {
+      if (nodeTypes(member.node).length === 0) untyped.push(member.path);
+    }
+  }
+  checks.push(
+    untyped.length === 0
+      ? check('agentic', 'jsonld-type', 'passed', 'every JSON-LD entity typed')
+      : check(
+          'agentic',
+          'jsonld-type',
+          'failed',
+          `JSON-LD entities missing @type: ${untyped.slice(0, 5).join(', ')}`,
+          'Every JSON-LD document must be a typed node or an @graph of typed nodes.'
+        )
+  );
+
+  // schema.org `url` properties must be absolute http(s); a relative href is
+  // meaningless off-origin (live evidence: /pricing Offer.url was '/signup').
+  const relativeUrls: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    for (const { node, path } of walkJsonLd(document, '$')) {
+      const url = node.url;
+      if (typeof url !== 'string' || url.length === 0) continue;
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:')
+          relativeUrls.push(`${path}.url`);
+      } catch {
+        relativeUrls.push(`${path}.url`);
+      }
+    }
+  }
+  checks.push(
+    relativeUrls.length === 0
+      ? check(
+          'agentic',
+          'jsonld-absolute-url',
+          'passed',
+          'all JSON-LD url properties are absolute http(s)'
+        )
+      : check(
+          'agentic',
+          'jsonld-absolute-url',
+          'failed',
+          `non-absolute JSON-LD url at ${relativeUrls.slice(0, 5).join(', ')}`,
+          'Emit absolute https://jov.ie URLs for schema.org url properties; crawlers resolve them off-origin.'
+        )
+  );
+
+  const missingProps: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    for (const { node, path } of walkJsonLd(document, '$')) {
+      for (const type of nodeTypes(node)) {
+        for (const prop of JSONLD_REQUIRED_PROPS[type] ?? []) {
+          const value = node[prop];
+          if (value === undefined || value === null || value === '')
+            missingProps.push(`${type} ${path} missing ${prop}`);
+        }
+      }
+    }
+  }
+  checks.push(
+    missingProps.length === 0
+      ? check(
+          'agentic',
+          'jsonld-required-props',
+          'passed',
+          'required JSON-LD properties present'
+        )
+      : check(
+          'agentic',
+          'jsonld-required-props',
+          'warn',
+          missingProps.slice(0, 5).join('; '),
+          'Populate the required property; rich-result parsers skip incomplete nodes.'
+        )
+  );
+
+  // Rendered-copy parity: a page-entity node that names or describes something
+  // the rendered title/description never said is schema/body drift.
+  const drifted: string[] = [];
+  for (const document of head.jsonLdDocuments) {
+    for (const { node, path } of graphMembers(document)) {
+      if (!nodeTypes(node).some(type => JSONLD_PAGE_ENTITY_TYPES.has(type)))
+        continue;
+      if (
+        typeof node.name === 'string' &&
+        !parityMatch(node.name, head.title) &&
+        !parityMatch(node.name, head.visibleText)
+      ) {
+        drifted.push(`${path} name "${node.name}" not in rendered copy`);
+      }
+      if (
+        typeof node.description === 'string' &&
+        !parityMatch(node.description, head.description) &&
+        !parityMatch(node.description, head.visibleText)
+      ) {
+        drifted.push(`${path} description not in rendered copy`);
+      }
+    }
+  }
+  checks.push(
+    drifted.length === 0
+      ? check(
+          'agentic',
+          'jsonld-rendered-parity',
+          'passed',
+          'JSON-LD page entities match rendered metadata'
+        )
+      : check(
+          'agentic',
+          'jsonld-rendered-parity',
+          'warn',
+          `schema/body drift: ${drifted.slice(0, 3).join('; ')}`,
+          'Align the JSON-LD page entity with the rendered title and meta description.'
+        )
+  );
+
+  return checks;
+}
+
 export function auditAgentReadiness(
   head: ExtractedSeoHead,
   surface: SeoPageSurface
@@ -705,6 +947,25 @@ export function auditAgentReadiness(
           'failed',
           `${words} server-rendered words`,
           'Render the page content on the server; agents and crawlers do not run client JS.'
+        )
+  );
+  checks.push(...auditJsonLdSemantics(head));
+  // Advisory only (JOV-7259): Markdown delivery is recorded until outcome
+  // data justifies a gate.
+  checks.push(
+    head.markdownAlternate
+      ? check(
+          'agentic',
+          'markdown-delivery',
+          'passed',
+          `markdown alternate advertised: ${head.markdownAlternate}`
+        )
+      : check(
+          'agentic',
+          'markdown-delivery',
+          'warn',
+          'no text/markdown alternate advertised',
+          'Advertise a Markdown representation via <link rel="alternate" type="text/markdown"> or Accept-header negotiation when the route serves one.'
         )
   );
   return checks;

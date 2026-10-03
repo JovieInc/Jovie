@@ -56,9 +56,13 @@ const DISALLOW_PATHS = [
  * AI crawlers to explicitly allow.
  * Listing them signals that Jovie welcomes AI search indexing.
  */
+// Mirrors AI_SEARCH_CRAWLERS + AI_TRAINING_TOKENS in lib/seo/guardrail-check.ts:
+// search crawlers are citability, training/control tokens are a separate grant.
 const AI_CRAWLERS = [
-  'GPTBot',
+  'OAI-SearchBot',
   'ChatGPT-User',
+  'GPTBot',
+  'Claude-SearchBot',
   'Claude-Web',
   'ClaudeBot',
   'Anthropic-AI',

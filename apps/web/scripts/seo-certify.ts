@@ -132,13 +132,23 @@ async function main() {
       baseUrl ? fetchPage(baseUrl, target) : readBuildPage(appDir, target)
     )
   );
-  const llmsPath = join(appDir, 'llms.txt.body');
+  const readSiteFile = async (pathname: string): Promise<string | null> => {
+    if (baseUrl) {
+      const response = await fetch(new URL(pathname, baseUrl)).catch(
+        () => null
+      );
+      return response?.ok ? response.text() : null;
+    }
+    const bodyPath = join(appDir, `${pathname.replace('/', '')}.body`);
+    return existsSync(bodyPath) ? readFileSync(bodyPath, 'utf8') : null;
+  };
   const results = certifySweep({
     pages,
     sourceSha: sha,
     runRef: values['run-ref'] ?? 'local',
     now: new Date(),
-    llmsTxt: existsSync(llmsPath) ? readFileSync(llmsPath, 'utf8') : null,
+    llmsTxt: await readSiteFile('/llms.txt'),
+    robotsTxt: await readSiteFile('/robots.txt'),
   });
 
   for (const result of results) {

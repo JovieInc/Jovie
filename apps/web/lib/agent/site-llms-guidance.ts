@@ -28,7 +28,7 @@ function buildFeatureAvailabilityLines(): string {
     .map(path => {
       const record = getRouteCapability(path);
       if (!record || !isPublicationPermitted(record)) return null;
-      return `- ${BASE_URL}${path} — ${describeFeatureAccess(record)}`;
+      return `- [${path}](${BASE_URL}${path}) — ${describeFeatureAccess(record)}`;
     })
     .filter((line): line is string => line !== null);
   return lines.length === 0
@@ -60,20 +60,20 @@ Do not use ${APP_NAME} for:
 
 ## ${APP_NAME} developer resources
 
-- **Site identity**: ${BASE_URL}/llms.txt
-- **Public API capability index**: \`GET ${BASE_URL}/api/v1\` — stable, non-enumerating contract discovery
-- **${APP_NAME} OpenAPI 3.1 spec**: ${BASE_URL}/openapi.json — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
-- **${APP_NAME} API docs**: ${BASE_URL}/developers — public API quickstart and active v1 lifecycle boundary
-- **${APP_NAME} CLI**: ${BASE_URL}/cli — npm package \`@jovie/cli\` (https://www.npmjs.com/package/@jovie/cli), binary \`jovie\`; read-only commands for public artist GET routes
-- **API versioning and deprecation policy**: ${PUBLIC_ARTIST_API_POLICY_URL} — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
-- **Public artist API**: \`GET ${BASE_URL}/api/v1/{username}\` — profile, releases, events, merch
-- **Per-artist MCP**: ${BASE_URL}/api/mcp/{username} — anonymous read resources/tools; owner-only merch and video tools are listed in the manifest and require authenticated ownership
-- **Per-artist llms.txt**: ${BASE_URL}/{username}/llms.txt
-- **Founder-only Ovie control**: ${BASE_URL}${OVIE_MCP_RESOURCE_PATH} — OAuth 2.1 MCP with scopes \`${OVIE_OAUTH_SCOPES.join(', ')}\`; not public artist API access
-- **Ovie protected-resource metadata**: ${BASE_URL}${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH}
-- **Ovie authorization-server metadata**: ${BASE_URL}${OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH} — issuer ${BASE_URL}${OVIE_OAUTH_ISSUER_PATH}
-- **${APP_NAME} docs**: ${DOCS_URL}/docs
-- **Sitemap**: ${BASE_URL}/sitemap.xml
-- **Full site guide**: ${BASE_URL}/llms-full.txt
+- [Site identity](${BASE_URL}/llms.txt)
+- [Public API capability index](${BASE_URL}/api/v1) — \`GET ${BASE_URL}/api/v1\`; stable, non-enumerating contract discovery
+- [${APP_NAME} OpenAPI 3.1 spec](${BASE_URL}/openapi.json) — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
+- [${APP_NAME} API docs](${BASE_URL}/developers) — public API quickstart and active v1 lifecycle boundary
+- [${APP_NAME} CLI](${BASE_URL}/cli) — npm package \`@jovie/cli\` (https://www.npmjs.com/package/@jovie/cli), binary \`jovie\`; read-only commands for public artist GET routes
+- [API versioning and deprecation policy](${PUBLIC_ARTIST_API_POLICY_URL}) — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
+- [Public artist API](${BASE_URL}/api/v1/{username}) — \`GET ${BASE_URL}/api/v1/{username}\`; profile, releases, events, merch
+- [Per-artist MCP](${BASE_URL}/api/mcp/{username}) — anonymous read resources/tools; owner-only merch and video tools are listed in the manifest and require authenticated ownership
+- [Per-artist llms.txt](${BASE_URL}/{username}/llms.txt)
+- [Founder-only Ovie control](${BASE_URL}${OVIE_MCP_RESOURCE_PATH}) — OAuth 2.1 MCP with scopes \`${OVIE_OAUTH_SCOPES.join(', ')}\`; not public artist API access
+- [Ovie protected-resource metadata](${BASE_URL}${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH})
+- [Ovie authorization-server metadata](${BASE_URL}${OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH}) — issuer ${BASE_URL}${OVIE_OAUTH_ISSUER_PATH}
+- [${APP_NAME} docs](${DOCS_URL}/docs)
+- [Sitemap](${BASE_URL}/sitemap.xml)
+- [Full site guide](${BASE_URL}/llms-full.txt)
 ${buildFeatureAvailabilityLines()}`;
 }

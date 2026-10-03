@@ -5,12 +5,7 @@
  * robots.txt that silently blocks all crawlers (incident #11043).
  */
 
-const REQUIRED_AI_CRAWLERS = [
-  'GPTBot',
-  'Claude-Web',
-  'PerplexityBot',
-  'Google-Extended',
-] as const;
+import { REQUIRED_AI_CRAWLERS } from '@/lib/seo/guardrail-check';
 
 export interface RobotsHttpGuardResult {
   readonly ok: boolean;
