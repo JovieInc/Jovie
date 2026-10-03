@@ -74,7 +74,7 @@ jobs:
             if [ "$compare_status" != ahead ]; then
               outcome=superseded replacement_sha="$current_main"
             else
-              newer_runs="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=100")"
+              newer_runs="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=100")"
               while IFS=$'\t' read -r candidate_id candidate_attempt candidate_sha; do
                 [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_attempt" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_sha" =~ ^[0-9a-f]{40}$ ]] || continue
                 # A later CI run can replay an older SHA after a main rewind.
