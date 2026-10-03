@@ -1414,6 +1414,11 @@ function LibraryImportMenu({
             {youtubeConnected ? 'Import YouTube' : 'Connect YouTube'}
           </DropdownMenuItem>
         ) : null}
+        {youtubeConnected ? (
+          <DropdownMenuItem asChild>
+            <Link href={APP_ROUTES.YOUTUBE_REVIVAL}>YouTube revival queue</Link>
+          </DropdownMenuItem>
+        ) : null}
         {canSyncSpotify ? (
           <DropdownMenuItem
             onSelect={() => onSyncSpotify()}

@@ -83,7 +83,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
   '/app/youtube':
-    'YouTube revival queue workspace (GH-10921); reachable from direct app links until nav placement is finalised',
+    'YouTube revival queue workspace (GH-10921); reachable from the Library Add menu and the cmd+k palette (JOV-7599)',
 };
 
 interface ShellPage {

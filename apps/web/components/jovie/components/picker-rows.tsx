@@ -27,6 +27,7 @@ import {
   Sparkles,
   UserCircle,
   Users,
+  Video,
 } from 'lucide-react';
 import Image from 'next/image';
 import { memo } from 'react';
@@ -49,6 +50,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Columns2,
   Settings,
   Calendar,
+  Video,
 };
 
 export interface PickerSkillItem {
