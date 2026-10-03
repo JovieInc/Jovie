@@ -1,0 +1,3 @@
+{"total": {"lines":{"total":173,"covered":164,"skipped":0,"pct":94.79},"statements":{"total":189,"covered":174,"skipped":0,"pct":92.06},"functions":{"total":52,"covered":51,"skipped":0,"pct":98.07},"branches":{"total":146,"covered":126,"skipped":0,"pct":86.3},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":"Unknown"}}
+,"/Users/timwhite/.codex/worktrees/agent-transport-ci-lane/scripts/lib/product-lane-classifier.mjs": {"lines":{"total":173,"covered":164,"skipped":0,"pct":94.79},"functions":{"total":52,"covered":51,"skipped":0,"pct":98.07},"statements":{"total":189,"covered":174,"skipped":0,"pct":92.06},"branches":{"total":146,"covered":126,"skipped":0,"pct":86.3}}
+}
