@@ -68,10 +68,12 @@ export function retireGeneratedReports({
     if (!measured || !isAncestor(measured, source)) continue;
     const read = () =>
       JSON.parse(gh(['api', `repos/${repo}/pulls/${candidate.number}`]));
-    const valid = pr =>
+    const valid = (pr, duplicate = false) =>
       pr.state === 'open' &&
       pr.draft &&
-      pr.labels.length === 0 &&
+      (duplicate
+        ? pr.labels.length === 1 && pr.labels[0].name === 'duplicate'
+        : pr.labels.length === 0) &&
       pr.base.ref === 'main' &&
       pr.head.repo?.full_name === repo &&
       pr.head.ref === candidate.headRefName &&
@@ -98,6 +100,20 @@ export function retireGeneratedReports({
     // A writer may have taken over while inventory was read. Leave that PR alone.
     const live = read();
     if (!valid(live) || live.head.sha !== pr.head.sha) continue;
+    // Only the proven, unmodified generated report can receive duplicate authority.
+    // Re-read after marking: a hold, changed head, or revoked label prevents closure.
+    gh([
+      'pr',
+      'edit',
+      String(candidate.number),
+      '--repo',
+      repo,
+      '--add-label',
+      'duplicate',
+    ]);
+    const authorized = read();
+    if (!valid(authorized, true) || authorized.head.sha !== pr.head.sha)
+      continue;
     gh(['pr', 'close', String(candidate.number), '--repo', repo]);
     retired.push(candidate.number);
   }

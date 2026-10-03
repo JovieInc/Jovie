@@ -83,25 +83,47 @@ the existing Slack webhook, exercising one synthetic incident end to end, and
 observing one scheduled heartbeat from outside Vercel. Source and CI evidence do
 not establish any of those runtime receipts.
 
-### Selected external destinations (prepared, not activated)
+### Selected external destinations
 
 The adopt-first implementation uses existing provider and repository surfaces.
-These are the exact intended destinations; none of the pending configuration in
-this section is evidence that the path is live.
+The Sentry availability monitors in this section are live as of the October 2,
+2026 readback. The spend feed, founder-member binding, and emergency envelope
+remain uncommissioned. An intended configuration is not evidence that a still
+pending path is live.
 
 | Role                                     | Selected destination                                                                                      | Exact configuration                                                                                                                                                                                                                                                                                               | Current receipt                                                                                                                                                                               |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Independent availability observer        | Sentry organization `jovie`, project `jovie-web`                                                          | Create `Jovie production serving` for `https://jov.ie/api/health/build-info` and `Summer production serving` for `https://summer.jov.ie/runtime/v1/health`; check every five minutes, alert after two consecutive failures, and notify on recovery.                                                              | The September 13 API readback returned zero monitors. The current token could not read project detectors or member identities (`403`), so no monitor or recipient is configured.              |
+| Independent availability observer        | Sentry organization `jovie`, project `jovie-web`                                                          | Create `Jovie production serving` for `https://jov.ie/api/health/build-info` and `Summer production serving` for `https://summer.jov.ie/runtime/v1/health`; check every five minutes, alert after two consecutive failures, and notify on recovery.                                                              | October 2, 2026 API readback: the monitors in [Production Sentry monitors](#production-sentry-monitors-october-2-2026) exist and are connected to email alerts. The September 13 readback returned zero monitors; that token could not read project detectors (`403`). |
 | Signed spend feed                        | Existing Cloudflare Worker `jovie-observability-ingest`                                                   | Extend it with `POST /vercel/spend`; verify the raw request body against Vercel's `x-vercel-signature` HMAC-SHA1 signature; require the expected Vercel team ID; accept only 50%, 75%, 100%, and billing-cycle-end events; persist the stable incident key before dispatch.                                       | The checked-in KV namespace ID is a placeholder and no deployed Worker hostname was found. The receiver is not commissioned, and a hostname must not be invented before deployment.           |
 | Founder notification and acknowledgement | Vercel native Web, Email, Push, and SMS to Tim; Sentry Email to Tim as the independent availability route | Keep Vercel native delivery as the primary pre-pause notification. Bind both Sentry uptime monitors to Tim's verified Sentry member only after an authorized token can resolve that member identity. Treat Summer to iMessage and Ovie activity as recovery-time projections, not as the independent outage path. | Vercel channel selections are enabled, but delivery and human acknowledgement are unverified. The Sentry member ID is unresolved. No machine-readable Tim acknowledgement channel exists yet. |
 | Operational transport                    | Existing Production Slack webhook and Gem delivery-state-machine ingress                                  | Retain HTTP 200 body `ok` as Slack transport acceptance and the stable Gem event as agent ingress.                                                                                                                                                                                                                | Neither receipt proves Tim saw or acknowledged an incident. Do not use either as the founder acknowledgement gate.                                                                            |
 
+### Production Sentry monitors (October 2, 2026)
+
+One-time Sentry setup in organization `jovie`, region `https://us.sentry.io`,
+project `jovie-web` (`4510479236792320`). Summer has no separate Sentry project.
+These rows are a live API readback, not infrastructure-as-code in this
+repository. jov.ie error-rate monitor `10520248` and homepage uptime monitor
+`10520249` already existed and were left in place.
+
+| Signal | Monitor | Alert | Readback |
+| --- | --- | --- | --- |
+| jov.ie production error rate | [10520248](https://jovie.sentry.io/monitors/10520248/) `level:error`, production, `count()` per hour. Critical above 30, warning above 15, resolves at or below 8. | [2854889](https://jovie.sentry.io/monitors/alerts/2854889/) emails issue owners, fallthrough Active Members. Last triggered 2026-10-02T16:17:30Z. | Enabled. |
+| summer.jov.ie production error rate | [10520461](https://jovie.sentry.io/monitors/10520461/) same thresholds. Query `level:error (url:*summer.jov.ie* OR transaction:*summer.jov.ie* OR server_name:*summer.jov.ie*)`. Created 2026-10-02T23:02:36Z. | Same alert 2854889. | Enabled. A 14-day search before creation returned zero matching events. This watches Summer only after that runtime reports errors to `jovie-web` with those fields. |
+| jov.ie homepage uptime | [10520249](https://jovie.sentry.io/monitors/10520249/) GET `https://jov.ie` every 300s, timeout 10000ms, downtime threshold 2, recovery 1, production. | [6106070](https://jovie.sentry.io/monitors/alerts/6106070/) "Production uptime: jov.ie and summer.jov.ie". Email to issue owners / Active Members. Frequency 30 minutes. Triggers on first seen, reappeared, regression, and resolved. Created 2026-10-02T23:02:27Z. `lastTriggered` was null. | Enabled. The same-day check query returned no recent checks. |
+| jov.ie build-info uptime | [10327180](https://jovie.sentry.io/monitors/10327180/) GET `https://jov.ie/api/health/build-info` every 300s, timeout 5000ms, HTTP 200–299, owner Tim. | Alert 6106070. | `uptimeStatus` ok. 2026-10-02T23:02:41Z check HTTP 200. |
+| summer.jov.ie health uptime | [10327184](https://jovie.sentry.io/monitors/10327184/) GET `https://summer.jov.ie/runtime/v1/health` every 300s, timeout 5000ms, HTTP 200–299, owner Tim. | Alert 6106070. | `uptimeStatus` ok. 2026-10-02T23:01:52Z check HTTP 200 in 280ms. |
+
+Uptime checks are external HTTP probes. They do not prove that Summer process
+exceptions reach Sentry. Alert 6106070 is the notification path that was missing
+when these uptime detectors had empty `workflowIds`.
+
 The proposed emergency envelope remains inactive: aggregate ceiling `$15`,
 maximum one-time stage `$2`, minimum remaining headroom `$1`, and a 15-minute
 founder acknowledgement window. Activating those values, changing the Vercel
-budget, resuming a project, creating Sentry monitors or recipients, deploying
-the Cloudflare receiver, or setting its secrets are separate operational
-mutations and require their applicable approval and identity receipts.
+budget, resuming a project, binding these alerts to Tim's Sentry member,
+deploying the Cloudflare spend receiver, or setting its secrets are separate
+operational mutations and require their applicable approval and identity receipts.
 
 ---
 
