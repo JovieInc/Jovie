@@ -50,12 +50,22 @@ struct NoopPushNotificationCoordinator: PushNotificationCoordinating {
 struct ProfileLoadContext {
   let ownership: NativeSessionOwnership?
   let canContinue: () -> Bool
+  var performMutation: ((() -> Void) -> Bool)?
+
+  func mutate(_ operation: () -> Void) -> Bool {
+    guard canContinue() else { return false }
+    if let performMutation { return performMutation(operation) }
+    operation()
+    return true
+  }
 
   static func live(for userID: String) -> Self? {
     guard let ownership = NativeSessionTokenStore.captureOwnership(for: userID) else { return nil }
-    return Self(ownership: ownership) {
+    return Self(ownership: ownership, canContinue: {
       NativeSessionTokenStore.canContinueProfileLoad(ownedBy: ownership)
-    }
+    }, performMutation: {
+      NativeSessionTokenStore.performProfileMutation(ownedBy: ownership, $0)
+    })
   }
 
   static func unmanaged(canContinue: @escaping () -> Bool = { true }) -> Self {
@@ -98,6 +108,14 @@ final class AppState {
     case completed(NativeSessionOwnership)
   }
   private var reconciliation: Reconciliation?
+  private struct AcceptedPresentation {
+    let owner: NativeSessionOwnership
+    let userID: String
+    let route: AppRouter
+    let dashboard: DashboardLoadState
+    let offline: Bool
+  }
+  private var acceptedPresentation: AcceptedPresentation?
   private var profileLoadAttempt: ProfileLoadAttempt? {
     if case let .profile(attempt, _) = reconciliation { return attempt }
     return nil
@@ -217,7 +235,7 @@ final class AppState {
   }
 
   func handleSignedInUserChange(_ userID: String?) async {
-    guard launchMode.usesLiveAuth, didInitializeAuth else { return }
+    guard launchMode.usesLiveAuth, didInitializeAuth, !NativeSessionTokenStore.hasPendingAuth else { return }
 
     let newAttempt: ProfileLoadAttempt?
     if let userID {
@@ -234,7 +252,7 @@ final class AppState {
 
     let previousUserID = activeUserID
     guard let userID, let attempt = newAttempt else {
-      let claim = NativeSessionTokenStore.claimCleanup()
+      guard let claim = NativeSessionTokenStore.claimOrdinaryCleanup() else { return }
       var retiredTask: Task<Void, Never>?
       NativeSessionTokenStore.performIfCurrent(claim) { _ in
         activeUserID = nil
@@ -253,8 +271,22 @@ final class AppState {
       return
     }
 
-    guard !isTerminalOwner(attempt.context.ownership) else { return }
+    var work: (task: Task<Void, Never>, retired: Task<Void, Never>?)?
+    _ = attempt.context.mutate {
+      guard !isTerminalOwner(attempt.context.ownership) else { return }
+      work = installProfileLoad(attempt)
+    }
+    work?.retired?.cancel()
+    await work?.task.value
+  }
+
+  // Called only from an already-admitted synchronous mutation. The repository
+  // task does not inherit cancellation from the view which accepted the result.
+  private func installProfileLoad(
+    _ attempt: ProfileLoadAttempt
+  ) -> (task: Task<Void, Never>, retired: Task<Void, Never>?) {
     let retiredTask = retireProfileLoad()
+    let userID = attempt.userID
     activeUserID = userID
     activeSessionOwnership = attempt.context.ownership
     Observability.setUser(id: userID)
@@ -297,8 +329,7 @@ final class AppState {
       }
     }
     reconciliation = .profile(attempt, task)
-    retiredTask?.cancel()
-    await task.value
+    return (task, retiredTask)
   }
 
   // Detachment is safe under the token-store lock; cancellation is not, because
@@ -314,14 +345,21 @@ final class AppState {
     _ = retireProfileLoad()
   }
 
-  private func presentCachedProfile(
-    _ cachedSnapshot: MobileMeResponse?, for attempt: ProfileLoadAttempt
-  ) -> Bool {
-    // Cache-first: paint the last persisted profile instantly so returning
-    // users never wait on the network to see their dashboard. The network
-    // revalidation below silently swaps in fresh data when it lands.
-    guard isActive(attempt), attempt.canContinue() else { return false }
+  private func mutateProfile(_ attempt: ProfileLoadAttempt, _ operation: () -> Void) -> Bool {
+    var admitted = false
+    let current = attempt.context.mutate {
+      guard isActive(attempt) else { return }
+      operation()
+      admitted = true
+    }
+    return current && admitted
+  }
 
+  private func presentCachedProfile(_ cachedSnapshot: MobileMeResponse?, for attempt: ProfileLoadAttempt) -> Bool {
+    return mutateProfile(attempt) { applyCachedProfile(cachedSnapshot) }
+  }
+
+  private func applyCachedProfile(_ cachedSnapshot: MobileMeResponse?) {
     if let cachedSnapshot {
       apply(response: cachedSnapshot)
       isOffline = false
@@ -337,12 +375,13 @@ final class AppState {
       isOffline = false
       MobileAuthDiagnostics.record("mobile_me_loading")
     }
-
-    return true
   }
 
   private func presentProfileResult(_ result: MeRepositoryResult, for attempt: ProfileLoadAttempt) {
-    guard isActive(attempt), attempt.canContinue() else { return }
+    _ = mutateProfile(attempt) { applyProfileResult(result) }
+  }
+
+  private func applyProfileResult(_ result: MeRepositoryResult) {
     isOffline = result.isStale
 
     switch result.response.state {
@@ -377,7 +416,10 @@ final class AppState {
   }
 
   private func presentProfileFailure(_ error: Error, for attempt: ProfileLoadAttempt) {
-    guard isActive(attempt), attempt.canContinue() else { return }
+    _ = mutateProfile(attempt) { applyProfileFailure(error) }
+  }
+
+  private func applyProfileFailure(_ error: Error) {
     var didTransportFail = false
     if let error = error as? APIClientError, case .transportFailed = error {
       didTransportFail = true
@@ -425,6 +467,10 @@ final class AppState {
   @discardableResult
   func signOut() async -> NativeSessionCleanupCompletion? {
     let claim = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
+    return await signOut(using: claim)
+  }
+
+  private func signOut(using claim: NativeSessionCleanupClaim) async -> NativeSessionCleanupCompletion? {
     var userID: String?
     var retiredTask: Task<Void, Never>?
     guard NativeSessionTokenStore.performIfCurrent(claim, { context in
@@ -469,22 +515,104 @@ final class AppState {
 
   func handleExpiredSession(_ receipt: NativeSessionExpiryReceipt) async {
     var task: Task<Void, Never>?
-    NativeSessionTokenStore.performIfCurrent(receipt.ownership) {
+    NativeSessionTokenStore.performIfCurrent(receipt) { pending in
       task = installTerminalCleanup(ownedBy: receipt.ownership,
-        userID: receipt.userID ?? activeUserID)
+        userID: receipt.userID ?? activeUserID, preservingAuthPresentation: pending)
     }
     await task?.value
   }
 
+  func acceptAuthAttempt(_ attempt: NativeAuthAttempt) {
+    var retired: Task<Void, Never>?
+    NativeSessionTokenStore.performIfCurrent(attempt) {
+      if let owner = activeSessionOwnership, let userID = activeUserID, case .loaded = dashboardState {
+        if route != .launching || acceptedPresentation?.owner != owner {
+          acceptedPresentation = AcceptedPresentation(owner: owner, userID: userID,
+            route: route, dashboard: dashboardState, offline: isOffline)
+        }
+      } else { acceptedPresentation = nil }
+      retired = retireProfileLoad()
+      route = .launching
+    }
+    retired?.cancel()
+  }
+
+  /// Dispatch is synchronous and one-shot, before any caller cancellation check.
+  /// Work is retained in the same slot as ordinary profile/expiry reconciliation.
+  func reconcileAuth(_ result: NativeAuthResolution, publication: () -> Void = {}) -> Task<Void, Never>? {
+    var task: Task<Void, Never>?
+    var retired: Task<Void, Never>?
+    NativeSessionTokenStore.consume(result) { session, receipt in
+      let previous = acceptedPresentation
+      acceptedPresentation = nil
+      if let receipt {
+        if isTerminalOwner(receipt.ownership) { retired = resetSignedOutPresentation().task }
+        task = installTerminalCleanup(ownedBy: receipt.ownership, userID: receipt.userID,
+          preservingAuthPresentation: false)
+      } else if let session, result.outcome == .persisted || result.origin == .cancellation {
+        let context = ProfileLoadContext(ownership: result.ownership, canContinue: {
+          NativeSessionTokenStore.performIfCurrent(result, {})
+        }, performMutation: { NativeSessionTokenStore.performProfileMutation(
+          ownedBy: result.ownership, result: result, $0) })
+        let work = installProfileLoad(ProfileLoadAttempt(userID: session.userID, context: context))
+        task = work.task
+        retired = work.retired
+      } else if (result.outcome == .preserved || result.storageWasUntouched),
+                let previous, previous.owner == result.ownership {
+        activeUserID = previous.userID
+        activeSessionOwnership = previous.owner
+        route = previous.route
+        dashboardState = previous.dashboard
+        isOffline = previous.offline
+        Observability.setUser(id: previous.userID)
+      } else if result.outcome == .consumed {
+        task = installTerminalCleanup(ownedBy: result.ownership,
+          userID: result.cleanupUserID ?? activeUserID, preservingAuthPresentation: false)
+      } else {
+        retired = resetSignedOutPresentation().task
+      }
+      publication()
+    }
+    retired?.cancel()
+    return task
+  }
+
+  func reconcileAuthFailure(
+    _ claim: NativeSessionCleanupClaim,
+    completion: @escaping (NativeSessionCleanupCompletion) -> Void
+  ) -> Task<Void, Never>? {
+    var task: Task<Void, Never>?
+    var retired: Task<Void, Never>?
+    NativeSessionTokenStore.performIfCurrent(claim) { context in
+      retired = retireProfileLoad()
+      var cleanupUser = activeUserID
+      if cleanupUser == nil, case let .terminal(_, owner, previousUser, _) = reconciliation,
+         owner == context.ownership { cleanupUser = previousUser }
+      let id = UUID()
+      let work = Task { [self] in
+        let result = await signOut(using: claim)
+        if let result {
+          NativeSessionTokenStore.finishAuthCleanup(result)
+          completion(result)
+        }
+        finishTerminal(id, ownedBy: result?.ownership ?? context.ownership)
+      }
+      reconciliation = .terminal(id, context.ownership, cleanupUser, work)
+      task = work
+    }
+    retired?.cancel()
+    return task
+  }
+
   private func installTerminalCleanup(
-    ownedBy owner: NativeSessionOwnership, userID: String?
+    ownedBy owner: NativeSessionOwnership, userID: String?, preservingAuthPresentation: Bool
   ) -> Task<Void, Never>? {
     switch reconciliation {
     case let .terminal(_, current, _, task) where current == owner: return task
     case let .completed(current) where current == owner: return nil
     default: break
     }
-    let retired = resetSignedOutPresentation().task
+    let retired = resetSignedOutPresentation(preservingAuthPresentation: preservingAuthPresentation).task
     let id = UUID()
     let task = Task { [weak self, pushNotifications, repository, chatCache, audienceHighlightsCache, actionLoopCache] in
       // A profile task may await us; never join it, or cancel it before cleanup.
@@ -519,16 +647,20 @@ final class AppState {
     return NativeSessionTokenStore.performIfCurrent(completion, {}) ? completion : nil
   }
 
-  private func resetSignedOutPresentation() -> (userID: String?, task: Task<Void, Never>?) {
+  private func resetSignedOutPresentation(
+    preservingAuthPresentation: Bool = false
+  ) -> (userID: String?, task: Task<Void, Never>?) {
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
     activeSessionOwnership = nil
     let task = retireProfileLoad()
-    route = .signedOut
     dashboardState = .idle
     isOffline = false
-    MobileAuthDiagnostics.record("route_signed_out")
+    if !preservingAuthPresentation {
+      route = .signedOut
+      MobileAuthDiagnostics.record("route_signed_out")
+    }
     return (userID, task)
   }
 
