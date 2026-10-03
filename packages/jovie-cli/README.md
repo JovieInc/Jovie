@@ -7,7 +7,7 @@ No login or API key is required.
 
 ## Install
 
-Requires Node.js `>=24.21.0 <25`. Install an exact public release globally from npm:
+Requires Node.js 22.13 or newer (tested on 22, 24, and 26). Install an exact public release globally from npm:
 
 ```sh
 npm install --global @jovie/cli@26.9.16
@@ -52,9 +52,17 @@ exit `0`, request/response failures exit `1`, and invalid usage exits `2`.
 
 `--help --json` returns `{ "content": "..." }`; `--version --json` returns `{ "version": "..." }`.
 
-Reads retry one transport failure. Writes never retry automatically: a timeout may
-have occurred after the server committed. Report tools therefore do not advertise
-idempotency. Responses share a 30-second request deadline and a 1 MiB body limit.
+Reads make up to three attempts with backoff for transient failures (connection
+resets, 502 without an error code, 503, 504, and 429 with `Retry-After` of 5 seconds
+or less). A longer `Retry-After` is reported, not slept through. Writes never retry
+automatically: a timeout may have occurred after the server committed. Report tools
+therefore do not advertise idempotency. Every attempt, backoff, and body read share
+one 30-second deadline, so no command waits longer. Bodies are capped at 1 MiB.
+
+Errors are one line on stderr that says what to do next (for example
+`Could not resolve jov.ie. Check your internet connection or --base-url.`). Add
+`--debug` to also print the stack and cause chain; secrets are redacted either way.
+Closing the output pipe early (`jovie docs llms | head`) exits quietly.
 
 Every command accepts `--base-url <url>` for a compatible deployment origin.
 The value must be an `http` or `https` origin without a path, credentials, or
@@ -64,7 +72,8 @@ query parameters.
 
 The standalone CLI and MCP server honor `HTTP_PROXY`, `HTTPS_PROXY`, and
 `NO_PROXY` (and their lowercase equivalents) through Node's built-in proxy
-support. No extra Node flags are needed. Existing TLS certificate settings
+support on Node.js 24 and newer (Node 22 warns and connects directly). No extra
+Node flags are needed. Existing TLS certificate settings
 remain in effect. A proxy must allow the deployment host (normally `jov.ie`);
 installing the CLI does not grant network access.
 
