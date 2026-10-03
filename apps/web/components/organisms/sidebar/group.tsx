@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/sidebar-row-alignment.test.tsx
 import { Slot } from '@radix-ui/react-slot';
 import React from 'react';
 import { cn } from '@/lib/utils';

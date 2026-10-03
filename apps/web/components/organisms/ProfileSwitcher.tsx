@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/organisms/ProfileSwitcher.test.tsx
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/sidebar-row-alignment.test.tsx
 import type { LucideIcon } from 'lucide-react';
 import { ChevronRight } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
