@@ -1162,6 +1162,8 @@ final class NativeAuthSecurityScript: @unchecked Sendable {
   private let lock = NSLock()
   private var bytes: Data?
   private var events: [String] = []
+  private var queryScopes: [(String?, String?, Bool)] = []
+  var scopes: [(String?, String?, Bool)] { lock.withLock { queryScopes } }
   private var reads: [(OSStatus, Data?)] = []
   private var copies = 0
   private var deleted = errSecSuccess
@@ -1192,6 +1194,9 @@ final class NativeAuthSecurityScript: @unchecked Sendable {
       if operation == "copy" { copies += 1 }
       let event = operation == "copy" ? "copy\(copies)" : operation
       events.append(event)
+      let attributes = query as NSDictionary
+      queryScopes.append((attributes[kSecAttrService] as? String, attributes[kSecAttrAccount] as? String,
+        attributes[kSecUseDataProtectionKeychain] as? Bool == true))
       if cancelAt == event { withUnsafeCurrentTask { $0?.cancel() } }
       if operation == "copy" {
         return reads.isEmpty ? (bytes == nil ? errSecItemNotFound : errSecSuccess, bytes) : reads.removeFirst()
@@ -1224,6 +1229,30 @@ private let nativeAuthExpiryKey = "ie.jov.Jovie.nativeSession.expiresAt"
 private let nativeAuthFallbackKey = "ie.jov.Jovie.nativeSession.token"
 
 extension APIClientTests {
+  @Test func nativeIOSPlatformKeepsNamespaceAndScopedTestDefaults() async throws {
+    try await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      let domain = "NativeIOSPlatform.\(UUID().uuidString)"
+      let defaults = try #require(UserDefaults(suiteName: domain))
+      let script = NativeAuthSecurityScript()
+      let oldDefaults = NativeSessionTokenStore.replaceDefaultsForTesting(defaults)
+      let oldSecurity = NativeSessionTokenStore.replaceSecurityOperationsForTesting(script.operations)
+      defer {
+        NativeSessionTokenStore.clear()
+        _ = NativeSessionTokenStore.replaceSecurityOperationsForTesting(oldSecurity)
+        _ = NativeSessionTokenStore.replaceDefaultsForTesting(oldDefaults)
+        defaults.removePersistentDomain(forName: domain)
+      }
+      NativeSessionTokenStore.clear()
+      NativeSessionTokenStore.save(token: "isolated", userID: "isolated", expiresAt: .distantFuture)
+      #expect(NativeSessionTokenStore.load()?.token == "isolated")
+      #expect(defaults.string(forKey: "ie.jov.Jovie.nativeSession.userID") == "isolated")
+      #expect(NativeAuthPlatform.storagePrefix == "ie.jov.Jovie")
+      #expect(NativeAuthPlatform.service == "ie.jov.Jovie")
+      #expect(!script.scopes.isEmpty)
+      #expect(script.scopes.allSatisfy { $0.0 == "ie.jov.Jovie" && $0.1 == "nativeSessionToken" && !$0.2 })
+    }
+  }
+
   @Test(arguments: ["success", "same", "preserved", "preserved-same", "consumed", "empty", "readback", "mismatch", "fractional-expiry",
                     "unreadable", "nil-data", "malformed", "orphan", "empty-user", "missing-expiry", "nan", "infinite", "expired"])
   func nativeAuthCommitClassifiesActualRawStorage(mode: String) async throws {
