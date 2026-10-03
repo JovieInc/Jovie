@@ -177,12 +177,14 @@ Gaps closed after the first week (no PR may sit unowned):
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
   drafts receive `repair`, or `hold:dependency` while a named dependency is open.
   A landed dependency releases repair; it never grants authority to discard the branch.
-  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement, with one
-  exception (v5, JOV-7708): an agent-owned PR parked by `lane-fix-exhausted` or `queue-poison`
-  for more than 48h (measured from the label's latest `labeled` event) is closed with a
-  reason, its branch kept, and its issue moved to Todo + `agent-ready` with a rebuild-from-main
-  note, unless the issue is done or another open PR carries it. Holds, the merge queue and live
-  repair claims preserve it; `LANES_PARKED_RETIRE=0` turns it off (`retire_parked()`). Every
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
+  exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
+  carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
+  latest `labeled` event) sends its issue to Todo + `agent-ready` with a rebuild-from-main note,
+  unless the issue is done or another open PR carries it. The PR stays open and gets
+  `lane-rebuild` (once), which stops it holding the issue in `in_flight_issues()`; label it
+  `duplicate` once the rebuild lands. Holds, the merge queue and live repair claims skip it;
+  `LANES_PARKED_REQUEUE=0` turns it off (`requeue_parked()`). Every
   close path re-reads the live source head, state, complete labels, fork and queue status;
   revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
