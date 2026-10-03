@@ -1920,6 +1920,14 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.calls.clear()
         return prior
 
+    def retain_with_source_safe_marker(self, prior):
+        lane.preserve_repair(self.path, {
+            "runId": prior["runId"],
+            "reasons": ["cleanup-source-unverified"],
+        })
+        marker = json.loads((self.path / lane.disk_guard.PRESERVED_REPAIR).read_text())
+        self.assertIsNone(marker["pr"], "source-safe cleanup has no target binding to copy")
+
     def test_disk_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("disk-held")
 
@@ -1935,6 +1943,71 @@ class PreservedRecoveryTest(unittest.TestCase):
 
     def test_transient_read_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("reconcile-unavailable")
+
+    def test_source_safe_marker_recovers_through_its_ended_ledger_receipt(self):
+        prior = self.hold()
+        self.retain_with_source_safe_marker(prior)
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            self.assertEqual(cwd, self.path)
+            self.assertEqual((cwd / "repair.txt").read_text(), "preserved useful edit")
+            raise lane.DiskAdmissionError("agent-running:disk-critical")
+        with patch.object(lane, "run_agent", side_effect=agent):
+            resumed = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(resumed["verdict"], "disk-held")
+        self.assertEqual(resumed["resumedFrom"], prior["runId"])
+        self.assertEqual(resumed["execution"]["identityDigest"], prior["execution"]["identityDigest"])
+        self.assertEqual(resumed["execution"]["attempt"], 2)
+        self.assertFalse(any(args[:3] == ["git", "worktree", "add"] for args in self.calls))
+        self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
+
+    def test_live_source_safe_predecessor_refuses_before_checkout_or_claim(self):
+        prior = self.hold()
+        self.retain_with_source_safe_marker(prior)
+        self.active = f"p123\nn{self.path}\n"
+        with patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "recovery-handoff")
+        self.assertEqual(receipt["recovery"]["reason"], "preserved-process-still-running")
+        self.assertFalse(any(args[:3] == ["git", "worktree", "add"] for args in self.calls))
+        self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
+        claim.assert_not_called()
+        agent.assert_not_called()
+
+    def test_stale_source_safe_predecessor_uses_canonical_handoff(self):
+        def predecessor(cmd, cwd, log, timeout, **kwargs):
+            (cwd / "repair.txt").write_text("preserved useful edit")
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=predecessor):
+            prior = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(prior["verdict"], "fix-no-change")
+        self.path = Path(prior["worktree"])
+        marker = json.loads((self.path / lane.disk_guard.PRESERVED_REPAIR).read_text())
+        self.assertIsNone(marker["pr"], "source-safe cleanup retained the checkout without a target binding")
+        self.assertNotIn("preservedWorktree", prior)
+        self.calls.clear()
+        with patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "recovery-handoff")
+        self.assertEqual(receipt["recovery"]["reason"], "preserved-target-needs-reconciliation")
+        self.assertFalse(any(args[:3] == ["git", "worktree", "add"] for args in self.calls))
+        self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
+        claim.assert_not_called()
+        agent.assert_not_called()
+
+    def test_competing_checkout_after_reconciliation_is_refused_safely(self):
+        competitor = self.host.state / "worktrees/competing-owner"
+        add_worktree = lane.add_worktree
+        def race(host, args, log):
+            self.git(host.repo, "worktree", "add", "-q", "-b", self.pr["headRefName"],
+                     str(competitor), f"origin/{self.pr['headRefName']}")
+            add_worktree(host, args, log)
+        with patch.object(lane, "add_worktree", side_effect=race), patch.object(lane, "run_agent") as agent:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "skipped")
+        self.assertIn("already used by worktree", receipt["reasons"][0])
+        self.assertTrue(competitor.exists())
+        self.assertFalse((competitor / lane.disk_guard.PRESERVED_REPAIR).exists())
+        agent.assert_not_called()
 
     def assert_resume(self, reason):
         prior = self.hold(reason)
@@ -2061,6 +2134,26 @@ class PreservedRecoveryTest(unittest.TestCase):
             receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
         self.assertEqual(receipt["recovery"]["reason"], "preserved-execution-unverified")
         claim.assert_not_called()
+
+    def test_malformed_path_fields_are_bounded_handoffs_for_direct_and_sparse_markers(self):
+        prior = self.hold()
+        original_marker = (self.path / lane.disk_guard.PRESERVED_REPAIR).read_text()
+        for sparse in (False, True):
+            for field in ("worktree", "preservedWorktree"):
+                for malformed in ([], {}, 123, ""):
+                    with self.subTest(sparse=sparse, field=field, malformed=malformed):
+                        (self.path / lane.disk_guard.PRESERVED_REPAIR).write_text(original_marker)
+                        if sparse:
+                            self.retain_with_source_safe_marker(prior)
+                        damaged = {**prior, field: malformed}
+                        (self.host.state / "runs/ledger.jsonl").write_text(json.dumps(damaged) + "\n")
+                        with patch.object(lane, "run_agent") as agent, patch.object(lane.execution_attempt, "claim") as claim:
+                            with self.assertRaises(lane.RecoveryHandoff) as caught:
+                                lane.preserved_run(self.host, pr=self.pr["number"])
+                        self.assertEqual(caught.exception.evidence["reason"], "preserved-ledger-path-invalid")
+                        self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
+                        agent.assert_not_called()
+                        claim.assert_not_called()
 
 
     def test_active_process_changed_head_and_missing_terminal_receipt_are_handoffs(self):
@@ -2775,6 +2868,10 @@ class FixRedTest(unittest.TestCase):
                 return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:
                 Path(args[-2]).mkdir(parents=True)
+            if args[:2] == ["git", "rev-list"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="0\n")
+            if args[:3] == ["git", "worktree", "remove"]:
+                Path(args[-1]).rmdir()
             return SimpleNamespace(returncode=0, stderr="", stdout="")
         lane.sh, lane.failure_excerpt = fake, lambda pr: "err"
         self.addCleanup(lambda: (setattr(lane, "sh", real), setattr(lane, "failure_excerpt", real_excerpt)))
@@ -2793,6 +2890,10 @@ class FixRedTest(unittest.TestCase):
                 return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:
                 Path(args[-2]).mkdir(parents=True)
+            if args[:2] == ["git", "rev-list"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="0\n")
+            if args[:3] == ["git", "worktree", "remove"]:
+                Path(args[-1]).rmdir()
             return SimpleNamespace(returncode=0, stderr="", stdout="")
 
         lane.sh, lane.failure_excerpt = fake, lambda pr: "err"
