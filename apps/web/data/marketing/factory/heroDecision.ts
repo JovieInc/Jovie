@@ -210,11 +210,6 @@ export interface HeroRouteIntent {
 export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
   { url: '/', input: { useCase: 'homepage', route: '/' }, why: 'homepage' },
   {
-    url: '/new',
-    input: { useCase: 'two-actions', actionCount: 2 },
-    why: 'homepage v2 front door offers start and a second path',
-  },
-  {
     url: '/pricing',
     input: { useCase: 'two-actions', actionCount: 2 },
     why: 'primary and secondary pricing CTAs',

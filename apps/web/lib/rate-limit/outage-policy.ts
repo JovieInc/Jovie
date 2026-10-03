@@ -83,6 +83,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   deployPromote: mandatoryDeny,
   accountDelete: mandatoryDeny,
   publicArtistApi: mandatoryDenyFixed,
+  agentCreatorLookup: mandatoryDenyFixed,
   agentProfileCreate: mandatoryDenyFixed,
   general: mandatoryDenyFixed,
   changelogSubscribe: mandatoryDenyFixed,

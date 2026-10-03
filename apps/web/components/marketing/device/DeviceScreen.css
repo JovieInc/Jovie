@@ -1,0 +1,48 @@
+/* Canonical device presentation. See deviceBezels.ts for the policy.
+   No shadows, reflections, glows, tilt, or simulated hardware here —
+   Apple's guidelines forbid them on the official bezel, and the bezel-free
+   web screen must not imitate one. */
+
+/* Layered so page-level Tailwind width utilities still win. */
+@layer components {
+  /* Bezel-free mobile web capture: a plain screen at iPhone 18 Pro logical
+     proportions (402 x 874). Radius scales with width via container units. */
+  .mobile-web-screen {
+    container-type: inline-size;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 402 / 874;
+    overflow: hidden;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: min(var(--radius-3xl), 8cqi);
+    background: var(--color-bg-surface-0);
+  }
+
+  /* Official iPhone bezel: the screen sits under the bezel PNG, which masks
+     its corners. Opening = 72,69 1206x2622 in the 1350x2760 source
+     (asserted against deviceBezels.ts by device-frame-policy.test.ts). */
+  .official-iphone-frame {
+    position: relative;
+    width: 100%;
+    min-height: 200px;
+    aspect-ratio: 1350 / 2760;
+  }
+
+  .official-iphone-frame__screen {
+    position: absolute;
+    left: 5.3333%;
+    top: 2.5%;
+    width: 89.3333%;
+    height: 95%;
+    overflow: hidden;
+    background: var(--color-bg-surface-0);
+  }
+
+  .official-iphone-frame__bezel {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+}

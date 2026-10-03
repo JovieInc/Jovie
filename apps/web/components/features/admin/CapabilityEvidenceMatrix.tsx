@@ -6,7 +6,7 @@ import {
   type CapabilityEvidenceRecord,
   type CapabilityObservation,
   deriveCapabilityStage,
-} from '@/lib/admin/capability-evidence';
+} from '@/lib/admin/capability-evidence-model';
 
 const REPOSITORY_URL = 'https://github.com/JovieInc/Jovie';
 

@@ -66,3 +66,32 @@ for 20, 200, and 2,000-message conversations with tool results and attachments.
 **Then:** establish comparable launch, typing, conversation-switch, sleep/wake,
 and resource budgets. The native Mac workload matrix remains unmeasured here;
 this Linux source validation does not certify installed-app performance.
+
+## Initial automatic maintenance (JOV-7511)
+
+The main process queues initial automatic update checks, including their
+automatic downloads, until two seconds after the accepted visible/editable
+composer receipt. A 30-second deadline from first-window construction releases
+the queue if sign-in, a non-chat route, hidden launch, recovery, offline startup,
+or an older hosted client never supplies that receipt. These are bounded
+scheduling defaults, not measured performance targets. A late readiness signal
+cannot extend the deadline. Actual focus remains a separate observation.
+
+Only already-due work is queued. The first web-build check normally sees the
+local splash and does nothing; it still does nothing, and the existing
+60-second poll keeps its original schedule. Updater checks retain their
+30-minute interval. Wake/unlock events before startup release coalesce with
+pending work; afterward they keep their current behavior and five-minute
+updater wake floor. This launch gate does not claim fresh readiness on wake.
+
+Updater configuration remains immediate. Explicit menu/IPC checks, downloads,
+and restart actions bypass the queue. An explicit check also fulfills a queued
+automatic check. Headless nightly updates retain their immediate check and
+15-minute timeout. Quit cancels pending startup timers. Existing request-time
+work-safety checks still decide whether a web reload or automatic update
+installation may proceed.
+
+[JOV-7511](https://linear.app/jovie/issue/JOV-7511) covers this scheduling slice.
+Representative installed-Mac comparison remains under
+[JOV-7463](https://linear.app/jovie/issue/JOV-7463); source tests establish timing
+and lifecycle behavior, not a measured startup improvement.

@@ -32,10 +32,19 @@ const GATE_RECEIPTS = {
   },
   'cross-product': {
     tests:
-      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test',
+      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test',
     artifact: 'cross-product shared-contract gate receipt',
   },
 };
+
+const BLOG_CONTENT_GATE_RECEIPT = {
+  tests:
+    'JOV-7396 publication contract, JOV-7397 agent certification, and exact candidate Next.js build',
+  artifact: 'blog-content-qualification-<merge-group-head-sha>-<run-attempt>',
+  releaseWorkflow: '.github/workflows/production-release.yml',
+};
+const BLOG_CONTENT_PATH =
+  /^(apps\/web\/content\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*\.md|apps\/web\/public\/images\/blog\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*\.(?:avif|jpe?g|png|webp))$/;
 
 const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   [
@@ -79,6 +88,12 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^packages\/auth-routing\//,
   ],
   [
+    'shared-release-channel',
+    'shared-contract',
+    PRODUCT_LANES,
+    /^packages\/release-channel-contracts\//,
+  ],
+  [
     // Lockfile-only churn (every dependabot group) changes the JS install
     // graph. The iOS lane is native xcodebuild with no causal path from it —
     // unlike the desktop lane, which bundles web output. Dropping ios here
@@ -99,7 +114,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'shared-release-admission',
     'operations-tooling',
     [],
-    /^(config\/node-runtime-policy\.json|\.github\/(workflows\/(ci|production-controller)\.yml|ci-harness\/)|scripts\/ci-fast-lanes\.mjs|scripts\/lib\/(ci-harness|merge-queue-guard|product-lane-(classifier|finalize)|production-lane-range)\.mjs|scripts\/lib\/__tests__\/(ci-harness|merge-group-workflow-contract|product-lane-classifier|production-lane-range)\.test\.mjs)$/,
+    /^(config\/node-runtime-policy\.json|\.github\/(workflows\/(ci|production-controller)\.yml|ci-harness\/)|scripts\/ci-fast-lanes\.mjs|scripts\/lib\/(blog-content-ci|ci-harness|merge-queue-guard|product-lane-(classifier|finalize)|production-lane-range)\.mjs|scripts\/lib\/__tests__\/(blog-content-ci|ci-harness|merge-group-workflow-contract|product-lane-classifier|production-lane-range)\.test\.mjs)$/,
   ],
   [
     'operations-release-contract-test',
@@ -124,7 +139,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'web-product',
     'web',
     ['web'],
-    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
     'operations-tooling',
@@ -352,11 +367,11 @@ export function classifyPackageJsonChange(beforeSource, afterSource) {
 
 /**
  * @param {string[]} paths
- * @param {{ packageJsonBefore?: string, packageJsonAfter?: string }} [options]
+ * @param {{ packageJsonBefore?: string, packageJsonAfter?: string, qualificationProfile?: 'full' | 'content-only' }} [options]
  */
 export function classifyProductLanes(
   paths,
-  { packageJsonBefore, packageJsonAfter } = {}
+  { packageJsonBefore, packageJsonAfter, qualificationProfile = 'full' } = {}
 ) {
   const changedPaths = [
     ...new Set(paths.map(normalizePath).filter(Boolean)),
@@ -413,8 +428,23 @@ export function classifyProductLanes(
     reason: 'no changed path can materially affect this lane',
   }));
 
+  if (!['full', 'content-only'].includes(qualificationProfile)) {
+    throw new Error(`Unknown qualification profile: ${qualificationProfile}`);
+  }
+  if (
+    qualificationProfile === 'content-only' &&
+    (selectedLanes.length !== 1 ||
+      selectedLanes[0] !== 'web' ||
+      changedPaths.some(path => !BLOG_CONTENT_PATH.test(path)))
+  ) {
+    throw new Error(
+      'Content-only qualification is valid only for approved blog content paths in the web lane'
+    );
+  }
+
   return {
     authority: 'Summer',
+    qualificationProfile,
     changedPaths,
     classifications,
     selectedLanes,
@@ -425,7 +455,12 @@ export function classifyProductLanes(
       paths: sharedClassifications.map(item => item.path),
     },
     requiredGates: Object.fromEntries(
-      selectedLanes.map(lane => [lane, GATE_RECEIPTS[lane]])
+      selectedLanes.map(lane => [
+        lane,
+        qualificationProfile === 'content-only' && lane === 'web'
+          ? BLOG_CONTENT_GATE_RECEIPT
+          : GATE_RECEIPTS[lane],
+      ])
     ),
   };
 }
@@ -541,6 +576,7 @@ export function runProductLaneClassifier(
   const receipt = classifyProductLanes(files, {
     packageJsonBefore,
     packageJsonAfter,
+    qualificationProfile: args['qualification-profile'] ?? 'full',
   });
   const json = `${JSON.stringify(receipt, null, 2)}\n`;
   if (args['json-out']) writeFileSync(args['json-out'], json);

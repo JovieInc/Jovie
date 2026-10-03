@@ -64,6 +64,16 @@ vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
         turnstileMock.onStateChange = null;
       };
     }, [onStateChange, onToken]);
+    // A reset signal re-executes the real widget and delivers a fresh token.
+    useEffect(() => {
+      if (
+        (resetSignal ?? 0) > 0 &&
+        turnstileMock.provideToken &&
+        !turnstileMock.failureMessage
+      ) {
+        onToken('test-turnstile-token');
+      }
+    }, [resetSignal, onToken]);
     return null;
   },
   isTurnstileClientBypassed: () => false,
@@ -197,8 +207,10 @@ describe('ChangelogEmailSignup', () => {
         'Confirm your subscription to receive Jovie changelog emails.'
       );
     });
-    await waitFor(() => expect(turnstileMock.unmountCount).toBe(1));
-    expect(turnstileMock.onStateChange).toBeNull();
+    // The widget stays mounted in the confirmation-required state so the
+    // resend action can reuse a fresh security token.
+    expect(turnstileMock.unmountCount).toBe(0);
+    expect(turnstileMock.onStateChange).not.toBeNull();
 
     expect(global.fetch).toHaveBeenCalledWith('/api/changelog/subscribe', {
       method: 'POST',
@@ -322,6 +334,129 @@ describe('ChangelogEmailSignup', () => {
       JSON.parse(vi.mocked(global.fetch).mock.calls[0][1]?.body as string)
         .source
     ).toBe('marketing:/blog');
+  });
+
+  it('shows the submitted address and lets the visitor correct a typo', async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'confirmation_required' }),
+    } as Response);
+
+    render(<ChangelogEmailSignup />);
+    fireEvent.change(screen.getByLabelText('Email Address'), {
+      target: { value: 'artist@exmaple.com' },
+    });
+    fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
+
+    const panel = await screen.findByTestId('changelog-confirmation-sent');
+    expect(within(panel).getByText('artist@exmaple.com')).toBeInTheDocument();
+    const form = screen.getByTestId('changelog-subscribe-form');
+    expect(form).toHaveAttribute('inert');
+    expect(form).toHaveAttribute('aria-hidden', 'true');
+
+    fireEvent.click(
+      within(panel).getByRole('button', { name: 'Use A Different Email' })
+    );
+
+    expect(form).not.toHaveAttribute('inert');
+    const input = screen.getByLabelText('Email Address');
+    expect(input).toHaveValue('artist@exmaple.com');
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: 'artist@example.com' } });
+    fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('changelog-confirmation-sent')).getByText(
+          'artist@example.com'
+        )
+      ).toBeInTheDocument()
+    );
+    const bodies = vi
+      .mocked(global.fetch)
+      .mock.calls.map(
+        call => JSON.parse(call[1]?.body as string) as { email: string }
+      );
+    expect(bodies.map(body => body.email)).toEqual([
+      'artist@exmaple.com',
+      'artist@example.com',
+    ]);
+  });
+
+  it('resends the confirmation to the submitted address and reports the result', async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'confirmation_required' }),
+    } as Response);
+
+    render(<ChangelogEmailSignup />);
+    fireEvent.change(screen.getByLabelText('Email Address'), {
+      target: { value: 'reader@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
+
+    const panel = await screen.findByTestId('changelog-confirmation-sent');
+    const resend = within(panel).getByRole('button', {
+      name: 'Resend Confirmation',
+    });
+    await waitFor(() => expect(resend).not.toBeDisabled());
+    fireEvent.click(resend);
+
+    expect(
+      await within(panel).findByText(
+        'Confirmation email sent again to reader@example.com.'
+      )
+    ).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenLastCalledWith('/api/changelog/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'reader@example.com',
+        turnstileToken: 'test-turnstile-token',
+        source: 'changelog_page',
+      }),
+    });
+    // The security token is single-use: each submission consumes it and the
+    // widget is reset so the next attempt needs a fresh server-checked token.
+    expect(turnstileMock.resetSignal).toBe(2);
+  });
+
+  it('surfaces the server resend cooldown without losing the submitted address', async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ state: 'confirmation_required' }),
+    } as Response);
+
+    render(<ChangelogEmailSignup />);
+    fireEvent.change(screen.getByLabelText('Email Address'), {
+      target: { value: 'reader@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
+
+    const panel = await screen.findByTestId('changelog-confirmation-sent');
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        error:
+          'Confirmation email was just sent. Please wait before resending.',
+        retryAfterSeconds: 42,
+      }),
+    } as Response);
+
+    const resend = within(panel).getByRole('button', {
+      name: 'Resend Confirmation',
+    });
+    await waitFor(() => expect(resend).not.toBeDisabled());
+    fireEvent.click(resend);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Please wait before resending.'
+    );
+    expect(within(panel).getByText('reader@example.com')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Check your email' })
+    ).toBeVisible();
   });
 
   it('preserves the email on failure and rejects an unrecognized success response', async () => {

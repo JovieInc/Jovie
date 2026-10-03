@@ -1,15 +1,19 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
+import { after } from 'next/server';
 import { isAdmin } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
+import { authorizeFounderSummerUser } from '@/lib/ovie/summer-founder-auth';
 import { fetchWithTimeout } from '@/lib/queries/fetch';
 import { FleetDispatcher } from './dispatcher';
 import type { FleetHttpDependencies } from './http';
 import { createFleetLinear } from './linear';
+import { sendSummerFleetWake } from './summer-transport';
 
 export function fleetRuntime(): FleetHttpDependencies {
   const enabled = env.JOVIE_FLEET_ENABLED === '1';
@@ -41,12 +45,34 @@ export function fleetRuntime(): FleetHttpDependencies {
           },
         })
       : undefined;
+  const dispatcher = new FleetDispatcher({
+    backend: postgresRecordBackend(),
+    enabled,
+    linear,
+  });
   return {
-    dispatcher: new FleetDispatcher({
-      backend: postgresRecordBackend(),
-      enabled,
-      linear,
-    }),
+    dispatcher,
+    summerFounder: actor => authorizeFounderSummerUser(actor) === 'authorized',
+    scheduleSummerWake(profileId) {
+      after(async () => {
+        try {
+          const events = await dispatcher.pendingSummerEvents(profileId);
+          const results = await Promise.allSettled(
+            events.map(event => sendSummerFleetWake(profileId, event.eventId))
+          );
+          const failure = results.find(result => result.status === 'rejected');
+          if (failure?.status === 'rejected') throw failure.reason;
+        } catch (error) {
+          await captureError(
+            'Summer fleet wake failed; durable event remains pending',
+            error,
+            {
+              route: '/api/v1/actions/[actionId]/invoke',
+            }
+          );
+        }
+      });
+    },
     validateMission: linear?.validateMission,
     async founder(request, profileId) {
       if (request.headers.has('authorization')) return null;

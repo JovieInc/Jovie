@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import {
   actionResultSchema,
   FLEET_SCOPES,
+  type FleetActionId,
   getActionDescriptor,
 } from '@jovie/action-contracts';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { FleetDispatcher } from './dispatcher';
+import { completedFleetResult } from '@/lib/ovie/mcp/postgres-canary.test-utils';
+import { type FleetControlOperation, FleetDispatcher } from './dispatcher';
 import { handleFleetInvocation } from './http';
 
 // Explicit, opt-in, disposable loopback database only; never a production URL.
@@ -36,6 +38,163 @@ afterAll(async () => {
 describe.skipIf(!url)(
   'actual Postgres backend and canonical adapters local canary',
   () => {
+    it('persists an attested two-worker request, exact approval and requester receipt across restarts', async () => {
+      const { postgresRecordBackend } = await import(
+        '@/lib/ovie/mcp/postgres-backend'
+      );
+      const profileId = randomUUID();
+      const backend = postgresRecordBackend();
+      const dispatcher = new FleetDispatcher({ backend, enabled: true });
+      const control = async (op: FleetControlOperation, input: unknown) =>
+        dispatcher.control(
+          profileId,
+          'test-founder',
+          await dispatcher.approve(profileId, 'test-founder', op, input),
+          op,
+          input
+        );
+      const provision = async (workerId: string) => {
+        const result = await control('provision', {
+          workerId,
+          scopes: FLEET_SCOPES,
+          expiresAt: new Date(Date.now() + 3600000).toISOString(),
+          authority: {
+            identity: {
+              provider: 'local-canary',
+              accountRef: `urn:fixture:account:${workerId}`,
+              runtimeRef: `urn:fixture:runtime:${workerId}`,
+              displayName: 'Synthetic canary worker',
+              role: 'operator',
+              attestationRef: 'urn:fixture:approval',
+            },
+            visibility: 'operators',
+            allowedCommands: ['api.openapi'],
+            allowedTools: ['jovie'],
+            allowedConnectors: [],
+            maxDurationSeconds: 60,
+            maxConcurrentLeases: 1,
+            spendUsd: 0,
+          },
+        });
+        return result.token as string;
+      };
+      const requester = await provision('requester');
+      const helper = await provision('helper');
+      const invoke = async (
+        d: FleetDispatcher,
+        id: FleetActionId,
+        input: unknown,
+        token: string,
+        idempotencyKey = randomUUID()
+      ) => {
+        const result = await d.invoke(
+          id,
+          {
+            schemaVersion: 1,
+            idempotencyKey,
+            context: { profileId, channel: 'cli' },
+            input,
+          },
+          token
+        );
+        return completedFleetResult(result, id);
+      };
+      for (const [workerId, token] of [
+        ['requester', requester],
+        ['helper', helper],
+      ]) {
+        await invoke(
+          dispatcher,
+          'fleet.register',
+          {
+            workerId,
+            runtimeClass: 'node24',
+            capabilities: ['api.openapi'],
+            tools: ['jovie'],
+            connectors: [],
+            availability: 'available',
+          },
+          token
+        );
+      }
+      expect(
+        (await invoke(dispatcher, 'fleet.directory', {}, requester)).workers
+      ).toHaveLength(2);
+      const requestId = randomUUID();
+      const proposal = {
+        requestId,
+        kind: 'dogfood',
+        proposal: {
+          issueId: 'JOV-7393',
+          title: 'Read real public OpenAPI',
+          acceptanceCriteria: ['Return a valid public contract receipt'],
+          existingWorkRefs: ['https://jov.ie/api/v1/openapi.json'],
+          command: 'api.openapi',
+          requiredTools: ['jovie'],
+          requiredConnectors: [],
+          targetWorkerId: 'helper',
+          maxDurationSeconds: 60,
+          notAfter: new Date(Date.now() + 600000).toISOString(),
+        },
+      };
+      const requests = await Promise.all([
+        invoke(dispatcher, 'work.request', proposal, requester),
+        invoke(dispatcher, 'work.request', proposal, requester),
+      ]);
+      expect(requests[0].request).toEqual(requests[1].request);
+      expect(
+        (await invoke(dispatcher, 'work.next', {}, helper)).lease
+      ).toBeNull();
+      await control('accept', {
+        requestId,
+        owner: 'test-founder',
+        founderIntentRef: 'urn:fixture:accept',
+      });
+      const restarted = new FleetDispatcher({
+        backend: postgresRecordBackend(),
+        enabled: true,
+      });
+      const { lease } = (await invoke(restarted, 'work.next', {}, helper)) as {
+        lease: { leaseId: string };
+      };
+      await invoke(restarted, 'work.claim', { leaseId: lease.leaseId }, helper);
+      const response = await fetch('https://jov.ie/api/v1/openapi.json', {
+        signal: AbortSignal.timeout(30000),
+      });
+      expect(response.ok).toBe(true);
+      const contract = await response.json();
+      expect(contract.openapi).toMatch(/^3\./);
+      const report = await invoke(
+        restarted,
+        'work.report',
+        {
+          leaseId: lease.leaseId,
+          outcome: 'completed',
+          summary: 'Synthetic helper read a real public contract',
+          evidence: [
+            {
+              ref: 'https://jov.ie/api/v1/openapi.json',
+              summary: `HTTP ${response.status}; OpenAPI ${contract.openapi}`,
+            },
+          ],
+        },
+        helper
+      );
+      const readback = new FleetDispatcher({
+        backend: postgresRecordBackend(),
+        enabled: true,
+      });
+      const status = await invoke(readback, 'fleet.status', {}, requester);
+      expect(status.requests).toMatchObject([
+        { requestId, state: 'completed', receipt: report.receipt },
+      ]);
+      expect((await readback.inspect(profileId)).requests).toHaveLength(1);
+      const persisted = JSON.stringify(
+        await backend.get(`ovie:mcp:v1:fleet:${profileId}`)
+      );
+      expect(persisted).not.toContain(requester);
+      expect(persisted).not.toContain(helper);
+    }, 60000);
     it('registers, leases, reads real OpenAPI, records durable evidence, replays through REST and proves revocation', async () => {
       const { postgresRecordBackend } = await import(
         '@/lib/ovie/mcp/postgres-backend'

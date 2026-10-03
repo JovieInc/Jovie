@@ -4,7 +4,7 @@ import {
   type CapabilityEvidenceRecord,
   type CapabilityObservation,
   deriveCapabilityStage,
-} from './capability-evidence';
+} from './capability-evidence-model';
 
 const observation = (
   overrides: Partial<CapabilityObservation> = {}

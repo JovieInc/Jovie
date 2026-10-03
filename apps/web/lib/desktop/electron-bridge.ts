@@ -37,6 +37,11 @@ export interface ElectronAPI {
     readonly state: DesktopWorkState;
     readonly reportedAt: number;
   } | null;
+  /** Native visual eligibility; independent from session work and keyboard focus. */
+  readonly getVisualActivity?: () => Promise<boolean | null>;
+  readonly onVisualActivity?: (
+    callback: (active: boolean) => void
+  ) => () => void;
   /** Register a callback that fires when electron-updater detects a new version. */
   readonly onUpdateAvailable: (cb: () => void) => void | (() => void);
   /** Register a callback that fires when the update download is complete. */
@@ -286,6 +291,48 @@ export function onDesktopNavigate(cb: (path: string) => void): () => void {
   const subscribe = getRawElectronAPI()?.onNavigate;
   if (typeof subscribe !== 'function') return noopUnsubscribe;
   return subscribe(cb);
+}
+
+/** Old binaries and browsers keep their existing visual behavior. */
+export function observeDesktopVisualActivity(
+  callback: (active: boolean) => void
+): () => void {
+  const api = getRawElectronAPI();
+  if (
+    typeof api?.getVisualActivity !== 'function' ||
+    typeof api.onVisualActivity !== 'function'
+  ) {
+    return () => undefined;
+  }
+  let disposed = false;
+  let revision = 0;
+  let unsubscribe: (() => void) | undefined;
+  try {
+    unsubscribe = api.onVisualActivity(active => {
+      if (disposed || typeof active !== 'boolean') return;
+      revision += 1;
+      callback(active);
+    });
+    const requestedRevision = revision;
+    void api
+      .getVisualActivity()
+      .then(active => {
+        // A live event wins over an older asynchronous snapshot.
+        if (
+          !disposed &&
+          revision === requestedRevision &&
+          typeof active === 'boolean'
+        )
+          callback(active);
+      })
+      .catch(() => undefined);
+  } catch {
+    // Optional stale bridge methods cannot break the transcript.
+  }
+  return () => {
+    disposed = true;
+    if (typeof unsubscribe === 'function') unsubscribe();
+  };
 }
 
 /**

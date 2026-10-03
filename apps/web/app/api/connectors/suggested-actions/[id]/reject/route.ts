@@ -15,6 +15,7 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import {
+  SOCIAL_REPLY_DRAFT_KIND,
   WORKFLOW_CAPTURE_REQUEST_KIND,
   YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
 } from '@/lib/connectors/suggested-action-kinds';
@@ -155,6 +156,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       verdict: 'rejected',
       reason,
       cardKind: updated[0]?.kind ?? null,
+      ...(updated[0]?.kind === SOCIAL_REPLY_DRAFT_KIND
+        ? { cardPayload: candidate.payload }
+        : {}),
       surface: 'opportunity-inbox',
     });
     revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');

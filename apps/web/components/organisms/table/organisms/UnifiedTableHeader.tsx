@@ -14,6 +14,12 @@ export interface UnifiedTableHeaderProps<TData extends RowData> {
    * Accessible caption for the table
    */
   readonly caption?: string;
+
+  /**
+   * Layout-snap header cells with the body when columns appear or disappear.
+   * @default false
+   */
+  readonly columnSnap?: boolean;
 }
 
 /**
@@ -36,6 +42,7 @@ export interface UnifiedTableHeaderProps<TData extends RowData> {
 export function UnifiedTableHeader<TData extends RowData>({
   headerGroups,
   caption,
+  columnSnap = false,
 }: UnifiedTableHeaderProps<TData>) {
   'use no memo';
   // TanStack keeps header groups stable while their column sorting state changes.
@@ -60,6 +67,7 @@ export function UnifiedTableHeader<TData extends RowData>({
                 stickyHeaderClass={presets.stickyHeader}
                 tableHeaderClass={presets.tableHeaderCell}
                 onToggleSort={header.column.getToggleSortingHandler()}
+                columnSnap={columnSnap}
               />
             ))}
           </tr>

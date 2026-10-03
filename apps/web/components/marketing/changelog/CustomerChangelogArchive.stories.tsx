@@ -21,6 +21,7 @@ const BOUNDED_MONTHS: readonly CustomerChangelogMonthGroup[] = [
         technicalVersion: '26.8.1',
         explanation: 'See the buyer, budget, and source.',
         supporting: [],
+        action: null,
         technical: [],
         prominence: 'featured',
       },
@@ -43,6 +44,7 @@ const BOUNDED_MONTHS: readonly CustomerChangelogMonthGroup[] = [
         technicalVersion: '26.7.0',
         explanation: 'Customer sessions can still leave.',
         supporting: [],
+        action: null,
         technical: ['JOV-5260', 'Redis', 'admission'],
         prominence: 'small',
       },
@@ -59,7 +61,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Deterministic, static reduced-motion state for the customer-outcome changelog archive (JOV-6203 Wave 1), rebuilt to the founder-locked pen entry master (sticky date rail, compact source-backed fallback media, image-first card) plus the YgxYz archive jump nav. Two neutral month groups bound the entry count and story height; the production route remains the source of the hero and signup, so ChangelogEmailSignup and Turnstile are intentionally absent.',
+          'Deterministic, static reduced-motion state for the customer-outcome changelog archive (JOV-6203 Wave 1), rebuilt to the founder-locked pen entry master (sticky date rail, text-first entries with at most one approved media region) plus the YgxYz archive jump nav. Two neutral month groups bound the entry count and story height; the production route remains the source of the hero and signup, so ChangelogEmailSignup and Turnstile are intentionally absent.',
       },
     },
   },
@@ -82,6 +84,28 @@ type Story = StoryObj<typeof meta>;
 
 export const BoundedArchive: Story = {
   name: 'bounded month archive',
+};
+
+export const WithMedia: Story = {
+  name: 'entry with approved media',
+  args: {
+    months: [
+      {
+        ...BOUNDED_MONTHS[0],
+        entries: [
+          {
+            ...BOUNDED_MONTHS[0].entries[0],
+            media: {
+              kind: 'image',
+              src: '/images/auth/noir-studio.webp',
+              alt: 'Jovie Inbox showing a qualified brand deal',
+            },
+          },
+          BOUNDED_MONTHS[1].entries[0],
+        ],
+      },
+    ],
+  },
 };
 
 export const Empty: Story = {

@@ -58,15 +58,13 @@ describe('Storybook next-themes resolution', () => {
     ]);
   });
 
-  it('uses the React-only framework only for live certification', () => {
-    expect(storybookFrameworkForEnvironment(false)).toEqual({
+  it('uses the Next.js Vite framework for the catalog and live certification', () => {
+    const framework = {
       name: '@storybook/nextjs-vite',
       options: { builder: { viteConfigPath: undefined } },
-    });
-    expect(storybookFrameworkForEnvironment(true)).toEqual({
-      name: '@storybook/react-vite',
-      options: {},
-    });
+    };
+    expect(storybookFrameworkForEnvironment(false)).toEqual(framework);
+    expect(storybookFrameworkForEnvironment(true)).toEqual(framework);
   });
 
   it('resolves the bare package import to the script-free mock', async () => {

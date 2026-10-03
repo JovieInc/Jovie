@@ -24,6 +24,7 @@ interface JsonRpcMessage {
 
 export interface McpContext {
   readonly version: string;
+  readonly workerToken?: string;
   readonly baseUrl: string;
   readonly fetchImpl?: FetchImplementation;
 }
@@ -62,20 +63,24 @@ function toolDefinition(command: CommandSpec) {
     annotations: {
       readOnlyHint: command.readOnly,
       destructiveHint: false,
-      idempotentHint: command.readOnly || command.tool === 'create_profile',
+      idempotentHint:
+        command.readOnly ||
+        command.internal === true ||
+        command.tool === 'create_profile',
       openWorldHint: true,
     },
   };
 }
 
 function errorText(error: unknown): string {
-  const { code, apiCode, status, retryAfterSeconds, responseBody } = (error ??
-    {}) as Record<string, unknown>;
+  const { code, apiCode, status, retryAfterSeconds, responseBody, retryable } =
+    (error ?? {}) as Record<string, unknown>;
   return JSON.stringify({
     error: {
       code: code ?? 'CLI_ERROR',
       message: error instanceof Error ? error.message : String(error),
       ...(apiCode === undefined ? {} : { apiCode }),
+      ...(retryable === undefined ? {} : { retryable }),
       ...(status === undefined ? {} : { status }),
       ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
       ...(typeof responseBody === 'string' ? { responseBody } : {}),
@@ -87,7 +92,10 @@ async function callTool(
   params: Record<string, unknown> | undefined,
   context: McpContext
 ) {
-  const command = COMMANDS.find(entry => entry.tool === params?.name);
+  const command = COMMANDS.find(
+    entry =>
+      entry.tool === params?.name && (!entry.internal || context.workerToken)
+  );
   if (!command) {
     return {
       content: [{ type: 'text', text: 'Unknown tool.' }],
@@ -135,6 +143,7 @@ async function callTool(
       },
       {
         baseUrl: context.baseUrl,
+        workerToken: context.workerToken,
         fetchImpl: context.fetchImpl,
         userAgent: `jovie-cli/${context.version} mcp`,
       }
@@ -212,7 +221,11 @@ export async function handleMcpMessage(
     case 'ping':
       return reply({});
     case 'tools/list':
-      return reply({ tools: COMMANDS.map(toolDefinition) });
+      return reply({
+        tools: COMMANDS.filter(
+          command => !command.internal || context.workerToken
+        ).map(toolDefinition),
+      });
     case 'tools/call':
       return reply(await callTool(message.params, context));
     default:

@@ -1,0 +1,21 @@
+{
+  "schema": "jovie-blog-publish-latency/v1",
+  "generatedAt": "2026-10-01T00:00:00.000Z",
+  "sampleCount": 0,
+  "cohorts": {
+    "legacy": {
+      "sampleCount": 0,
+      "completeSampleCount": 0,
+      "candidateToLiveSeconds": { "p50": null, "p95": null },
+      "representative": []
+    },
+    "contentOnly": {
+      "sampleCount": 0,
+      "completeSampleCount": 0,
+      "candidateToLiveSeconds": { "p50": null, "p95": null },
+      "representative": []
+    }
+  },
+  "samples": [],
+  "claims": { "measuredImprovement": null, "publishingSla": null }
+}

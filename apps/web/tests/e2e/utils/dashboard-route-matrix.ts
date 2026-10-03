@@ -301,7 +301,7 @@ const aliasRoutes = [
     kind: 'redirect',
     surface: 'alias',
     authRole: 'user',
-    acceptedDestinations: [`${APP_ROUTES.CHAT}?panel=profile`, APP_ROUTES.CHAT],
+    acceptedDestinations: [APP_ROUTES.LINKS],
   },
   {
     path: APP_ROUTES.CONTACTS,

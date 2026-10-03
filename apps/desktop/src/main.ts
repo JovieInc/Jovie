@@ -123,6 +123,7 @@ import {
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import { DesktopNavigationCoordinator } from './navigation-coordinator';
+import { createStartupMaintenanceGate } from './startup-maintenance';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -181,6 +182,12 @@ import {
   shouldRestoreNativeFullscreen,
   type WindowState,
 } from './window-state';
+import {
+  GET_VISUAL_ACTIVITY_CHANNEL,
+  observeWindowVisualActivity,
+  trustedVisualActivityRequest,
+  VISUAL_ACTIVITY_CHANNEL,
+} from './visual-activity';
 import {
   createWindowStateStore,
   WINDOW_STATE_SHUTDOWN_FLUSH_MS,
@@ -364,6 +371,7 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
 const desktopNavigation = new DesktopNavigationCoordinator();
+const visualActivityReaders = new Map<number, () => boolean>();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
@@ -405,6 +413,8 @@ app.on('web-contents-created', (_event, contents) => {
   });
 });
 let lastDesktopUpdateCheckMs: number | null = null;
+let startupMaintenance: ReturnType<typeof createStartupMaintenanceGate> | null =
+  null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
 
@@ -2438,6 +2448,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       now: () => performance.now(),
       onChange: receipt => {
         void writeReceipt(receipt);
+        if (receipt.composerVisibleEditableAfterPaintOpportunityMs !== null) {
+          startupMaintenance?.composerUsable();
+        }
       },
     });
   }
@@ -2515,6 +2528,18 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('destroyed', () => {
     desktopNavigation.setReady(navigationContentsId, false);
   });
+  const visualActivity = observeWindowVisualActivity(
+    win,
+    powerMonitor,
+    active => {
+      if (!win.webContents.isDestroyed()) {
+        win.webContents.send(VISUAL_ACTIVITY_CHANNEL, active);
+      }
+    }
+  );
+  const visualContentsId = win.webContents.id;
+  visualActivityReaders.set(visualContentsId, visualActivity.read);
+  win.once('closed', () => visualActivityReaders.delete(visualContentsId));
   const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
   const authNavigationContentsId = win.webContents.id;
   authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
@@ -2789,6 +2814,9 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
     return;
   }
 
+  // An explicit check before startup settles also fulfills queued auto work.
+  startupMaintenance?.cancelPending('update-check');
+
   if (mode === 'notify') {
     pendingManualUpdateCheck = true;
   }
@@ -2806,14 +2834,22 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
   });
 }
 
+function requestAutomaticDesktopUpdateCheck(): void {
+  const check = () => runDesktopUpdateCheck('silent');
+  if (startupMaintenance) startupMaintenance.request('update-check', check);
+  else check();
+}
+
 function scheduleDesktopAutoUpdate(): void {
   configureDesktopAutoUpdater();
-  runDesktopUpdateCheck('silent');
+  // The application menu is available while window-state/assets hydrate,
+  // before the startup gate exists. Honor an explicit check made there too.
+  if (lastDesktopUpdateCheckMs === null) requestAutomaticDesktopUpdateCheck();
 
   const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
   const interval = setInterval(() => {
     void installDownloadedUpdateIfIdle();
-    runDesktopUpdateCheck('silent');
+    requestAutomaticDesktopUpdateCheck();
   }, UPDATE_INTERVAL_MS);
   interval.unref?.();
 
@@ -2825,7 +2861,7 @@ function scheduleDesktopAutoUpdate(): void {
         lastCheckMs: lastDesktopUpdateCheckMs,
       })
     ) {
-      runDesktopUpdateCheck('silent');
+      requestAutomaticDesktopUpdateCheck();
     }
   };
   powerMonitor.on('resume', checkAfterWake);
@@ -2882,16 +2918,28 @@ function scheduleNightlyUpdateLaunchAgent(): void {
   });
 }
 
+function requestAutomaticWebBuildCheck(): void {
+  // The initial call normally sees only the local splash. Preserve that no-op
+  // instead of queuing an earlier poll when the composer becomes usable.
+  if (!BrowserWindow.getAllWindows().some(isWebBuildReloadWindow)) {
+    webBuildReloadPending.clear();
+    return;
+  }
+  const check = () => void checkHudBuildAndReload();
+  if (startupMaintenance) startupMaintenance.request('web-build-check', check);
+  else check();
+}
+
 function scheduleHudBuildAutoReload(): void {
-  void checkHudBuildAndReload();
+  requestAutomaticWebBuildCheck();
 
   const interval = setInterval(() => {
-    void checkHudBuildAndReload();
+    requestAutomaticWebBuildCheck();
   }, HUD_BUILD_INFO_POLL_INTERVAL_MS);
 
   interval.unref?.();
   powerMonitor.on('resume', () => {
-    void checkHudBuildAndReload();
+    requestAutomaticWebBuildCheck();
   });
 }
 
@@ -3109,6 +3157,31 @@ autoUpdater.on('error', error => {
   }
 });
 
+// Native visibility stays truthful when backgroundThrottling disables Page Visibility.
+ipcMain.handle(GET_VISUAL_ACTIVITY_CHANNEL, (event, ...args: unknown[]) => {
+  const frame = event.senderFrame;
+  if (
+    !trustedVisualActivityRequest({
+      args,
+      isMainWindow: Boolean(
+        mainWindow &&
+          !mainWindow.isDestroyed() &&
+          event.sender === mainWindow.webContents
+      ),
+      isCurrentMainFrame: Boolean(
+        frame &&
+          !frame.detached &&
+          frame === event.sender.mainFrame &&
+          frame.parent === null
+      ),
+      senderUrl: frame?.url ?? '',
+      appOrigin: APP_ORIGIN,
+    })
+  )
+    return null;
+  return visualActivityReaders.get(event.sender.id)?.() ?? null;
+});
+
 // Return only the already-validated identity, and only to the trusted app origin.
 ipcMain.handle(
   GET_BUILD_IDENTITY_CHANNEL,
@@ -3235,6 +3308,7 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
 });
 
 app.on('before-quit', event => {
+  startupMaintenance?.dispose();
   mainLivenessMonitor?.dispose();
   mainLivenessMonitor = null;
   summerRuntimeBridge?.stop();
@@ -3677,6 +3751,7 @@ app.whenReady().then(async () => {
     menuBarTray = new MenuBarTray(handleTrayAction);
   }
 
+  startupMaintenance = createStartupMaintenanceGate();
   createWindow(
     pendingAuthCompletion
       ? buildAuthCompletionUrl(pendingAuthCompletion)

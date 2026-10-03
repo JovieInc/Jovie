@@ -15,7 +15,7 @@ export const PRODUCT_ONTOLOGY = {
       APP_ROUTES.DASHBOARD_PROFILE,
       APP_ROUTES.DASHBOARD_LINKS,
     ],
-    contextualRoutes: [APP_ROUTES.CHAT_PROFILE_PANEL],
+    contextualRoutes: [APP_ROUTES.CHAT_PROFILE_PANEL, APP_ROUTES.LINKS],
     capabilities: ['bio', 'profile', 'social', 'contact', 'search'],
   },
   work: {
