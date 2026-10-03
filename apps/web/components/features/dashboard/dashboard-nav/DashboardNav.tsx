@@ -457,11 +457,6 @@ export function DashboardNav({
                   aria-busy={
                     pendingNavigation?.itemId === inboxNavItem.id || undefined
                   }
-                  aria-current={
-                    normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
-                      ? 'page'
-                      : undefined
-                  }
                   aria-label={
                     hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
                   }
