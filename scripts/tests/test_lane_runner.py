@@ -832,6 +832,14 @@ class RunIssueTest(unittest.TestCase):
         receipt = lane.run_issue(self.host, "devin", {"cmd": ["false"]}, FakeLinear([]), issue())
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
 
+    def test_hyperagent_without_actual_dispatch_proof_holds_before_any_provider_process(self):
+        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
+                                 FakeLinear([]), issue("JOV-6871"))
+        self.assertEqual(receipt["verdict"], "remote-held")
+        self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
+        self.assertNotIn("agentExit", receipt)
+        self.assertFalse((self.host.state / "worktrees").exists())
+
     def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
         seen = []
