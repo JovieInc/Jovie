@@ -22,10 +22,22 @@ describe('investor brief source contract', () => {
 
     expect(component).toContain('bg-(--color-bg-base)/90');
     expect(component).toContain('const registry = fundraisingRegistry');
-    expect(component).toContain('registry.coreSlides.map');
+    expect(component).toContain('narrativeSlides.map');
     expect(component).toContain('registry.operatingLoop.map');
     expect(component).toContain('registry.risks.map');
     expect(component).toContain('data-pitch-demo-video');
+  });
+
+  it('keeps the YC deck order behind an off-by-default flag', () => {
+    const component = read('components/features/pitch/InvestorBrief.tsx');
+    const flags = read('lib/flags/code-flags.ts');
+
+    expect(flags).toContain('INVESTOR_PORTAL_YC_DECK: false');
+    expect(component).toContain("isCodeFlagEnabled('INVESTOR_PORTAL_YC_DECK')");
+    expect(component).toContain(
+      'buildInvestorYcDeck(registry, loadInvestorSourcedMetrics())'
+    );
+    expect(component).toContain('registry.coreSlides');
   });
 
   it('keeps exactly one primary-variant CTA on the screen', () => {

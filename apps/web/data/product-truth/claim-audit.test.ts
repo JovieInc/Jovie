@@ -1,15 +1,17 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import {
   auditCopyClaims,
   collectStrings,
   compareToBaseline,
+  findUncertifiedWebResearchClaims,
   isClaimBearing,
   resolvesToClaim,
 } from './claim-audit';
 import { listProductTruthClaims } from './claims';
-import type { Claim } from './registry';
+import { type Claim, PRODUCT_CAPABILITIES } from './registry';
 
 /**
  * Claim coverage over existing marketing copy. Unresolved claim-bearing
@@ -141,5 +143,43 @@ describe('marketing copy claim coverage', () => {
       stale,
       'resolved claims: rerun with UPDATE_PRODUCT_TRUTH_BASELINE=1 to shrink the baseline'
     ).toEqual([]);
+  });
+
+  it('keeps internal-only web research out of public identity copy', () => {
+    expect(PRODUCT_CAPABILITIES['profile-monitoring'].publication).toBe(
+      'internal_only'
+    );
+    expect(
+      PRODUCT_CAPABILITIES['profile-monitoring'].marketing
+    ).toBeUndefined();
+
+    const homepageSource = readFileSync(
+      path.join(__dirname, '../homepageIdentityCopy.ts'),
+      'utf8'
+    );
+    const companySource = readFileSync(
+      path.join(__dirname, '../companyIdentity.ts'),
+      'utf8'
+    );
+    expect(homepageSource).not.toContain('what the web says about you');
+    expect(companySource).not.toContain('what the web says about you');
+
+    const modules = {
+      ...moduleMap(),
+      'apps/web/data/companyIdentity.ts': { COMPANY_IDENTITY },
+    };
+    expect(findUncertifiedWebResearchClaims(modules)).toEqual([]);
+    expect(COMPANY_IDENTITY.seoDescription).toBe(
+      'Claim your name. Jovie makes you easy to reach, for people and for agents.'
+    );
+
+    const planted = findUncertifiedWebResearchClaims({
+      'apps/web/data/exampleCopy.ts': {
+        line: 'Jovie finds what the web says about you.',
+      },
+    });
+    expect(planted).toHaveLength(1);
+    expect(planted[0]?.file).toBe('apps/web/data/exampleCopy.ts');
+    expect(planted[0]?.text).toContain('what the web says about you');
   });
 });

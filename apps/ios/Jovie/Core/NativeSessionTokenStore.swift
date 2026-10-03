@@ -14,6 +14,7 @@ struct NativeRequestAuthorization: Equatable, Sendable {
   fileprivate let session: NativeStoredSession?
   fileprivate let generation: UUID?
   fileprivate let bearerRevision: UUID?
+  var isManaged: Bool { generation != nil }
 
   init(unmanagedBearerToken: String) {
     bearerToken = unmanagedBearerToken
@@ -40,6 +41,18 @@ struct NativeSessionContext: Equatable, Sendable {
   let authorization: NativeRequestAuthorization?
 }
 
+struct NativeSessionExpiryReceipt: Equatable, Sendable {
+  let ownership: NativeSessionOwnership
+  let userID: String?
+  fileprivate let originalGeneration: UUID?
+  fileprivate let originalRevision: UUID?
+}
+
+enum NativeSessionRequestError: Error, Equatable {
+  case expired(NativeSessionExpiryReceipt)
+  case superseded
+}
+
 enum NativeSessionTokenStore {
   /// Every complete Keychain + metadata operation uses this same lock. Locked
   /// helpers never call a public operation, so expiry cleanup cannot re-enter it.
@@ -47,7 +60,7 @@ enum NativeSessionTokenStore {
     let lock = NSLock()
     var generation = UUID()
     var bearerRevision = UUID()
-    var passivelyExpiredProfileOwner: (originalGeneration: UUID, emptyGeneration: UUID)?
+    var expiryReceipt: NativeSessionExpiryReceipt?
   }
 
   private static let state = State()
@@ -62,7 +75,7 @@ enum NativeSessionTokenStore {
     withLock {
       state.generation = UUID()
       state.bearerRevision = UUID()
-      state.passivelyExpiredProfileOwner = nil
+      state.expiryReceipt = nil
       saveLocked(token: token, userID: userID, expiresAt: expiresAt)
     }
   }
@@ -101,6 +114,111 @@ enum NativeSessionTokenStore {
     captureSessionContext().authorization
   }
 
+  /// Capture before an asynchronous profile load, without expiring its owner.
+  static func captureOwnership() -> NativeSessionOwnership {
+    withLock { NativeSessionOwnership(generation: state.generation) }
+  }
+
+  static func captureOwnership(for userID: String) -> NativeSessionOwnership? {
+    withLock {
+      guard matchesUserLocked(userID) else { return nil }
+      return NativeSessionOwnership(generation: state.generation)
+    }
+  }
+
+  private static func matchesUserLocked(_ userID: String) -> Bool {
+    let storedUserID = UserDefaults.standard.string(forKey: userIDKey)
+      ?? currentReceiptLocked()?.userID
+    return storedUserID == nil || storedUserID == userID
+  }
+
+  static func ownedRequestAuthorization(
+    ifOwnedBy ownership: NativeSessionOwnership, for userID: String? = nil
+  ) throws -> NativeRequestAuthorization {
+    try withLock {
+      // A delayed profile callback must not label another user's response/cache.
+      if let userID, !matchesUserLocked(userID) {
+        throw NativeSessionRequestError.superseded
+      }
+      guard state.generation == ownership.generation else {
+        if let receipt = currentReceiptLocked(),
+           receipt.originalGeneration == ownership.generation
+        {
+          throw NativeSessionRequestError.expired(receipt)
+        }
+        throw NativeSessionRequestError.superseded
+      }
+      guard let session = loadLocked() else {
+        let receipt = currentReceiptLocked() ?? NativeSessionExpiryReceipt(
+          ownership: NativeSessionOwnership(generation: state.generation), userID: nil,
+          originalGeneration: nil, originalRevision: nil
+        )
+        state.expiryReceipt = receipt
+        throw NativeSessionRequestError.expired(receipt)
+      }
+      return NativeRequestAuthorization(
+        session: session, generation: state.generation, bearerRevision: state.bearerRevision
+      )
+    }
+  }
+
+  /// A rejected request may retry a different bearer only within its own login.
+  /// Parallel failures reuse only the receipt for the exact rejected revision.
+  static func resolveUnauthorized(
+    authorizedBy authorization: NativeRequestAuthorization,
+    allowRetry: Bool
+  ) throws -> NativeRequestAuthorization {
+    try withLock {
+      guard let generation = authorization.generation,
+            let revision = authorization.bearerRevision, let captured = authorization.session
+      else { throw NativeSessionRequestError.superseded }
+      guard state.generation == generation else {
+        if let receipt = currentReceiptLocked(),
+           receipt.originalGeneration == generation, receipt.originalRevision == revision,
+           receipt.userID == captured.userID
+        {
+          throw NativeSessionRequestError.expired(receipt)
+        }
+        throw NativeSessionRequestError.superseded
+      }
+      guard let stored = loadLocked() else {
+        if let receipt = currentReceiptLocked(), receipt.originalGeneration == generation,
+           receipt.originalRevision == revision, receipt.userID == captured.userID
+        {
+          throw NativeSessionRequestError.expired(receipt)
+        }
+        throw NativeSessionRequestError.superseded
+      }
+      guard stored.userID == captured.userID else { throw NativeSessionRequestError.superseded }
+      if state.bearerRevision == revision, stored.token == authorization.bearerToken {
+        throw NativeSessionRequestError.expired(expireLocked(userID: stored.userID))
+      }
+      guard allowRetry, stored.token != authorization.bearerToken else {
+        throw NativeSessionRequestError.superseded
+      }
+      return NativeRequestAuthorization(
+        session: stored, generation: state.generation, bearerRevision: state.bearerRevision
+      )
+    }
+  }
+
+  private static func currentReceiptLocked() -> NativeSessionExpiryReceipt? {
+    guard state.expiryReceipt?.ownership.generation == state.generation else { return nil }
+    return state.expiryReceipt
+  }
+
+  private static func expireLocked(userID: String) -> NativeSessionExpiryReceipt {
+    let generation = state.generation
+    let revision = state.bearerRevision
+    clearLocked()
+    let receipt = NativeSessionExpiryReceipt(
+      ownership: NativeSessionOwnership(generation: state.generation), userID: userID,
+      originalGeneration: generation, originalRevision: revision
+    )
+    state.expiryReceipt = receipt
+    return receipt
+  }
+
   /// Also captures an empty store's generation so delayed local cleanup cannot
   /// adopt a login that appears after capture.
   static func captureSessionContext() -> NativeSessionContext {
@@ -131,8 +249,7 @@ enum NativeSessionTokenStore {
   static func canContinueProfileLoad(ownedBy ownership: NativeSessionOwnership) -> Bool {
     withLock {
       state.generation == ownership.generation || (
-        state.passivelyExpiredProfileOwner?.originalGeneration == ownership.generation &&
-        state.passivelyExpiredProfileOwner?.emptyGeneration == state.generation
+        currentReceiptLocked()?.originalGeneration == ownership.generation
       )
     }
   }
@@ -178,9 +295,7 @@ enum NativeSessionTokenStore {
     )
 
     guard expiresAt.timeIntervalSinceNow > expiryLeeway else {
-      let expiredGeneration = state.generation
-      clearLocked()
-      state.passivelyExpiredProfileOwner = (expiredGeneration, state.generation)
+      _ = expireLocked(userID: userID)
       return nil
     }
 
@@ -194,7 +309,7 @@ enum NativeSessionTokenStore {
   private static func clearLocked() {
     state.generation = UUID()
     state.bearerRevision = UUID()
-    state.passivelyExpiredProfileOwner = nil
+    state.expiryReceipt = nil
     clearToken()
     UserDefaults.standard.removeObject(forKey: fallbackTokenKey)
     UserDefaults.standard.removeObject(forKey: userIDKey)
@@ -235,10 +350,10 @@ enum NativeSessionTokenStore {
     }
   }
 
-  private static func withLock<T>(_ operation: () -> T) -> T {
+  private static func withLock<T>(_ operation: () throws -> T) rethrows -> T {
     state.lock.lock()
     defer { state.lock.unlock() }
-    return operation()
+    return try operation()
   }
 
   private static func loadToken() -> String? {
@@ -284,6 +399,12 @@ enum NativeSessionTokenStore {
  * terminal 401 clears the Keychain in each client.
  */
 struct NativeSessionTokenProvider: TokenProviding {
+  func ownedRequestAuthorization(
+    for userID: String, ifOwnedBy ownership: NativeSessionOwnership
+  ) async throws -> NativeRequestAuthorization {
+    try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: ownership, for: userID)
+  }
+
   func bearerToken(forceRefresh: Bool) async throws -> String {
     try await requestAuthorization(forceRefresh: forceRefresh).bearerToken
   }

@@ -10,12 +10,20 @@ enum DashboardLoadState: Equatable {
 
 protocol AppStateRepository: Sendable {
   func loadMe(for userID: String) async throws -> MeRepositoryResult
+  func loadMe(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) async throws
+    -> MeRepositoryResult
   func clearCachedUser(_ userID: String) async
   func clearCachedUser(_ userID: String, ifOwnedBy ownership: NativeSessionOwnership) async
   func cachedSnapshot(for userID: String) async -> MobileMeResponse?
 }
 
 extension AppStateRepository {
+  func loadMe(for userID: String, ifOwnedBy _: NativeSessionOwnership) async throws
+    -> MeRepositoryResult
+  {
+    try await loadMe(for: userID)
+  }
+
   /// Default: no cached snapshot. Concrete repositories that persist profiles
   /// (e.g. ``MeRepository``) override this to enable instant cache-first paint.
   func cachedSnapshot(for _: String) async -> MobileMeResponse? { nil }
@@ -27,12 +35,30 @@ extension MeRepository: AppStateRepository {}
 protocol PushNotificationCoordinating {
   func activate() async
   func deactivate() async
+  func deactivateLocally(ifOwnedBy ownership: NativeSessionOwnership) async
 }
 
 @MainActor
 struct NoopPushNotificationCoordinator: PushNotificationCoordinating {
   func activate() async {}
   func deactivate() async {}
+  func deactivateLocally(ifOwnedBy _: NativeSessionOwnership) async {}
+}
+
+struct ProfileLoadContext {
+  let ownership: NativeSessionOwnership?
+  let canContinue: () -> Bool
+
+  static func live(for userID: String) -> Self? {
+    guard let ownership = NativeSessionTokenStore.captureOwnership(for: userID) else { return nil }
+    return Self(ownership: ownership) {
+      NativeSessionTokenStore.canContinueProfileLoad(ownedBy: ownership)
+    }
+  }
+
+  static func unmanaged(canContinue: @escaping () -> Bool = { true }) -> Self {
+    Self(ownership: nil, canContinue: canContinue)
+  }
 }
 
 @MainActor
@@ -58,10 +84,11 @@ final class AppState {
   private struct ProfileLoadAttempt {
     let id = UUID()
     let userID: String
-    let canContinue: () -> Bool
+    let context: ProfileLoadContext
+    var canContinue: () -> Bool { context.canContinue }
   }
 
-  private let captureProfileLoadCurrentness: () -> (() -> Bool)
+  private let captureProfileLoadCurrentness: (String) -> ProfileLoadContext?
   private var profileLoadAttempt: ProfileLoadAttempt?
   // Matches SplashView's cinematic entrance (JovieMotion.cinematicDuration)
   // so the primary logo reveal completes before the route crossfade starts.
@@ -77,9 +104,8 @@ final class AppState {
     chatCache: ChatCache? = nil,
     audienceHighlightsCache: AudienceHighlightsCache? = nil,
     actionLoopCache: ActionLoopCache? = nil,
-    captureProfileLoadCurrentness: @escaping () -> (() -> Bool) = {
-      let ownership = NativeSessionTokenStore.captureSessionContext().ownership
-      return { NativeSessionTokenStore.canContinueProfileLoad(ownedBy: ownership) }
+    captureProfileLoadCurrentness: @escaping (String) -> ProfileLoadContext? = {
+      ProfileLoadContext.live(for: $0)
     }
   ) {
     self.configuration = configuration
@@ -175,6 +201,14 @@ final class AppState {
   func handleSignedInUserChange(_ userID: String?) async {
     guard launchMode.usesLiveAuth, didInitializeAuth else { return }
 
+    let newAttempt: ProfileLoadAttempt?
+    if let userID {
+      guard let context = captureProfileLoadCurrentness(userID) else { return }
+      newAttempt = ProfileLoadAttempt(userID: userID, context: context)
+    } else {
+      newAttempt = nil
+    }
+
     if let userID, let attempt = profileLoadAttempt,
        attempt.userID == userID, attempt.canContinue() {
       return
@@ -183,7 +217,7 @@ final class AppState {
     let previousUserID = activeUserID
     activeUserID = userID
 
-    guard let userID else {
+    guard let userID, let attempt = newAttempt else {
       if previousUserID != nil {
         await pushNotifications.deactivate()
       }
@@ -201,10 +235,6 @@ final class AppState {
     Task {
       await pushNotifications.activate()
     }
-    let attempt = ProfileLoadAttempt(
-      userID: userID,
-      canContinue: captureProfileLoadCurrentness()
-    )
     profileLoadAttempt = attempt
     defer {
       if profileLoadAttempt?.id == attempt.id {
@@ -235,7 +265,12 @@ final class AppState {
     }
 
     do {
-      let result = try await repository.loadMe(for: userID)
+      let result: MeRepositoryResult
+      if let ownership = attempt.context.ownership {
+        result = try await repository.loadMe(for: userID, ifOwnedBy: ownership)
+      } else {
+        result = try await repository.loadMe(for: userID)
+      }
       guard isActive(attempt), attempt.canContinue() else { return }
       isOffline = result.isStale
 
@@ -269,6 +304,12 @@ final class AppState {
         )
       }
     } catch {
+      // The receipt, not a still-active load UUID, authorizes terminal effects.
+      if let error = error as? NativeSessionRequestError {
+        if case let .expired(receipt) = error { await handleExpiredSession(receipt) }
+        return
+      }
+      if error is CancellationError { return }
       guard isActive(attempt) else { return }
 
       var didTransportFail = false
@@ -276,10 +317,10 @@ final class AppState {
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
-          // The client may already have cleared a genuinely expired session.
-          // Preserve terminal handling before the presentation ownership check.
-          await handleExpiredSession()
-          return
+          if attempt.context.ownership == nil {
+            await handleExpiredSession()
+            return
+          }
         case .transportFailed:
           didTransportFail = true
         case .decodingFailed, .invalidResponse, .requestFailed, .profileCompletionFailed:
@@ -354,8 +395,22 @@ final class AppState {
     await resetToSignedOut()
   }
 
+  func handleExpiredSession(_ receipt: NativeSessionExpiryReceipt) async {
+    var userID: String?
+    guard NativeSessionTokenStore.performIfCurrent(receipt.ownership, {
+      userID = resetSignedOutPresentation()
+    }) else { return }
+    await pushNotifications.deactivateLocally(ifOwnedBy: receipt.ownership)
+    await clearCaches(for: userID, ifOwnedBy: receipt.ownership)
+  }
+
   private func resetToSignedOut() async {
     let cleanupOwnership = NativeSessionTokenStore.captureSessionContext().ownership
+    let userID = resetSignedOutPresentation()
+    await clearCaches(for: userID, ifOwnedBy: cleanupOwnership)
+  }
+
+  private func resetSignedOutPresentation() -> String? {
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
@@ -364,7 +419,10 @@ final class AppState {
     dashboardState = .idle
     isOffline = false
     MobileAuthDiagnostics.record("route_signed_out")
+    return userID
+  }
 
+  private func clearCaches(for userID: String?, ifOwnedBy cleanupOwnership: NativeSessionOwnership) async {
     if let userID {
       await repository.clearCachedUser(userID, ifOwnedBy: cleanupOwnership)
       await chatCache.remove(for: userID, ifOwnedBy: cleanupOwnership)

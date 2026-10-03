@@ -120,10 +120,11 @@ describe('POST /api/admin/investors/links', () => {
 
     const insertPayload = mockValues.mock.calls[0][0];
 
-    // Token must be present, non-trivial, and URL-safe (base-36 alphabet).
-    expect(typeof insertPayload.token).toBe('string');
-    expect(insertPayload.token.length).toBeGreaterThan(0);
-    expect(insertPayload.token).toMatch(/^[0-9a-z]+$/);
+    expect(insertPayload.token).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+    expect(insertPayload.expiresAt).toBeInstanceOf(Date);
+    expect((insertPayload.expiresAt as Date).getTime()).toBeGreaterThan(
+      Date.now()
+    );
 
     expect(insertPayload.label).toBe('Acme Ventures'); // trimmed
     expect(insertPayload.investorName).toBeNull(); // whitespace-only -> null
