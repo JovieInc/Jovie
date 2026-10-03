@@ -95,7 +95,8 @@ function toolPart({
     toolName,
     state,
     input: { fixture: true },
-    output,
+    // The SDK renderer derives successful status copy from the output payload.
+    output: summary ? { ...output, summary } : output,
     errorMessage,
     retryable: state === 'failed',
     summary,

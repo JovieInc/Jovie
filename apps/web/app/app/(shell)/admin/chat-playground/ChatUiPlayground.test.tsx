@@ -17,7 +17,7 @@ vi.mock('@/components/jovie/components/ChatMessage', () => ({
     parts,
   }: Pick<ComponentProps<'div'>, 'id'> & { parts: readonly MessagePart[] }) => (
     <div data-testid={`fixture-message-${id}`}>
-      {id === 'playground-tool-running' ? (
+      {id === 'playground-tool-running' || id === 'playground-tool-success' ? (
         <ToolPartsRenderer parts={parts} variant='chat' />
       ) : (
         id
@@ -54,6 +54,15 @@ describe('ChatUiPlayground', () => {
     expect(
       running.queryByText('Reading the supplied press page.')
     ).not.toBeInTheDocument();
+  });
+  it('renders the fixture description after persisted tool conversion', async () => {
+    const user = userEvent.setup();
+    render(<ChatUiPlayground />);
+    await user.click(screen.getByRole('button', { name: 'Tool lifecycle' }));
+    const succeeded = within(screen.getByLabelText('Succeeded'));
+    expect(
+      succeeded.getByText('Feedback sent to the product team.')
+    ).toBeInTheDocument();
   });
   it('keeps the critical state inventory and cleanup proposal connected', () => {
     expect(
