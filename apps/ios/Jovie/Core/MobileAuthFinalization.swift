@@ -86,27 +86,29 @@ enum MobileAuthFinalizationPlanner {
   }
 }
 
-/// The existing view owns one exchange handle, never profile/terminal work.
+/// The app owner keeps one exchange handle, never profile/terminal work.
 /// Matching release also keeps a late A completion from losing B's handle.
 @MainActor
-struct MobileAuthFinalizationSlot {
+final class MobileAuthFinalizationSlot {
   private(set) var attempt: NativeAuthAttempt?
   private(set) var task: Task<Void, Never>?
 
-  mutating func install(_ attempt: NativeAuthAttempt, operation: @escaping @MainActor () async -> Void) {
+  deinit { task?.cancel() }
+
+  func install(_ attempt: NativeAuthAttempt, operation: @escaping @MainActor () async -> Void) {
     let old = task
     self.attempt = attempt
     task = Task { await operation() }
     old?.cancel()
   }
 
-  mutating func release(_ attempt: NativeAuthAttempt) {
+  func release(_ attempt: NativeAuthAttempt) {
     guard self.attempt == attempt else { return }
     self.attempt = nil
     task = nil
   }
 
-  mutating func cancel(_ attempt: NativeAuthAttempt, reconcile: (NativeAuthResolution) -> Void) {
+  func cancel(_ attempt: NativeAuthAttempt, reconcile: (NativeAuthResolution) -> Void) {
     guard self.attempt == attempt else { return }
     if let result = NativeSessionTokenStore.cancelAuthAttempt(attempt) { reconcile(result) }
     let old = task

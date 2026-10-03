@@ -6,8 +6,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: source-validation-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  # A synchronize and body/base edit can arrive together on the same head.
+  # Canceling the newer suite leaves admission blocked even if its peer passes.
+  # Retain every validation receipt; a new source head has its own queue.
+  group: source-validation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+  queue: max
 jobs:
   deterministic:
     name: Source Validation
@@ -25,6 +29,8 @@ jobs:
           persist-credentials: false
       - &source-setup
         uses: ./.github/actions/setup-node-pnpm
+      - name: Validate performance policy source bindings
+        run: node scripts/invariants/performance-factory.mjs
       - name: Measure actual installed source dependency graph
         env:
           DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
