@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { investorLinks, investorViews } from '@/lib/db/schema/investors';
 import { captureError } from '@/lib/error-tracking';
+import {
+  isInvestorClaimTokenShape,
+  isInvestorClaimUnexpired,
+} from '@/lib/investors/claim-token';
 
 export const runtime = 'nodejs';
 
@@ -23,16 +27,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
 
+    if (!isInvestorClaimTokenShape(token)) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     // Find the active link
     const [link] = await db
-      .select({ id: investorLinks.id })
+      .select({
+        id: investorLinks.id,
+        expiresAt: investorLinks.expiresAt,
+      })
       .from(investorLinks)
       .where(
         and(eq(investorLinks.token, token), eq(investorLinks.isActive, true))
       )
       .limit(1);
 
-    if (!link) {
+    if (!link || !isInvestorClaimUnexpired(link.expiresAt)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

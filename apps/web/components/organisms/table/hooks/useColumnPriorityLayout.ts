@@ -9,7 +9,9 @@ import {
 } from '../column-priority';
 import { useContainerWidth } from './useContainerWidth';
 
-const WIDE_INITIAL_WIDTH = 1280;
+// Unmeasured first paint. The catalog fit sum is 1316, so 1280 would drop
+// Waveform before layout runs. jsdom never reports a positive width.
+const WIDE_INITIAL_WIDTH = 1440;
 
 export interface UseColumnPriorityLayoutOptions {
   /**

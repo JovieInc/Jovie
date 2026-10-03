@@ -237,10 +237,15 @@ describe('shared anonymous REST/MCP draft boundary', () => {
     const init = await mcpPost(
       request(rpc('initialize', { protocolVersion: '2025-06-18' }))
     );
-    expect(await init.json()).toMatchObject({
+    const initBody = await init.json();
+    expect(initBody).toMatchObject({
       id: 'req-1',
       result: { protocolVersion: '2025-06-18', capabilities: { tools: {} } },
     });
+    expect(initBody.result.instructions).toContain(
+      'Resolve an exact public creator profile'
+    );
+    expect(initBody.result.instructions).not.toContain('public artist');
     const latest = await mcpPost(
       request(rpc('initialize', { protocolVersion: 'unknown' }))
     );

@@ -10,6 +10,7 @@ import {
 import {
   getFirstSliceInteractionHotPaths,
   getInteractionHotPathById,
+  type InteractionLatencyBudget,
 } from './performance-interaction-manifest';
 import {
   buildInteractionLatencyReport,
@@ -124,6 +125,58 @@ describe('performance interaction report', () => {
     expect(percentile([10, 20, 30, 40, 50], 50)).toBe(30);
     expect(percentile([10, 20, 30, 40, 50], 95)).toBe(50);
     expect(percentile([], 95)).toBeNull();
+  });
+
+  it('keeps the chat ratchet failed on cold mounts and passing once warm', () => {
+    // Oct 2 Extended Smoke, job 110919347908. n=5 makes p95 the worst sample.
+    const coldMounts = [
+      [180.1, 580.4, 29.6],
+      [148.1, 314.3, 37.2],
+      [119.6, 273, 9],
+      [50, 141.9, 17.8],
+      [47.9, 147.5, 10.4],
+    ] as const;
+    const warmTail = [
+      [50, 141.9, 17.8],
+      [47.9, 147.5, 10.4],
+      [48, 145, 12],
+      [46, 140, 11],
+      [49, 143, 10],
+    ] as const;
+
+    const reportFor = (rows: readonly (readonly number[])[]) =>
+      buildInteractionLatencyReport({
+        samples: rows.map(
+          (
+            [firstFeedbackMs, usableStateMs, renderToInteractiveMs],
+            runIndex
+          ) => ({
+            droppedFrameCount: 0,
+            firstFeedbackMs,
+            renderToInteractiveMs,
+            runIndex,
+            scenarioId: 'chat-message-round-trip',
+            usableStateMs,
+          })
+        ),
+      });
+
+    const cold = reportFor(coldMounts);
+    const warm = reportFor(warmTail);
+    const chat = (report: ReturnType<typeof buildInteractionLatencyReport>) =>
+      report.summaries.find(
+        summary => summary.scenario.id === 'chat-message-round-trip'
+      );
+
+    expect(cold.status).toBe('fail');
+    expect(chat(cold)?.passed).toBe(false);
+    expect(chat(cold)?.p95UsableStateMs).toBe(580.4);
+    expect(warm.status).toBe('pass');
+    expect(chat(warm)?.passed).toBe(true);
+    const chatBudget: InteractionLatencyBudget | undefined =
+      getInteractionHotPathById('chat-message-round-trip')?.budget;
+    expect(chatBudget?.usableStateP95Ms).toBe(300);
+    expect(chatBudget?.firstFeedbackP50Ms).toBe(100);
   });
 
   it('ranks failing manager-loop interactions ahead of passing lower risk ones', () => {

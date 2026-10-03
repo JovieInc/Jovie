@@ -11,15 +11,11 @@ const meta = {
   },
   args: {
     release: {
-      id: 'release-1',
       slug: 'the-deep-end',
       title: 'The Deep End',
       artworkUrl: getMarketingExportImage('tim-white-profile-live-mobile')
         .publicUrl,
       releaseDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      trackId: null,
-      hasSpotify: true,
-      hasAppleMusic: true,
     },
     artist: {
       id: 'artist-1',

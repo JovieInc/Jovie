@@ -30,7 +30,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/library': 'Canonical Work surface with stable library route ownership',
   '/app/links':
-    'Contextual smart-link workspace reached from Cmd-K and the G then K shortcut, plus the legacy /app/dashboard/links redirect. Desktop rail placement stays founder-locked',
+    'Contextual smart-link workspace reached from the G then K shortcut and the legacy /app/dashboard/links redirect. Desktop rail placement stays founder-locked',
   '/app/calendar':
     'Contextual moments workspace reached from event and release links',
   '/app/tasks':
@@ -38,7 +38,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/audience':
     'Retained customer workspace reachable by direct links and shortcuts after primary navigation consolidation',
   '/app/tour-dates':
-    'Retained show-date workspace. Cmd-K go-tour-dates and shortcut G then O. Kept off the primary rail after JOV-7305',
+    'Retained customer workspace reachable by direct links and Settings after primary navigation consolidation',
   '/app/threads': 'Legacy all threads route redirects to chats',
   '/app/ov/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/ov/investors/settings':
@@ -47,14 +47,10 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Sub-tool reached from Investors workspace actions',
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
-  '/app/ov/interviews': 'Linked from the OV utilities registry (Interviews)',
   '/app/ov/wiki':
     'Internal admin wiki index reached from the /hud/wiki rewrite into the OV app shell',
   '/app/ov/wiki/[...slug]':
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
-  '/app/ov/playlists': 'Linked from the OV utilities registry (Playlists)',
-  '/app/ov/presence':
-    'Linked from the OV utilities registry (Company presence)',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
   '/app/ov/system':
@@ -68,25 +64,21 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/releases/[releaseId]/downloads':
     'Internal release workflow (manual entry)',
   '/app/dashboard/releases':
-    'Intentional legacy matrix owner. The customer door is /app/releases, which redirects to the library releases view',
+    'Legacy releases workspace retained for old bookmarks',
   '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
-  '/app/settings/retargeting-ads':
-    'Legacy settings route redirected to Audience',
   '/app/settings/connectors':
     'Settings Connections page loads shared shell route context directly (data-backed since JOV-4799)',
   '/app/settings/admin': 'Legacy admin settings route redirected to Ops',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
   '/app/insights':
-    'Needs a product decision before nav: Audience may have replaced this workspace. Expires 2026-12-31',
+    'AI insights workspace is reachable from dashboard widgets and direct app links until nav placement is finalised',
   '/app/jovie-work':
-    'Cmd-K row is gated by JOVIE_WORK_NAV (default off) until 2026-12-31',
+    'Unified autonomous work feed is reachable from direct app links until nav placement is finalised',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
-  '/app/settings/referral':
-    'Referral code page reached from share/referral flows; Settings IA nav placement lands with the Settings sidebar consolidation (#13134)',
   '/app/youtube':
-    'Cmd-K row is gated by YOUTUBE_WORKSPACE_NAV (default off) until 2026-12-31',
+    'YouTube revival queue workspace (GH-10921); reachable from direct app links until nav placement is finalised',
 };
 
 interface ShellPage {
@@ -254,19 +246,6 @@ describe('shell route coverage', () => {
       .sort();
 
     expect(staleAllowlistEntries).toEqual([]);
-  });
-
-  it('rejects expired nav-placement reasons', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const expired = Object.entries(INTENTIONAL_INTERNAL_ROUTES).flatMap(
-      ([route, reason]) => {
-        const match = reason.match(/\b(?:until|Expires) (\d{4}-\d{2}-\d{2})\b/);
-        if (!match || !match[1] || match[1] >= today) return [];
-        return [`${route} expired ${match[1]}`];
-      }
-    );
-
-    expect(expired).toEqual([]);
   });
 
   it('keeps release task implementation owned by the canonical shell route', () => {
