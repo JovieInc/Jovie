@@ -5,7 +5,7 @@
  * extracts signals, and determines qualification status.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { qualifyLead } from '@/lib/leads/qualify';
 
@@ -106,6 +106,11 @@ function setupDefaultMocks(
 describe('qualifyLead', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('FEATURE_LEAD_QUALIFY_GENERIC', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('does not certify commercial fit from a verified badge', async () => {
@@ -160,6 +165,40 @@ describe('qualifyLead', () => {
     const result = await qualifyLead('https://linktr.ee/testartist');
 
     expect(result.musicToolsDetected).toEqual(['linkfire', 'featurefm']);
+  });
+
+  it('qualifies a named creator without Spotify when generic qualification is on', async () => {
+    vi.stubEnv('FEATURE_LEAD_QUALIFY_GENERIC', 'true');
+    setupDefaultMocks({
+      displayName: 'Ada',
+      links: [{ url: 'https://instagram.com/ada', platformId: 'instagram' }],
+    });
+
+    const result = await qualifyLead('https://linktr.ee/ada');
+
+    expect(result.status).toBe('qualified');
+    expect(result.hasSpotifyLink).toBe(false);
+    expect(result.disqualificationReason).toBeNull();
+  });
+
+  it('still rejects a blank identity when generic qualification is on', async () => {
+    vi.stubEnv('FEATURE_LEAD_QUALIFY_GENERIC', 'true');
+    setupDefaultMocks({
+      displayName: '   ',
+      links: [{ url: 'https://instagram.com/ada', platformId: 'instagram' }],
+    });
+
+    const blankName = await qualifyLead('https://linktr.ee/ada');
+    expect(blankName.status).toBe('disqualified');
+    expect(blankName.disqualificationReason).toBe('insufficient_identity');
+
+    setupDefaultMocks({
+      displayName: 'Ada',
+      links: [],
+    });
+    const noLinks = await qualifyLead('https://linktr.ee/ada');
+    expect(noLinks.status).toBe('disqualified');
+    expect(noLinks.disqualificationReason).toBe('insufficient_identity');
   });
 
   it('should disqualify when no Spotify link is present', async () => {

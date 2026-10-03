@@ -64,6 +64,24 @@ const makeLead = (overrides: Partial<Record<string, unknown>> = {}) => ({
 describe('processOutreachBatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+  });
+
+  it('does not claim or push leads when Instantly outbound is off', async () => {
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', '');
+
+    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
+    const result = await processOutreachBatch(10);
+
+    expect(result).toEqual({
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      dismissed: 0,
+      remainingPending: 0,
+    });
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
   });
 
   it('skips send for suppressed leads (Fix #1)', async () => {

@@ -19,6 +19,7 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 
 export const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
@@ -279,6 +280,16 @@ export async function processOutreachBatch(
   limit: number,
   options: ProcessOutreachBatchOptions = {}
 ): Promise<OutreachBatchResult> {
+  if (!isInstantlyOutboundEnabled()) {
+    return {
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      dismissed: 0,
+      remainingPending: 0,
+    };
+  }
+
   const now = new Date();
   const pendingEmailWhereClause = getPendingEmailWhereClause(now);
 
