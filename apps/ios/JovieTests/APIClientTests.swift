@@ -1325,7 +1325,11 @@ extension APIClientTests {
       if change == "intent" { _ = NativeSessionTokenStore.beginAuthAttempt() }
       if change == "same-login" { NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture) }
       var delivered: NativeStoredSession?
-      #expect(NativeSessionTokenStore.consume(result, { session, receipt in delivered = session; #expect(receipt == nil) }) == (change == "current"))
+      let consumed = NativeSessionTokenStore.consume(result) { session, receipt in
+        delivered = session
+        #expect(receipt == nil)
+      }
+      #expect(consumed == (change == "current"))
       #expect(delivered == (change == "current" ? nativeAuthA : nil))
       #expect(!NativeSessionTokenStore.consume(result, { _, _ in Issue.record("Duplicate delivery") }))
       #expect(NativeSessionTokenStore.performIfCurrent(result, {}) == (change == "current"))
@@ -1358,7 +1362,11 @@ extension APIClientTests {
       }
       let resolved = try #require(result)
       var deliveredReceipt: NativeSessionExpiryReceipt?
-      #expect(NativeSessionTokenStore.consume(resolved, { session, value in #expect(session == nil); deliveredReceipt = value }))
+      let consumed = NativeSessionTokenStore.consume(resolved) { session, value in
+        #expect(session == nil)
+        deliveredReceipt = value
+      }
+      #expect(consumed)
       #expect(deliveredReceipt == receipt)
       #expect(NativeSessionTokenStore.captureOwnership() == receipt.ownership)
       #expect(io.calls.filter { $0 == "delete" }.count == (mode == "consumed" ? 1 : 0))
@@ -1388,7 +1396,10 @@ extension APIClientTests {
       #expect(!Task.isCancelled && !NativeSessionTokenStore.hasPendingAuth)
       io.configure()
       let delivered = expected == .preserved ? nativeAuthA : (expected == .persisted ? nativeAuthB : nil)
-      #expect(NativeSessionTokenStore.consume(result, { session, _ in #expect(session == delivered) }))
+      let consumed = NativeSessionTokenStore.consume(result) { session, _ in
+        #expect(session == delivered)
+      }
+      #expect(consumed)
       #expect(!NativeSessionTokenStore.consume(result, { _, _ in Issue.record("Canceled result replayed") }))
     }
   }
