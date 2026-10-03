@@ -11,17 +11,19 @@ import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { getTasks } from '../dashboard/tasks/task-actions';
 
 export async function TasksRoute() {
-  const routeContext = await loadAppShellRouteContext({
-    route: APP_ROUTES.TASKS,
-    dashboardErrorLogMessage: 'Dashboard data load failed on tasks page',
-    dashboardErrorMessage:
-      'Failed to load tasks data. Please refresh the page.',
-  });
+  // Entitlements do not depend on the route context; resolve both at once.
+  const [routeContext, entitlements] = await Promise.all([
+    loadAppShellRouteContext({
+      route: APP_ROUTES.TASKS,
+      dashboardErrorLogMessage: 'Dashboard data load failed on tasks page',
+      dashboardErrorMessage:
+        'Failed to load tasks data. Please refresh the page.',
+    }),
+    getCurrentUserEntitlements(),
+  ]);
   if (!routeContext.ok) {
     return routeContext.error;
   }
-
-  const entitlements = await getCurrentUserEntitlements();
   if (!entitlements.canAccessTasksWorkspace) {
     return <TasksWorkspaceUpgradeInterstitial />;
   }

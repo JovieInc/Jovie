@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
@@ -159,11 +160,35 @@ function normalizeBillingPlan(params: {
 
 const FRESH_ENTITLEMENT_AUTH = { session: 'fresh' } as const;
 
+type EntitlementSessionRead = 'cookie' | 'fresh';
+
+const loadRequestEntitlements = cache(
+  (mode: EntitlementSessionRead): Promise<UserEntitlements> =>
+    resolveCurrentUserEntitlements(mode === 'fresh' ? { session: mode } : {})
+);
+
+/**
+ * Current user's entitlements, resolved once per render per session mode.
+ *
+ * Each resolution reads admin role, billing, and admin MFA state. Pages,
+ * gates (`requireTasksWorkspaceAccess`), and dashboard loaders all ask for
+ * it, so a single /app/tasks render used to resolve it three times in
+ * sequence. The cache key is the mode string: an options object literal
+ * would miss React's cache on every call.
+ */
 export async function getCurrentUserEntitlements(options?: {
-  session?: 'cookie' | 'fresh';
+  session?: EntitlementSessionRead;
+}): Promise<UserEntitlements> {
+  return loadRequestEntitlements(
+    options?.session === 'fresh' ? 'fresh' : 'cookie'
+  );
+}
+
+async function resolveCurrentUserEntitlements(options: {
+  session?: EntitlementSessionRead;
 }): Promise<UserEntitlements> {
   const authResult =
-    options?.session === 'fresh'
+    options.session === 'fresh'
       ? await getCachedAuth(FRESH_ENTITLEMENT_AUTH)
       : await getCachedAuth();
   const { userId } = authResult;
@@ -174,7 +199,7 @@ export async function getCurrentUserEntitlements(options?: {
   let userEmail: string | null = null;
   try {
     const userIdentity = resolveUserIdentity(
-      await (options?.session === 'fresh'
+      await (options.session === 'fresh'
         ? getCachedCurrentUser(FRESH_ENTITLEMENT_AUTH)
         : getCachedCurrentUser())
     );
