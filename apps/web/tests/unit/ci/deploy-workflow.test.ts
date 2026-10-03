@@ -2427,7 +2427,7 @@ describe('canary health gate workflow', () => {
     const releaseResult = getJobBlock(release, 'release-result');
 
     expect(receiptJob).toContain(
-      'needs: [deploy-staging, alias-staging, promote-production]'
+      'needs: [deploy-staging, alias-staging, promote-production, rollback-production]'
     );
     expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
     expect(receiptJob).toContain(
@@ -2454,6 +2454,17 @@ describe('canary health gate workflow', () => {
     expect(prove).toContain("$'User-Agent: *\\nDisallow: /'");
     expect(prove).toContain('[[ "$robots" == *\'Sitemap:\'* ]]');
     expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
+    expect(writeReceipt).toContain(
+      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
+    );
+    expect(writeReceipt).toContain(
+      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+    );
+    expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
+    expect(writeReceipt).toContain(
+      'ROLLBACK_RESULT: ${{ needs.rollback-production.result }}'
+    );
+    expect(writeReceipt).toContain('rollbackResult: $rollbackResult');
     expect(writeReceipt).toContain('state: "deployed"');
     expect(writeReceipt).toContain('terminal: true');
     expect(writeReceipt).toContain(

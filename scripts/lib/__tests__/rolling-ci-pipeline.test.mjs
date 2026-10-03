@@ -32,6 +32,7 @@ import {
 
 const head = 'a'.repeat(40);
 const nextHead = 'b'.repeat(40);
+const policySha = 'c'.repeat(40);
 const read = path =>
   readFileSync(resolve(import.meta.dirname, '../../..', path), 'utf8');
 const green = names => Object.fromEntries(names.map(name => [name, 'success']));
@@ -50,6 +51,7 @@ const failure = normalizeFailureEvents({
     workflowPath: '.github/workflows/ci.yml',
   },
   checkSuiteId: 44,
+  policySha,
 })[0];
 const identity = {
   repository: 'JovieInc/Jovie',
@@ -79,7 +81,7 @@ function attempted(attempt, runId = 9000 + attempt) {
     ...failure,
     attempt,
     workflowRunId: String(runId),
-    delivery: `${runId}:${attempt}:${failure.fingerprint}`,
+    delivery: `${runId}:${attempt}:${failure.fingerprint}:${policySha}`,
   };
 }
 

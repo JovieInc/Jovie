@@ -14,13 +14,28 @@ pr_number="${1:?pr number required}"
 marker="${2:?marker required}"
 body="${3:?body required}"
 repo="${GITHUB_REPOSITORY:-JovieInc/Jovie}"
+trusted_author="${BOT_COMMENT_AUTHOR:-}"
 
 hidden="<!-- bot-comment:${marker} -->"
 full_body="${hidden}
 ${body}"
 
-existing_id=$(gh api "repos/${repo}/issues/${pr_number}/comments" --paginate \
-  --jq ".[] | select(.body | contains(\"${hidden}\")) | .id" 2>/dev/null | head -1)
+if [ -n "${trusted_author}" ]; then
+  comment_stream=$(gh api "repos/${repo}/issues/${pr_number}/comments" --paginate \
+    --jq '.[]' 2>/dev/null)
+  existing_id=$(printf '%s\n' "${comment_stream}" | jq -s -r \
+    --arg author "${trusted_author}" \
+    --arg hidden "${hidden}" '
+      [.[] | select(.user.login == $author and ((.body // "") | contains($hidden)))] |
+      if length > 1 then error("multiple trusted bot marker comments")
+      elif length == 1 then .[0].id
+      else empty
+      end
+    ')
+else
+  existing_id=$(gh api "repos/${repo}/issues/${pr_number}/comments" --paginate \
+    --jq ".[] | select(.body | contains(\"${hidden}\")) | .id" 2>/dev/null | head -1)
+fi
 
 if [ -n "${existing_id}" ]; then
   gh api -X PATCH "repos/${repo}/issues/comments/${existing_id}" \

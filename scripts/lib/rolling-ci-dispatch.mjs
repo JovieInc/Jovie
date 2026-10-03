@@ -10,7 +10,10 @@ export const TRUSTED_REPOSITORY = 'JovieInc/Jovie';
 export const TRUSTED_CI_WORKFLOW = 'CI';
 export const TRUSTED_CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 export const TRUSTED_FAILURE_EVENTS = Object.freeze(['workflow_run']);
-export const TRUSTED_PRODUCER_EVENTS = Object.freeze(['pull_request']);
+export const TRUSTED_PRODUCER_EVENTS = Object.freeze([
+  'pull_request',
+  'merge_group',
+]);
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
 const QUEUE_FRONT_RE =
@@ -33,7 +36,14 @@ export function resolveDispatchPullRequest(input = {}) {
   if (Number.isInteger(parsedNumber) && parsedNumber > 0) {
     return { prNumber: parsedNumber, source: 'event' };
   }
-  return null;
+  if (input.producerEvent !== 'merge_group') return null;
+  const front = parseMergeQueueFrontBranch(input.headBranch);
+  if (!front) return null;
+  return {
+    prNumber: front.prNumber,
+    source: 'merge_queue_front_ref',
+    baseSha: front.baseSha,
+  };
 }
 
 /**
@@ -46,7 +56,12 @@ export function bindDispatchLiveHead(input = {}) {
   const expected = String(input.expectedHead ?? '').toLowerCase();
   const live = String(input.liveHead ?? '').toLowerCase();
   if (!SHA_RE.test(expected)) return null;
-  if (input.producerEvent !== 'pull_request') return null;
+  if (input.producerEvent === 'merge_group') {
+    return {
+      liveHead: expected,
+      reason: 'merge_group_synthetic_head',
+    };
+  }
   if (live === expected) {
     return { liveHead: live, reason: 'exact_source_head' };
   }
@@ -76,6 +91,7 @@ function isAuthenticatedWorkflowRun(source) {
 export function resolveCiWorkflowRun(input = {}) {
   const runs = Array.isArray(input.runs) ? input.runs : [];
   const head = String(input.headSha ?? '').toLowerCase();
+  const producerEvent = input.producerEvent ?? null;
   const suite = input.checkSuiteId == null ? null : String(input.checkSuiteId);
   return (
     [...runs]
@@ -89,16 +105,18 @@ export function resolveCiWorkflowRun(input = {}) {
           run?.name === TRUSTED_CI_WORKFLOW &&
           path === TRUSTED_CI_WORKFLOW_PATH &&
           isTrustedProducerEvent(run?.event) &&
+          (producerEvent == null || run?.event === producerEvent) &&
           runHead === head &&
           (suite == null || runSuite === suite)
         );
       })
       .sort((left, right) => {
+        const idDelta = Number(right.id ?? 0) - Number(left.id ?? 0);
+        if (idDelta !== 0) return idDelta;
         const attemptDelta =
           (right.run_attempt ?? right.runAttempt ?? 0) -
           (left.run_attempt ?? left.runAttempt ?? 0);
-        if (attemptDelta !== 0) return attemptDelta;
-        return Number(right.id ?? 0) - Number(left.id ?? 0);
+        return attemptDelta;
       })[0] ?? null
   );
 }
@@ -177,11 +195,13 @@ export function normalizeFailureEvents({
   failedJobs,
   source,
   checkSuiteId,
+  policySha,
 }) {
   if (repository !== TRUSTED_REPOSITORY)
     throw new Error(`repository must be ${TRUSTED_REPOSITORY}`);
   assertPositiveInteger(prNumber, 'prNumber');
   assertSha(headSha, 'headSha');
+  assertSha(policySha, 'policySha');
   if (!/^\d+$/.test(String(workflowRunId ?? ''))) {
     throw new Error('workflowRunId must be numeric');
   }
@@ -205,12 +225,13 @@ export function normalizeFailureEvents({
         repository,
         pr: prNumber,
         head: headSha.toLowerCase(),
+        policySha: policySha.toLowerCase(),
         check,
         attempt: workflowRunAttempt,
         workflowRunId: String(workflowRunId),
         ...(suiteId ? { checkSuiteId: suiteId } : {}),
         fingerprint,
-        delivery: `${suiteId ?? workflowRunId}:${workflowRunAttempt}:${fingerprint}`,
+        delivery: `${suiteId ?? workflowRunId}:${workflowRunAttempt}:${fingerprint}:${policySha.toLowerCase()}`,
         failedSteps: [...new Set(failedSteps)].sort(),
         source: trustedSource,
       };
@@ -218,12 +239,14 @@ export function normalizeFailureEvents({
     .sort((left, right) => left.check.localeCompare(right.check));
 }
 
-export function emptyRollingCiState(headSha) {
+export function emptyRollingCiState(headSha, policySha = null) {
   assertSha(headSha, 'headSha');
+  if (policySha != null) assertSha(policySha, 'policySha');
   return {
     schema: ROLLING_CI_STATE_SCHEMA,
     policyVersion: ROLLING_CI_POLICY_VERSION,
     head: headSha.toLowerCase(),
+    ...(policySha ? { policySha: policySha.toLowerCase() } : {}),
     deliveries: [],
     failures: {},
     claim: null,
@@ -266,10 +289,15 @@ export function planFailureDispatch({
     return { action: 'reject_stale_head', mutate: false, state: priorState };
   }
 
-  const superseded = priorState?.head && priorState.head !== event.head;
-  const state = superseded
-    ? emptyRollingCiState(event.head)
-    : structuredClone(priorState ?? emptyRollingCiState(event.head));
+  const supersededHead = priorState?.head && priorState.head !== event.head;
+  const supersededPolicy =
+    priorState != null && priorState.policySha !== event.policySha;
+  const state =
+    supersededHead || supersededPolicy
+      ? emptyRollingCiState(event.head, event.policySha)
+      : structuredClone(
+          priorState ?? emptyRollingCiState(event.head, event.policySha)
+        );
 
   if (state.deliveries.includes(event.delivery)) {
     return { action: 'deduplicate_delivery', mutate: false, state };
@@ -330,7 +358,8 @@ export function planFailureDispatch({
     status: 'active',
     writer,
     policyVersion: ROLLING_CI_POLICY_VERSION,
-    key: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${ROLLING_CI_POLICY_VERSION}`,
+    policySha: event.policySha,
+    key: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${event.policySha}:${ROLLING_CI_POLICY_VERSION}`,
     repository: event.repository,
     pr: event.pr,
     head: event.head,
@@ -339,15 +368,25 @@ export function planFailureDispatch({
   };
 
   return {
-    action: superseded ? 'dispatch_superseding_head' : 'dispatch_implementer',
+    action: supersededHead
+      ? 'dispatch_superseding_head'
+      : supersededPolicy
+        ? 'dispatch_superseding_policy'
+        : 'dispatch_implementer',
     mutate: true,
     state,
   };
 }
 
-export function planGreenRecovery({ headSha, liveHead, priorState = null }) {
+export function planGreenRecovery({
+  headSha,
+  liveHead,
+  policySha = null,
+  priorState = null,
+}) {
   assertSha(headSha, 'headSha');
   assertSha(liveHead, 'liveHead');
+  if (policySha != null) assertSha(policySha, 'policySha');
   if (headSha.toLowerCase() !== liveHead.toLowerCase()) {
     return { action: 'reject_stale_green', mutate: false, state: priorState };
   }
@@ -366,14 +405,17 @@ export function planGreenRecovery({ headSha, liveHead, priorState = null }) {
   ) {
     return { action: 'deduplicate_green', mutate: false, state: priorState };
   }
-  const state = emptyRollingCiState(liveHead);
+  const state = emptyRollingCiState(liveHead, policySha);
   return { action: 'supersede_repairs_green', mutate: true, state };
 }
 
 export function renderDispatchComment({ event, plan }) {
   const owner = plan.state?.claim?.writer ?? 'unassigned';
   const count = plan.state?.failures?.[event.fingerprint]?.deliveryCount ?? 0;
-  const role = owner === 'fx' ? 'FX backstop' : 'active implementer';
+  const role =
+    owner === 'fx' || owner === 'fx-hosted'
+      ? 'FX backstop'
+      : 'active implementer';
   return `## Rolling CI failure dispatched
 
 - PR: #${event.pr}
@@ -418,6 +460,7 @@ export function runDispatch(input) {
     const plan = planGreenRecovery({
       headSha: input.headSha,
       liveHead: input.liveHead,
+      policySha: input.policySha,
       priorState: state,
     });
     return {
@@ -432,8 +475,9 @@ export function runDispatch(input) {
   }
 
   const events = normalizeFailureEvents(input);
-  let mutated = false;
   let finalPlan = null;
+  let actionablePlan = null;
+  let actionableEvent = null;
   for (const event of events) {
     finalPlan = planFailureDispatch({
       event,
@@ -442,23 +486,23 @@ export function runDispatch(input) {
       priorState: state,
     });
     if (finalPlan.mutate) {
-      mutated = true;
       state = finalPlan.state;
+      actionablePlan = finalPlan;
+      actionableEvent = event;
+      break;
     }
   }
-  const actionableEvent = events.find(event =>
-    state?.deliveries?.includes(event.delivery)
-  );
+  const selectedPlan = actionablePlan ?? finalPlan;
   return {
     events,
-    action: finalPlan?.action ?? 'no_failure',
-    mutate: mutated,
+    action: selectedPlan?.action ?? 'no_failure',
+    mutate: Boolean(actionablePlan),
     state,
     body:
-      mutated && actionableEvent && state
+      actionablePlan && actionableEvent && state
         ? renderDispatchComment({
             event: actionableEvent,
-            plan: { ...finalPlan, state },
+            plan: { ...actionablePlan, state },
           })
         : '',
   };

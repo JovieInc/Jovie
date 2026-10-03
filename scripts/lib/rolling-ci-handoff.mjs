@@ -97,6 +97,7 @@ export function validateHandoffReceipt(receipt, options = {}) {
   if (
     receipt?.status === 'active' &&
     (!receipt.leaseExpiresAt ||
+      !Number.isFinite(Date.parse(receipt.leaseExpiresAt)) ||
       Date.parse(receipt.leaseExpiresAt) <=
         Date.parse(now ?? new Date().toISOString()))
   ) {

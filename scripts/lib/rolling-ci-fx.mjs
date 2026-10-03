@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import {
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   parseRollingCiState,
@@ -15,9 +21,11 @@ import {
   FX_ADAPTER_NAME,
   FX_HANDOFF_FAILURE,
   fxConfigurationIncident,
+  isImplementerLeaseLive,
   parseHandoffReceipt,
   resolveFxAdapter,
   resolveRemediationRoute,
+  validateHandoffReceipt,
 } from './rolling-ci-handoff.mjs';
 
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v1/agents';
@@ -44,11 +52,18 @@ export const HOSTED_ACCEPTANCE_RECEIPT_SCHEMA =
   'jovie-hosted-ci-acceptance-receipt/v1';
 export const HOSTED_TERMINAL_RECEIPT_SCHEMA =
   'jovie-hosted-ci-terminal-receipt/v1';
+export const HOSTED_POLICY_RECEIPT_SCHEMA =
+  'jovie-hosted-ci-policy-admission/v1';
 export const HOSTED_REPAIR_MAX_CONCURRENT = 1;
 export const HOSTED_REPAIR_MAX_FILES = 8;
 export const HOSTED_REPAIR_MAX_PATCH_BYTES = 512 * 1024;
 export const HOSTED_GATE_MAX_AGE_MS = 5 * 60 * 1000;
 export const HOSTED_ACCEPTANCE_TTL_MS = 45 * 60 * 1000;
+export const HOSTED_CURSOR_VERSION = '2026.08.25-3e8eec8';
+export const HOSTED_CURSOR_ARCHIVE_URL =
+  'https://downloads.cursor.com/lab/2026.08.25-3e8eec8/linux/x64/agent-cli-package.tar.gz';
+export const HOSTED_CURSOR_ARCHIVE_SHA256 =
+  '7a212e5a17ff9316f5acc78808e33c536940d5455645022e6388d99ba48c8425';
 
 const HOSTED_REPAIR_TEST_COMMANDS = Object.freeze([
   'pnpm biome check <changed-files>',
@@ -56,8 +71,7 @@ const HOSTED_REPAIR_TEST_COMMANDS = Object.freeze([
   'node scripts/run-affected-tests.mjs --base <expected-head>',
 ]);
 const HOSTED_ALLOWED_PATH_RE = Object.freeze([
-  /^apps\/web\/(?:app|components|hooks|lib|types)\/.+\.(?:[cm]?[jt]sx?)$/,
-  /^packages\/[^/]+\/src\/.+\.(?:[cm]?[jt]sx?)$/,
+  /^apps\/web\/components\/marketing\/.+\.(?:[cm]?[jt]sx?)$/,
 ]);
 const HOSTED_DENIED_PATH_RE = Object.freeze([
   /(^|\/)\.github(\/|$)/i,
@@ -69,11 +83,14 @@ const HOSTED_DENIED_PATH_RE = Object.freeze([
   /(?:^|\/)(?:billing|payments?|stripe|entitlements?)(?:[._-]|\/|$)/i,
   /(?:^|\/)(?:release|deployment|deploy|vercel)(?:[._-]|\/|$)/i,
   /(?:^|\/)proxy\.ts$/i,
+  /(?:^|\/)(?:api|admin|data|database|db|queries?|security|server|supabase|permissions?|middleware|webhooks?|cron|jobs?|workers?)(?:[._-]|\/|$)/i,
   /(?:^|\/)(?:package\.json|pnpm-lock\.yaml|turbo\.json|biome\.jsonc?)$/i,
   /(?:^|\/)(?:tests?|__tests__|__snapshots__)(?:\/|$)/i,
   /\.(?:test|spec)\.[cm]?[jt]sx?$/i,
   /scripts\/lib\/(?:rolling-ci|safe-pr-remediation)/i,
 ]);
+const HOSTED_DENIED_PATH_TOKEN_RE =
+  /^(?:drizzle|migrations?|auth.*|oauth|clerk|sessions?|billing|payments?|stripe|entitlements?|release|deployment|deploy|vercel|api|admin|data|database|db|queries?|security|server|supabase|permissions?|middleware|webhooks?|cron|jobs?|workers?)$/;
 const CREATE_HOSTED_COMMIT_MUTATION = `mutation HostedCiRepair($input: CreateCommitOnBranchInput!) {
   createCommitOnBranch(input: $input) {
     commit { oid url }
@@ -110,6 +127,54 @@ function assertSafeHeadRef(value) {
   return ref;
 }
 
+function normalizeHostedAllowedPaths(paths) {
+  if (!Array.isArray(paths) || paths.length < 1 || paths.length > 40) {
+    throw new Error('hosted repair requires a bounded original-PR file set');
+  }
+  const policies = paths.map(path => validateHostedRepairPath(path));
+  const deniedIndex = policies.findIndex(policy => !policy.allowed);
+  if (deniedIndex >= 0) {
+    throw new Error(
+      `${String(paths[deniedIndex])}: original PR contains a path outside hosted repair policy`
+    );
+  }
+  return [...new Set(policies.map(policy => policy.path))].sort();
+}
+
+function normalizeHostedPullRequestFiles(records) {
+  if (!Array.isArray(records) || records.length < 1 || records.length > 40) {
+    throw new Error('hosted repair requires bounded original-PR file records');
+  }
+  const acceptedStatuses = new Set(['added', 'modified']);
+  const normalized = records.map((record, index) => {
+    const filename = String(record?.filename ?? '');
+    const status = String(record?.status ?? '');
+    const previousFilename = String(record?.previous_filename ?? '');
+    if (!filename) {
+      throw new Error(`original PR file record ${index} is missing filename`);
+    }
+    if (!acceptedStatuses.has(status) || previousFilename) {
+      throw new Error(
+        `${filename}: original PR file transition ${status || 'missing'} is not eligible for hosted repair`
+      );
+    }
+    return { filename, status };
+  });
+  const allowedPaths = normalizeHostedAllowedPaths(
+    normalized.map(record => record.filename)
+  );
+  if (
+    new Set(normalized.map(record => record.filename)).size !==
+    normalized.length
+  ) {
+    throw new Error('original PR file records contain duplicate paths');
+  }
+  return {
+    records: normalized.sort((a, b) => a.filename.localeCompare(b.filename)),
+    allowedPaths,
+  };
+}
+
 function assertHostedRepairPlan(plan) {
   if (
     plan?.schema !== HOSTED_REPAIR_PLAN_SCHEMA ||
@@ -130,10 +195,29 @@ function assertHostedRepairPlan(plan) {
     throw new Error('checkSuiteId must be numeric');
   }
   assertExactSha(plan.expectedHeadOid, 'expectedHeadOid');
+  assertExactSha(plan.policySha, 'policySha');
   assertSafeHeadRef(plan.headRefName);
-  const expectedKey = `${plan.repository}:pr-${plan.prNumber}:${plan.expectedHeadOid}:${plan.fingerprint}:${plan.policyVersion}`;
+  const expectedKey = `${plan.repository}:pr-${plan.prNumber}:${plan.expectedHeadOid}:${plan.fingerprint}:${plan.policySha}:${plan.policyVersion}`;
   if (plan.idempotencyKey !== expectedKey) {
     throw new Error('hosted repair idempotency key is not exact-head bound');
+  }
+  const sourceFiles = normalizeHostedPullRequestFiles(plan.sourceFiles);
+  if (
+    JSON.stringify(plan.sourceFiles) !== JSON.stringify(sourceFiles.records)
+  ) {
+    throw new Error('hosted repair source file records are not normalized');
+  }
+  const allowedPaths = normalizeHostedAllowedPaths(plan.allowedPaths);
+  if (JSON.stringify(plan.allowedPaths) !== JSON.stringify(allowedPaths)) {
+    throw new Error('hosted repair allowed paths are not normalized');
+  }
+  if (
+    JSON.stringify(plan.allowedPaths) !==
+    JSON.stringify(sourceFiles.allowedPaths)
+  ) {
+    throw new Error(
+      'hosted repair allowed paths do not match source file records'
+    );
   }
   return plan;
 }
@@ -146,19 +230,23 @@ export function buildHostedRepairPlan(input = {}) {
   );
   if (
     input.dispatch?.mutate !== true ||
-    !['dispatch_implementer', 'dispatch_superseding_head'].includes(
-      input.dispatch?.action
-    ) ||
+    ![
+      'dispatch_implementer',
+      'dispatch_superseding_head',
+      'dispatch_superseding_policy',
+    ].includes(input.dispatch?.action) ||
     !event
   ) {
     throw new Error('dispatch does not authorize a hosted repair');
   }
+  const sourceFiles = normalizeHostedPullRequestFiles(input.fileRecords);
   const plan = {
     schema: HOSTED_REPAIR_PLAN_SCHEMA,
     policyVersion: ROLLING_CI_POLICY_VERSION,
     repository: event.repository,
     prNumber: event.pr,
     expectedHeadOid: event.head,
+    policySha: input.policySha,
     headRefName: assertSafeHeadRef(input.headRefName),
     producerEvent: event.source?.producerEvent,
     workflowRunId: event.workflowRunId,
@@ -169,7 +257,9 @@ export function buildHostedRepairPlan(input = {}) {
       check: candidate.check,
       failedSteps: [...(candidate.failedSteps ?? [])],
     })),
-    idempotencyKey: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${ROLLING_CI_POLICY_VERSION}`,
+    sourceFiles: sourceFiles.records,
+    allowedPaths: sourceFiles.allowedPaths,
+    idempotencyKey: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${input.policySha}:${ROLLING_CI_POLICY_VERSION}`,
     maxConcurrent: HOSTED_REPAIR_MAX_CONCURRENT,
   };
   return assertHostedRepairPlan(plan);
@@ -241,14 +331,142 @@ export function validateHostedGateAdmission({
     : { accepted: false, reason: 'fresh-typed-capacity-not-admitted' };
 }
 
+export function validateHostedPolicyBase({ eventPolicySha, currentMainSha }) {
+  assertExactSha(eventPolicySha, 'eventPolicySha');
+  assertExactSha(currentMainSha, 'currentMainSha');
+  const accepted = eventPolicySha === currentMainSha;
+  return {
+    schema: HOSTED_POLICY_RECEIPT_SCHEMA,
+    accepted,
+    status: accepted ? 'accepted' : 'blocked',
+    reason: accepted ? null : 'stale_policy_base',
+    eventPolicySha,
+    currentMainSha,
+  };
+}
+
+export function resolveHostedHandoffAdmission({
+  comments,
+  repository,
+  prNumber,
+  liveHead,
+  now = new Date().toISOString(),
+}) {
+  if (
+    repository !== TRUSTED_REPOSITORY ||
+    !Number.isInteger(prNumber) ||
+    prNumber < 1 ||
+    !/^[0-9a-f]{40}$/.test(String(liveHead ?? '')) ||
+    !Array.isArray(comments)
+  ) {
+    return { valid: false, allowed: false, reason: 'invalid-handoff-input' };
+  }
+  if (comments.length === 0) {
+    return {
+      schema: 'jovie-hosted-ci-handoff-admission/v1',
+      valid: true,
+      allowed: true,
+      reason: 'no-handoff-receipt',
+      repository,
+      prNumber,
+      liveHead,
+    };
+  }
+  if (comments.length !== 1) {
+    return {
+      schema: 'jovie-hosted-ci-handoff-admission/v1',
+      valid: false,
+      allowed: false,
+      reason: 'ambiguous-handoff-receipts',
+      repository,
+      prNumber,
+      liveHead,
+    };
+  }
+  const body = String(comments[0] ?? '');
+  const markers = [
+    ...body.matchAll(
+      /<!-- jovie-rolling-ci-handoff:([A-Za-z0-9_-]+) -->/g
+    ),
+  ];
+  const receipt = markers.length === 1 ? parseHandoffReceipt(body) : null;
+  if (!receipt || receipt.pr !== prNumber) {
+    return {
+      schema: 'jovie-hosted-ci-handoff-admission/v1',
+      valid: false,
+      allowed: false,
+      reason: 'invalid-handoff-receipt',
+      repository,
+      prNumber,
+      liveHead,
+    };
+  }
+  const validation = validateHandoffReceipt(receipt, { liveHead, now });
+  const nonBlockingErrors = new Set([
+    'stale handoff head',
+    'implementer lease is expired',
+  ]);
+  const hardErrors = validation.errors.filter(
+    error => !nonBlockingErrors.has(error)
+  );
+  if (hardErrors.length > 0) {
+    return {
+      schema: 'jovie-hosted-ci-handoff-admission/v1',
+      valid: false,
+      allowed: false,
+      reason: 'invalid-handoff-receipt',
+      errors: hardErrors,
+      repository,
+      prNumber,
+      liveHead,
+    };
+  }
+  if (isImplementerLeaseLive(receipt, { liveHead, now })) {
+    return {
+      schema: 'jovie-hosted-ci-handoff-admission/v1',
+      valid: true,
+      allowed: false,
+      reason: 'implementer-lease-live',
+      repository,
+      prNumber,
+      liveHead,
+      remediationOwner: receipt.remediationOwner,
+      leaseExpiresAt: receipt.leaseExpiresAt,
+    };
+  }
+  return {
+    schema: 'jovie-hosted-ci-handoff-admission/v1',
+    valid: true,
+    allowed: true,
+    reason: validation.errors.includes('stale handoff head')
+      ? 'stale-handoff-head'
+      : validation.errors.includes('implementer lease is expired')
+        ? 'implementer-lease-expired'
+        : `handoff-${receipt.status}`,
+    repository,
+    prNumber,
+    liveHead,
+  };
+}
+
 export function validateHostedRepairPath(path) {
-  const normalized = String(path ?? '').replaceAll('\\', '/');
+  const raw = String(path ?? '');
+  const normalized = raw.replaceAll('\\', '/');
+  const pathTokens = normalized
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
   if (
     !normalized ||
+    normalized !== raw ||
+    !/^[-A-Za-z0-9_./@+]+$/.test(normalized) ||
     normalized.startsWith('/') ||
     normalized.includes('/../') ||
     normalized.startsWith('../') ||
     HOSTED_DENIED_PATH_RE.some(pattern => pattern.test(normalized)) ||
+    pathTokens.some(token => HOSTED_DENIED_PATH_TOKEN_RE.test(token)) ||
     !HOSTED_ALLOWED_PATH_RE.some(pattern => pattern.test(normalized))
   ) {
     return { allowed: false, reason: 'path-outside-hosted-repair-policy' };
@@ -256,7 +474,169 @@ export function validateHostedRepairPath(path) {
   return { allowed: true, path: normalized };
 }
 
-function validateHostedChanges(changes) {
+export function validateHostedCandidateTree({ repository, allowedPaths }) {
+  const root = resolve(String(repository ?? ''));
+  const allowed = normalizeHostedAllowedPaths(allowedPaths);
+
+  function scan(directory, prefix = '') {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (!prefix && entry.name === '.git') continue;
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const fullPath = join(directory, entry.name);
+      const stat = lstatSync(fullPath);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`${path}: candidate symlink is forbidden`);
+      }
+      if (stat.isDirectory()) scan(fullPath, path);
+    }
+  }
+
+  scan(root);
+  const trackedModes = new Map();
+  const records = execFileSync('git', ['ls-files', '--stage', '-z'], {
+    cwd: root,
+  })
+    .toString('utf8')
+    .split('\0')
+    .filter(Boolean);
+  for (const record of records) {
+    const match = /^(\d{6}) [0-9a-f]+ \d+\t(.+)$/.exec(record);
+    if (!match) throw new Error('candidate git index is malformed');
+    const [, mode, path] = match;
+    if (mode === '160000') {
+      throw new Error(`${path}: candidate gitlink is forbidden`);
+    }
+    trackedModes.set(path, mode);
+  }
+  for (const path of allowed) {
+    const mode = trackedModes.get(path);
+    if (!['100644', '100755'].includes(mode)) {
+      throw new Error(
+        `${path}: hosted repair path is not a regular tracked file`
+      );
+    }
+    if (!lstatSync(join(root, path)).isFile()) {
+      throw new Error(`${path}: hosted repair path is not a regular file`);
+    }
+  }
+  return {
+    schema: 'jovie-hosted-ci-candidate-tree/v1',
+    accepted: true,
+    allowedPaths: allowed,
+  };
+}
+
+export function applyHostedPatchProposal({ plan, repository, proposalBytes }) {
+  assertHostedRepairPlan(plan);
+  const root = resolve(String(repository ?? ''));
+  const currentHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+  if (currentHead !== plan.expectedHeadOid) {
+    throw new Error('candidate checkout is not the exact planned head');
+  }
+  validateHostedCandidateTree({
+    repository: root,
+    allowedPaths: plan.allowedPaths,
+  });
+  if (
+    execFileSync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+      { cwd: root }
+    ).length > 0
+  ) {
+    throw new Error('candidate checkout must be clean before proposal apply');
+  }
+
+  const patch = Buffer.from(proposalBytes ?? '');
+  const text = patch.toString('utf8');
+  if (
+    patch.length < 1 ||
+    patch.length > HOSTED_REPAIR_MAX_PATCH_BYTES ||
+    !Buffer.from(text, 'utf8').equals(patch) ||
+    text.includes('\0') ||
+    text.includes('\r') ||
+    !text.startsWith('diff --git ')
+  ) {
+    throw new Error('hosted proposal is not a bounded UTF-8 git patch');
+  }
+  if (
+    /^(?:new file mode|deleted file mode|old mode|new mode|similarity index|rename from|rename to|copy from|copy to|GIT binary patch|Binary files )/m.test(
+      text
+    )
+  ) {
+    throw new Error('hosted proposal contains a forbidden file transition');
+  }
+  const diffHeaders = [...text.matchAll(/^diff --git a\/(\S+) b\/(\S+)$/gm)];
+  const rawHeaderCount = (text.match(/^diff --git /gm) ?? []).length;
+  if (diffHeaders.length < 1 || diffHeaders.length !== rawHeaderCount) {
+    throw new Error('hosted proposal contains an unsupported diff header');
+  }
+  const allowedPaths = new Set(plan.allowedPaths);
+  const paths = [];
+  for (const [, before, after] of diffHeaders) {
+    if (before !== after) {
+      throw new Error('hosted proposal may not rename or copy files');
+    }
+    const policy = validateHostedRepairPath(after);
+    if (!policy.allowed || !allowedPaths.has(policy.path)) {
+      throw new Error(`${after}: proposal path is outside planned authority`);
+    }
+    if (paths.includes(policy.path)) {
+      throw new Error('hosted proposal contains duplicate diff paths');
+    }
+    paths.push(policy.path);
+  }
+  const oldPaths = [...text.matchAll(/^--- a\/(\S+)$/gm)].map(
+    match => match[1]
+  );
+  const newPaths = [...text.matchAll(/^\+\+\+ b\/(\S+)$/gm)].map(
+    match => match[1]
+  );
+  if (
+    JSON.stringify(oldPaths) !== JSON.stringify(paths) ||
+    JSON.stringify(newPaths) !== JSON.stringify(paths)
+  ) {
+    throw new Error('hosted proposal file headers do not match diff authority');
+  }
+
+  execFileSync('git', ['apply', '--check', '--whitespace=error-all', '-'], {
+    cwd: root,
+    input: patch,
+    maxBuffer: HOSTED_REPAIR_MAX_PATCH_BYTES + 1,
+  });
+  execFileSync('git', ['apply', '--whitespace=error-all', '-'], {
+    cwd: root,
+    input: patch,
+    maxBuffer: HOSTED_REPAIR_MAX_PATCH_BYTES + 1,
+  });
+  const changed = execFileSync(
+    'git',
+    ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+    { cwd: root }
+  )
+    .toString('utf8')
+    .split('\0')
+    .filter(Boolean);
+  if (
+    changed.length !== paths.length ||
+    changed.some(record => record.slice(0, 3) !== ' M ') ||
+    JSON.stringify(changed.map(record => record.slice(3)).sort()) !==
+      JSON.stringify([...paths].sort())
+  ) {
+    throw new Error('applied proposal produced an unauthorized git transition');
+  }
+  return {
+    schema: 'jovie-hosted-ci-proposal-apply/v1',
+    applied: true,
+    paths: [...paths].sort(),
+    proposalSha256: sha256(patch),
+  };
+}
+
+function validateHostedChanges(changes, allowedPaths = null) {
   if (
     !Array.isArray(changes) ||
     changes.length < 1 ||
@@ -265,9 +645,17 @@ function validateHostedChanges(changes) {
     throw new Error('hosted repair must modify a bounded non-empty file set');
   }
   const unique = new Set();
+  const allowed = allowedPaths
+    ? new Set(normalizeHostedAllowedPaths(allowedPaths))
+    : null;
   for (const change of changes) {
     const policy = validateHostedRepairPath(change?.path);
     if (!policy.allowed) throw new Error(`${change?.path}: ${policy.reason}`);
+    if (allowed && !allowed.has(policy.path)) {
+      throw new Error(
+        `${policy.path}: path was not changed by the original PR`
+      );
+    }
     if (unique.has(policy.path)) throw new Error('duplicate changed path');
     unique.add(policy.path);
     if (
@@ -286,6 +674,36 @@ function validateHostedChanges(changes) {
   );
 }
 
+export function verifyHostedRepairFiles({ plan, changes, fileContents }) {
+  assertHostedRepairPlan(plan);
+  const acceptedChanges = validateHostedChanges(changes, plan.allowedPaths);
+  for (const change of acceptedChanges) {
+    const contents = fileContents?.[change.path];
+    if (
+      !Buffer.isBuffer(contents) ||
+      contents.length !== change.bytes ||
+      sha256(contents) !== change.sha256
+    ) {
+      throw new Error(`${change.path}: tested file hash mismatch`);
+    }
+  }
+  return {
+    verified: true,
+    changedFiles: acceptedChanges.map(change => change.path),
+    manifestSha256: sha256(Buffer.from(JSON.stringify(acceptedChanges))),
+  };
+}
+
+function isTrustedHostedExecutor(executor) {
+  return (
+    executor?.kind === 'cursor-cli' &&
+    executor.archiveUrl === HOSTED_CURSOR_ARCHIVE_URL &&
+    executor.archiveSha256 === HOSTED_CURSOR_ARCHIVE_SHA256 &&
+    executor.version === HOSTED_CURSOR_VERSION &&
+    /^[0-9a-f]{64}$/.test(executor.binarySha256 ?? '')
+  );
+}
+
 export function buildHostedAcceptanceReceipt({
   plan,
   gateReceipt,
@@ -301,13 +719,8 @@ export function buildHostedAcceptanceReceipt({
   if (patch.length < 1 || patch.length > HOSTED_REPAIR_MAX_PATCH_BYTES) {
     throw new Error('hosted repair patch is empty or exceeds the byte limit');
   }
-  const acceptedChanges = validateHostedChanges(changes);
-  if (
-    executor?.kind !== 'cursor-cli' ||
-    !/^[0-9a-f]{64}$/.test(executor?.installerSha256 ?? '') ||
-    typeof executor?.version !== 'string' ||
-    executor.version.length < 1
-  ) {
+  const acceptedChanges = validateHostedChanges(changes, plan.allowedPaths);
+  if (!isTrustedHostedExecutor(executor)) {
     throw new Error('executor identity is missing or malformed');
   }
   return {
@@ -356,16 +769,13 @@ export function validateHostedAcceptance({
       acceptance.patchSha256 !== sha256(Buffer.from(patchBytes ?? '')) ||
       acceptance.gate?.receiptSha256 === undefined ||
       acceptance.gate.receiptSha256 !== gate.receiptSha256 ||
-      acceptance.executor?.kind !== 'cursor-cli' ||
-      !/^[0-9a-f]{64}$/.test(acceptance.executor?.installerSha256 ?? '') ||
-      typeof acceptance.executor?.version !== 'string' ||
-      acceptance.executor.version.length < 1 ||
+      !isTrustedHostedExecutor(acceptance.executor) ||
       JSON.stringify(acceptance.testCommands) !==
         JSON.stringify(HOSTED_REPAIR_TEST_COMMANDS)
     ) {
       return { accepted: false, reason: 'acceptance-identity-mismatch' };
     }
-    validateHostedChanges(acceptance.changedFiles);
+    validateHostedChanges(acceptance.changedFiles, plan.allowedPaths);
     return { accepted: true, gate };
   } catch (error) {
     return {
@@ -423,9 +833,11 @@ export function buildHostedTerminalReceipt({
 }) {
   assertHostedRepairPlan(plan);
   const allowedOutcomes = new Set([
+    'candidate_committed',
     'repaired',
     'superseded_green',
     'stale_head',
+    'stale_policy_base',
     'capacity_denied',
     'patch_rejected',
     'tests_failed',
@@ -435,13 +847,18 @@ export function buildHostedTerminalReceipt({
   ]);
   if (!allowedOutcomes.has(outcome))
     throw new Error('invalid terminal outcome');
-  if (outcome === 'repaired')
+  if (['candidate_committed', 'repaired'].includes(outcome))
     assertExactSha(committedHeadOid, 'committedHeadOid');
   return {
     schema: HOSTED_TERMINAL_RECEIPT_SCHEMA,
     policyVersion: plan.policyVersion,
     stage: 'terminal',
-    status: outcome === 'repaired' ? 'completed' : 'aborted',
+    status:
+      outcome === 'candidate_committed'
+        ? 'awaiting_verification'
+        : outcome === 'repaired'
+          ? 'completed'
+          : 'aborted',
     terminal: true,
     outcome,
     repository: plan.repository,
@@ -455,6 +872,126 @@ export function buildHostedTerminalReceipt({
       : null,
     observedAt: new Date(now).toISOString(),
   };
+}
+
+export function promoteHostedCandidateReceipt({
+  commentAuthor,
+  commentBody,
+  repository,
+  prNumber,
+  greenHead,
+  policySha,
+  workflowRunId,
+  workflowRunAttempt,
+  checkSuiteId,
+  now = new Date(),
+}) {
+  if (commentAuthor !== 'github-actions[bot]') {
+    return { promoted: false, reason: 'untrusted-comment-author' };
+  }
+  if (repository !== TRUSTED_REPOSITORY) {
+    return { promoted: false, reason: 'untrusted-repository' };
+  }
+  if (!Number.isInteger(prNumber) || prNumber < 1) {
+    return { promoted: false, reason: 'invalid-pr-number' };
+  }
+  try {
+    assertExactSha(greenHead, 'greenHead');
+    assertExactSha(policySha, 'policySha');
+    if (!/^\d+$/.test(String(workflowRunId ?? ''))) {
+      throw new Error('workflowRunId must be numeric');
+    }
+    assertPositiveInteger(workflowRunAttempt, 'workflowRunAttempt');
+    if (!/^\d+$/.test(String(checkSuiteId ?? ''))) {
+      throw new Error('checkSuiteId must be numeric');
+    }
+  } catch {
+    return { promoted: false, reason: 'invalid-green-identity' };
+  }
+  const markers = [
+    ...String(commentBody ?? '').matchAll(
+      /<!-- jovie-hosted-ci-terminal-receipt:([A-Za-z0-9+/=_-]+) -->/g
+    ),
+  ];
+  if (markers.length === 0) {
+    return { promoted: false, reason: 'no-candidate-receipt' };
+  }
+  if (markers.length !== 1) {
+    return { promoted: false, reason: 'ambiguous-candidate-receipt' };
+  }
+
+  try {
+    const candidate = JSON.parse(
+      Buffer.from(markers[0][1], 'base64').toString('utf8')
+    );
+    assertExactSha(candidate.expectedHeadOid, 'expectedHeadOid');
+    assertExactSha(candidate.committedHeadOid, 'committedHeadOid');
+    const expectedIdempotencyKey = `${repository}:pr-${prNumber}:${candidate.expectedHeadOid}:${candidate.fingerprint}:${policySha}:${ROLLING_CI_POLICY_VERSION}`;
+    if (
+      candidate.schema !== HOSTED_TERMINAL_RECEIPT_SCHEMA ||
+      candidate.policyVersion !== ROLLING_CI_POLICY_VERSION ||
+      candidate.stage !== 'terminal' ||
+      candidate.status !== 'awaiting_verification' ||
+      candidate.terminal !== true ||
+      candidate.outcome !== 'candidate_committed' ||
+      candidate.repository !== repository ||
+      candidate.prNumber !== prNumber ||
+      candidate.committedHeadOid !== greenHead ||
+      candidate.expectedHeadOid === greenHead ||
+      !String(candidate.fingerprint ?? '').startsWith('ci:') ||
+      candidate.idempotencyKey !== expectedIdempotencyKey ||
+      !/^[0-9a-f]{64}$/.test(String(candidate.acceptanceSha256 ?? '')) ||
+      !Number.isFinite(Date.parse(candidate.observedAt ?? ''))
+    ) {
+      return { promoted: false, reason: 'candidate-identity-mismatch' };
+    }
+    return {
+      promoted: true,
+      receipt: {
+        ...candidate,
+        status: 'completed',
+        outcome: 'repaired',
+        observedAt: new Date(now).toISOString(),
+        verification: {
+          workflow: 'CI',
+          producerEvent: 'pull_request',
+          conclusion: 'success',
+          headOid: greenHead,
+          policySha,
+          workflowRunId: String(workflowRunId),
+          workflowRunAttempt,
+          checkSuiteId: String(checkSuiteId),
+          runUrl: `https://github.com/${repository}/actions/runs/${workflowRunId}/attempts/${workflowRunAttempt}`,
+        },
+      },
+    };
+  } catch {
+    return { promoted: false, reason: 'invalid-candidate-receipt' };
+  }
+}
+
+export function resolveHostedTerminalOutcome(input = {}) {
+  const typedOutcomes = [
+    input.prelaunchTerminalOutcome,
+    input.prepareTerminalOutcome,
+    input.testTerminalOutcome,
+    input.writeGateTerminalOutcome,
+  ].filter(Boolean);
+  if (typedOutcomes.includes('stale_policy_base')) {
+    return 'stale_policy_base';
+  }
+  if (typedOutcomes.includes('capacity_denied')) {
+    return 'capacity_denied';
+  }
+  if (
+    input.prelaunchGateResult !== 'success' ||
+    input.writeGateResult === 'failure'
+  ) {
+    return 'capacity_denied';
+  }
+  if (input.prepareResult !== 'success') return 'executor_failed';
+  if (input.testResult !== 'success') return 'tests_failed';
+  return 'writer_failed';
 }
 
 export function classifyHostedReceiptLiveness({
@@ -821,13 +1358,6 @@ export function planFxLaunch(input = {}) {
     producerEvent,
     runnerClass = null,
   } = input;
-  if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
-    return {
-      action: 'configuration_incident',
-      reason: 'fx-auth-missing',
-      incident: fxConfigurationIncident(),
-    };
-  }
   if (remoteMutationAllowed !== true) {
     const receipt = blockedExecutorReceipt({
       repository,
@@ -840,6 +1370,13 @@ export function planFxLaunch(input = {}) {
       reason: 'fx-safe-executor-unavailable',
       incident: blockedExecutorIncident(),
       receipt,
+    };
+  }
+  if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
+    return {
+      action: 'configuration_incident',
+      reason: 'fx-auth-missing',
+      incident: fxConfigurationIncident(),
     };
   }
   const owned = findOwnedAgents(cursorAgents, fingerprint);
@@ -917,6 +1454,7 @@ export function planFxWebhookRemediation(input = {}) {
   const isFailureDispatch =
     action === 'dispatch_implementer' ||
     action === 'dispatch_superseding_head' ||
+    action === 'dispatch_superseding_policy' ||
     action === 'reject_competing_writer';
   const allowRunnerClassFx = Boolean(runnerClass);
 
@@ -1118,9 +1656,21 @@ export async function commitHostedRepair({
     String(latest?.id ?? '') !== String(plan.workflowRunId) ||
     Number(latest?.run_attempt ?? 0) !== plan.workflowRunAttempt ||
     latest?.status !== 'completed' ||
-    latest?.conclusion !== 'failure'
+    !['failure', 'timed_out'].includes(latest?.conclusion)
   ) {
     return { committed: false, outcome: 'stale_head' };
+  }
+
+  const currentMain = await request(`/repos/${plan.repository}/commits/main`, {
+    token: readToken,
+  });
+  if (
+    !validateHostedPolicyBase({
+      eventPolicySha: plan.policySha,
+      currentMainSha: currentMain?.sha,
+    }).accepted
+  ) {
+    return { committed: false, outcome: 'stale_policy_base' };
   }
 
   const response = await request('/graphql', {
@@ -1135,7 +1685,7 @@ export async function commitHostedRepair({
   assertExactSha(commit?.oid, 'committedHeadOid');
   return {
     committed: true,
-    outcome: 'repaired',
+    outcome: 'candidate_committed',
     committedHeadOid: commit.oid,
     url: commit.url ?? null,
   };
@@ -1163,11 +1713,38 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
 }
 
+function hostedGateCommand(args) {
+  const result = validateHostedGateAdmission({
+    receipt: readJson(args.receipt),
+  });
+  if (!result.accepted) throw new Error(result.reason);
+  writeJson(args.output, result);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+function hostedPolicyCommand(args) {
+  const result = validateHostedPolicyBase({
+    eventPolicySha: args['event-sha'],
+    currentMainSha: args['main-sha'],
+  });
+  writeJson(args.output, result);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+function hostedHandoffAdmissionCommand(args) {
+  const input = readJson(args.input);
+  const result = resolveHostedHandoffAdmission(input);
+  writeJson(args.output, result);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
 function hostedPlanCommand(args) {
   const input = readJson(args.input);
   const plan = buildHostedRepairPlan({
     dispatch: input.dispatch,
     headRefName: input.headRefName,
+    fileRecords: input.fileRecords,
+    policySha: input.policySha,
   });
   writeJson(args.output, plan);
   process.stdout.write(`${JSON.stringify(plan)}\n`);
@@ -1216,7 +1793,8 @@ function hostedStageCommand(args) {
         bytes: bytes.length,
         sha256: sha256(bytes),
       };
-    })
+    }),
+    plan.allowedPaths
   );
   const patchBytes = execFileSync(
     'git',
@@ -1252,6 +1830,43 @@ function hostedAcceptanceCommand(args) {
     patchBytes: readFileSync(args.patch),
     changes: readJson(args.changes),
     executor: readJson(args.executor),
+  });
+  writeJson(args.output, receipt);
+  process.stdout.write(`${JSON.stringify(receipt)}\n`);
+}
+
+function hostedVerifyTreeCommand(args) {
+  const plan = readJson(args.plan);
+  const changes = readJson(args.changes);
+  const fileContents = Object.fromEntries(
+    changes.map(change => {
+      const fullPath = join(args.repository, change.path);
+      if (lstatSync(fullPath).isSymbolicLink()) {
+        throw new Error(`${change.path}: tested symlink is forbidden`);
+      }
+      return [change.path, readFileSync(fullPath)];
+    })
+  );
+  const receipt = verifyHostedRepairFiles({ plan, changes, fileContents });
+  writeJson(args.output, receipt);
+  process.stdout.write(`${JSON.stringify(receipt)}\n`);
+}
+
+function hostedValidateCandidateCommand(args) {
+  const plan = assertHostedRepairPlan(readJson(args.plan));
+  const receipt = validateHostedCandidateTree({
+    repository: args.repository,
+    allowedPaths: plan.allowedPaths,
+  });
+  writeJson(args.output, receipt);
+  process.stdout.write(`${JSON.stringify(receipt)}\n`);
+}
+
+function hostedApplyProposalCommand(args) {
+  const receipt = applyHostedPatchProposal({
+    plan: readJson(args.plan),
+    repository: args.repository,
+    proposalBytes: readFileSync(args.proposal),
   });
   writeJson(args.output, receipt);
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
@@ -1296,6 +1911,30 @@ function hostedTerminalCommand(args) {
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
 }
 
+function hostedPromoteGreenCommand(args) {
+  const input = readJson(args.input);
+  const result = promoteHostedCandidateReceipt({
+    commentAuthor: input.commentAuthor,
+    commentBody: input.commentBody,
+    repository: input.repository,
+    prNumber: input.prNumber,
+    greenHead: input.greenHead,
+    policySha: input.policySha,
+    workflowRunId: input.workflowRunId,
+    workflowRunAttempt: input.workflowRunAttempt,
+    checkSuiteId: input.checkSuiteId,
+  });
+  writeJson(args.output, result);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+function hostedResolveTerminalCommand(args) {
+  const outcome = resolveHostedTerminalOutcome(readJson(args.input));
+  const result = { outcome };
+  writeJson(args.output, result);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
 async function readInput() {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
@@ -1306,25 +1945,45 @@ async function main() {
   const command = process.argv[2];
   if (command?.startsWith('hosted-')) {
     const args = cliArgs(process.argv.slice(3));
+    if (command === 'hosted-gate') return hostedGateCommand(args);
+    if (command === 'hosted-policy') return hostedPolicyCommand(args);
+    if (command === 'hosted-handoff-admission')
+      return hostedHandoffAdmissionCommand(args);
     if (command === 'hosted-plan') return hostedPlanCommand(args);
     if (command === 'hosted-prelaunch') return hostedPrelaunchCommand(args);
     if (command === 'hosted-stage') return hostedStageCommand(args);
+    if (command === 'hosted-validate-candidate')
+      return hostedValidateCandidateCommand(args);
+    if (command === 'hosted-apply-proposal')
+      return hostedApplyProposalCommand(args);
+    if (command === 'hosted-verify-tree') return hostedVerifyTreeCommand(args);
     if (command === 'hosted-acceptance') return hostedAcceptanceCommand(args);
     if (command === 'hosted-commit') return hostedCommitCommand(args);
     if (command === 'hosted-terminal') return hostedTerminalCommand(args);
+    if (command === 'hosted-promote-green')
+      return hostedPromoteGreenCommand(args);
+    if (command === 'hosted-resolve-terminal')
+      return hostedResolveTerminalCommand(args);
     throw new Error(`unknown hosted remediation command: ${command}`);
   }
   const input = await readInput();
+  const mergeGroup = input.source?.producerEvent === 'merge_group';
+  const remoteMutationAllowed =
+    mergeGroup !== true && input.remoteMutationAllowed === true;
   const receipt =
     input.receipt ??
     parseHandoffReceipt(input.handoffCommentBody ?? '') ??
     null;
   const cursorApiKey = input.cursorApiKey ?? process.env.CURSOR_API_KEY ?? '';
+  const effectiveFxAdapter = input.fxAdapter ?? {
+    name: FX_ADAPTER_NAME,
+    authConfigured: mergeGroup || Boolean(String(cursorApiKey).trim()),
+  };
   let cursorAgents = Array.isArray(input.cursorAgents)
     ? input.cursorAgents
     : [];
   if (
-    input.remoteMutationAllowed === true &&
+    remoteMutationAllowed &&
     cursorApiKey &&
     cursorAgents.length === 0 &&
     input.listCursorAgents !== false
@@ -1339,10 +1998,7 @@ async function main() {
     receipt,
     liveHead: input.liveHead,
     implementer: input.writer,
-    fxAdapter: input.fxAdapter ?? {
-      name: FX_ADAPTER_NAME,
-      authConfigured: Boolean(String(cursorApiKey).trim()),
-    },
+    fxAdapter: effectiveFxAdapter,
     now: input.now,
   });
   const priorClaimWriter =
@@ -1377,10 +2033,10 @@ async function main() {
     receipt,
     liveHead: input.liveHead,
     implementer: input.writer,
-    fxAdapter: input.fxAdapter,
+    fxAdapter: effectiveFxAdapter,
     cursorAgents,
     cursorApiKey,
-    remoteMutationAllowed: input.remoteMutationAllowed === true,
+    remoteMutationAllowed,
     now: input.now,
     repository: input.repository,
     prNumber: input.prNumber,

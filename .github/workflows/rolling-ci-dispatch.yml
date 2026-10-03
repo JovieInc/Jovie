@@ -12,8 +12,192 @@ permissions: {}
 concurrency:
   group: rolling-ci-remediation-global-v1
   cancel-in-progress: false
+  queue: max
 
 jobs:
+  merge_group_diagnostic:
+    name: Terminalize merge-group CI without mutation authority
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      github.event.workflow_run.event == 'merge_group' &&
+      github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+      (github.event.workflow_run.conclusion == 'failure' ||
+      github.event.workflow_run.conclusion == 'success' ||
+      github.event.workflow_run.conclusion == 'timed_out')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout trusted diagnostic policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/rolling-ci-dispatch.mjs
+            scripts/lib/rolling-ci-fx.mjs
+            scripts/lib/rolling-ci-handoff.mjs
+            scripts/lib/upsert-pr-comment.sh
+          sparse-checkout-cone-mode: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: Check current trusted merge-group policy
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          POLICY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')
+          node scripts/lib/rolling-ci-fx.mjs hosted-policy \
+            --event-sha "$POLICY_SHA" \
+            --main-sha "$CURRENT_MAIN_SHA" \
+            --output "$RUNNER_TEMP/merge-group-policy.json" >/dev/null
+          echo "accepted=$(jq -r '.accepted' "$RUNNER_TEMP/merge-group-policy.json")" >> "$GITHUB_OUTPUT"
+          RECEIPT_B64=$(base64 -w0 < "$RUNNER_TEMP/merge-group-policy.json" 2>/dev/null || base64 < "$RUNNER_TEMP/merge-group-policy.json" | tr -d '\n')
+          echo "receipt_b64=$RECEIPT_B64" >> "$GITHUB_OUTPUT"
+      - name: Materialize merge-group policy receipt
+        env:
+          RECEIPT_B64: ${{ steps.policy.outputs.receipt_b64 }}
+        run: printf '%s' "$RECEIPT_B64" | base64 --decode > "$RUNNER_TEMP/merge-group-policy.json"
+      - name: Upload merge-group policy receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: merge-group-policy-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: ${{ runner.temp }}/merge-group-policy.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Block stale merge-group policy
+        if: steps.policy.outputs.accepted != 'true'
+        run: |
+          echo '::error title=stale_policy_base::Merge-group diagnostic policy no longer matches current main.'
+          exit 1
+      - name: Record exact synthetic-head terminal diagnostic
+        if: steps.policy.outputs.accepted == 'true'
+        env:
+          BOT_COMMENT_AUTHOR: github-actions[bot]
+          CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          POLICY_SHA: ${{ github.sha }}
+          PRODUCER_EVENT: ${{ github.event.workflow_run.event }}
+          TRUSTED_REF: ${{ github.ref_name }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
+          WORKFLOW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          RESOLVED_PR=$(node --input-type=module <<'EOF'
+          import { resolveDispatchPullRequest } from './scripts/lib/rolling-ci-dispatch.mjs';
+          const resolved = resolveDispatchPullRequest({
+            producerEvent: process.env.PRODUCER_EVENT,
+            headBranch: process.env.HEAD_BRANCH,
+          });
+          if (!resolved) process.exit(2);
+          process.stdout.write(String(resolved.prNumber));
+          EOF
+          ) || {
+            echo 'Merge-group run has no authenticated queue-front pull request.'
+            exit 0
+          }
+          if [[ "$TRUSTED_REF" != 'main' || ! "$RESOLVED_PR" =~ ^[1-9][0-9]*$ || ! "$CHECK_SUITE_ID" =~ ^[0-9]+$ || ! "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ || ! "$WORKFLOW_RUN_ID" =~ ^[0-9]+$ || ! "$WORKFLOW_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'Merge-group event is not exact-head authenticated.'
+            exit 0
+          fi
+
+          CI_RUNS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$EXPECTED_HEAD&per_page=100" \
+            --jq '.workflow_runs[] | {id,name,path,event,head_sha,run_attempt,check_suite_id}' | jq -s '.')
+          export CI_RUNS
+          LATEST_CI=$(node --input-type=module <<'EOF'
+          import { resolveCiWorkflowRun } from './scripts/lib/rolling-ci-dispatch.mjs';
+          const latest = resolveCiWorkflowRun({
+            runs: JSON.parse(process.env.CI_RUNS),
+            headSha: process.env.EXPECTED_HEAD,
+            producerEvent: process.env.PRODUCER_EVENT,
+          });
+          process.stdout.write(JSON.stringify(latest));
+          EOF
+          )
+          if [[ "$(jq -r '.id // empty' <<<"$LATEST_CI")" != "$WORKFLOW_RUN_ID" || "$(jq -r '.run_attempt // empty' <<<"$LATEST_CI")" != "$WORKFLOW_RUN_ATTEMPT" ]]; then
+            echo 'Event is not the latest canonical CI run for this exact head.'
+            exit 0
+          fi
+
+          LIVE_PR=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$RESOLVED_PR" \
+            --jq '{head:.head.sha,ref:.head.ref,author:(.user.login // ""),state,fork:(.head.repo.fork // false),same_repo:(.head.repo.full_name == .base.repo.full_name),base_repo:.base.repo.full_name,base_ref:.base.ref}')
+          if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != 'open' || "$(jq -r '.fork' <<<"$LIVE_PR")" == 'true' || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != 'true' || "$(jq -r '.base_repo' <<<"$LIVE_PR")" != 'JovieInc/Jovie' || "$(jq -r '.base_ref' <<<"$LIVE_PR")" != 'main' ]]; then
+            echo 'Merge-group source pull request is closed, forked, or outside main.'
+            exit 0
+          fi
+          LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
+          LIVE_REF=$(jq -r '.ref' <<<"$LIVE_PR")
+          LIVE_AUTHOR=$(jq -r '.author' <<<"$LIVE_PR")
+          export LIVE_HEAD
+          BOUND_HEAD=$(node --input-type=module <<'EOF'
+          import { bindDispatchLiveHead } from './scripts/lib/rolling-ci-dispatch.mjs';
+          const bound = bindDispatchLiveHead({
+            producerEvent: process.env.PRODUCER_EVENT,
+            liveHead: process.env.LIVE_HEAD,
+            expectedHead: process.env.EXPECTED_HEAD,
+          });
+          if (!bound) process.exit(2);
+          process.stdout.write(bound.liveHead);
+          EOF
+          ) || exit 0
+
+          FAILED_JOBS='[]'
+          if [[ "$CONCLUSION" == 'failure' || "$CONCLUSION" == 'timed_out' ]]; then
+            FAILED_JOBS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | {name:.name,conclusion:.conclusion,steps:[.steps[]? | select(.conclusion == "failure" or .conclusion == "timed_out") | .name]}' | jq -s '.')
+            [[ "$(jq 'length' <<<"$FAILED_JOBS")" -gt 0 ]] || exit 0
+          fi
+          CHECKS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
+            --jq '.check_runs[] | {name:.name,conclusion:.conclusion,headSha:.head_sha,checkSuiteId:.check_suite.id}' | jq -s '.')
+          TRUSTED_COMMENT_STREAM=$(gh api "repos/$GITHUB_REPOSITORY/issues/$RESOLVED_PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and ((.body // "") | contains("<!-- bot-comment:rolling-ci-dispatch -->")))')
+          [[ "$(printf '%s\n' "$TRUSTED_COMMENT_STREAM" | jq -s 'length')" -le 1 ]] || exit 1
+          PRIOR_COMMENT=$(printf '%s\n' "$TRUSTED_COMMENT_STREAM" | jq -s -r 'if length == 1 then .[0].body else "" end')
+
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --argjson prNumber "$RESOLVED_PR" \
+            --arg headSha "$EXPECTED_HEAD" \
+            --arg policySha "$POLICY_SHA" \
+            --arg liveHead "$BOUND_HEAD" \
+            --arg sourceHead "$LIVE_HEAD" \
+            --arg headRef "$LIVE_REF" \
+            --arg workflowRunId "$WORKFLOW_RUN_ID" \
+            --argjson workflowRunAttempt "$WORKFLOW_RUN_ATTEMPT" \
+            --argjson failedJobs "$FAILED_JOBS" \
+            --arg writer "$LIVE_AUTHOR" \
+            --arg priorCommentBody "$PRIOR_COMMENT" \
+            --arg conclusion "$CONCLUSION" \
+            --argjson checkSuiteId "$CHECK_SUITE_ID" \
+            --argjson checks "$CHECKS" \
+            --arg eventName "$EVENT_NAME" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg workflowPath "$WORKFLOW_PATH" \
+            --arg producerEvent "$PRODUCER_EVENT" \
+            --arg trustedPolicyRef "$TRUSTED_REF" \
+            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,policySha:$policySha,liveHead:$liveHead,sourceHead:$sourceHead,headRef:$headRef,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,listCursorAgents:false,remoteMutationAllowed:true,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
+            | node scripts/lib/rolling-ci-fx.mjs > "$RUNNER_TEMP/merge-group-diagnostic.json"
+          if [[ "$(jq -r '.dispatch.mutate' "$RUNNER_TEMP/merge-group-diagnostic.json")" == 'true' ]]; then
+            COMMENT_BODY=$(jq -r '.dispatch.body' "$RUNNER_TEMP/merge-group-diagnostic.json")
+            bash scripts/lib/upsert-pr-comment.sh "$RESOLVED_PR" rolling-ci-dispatch "$COMMENT_BODY"
+          fi
+
   plan:
     name: Plan exact-head Jovie remediation
     if: >-
@@ -21,7 +205,8 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.path == '.github/workflows/ci.yml' &&
       (github.event.workflow_run.conclusion == 'failure' ||
-      github.event.workflow_run.conclusion == 'success')
+      github.event.workflow_run.conclusion == 'success' ||
+      github.event.workflow_run.conclusion == 'timed_out')
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     permissions:
@@ -34,6 +219,8 @@ jobs:
       comment_b64: ${{ steps.plan.outputs.comment_b64 }}
       expected_head: ${{ steps.plan.outputs.expected_head }}
       plan_b64: ${{ steps.plan.outputs.plan_b64 }}
+      policy_b64: ${{ steps.plan.outputs.policy_b64 }}
+      policy_accepted: ${{ steps.plan.outputs.policy_accepted }}
       prelaunch_b64: ${{ steps.plan.outputs.prelaunch_b64 }}
       pr_number: ${{ steps.plan.outputs.pr_number }}
     steps:
@@ -71,6 +258,7 @@ jobs:
           WORKFLOW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}
           PR_NUMBER_EVENT: ${{ github.event.workflow_run.pull_requests[0].number }}
+          POLICY_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           {
@@ -78,9 +266,23 @@ jobs:
             echo 'comment_b64='
             echo 'expected_head='
             echo 'plan_b64='
+            echo 'policy_b64='
+            echo 'policy_accepted=false'
             echo 'prelaunch_b64='
             echo 'pr_number='
           } >> "$GITHUB_OUTPUT"
+
+          CURRENT_MAIN_SHA=$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha')
+          node scripts/lib/rolling-ci-fx.mjs hosted-policy \
+            --event-sha "$POLICY_SHA" \
+            --main-sha "$CURRENT_MAIN_SHA" \
+            --output "$RUNNER_TEMP/hosted-policy.json" >/dev/null
+          POLICY_B64=$(base64 -w0 < "$RUNNER_TEMP/hosted-policy.json" 2>/dev/null || base64 < "$RUNNER_TEMP/hosted-policy.json" | tr -d '\n')
+          echo "policy_b64=$POLICY_B64" >> "$GITHUB_OUTPUT"
+          echo "policy_accepted=$(jq -r '.accepted' "$RUNNER_TEMP/hosted-policy.json")" >> "$GITHUB_OUTPUT"
+          if [[ "$(jq -r '.accepted' "$RUNNER_TEMP/hosted-policy.json")" != 'true' ]]; then
+            exit 0
+          fi
 
           if [[ "$REPOSITORY" != 'JovieInc/Jovie' || "$PRODUCER_EVENT" != 'pull_request' || "$TRUSTED_REF" != 'main' ]]; then
             echo 'Event is outside the Jovie trusted pull-request policy.'
@@ -95,6 +297,24 @@ jobs:
             exit 0
           fi
 
+          CI_RUNS=$(gh api --paginate "repos/$REPOSITORY/actions/runs?head_sha=$EXPECTED_HEAD&per_page=100" \
+            --jq '.workflow_runs[] | {id,name,path,event,head_sha,run_attempt,check_suite_id}' | jq -s '.')
+          export CI_RUNS EXPECTED_HEAD PRODUCER_EVENT
+          LATEST_CI=$(node --input-type=module <<'EOF'
+          import { resolveCiWorkflowRun } from './scripts/lib/rolling-ci-dispatch.mjs';
+          const latest = resolveCiWorkflowRun({
+            runs: JSON.parse(process.env.CI_RUNS),
+            headSha: process.env.EXPECTED_HEAD,
+            producerEvent: process.env.PRODUCER_EVENT,
+          });
+          process.stdout.write(JSON.stringify(latest));
+          EOF
+          )
+          if [[ "$(jq -r '.id // empty' <<<"$LATEST_CI")" != "$WORKFLOW_RUN_ID" || "$(jq -r '.run_attempt // empty' <<<"$LATEST_CI")" != "$WORKFLOW_RUN_ATTEMPT" ]]; then
+            echo 'Event is not the latest canonical CI run for this exact head.'
+            exit 0
+          fi
+
           LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER_EVENT" \
             --jq '{number,head:.head.sha,ref:.head.ref,state,fork:(.head.repo.fork // false),same_repo:(.head.repo.full_name == .base.repo.full_name),base_repo:.base.repo.full_name,base_ref:.base.ref}')
           LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
@@ -105,9 +325,9 @@ jobs:
           fi
 
           FAILED_JOBS='[]'
-          if [[ "$CONCLUSION" == 'failure' ]]; then
-            FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100" \
-              --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | {name:.name,conclusion:.conclusion,steps:[.steps[]? | select(.conclusion == "failure" or .conclusion == "timed_out") | .name]}]')
+          if [[ "$CONCLUSION" == 'failure' || "$CONCLUSION" == 'timed_out' ]]; then
+            FAILED_JOBS=$(gh api --paginate "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | {name:.name,conclusion:.conclusion,steps:[.steps[]? | select(.conclusion == "failure" or .conclusion == "timed_out") | .name]}' | jq -s '.')
             if [[ "$(jq 'length' <<<"$FAILED_JOBS")" -lt 1 ]]; then
               echo 'Failed CI supplied no authenticated failing job.'
               exit 0
@@ -115,13 +335,20 @@ jobs:
           fi
           CHECKS=$(gh api --paginate "repos/$REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
             --jq '.check_runs[] | {name:.name,conclusion:.conclusion,headSha:.head_sha,checkSuiteId:.check_suite.id}' | jq -s '.')
-          PRIOR_COMMENT=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER_EVENT/comments" --paginate \
-            --jq '[.[] | select(.body | contains("<!-- bot-comment:rolling-ci-dispatch -->"))] | last | .body // ""')
+          TRUSTED_COMMENT_STREAM=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER_EVENT/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and ((.body // "") | contains("<!-- bot-comment:rolling-ci-dispatch -->")))')
+          TRUSTED_COMMENT_COUNT=$(printf '%s\n' "$TRUSTED_COMMENT_STREAM" | jq -s 'length')
+          if [[ "$TRUSTED_COMMENT_COUNT" -gt 1 ]]; then
+            echo 'Multiple trusted Rolling CI comments found; refusing ambiguous state.'
+            exit 1
+          fi
+          PRIOR_COMMENT=$(printf '%s\n' "$TRUSTED_COMMENT_STREAM" | jq -s -r 'if length == 1 then .[0].body else "" end')
 
           jq -n \
             --arg repository "$REPOSITORY" \
             --argjson prNumber "$PR_NUMBER_EVENT" \
             --arg headSha "$EXPECTED_HEAD" \
+            --arg policySha "$POLICY_SHA" \
             --arg liveHead "$LIVE_HEAD" \
             --arg workflowRunId "$WORKFLOW_RUN_ID" \
             --argjson workflowRunAttempt "$WORKFLOW_RUN_ATTEMPT" \
@@ -136,25 +363,57 @@ jobs:
             --arg workflowPath "$WORKFLOW_PATH" \
             --arg producerEvent "$PRODUCER_EVENT" \
             --arg trustedPolicyRef "$TRUSTED_REF" \
-            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,liveHead:$liveHead,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
+            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,policySha:$policySha,liveHead:$liveHead,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
             | node scripts/rolling-ci-dispatch.mjs > "$RUNNER_TEMP/dispatch.json"
 
           if [[ "$(jq -r '.mutate' "$RUNNER_TEMP/dispatch.json")" == 'true' ]]; then
             jq -r '.body' "$RUNNER_TEMP/dispatch.json" > "$RUNNER_TEMP/comment.md"
-            COMMENT_B64=$(base64 -w0 < "$RUNNER_TEMP/comment.md" 2>/dev/null || base64 < "$RUNNER_TEMP/comment.md" | tr -d '\n')
-            echo "comment_b64=$COMMENT_B64" >> "$GITHUB_OUTPUT"
           fi
           echo "pr_number=$PR_NUMBER_EVENT" >> "$GITHUB_OUTPUT"
           if [[ "$CONCLUSION" == 'success' ]]; then
+            jq -n \
+              --arg commentAuthor 'github-actions[bot]' \
+              --arg commentBody "$PRIOR_COMMENT" \
+              --arg repository "$REPOSITORY" \
+              --argjson prNumber "$PR_NUMBER_EVENT" \
+              --arg greenHead "$EXPECTED_HEAD" \
+              --arg policySha "$POLICY_SHA" \
+              --arg workflowRunId "$WORKFLOW_RUN_ID" \
+              --argjson workflowRunAttempt "$WORKFLOW_RUN_ATTEMPT" \
+              --arg checkSuiteId "$CHECK_SUITE_ID" \
+              '{commentAuthor:$commentAuthor,commentBody:$commentBody,repository:$repository,prNumber:$prNumber,greenHead:$greenHead,policySha:$policySha,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,checkSuiteId:$checkSuiteId}' \
+              > "$RUNNER_TEMP/hosted-green-input.json"
+            node scripts/lib/rolling-ci-fx.mjs hosted-promote-green \
+              --input "$RUNNER_TEMP/hosted-green-input.json" \
+              --output "$RUNNER_TEMP/hosted-green.json" >/dev/null
+            if [[ "$(jq -r '.promoted' "$RUNNER_TEMP/hosted-green.json")" == 'true' ]]; then
+              if [[ ! -f "$RUNNER_TEMP/comment.md" ]]; then
+                echo 'Candidate receipt matched green head without mutable repair state.'
+                exit 1
+              fi
+              jq '.receipt' "$RUNNER_TEMP/hosted-green.json" > "$RUNNER_TEMP/hosted-repaired.json"
+              REPAIRED_MARKER=$(base64 -w0 < "$RUNNER_TEMP/hosted-repaired.json" 2>/dev/null || base64 < "$RUNNER_TEMP/hosted-repaired.json" | tr -d '\n')
+              printf '\n<!-- jovie-hosted-ci-terminal-receipt:%s -->\n' "$REPAIRED_MARKER" >> "$RUNNER_TEMP/comment.md"
+            fi
+            if [[ -f "$RUNNER_TEMP/comment.md" ]]; then
+              COMMENT_B64=$(base64 -w0 < "$RUNNER_TEMP/comment.md" 2>/dev/null || base64 < "$RUNNER_TEMP/comment.md" | tr -d '\n')
+              echo "comment_b64=$COMMENT_B64" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
-          if [[ "$(jq -r '.mutate' "$RUNNER_TEMP/dispatch.json")" != 'true' || ! "$(jq -r '.action' "$RUNNER_TEMP/dispatch.json")" =~ ^dispatch_(implementer|superseding_head)$ ]]; then
+          if [[ -f "$RUNNER_TEMP/comment.md" ]]; then
+            COMMENT_B64=$(base64 -w0 < "$RUNNER_TEMP/comment.md" 2>/dev/null || base64 < "$RUNNER_TEMP/comment.md" | tr -d '\n')
+            echo "comment_b64=$COMMENT_B64" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ "$(jq -r '.mutate' "$RUNNER_TEMP/dispatch.json")" != 'true' || ! "$(jq -r '.action' "$RUNNER_TEMP/dispatch.json")" =~ ^dispatch_(implementer|superseding_head|superseding_policy)$ ]]; then
             echo 'Fingerprint is already owned, terminal, or deduplicated.'
             exit 0
           fi
 
-          jq -n --slurpfile dispatch "$RUNNER_TEMP/dispatch.json" --arg headRefName "$LIVE_REF" \
-            '{dispatch:$dispatch[0],headRefName:$headRefName}' > "$RUNNER_TEMP/hosted-input.json"
+          PR_FILE_RECORDS=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER_EVENT/files?per_page=100" \
+            --jq '[.[] | {filename, status, previous_filename}]' | jq -sc 'add')
+          jq -n --slurpfile dispatch "$RUNNER_TEMP/dispatch.json" --arg headRefName "$LIVE_REF" --argjson fileRecords "$PR_FILE_RECORDS" --arg policySha "$POLICY_SHA" \
+            '{dispatch:$dispatch[0],headRefName:$headRefName,fileRecords:$fileRecords,policySha:$policySha}' > "$RUNNER_TEMP/hosted-input.json"
           node scripts/lib/rolling-ci-fx.mjs hosted-plan \
             --input "$RUNNER_TEMP/hosted-input.json" \
             --output "$RUNNER_TEMP/plan.json" >/dev/null
@@ -198,11 +457,30 @@ jobs:
             echo "prelaunch_b64=$PRELAUNCH_B64"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Materialize typed policy admission receipt
+        if: steps.plan.outputs.policy_b64 != ''
+        env:
+          POLICY_B64: ${{ steps.plan.outputs.policy_b64 }}
+        run: printf '%s' "$POLICY_B64" | base64 --decode > "$RUNNER_TEMP/hosted-policy-admission.json"
+      - name: Upload typed policy admission receipt
+        if: steps.plan.outputs.policy_b64 != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hosted-ci-policy-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: ${{ runner.temp }}/hosted-policy-admission.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Block stale hosted policy admission
+        if: steps.plan.outputs.policy_b64 != '' && steps.plan.outputs.policy_accepted != 'true'
+        run: |
+          echo '::error title=stale_policy_base::Trusted remediation policy no longer matches current main.'
+          exit 1
       - name: Record typed controller receipt
         if: steps.plan.outputs.comment_b64 != ''
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          BOT_COMMENT_AUTHOR: github-actions[bot]
           PR_NUMBER: ${{ steps.plan.outputs.pr_number }}
           COMMENT_B64: ${{ steps.plan.outputs.comment_b64 }}
         run: |
@@ -222,6 +500,7 @@ jobs:
       contents: read
     outputs:
       gate_b64: ${{ steps.admit.outputs.gate_b64 }}
+      terminal_outcome: ${{ steps.admit.outputs.terminal_outcome }}
     steps:
       - name: Checkout trusted fleet policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -241,17 +520,12 @@ jobs:
           RECEIPT: ${{ steps.gate.outputs.receipt_path }}
         run: |
           set -euo pipefail
-          jq -e '
-            .schema == "jovie-fleet-gate/v1" and
-            .remediationAdmission.allowed == true and
-            .remediationAdmission.localAllowed == true and
-            .remediationAdmission.pushAllowed == true and
-            (.remediationAdmission.activities | index("expected-head-pr-update") != null) and
-            .remediationAdmission.maxConcurrent >= 1 and
-            .concurrency.gem.evidenceAccepted == true and
-            .concurrency.gem.newMutationAllowed == true and
-            .concurrency.gem.maxConcurrent >= 1
-          ' "$RECEIPT" >/dev/null
+          if ! node scripts/lib/rolling-ci-fx.mjs hosted-gate \
+              --receipt "$RECEIPT" \
+              --output "$RUNNER_TEMP/hosted-prelaunch-gate.json" >/dev/null; then
+            echo 'terminal_outcome=capacity_denied' >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           GATE_B64=$(base64 -w0 < "$RECEIPT" 2>/dev/null || base64 < "$RECEIPT" | tr -d '\n')
           echo "gate_b64=$GATE_B64" >> "$GITHUB_OUTPUT"
 
@@ -265,6 +539,7 @@ jobs:
       contents: read
     outputs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      terminal_outcome: ${{ steps.model.outputs.terminal_outcome }}
     steps:
       - name: Checkout immutable trusted policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -296,61 +571,62 @@ jobs:
           path: ${{ runner.temp }}/hosted-repair/prelaunch.json
           if-no-files-found: error
           retention-days: 7
-      - name: Install Cursor CLI and capture immutable executor identity
+      - name: Materialize pinned Cursor CLI and capture executor identity
         run: |
           set -euo pipefail
-          curl https://cursor.com/install -fsS -o "$RUNNER_TEMP/cursor-install.sh"
-          INSTALLER_SHA=$(sha256sum "$RUNNER_TEMP/cursor-install.sh" | cut -d' ' -f1)
-          bash "$RUNNER_TEMP/cursor-install.sh"
-          echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
-          VERSION=$("$HOME/.cursor/bin/cursor-agent" --version)
-          jq -n --arg installerSha256 "$INSTALLER_SHA" --arg version "$VERSION" \
-            '{kind:"cursor-cli",installerSha256:$installerSha256,version:$version}' > "$RUNNER_TEMP/hosted-repair/executor.json"
+          EXPECTED_VERSION='2026.08.25-3e8eec8'
+          ARCHIVE_URL='https://downloads.cursor.com/lab/2026.08.25-3e8eec8/linux/x64/agent-cli-package.tar.gz'
+          ARCHIVE_SHA256='7a212e5a17ff9316f5acc78808e33c536940d5455645022e6388d99ba48c8425'
+          ARCHIVE="$RUNNER_TEMP/cursor-agent-package.tar.gz"
+          CURSOR_ROOT="$RUNNER_TEMP/cursor-agent/$EXPECTED_VERSION"
+          CURSOR_AGENT="$CURSOR_ROOT/dist-package/cursor-agent"
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
+            "$ARCHIVE_URL" --output "$ARCHIVE"
+          printf '%s  %s\n' "$ARCHIVE_SHA256" "$ARCHIVE" | sha256sum --check --strict
+          mkdir -p "$CURSOR_ROOT"
+          tar -xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "$CURSOR_ROOT"
+          test -x "$CURSOR_AGENT"
+          VERSION=$("$CURSOR_AGENT" --disable-auto-update --version)
+          [[ "$VERSION" == "$EXPECTED_VERSION" ]]
+          BINARY_SHA256=$(sha256sum "$CURSOR_AGENT" | cut -d' ' -f1)
+          jq -n \
+            --arg archiveUrl "$ARCHIVE_URL" \
+            --arg archiveSha256 "$ARCHIVE_SHA256" \
+            --arg binarySha256 "$BINARY_SHA256" \
+            --arg version "$VERSION" \
+            '{kind:"cursor-cli",archiveUrl:$archiveUrl,archiveSha256:$archiveSha256,binarySha256:$binarySha256,version:$version}' \
+            > "$RUNNER_TEMP/hosted-repair/executor.json"
       - name: Configure restrictive Cursor permissions
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/cursor-config"
-          jq -n '{
+          jq -n --slurpfile plan "$RUNNER_TEMP/hosted-repair/plan.json" '{
             version: 1,
             editor: {vimMode: false},
             permissions: {
-              allow: [
-                "Read(**/*)",
-                "Write(apps/web/app/**/*)",
-                "Write(apps/web/components/**/*)",
-                "Write(apps/web/hooks/**/*)",
-                "Write(apps/web/lib/**/*)",
-                "Write(apps/web/types/**/*)",
-                "Write(packages/*/src/**/*)"
-              ],
+              allow: ($plan[0].allowedPaths | map("Read(" + . + ")")),
               deny: [
-                "Shell(*)", "WebFetch(*)", "Mcp(*:*)",
+                "Shell(*)", "WebFetch(*)", "Mcp(*:*)", "Write(**/*)",
                 "Read(**/.env*)", "Read(**/*secret*)", "Read(**/*credential*)",
-                "Write(.github/**/*)", "Write(.cursor/**/*)", "Write(.agents/**/*)",
-                "Write(.claude/**/*)", "Write(.codex/**/*)", "Write(**/.env*)",
-                "Write(**/*secret*)", "Write(**/*credential*)", "Write(**/migrations/**/*)",
-                "Write(**/*migration*)", "Write(**/*drizzle*)", "Write(**/auth/**/*)",
-                "Write(**/*auth*)", "Write(**/*oauth*)", "Write(**/*clerk*)",
-                "Write(**/billing/**/*)", "Write(**/*billing*)", "Write(**/*payment*)",
-                "Write(**/*stripe*)", "Write(**/*entitlement*)", "Write(**/release/**/*)",
-                "Write(**/*release*)", "Write(**/deploy/**/*)", "Write(**/*deploy*)",
-                "Write(**/*vercel*)", "Write(**/proxy.ts)", "Write(**/tests/**/*)",
-                "Write(**/__tests__/**/*)", "Write(**/*.test.*)", "Write(**/*.spec.*)",
-                "Write(package.json)", "Write(**/package.json)", "Write(pnpm-lock.yaml)"
+                "Read(/etc/**/*)", "Read(/proc/**/*)", "Read(/sys/**/*)",
+                "Read(/home/**/*)", "Read(/root/**/*)"
               ]
             }
           }' > "$RUNNER_TEMP/cursor-config/cli-config.json"
       - name: Generate one bounded patch
+        id: model
         working-directory: candidate
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          CURSOR_AGENT_PATH: ${{ runner.temp }}/cursor-agent/2026.08.25-3e8eec8/dist-package/cursor-agent
           CURSOR_CONFIG_DIR: ${{ runner.temp }}/cursor-config
+          GH_TOKEN: ${{ github.token }}
+          POLICY_SHA: ${{ github.sha }}
           PLAN_PATH: ${{ runner.temp }}/hosted-repair/plan.json
         run: |
           set -euo pipefail
-          unset GH_TOKEN GITHUB_TOKEN
           test -n "${CURSOR_API_KEY:-}"
-          PROMPT=$(jq -r '"Repair the authenticated failed CI on this exact Jovie PR head. Only edit existing production source files already permitted by the runner. Do not create, delete, rename, commit, push, merge, dispatch, rerun, comment, label, use shell, web, or MCP. Do not edit workflows, credentials, secrets, migrations, auth, billing, release, deployment, tests, configs, or lockfiles. A separate trusted runner validates the patch, runs gates, and performs an atomic expected-head update. Failure fingerprint: " + .fingerprint + ". Failed checks: " + ([.failedChecks[] | .check + " [" + (.failedSteps | join(", ")) + "]"] | join("; "))' "$PLAN_PATH")
+          PROMPT=$(jq -r '"Propose the smallest unified git diff that repairs the authenticated failed CI on this exact Jovie PR head. You may read only the files permitted by the runner. Do not attempt to write files or use shell, web, or MCP. Do not create, delete, rename, commit, push, merge, dispatch, rerun, comment, or label. Output only a standard unified git diff beginning with diff --git and no prose or code fences. A separate trusted runner validates and applies only a patch confined to the original approved files, then runs gates and performs an atomic expected-head update. Failure fingerprint: " + .fingerprint + ". Failed checks: " + ([.failedChecks[] | .check + " [" + (.failedSteps | join(", ")) + "]"] | join("; "))' "$PLAN_PATH")
           QUARANTINE="$RUNNER_TEMP/cursor-untrusted-rules"
           mkdir -p "$QUARANTINE"
           restore_rules() {
@@ -371,9 +647,38 @@ jobs:
               mv "$entry" "$QUARANTINE/$entry"
             fi
           done
-          cursor-agent -p --force --output-format text "$PROMPT"
+          node ../.fx-policy/scripts/lib/rolling-ci-fx.mjs hosted-validate-candidate \
+            --plan "$PLAN_PATH" \
+            --repository . \
+            --output "$RUNNER_TEMP/hosted-repair/candidate-tree.json" >/dev/null
+          if ! node ../.fx-policy/scripts/lib/rolling-ci-fx.mjs hosted-gate \
+              --receipt "$RUNNER_TEMP/hosted-repair/gate.json" \
+              --output "$RUNNER_TEMP/hosted-repair/model-gate.json" >/dev/null; then
+            echo 'terminal_outcome=capacity_denied' >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          CURRENT_MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')
+          node ../.fx-policy/scripts/lib/rolling-ci-fx.mjs hosted-policy \
+            --event-sha "$POLICY_SHA" \
+            --main-sha "$CURRENT_MAIN_SHA" \
+            --output "$RUNNER_TEMP/hosted-repair/model-policy.json" >/dev/null
+          if [[ "$(jq -r '.accepted' "$RUNNER_TEMP/hosted-repair/model-policy.json")" != 'true' ]]; then
+            echo 'terminal_outcome=stale_policy_base' >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          unset GH_TOKEN GITHUB_TOKEN
+          test -x "$CURSOR_AGENT_PATH"
+          EXPECTED_BINARY_SHA256=$(jq -r '.binarySha256' "$RUNNER_TEMP/hosted-repair/executor.json")
+          printf '%s  %s\n' "$EXPECTED_BINARY_SHA256" "$CURSOR_AGENT_PATH" | sha256sum --check --strict
+          "$CURSOR_AGENT_PATH" --disable-auto-update -p --mode=ask --sandbox enabled --output-format text "$PROMPT" > "$RUNNER_TEMP/hosted-repair/proposal.patch"
+          printf '%s  %s\n' "$EXPECTED_BINARY_SHA256" "$CURSOR_AGENT_PATH" | sha256sum --check --strict
           restore_rules
           trap - EXIT
+          node ../.fx-policy/scripts/lib/rolling-ci-fx.mjs hosted-apply-proposal \
+            --plan "$PLAN_PATH" \
+            --repository . \
+            --proposal "$RUNNER_TEMP/hosted-repair/proposal.patch" \
+            --output "$RUNNER_TEMP/hosted-repair/proposal-apply.json" >/dev/null
       - name: Validate and stage immutable patch artifact
         run: |
           set -euo pipefail
@@ -400,7 +705,20 @@ jobs:
     timeout-minutes: 35
     permissions:
       contents: read
+    outputs:
+      terminal_outcome: ${{ steps.policy.outputs.terminal_outcome }}
     steps:
+      - name: Checkout trusted artifact verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .fx-policy
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/rolling-ci-dispatch.mjs
+            scripts/lib/rolling-ci-fx.mjs
+            scripts/lib/rolling-ci-handoff.mjs
+          sparse-checkout-cone-mode: false
       - name: Checkout exact candidate head without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -412,6 +730,22 @@ jobs:
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/hosted-repair
+      - name: Invalidate test receipt if trusted policy main advanced
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          POLICY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')
+          node .fx-policy/scripts/lib/rolling-ci-fx.mjs hosted-policy \
+            --event-sha "$POLICY_SHA" \
+            --main-sha "$CURRENT_MAIN_SHA" \
+            --output "$RUNNER_TEMP/hosted-repair/test-policy.json" >/dev/null
+          if [[ "$(jq -r '.accepted' "$RUNNER_TEMP/hosted-repair/test-policy.json")" != 'true' ]]; then
+            echo 'terminal_outcome=stale_policy_base' >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
       - name: Apply exact patch and create local test commit
         working-directory: candidate
         env:
@@ -420,6 +754,11 @@ jobs:
           set -euo pipefail
           git apply --check "$RUNNER_TEMP/hosted-repair/repair.patch"
           git apply "$RUNNER_TEMP/hosted-repair/repair.patch"
+          node ../.fx-policy/scripts/lib/rolling-ci-fx.mjs hosted-verify-tree \
+            --plan "$RUNNER_TEMP/hosted-repair/plan.json" \
+            --repository . \
+            --changes "$RUNNER_TEMP/hosted-repair/changes.json" \
+            --output "$RUNNER_TEMP/hosted-repair/tested-tree.json"
           mapfile -t CHANGED < <(jq -r '.[].path' "$RUNNER_TEMP/hosted-repair/changes.json")
           git add -- "${CHANGED[@]}"
           TREE=$(git write-tree)
@@ -464,6 +803,7 @@ jobs:
       contents: read
     outputs:
       gate_b64: ${{ steps.admit.outputs.gate_b64 }}
+      terminal_outcome: ${{ steps.admit.outputs.terminal_outcome }}
     steps:
       - name: Checkout trusted fleet policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -483,14 +823,21 @@ jobs:
           RECEIPT: ${{ steps.gate.outputs.receipt_path }}
         run: |
           set -euo pipefail
-          jq -e '.schema == "jovie-fleet-gate/v1" and .remediationAdmission.pushAllowed == true and (.remediationAdmission.activities | index("expected-head-pr-update") != null) and .remediationAdmission.maxConcurrent >= 1 and .concurrency.gem.evidenceAccepted == true and .concurrency.gem.newMutationAllowed == true and .concurrency.gem.maxConcurrent >= 1' "$RECEIPT" >/dev/null
+          if ! node scripts/lib/rolling-ci-fx.mjs hosted-gate \
+              --receipt "$RECEIPT" \
+              --output "$RUNNER_TEMP/hosted-write-gate.json" >/dev/null; then
+            echo 'terminal_outcome=capacity_denied' >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           GATE_B64=$(base64 -w0 < "$RECEIPT" 2>/dev/null || base64 < "$RECEIPT" | tr -d '\n')
           echo "gate_b64=$GATE_B64" >> "$GITHUB_OUTPUT"
 
   commit:
     name: Validate acceptance and atomically update exact PR head
     needs: [plan, prepare, test, write_gate]
-    if: needs.write_gate.result == 'success'
+    if: >-
+      needs.write_gate.result == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     permissions:
@@ -498,7 +845,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      terminal_b64: ${{ steps.commit.outputs.terminal_b64 }}
+      terminal_b64: ${{ steps.policy.outputs.terminal_b64 || steps.commit.outputs.terminal_b64 }}
     steps:
       - name: Checkout trusted writer policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -523,8 +870,31 @@ jobs:
             --changes "$RUNNER_TEMP/hosted-repair/changes.json" \
             --executor "$RUNNER_TEMP/hosted-repair/executor.json" \
             --output "$RUNNER_TEMP/hosted-repair/acceptance.json"
+      - name: Invalidate receipts if trusted policy main advanced
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          POLICY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')
+          node scripts/lib/rolling-ci-fx.mjs hosted-policy \
+            --event-sha "$POLICY_SHA" \
+            --main-sha "$CURRENT_MAIN_SHA" \
+            --output "$RUNNER_TEMP/hosted-repair/final-policy.json" >/dev/null
+          POLICY_ACCEPTED=$(jq -r '.accepted' "$RUNNER_TEMP/hosted-repair/final-policy.json")
+          echo "accepted=$POLICY_ACCEPTED" >> "$GITHUB_OUTPUT"
+          if [[ "$POLICY_ACCEPTED" != 'true' ]]; then
+            node scripts/lib/rolling-ci-fx.mjs hosted-terminal \
+              --plan "$RUNNER_TEMP/hosted-repair/plan.json" \
+              --outcome stale_policy_base \
+              --output "$RUNNER_TEMP/hosted-repair/terminal.json" >/dev/null
+            TERMINAL_B64=$(base64 -w0 < "$RUNNER_TEMP/hosted-repair/terminal.json" 2>/dev/null || base64 < "$RUNNER_TEMP/hosted-repair/terminal.json" | tr -d '\n')
+            echo "terminal_b64=$TERMINAL_B64" >> "$GITHUB_OUTPUT"
+          fi
       - name: Generate Jovie-only short-lived writer token
         id: app-token
+        if: steps.policy.outputs.accepted == 'true'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
@@ -535,6 +905,7 @@ jobs:
           permission-pull-requests: read
       - name: Revalidate and atomically update exact PR branch
         id: commit
+        if: steps.policy.outputs.accepted == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           STATUS_TOKEN: ${{ github.token }}
@@ -547,6 +918,8 @@ jobs:
             --patch "$RUNNER_TEMP/hosted-repair/repair.patch" \
             --files "$RUNNER_TEMP/hosted-repair/files" \
             --output "$RUNNER_TEMP/hosted-repair/terminal.json"
+          COMMIT_OUTCOME=$(jq -r '.outcome' "$RUNNER_TEMP/hosted-repair/terminal.json")
+          echo "outcome=$COMMIT_OUTCOME" >> "$GITHUB_OUTPUT"
           TERMINAL_B64=$(base64 -w0 < "$RUNNER_TEMP/hosted-repair/terminal.json" 2>/dev/null || base64 < "$RUNNER_TEMP/hosted-repair/terminal.json" | tr -d '\n')
           echo "terminal_b64=$TERMINAL_B64" >> "$GITHUB_OUTPUT"
       - name: Upload acceptance and terminal receipts
@@ -559,6 +932,16 @@ jobs:
             ${{ runner.temp }}/hosted-repair/terminal.json
           if-no-files-found: error
           retention-days: 7
+      - name: Block stale writer policy after publishing its terminal receipt
+        if: steps.policy.outputs.accepted != 'true'
+        run: |
+          echo '::error title=stale_policy_base::Writer policy advanced before token issuance.'
+          exit 1
+      - name: Block atomic writer policy race after publishing its terminal receipt
+        if: steps.commit.outputs.outcome == 'stale_policy_base'
+        run: |
+          echo '::error title=stale_policy_base::Writer policy advanced before the atomic branch update.'
+          exit 1
 
   terminal:
     name: Publish typed terminal receipt
@@ -586,10 +969,14 @@ jobs:
           COMMIT_RESULT: ${{ needs.commit.result }}
           PLAN_B64: ${{ needs.plan.outputs.plan_b64 }}
           PRELAUNCH_GATE_RESULT: ${{ needs.prelaunch_gate.result }}
+          PRELAUNCH_TERMINAL_OUTCOME: ${{ needs.prelaunch_gate.outputs.terminal_outcome }}
           PREPARE_RESULT: ${{ needs.prepare.result }}
+          PREPARE_TERMINAL_OUTCOME: ${{ needs.prepare.outputs.terminal_outcome }}
           TEST_RESULT: ${{ needs.test.result }}
+          TEST_TERMINAL_OUTCOME: ${{ needs.test.outputs.terminal_outcome }}
           TERMINAL_B64: ${{ needs.commit.outputs.terminal_b64 }}
           WRITE_GATE_RESULT: ${{ needs.write_gate.result }}
+          WRITE_GATE_TERMINAL_OUTCOME: ${{ needs.write_gate.outputs.terminal_outcome }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/hosted-terminal"
@@ -597,16 +984,22 @@ jobs:
           if [[ -n "${TERMINAL_B64:-}" ]]; then
             printf '%s' "$TERMINAL_B64" | base64 --decode > "$RUNNER_TEMP/hosted-terminal/terminal.json"
           else
-            outcome=writer_failed
-            if [[ "$PRELAUNCH_GATE_RESULT" != 'success' || "$WRITE_GATE_RESULT" == 'failure' ]]; then
-              outcome=capacity_denied
-            elif [[ "$PREPARE_RESULT" != 'success' ]]; then
-              outcome=executor_failed
-            elif [[ "$TEST_RESULT" != 'success' ]]; then
-              outcome=tests_failed
-            elif [[ "$COMMIT_RESULT" != 'success' ]]; then
-              outcome=writer_failed
-            fi
+            jq -n \
+              --arg prelaunchGateResult "$PRELAUNCH_GATE_RESULT" \
+              --arg prelaunchTerminalOutcome "$PRELAUNCH_TERMINAL_OUTCOME" \
+              --arg prepareResult "$PREPARE_RESULT" \
+              --arg prepareTerminalOutcome "$PREPARE_TERMINAL_OUTCOME" \
+              --arg testResult "$TEST_RESULT" \
+              --arg testTerminalOutcome "$TEST_TERMINAL_OUTCOME" \
+              --arg writeGateResult "$WRITE_GATE_RESULT" \
+              --arg writeGateTerminalOutcome "$WRITE_GATE_TERMINAL_OUTCOME" \
+              --arg commitResult "$COMMIT_RESULT" \
+              '{prelaunchGateResult:$prelaunchGateResult,prelaunchTerminalOutcome:$prelaunchTerminalOutcome,prepareResult:$prepareResult,prepareTerminalOutcome:$prepareTerminalOutcome,testResult:$testResult,testTerminalOutcome:$testTerminalOutcome,writeGateResult:$writeGateResult,writeGateTerminalOutcome:$writeGateTerminalOutcome,commitResult:$commitResult}' \
+              > "$RUNNER_TEMP/hosted-terminal/job-states.json"
+            node scripts/lib/rolling-ci-fx.mjs hosted-resolve-terminal \
+              --input "$RUNNER_TEMP/hosted-terminal/job-states.json" \
+              --output "$RUNNER_TEMP/hosted-terminal/outcome.json" >/dev/null
+            outcome=$(jq -r '.outcome' "$RUNNER_TEMP/hosted-terminal/outcome.json")
             node scripts/lib/rolling-ci-fx.mjs hosted-terminal \
               --plan "$RUNNER_TEMP/hosted-terminal/plan.json" \
               --outcome "$outcome" \
@@ -624,6 +1017,7 @@ jobs:
           COMMENT_B64: ${{ needs.plan.outputs.comment_b64 }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          BOT_COMMENT_AUTHOR: github-actions[bot]
           PR_NUMBER: ${{ needs.plan.outputs.pr_number }}
         run: |
           set -euo pipefail

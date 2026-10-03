@@ -122,15 +122,15 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   GitHub parked the group, not the PR. The same head is not re-enqueued.
   Tell it worked: `list-state` shows no `UNMERGEABLE` members, and the eject
   receipt's description starts with `ejected:`.
-- FX remediator on failed merge_group (JOV-5303): Rolling CI Dispatch accepts
+- FX diagnostic on failed merge_group (JOV-5303): Rolling CI Dispatch accepts
   completed `CI` `workflow_run` events whose producer is `merge_group`,
   resolves the source PR from `gh-readonly-queue/main/pr-<n>-<baseSha>`, and
-  launches FX against that source branch. Tell it worked: a failed merge_group
-  CI run starts Rolling CI Dispatch and reaches `Launch FX remediator`.
-  Runner-class failures (checkout, infra, flake) still launch FX and record a
-  named Actions outcome (`launched` / `repaired` / `skipped_stale` /
-  `writer_missing` / `no_key` / `needs_human`) even when an implementer lease
-  is live or `LIVE_AUTHOR` is blank (JOV-5335).
+  records an exact synthetic-head terminal diagnostic on that PR. It never
+  receives an App token or source-write authority. Tell it worked: a failed
+  merge_group CI run starts Rolling CI Dispatch and records a typed
+  `blocked_executor` receipt with `remoteMutationAllowed=false`. Named outcomes
+  remain `launched` / `repaired` / `skipped_stale` / `writer_missing` /
+  `no_key` / `blocked_executor` / `needs_human` (JOV-5335).
 - Pre-land CHANGELOG prohibition (JOV-5291 / JOV-5378): GitHub's server merge
   ignores local union drivers, so two Unreleased `CHANGELOG.md` edits in one
   group park the later entry. Implementation PRs never edit `CHANGELOG.md`.

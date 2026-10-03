@@ -1196,10 +1196,10 @@ jobs:
 
   staging-deployment-receipt:
     name: Preserve exact staging deployment receipt
-    needs: [deploy-staging, alias-staging, promote-production]
-    # The initial alias is exact and current. Wait for the production mutation
-    # to settle, then reassert the preview because Vercel promotion may retarget
-    # every project domain, including staging.jov.ie, to a production build.
+    needs: [deploy-staging, alias-staging, promote-production, rollback-production]
+    # The initial alias is exact and current. Wait for every production routing
+    # mutation, including a possible rollback, to settle before reasserting the
+    # preview because Vercel may retarget project domains such as staging.jov.ie.
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.alias-staging.result == 'success' && needs.alias-staging.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1317,17 +1317,26 @@ jobs:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_DEPLOYMENT_ID: ${{ needs.deploy-staging.outputs.deploy_id }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           PROMOTION_RESULT: ${{ needs.promote-production.result }}
+          ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
           SOURCE_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           SOURCE_CI_RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
+          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            echo "::error::Refusing a stale staging receipt for $EXPECTED_COMMIT_SHA; current main is $current_main."
+            exit 1
+          fi
           deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
           jq -n \
             --arg schema 'jovie-staging-deployment/v1' \
             --arg repository '${{ github.repository }}' \
             --arg sha "$EXPECTED_COMMIT_SHA" \
+            --arg currentMainSha "$current_main" \
             --arg deploymentId "$EXPECTED_DEPLOYMENT_ID" \
             --arg deploymentUrl "$deployment_url" \
             --arg sourceCiRunId "$SOURCE_CI_RUN_ID" \
@@ -1335,6 +1344,7 @@ jobs:
             --arg controllerRunId '${{ github.run_id }}' \
             --arg controllerRunAttempt '${{ github.run_attempt }}' \
             --arg promotionResult "$PROMOTION_RESULT" \
+            --arg rollbackResult "$ROLLBACK_RESULT" \
             --arg observedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
               schema: $schema,
@@ -1342,6 +1352,7 @@ jobs:
               terminal: true,
               repository: $repository,
               sha: $sha,
+              currentMainSha: $currentMainSha,
               deploymentId: $deploymentId,
               deploymentUrl: $deploymentUrl,
               alias: "staging.jov.ie",
@@ -1351,6 +1362,7 @@ jobs:
               controllerRunId: $controllerRunId,
               controllerRunAttempt: $controllerRunAttempt,
               promotionResult: $promotionResult,
+              rollbackResult: $rollbackResult,
               exactIdentity: "passed",
               routeSmoke: "passed",
               privacy: "robots-block-all-and-http-noindex",

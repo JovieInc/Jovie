@@ -274,11 +274,13 @@ existed. Contract:
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
    `Rolling CI Dispatch` subscribes only to completed `CI` `workflow_run`
-   events for `pull_request` and `merge_group`, then launches Cursor-direct
-   exact-head repair when the implementer lease is not live. It must not
+   events for `pull_request` and `merge_group`. A same-repository
+   `pull_request` may enter the hosted, tested, exact-head writer. A
+   `merge_group` resolves its source PR but is diagnostic-only: it publishes a
+   typed `blocked_executor` receipt with remote mutation disabled and cannot
+   receive an App token or source-write authority. The workflow must not
    subscribe to generic `check_suite` or `check_run` events because its own
-   completed checks can recursively re-enter the dispatcher. It does not
-   check out PR code.
+   completed checks can recursively re-enter the dispatcher.
    `Actions Cache GC` evicts stale or duplicate turbo caches without
    deleting live pnpm, node-cache, or playwright caches.
 5. A new commit or green rerun supersedes obsolete repairs.
