@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+
+import {
+  closeLinearIssueByFingerprint,
+  logRemediationDryRun,
+  remediationTriggersEnabled,
+  upsertLinearIssueByTitleFingerprint,
+} from './lib/linear-issue-intake.mjs';
+
+export const DOCS_DEPLOY_KEY = 'vercel-deploy-failed-jovie-docs';
+export const DOCS_ENVIRONMENT = 'Production – jovie-docs';
+
+export function planDocsDeploy({ status, onMain }) {
+  if (!onMain) return { action: 'skip', key: DOCS_DEPLOY_KEY };
+  if (status === 'failure' || status === 'error') {
+    return { action: 'upsert', key: DOCS_DEPLOY_KEY };
+  }
+  if (status === 'success') return { action: 'resolve', key: DOCS_DEPLOY_KEY };
+  return { action: 'skip', key: DOCS_DEPLOY_KEY };
+}
+
+export function docsShaOnMain(compareStatus) {
+  return compareStatus === 'ahead' || compareStatus === 'identical';
+}
+
+export async function applyDocsDeployPlan(
+  plan,
+  { runId, deploymentUrl, fetchImpl } = {}
+) {
+  if (plan.action === 'skip') return { ok: true, action: 'skip' };
+  if (!remediationTriggersEnabled()) {
+    return logRemediationDryRun({
+      action: plan.action === 'resolve' ? 'resolve' : 'upsert',
+      key: plan.key,
+      fingerprint: plan.key,
+    });
+  }
+  if (plan.action === 'resolve') {
+    return closeLinearIssueByFingerprint({
+      fingerprint: plan.key,
+      labelKey: plan.key,
+      comment: 'jovie-docs production deployment succeeded.',
+      runId,
+      fetchImpl,
+    });
+  }
+  return upsertLinearIssueByTitleFingerprint({
+    fingerprint: plan.key,
+    labelKey: plan.key,
+    title: `P1: jovie-docs production deploy failed (${plan.key})`,
+    description: `The latest Production – jovie-docs deployment whose SHA is on main failed.\n\n${deploymentUrl ?? ''}`,
+    priority: 2,
+    reopenTerminal: true,
+    fetchImpl,
+  });
+}
+
+async function main() {
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
+  if (!token) {
+    console.log(
+      JSON.stringify({ ok: true, action: 'skip', reason: 'missing_token' })
+    );
+    return;
+  }
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+  };
+  const list = await fetch(
+    `https://api.github.com/repos/${repo}/deployments?environment=${encodeURIComponent(DOCS_ENVIRONMENT)}&per_page=5`,
+    { headers }
+  );
+  if (!list.ok) {
+    throw new Error(`docs deployment list failed: ${list.status}`);
+  }
+  const deployments = await list.json();
+  const deployment = Array.isArray(deployments) ? deployments[0] : null;
+  if (!deployment?.sha) {
+    console.log(
+      JSON.stringify({ ok: true, action: 'skip', reason: 'no_deployment' })
+    );
+    return;
+  }
+  const compare = await fetch(
+    `https://api.github.com/repos/${repo}/compare/${deployment.sha}...main`,
+    { headers }
+  );
+  const compareBody = compare.ok ? await compare.json() : null;
+  const onMain = docsShaOnMain(compareBody?.status);
+  const statuses = await fetch(
+    `https://api.github.com/repos/${repo}/deployments/${deployment.id}/statuses?per_page=5`,
+    { headers }
+  );
+  const statusRows = statuses.ok ? await statuses.json() : [];
+  const status = Array.isArray(statusRows) ? statusRows[0]?.state : null;
+  const plan = planDocsDeploy({ status, onMain });
+  const result = await applyDocsDeployPlan(plan, {
+    runId: process.env.GITHUB_RUN_ID,
+    deploymentUrl: deployment.payload?.web_url || deployment.url,
+  });
+  if (!result.ok)
+    throw new Error(`docs deploy intake failed: ${result.reason}`);
+  console.log(JSON.stringify(result));
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(error => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

@@ -318,6 +318,8 @@ export const ServerEnvSchema = z.object({
   RELEASE_COMMUNICATIONS_WEBHOOK_SECRET: z.string().optional(),
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
+  REMEDIATION_TRIGGERS_ENABLED: z.string().optional(),
+  SUMMER_SENTRY_INTAKE_LIVE: z.string().optional(),
   // JOV-7331: internal fleet canary, disabled until deployment approval.
   JOVIE_FLEET_ENABLED: z.enum(['0', '1']).optional(),
   JOVIE_FLEET_LINEAR_TEAM_ID: z.string().uuid().optional(),
@@ -659,6 +661,8 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
+  'REMEDIATION_TRIGGERS_ENABLED',
+  'SUMMER_SENTRY_INTAKE_LIVE',
   'RELEASE_COMMUNICATIONS_WEBHOOK_SECRET',
   'JOVIE_FLEET_ENABLED',
   'JOVIE_FLEET_LINEAR_TEAM_ID',
