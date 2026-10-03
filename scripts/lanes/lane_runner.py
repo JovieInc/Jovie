@@ -4656,6 +4656,7 @@ def graphql_budget() -> tuple[int, str] | None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    disk_guard.ensure_sbin_on_path()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
