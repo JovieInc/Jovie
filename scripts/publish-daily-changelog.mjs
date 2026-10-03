@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
 import {
+  assertTrustedControllerRun,
   checkPublicationBinding,
   planDailyPublication,
 } from './lib/daily-changelog-publication.mjs';
@@ -50,12 +51,7 @@ const run = gh([
   'api',
   `repos/JovieInc/Jovie/actions/runs/${marker.controllerRun}/attempts/${marker.controllerAttempt}`,
 ]);
-if (
-  run.path !== '.github/workflows/production-controller.yml' ||
-  run.head_branch !== 'main' ||
-  run.head_sha !== marker.sha
-)
-  throw new Error('Untrusted controller run');
+assertTrustedControllerRun(marker, run);
 const jobs = gh([
   'api',
   `repos/JovieInc/Jovie/actions/runs/${marker.controllerRun}/attempts/${marker.controllerAttempt}/jobs?per_page=100`,

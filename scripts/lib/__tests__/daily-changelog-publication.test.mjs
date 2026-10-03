@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parseChangelog } from '../changelog-parser.mjs';
 import { collectCustomerCandidates } from '../daily-changelog-collector.mjs';
 import {
+  assertTrustedControllerRun,
   checkPublicationBinding,
   evaluateCustomerNoteContract,
   planDailyPublication,
@@ -40,6 +41,14 @@ const buildInfo = {
   environment: 'production',
 };
 const controller = { verified: true, runId: 123, attempt: 1 };
+const workflowRun = {
+  id: 123,
+  run_attempt: 1,
+  path: '.github/workflows/production-controller.yml',
+  event: 'workflow_run',
+  head_branch: 'main',
+  head_sha: MERGE,
+};
 const candidate = (overrides = {}) => ({
   pr: {
     number: 1,
@@ -191,6 +200,28 @@ describe('customer release metadata', () => {
     expect(readCustomerNote(body({ ...note, ...patch })).reason).toBe(
       'failed-validation'
     );
+  });
+});
+describe('production controller binding', () => {
+  it('trusts the exact workflow-run attempt without treating its policy SHA as the deployment SHA', () => {
+    expect(() => assertTrustedControllerRun(marker, workflowRun)).not.toThrow();
+    for (const changedRun of [
+      { ...workflowRun, id: 124 },
+      { ...workflowRun, run_attempt: 2 },
+      { ...workflowRun, path: '.github/workflows/ci.yml' },
+      { ...workflowRun, event: 'workflow_dispatch' },
+      { ...workflowRun, head_branch: 'feature/untrusted' },
+    ]) {
+      expect(() => assertTrustedControllerRun(marker, changedRun)).toThrow(
+        'Untrusted controller run'
+      );
+    }
+    expect(() =>
+      assertTrustedControllerRun(
+        { ...marker, controllerRun: 'not-a-run' },
+        workflowRun
+      )
+    ).toThrow('Invalid controller run');
   });
 });
 describe('source → published changelog', () => {

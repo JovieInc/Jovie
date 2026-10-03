@@ -139,6 +139,23 @@ export function evaluateCustomerNoteContract({ files, body, createdAt }) {
   };
 }
 
+/** Bind publication to the exact trusted controller attempt that wrote the marker. */
+export function assertTrustedControllerRun(marker, run) {
+  if (
+    !/^\d+$/.test(marker?.controllerRun ?? '') ||
+    !/^\d+$/.test(marker?.controllerAttempt ?? '')
+  )
+    throw new Error('Invalid controller run');
+  if (
+    String(run?.id) !== marker.controllerRun ||
+    String(run?.run_attempt) !== marker.controllerAttempt ||
+    run?.path !== '.github/workflows/production-controller.yml' ||
+    run?.event !== 'workflow_run' ||
+    run?.head_branch !== 'main'
+  )
+    throw new Error('Untrusted controller run');
+}
+
 /** A retained verified marker AND an exact fresh public readback are required. */
 export function assertPublicationBinding(marker, buildInfo, controller) {
   if (
