@@ -115,9 +115,13 @@ describe('merge evidence coverage selection', () => {
     const command = commands.find(
       ([binary, args]) =>
         binary === 'env' &&
+        Array.isArray(args) &&
         args.some(arg => arg.includes('coverage run --branch'))
     );
     expect(command).toBeDefined();
+    if (!command || !Array.isArray(command[1])) {
+      throw new Error('Expected structural Python command arguments');
+    }
     expect(command[1].join(' ')).toContain('scripts/tests/test_hud.py');
     expect(command[1].join(' ')).toContain('scripts/tests/test_doctor.py');
     expect(command[1].join(' ')).toContain(
