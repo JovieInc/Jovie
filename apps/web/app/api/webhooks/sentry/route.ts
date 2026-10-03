@@ -346,6 +346,10 @@ export async function POST(request: NextRequest) {
       culprit,
     });
     if (sentryAction === 'resolved') {
+      // A completed incident must not suppress its next regression. Resolution
+      // retries returned at the independent lease above, so they cannot clear
+      // the lock acquired by a newer regression.
+      await clearRecentDispatch('sentry', dedupeKey);
       return NextResponse.json(
         {
           received: true,
