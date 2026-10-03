@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import JovieKit
 
 /// Terminal chat auth: missing token or a 401 after retry. Not a transport outage.
@@ -62,7 +63,7 @@ final class ChatRepository {
     userID: String,
     webBaseURL: URL,
     workspace: MobileWorkspaceMode = .jovie,
-    activityDonator: (any ConversationActivityDonating)? = LiveConversationActivityDonator(),
+    activityDonator: (any ConversationActivityDonating)? = defaultConversationActivityDonator(),
     identity: NativeChatIdentity? = nil,
     onSessionExpired: @escaping @MainActor (NativeSessionExpiryReceipt) async -> Void = { _ in }
   ) {
