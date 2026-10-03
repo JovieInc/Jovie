@@ -16,7 +16,7 @@ describe('VisibilityAuditReportView', () => {
     const report = screen.getByTestId('visibility-audit-report');
     expect(report).toContainElement(
       screen.getByRole('heading', {
-        level: 1,
+        level: 2,
         name: 'Digital Footprint & Visibility Audit',
       })
     );
@@ -24,6 +24,7 @@ describe('VisibilityAuditReportView', () => {
     expect(screen.getByText(TIM_WHITE_REPORT.evidenceNote ?? '')).toBeVisible();
     expect(
       screen.getByRole('heading', {
+        level: 3,
         name: `DSP Presence (${TIM_WHITE_REPORT.dspPresence.presentCount} Of ${TIM_WHITE_REPORT.dspPresence.registryCount})`,
       })
     ).toBeVisible();
