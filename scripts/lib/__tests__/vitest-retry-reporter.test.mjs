@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import RetryVisibilityReporter, {
+  executionReceipt,
   formatAnnotation,
   toFlakyEntry,
 } from '../vitest-retry-reporter.mjs';
@@ -46,6 +47,12 @@ function runFixture(include, dir) {
         RETRY_FIXTURE_CACHE_DIR: path.join(dir, 'cache'),
         RETRY_FIXTURE_INCLUDE: include,
         RETRY_FIXTURE_OUTPUT: outputFile,
+        GITHUB_REPOSITORY: 'JovieInc/Jovie',
+        GITHUB_SHA: 'a'.repeat(40),
+        GITHUB_RUN_ID: '101',
+        GITHUB_RUN_ATTEMPT: '1',
+        GITHUB_EVENT_NAME: 'merge_group',
+        GITHUB_JOB: 'unit-tests',
       },
       stdio: ['ignore', 'pipe', 'inherit'],
     }
@@ -120,6 +127,37 @@ describe('vitest retry visibility reporter (real Vitest run)', () => {
     ]);
     expect(summary).toContain('Flaky unit tests (fixture): 1');
     expect(summary).toContain('fails once then passes');
+  });
+
+  it('emits real module execution and source hashes alongside existing flake visibility', () => {
+    for (const { report } of [flakyRun, cleanRun]) {
+      expect(report.schemaVersion).toBe(2);
+      expect(report.complete).toBe(true);
+      expect(report.run).toEqual({
+        repository: 'JovieInc/Jovie',
+        headSha: 'a'.repeat(40),
+        runId: 101,
+        runAttempt: 1,
+        event: 'merge_group',
+        job: 'unit-tests',
+      });
+      expect(report.executions).toHaveLength(1);
+      expect(report.executions[0].fileHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(report.executions[0].complete).toBe(true);
+      expect(report.executions[0].skippedCount).toBe(0);
+      expect(report.executions[0].executedCount).toBeGreaterThan(0);
+    }
+    expect(flakyRun.report.executions[0].outcome).toBe('flaky');
+    expect(flakyRun.report.executions[0].retryCount).toBe(1);
+    expect(flakyRun.report.executions[0].failures).toEqual([
+      expect.objectContaining({
+        name: 'fails once then passes',
+        outcome: 'flaky',
+        error: expect.stringContaining('greater than 1'),
+      }),
+    ]);
+    expect(cleanRun.report.executions[0].outcome).toBe('clean');
+    expect(cleanRun.report.executions[0].retryCount).toBe(0);
   });
 
   it('records no flaky entries, warnings or summary for a clean run', () => {
@@ -220,5 +258,98 @@ describe('vitest retry visibility reporter (unit)', () => {
     expect(lines.at(-1)).toMatch(
       /^::notice::Flaky-test reporter could not write/
     );
+  });
+});
+
+describe('execution receipt negative cases', () => {
+  /** @param {{ state?: string, testState?: string, retryCount?: unknown, errors?: Array<{message: string}> }} [options] */
+  function moduleFixture({
+    state = 'passed',
+    testState = 'passed',
+    retryCount = 0,
+    errors = [],
+  } = {}) {
+    const root = tempDir();
+    const file = path.join(root, 'test.mjs');
+    fs.writeFileSync(file, 'test source');
+    const module = {
+      moduleId: file,
+      state: () => state,
+      errors: () => errors,
+      children: {
+        allTests: () => [
+          {
+            fullName: 'case',
+            result: () => ({
+              state: testState,
+              errors: testState === 'failed' ? [{ message: 'failure' }] : [],
+            }),
+            diagnostic: () => ({ retryCount }),
+          },
+        ],
+      },
+    };
+    return { root, file, module };
+  }
+  it('refuses absent, foreign and changed-source identities', async () => {
+    const { root, file, module } = moduleFixture();
+    const hash = (await import('node:crypto'))
+      .createHash('sha256')
+      .update('test source')
+      .digest('hex');
+    expect(executionReceipt(module, root, null)).toBeNull();
+    expect(executionReceipt(module, path.join(root, 'other'), hash)).toBeNull();
+    fs.writeFileSync(file, 'changed source');
+    expect(executionReceipt(module, root, hash)).toBeNull();
+  });
+  it('records a failed execution and marks skipped, pending and hook failures incomplete', async () => {
+    const hash = (await import('node:crypto'))
+      .createHash('sha256')
+      .update('test source')
+      .digest('hex');
+    for (const config of [
+      { testState: 'skipped' },
+      { testState: 'pending' },
+      { errors: [{ message: 'hook failure' }] },
+      { state: 'queued' },
+    ]) {
+      const { root, module } = moduleFixture(config);
+      expect(executionReceipt(module, root, hash).complete).toBe(false);
+    }
+    const { root, module } = moduleFixture({
+      state: 'failed',
+      testState: 'failed',
+    });
+    expect(executionReceipt(module, root, hash)).toMatchObject({
+      outcome: 'failed',
+      executedCount: 1,
+      failures: [{ name: 'case', error: 'failure', outcome: 'failed' }],
+    });
+  });
+  it('refuses negative or ambiguous retry counters', async () => {
+    const hash = (await import('node:crypto'))
+      .createHash('sha256')
+      .update('test source')
+      .digest('hex');
+    for (const retryCount of [-1, 0.5, '1']) {
+      const { root, module } = moduleFixture({ retryCount });
+      expect(executionReceipt(module, root, hash)).toBeNull();
+    }
+  });
+  it('never certifies an incomplete reporter callback or an empty run', () => {
+    const root = tempDir();
+    const outputFile = path.join(root, 'report.json');
+    const reporter = new RetryVisibilityReporter({
+      workspaceRoot: root,
+      outputFile,
+      env: {},
+      log: () => {},
+    });
+    reporter.onTestModuleStart({ moduleId: path.join(root, 'missing') });
+    reporter.onTestRunEnd();
+    const report = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+    expect(report.complete).toBe(false);
+    expect(report.run.runId).toBeNull();
+    expect(report.executions).toEqual([]);
   });
 });
