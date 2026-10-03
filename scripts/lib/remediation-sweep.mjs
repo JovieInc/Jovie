@@ -5,7 +5,13 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 export const DRAFT_STALE_MS = 7 * DAY_MS;
 export const EXHAUSTED_MIN_AGE_MS = DAY_MS;
 export const HOLD_IDLE_MS = 7 * DAY_MS;
-export const RECEIPT_STALE_MS = DAY_MS;
+// Summer refreshes provider receipts on its hourly heartbeat (JOV-7545); two missed beats is stale.
+export const RECEIPT_STALE_MS = 2 * 60 * 60 * 1000;
+export const SUMMER_PROVIDER_RECEIPTS = Object.freeze([
+  'githubRead',
+  'linearRead',
+  'gbrainRead',
+]);
 export const EXHAUSTED_LABEL = 'lane-fix-exhausted';
 export const SUMMER_HEALTH_URL = 'https://summer.jov.ie/runtime/v1/health';
 export const VERCEL_TEAM_ID = 'team_bpNDbti6srVLYPKdmQLu4UgT';
@@ -190,35 +196,59 @@ export function newestReceiptAt(health) {
   return times.length === 0 ? null : Math.max(...times);
 }
 
+/**
+ * One condition, one fingerprint: every provider receipt Summer refreshes on its
+ * heartbeat must be younger than RECEIPT_STALE_MS. Each provider is judged on its
+ * own, so a fresh GitHub read never hides a dead Linear or GBrain read, and a
+ * missing or invalid timestamp is stale. `commissioned` is not this signal: it
+ * stays false until the commissioning ledgers exist (JOV-5853) and is the
+ * gate-7 exit check on Summer's critical-path spine (JOV-7702).
+ */
 export function evaluateSummerHealth(health, nowMs) {
   if (!health || typeof health !== 'object' || Array.isArray(health)) {
-    return { stale: false, reason: 'unreadable-health', newestReceiptAt: null };
-  }
-  const newest = newestReceiptAt(health);
-  if (health.commissioned === false) {
     return {
       stale: true,
-      reason: 'commissioned-false',
-      newestReceiptAt: newest,
+      reason: 'unreadable-health',
+      providers: [],
+      newestReceiptAt: null,
     };
   }
-  if (newest != null && nowMs - newest > RECEIPT_STALE_MS) {
-    return {
-      stale: true,
-      reason: 'receipt-older-than-24h',
-      newestReceiptAt: newest,
-    };
-  }
-  return { stale: false, reason: 'fresh', newestReceiptAt: newest };
+  const freshness =
+    health.receiptFreshness && typeof health.receiptFreshness === 'object'
+      ? health.receiptFreshness
+      : {};
+  const providers = SUMMER_PROVIDER_RECEIPTS.map(name => {
+    const observedAt = freshness[name]?.observedAt ?? null;
+    const parsed = Date.parse(observedAt ?? '');
+    const status = !Number.isFinite(parsed)
+      ? 'missing'
+      : nowMs - parsed > RECEIPT_STALE_MS
+        ? 'stale'
+        : 'fresh';
+    return { name, status, observedAt };
+  });
+  const stale = providers.filter(provider => provider.status !== 'fresh');
+  return {
+    stale: stale.length > 0,
+    reason:
+      stale.length > 0
+        ? `provider-receipts-stale:${stale.map(provider => provider.name).join(',')}`
+        : 'fresh',
+    providers,
+    newestReceiptAt: newestReceiptAt(health),
+  };
 }
 
 export function planSummerReceipts(health, nowMs) {
   const evaluation = evaluateSummerHealth(health, nowMs);
   if (!evaluation.stale) return null;
   const fingerprint = 'remediation:summer-receipts-stale';
-  const newest = Number.isFinite(evaluation.newestReceiptAt)
-    ? new Date(evaluation.newestReceiptAt).toISOString()
-    : 'none';
+  const rows = evaluation.providers
+    .map(
+      provider =>
+        `- ${provider.name}: ${provider.status} (observedAt ${provider.observedAt ?? 'none'})`
+    )
+    .join('\n');
   return issue({
     fingerprint,
     summary: 'Summer receipts are stale',
@@ -226,7 +256,14 @@ export function planSummerReceipts(health, nowMs) {
     reason: evaluation.reason,
     description: note(
       fingerprint,
-      `JOV-7545. ${evaluation.reason}. commissioned=${String(health?.commissioned)}. Newest receipt ${newest}.`
+      [
+        `JOV-7545. ${evaluation.reason}. Window ${RECEIPT_STALE_MS / 3_600_000}h.`,
+        rows,
+        'Summer refreshes these receipts on its hourly summer-bottleneck-heartbeat (JovieInc/summer-config apps/summer, refreshCapabilityReceipts). Check jovie-eve-shadow production logs for `capabilityReceipts` on that schedule: a missing line means the heartbeat did not run; a `failed` list names the provider read to repair.',
+        `commissioned=${String(health?.commissioned)} is not this signal; it is the gate-7 check on the critical path (JOV-7702, JOV-5853).`,
+      ]
+        .filter(Boolean)
+        .join('\n')
     ),
   });
 }
