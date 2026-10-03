@@ -35,7 +35,9 @@ vi.mock('@/features/profile/artist-notifications-cta', () => ({
 }));
 
 vi.mock('@/features/release/ReleaseCountdown', () => ({
-  ReleaseCountdown: () => <div data-testid='release-countdown'>Countdown</div>,
+  ReleaseCountdown: () => (
+    <div data-testid='release-countdown-inner'>Countdown</div>
+  ),
 }));
 
 vi.mock('@/features/release/SmartLinkPagePrimitives', () => ({

@@ -9,7 +9,8 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 /**
  * Shared "show off your profile" bento: a gradient hero card holding a phone
  * preview of the live public profile. Reused by the chat profile rail (view
- * mode, with action footer) and onboarding (with a DSP-match overlay).
+ * mode, with action footer) and onboarding (with the DSP-match strip under
+ * the phone).
  *
  * ponytail: one component with optional slots instead of two near-duplicate
  * gradient-card-with-phone blocks. Callers supply the artist/links they already
@@ -26,7 +27,10 @@ export interface ProfilePreviewBentoProps {
   readonly showLiveBadge?: boolean;
   /** Top-right node (e.g. the More dropdown trigger). */
   readonly topRight?: ReactNode;
-  /** Absolutely-positioned bottom overlay inside the hero (e.g. DSP strip). */
+  /**
+   * In-flow content under the phone (e.g. the onboarding DSP strip).
+   * Kept out of the phone box so it cannot cover the preview CTA.
+   */
   readonly overlay?: ReactNode;
   /** Caption under the phone (e.g. "Your live profile"). */
   readonly caption?: ReactNode;
@@ -95,12 +99,59 @@ export function ProfilePreviewBento({
   phonePreviewTestId,
   surfaceTestId,
 }: ProfilePreviewBentoProps) {
+  const phone = (
+    <PhoneFrame
+      className={cn(
+        'relative z-10',
+        overlay ? 'max-h-full' : null,
+        phoneFrameClassName
+      )}
+    >
+      <div
+        className='h-full w-full'
+        style={coverVars ?? DEFAULT_COVER_VARS}
+        data-testid={phonePreviewTestId}
+      >
+        <ProfileCompactSurface
+          renderMode='preview'
+          presentation='embedded'
+          artist={artist}
+          socialLinks={socialLinks}
+          contacts={[]}
+          showPayButton={false}
+          genres={genres}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode='profile'
+          onDrawerOpenChange={() => {}}
+          onDrawerViewChange={() => {}}
+          onBack={() => {}}
+          onOpenMenu={() => {}}
+          onPlayClick={() => {}}
+          onShare={() => {}}
+          onModeSelect={() => {}}
+          profileHref={profileHref}
+          dataTestId={surfaceTestId}
+          isSubscribed={isSubscribed}
+          hideBackButton
+          hideJovieBranding
+          hideMoreMenu
+          renderInteractiveOverlays={false}
+          renderSemanticHeading={false}
+          headerSocialLinksOverride={[]}
+          resolveNearbyTour={false}
+        />
+      </div>
+    </PhoneFrame>
+  );
+
   return (
     <div className={cn('flex flex-col', className)} data-testid={dataTestId}>
       <div
         className={cn(
           'relative flex justify-center overflow-hidden',
           phoneAlign === 'top' ? 'items-start' : 'flex-1 items-center',
+          overlay && 'min-h-0 flex-col items-stretch justify-start',
           heroClassName
         )}
         style={heroStyle ?? DEFAULT_HERO_STYLE}
@@ -117,43 +168,16 @@ export function ProfilePreviewBento({
           <div className='absolute right-3.5 top-3.5 z-20'>{topRight}</div>
         )}
 
-        <PhoneFrame className={cn('relative z-10', phoneFrameClassName)}>
-          <div
-            className='h-full w-full'
-            style={coverVars ?? DEFAULT_COVER_VARS}
-            data-testid={phonePreviewTestId}
-          >
-            <ProfileCompactSurface
-              renderMode='preview'
-              presentation='embedded'
-              artist={artist}
-              socialLinks={socialLinks}
-              contacts={[]}
-              showPayButton={false}
-              genres={genres}
-              drawerOpen={false}
-              drawerView='menu'
-              activeMode='profile'
-              onDrawerOpenChange={() => {}}
-              onDrawerViewChange={() => {}}
-              onBack={() => {}}
-              onOpenMenu={() => {}}
-              onPlayClick={() => {}}
-              onShare={() => {}}
-              onModeSelect={() => {}}
-              profileHref={profileHref}
-              dataTestId={surfaceTestId}
-              isSubscribed={isSubscribed}
-              hideBackButton
-              hideJovieBranding
-              hideMoreMenu
-              renderInteractiveOverlays={false}
-              renderSemanticHeading={false}
-              headerSocialLinksOverride={[]}
-              resolveNearbyTour={false}
-            />
+        {overlay ? (
+          <div className='flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-3'>
+            <div className='flex min-h-0 w-full flex-auto items-center justify-center'>
+              {phone}
+            </div>
+            <div className='relative z-20 shrink-0'>{overlay}</div>
           </div>
-        </PhoneFrame>
+        ) : (
+          phone
+        )}
 
         {showBottomFade && (
           <div
@@ -161,7 +185,6 @@ export function ProfilePreviewBento({
             style={BOTTOM_FADE_STYLE}
           />
         )}
-        {overlay}
       </div>
 
       {caption && (

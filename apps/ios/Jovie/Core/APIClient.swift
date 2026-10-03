@@ -34,9 +34,17 @@ enum IOSPushEnvironment: String, Encodable, Sendable {
 protocol TokenProviding: Sendable {
   func bearerToken(forceRefresh: Bool) async throws -> String
   func requestAuthorization(forceRefresh: Bool) async throws -> NativeRequestAuthorization
+  func ownedRequestAuthorization(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) async throws
+    -> NativeRequestAuthorization
 }
 
 extension TokenProviding {
+  func ownedRequestAuthorization(for _: String, ifOwnedBy _: NativeSessionOwnership) async throws
+    -> NativeRequestAuthorization
+  {
+    NativeRequestAuthorization(unmanagedBearerToken: try await bearerToken(forceRefresh: false))
+  }
+
   func requestAuthorization(forceRefresh: Bool) async throws -> NativeRequestAuthorization {
     NativeRequestAuthorization(
       unmanagedBearerToken: try await bearerToken(forceRefresh: forceRefresh)
@@ -55,6 +63,7 @@ extension TokenProviding {
 
 protocol APIClientProtocol: Sendable {
   func fetchMe() async throws -> MobileMeResponse
+  func fetchMe(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) async throws -> MobileMeResponse
   func fetchAppleWalletProfilePass() async throws -> Data
   func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse
   func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse
@@ -73,6 +82,10 @@ enum SummerCardDecisionResult: Equatable, Sendable {
 }
 
 extension APIClientProtocol {
+  func fetchMe(for _: String, ifOwnedBy _: NativeSessionOwnership) async throws -> MobileMeResponse {
+    try await fetchMe()
+  }
+
   func decideSummerCard(
     cardID _: String,
     decision _: SummerCardDecision,
@@ -158,6 +171,10 @@ struct APIClient: APIClientProtocol, Sendable {
 
   func fetchMe() async throws -> MobileMeResponse {
     try await sendMeRequest(forceRefresh: false)
+  }
+
+  func fetchMe(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) async throws -> MobileMeResponse {
+    try await sendMeRequest(forceRefresh: false, ifOwnedBy: ownership, userID: userID)
   }
 
   func registerPushDevice(
@@ -451,11 +468,23 @@ struct APIClient: APIClientProtocol, Sendable {
 
   private func sendMeRequest(
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    ifOwnedBy ownership: NativeSessionOwnership? = nil,
+    userID: String? = nil,
+    authorizationOverride: NativeRequestAuthorization? = nil
   ) async throws -> MobileMeResponse {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
-    )
+    let authorization: NativeRequestAuthorization
+    if let authorizationOverride {
+      authorization = authorizationOverride
+    } else if let ownership {
+      guard let userID else { throw NativeSessionRequestError.superseded }
+      try Task.checkCancellation()
+      authorization = try await tokenProvider.ownedRequestAuthorization(for: userID, ifOwnedBy: ownership)
+    } else {
+      authorization = try await resolveAuthorization(
+        forceRefresh: forceRefresh, tokenOverride: tokenOverride
+      )
+    }
     let token = authorization.bearerToken
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/me"))
     request.httpMethod = "GET"
@@ -473,14 +502,33 @@ struct APIClient: APIClientProtocol, Sendable {
     do {
       (data, response) = try await session.data(for: request)
     } catch let error as URLError {
+      if ownership != nil, error.code == .cancelled { throw CancellationError() }
       throw APIClientError.transportFailed(code: error.code.rawValue)
     } catch {
+      if ownership != nil, error is CancellationError { throw error }
       throw APIClientError.invalidResponse
     }
 
     guard let httpResponse = response as? HTTPURLResponse else {
       MobileAuthDiagnostics.record("mobile_me_invalid_response")
       throw APIClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401, let ownership {
+      let retry: NativeRequestAuthorization
+      if authorization.isManaged {
+        retry = try NativeSessionTokenStore.resolveUnauthorized(
+          authorizedBy: authorization, allowRetry: !forceRefresh
+        )
+      } else {
+        guard !forceRefresh else { throw APIClientError.requestFailed(statusCode: 401) }
+        retry = NativeRequestAuthorization(
+          unmanagedBearerToken: try await tokenProvider.refreshedBearerToken(after: token)
+        )
+      }
+      return try await sendMeRequest(
+        forceRefresh: true, ifOwnedBy: ownership, userID: userID, authorizationOverride: retry
+      )
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
@@ -501,6 +549,8 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     NativeSessionTokenStore.refresh(from: response, authorizedBy: authorization)
+
+    if ownership != nil { try Task.checkCancellation() }
 
     do {
       MobileAuthDiagnostics.record(

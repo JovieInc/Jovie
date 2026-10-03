@@ -114,7 +114,7 @@ export const DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE = Object.fromEntries([
   ...routes('editor', '/app/chat,/app/admin/chat,/app/admin/share-studio'),
   ...routes(
     'settings',
-    '/app/settings/account,/app/settings/analytics,/app/settings/artist-profile,/app/settings/audience,/app/settings/billing,/app/settings/connectors,/app/settings/contacts,/app/settings/data-privacy,/app/settings/referral,/app/settings/retargeting-ads,/app/settings/touring,/app/settings/usage,/app/admin/investors/settings'
+    '/app/settings/account,/app/settings/analytics,/app/settings/artist-profile,/app/settings/audience,/app/settings/billing,/app/settings/connectors,/app/settings/contacts,/app/settings/data-privacy,/app/settings/retargeting-ads,/app/settings/touring,/app/settings/usage,/app/admin/investors/settings'
   ),
   ...routes('profile', '/app/presence'),
   ...routes(

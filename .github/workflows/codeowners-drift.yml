@@ -1,0 +1,42 @@
+name: CODEOWNERS Path Drift
+
+# Fail when a CODEOWNERS pattern matches no tracked file. On main, file or
+# reopen remediation:codeowners-drift. Pull requests only fail the check.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: codeowners-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: Match CODEOWNERS patterns to tracked files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Check CODEOWNERS patterns
+        run: node scripts/codeowners-drift.mjs --out codeowners-drift.json
+
+      - name: Upsert remediation:codeowners-drift on main
+        if: ${{ failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node scripts/codeowners-drift.mjs --file-linear --report codeowners-drift.json
