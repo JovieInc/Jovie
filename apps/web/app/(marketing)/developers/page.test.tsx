@@ -16,7 +16,7 @@ describe('DevelopersPage', () => {
     render(<DevelopersPage />);
 
     expect(
-      screen.getByRole('heading', { name: 'Public artist data, in the open.' })
+      screen.getByRole('heading', { name: 'Public profile data, in the open.' })
     ).toBeInTheDocument();
     expect(
       screen.getByText('curl https://jov.ie/api/v1/{username}')
@@ -39,7 +39,7 @@ describe('DevelopersPage', () => {
 
     expect(
       screen.getByText(
-        /anonymous GET access to data an artist has made public/i
+        /anonymous GET access to data a creator has made public/i
       )
     ).toBeInTheDocument();
     expect(

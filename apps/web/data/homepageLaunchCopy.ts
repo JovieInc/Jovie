@@ -86,7 +86,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
         key: 'import',
         number: '01',
         title: 'Your catalog, in one place',
-        body: 'Releases, assets, links, dates, fans, and stream history come together automatically.',
+        body: 'Releases, assets, links, dates, audience, and stream history come together automatically.',
       },
       {
         key: 'publish',
@@ -112,7 +112,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
       {
         number: '',
         title: 'Underexposed releases.',
-        body: 'Songs gaining momentum that have no presave page or fan capture set up.',
+        body: 'Songs gaining momentum that have no presave page or audience capture set up.',
       },
       {
         number: '',
@@ -133,22 +133,22 @@ export const HOMEPAGE_LAUNCH_COPY = {
   intentBand: {
     eyebrow: 'Ask Jovie',
     headline: 'Turn the next release into a working plan.',
-    body: 'Use the prompt when you want Jovie to draft the release plan, profile updates, and fan captures after you have seen the product surface.',
+    body: 'Use the prompt when you want Jovie to draft the release plan, profile updates, and audience captures after you have seen the product surface.',
   },
   profileProof: {
-    headline: 'Artist profiles built to convert.',
-    body: 'A Jovie profile is not another link list. It routes fans to the right action and keeps the signal for the next release.',
+    headline: 'Creator profiles built to convert.',
+    body: 'A Jovie profile is not another link list. It routes the audience to the right action and keeps the signal for the next release.',
     items: [
       'Listen links stay synced across DSPs.',
       'Presaves, shows, merch, and contact live in the same presence.',
-      'Fan capture builds a list you can use again.',
+      'Audience capture builds a list you can use again.',
       'Analytics show what moved before the next Friday.',
     ],
   },
   artistProfiles: {
-    headline: 'Artist profiles',
+    headline: 'Creator profiles',
     headlineAccent: 'Built to convert',
-    subhead: 'Streams. Fans. Shows. Payments. Drops.',
+    subhead: 'Streams. Audience. Shows. Payments. Drops.',
     cards: [
       {
         id: 'get-paid',
@@ -164,7 +164,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
       },
       {
         id: 'capture-fans',
-        title: 'Capture Fans',
+        title: 'Capture Audience',
         screenshotScenarioId: 'tim-white-profile-subscribe-mobile',
         glow: 'violet',
       },
@@ -220,8 +220,8 @@ export const HOMEPAGE_LAUNCH_COPY = {
         accent: 'cyan',
       },
       {
-        title: 'Fan notifications',
-        body: 'Fans opt in once. Jovie brings them back for the next song or show.',
+        title: 'Audience notifications',
+        body: 'The audience opts in once. Jovie brings them back for the next song or show.',
         accent: 'blue',
       },
     ],
@@ -230,7 +230,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
     {
       question: 'What does Jovie actually do?',
       answer:
-        'Connect your music. Jovie watches your catalog, fans, and stream movement, then surfaces specific opportunities. A release worth a presave. A playlist that fits your sound. A fan moment to capture.',
+        'Connect your music. Jovie watches your catalog, audience, and stream movement, then surfaces specific opportunities. A release worth a presave. A playlist that fits your sound. An audience moment to capture.',
     },
     {
       question: 'Is Jovie a distributor?',
@@ -250,12 +250,12 @@ export const HOMEPAGE_LAUNCH_COPY = {
     {
       question: 'How does Jovie know what is worth surfacing?',
       answer:
-        'It watches every track in your catalog every day. Streams, fan moments, playlist movement, and editorial activity all feed the model.',
+        'It watches every track in your catalog every day. Streams, audience moments, playlist movement, and editorial activity all feed the model.',
     },
     {
       question: 'Who is Jovie for?',
       answer:
-        'Artists with a catalog already out and the team around them. Built for the work between drops and during launch week.',
+        'Creators with a catalog already out and the team around them. Built for the work between drops and during launch week.',
     },
   ],
 } as const;
@@ -264,10 +264,10 @@ export const HOMEPAGE_HERO_CAROUSEL_SLIDES: readonly HomepageHeroCarouselSlide[]
   [
     {
       id: 'profile-presence',
-      label: 'Artist Profile',
-      headline: 'A profile that looks ready before fans arrive.',
+      label: 'Creator Profile',
+      headline: 'A profile that looks ready before the audience arrives.',
       description:
-        'Show the full artist presence on desktop and the mobile view fans actually open.',
+        'Show the full creator presence on desktop and the mobile view the audience actually opens.',
       desktopScreenshotKey: 'public-profile-desktop',
       mobileScreenshotKey: 'public-profile-mobile',
       ctaAnchor: '#artist-profiles',
@@ -275,7 +275,7 @@ export const HOMEPAGE_HERO_CAROUSEL_SLIDES: readonly HomepageHeroCarouselSlide[]
     {
       id: 'release-command',
       label: 'Release Workspace',
-      headline: 'The launch plan stays beside the fan experience.',
+      headline: 'The launch plan stays beside the audience experience.',
       description:
         'Tasks, presaves, copy, and release timing stay in one place instead of another scattered checklist.',
       desktopScreenshotKey: 'release-tasks-desktop',
@@ -284,10 +284,10 @@ export const HOMEPAGE_HERO_CAROUSEL_SLIDES: readonly HomepageHeroCarouselSlide[]
     },
     {
       id: 'fan-routing',
-      label: 'Fan Routing',
+      label: 'Audience Routing',
       headline: 'Every click can become a cleaner next move.',
       description:
-        'Track links, capture intent, and route each fan to the action that matters for this release.',
+        'Track links, capture intent, and route the audience to the action that matters for this release.',
       desktopScreenshotKey: 'artist-spec-tracked-links-desktop',
       mobileScreenshotKey: 'tim-white-profile-subscribe-mobile',
       ctaAnchor: '#artist-profiles',
@@ -297,7 +297,7 @@ export const HOMEPAGE_HERO_CAROUSEL_SLIDES: readonly HomepageHeroCarouselSlide[]
       label: 'Audience Signal',
       headline: 'See what moved before the next Friday.',
       description:
-        'Geography, traffic quality, and fan action stay connected to the profile and release plan.',
+        'Geography, traffic quality, and audience action stay connected to the profile and release plan.',
       desktopScreenshotKey: 'artist-spec-geo-insights-desktop',
       mobileScreenshotKey: 'tim-white-profile-listen-mobile',
       ctaAnchor: '#pricing',
