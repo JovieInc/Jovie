@@ -97,12 +97,13 @@ def index_locked(path: Path) -> bool:
         return False
 
 
-def lsof_command() -> str:
+def ensure_sbin_on_path(environ=os.environ) -> None:
     """launchd's PATH omits /usr/sbin, where macOS ships lsof; without it every
-    liveness check fails closed and no cleanup ever runs."""
-    if shutil.which("lsof") is None and Path("/usr/sbin/lsof").exists():
-        return "/usr/sbin/lsof"
-    return "lsof"
+    liveness check fails closed and no cleanup ever runs. Entry points call this
+    so `lsof` resolves by name for the whole process tree."""
+    parts = environ.get("PATH", "").split(os.pathsep)
+    if "/usr/sbin" not in parts:
+        environ["PATH"] = os.pathsep.join([p for p in parts if p] + ["/usr/sbin"])
 
 
 def busy_reason(path: Path, run=subprocess.run) -> str | None:
@@ -115,7 +116,7 @@ def busy_reason(path: Path, run=subprocess.run) -> str | None:
     if index_locked(path):
         return "git-index-locked"
     try:
-        active = run([lsof_command(), "-nP", "-a", "-d", "cwd", "-F", "pn"],
+        active = run(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
                      capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return "process-state-unavailable"
