@@ -2843,6 +2843,8 @@ class FixRedTest(unittest.TestCase):
         posted = []
         lane.sh = lambda args, **k: posted.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
         linear = FakeLinear([])
+        real_healthy = lane.provider_healthy
+        lane.provider_healthy = lambda spec: bool(spec.get("enabled", True))
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
@@ -2864,6 +2866,7 @@ class FixRedTest(unittest.TestCase):
                 lane.escalate_exhausted(host, [stuck], linear)
             finally:
                 lane.sh = real
+                lane.provider_healthy = real_healthy
                 os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
             self.assertEqual(linear.triaged, [], "a terminal outcome is not generic Triage inventory (JOV-7089)")
             self.assertEqual(linear.moves, [("id-JOV-7", "Backlog")],
