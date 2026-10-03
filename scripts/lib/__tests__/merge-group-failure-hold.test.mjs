@@ -1087,7 +1087,10 @@ describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
             state: 'OPEN',
             headRefOid: SOURCE,
             isInMergeQueue: queued,
-            mergeQueueEntry: queued ? { id: 'MQE' } : null,
+            // The failed group is the live entry: not a superseded run.
+            mergeQueueEntry: queued
+              ? { id: 'MQE', headCommit: { oid: GROUP } }
+              : null,
             autoMergeRequest: null, // GitHub's lagging read
           }),
           dequeuePullRequest: async () => {
@@ -1119,6 +1122,28 @@ describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
     expect(enqueues).toBe(1);
     // One failure, one hold: the loop never reaches a second merge group.
     expect(statuses).toHaveLength(1);
+  });
+
+  it('never disables auto-merge for a superseded run, even when the read hides it', async () => {
+    const disableAutoMerge = vi.fn();
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: true,
+        mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: 'f'.repeat(40) } },
+        autoMergeRequest: null,
+      })),
+      dequeuePullRequest: vi.fn(),
+      disableAutoMerge,
+    });
+    expect(result).toMatchObject({
+      superseded: true,
+      autoMergeDisabled: false,
+    });
+    expect(disableAutoMerge).not.toHaveBeenCalled();
   });
 
   it('still fails closed when disabling auto-merge hits a genuine error', async () => {
