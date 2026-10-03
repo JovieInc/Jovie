@@ -16,11 +16,12 @@ async function solidImage(format: 'png' | 'avif' | 'webp'): Promise<Buffer> {
 }
 
 function stubFetch(body: Uint8Array, contentType: string) {
+  const bytes = new Uint8Array(body);
   vi.stubGlobal(
     'fetch',
     vi.fn(
       async () =>
-        new Response(body, {
+        new Response(bytes.buffer, {
           status: 200,
           headers: { 'content-type': contentType },
         })
