@@ -74,6 +74,14 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # This job's only credential is the Jovie Bot installation token below.
+      # It is minted with actions, contents, pull-requests, and statuses — not
+      # merge_queues. dequeuePullRequest then returns "Resource not accessible by integration".
+      # GitHub already removes a PR when its merge_group run fails, so the hold
+      # script treats that denial and a "not in queue" response as a logged
+      # non-fatal outcome and still writes the hold. Do not add
+      # permission-merge-queues unless the installation already has it: an
+      # ungranted permission fails token mint before the hold is written.
       - name: Generate Jovie Bot failure-hold token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0

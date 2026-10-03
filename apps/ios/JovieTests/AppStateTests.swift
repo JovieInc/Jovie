@@ -2349,7 +2349,7 @@ extension AppStateTests {
   @Test(arguments: ProfileCompletion.allCases)
   func oldNetworkCompletionCannotPublishOrClearSameUserReplacementLoad(completion: ProfileCompletion) async throws {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
-      _ = try saveSession()
+      let original = try saveSession()
       let oldLoad = ProfileLoadGate()
       let newLoad = ProfileLoadGate()
       let firstResult: Result<MeRepositoryResult, Error>
@@ -2363,6 +2363,7 @@ extension AppStateTests {
       let state = makeState(repository)
       let oldTask = Task { await state.handleSignedInUserChange("same-user") }
       await oldLoad.waitUntilEntered()
+      #expect(state.activeSessionOwnership == original.ownership)
       let replacement = try saveSession()
       let newTask = Task {
         await state.handleSignedInUserChange("same-user")
@@ -2377,11 +2378,14 @@ extension AppStateTests {
         await newTask.value
         return
       }
+      #expect(state.activeSessionOwnership == replacement.ownership)
+      #expect(state.activeSessionOwnership != original.ownership)
       // A mismatched callback must not replace B's pending attempt or its dedupe marker.
       await state.handleSignedInUserChange("obsolete-user")
       #expect(state.activeUserID == "same-user")
       await oldLoad.complete(true)
       await oldTask.value
+      #expect(state.activeSessionOwnership == replacement.ownership)
       #expect(state.route == .ready)
       #expect(state.dashboardState == .loading)
       #expect(!state.isOffline)
@@ -2441,11 +2445,14 @@ extension AppStateTests {
       NativeSessionTokenStore.refresh(from: response, authorizedBy: original)
       await state.handleSignedInUserChange("same-user")
       #expect(await repository.loadCount() == 1)
+      #expect(state.activeSessionOwnership == original.ownership)
       await gate.complete(true)
       await task.value
       #expect(state.route == .ready)
       #expect(state.dashboardState == .loaded(.previewReady))
       #expect(NativeSessionTokenStore.load()?.token == "rotated-token")
+      await state.handleSignedInUserChange(nil)
+      #expect(state.activeSessionOwnership == nil)
     }
   }
 
@@ -2924,6 +2931,98 @@ extension AppStateTests {
       await newTask.value
       #expect(state.activeUserID == nil)
       #expect(NativeSessionTokenStore.load() == nil)
+    }
+  }
+}
+
+@MainActor
+private final class ChatReceiptPush: PushNotificationCoordinating {
+  let manager: PushNotificationManager
+  var activation = ProfileLoadGate()
+  init(_ manager: PushNotificationManager) { self.manager = manager }
+  func activate() async {
+    let completion = activation
+    await manager.activate()
+    await completion.complete(true)
+  }
+  func waitForActivation() async -> Bool {
+    let completion = activation
+    let watchdog = Task {
+      do { try await Task.sleep(for: .seconds(5)) } catch { return }
+      await completion.complete(false)
+    }
+    let result = await completion.wait()
+    watchdog.cancel()
+    await watchdog.value
+    return result
+  }
+  func deactivate() async { await manager.deactivate() }
+  func deactivateLocally(ifOwnedBy owner: NativeSessionOwnership) async {
+    await manager.deactivateLocally(ifOwnedBy: owner)
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func discardedWorkspaceRepositoryStillDeliversOnlyItsOriginalExpiry(replaceLogin: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let caches = CleanupCacheHarness()
+      let push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      let awaitedPush = ChatReceiptPush(push.manager)
+      let state = AppState(configuration: .mock, launchMode: .live,
+        repository: MeRepository(apiClient: caches.api, cache: caches.me), brightnessManager: MockBrightnessController(),
+        pushNotifications: awaitedPush, chatCache: caches.chat,
+        audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      await state.handleSignedInUserChange(caches.userID)
+      #expect(await awaitedPush.waitForActivation())
+      push.defaults.set("old-apns", forKey: PushLifecycleHarness.tokenKey)
+      let gate = ProfileLoadGate()
+      let client = OwnedChatTestClient(original, gate: gate, operation: "list")
+      var receiptDeliveries = 0
+      @MainActor func make(_ identity: NativeChatIdentity) -> ChatRepository {
+        ChatRepository(client: client, cache: caches.chat, userID: identity.userID,
+          webBaseURL: URL(string: "https://jov.ie")!, identity: identity,
+          onSessionExpired: { receipt in
+            receiptDeliveries += 1
+            await state.handleExpiredSession(receipt)
+          })
+      }
+      let old = make(NativeChatIdentity(userID: caches.userID, ownership: state.activeSessionOwnership, workspace: .jovie))
+      let request = Task { await old.refreshConversations(); await gate.ownerFinished() }
+      #expect(await gate.waitUntilEntered())
+      let visible = ChatRepository.resolve(old, for: NativeChatIdentity(
+        userID: caches.userID, ownership: state.activeSessionOwnership, workspace: .ovie), create: make)
+      #expect(visible !== old)
+      let receipt: NativeSessionExpiryReceipt
+      do { receipt = try ownedProfileExpiryReceipt(original) } catch {
+        await gate.complete(true); await request.value
+        throw error
+      }
+      if replaceLogin {
+        _ = try saveSession()
+        awaitedPush.activation = ProfileLoadGate()
+        await caches.api.updateMode(.success(.previewNeedsOnboarding))
+        await state.handleSignedInUserChange(caches.userID)
+        #expect(await awaitedPush.waitForActivation())
+        push.defaults.set("new-apns", forKey: PushLifecycleHarness.tokenKey)
+      }
+      await caches.seed(profile: replaceLogin ? .previewNeedsOnboarding : .previewReady)
+      let expected = NativeSessionTokenStore.captureSessionContext()
+      await client.fail(with: NativeSessionRequestError.expired(receipt))
+      request.cancel()
+      await gate.complete(true); await request.value
+      #expect(receiptDeliveries == 1)
+      #expect(state.route == (replaceLogin ? .needsOnboarding : .signedOut))
+      #expect(state.activeSessionOwnership == (replaceLogin ? expected.ownership : nil))
+      #expect(!visible.sessionExpired && !old.sessionExpired && !old.isOffline)
+      #expect(push.unregisterCount == (replaceLogin ? 0 : 1))
+      #expect(push.storedToken == (replaceLogin ? "new-apns" : nil))
+      #expect(await push.service.requests().deletions.isEmpty)
+      await caches.expectContents(present: replaceLogin, profile: .previewNeedsOnboarding)
+      #expect(NativeSessionTokenStore.captureSessionContext() == expected)
     }
   }
 }

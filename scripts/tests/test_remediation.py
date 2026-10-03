@@ -107,6 +107,84 @@ class ClassifierFixtureTest(unittest.TestCase):
         self.assertEqual(remediation.classify_event({"source": "sentry", "evidence": {}})["subtype"], "sentry")
 
 
+class RouterLadderTest(unittest.TestCase):
+    def test_disabled_lanes_including_hyperagent_are_never_chosen(self):
+        catalog = providers()
+        healthy = lambda name, spec: True
+        chosen = remediation.route_lane(catalog, healthy=healthy)
+        self.assertEqual(chosen["lane"], "devin")
+        nxt = remediation.failover(catalog, "devin", "provider-error", healthy=healthy)
+        self.assertEqual(nxt["to"], "codex")
+        self.assertEqual(nxt["reason"], "provider-error")
+        for reason in ("error", "404", "exhausted", "unhealthy"):
+            skipped = remediation.failover(catalog, "codex", reason, exclude={"devin"}, healthy=lambda name, spec: name != "codex")
+            self.assertNotIn(skipped["to"], {"hyperagent", "claude", "grok", "kimi", "codex"})
+            self.assertEqual(skipped["to"], "host-local")
+        self.assertIsNone(remediation.route_lane(
+            {name: spec for name, spec in catalog.items() if name != "host-local"},
+            exclude={"devin", "codex"}, healthy=healthy))
+
+    def test_escalation_picks_a_stronger_tier_then_one_top_rung(self):
+        catalog = providers()
+        healthy = lambda name, spec: True
+        first = remediation.select_escalation_lane(catalog, {"devin"}, healthy=healthy)
+        self.assertEqual((first["lane"], first["topRung"]), ("codex", False))
+        top = remediation.select_escalation_lane(catalog, {"devin", "codex", "host-local"}, healthy=healthy)
+        self.assertEqual((top["lane"], top["topRung"]), ("host-local", True))
+        self.assertIsNone(remediation.select_escalation_lane(
+            catalog, {"devin", "codex", "host-local"}, healthy=healthy, top_rung_used=True))
+
+    def test_deterministic_rungs_spend_no_model_and_caps_stop_the_ladder(self):
+        catalog = providers()
+        record = {}
+        classified = {"cls": "needs-rebase", "subtype": "semantic", "next_action": "update-branch"}
+        plan = remediation.plan_ladder(classified, record, catalog, NOW, HEAD)
+        self.assertEqual(plan["kind"], "deterministic")
+        record = remediation.append_rung(record, rung="update-branch", lane=None, cls="needs-rebase",
+                                         at=NOW, head=HEAD, kind="deterministic", ok=False)
+        self.assertEqual(record.get("count", 0), 0)
+        model = remediation.plan_ladder(classified, record, catalog, NOW, HEAD)
+        self.assertEqual(model["action"], "model")
+        record = remediation.append_rung(record, rung="escalate", lane="devin", cls="needs-rebase",
+                                         at=NOW - 10, head=HEAD, kind="model")
+        record = remediation.append_rung(record, rung="escalate", lane="codex", cls="needs-rebase",
+                                         at=NOW - 10, head=HEAD, kind="model")
+        blocked = remediation.plan_ladder(classified, record, catalog, NOW, HEAD)
+        self.assertEqual(blocked["reason"], "ladder-exhausted")
+        cooled = remediation.append_rung({}, rung="escalate", lane="devin", cls="fixable-by-model",
+                                         at=NOW - 10, head=HEAD, kind="model")
+        wait = remediation.plan_ladder({"cls": "fixable-by-model", "subtype": "check", "next_action": "escalate"},
+                                       cooled, catalog, NOW, HEAD)
+        self.assertEqual(wait["reason"], "cooldown")
+        prior = {"priorEscalations": [{"kind": "model", "head": "old", "at": 1}] * 4, "escalations": []}
+        self.assertEqual(remediation.caps_allow(prior, HEAD, NOW)[1], "ladder-exhausted")
+
+    def test_flag_defaults(self):
+        for name in ("LANES_ESCALATION", "LANES_ESCALATION_NOTIFY_TIM", "LANES_ESCALATION_LIFT_HUMAN_HOLDS"):
+            os.environ.pop(name, None)
+        self.assertTrue(remediation.escalation_enabled())
+        self.assertFalse(remediation.notify_tim())
+        self.assertFalse(remediation.lift_human_holds())
+        self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            plan = remediation.plan_ladder({"cls": "fixable-by-model", "subtype": "check", "next_action": "escalate"},
+                                           {}, providers(), NOW, HEAD)
+            self.assertEqual(plan["reason"], "escalation-disabled")
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+
+    def test_surface_and_hold_nag_dedupe(self):
+        body = remediation.surface_body(pr(number=9), {"cls": "needs-human-decision", "subtype": "hold",
+                                                       "evidence": ["wait"], "next_action": "tim-decides"}, "hold")
+        self.assertIn("symphony-surface pr=9", body)
+        self.assertTrue(remediation.already_surfaced([body], 9, HEAD))
+        self.assertFalse(remediation.already_surfaced([body], 9, "other"))
+        self.assertTrue(remediation.hold_nag_due({}, 9, HEAD, NOW))
+        self.assertFalse(remediation.hold_nag_due({"9": {"head": HEAD, "at": NOW - 10}}, 9, HEAD, NOW))
+        self.assertTrue(remediation.hold_nag_due({"9": {"head": HEAD, "at": NOW - remediation.HOLD_NAG_S - 1}}, 9, HEAD, NOW))
+
+
 class DoctorAndIntakeTest(unittest.TestCase):
     def test_doctor_blocks_count_classes_and_alert(self):
         snapshot = {"classified": [{"pr": 1, "cls": "ready"}, {"pr": 2, "cls": "needs-human-decision"}],
@@ -147,6 +225,19 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIn("ws:reliability", plan["labels"])
         self.assertIsNone(remediation.non_pr_event("workflow_run", {"workflow_run": {
             "event": "pull_request", "conclusion": "failure", "pull_requests": [{"number": 1}]}}))
+
+    def test_registry_keeps_hyperagent_disabled(self):
+        catalog = json_providers()
+        self.assertFalse(catalog["hyperagent"]["enabled"])
+        self.assertFalse(catalog["grok"]["enabled"])
+        self.assertFalse(catalog["kimi"]["enabled"])
+        chosen = remediation.route_lane(catalog, healthy=lambda name, spec: True)
+        self.assertNotEqual(chosen["lane"], "hyperagent")
+        self.assertNotIn("hyperagent", {spec and name for name, spec in catalog.items() if not spec.get("enabled", True)} & {chosen["lane"]})
+def json_providers():
+    import json
+    return json.loads((ROOT / "scripts/lanes/providers.json").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()
