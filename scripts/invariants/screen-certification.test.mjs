@@ -144,6 +144,16 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('registers the money route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/money/page.tsx',
+      'apps/web/app/app/money/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.money');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
     const platforms = [...new Set(gated().map(e => e.platform))].sort();
