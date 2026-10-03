@@ -15,7 +15,8 @@ The harness, not the model, owns:
 |---|---|
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
-| Open-PR budget: a lane holding `slots × 2` open non-green PRs only fixes/adopts until it drains | `over_budget()` |
+| Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
+| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
@@ -90,6 +91,32 @@ JOV-5257 admission serialization. During a drain-safe release update, old worker
 still run their old code; runtime singleflight is proven only after those workers
 and their gate descendants have naturally drained. Never kill or reset their work
 to make an activation claim.
+
+## Workstreams and leverage-first admission (JOV-7514, JOV-7423, JOV-7330, JOV-5555)
+
+Every issue belongs to exactly one workstream (`workstreams.py`). An explicit
+`ws:<key>` Linear label wins; otherwise the first matching rule (labels, then title)
+in classification order; otherwise `general`. Dispatch rank, compounding
+infrastructure first:
+
+`ci` → `symphony-throughput` → `release-deploy` → `reliability` → `security-auth` →
+`ui-ia` → `native-apps` → `chat-agent` → `ovie-ops` → `profiles-marketing` →
+`library-content` → `analytics-gtm` → `docs-changelog` → `lyb` → `memory-gbrain` →
+`general` → `human-decision`.
+
+`pick_issue()` orders candidates by `admission_order()`: tier 0 is urgent work
+(effective P1, including work aged to P1) or a compounding workstream (CI, Symphony
+throughput); then aged priority; then workstream rank; then age. Urgent-first and
+anti-starvation aging are preserved; a non-urgent CI or throughput fix runs ahead of
+non-urgent product work. The Linear backlog carries the same `ws:*` labels so new
+intake and existing work follow one rule.
+
+Duplicate identity is deliberately exact: titles equal after case, punctuation and
+conventional `bug:`/`P1:` prefixes are stripped (bracketed tags such as `[web-053]`
+are identity). Only the oldest member is admissible; the others are rejected as
+`duplicate-candidate:<JOV>` in the worker and counted under `duplicate-candidate` in
+the doctor census. Near-duplicates are grouped by workstream, never auto-merged.
+Lane reads paginate the Todo pool (up to `LANE_ISSUE_PAGES` × 100).
 
 ## Event queue (JOV-6672)
 
@@ -331,3 +358,31 @@ Re-evaluate when observed dispatches and real workflow/check-in receipts prove
 recurrence, or native scheduling reliably supplies the cadence again. Then:
 remove unnecessary recovery calls while retaining the independent deadman.
 JOV-6909 remains commissioning until recurrence is observed after deployment.
+
+## Design gate (JOV-7541)
+
+UI and landing work does not enter a build lane until a design brief has
+finished the founder's IA-first pipeline (steps 1–9 of
+`docs/design/design-brief-template.md`). Step 2 may cite only certified
+capability ids from `scripts/lanes/certified-capabilities.gen.json`, a
+checked-in projection of `apps/web/data/product-truth/registry.ts`:
+publication `public`, `marketing.proofAuthorized` true, maturity not
+`proposed`, access not `unavailable`.
+
+`design_gate.py` is pure stdlib, no I/O at import. An issue is gated on
+`ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or when title or
+description names a `GATED_PATH_PREFIXES` path or clearly targets a
+homepage, landing, or marketing page. `worker()` calls
+`design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
+gated issue with an incomplete brief is not claimed, and the runner writes
+`needs-design-brief` plus the matching Linear label at most once. The label
+routes a design pass — it does not itself block — and the next claim admits
+the issue once steps 1–9 are complete.
+
+`doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
+`needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
+`rejectedByProvider["needs-design-brief"]`.
+
+CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
+paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
+is truthy, and unreadable briefs stay warnings even then.

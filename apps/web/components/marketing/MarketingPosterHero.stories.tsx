@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, fn, userEvent } from 'storybook/test';
 import { MarketingElectricSeam } from './MarketingElectricSeam';
 import { MarketingPosterHero } from './MarketingPosterHero';
 
@@ -6,6 +7,34 @@ const meta: Meta<typeof MarketingPosterHero> = {
   title: 'Marketing/Sections/MarketingPosterHero',
   component: MarketingPosterHero,
   parameters: { layout: 'fullscreen' },
+  play: async ({ canvasElement, args }) => {
+    for (const [id, cta] of [
+      ['homepage-primary-cta', args.primaryCta],
+      ['homepage-secondary-cta', args.secondaryCta],
+    ] as const) {
+      if (!cta) continue;
+      const link = canvasElement.querySelector<HTMLAnchorElement>(
+        `[data-testid="${id}"]`
+      );
+      if (!link) throw new Error(`The poster hero must render ${id}.`);
+      await expect(link).toHaveAttribute('href', cta.href);
+      if (typeof cta.label === 'string')
+        await expect(link).toHaveAccessibleName(cta.label);
+      link.focus();
+      await expect(link).toHaveFocus();
+      const clicked = fn();
+      link.addEventListener(
+        'click',
+        event => {
+          event.preventDefault();
+          clicked();
+        },
+        { once: true }
+      );
+      await userEvent.click(link);
+      await expect(clicked).toHaveBeenCalledOnce();
+    }
+  },
 };
 
 export default meta;
@@ -34,5 +63,29 @@ export const OverlongHeadline: Story = {
   args: {
     ...Default.args,
     headline: LONG_MARKETING_H1_FIXTURE,
+  },
+};
+
+export const AuthEntryDestinations: Story = {
+  args: {
+    ...Default.args,
+    primaryCta: { label: 'Get started', href: '/start' },
+    secondaryCta: { label: 'Sign in', href: '/signin' },
+  },
+};
+
+export const ExplicitPrefetchChoices: Story = {
+  args: {
+    ...Default.args,
+    primaryCta: { label: 'Get started', href: '/start', prefetch: true },
+    secondaryCta: { label: 'See pricing', href: '/pricing', prefetch: false },
+  },
+};
+
+export const PublicDestinations: Story = {
+  args: {
+    ...Default.args,
+    primaryCta: { label: 'See pricing', href: '/pricing' },
+    secondaryCta: { label: 'Contact', href: '/support' },
   },
 };

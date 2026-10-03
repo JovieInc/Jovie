@@ -1,5 +1,5 @@
 import { BUTTON_PEN_CONTRACT } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
@@ -35,6 +35,85 @@ vi.mock('next/link', () => ({
 }));
 
 describe('Marketing terminal CTA wrappers', () => {
+  it.each([
+    ['/signup?plan=pro', '/signin?returnTo=%2Fapp'],
+    ['/start?source=footer', '/signup?source=secondary'],
+    ['/pricing?from=footer', '/signin?returnTo=%2Fpricing'],
+  ])(
+    'defers terminal auth actions while preserving %s and %s',
+    (primaryHref, secondaryHref) => {
+      render(
+        <MarketingTerminalCta
+          title='Keep your release moving.'
+          ctaLabel='Continue'
+          ctaHref={primaryHref}
+          secondaryLabel='Another option'
+          secondaryHref={secondaryHref}
+          testId='terminal-intent-boundary'
+          penContractId={MARKETING_PEN_CONTRACT_IDS.shell.finalCta}
+        />
+      );
+
+      for (const [name, href] of [
+        ['Continue', primaryHref],
+        ['Another option', secondaryHref],
+      ]) {
+        const link = screen.getByRole('link', { name });
+        const authDestination = /^\/(signup|signin|start)(?:[?#]|$)/.test(
+          href!
+        );
+        expect(link).toHaveAttribute('href', href);
+        expect(link).toHaveAttribute(
+          'data-prefetch',
+          authDestination ? 'false' : 'undefined'
+        );
+        fireEvent.focus(link);
+        fireEvent.mouseEnter(link);
+        expect(link).toHaveAttribute('href', href);
+        expect(link).toHaveAttribute(
+          'data-prefetch',
+          authDestination ? 'false' : 'undefined'
+        );
+      }
+    }
+  );
+
+  it('defers the shared footer signup before and after keyboard focus', () => {
+    render(<MarketingFooterCta />);
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('href', '/signup');
+    expect(link).toHaveAttribute('data-prefetch', 'false');
+    fireEvent.focus(link);
+    fireEvent.mouseEnter(link);
+    expect(link).toHaveAttribute('data-prefetch', 'false');
+  });
+
+  it.each([
+    ['/pricing', undefined, 'undefined'],
+    ['/signup?source=explicit', true, 'true'],
+    ['/api/desktop/download', false, 'false'],
+  ] as const)(
+    'preserves public and explicit terminal prefetch for %s',
+    (href, prefetch, expected) => {
+      render(
+        <MarketingTerminalCta
+          title='Choose your next step.'
+          ctaLabel='Continue'
+          ctaHref={href}
+          secondaryLabel='Another option'
+          secondaryHref={href}
+          prefetch={prefetch}
+          testId='terminal-explicit-prefetch'
+          penContractId={MARKETING_PEN_CONTRACT_IDS.shell.finalCta}
+        />
+      );
+      for (const link of screen.getAllByRole('link')) {
+        expect(link).toHaveAttribute('href', href);
+        expect(link).toHaveAttribute('data-prefetch', expected);
+      }
+    }
+  );
+
   it('keeps the final CTA copy and both conversion links while using the shared primitive', () => {
     render(
       <MarketingFinalCTA
@@ -173,5 +252,6 @@ describe('Marketing terminal CTA wrappers', () => {
     );
     expect(action).toHaveAttribute('data-size', 'md');
     expect(action).toHaveAttribute('data-cta-sign-up', 'true');
+    expect(action).toHaveAttribute('data-prefetch', 'false');
   });
 });

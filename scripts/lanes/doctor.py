@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
+import design_gate  # noqa: E402  (design-brief admission census)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -91,8 +92,11 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     qualified, rejected = {}, {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
+        duplicates = lane.pool_rejections(candidates.get(name, []))
         for issue in candidates.get(name, []):
-            reason = lane.admission_rejection(issue, failures, now, in_flight, name)
+            # Census key stays bounded: one bucket for all duplicate candidates.
+            reason = ("duplicate-candidate" if issue.identifier in duplicates
+                      else lane.admission_rejection(issue, failures, now, in_flight, name))
             if reason is None:
                 qualified[name].append(issue)
             else:
@@ -128,8 +132,11 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     account_observed_at = sample_clock()
     capacity_by_provider = host_capacity(host, lane)
+    design_census = None
     try:
         qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
+        design_census = design_gate.apply_to_pool(
+            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo))
         eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
         budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
@@ -147,6 +154,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
         candidate_counts, rejected = {}, {}
         eligible_pool, eligible_by_provider, budgets = None, {}, {}
+        design_census = None
     github = None
     merged, merged_error = [], None
     try:
@@ -192,6 +200,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "codexAttribution": codex_attribution(accounts, account_observed_at),
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
+        "designGate": design_census,
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -660,6 +669,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "pr-inventory-unavailable" if budget.get("reason") == "pr-inventory-unavailable" else
             "fully-utilized" if not metric["idleSlots"] else
             "open-pr-budget" if budget.get("reason") == "over-budget" else
+            "terminal-pr-backlog" if budget.get("reason") == "terminal-pr-backlog" else
             "account-status-unknown" if provider == "codex" and account_state["state"] == "unknown" else
             "account-leases-occupied" if provider == "codex" and account_state["state"] == "leases-occupied" else
             "account-quota-banked" if provider == "codex" and account_state["state"] == "quota-banked" else
@@ -704,6 +714,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                           "poolByProvider": obs.get("poolByProvider") or {},
                           "candidatePoolByProvider": obs.get("candidatePoolByProvider") or {},
                           "rejectedByProvider": obs.get("rejectedByProvider") or {},
+                          "designGate": obs.get("designGate"),
                           "error": obs.get("linearError")},
             "gateWaits24h": obs.get("gateWaits24h"),
             "gateWaitMedianS24h": obs.get("gateWaitMedianS24h"),

@@ -1,0 +1,66 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Cursor
+# necessary-trust-boundary: Read-only pull_request listing of changed files via the ephemeral github.token (`gh api .../pulls/<n>/files`); permissions are contents:read + pull-requests:read only, so the hop can observe but cannot write labels, checks, code, or comments. No merge, deploy, or release authority is added.
+# revisit-trigger: Remove this workflow (and the exception) once the design gate is enforced by an existing controller or required check rather than a standalone pull_request hop; otherwise revisit if DESIGN_GATE_ENFORCE graduates to a merge-queue required check.
+name: Design gate
+
+# Warns when a PR touches a marketing or landing surface without a completed
+# design brief (JOV-7541). Warn-only unless the repo variable
+# DESIGN_GATE_ENFORCE is truthy. Default off: a warning still exits 0.
+# The path list is design_gate.GATED_PATH_PREFIXES; the globs below only
+# skip unrelated PRs and must keep those prefixes:
+#   apps/web/app/(marketing)/
+#   apps/web/app/(home)/
+#   apps/web/components/marketing/
+#   apps/web/data/marketing/
+# Not a merge-queue required check. Unreadable briefs stay warnings.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - 'apps/web/app/(marketing)/**'
+      - 'apps/web/app/(home)/**'
+      - 'apps/web/components/marketing/**'
+      - 'apps/web/data/marketing/**'
+      - 'docs/design/**'
+      - 'scripts/lanes/design_gate.py'
+      - 'scripts/lanes/design_gate_check.py'
+      - 'scripts/lanes/certified-capabilities.gen.json'
+      - '.github/workflows/design-gate.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: design-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  brief:
+    name: Design gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename' > "$RUNNER_TEMP/design-gate-files.txt"
+
+      - name: Check the design brief
+        env:
+          DESIGN_GATE_ENFORCE: ${{ vars.DESIGN_GATE_ENFORCE }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          python3 scripts/lanes/design_gate_check.py \
+            --event "$GITHUB_EVENT_PATH" \
+            --files-from "$RUNNER_TEMP/design-gate-files.txt" \
+            --repo .

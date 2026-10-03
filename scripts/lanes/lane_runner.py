@@ -40,8 +40,10 @@ import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
+import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
+import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -81,7 +83,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
-              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py"]
+              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
+              "scripts/tests/test_design_gate.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -90,6 +93,11 @@ RETRY_BACKOFF_S = 1800
 # JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
 # new issues and only fixes/adopts what it already opened.
 OPEN_PRS_PER_SLOT = 2
+# Held/exhausted lane PRs wait for a human and cannot be advanced by the owning lane
+# (codex may not adopt/gate). They are bounded separately so they cannot pin the
+# active budget at its cap forever (JOV-7514: codex idle with 7 terminal PRs).
+TERMINAL_PRS_PER_SLOT = 4
+LANE_ISSUE_PAGES = 5  # <=500 Todo candidates per lane read
 STALE_DRAFT_S = 24 * 3600
 SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
@@ -496,27 +504,48 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     return None
 
 
+def pool_rejections(issues: list[Issue]) -> dict[str, str]:
+    """Pool-level admission (JOV-5555): exact normalized-title duplicates are one unit of
+    work. Non-canonical members are rejected; the canonical (oldest) one stays admissible."""
+    return {identifier: "duplicate-candidate:" + canonical
+            for identifier, canonical in workstreams.duplicate_of(issues).items()}
+
+
+def admission_order(issue: Issue, now: float) -> tuple:
+    """Dispatch rule shared by every lane and the doctor (JOV-7423 leverage-first):
+
+    1. tier 0 = urgent (effective P1, including aged work) or compounding infrastructure
+       (CI, Symphony throughput); everything else is tier 1;
+    2. aged priority: waiting work gains one level per day until it reaches P1;
+    3. workstream rank (workstreams.RANK);
+    4. age (createdAt, malformed dates last).
+    """
+    created_at = created_at_epoch(issue.created_at)
+    base_priority = issue.priority or 5
+    waited = max(0, now - created_at) if created_at is not None else 0
+    effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
+    stream = workstreams.classify(issue.title, issue.labels)
+    tier = 0 if effective_priority == 1 or workstreams.compounding(stream) else 1
+    return (tier, effective_priority, workstreams.rank(stream),
+            created_at if created_at is not None else float("inf"))
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
-    """Symphony orders by aged priority then age, while preserving urgent-first admission.
+    """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
     sustained stream of newer urgent work from starving older work. Excluded work,
-    3x failures, retry backoff, and issues with an open lane PR remain ineligible.
+    3x failures, retry backoff, issues with an open lane PR, and duplicate candidates
+    (pool_rejections) remain ineligible.
     """
     now = time.time() if now is None else now
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
+    duplicates = pool_rejections(issues)
     eligible = [issue for issue in issues
-                if admission_rejection(issue, failures, now, in_flight, provider) is None]
-
-    def admission_order(issue: Issue) -> tuple[int, float]:
-        created_at = created_at_epoch(issue.created_at)
-        base_priority = issue.priority or 5
-        waited = max(0, now - created_at) if created_at is not None else 0
-        effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
-        return effective_priority, created_at if created_at is not None else float("inf")
-
-    eligible.sort(key=admission_order)
+                if issue.identifier not in duplicates
+                and admission_rejection(issue, failures, now, in_flight, provider) is None]
+    eligible.sort(key=lambda issue: admission_order(issue, now))
     return eligible[0] if eligible else None
 
 
@@ -831,14 +860,27 @@ class Linear:
         return payload["data"]
 
     def lane_issues(self, label: str) -> list[Issue]:
-        """Todo issues carrying the lane's own label or the shared pool label."""
-        data = self.gql(
-            'query($labels:[String!]!){issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
-            'labels:{name:{in:$labels}}}){nodes{id identifier title description priority createdAt '
-            'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
+        """Todo issues carrying the lane's own label or the shared pool label.
+
+        Paginated (bounded by LANE_ISSUE_PAGES): the leverage-first rank and duplicate
+        identity are pool properties, so admission must see the whole pool rather than
+        whichever 100 issues Linear returns first."""
+        nodes, after = [], None
+        for _ in range(LANE_ISSUE_PAGES):
+            data = self.gql(
+                'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
+                'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
+                'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
+                'nodes{id identifier title description priority createdAt '
+                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL], "after": after})
+            nodes += data["issues"]["nodes"]
+            page = data["issues"].get("pageInfo") or {}
+            after = page.get("endCursor")
+            if not page.get("hasNextPage") or not after:
+                break
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
-                for n in data["issues"]["nodes"]]
+                for n in nodes]
 
     def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
         """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
@@ -868,8 +910,17 @@ class Linear:
                      {"id": issue_id, "s": target})
 
     def comment(self, issue_id: str, body: str) -> None:
-        self.gql('mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}',
-                 {"id": issue_id, "b": body})
+        result = self.gql('mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}',
+                          {"id": issue_id, "b": body})
+        if not isinstance(result, dict) or not isinstance(result.get("commentCreate"), dict) or result["commentCreate"].get("success") is not True: raise RuntimeError("linear: comment not delivered")
+
+
+def notify_issue_claim(linear: Linear, issue: Issue, name: str, spec: dict) -> None:
+    """An informational comment cannot prevent durable ownership from being recorded."""
+    try:
+        linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
+    except Exception as error:
+        print(f"lane claim comment unavailable: {type(error).__name__}", file=sys.stderr)
 
 
 class Locked:
@@ -1590,7 +1641,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
     if queued.returncode != 0:
         # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
         # would strand a green PR; each worker pass retries it via requeue_verified.
-        update_json(host.state / "requeue.json", lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
+        update_requeue_locked(host, lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
 
 
@@ -1616,23 +1667,84 @@ def update_json(path: Path, change) -> None:
         lock.release()
 
 
-def requeue_verified(host: Host, prs: list[dict]) -> None:
+def gate_outcome(receipt: dict) -> dict:
+    """Project gate evidence without importing the producer's enclosing run identity."""
+    fields = ("verdict", "pr", "prUrl", "headSha", "reasons", "changedFiles", "gateWaitS", "revocation",
+              "gateSensitive", "dependencies", "next_action", "execution", "qualificationExecution",
+              "sourceFencingToken", "remoteThreadId", "remoteAgentId", "modelSettingsProof", "adoptRunId")
+    result = {key: receipt[key] for key in fields if key in receipt}
+    if receipt.get("kind") == "adopt" and receipt.get("runId"):
+        result["adoptRunId"] = receipt["runId"]
+    return result
+
+
+def qualification_receipt(name: str, issue: Issue, outcome: dict) -> dict:
+    """A continuation is a distinct ledger event linked to the source and gate receipts."""
+    return {**gate_outcome(outcome), "schema": "jovie-lane-run/v1", "runId": uuid.uuid4().hex,
+            "kind": "qualification", "provider": name, "issue": issue.identifier,
+            "linearIssueId": issue.id, "startedAt": now_iso(), "endedAt": now_iso()}
+
+
+def update_requeue_locked(host: Host, change) -> None:
+    """Gate writers and deferred removals share the worker's short inventory lock."""
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        update_json(host.state / "requeue.json", change)
+    finally:
+        lock.release()
+
+
+def remove_requeue_head(host: Host, pr: dict) -> None:
+    """Remove only a landed selection; other slots may have changed the inventory."""
+    def remove(rows):
+        number = str(pr["number"])
+        if rows.get(number) == pr["headRefOid"]:
+            del rows[number]
+    update_requeue_locked(host, remove)
+
+
+def run_deferred_requeue(host: Host, pr: dict, retry, *, slot=None):
+    """Outside claim.lock, refresh the exact target before expensive qualification."""
+    try:
+        live = reconcile_fix_target(pr)
+        if (not live or live.get("state") != "OPEN"
+            or (live.get("number"), live.get("headRefOid"), live.get("headRefName"))
+               != (pr.get("number"), pr.get("headRefOid"), pr.get("headRefName"))
+            or publication_revocation(host, live.get("headRefName"))):
+            return None
+        result = retry(live)
+        if result and result.get("verdict") == "landing":
+            remove_requeue_head(host, pr)
+        return result
+    except BaseException:
+        if slot is not None: slot.release()
+        raise
+
+def requeue_verified(host: Host, prs: list[dict], *, defer=None) -> dict | None:
     """Retry enqueueing gate-verified PRs whose enqueue failed; drop them once queued or moved."""
     path = host.state / "requeue.json"
     if not path.exists():
         return
-    heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
-    branches = {str(pr["number"]): pr.get("headRefName") for pr in prs}
-    targets = {str(pr["number"]): pr for pr in prs}
+    selected = None
+    inventory = {str(pr["number"]): pr for pr in prs}
     def retry(requeue: dict) -> None:
+        nonlocal selected
         for number, head in list(requeue.items()):
-            if heads.get(number) != head:
+            if number not in inventory:
+                live = reconcile_fix_target({"number": int(number), "headRefOid": head})
+                if live is None: continue
+                inventory[number] = live
+            if inventory[number].get("state", "OPEN") != "OPEN" or inventory[number].get("headRefOid") != head:
                 del requeue[number]  # merged, closed, or a new head that the gate owns again
                 continue
-            if publication_revocation(host, branches.get(number)):
+            if publication_revocation(host, inventory[number].get("headRefName")):
                 del requeue[number]  # revoked branches never re-enroll
                 continue
-            pr = targets[number]
+            if defer and defer(inventory[number]):
+                if selected is None:
+                    selected = dict(inventory[number])
+                continue
+            pr = inventory[number]
             # Only current structured proof records sensitive review. Legacy requeue
             # entries prove an old pass, but cannot authorize a newly sensitive head.
             proof_path = host.state / "verified.json"
@@ -1649,6 +1761,7 @@ def requeue_verified(host: Host, prs: list[dict]) -> None:
                    "--match-head-commit", head]).returncode == 0:
                 del requeue[number]
     update_json(path, retry)
+    return selected
 
 
 # ---------------------------------------------------------------- fix red first
@@ -2399,7 +2512,7 @@ def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     return None
 
 
-def adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim | None = None) -> dict:
+def adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim | None = None, *, sensitive: bool = False) -> dict:
     if not provider_may_run(name, "adopt"):
         if claim is not None:
             claim.lock.release()
@@ -2411,12 +2524,12 @@ def adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim | None = None) ->
         return {"provider": name, "kind": "adopt", "pr": pr["number"], "headSha": pr["headRefOid"],
                 "verdict": "gate-in-progress", "reasons": ["exact-head-gate-reserved"]}
     try:
-        return _adopt_pr(host, name, pr, claim)
+        return _adopt_pr(host, name, pr, claim, sensitive=sensitive)
     finally:
         claim.lock.release()
 
 
-def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim) -> dict:
+def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: bool = False) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-adopt-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -2435,7 +2548,7 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim) -> dict:
             add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
             install_dependencies(host, worktree, log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
-            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels, claim=claim))
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=sensitive or SENSITIVE_PR_LABEL in labels, claim=claim))
         except RepairStopped as error:
             receipt.update(verdict="gate-deferred", reasons=[str(error)], stage=error.stage)
         except WorktreeUnavailable as error:
@@ -2586,18 +2699,35 @@ def over_budget(name: str, prs: list[dict], slots: int) -> bool:
     return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
 
 
+def pr_is_terminal(pr: dict) -> bool:
+    """Held or repair-exhausted: only a human (or another lane's adopt) can move it."""
+    labels = {label.lower() for label in pr_events.label_names(pr)}
+    return bool(labels & (pr_events.HOLD_LABELS | {pr_events.PREFIX + pr_events.EXHAUSTED}))
+
+
 def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
-    """One owning lane's new-issue budget; maintenance/orphan work is separate."""
+    """One owning lane's new-issue budget; maintenance/orphan work is separate.
+
+    Active (advanceable) non-green PRs are capped at slots x OPEN_PRS_PER_SLOT.
+    Terminal PRs (hold / lane-fix-exhausted) are capped separately at
+    slots x TERMINAL_PRS_PER_SLOT so a lane cannot accumulate unbounded parked work,
+    but parked work alone can no longer pin a lane idle (JOV-7514)."""
     cap = max(0, slots) * OPEN_PRS_PER_SLOT
+    terminal_cap = max(0, slots) * TERMINAL_PRS_PER_SLOT
     if slots <= 0:
-        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap}
+        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap,
+                "terminal": 0, "terminalCap": terminal_cap}
     if inventory is None:
-        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap}
+        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap,
+                "terminal": None, "terminalCap": terminal_cap}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = {pr["number"]: pr for pr in inventory if dated.match(pr["headRefName"])}
-    used = sum(not is_green(pr) for pr in own.values())
-    return {"allowed": used < cap, "reason": "within-budget" if used < cap else "over-budget",
-            "used": used, "cap": cap}
+    terminal = sum(pr_is_terminal(pr) for pr in own.values())
+    used = sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own.values())
+    reason = ("over-budget" if used >= cap else
+              "terminal-pr-backlog" if terminal >= terminal_cap else "within-budget")
+    return {"allowed": reason == "within-budget", "reason": reason, "used": used, "cap": cap,
+            "terminal": terminal, "terminalCap": terminal_cap}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
@@ -2746,14 +2876,70 @@ def failures_path(host: Host) -> Path:
     return host.state / "failures.json"
 
 
-def record_idle_exit(host: Host, name: str, reason: str) -> None:
+def deferred_requeue_blocks(host: Host, name: str, current_context=None) -> dict:
+    """Exact retry dispositions since the last ordinary work scan, in the existing idle ledger."""
+    try:
+        idle = json.loads((host.state / "worker-idle.json").read_text()).get(name, {})
+        queued = json.loads((host.state / "requeue.json").read_text())
+        blocks = {number: row for number, row in idle.get("deferredRequeue", {}).items()
+                  if queued.get(number) == row["pr"]["headRefOid"]}
+        if current_context:
+            blocks = {number: row for number, row in blocks.items()
+                      if (not current_context(row["pr"]).get("active") if row.get("terminal", False)
+                          else current_context(row["pr"]) == row["context"])}
+        return blocks
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
+def yield_deferred_requeues(host: Host, name: str) -> None:
+    """Under claim.lock: one ordinary unit/scan yields before reconsidering transient holds."""
+    path = host.state / "worker-idle.json"
+    if not path.exists(): return
+    def clear(data):
+        row = data.get(name, {})
+        row["deferredRequeue"] = {number: item for number, item in row.get("deferredRequeue", {}).items()
+                                  if item.get("terminal", False)}
+    update_json(path, clear)
+
+
+def finish_deferred_retry(host: Host, name: str, pr: dict, retry, context, *, slot):
+    """One deferred unit owns its receipt and exit; no second work starts on a held result."""
+    try:
+        def invoke(live):
+            issue, outcome = retry(live)
+            if outcome and outcome.get("verdict") in ("landing", "verified-not-queued", "gate-timeout", "remote-repair-required"):
+                receipt = qualification_receipt(name, issue, outcome)
+                with (host.state / "runs/ledger.jsonl").open("a") as ledger: ledger.write(json.dumps(receipt) + "\n")
+                return receipt
+        try:
+            receipt = run_deferred_requeue(host, pr, invoke, slot=slot)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError):
+            receipt = None  # run_deferred_requeue already released its slot on an error
+        if receipt is None or receipt.get("verdict") == "remote-repair-required":
+            branch = LANE_BRANCH.match(pr.get("headRefName") or "")
+            marker = {"pr": {key: pr[key] for key in ("number", "headRefOid", "headRefName")},
+                      **({"issue": branch.group("issue").upper()} if branch else {}),
+                      "context": context(pr), "terminal": bool(receipt)}
+            record_idle_exit(host, name, "deferred-repair-required" if receipt else "deferred-held", deferred=marker)
+        if receipt is None and not slot.handle.closed: slot.release()
+        return receipt
+    except BaseException:
+        if not slot.handle.closed: slot.release()
+        raise
+
+
+def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> None:
     """A durable marker that a spawned worker reached the claim scan and exited cleanly, so the
     doctor's spawn-exit rule can tell 'pool had nothing claimable' from workers dying on claim."""
     lock = Locked(host.state / "claim.lock", blocking=True)
     try:
         path = host.state / "worker-idle.json"
         data = json.loads(path.read_text()) if path.exists() else {}
-        data[name] = {"at": now_iso(), "reason": reason}
+        blocks = data.get(name, {}).get("deferredRequeue", {})
+        if deferred: blocks[str(deferred["pr"]["number"])] = deferred
+        else: blocks = {number: row for number, row in blocks.items() if row.get("terminal", False)}
+        data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
         path.write_text(json.dumps(data))
     except (OSError, ValueError):
         pass
@@ -2774,6 +2960,14 @@ def worker(host: Host, name: str) -> int:
         lock.release()
     if slot is None:
         return 0
+    try:
+        return worker_with_slot(host, name, spec, slot)
+    finally:
+        if not slot.handle.closed: slot.release()
+
+
+def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
+    """Release ownership on every exceptional exit, including notification failures."""
     try:
         report = disk_guard.check(host, sweep=True)
         if not report.get("admitted"):
@@ -2803,14 +2997,19 @@ def worker(host: Host, name: str) -> int:
         in_flight = None if red or adopt or blocked else in_flight_issues()
         if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
-                               provider=name)
+            issue = design_gate.pick_build_issue(
+                linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
+                provider=name, pick=pick_issue, linear=linear, repo=host.repo)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
             if issue:
                 linear.move(issue.id, "In Progress")
     finally:
         claim.release()
+    if red is not None or adopt is not None or issue is not None:
+        claim = Locked(host.state / "claim.lock", blocking=True)
+        try: yield_deferred_requeues(host, name)
+        finally: claim.release()
     if red is not None or adopt is not None:
         if red is not None:
             fix_red_pr(host, name, spec, red)
@@ -2823,7 +3022,7 @@ def worker(host: Host, name: str) -> int:
                          "in-flight-unknown" if in_flight is None else "none-eligible")
         slot.release()
         return 0
-    linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
+    notify_issue_claim(linear, issue, name, spec)
     receipt = run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
     if verdict == "disk-held":
@@ -2871,7 +3070,7 @@ def worker(host: Host, name: str) -> int:
                                  "Disposition: obsolete/invalid — needs a human decision, not a work queue.")
     elif verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
-                                 f"queued; required checks and the merge queue decide.")
+                                 f"{'queued' if verdict == 'landing' else 'verified; enqueue retry pending'}; required checks and the merge queue decide.")
     elif verdict == "held" and receipt.get("pr"):
         # One PR per issue: the fix loop repairs it on the same branch instead of a fresh attempt.
         linear.comment(issue.id, f"🤖 lane `{name}`: the lane gate held PR {receipt.get('prUrl')} "

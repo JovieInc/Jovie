@@ -332,6 +332,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:intake
     jobCount: 1
+  - name: Design gate
+    path: .github/workflows/design-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:brief
+    jobCount: 1
   - name: Design Governance
     path: .github/workflows/design-governance.yml
     active: true
@@ -717,7 +728,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:enroll
-    jobCount: 1
+    jobCount: 2
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true

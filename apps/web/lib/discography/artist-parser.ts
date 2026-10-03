@@ -449,14 +449,51 @@ export function extractWith(title: string): ParsedArtistCredit[] {
   return withArtists;
 }
 
+function comparableArtistName(name: string): string {
+  return name.trim().toLowerCase().replaceAll(/\s+/g, ' ');
+}
+
+function knownProviderArtistNames(
+  names: readonly string[] | undefined
+): ReadonlySet<string> | undefined {
+  if (!names || names.length === 0) return undefined;
+  const known = new Set<string>();
+  for (const name of names) {
+    const comparable = comparableArtistName(name);
+    if (comparable) known.add(comparable);
+  }
+  return known.size > 0 ? known : undefined;
+}
+
+function matchesKnownProviderArtist(
+  name: string,
+  known: ReadonlySet<string> | undefined
+): boolean {
+  if (!known) return false;
+  return known.has(comparableArtistName(name));
+}
+
 /**
  * Split artist name string by conjunction patterns (& / and / x)
+ *
+ * A whole name that matches a known provider artist stays intact. "Tones And I"
+ * is one artist; "Artist A & Artist B" still splits when that full string is
+ * not itself a provider artist.
  *
  * @example
  * splitByConjunction("Artist A & Artist B")
  * // Returns: ["Artist A", "Artist B"]
  */
-export function splitByConjunction(artistString: string): string[] {
+export function splitByConjunction(
+  artistString: string,
+  knownProviderArtists?: readonly string[]
+): string[] {
+  const trimmed = artistString.trim();
+  const known = knownProviderArtistNames(knownProviderArtists);
+  if (trimmed && matchesKnownProviderArtist(trimmed, known)) {
+    return [trimmed];
+  }
+
   // Split by & , "and", or standalone "x"
   return artistString
     .split(/ *(?:&|,|\band\b|\bx\b) */i)
@@ -473,8 +510,14 @@ function splitVsName(name: string): string[] | null {
     .filter(Boolean);
 }
 
-// Helper to split conjunction pattern in artist name
-function splitMainConjunctionName(name: string): string[] | null {
+// Helper to split conjunction pattern in artist name.
+// Provider artist objects are already identities. Do not split "and" / "&"
+// when the whole name is one of those artists ("Tones And I").
+function splitMainConjunctionName(
+  name: string,
+  knownProviderArtists?: ReadonlySet<string>
+): string[] | null {
+  if (matchesKnownProviderArtist(name, knownProviderArtists)) return null;
   if (!AND_SEPARATOR_PATTERN.test(name)) return null;
 
   const parts = name
@@ -553,6 +596,9 @@ export function parseMainArtists(
 ): ParsedArtistCredit[] {
   const credits: ParsedArtistCredit[] = [];
   let position = 0;
+  const knownProviderArtists = knownProviderArtistNames(
+    spotifyArtists.flatMap(artist => (artist?.name ? [artist.name] : []))
+  );
 
   for (const artist of spotifyArtists) {
     if (!artist) continue;
@@ -566,7 +612,10 @@ export function parseMainArtists(
       continue;
     }
 
-    const conjunctionParts = splitMainConjunctionName(artistName);
+    const conjunctionParts = splitMainConjunctionName(
+      artistName,
+      knownProviderArtists
+    );
     if (conjunctionParts) {
       position = processConjunctionParts(
         conjunctionParts,

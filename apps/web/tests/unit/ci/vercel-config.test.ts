@@ -33,6 +33,13 @@ const { default: getIgnoreFilter } = buildUtilsRequire(
   ) => Promise<(filePath: string) => boolean>;
 };
 
+const { getLambdaOptionsFromFunction } = buildUtilsRequire(buildUtilsEntry) as {
+  getLambdaOptionsFromFunction: (input: {
+    sourceFile: string;
+    config: VercelConfig;
+  }) => Promise<{ maxDuration?: number }>;
+};
+
 type VercelConfig = {
   functions?: Record<string, unknown>;
   ignoreCommand?: string;
@@ -213,6 +220,32 @@ describe('Vercel function config', () => {
         ),
         configPath
       ).toBe(true);
+    }
+  });
+
+  it('gives only the fleet event batch enough time through the actual first-match builder', async () => {
+    const sourceFile = 'app/api/internal/ovie/fleet/events/route.ts';
+    const route = readFileSync(resolve(appWebRoot, sourceFile), 'utf8');
+    const duration = Number(
+      /export const maxDuration = (\d+);/.exec(route)?.[1]
+    );
+    // At most five sequential 15s Linear reads plus 25s for auth, CAS and reply.
+    expect(duration).toBe(5 * 15 + 25);
+    for (const path of ['vercel.json', 'apps/web/vercel.json']) {
+      const config = readVercelConfig(path);
+      expect(
+        await getLambdaOptionsFromFunction({ sourceFile, config }),
+        path
+      ).toMatchObject({ maxDuration: duration });
+      for (const unrelated of [
+        'app/api/internal/ovie/fleet/control/route.ts',
+        'app/api/v1/actions/[actionId]/invoke/route.ts',
+      ]) {
+        expect(
+          await getLambdaOptionsFromFunction({ sourceFile: unrelated, config }),
+          path
+        ).toMatchObject({ maxDuration: 30 });
+      }
     }
   });
 

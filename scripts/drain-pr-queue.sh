@@ -143,14 +143,13 @@ inventory_native_queue_state() {
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
   local max_delay="${GH_INVENTORY_RETRY_MAX_DELAY:-15}"
   local attempt=1
-  local out_file err_file err delay
-  out_file="$(mktemp)"
+  local out err_file err delay
   err_file="$(mktemp)"
   # shellcheck disable=SC2064
-  trap "rm -f '$out_file' '$err_file'" RETURN
+  trap "rm -f '$err_file'" RETURN
   while [[ "$attempt" -le "$attempts" ]]; do
-    if node scripts/merge-queue-backend.mjs list-state "$@" >"$out_file" 2>"$err_file"; then
-      cat "$out_file"
+    if out="$(node scripts/merge-queue-backend.mjs list-state "$@" 2>"$err_file")"; then
+      printf '%s\n' "$out"
       return 0
     fi
     err="$(<"$err_file")"
@@ -1297,12 +1296,45 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 }
 
 changelog_collision_decision_for_pr() {  # <num>
-  local n="$1" candidate queued members='[]' files branch admission queue_state queue_snap
+  local n="$1" candidate queued members='[]' files branch payload admission terminal queue_state queue_snap fused=0
   candidate="$(pr_changed_paths_json "$n")"
-  branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
-  admission="$(PRE_LAND_CHANGELOG_JSON="$(jq -nc --argjson changedFiles "$candidate" --arg branch "$branch" \
-    '{changedFiles:$changedFiles, branch:$branch}')" \
+  # Fuse only the string-head snapshot contract. Other shapes keep the original
+  # raw jq branch read; duplicate heads and shell newline stripping stay exact.
+  if payload="$(jq -cse --argjson n "$n" --argjson changedFiles "$candidate" '
+    if length == 1 and (.[0] | type == "array") then
+      [.[0][] | select(.n == $n) | .head // empty] as $heads
+      | if all($heads[]; type == "string") then
+          {changedFiles:$changedFiles, branch:($heads | join("\n") | sub("\n+$"; ""))}
+        else empty end
+    else empty end
+  ' <<<"${RECOVERY_SNAP:-$SNAP}" 2>/dev/null)"; then
+    fused=1
+  else
+    branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
+    payload="$(jq -nc --argjson changedFiles "$candidate" --arg branch "$branch" \
+      '{changedFiles:$changedFiles, branch:$branch}')"
+  fi
+  admission="$(PRE_LAND_CHANGELOG_JSON="$payload" \
     node scripts/lib/pre-land-changelog.mjs admission)"
+  # Canonical admission already settles these negative paths. Avoid a second
+  # Node bootstrap and repeated policy evaluation; stamp inventory stays below.
+  if terminal="$(jq -ce '
+    if .schema == "jovie-pre-land-changelog/v1"
+      and .action == "unknown" and .reason == "changelog-evidence-unavailable"
+      and .path == null then
+      {action:"unknown", reason:"changelog-evidence-unavailable"}
+    elif .schema == "jovie-pre-land-changelog/v1"
+      and .action == "reject" and .reason == "pre-land-changelog"
+      and .path == "CHANGELOG.md" then
+      {action:"skip", reason:"pre-land-changelog"}
+    else empty end
+  ' <<<"$admission" 2>/dev/null)"; then
+    printf '%s\n' "$terminal"
+    return 0
+  fi
+  if [[ "$fused" == 1 ]]; then
+    branch="$(echo "${RECOVERY_SNAP:-$SNAP}" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
+  fi
   if [[ "$(jq -r '.reason' <<<"$admission")" == "stamp-path" ]]; then
     # Targeted enrollment SNAP contains only the candidate. Read the existing
     # paginated native inventory separately; never widen mutation scope.

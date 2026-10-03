@@ -60,7 +60,7 @@ describe('consumer opportunity storage boundary', () => {
         (await response.json()).cards.map((c: { id: string }) => c.id)
       ).toEqual(['creator-opportunity']);
       expectConsumerQuery(0);
-      expect(mocks.limit).toHaveBeenCalledWith(50);
+      expect(mocks.limit).toHaveBeenCalledWith(200);
     }
   );
   it('uses the same owner and audience restriction through migration fallback and mobile', async () => {
@@ -72,6 +72,69 @@ describe('consumer opportunity storage boundary', () => {
     expect(result?.pendingCount).toBe(1);
     expectConsumerQuery(0);
     expectConsumerQuery(1);
+  });
+  it('applies learned artist feedback when ranking social replies', async () => {
+    const basePayload = {
+      schemaVersion: 1,
+      platform: 'youtube',
+      sourceId: 'video-1',
+      authorLabel: '@listener',
+      authorKind: 'anonymous',
+      inboundText: 'Hello',
+      inboundAt: '2026-10-02T12:00:00.000Z',
+      draftedText: 'Thanks for reaching out.',
+      sourceUrl: 'https://youtube.com/watch?v=video-1',
+    };
+    mocks.limit
+      .mockResolvedValueOnce([
+        {
+          id: 'prior-thread',
+          kind: 'social_reply.draft',
+          payload: {
+            ...basePayload,
+            title: 'Prior thread',
+            targetId: 'comment-1',
+            rankingSignals: { relationship: ['prior_thread'] },
+          },
+          rationale: null,
+          createdAt: new Date('2026-10-02T12:00:00.000Z'),
+        },
+        {
+          id: 'repeat-commenter',
+          kind: 'social_reply.draft',
+          payload: {
+            ...basePayload,
+            title: 'Repeat commenter',
+            targetId: 'comment-2',
+            rankingSignals: { relationship: ['repeat_commenter'] },
+          },
+          rationale: null,
+          createdAt: new Date('2026-10-02T12:00:00.000Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        ...Array.from({ length: 12 }, () => ({
+          context: {
+            verdict: 'rejected',
+            socialInboxFeatureKeys: ['relationship:prior_thread'],
+          },
+        })),
+        ...Array.from({ length: 12 }, () => ({
+          context: {
+            rating: 'positive',
+            socialInboxFeatureKeys: ['relationship:repeat_commenter'],
+          },
+        })),
+      ]);
+
+    const result = await loadOpportunityInboxData('signed-in');
+
+    expect(result?.cards.map(card => card.id)).toEqual([
+      'repeat-commenter',
+      'prior-thread',
+    ]);
+    expect(mocks.limit).toHaveBeenNthCalledWith(1, 200);
+    expect(mocks.limit).toHaveBeenNthCalledWith(2, 500);
   });
   it('does not query for an unknown owner and degrades missing tables to empty', async () => {
     mocks.user.mockResolvedValueOnce(null);
