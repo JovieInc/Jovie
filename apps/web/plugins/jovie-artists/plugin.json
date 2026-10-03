@@ -15,7 +15,7 @@
     "com.openai": {
       "interface": {
         "displayName": "Jovie",
-        "shortDescription": "Find artists and get updates",
+        "shortDescription": "Find creators and get updates",
         "longDescription": "Jovie helps you find a musician's public page, read that page, and see public releases and upcoming shows. Search returns candidates, including a single match. A profile, update list, or subscribe link is available only for an exact public handle returned by search. The subscribe tool opens the artist's public Jovie page. It does not collect an email address, phone number, or confirmation code, and it does not create a subscription. This plugin does not return owner, billing, audience, analytics, or private account data, and it does not publish, sell, or change anything.",
         "developerName": "Jovie",
         "category": "Entertainment",
