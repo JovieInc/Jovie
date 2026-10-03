@@ -8,7 +8,7 @@ struct LiveRootContainer: View {
   @State private var backgroundedAt: Date?
   @State private var isPrivacyShieldVisible = false
   @State private var didHandleLaunchAuthCallback = false
-  @State private var authReturnTask: Task<Void, Never>?
+  @State private var authReturnSlot = MobileAuthFinalizationSlot()
   @State private var handledAuthReturnStates: Set<String> = []
   @State private var startedAuthFinalizeStates: Set<String> = []
   @State private var seenAuthCallbackURLs: Set<String> = []
@@ -30,7 +30,10 @@ struct LiveRootContainer: View {
           authErrorMessage: authErrorMessage,
           onLogout: handleLogout,
           onAuthReturn: handleAuthReturn,
-          onAuthError: { authErrorMessage = $0 }
+          onAuthError: { message in
+            presentUnprovenMobileAuthError(route: appState.route,
+              hasFinalizeInFlight: authReturnSlot.task != nil) { authErrorMessage = message }
+          }
         )
         .allowsHitTesting(!isAppContentCovered)
         .accessibilityHidden(isAppContentCovered)
@@ -122,8 +125,9 @@ struct LiveRootContainer: View {
       }
 #endif
       .onDisappear {
-        authReturnTask?.cancel()
-        authReturnTask = nil
+        if let attempt = authReturnSlot.attempt {
+          authReturnSlot.cancel(attempt) { _ = appState.reconcileAuth($0) }
+        }
       }
   }
 
@@ -183,11 +187,13 @@ struct LiveRootContainer: View {
 
   @MainActor
   private func handleLogout() async {
-    await appState.signOut()
-    biometricLockState = .unlocked
-    isPrivacyShieldVisible = false
-    backgroundedAt = nil
-    canRenderRoot = true
+    guard let completion = await appState.signOut() else { return }
+    NativeSessionTokenStore.performIfCurrent(completion) {
+      biometricLockState = .unlocked
+      isPrivacyShieldVisible = false
+      backgroundedAt = nil
+      canRenderRoot = true
+    }
   }
 
   @MainActor
@@ -284,19 +290,19 @@ struct LiveRootContainer: View {
           return
         }
 
-        MobileAuthPendingStore.shared.clear()
         Observability.addBreadcrumb(
           .deepLinkRouteMatched,
           level: .warning,
           context: ["route": "auth_error", "url": url]
         )
-        authReturnTask?.cancel()
-        authReturnTask = nil
-        authErrorMessage = providerError.userMessage
-        MobileAuthDiagnostics.record("auth_callback_provider_error", detail: providerError.error)
+        presentUnprovenMobileAuthError(route: appState.route,
+          hasFinalizeInFlight: authReturnSlot.task != nil) {
+          authErrorMessage = providerError.userMessage
+          MobileAuthDiagnostics.record("auth_callback_provider_error", detail: providerError.error)
 #if DEBUG
-        LiveAuthUITestStatus.set("error", error: providerError.userMessage)
+          LiveAuthUITestStatus.set("error", error: providerError.userMessage)
 #endif
+        }
         return
       }
 
@@ -373,15 +379,14 @@ struct LiveRootContainer: View {
         level: .warning,
         context: ["reason": "missing_pending_verifier", "url": url]
       )
-      await appState.signOut()
-      authErrorMessage = "Couldn't finish sign-in. Try again."
-      MobileAuthDiagnostics.record("auth_callback_missing_verifier")
+      presentUnprovenMobileAuthError(route: appState.route,
+        hasFinalizeInFlight: authReturnSlot.task != nil) {
+        authErrorMessage = "Couldn't finish sign-in. Try again."
+        MobileAuthDiagnostics.record("auth_callback_missing_verifier")
 #if DEBUG
-      LiveAuthUITestStatus.set(
-        "error",
-        error: "Missing pending native auth code verifier."
-      )
+        LiveAuthUITestStatus.set("error", error: "Missing pending native auth code verifier.")
 #endif
+      }
     }
   }
 
@@ -398,7 +403,7 @@ struct LiveRootContainer: View {
 
   @MainActor
   private func isAuthFinalizeInFlight(for url: URL) -> Bool {
-    if authReturnTask != nil {
+    if authReturnSlot.task != nil {
       return true
     }
 
@@ -415,112 +420,62 @@ struct LiveRootContainer: View {
     guard !startedAuthFinalizeStates.contains(authReturn.state) else { return }
     startedAuthFinalizeStates.insert(authReturn.state)
 
-    authReturnTask?.cancel()
+    let attempt = NativeSessionTokenStore.beginAuthAttempt()
+    appState.acceptAuthAttempt(attempt)
     authErrorMessage = nil
-    appState.route = .launching
     MobileAuthDiagnostics.record("auth_finalization_started")
 #if DEBUG
     LiveAuthUITestStatus.set("exchanging")
 #endif
-
-    authReturnTask = Task { @MainActor in
-      let span = Observability.startSpan(
-        name: .nativeAuthExchangeStarted,
-        context: ["stage": "native_auth_return"]
-      )
-      defer {
-        span.finish()
-        authReturnTask = nil
-      }
-
-      do {
-        Observability.addBreadcrumb(
-          .nativeAuthExchangeStarted,
-          context: ["stage": "native_auth_return"]
-        )
-        let exchangeResponse = try await runMobileAuthFinalizationStage("exchange") {
-          try await NativeAuthExchangeClient(
-            baseURL: appState.configuration.webBaseURL
-          ).exchange(authReturn)
+    authReturnSlot.install(attempt) {
+      let span = Observability.startSpan(name: .nativeAuthExchangeStarted,
+        context: ["stage": "native_auth_return"])
+      defer { span.finish(); authReturnSlot.release(attempt) }
+      await finalizeMobileAuthAttempt(attempt, exchange: {
+        Observability.addBreadcrumb(.nativeAuthExchangeStarted,
+          context: ["stage": "native_auth_return"])
+        return try await NativeAuthExchangeClient(baseURL: appState.configuration.webBaseURL).exchange(authReturn)
+      }, reconcile: { result, error in
+        appState.reconcileAuth(result) {
+          // This publication is inside the store's one-shot delivery guard.
+          guard authReturnSlot.attempt == attempt else { return }
+          if result.outcome == .persisted {
+            MobileAuthDiagnostics.record("native_exchange_session_token_received")
+            Observability.addBreadcrumb(.nativeAuthExchangeSucceeded,
+              context: ["stage": "native_session_token"])
+            Observability.addBreadcrumb(.nativeSessionPersisted)
+          } else if let error { publishAuthFailure(error) }
         }
-        Observability.addBreadcrumb(
-          .nativeAuthExchangeSucceeded,
-          context: ["stage": "native_auth_exchange"]
-        )
-
-        guard let finalizationPlan = MobileAuthFinalizationPlanner.plan(for: exchangeResponse) else {
-          throw MobileAuthReturnError.missingExchangeCredential
+      }, failure: { claim, error in
+        appState.reconcileAuthFailure(claim) { completion in
+          NativeSessionTokenStore.performIfCurrent(completion) {
+            guard authReturnSlot.attempt == attempt else { return }
+            publishAuthFailure(error)
+          }
         }
-
-        switch finalizationPlan {
-        case let .completeWithNativeSession(sessionToken, userID, expiresInSeconds):
-          NativeSessionTokenStore.save(
-            token: sessionToken,
-            userID: userID,
-            expiresAt: Date().addingTimeInterval(TimeInterval(expiresInSeconds))
-          )
-          MobileAuthDiagnostics.record("native_exchange_session_token_received")
-          Observability.addBreadcrumb(
-            .nativeAuthExchangeSucceeded,
-            context: ["stage": "native_session_token"]
-          )
-          Observability.addBreadcrumb(.nativeSessionPersisted)
-          await appState.handleSignedInUserChange(userID)
+      }, settled: { result in
+        NativeSessionTokenStore.performIfCurrent(result) {
+          guard authReturnSlot.attempt == attempt else { return }
 #if DEBUG
-          LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
+          if authErrorMessage == nil, let userID = appState.activeUserID {
+            LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
+          }
 #endif
-          return
         }
-      } catch {
-        guard !(error is CancellationError), !Task.isCancelled else {
-          return
-        }
-
-        let context = observabilityFailureContext(
-          stage: "native_auth_return",
-          error: error
-        )
-        Observability.addBreadcrumb(
-          .nativeAuthExchangeFailed,
-          level: .error,
-          context: context
-        )
-        Observability.captureError(
-          error,
-          event: .nativeAuthExchangeFailed,
-          context: context
-        )
-
-        if error is MobileAuthReturnError {
-          // Better Auth sign-out clears the native Keychain token and state.
-          await appState.signOut()
-          authErrorMessage = "Couldn't finish sign-in. Try again."
-          MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)
-#if DEBUG
-          LiveAuthUITestStatus.set(
-            "error",
-            error: error.localizedDescription.isEmpty
-              ? "Native auth callback exchange failed."
-              : error.localizedDescription
-          )
-#endif
-          return
-        }
-
-        await appState.signOut()
-
-        authErrorMessage = "Couldn't finish sign-in. Try again."
-        MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)
-#if DEBUG
-        LiveAuthUITestStatus.set(
-          "error",
-          error: error.localizedDescription.isEmpty
-            ? "Native auth callback exchange failed."
-            : error.localizedDescription
-        )
-#endif
-      }
+      })
     }
+  }
+
+  private func publishAuthFailure(_ error: Error) {
+    let context = observabilityFailureContext(stage: "native_auth_return", error: error)
+    Observability.addBreadcrumb(.nativeAuthExchangeFailed, level: .error, context: context)
+    Observability.captureError(error, event: .nativeAuthExchangeFailed, context: context)
+    authErrorMessage = "Couldn't finish sign-in. Try again."
+    MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)
+#if DEBUG
+    LiveAuthUITestStatus.set("error", error: error.localizedDescription.isEmpty
+      ? "Native auth callback exchange failed." : error.localizedDescription)
+#endif
   }
 
   private func observabilityFailureContext(

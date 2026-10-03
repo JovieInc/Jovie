@@ -44,6 +44,19 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      - name: Check agent-context size after merge onto base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/agent-context-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/agent-context | tar -x -C "$guard_root"
+          node "$guard_root/scripts/agent-context/merge-budget.mjs" --base "$trusted_ref" --head "$EXPECTED_HEAD"
       - name: Run deterministic source contract
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}

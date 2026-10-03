@@ -318,6 +318,9 @@ export const ServerEnvSchema = z.object({
   RELEASE_COMMUNICATIONS_WEBHOOK_SECRET: z.string().optional(),
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
+  // Kill switch for Linear remediation intake. Unset files. 'true' skips.
+  REMEDIATION_TRIGGERS_DISABLED: z.string().optional(),
+  SUMMER_SENTRY_INTAKE_LIVE: z.string().optional(),
   // JOV-7331: internal fleet canary, disabled until deployment approval.
   JOVIE_FLEET_ENABLED: z.enum(['0', '1']).optional(),
   JOVIE_FLEET_LINEAR_TEAM_ID: z.string().uuid().optional(),
@@ -431,8 +434,7 @@ export const ServerEnvSchema = z.object({
 
   // Search APIs (lead discovery)
   SERPAPI_API_KEY: z.string().optional(),
-  GOOGLE_CSE_API_KEY: z.string().optional(),
-  GOOGLE_CSE_ENGINE_ID: z.string().optional(),
+  EXA_API_KEY: z.string().optional(),
 
   // Jovie Marketing Pixels (for retargeting Jovie visitors)
   JOVIE_FACEBOOK_PIXEL_ID: z.string().optional(),
@@ -659,6 +661,8 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
+  'REMEDIATION_TRIGGERS_DISABLED',
+  'SUMMER_SENTRY_INTAKE_LIVE',
   'RELEASE_COMMUNICATIONS_WEBHOOK_SECRET',
   'JOVIE_FLEET_ENABLED',
   'JOVIE_FLEET_LINEAR_TEAM_ID',
@@ -700,8 +704,7 @@ export const ENV_KEYS = [
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
   'SERPAPI_API_KEY',
-  'GOOGLE_CSE_API_KEY',
-  'GOOGLE_CSE_ENGINE_ID',
+  'EXA_API_KEY',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',
   'JOVIE_GOOGLE_MEASUREMENT_ID',
