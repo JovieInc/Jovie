@@ -10,10 +10,7 @@ import {
   SETTINGS_SIDEBAR_GROUPS,
 } from './settings-sidebar-config';
 
-const LIVE_SETTINGS = [
-  ...userSettingsNavigation,
-  ...artistSettingsNavigation,
-];
+const LIVE_SETTINGS = [...userSettingsNavigation, ...artistSettingsNavigation];
 
 describe('SETTINGS_SIDEBAR_GROUPS', () => {
   it('projects the live settings rail and no other list', () => {
@@ -22,9 +19,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
       'profile',
     ]);
     expect(
-      SETTINGS_SIDEBAR_GROUPS.flatMap(group =>
-        group.items.map(item => item.id)
-      )
+      SETTINGS_SIDEBAR_GROUPS.flatMap(group => group.items.map(item => item.id))
     ).toEqual(LIVE_SETTINGS.map(item => item.id));
     expect(
       SETTINGS_SIDEBAR_GROUPS.flatMap(group =>
