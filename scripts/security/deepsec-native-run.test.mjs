@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -24,7 +25,7 @@ afterEach(() => {
 });
 const target = 'apps/web/lib/auth/require-auth.ts';
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'native-scan-test-'));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'native-scan-test-')));
   roots.push(root);
   const sourceRoot = join(root, 'source'),
     workspace = join(root, 'scanner');
@@ -369,21 +370,56 @@ test('output overflow kills the real native process group', async () => {
   assert.notEqual(result.status, 0);
 });
 
+// Process identity (group + kernel start time + zombie state) comes from
+// /proc on Linux and ps elsewhere, so the PID-reuse guard holds on macOS too.
+function processIdentity(pid, { readFileSync, spawnSync }) {
+  if (process.platform === 'linux') {
+    let stat;
+    try {
+      stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    } catch (error) {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
+    const fields = stat
+      .slice(stat.lastIndexOf(')') + 2)
+      .trim()
+      .split(/\s+/);
+    return {
+      pgid: Number(fields[2]),
+      start: fields[19],
+      zombie: fields[0] === 'Z',
+    };
+  }
+  const ps = spawnSync(
+    'ps',
+    ['-o', 'pgid=,state=,lstart=', '-p', String(pid)],
+    {
+      encoding: 'utf8',
+    }
+  );
+  const line = ps.stdout.trim();
+  if (ps.status !== 0 || !line) return null;
+  const [pgid, state, ...start] = line.split(/\s+/);
+  return {
+    pgid: Number(pgid),
+    start: start.join(' '),
+    zombie: state.startsWith('Z'),
+  };
+}
+const identityOf = pid => processIdentity(pid, { readFileSync, spawnSync });
+
 test('deadline kills both the real parent and its SDK-style descendant', async () => {
   const result = await boundedNativeCommand(
     [
       process.execPath,
       '-e',
-      String.raw`
-        const fs = require('node:fs');
+      `
+        const processIdentity = ${processIdentity.toString()};
         const child = require('node:child_process').spawn(
           process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore' }
         );
-        const stat = fs.readFileSync('/proc/' + child.pid + '/stat', 'utf8');
-        const fields = stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/);
-        process.stdout.write(JSON.stringify({
-          pid: child.pid, pgid: Number(fields[2]), startTime: fields[19],
-        }));
+        process.stdout.write(JSON.stringify({ pid: child.pid, ...processIdentity(child.pid, { readFileSync: require('node:fs').readFileSync, spawnSync: require('node:child_process').spawnSync }) }));
         setInterval(()=>{},1000);
       `,
     ],
@@ -394,51 +430,28 @@ test('deadline kills both the real parent and its SDK-style descendant', async (
   const pid = owned.pid;
   assert.ok(Number.isSafeInteger(pid) && pid > 0);
   assert.ok(Number.isSafeInteger(owned.pgid) && owned.pgid > 0);
-  assert.match(owned.startTime, /^\d+$/);
-  const ownedIdentity = `${owned.pgid}:${owned.startTime}`;
-  const readStat = () => {
-    try {
-      return readFileSync(`/proc/${pid}/stat`, 'utf8');
-    } catch (error) {
-      if (error.code === 'ENOENT') return null;
-      throw error;
-    }
-  };
-  const identity = stat => {
-    const fields = stat
-      .slice(stat.lastIndexOf(')') + 2)
-      .trim()
-      .split(/\s+/);
-    return `${fields[2]}:${fields[19]}`; // process group and kernel start time
-  };
+  assert.ok(owned.start);
+  const ownedIdentity = `${owned.pgid}:${owned.start}`;
+  const sameLiveProcess = current =>
+    current !== null &&
+    `${current.pgid}:${current.start}` === ownedIdentity &&
+    !current.zombie;
   try {
     assert.match(result.error.message, /timed out/);
-    let stat = readStat();
+    let current = identityOf(pid);
     // Parent close is not a barrier for the group's descendant exit transitions.
     const deadline = performance.now() + 5_000;
-    while (
-      stat !== null &&
-      identity(stat) === ownedIdentity &&
-      !/\) Z /.test(stat) &&
-      performance.now() < deadline
-    ) {
+    while (sameLiveProcess(current) && performance.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 10));
-      stat = readStat();
+      current = identityOf(pid);
     }
     // A different identity means the original descendant was reaped and the PID reused.
-    if (stat !== null && identity(stat) === ownedIdentity)
-      assert.match(
-        stat,
-        /\) Z /,
-        `Descendant ${pid} remained live after 5s: ${stat}`
-      );
+    assert.ok(
+      !sameLiveProcess(current),
+      `Descendant ${pid} remained live after 5s: ${JSON.stringify(current)}`
+    );
   } finally {
-    const stat = readStat();
-    if (
-      stat !== null &&
-      identity(stat) === ownedIdentity &&
-      !/\) Z /.test(stat)
-    ) {
+    if (sameLiveProcess(identityOf(pid))) {
       try {
         process.kill(pid, 'SIGKILL');
       } catch (error) {
