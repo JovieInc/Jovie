@@ -12,6 +12,7 @@ import {
   fetchMusicArtist,
   musicFetchOutputSchema,
   musicFetchSchema,
+  musicReadErrorSchema,
   musicSearchOutputSchema,
   musicSearchSchema,
   searchMusicArtists,
@@ -25,10 +26,21 @@ const annotations = {
 };
 
 function toolResult(result: Record<string, unknown>): CallToolResult {
+  const validated =
+    'error' in result ? musicReadErrorSchema.parse(result) : result;
   return {
-    content: [{ type: 'text', text: JSON.stringify(result) }],
-    structuredContent: result,
-    isError: 'error' in result,
+    content: [{ type: 'text', text: JSON.stringify(validated) }],
+    structuredContent: validated,
+    isError: 'error' in validated,
+  };
+}
+
+function objectOutputSchema(schema: z.ZodType) {
+  // MCP requires an object root. Every branch of our runtime result unions is
+  // already a strict object; this redundant type preserves those exact rules.
+  return {
+    ...z.toJSONSchema(schema, { target: 'draft-7' }),
+    type: 'object' as const,
   };
 }
 
@@ -103,9 +115,7 @@ export function createMusicMcpServer(requestSignal?: AbortSignal) {
         description:
           'Search public artist identities by name, Spotify/Apple Music artist URL or qualified ID. Names produce ranked candidates; never silently select a same-name artist. Fetch a selected result by its exact id.',
         inputSchema: z.toJSONSchema(musicSearchSchema, { target: 'draft-7' }),
-        outputSchema: z.toJSONSchema(musicSearchOutputSchema, {
-          target: 'draft-7',
-        }),
+        outputSchema: objectOutputSchema(musicSearchOutputSchema),
         annotations,
         securitySchemes: [{ type: 'noauth' }],
         _meta: { securitySchemes: [{ type: 'noauth' }] },
@@ -116,9 +126,7 @@ export function createMusicMcpServer(requestSignal?: AbortSignal) {
         description:
           'Fetch public artist name, biography, genres and provider provenance using the exact id from search. Does not resolve cross-provider identity or claim ownership.',
         inputSchema: z.toJSONSchema(musicFetchSchema, { target: 'draft-7' }),
-        outputSchema: z.toJSONSchema(musicFetchOutputSchema, {
-          target: 'draft-7',
-        }),
+        outputSchema: objectOutputSchema(musicFetchOutputSchema),
         annotations,
         securitySchemes: [{ type: 'noauth' }],
         _meta: { securitySchemes: [{ type: 'noauth' }] },
@@ -137,9 +145,7 @@ export function createMusicMcpServer(requestSignal?: AbortSignal) {
       return readResult(
         async signal => {
           const result = await searchMusicArtists(input.data, signal);
-          return 'error' in result
-            ? result
-            : musicSearchOutputSchema.parse(result);
+          return musicSearchOutputSchema.parse(result);
         },
         requestSignal,
         extra.signal
@@ -154,9 +160,7 @@ export function createMusicMcpServer(requestSignal?: AbortSignal) {
       return readResult(
         async signal => {
           const result = await fetchMusicArtist(input.data, signal);
-          return 'error' in result
-            ? result
-            : musicFetchOutputSchema.parse(result);
+          return musicFetchOutputSchema.parse(result);
         },
         requestSignal,
         extra.signal

@@ -44,7 +44,26 @@ const provenanceSchema = z
     cross_provider_identity: z.literal('unverified'),
   })
   .strict();
-export const musicSearchOutputSchema = z
+export const musicReadErrorSchema = z
+  .object({
+    error: z
+      .object({
+        code: z.enum([
+          'INVALID_INPUT',
+          'UNSUPPORTED_INPUT',
+          'ARTIST_NOT_FOUND',
+          'UPSTREAM_FAILURE',
+          'UPSTREAM_TIMEOUT',
+          'CANCELLED',
+          'UNKNOWN_TOOL',
+        ]),
+        retryable: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const musicSearchSuccessSchema = z
   .object({
     results: z
       .array(
@@ -60,7 +79,7 @@ export const musicSearchOutputSchema = z
       .max(5),
   })
   .strict();
-export const musicFetchOutputSchema = z
+const musicFetchSuccessSchema = z
   .object({
     id: z.string(),
     title: z.string(),
@@ -69,6 +88,15 @@ export const musicFetchOutputSchema = z
     metadata: provenanceSchema,
   })
   .strict();
+
+export const musicSearchOutputSchema = z.union([
+  musicSearchSuccessSchema,
+  musicReadErrorSchema,
+]);
+export const musicFetchOutputSchema = z.union([
+  musicFetchSuccessSchema,
+  musicReadErrorSchema,
+]);
 
 const provenance = (
   artist: PublicArtistSnapshot,

@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -168,6 +169,92 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
       await client.close();
     }
   });
+
+  it.each([
+    {
+      name: 'fetch',
+      args: { id: `spotify:${ID}` },
+      code: 'ARTIST_NOT_FOUND',
+      retryable: false,
+      status: 404,
+    },
+    {
+      name: 'fetch',
+      args: { id: `spotify:${ID}` },
+      code: 'UPSTREAM_FAILURE',
+      retryable: true,
+      status: 503,
+    },
+    {
+      name: 'search',
+      args: { query: 7 },
+      code: 'INVALID_INPUT',
+      retryable: false,
+    },
+    {
+      name: 'search',
+      args: { query: 'Radiohead', unexpected: 'canary' },
+      code: 'INVALID_INPUT',
+      retryable: false,
+    },
+    {
+      name: 'search',
+      args: { query: 'x'.repeat(501) },
+      code: 'INVALID_INPUT',
+      retryable: false,
+    },
+    {
+      name: 'search',
+      args: { query: 'https://example.com/artist/unknown' },
+      code: 'UNSUPPORTED_INPUT',
+      retryable: false,
+    },
+  ])(
+    'discovered official client accepts $code from $name as a structured tool error',
+    async ({ name, args, code, retryable, status }) => {
+      if (status)
+        mocks.spotifyGet.mockRejectedValueOnce(
+          Object.assign(new Error('Provider failure'), { statusCode: status })
+        );
+      const client = new Client({
+        name: 'error-contract-client',
+        version: '1.0.0',
+      });
+      const transport = new StreamableHTTPClientTransport(new URL(url), {
+        fetch: async (input, init) => {
+          const req = new Request(
+            input instanceof Request ? input : String(input),
+            init
+          );
+          return req.method === 'GET' ? GET(req) : POST(req);
+        },
+      });
+      await client.connect(transport);
+      try {
+        // Discovery activates the SDK's real output-schema validator. Raw HTTP
+        // assertions alone missed the production failure of structured errors.
+        await client.listTools();
+        const result = CallToolResultSchema.parse(
+          await client.callTool({ name, arguments: args })
+        );
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toEqual({
+          error: { code, retryable },
+        });
+        expect(
+          JSON.parse((result.content[0] as { text: string }).text)
+        ).toEqual(result.structuredContent);
+        expect(mocks.spotifyGet).toHaveBeenCalledTimes(status ? 1 : 0);
+        expect(mocks.spotifySearch).not.toHaveBeenCalled();
+        expect(mocks.appleGet).not.toHaveBeenCalled();
+        expect(mocks.appleSearch).not.toHaveBeenCalled();
+        expect(mocks.draft).not.toHaveBeenCalled();
+        expect(mocks.writeLimit).not.toHaveBeenCalled();
+      } finally {
+        await client.close();
+      }
+    }
+  );
 
   it.each([
     `spotify:${ID}`,
