@@ -2421,9 +2421,7 @@ ${selectedGateScript}`,
     expect(PRODUCTION_RELEASE_WORKFLOW).toContain('  promote-production:');
     expect(PRODUCTION_RELEASE_WORKFLOW).not.toContain('concurrency:');
 
-    expect(verified).toContain(
-      "needs.release-source.result == 'success'"
-    );
+    expect(verified).toContain("needs.release-source.result == 'success'");
     expect(verified).toContain(
       "fromJSON(needs.release-source.outputs.ci || '{}').event == 'push'"
     );
