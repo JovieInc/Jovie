@@ -817,8 +817,15 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
 
 
 class ProviderCapacityRecoveryTests(unittest.TestCase):
-    def test_exit_75_is_typed_provider_capacity(self):
-        failure = MODULE.classify_launcher_failure("{:port_exit, 75}")
+    CAPACITY_ERROR = (
+        "CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 "
+        "class=provider-capacity retryable=true reason=account_busy"
+    )
+
+    def test_explicit_capacity_evidence_with_exit_75_is_provider_capacity(self):
+        failure = MODULE.classify_launcher_failure(
+            self.CAPACITY_ERROR, {"exit_code": 75}
+        )
         self.assertEqual(failure["class"], MODULE.PROVIDER_CAPACITY_CLASS)
         self.assertEqual(failure["code"], "capacity-unavailable")
         self.assertTrue(failure["retryable"])
@@ -828,7 +835,8 @@ class ProviderCapacityRecoveryTests(unittest.TestCase):
         decision = MODULE.controller_retry_decision(
             {
                 "issue_identifier": "JOV-5034",
-                "error": "{:port_exit, 75}",
+                "error": self.CAPACITY_ERROR,
+                "exit_code": 75,
                 "attempt": MODULE.PROVIDER_CAPACITY_MAX_ATTEMPTS,
             }
         )
@@ -840,6 +848,53 @@ class ProviderCapacityRecoveryTests(unittest.TestCase):
         )
         self.assertTrue(decision["failure"]["escalateSharedIncident"])
         self.assertNotEqual(decision["state"], "blocked")
+
+    def test_failure_classes_preserve_terminal_and_unknown_exit_contracts(self):
+        cases = (
+            (
+                "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+                "class=invalid-config retryable=false reason=invalid",
+                "invalid-config",
+                False,
+            ),
+            ("{:port_exit, 78}", "deterministic-launcher", False),
+            ("configuration missing", "deterministic-launcher", False),
+            ("{:port_exit, 1}", "unknown-launcher", True),
+        )
+        for error, expected_class, retryable in cases:
+            with self.subTest(error=error):
+                failure = MODULE.classify_launcher_failure(error)
+                self.assertEqual(failure["class"], expected_class)
+                self.assertEqual(failure["retryable"], retryable)
+
+    def test_generic_exit_75_does_not_escalate_a_provider_incident(self):
+        decision = MODULE.controller_retry_decision(
+            {
+                "issue_identifier": "JOV-5034",
+                "error": "{:port_exit, 75}",
+                "attempt": MODULE.TRANSIENT_LAUNCHER_ATTEMPTS,
+            }
+        )
+        self.assertEqual(decision["failure"]["class"], "transient-launcher")
+        self.assertEqual(decision["state"], "blocked")
+        self.assertFalse(decision["handoff"])
+
+    def test_issue_lease_busy_sentinel_takes_precedence_over_exit_75(self):
+        decision = MODULE.controller_retry_decision(
+            {
+                "issue_identifier": "JOV-5034",
+                "error": (
+                    "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+                    "class=issue-lease-busy retryable=true maxAttempts=3 "
+                    'reason="issue lease is held by another worker"'
+                ),
+                "exit_code": 75,
+                "attempt": MODULE.TRANSIENT_LAUNCHER_ATTEMPTS,
+            }
+        )
+        self.assertEqual(decision["failure"]["class"], "issue-lease-busy")
+        self.assertEqual(decision["state"], "blocked")
+        self.assertFalse(decision["handoff"])
 
     def test_corrupt_receipt_requires_reconciliation(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
