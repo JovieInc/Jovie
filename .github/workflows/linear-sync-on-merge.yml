@@ -30,7 +30,7 @@ permissions:
   actions: read
 
 jobs:
-  sync_lifecycle:
+  sync_done:
     name: Project merge and deploy evidence onto Linear
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest

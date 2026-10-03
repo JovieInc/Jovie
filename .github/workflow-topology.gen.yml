@@ -684,7 +684,7 @@ nodes:
       - schedule
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:sync_lifecycle
+    terminalReceipt: job:sync_done
     jobCount: 1
   - name: M2 Revenue-Path Canary
     path: .github/workflows/m2-revenue-path-canary.yml
