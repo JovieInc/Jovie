@@ -2588,6 +2588,188 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
         publish_verified(host, pr)
 
 
+def fetch_labeled_events(linear) -> list:
+    """The one label-filtered Linear read per tick, shared across workers via `shared`.
+
+    JOV and LYB issues labeled `remediation:<fingerprint>` come back together.
+    Callers must not issue a follow-up read per issue.
+    """
+    def fetch():
+        data = linear.gql(remediation.LABELED_EVENT_QUERY, {})
+        return (data.get("issues") or {}).get("nodes") or []
+
+    return shared("remediation-events", SUMMARY_TTL_S, fetch) or []
+
+
+def _apply_event_plan(linear, plan: dict) -> None:
+    """Writes only: reopen, one comment, one needs-human label. No extra reads."""
+    for row in plan.get("reopens") or []:
+        if not row.get("id") or not row.get("stateId"):
+            continue
+        try:
+            linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                       {"id": row["id"], "s": row["stateId"]})
+        except Exception:
+            pass
+    for row in plan.get("comments") or []:
+        if not row.get("id") or not row.get("body"):
+            continue
+        try:
+            linear.comment(row["id"], row["body"])
+        except Exception:
+            pass
+    for row in plan.get("labels") or []:
+        if not row.get("id"):
+            continue
+        try:
+            linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                       {"id": row["id"], "l": row["labelId"]})
+        except Exception:
+            pass
+
+
+def claim_remediation_events(host: Host, linear) -> dict:
+    """Claim every labeled remediation event. One cached read, then local planning."""
+    issues = fetch_labeled_events(linear)
+    providers = load_providers()
+    cooled = {name for name in providers if cooling(host, name)}
+
+    def healthy(_name, spec):
+        return provider_healthy(spec)
+
+    data = load_escalation(host)
+    plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
+                                           healthy=healthy, cooled=cooled)
+    _apply_event_plan(linear, plan)
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        current = load_escalation(host)
+        previous = current.get("events") or {}
+        merged = plan["events"]
+        for fingerprint, row in merged.items():
+            prior = previous.get(fingerprint) or {}
+            if not isinstance(prior, dict):
+                continue
+            # A worker can finish while this plan was being built. Keep that outcome.
+            if prior.get("status") in {"done", "exhausted"} and row.get("status") not in {"done", "exhausted"}:
+                row["status"] = prior["status"]
+                row["running"] = False
+                row["lane"] = prior.get("lane")
+                row["release"] = prior.get("release", False)
+            elif prior.get("release") and not row.get("release"):
+                row["release"] = True
+                row["running"] = False
+                row["lane"] = None
+                row["status"] = prior.get("status") or row.get("status")
+            elif prior.get("running") and not row.get("release"):
+                row["running"] = True
+                row["claimedAt"] = prior.get("claimedAt")
+                row["lane"] = prior.get("lane", row.get("lane"))
+                row["status"] = prior.get("status", row.get("status"))
+        current["events"] = merged
+        save_escalation(host, current)
+    finally:
+        lock.release()
+    summary = remediation.events_summary({"events": plan["events"]})
+    return {"eventsOpen": summary["eventsOpen"], "eventsClaimed": summary["eventsClaimed"],
+            "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"]}
+
+
+def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
+    """Take a fixable event this lane was assigned. No Linear read; state comes from the tick."""
+    data = load_escalation(host)
+    events = data.get("events") or {}
+    now = time.time()
+    for row in events.values():
+        if not isinstance(row, dict):
+            continue
+        if row.get("status") != "claimed" or row.get("lane") != name or row.get("running"):
+            continue
+        if not row.get("issueId"):
+            continue
+        row["running"] = True
+        row["claimedAt"] = now
+        row["release"] = False
+        save_escalation(host, data)
+        started = row.get("startedStateId")
+        if started:
+            try:
+                linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                           {"id": row["issueId"], "s": started})
+            except Exception:
+                pass
+        description = row.get("description") or ""
+        dossier = row.get("dossier") or ""
+        if dossier:
+            description = dossier + "\n\n" + description
+        return Issue(row["issueId"], row.get("identifier") or row["issueId"], row.get("title") or "",
+                     description, 2, now_iso(), list(row.get("labels") or []))
+    return None
+
+
+def note_event_outcome(host: Host, issue, verdict: str) -> None:
+    """Hand a labeled event back to the ladder after the lane run, without a Linear read."""
+    if issue is None or not getattr(issue, "id", None):
+        return
+    data = load_escalation(host)
+    events = data.get("events") or {}
+    changed = False
+    for row in events.values():
+        if not isinstance(row, dict) or row.get("issueId") != issue.id:
+            continue
+        row["running"] = False
+        if verdict == "provider-error":
+            row["lane"] = None
+            row["release"] = True
+            row["status"] = "claimed"
+        elif verdict in {"landing", "verified-not-queued"}:
+            row["status"] = "done"
+            row["release"] = False
+        elif verdict in {"not-shippable", "quarantined"}:
+            row["status"] = "exhausted"
+            row["lane"] = None
+            row["release"] = False
+        changed = True
+    if changed:
+        save_escalation(host, data)
+
+
+def claim_escalation_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
+    """Take a pending model rung for this lane. Charges an escalation row, not `count`."""
+    path = host.state / "fix-attempts.json"
+    if not path.exists():
+        return None
+    try:
+        attempts = json.loads(path.read_text())
+    except ValueError:
+        return None
+    now = time.time()
+    data = load_escalation(host)
+    for key, record in attempts.items():
+        if not isinstance(record, dict):
+            continue
+        pending = record.get("pendingEscalation") or {}
+        if pending.get("lane") != name or not pending.get("dossier"):
+            continue
+        pr = next((item for item in prs if str(item.get("number")) == str(key)), None)
+        if pr is None or pending.get("head") not in (None, pr.get("headRefOid")):
+            continue
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            continue
+        updated = remediation.append_rung(record, rung="escalate" if not pending.get("topRung") else "top-rung",
+                                          lane=name, cls=pending.get("cls") or "fixable-by-model", at=now,
+                                          head=pr["headRefOid"], kind="model", top_rung=bool(pending.get("topRung")))
+        updated.pop("pendingEscalation", None)
+        attempts[key] = updated
+        path.write_text(json.dumps(attempts))
+        data["attempts"].append({"pr": pr["number"], "at": now, "lane": name})
+        save_escalation(host, data)
+        post_claim(pr["number"], pr["headRefOid"], "fix")
+        return {**pr, "dossier": pending["dossier"],
+                "liftHold": pending.get("subtype") == "human-hold"}
+    return None
+
+
 def failure_excerpt(pr: dict, limit: int = 6000) -> str:
     """The failing jobs' own error lines, so the fixer works from evidence, not guesses."""
     parts = []
@@ -3745,14 +3927,17 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         candidates = fix_candidates(name)
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
         escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-        red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
+        red = (pr_events.claim_event_pr(host, THIS, name, events)
+               or claim_escalation_pr(host, name, candidates)
+               or claim_red_pr(host, name, candidates))
         adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs, candidates)
-        issue = None
+        labeled = None if red or adopt else claim_labeled_event(host, name, linear)
+        issue = labeled
         sweep_lane_prs(host, name, linear)
-        budget = None if red or adopt else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
-        in_flight = None if red or adopt or blocked else in_flight_issues()
-        if in_flight is not None:
+        in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
+        if labeled is None and in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = design_gate.pick_build_issue(
                 linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
@@ -3790,6 +3975,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     notify_issue_claim(linear, issue, name, spec)
     receipt = run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
+    note_event_outcome(host, issue, verdict)
     if verdict == "disk-held":
         linear.move(issue.id, "Todo")
         slot.release()
@@ -3895,6 +4081,10 @@ def dispatch(host: Host) -> int:
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
+        try:
+            tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
+        except Exception as error:  # the label scan never takes worker spawn down
+            tick["remediationEventsError"] = f"{type(error).__name__}: {error}"[:200]
         for name, spec in load_providers().items():
             slots = host.slots(name, spec.get("slots", 1))
             # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
