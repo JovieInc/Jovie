@@ -495,6 +495,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
+  'scripts/lib/__tests__/pr-review-workflow.test.mjs',
   'scripts/lib/__tests__/pr-review-contracts.test.mjs',
   'scripts/lib/__tests__/pr-review-kernel.test.mjs',
   'scripts/lib/__tests__/pr-review-learn.test.mjs',
@@ -2113,6 +2114,7 @@ export async function runStructural(opts = {}) {
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
     'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js',
+    'node --test .github/scripts/marketing-dom-workflow.test.mjs',
     'node --test .github/scripts/update-quarantine.test.js',
     // Orphan sweep: script contracts no other CI command ran.
     SCRIPT_CONTRACT_NODE_COMMAND,

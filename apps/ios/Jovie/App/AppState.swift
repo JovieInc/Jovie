@@ -92,8 +92,22 @@ final class AppState {
   }
 
   private let captureProfileLoadCurrentness: (String) -> ProfileLoadContext?
-  private var profileLoadAttempt: ProfileLoadAttempt?
-  private var profileLoadTask: Task<Void, Never>?
+  private enum Reconciliation {
+    case profile(ProfileLoadAttempt, Task<Void, Never>)
+    case terminal(UUID, NativeSessionOwnership, String?, Task<Void, Never>)
+    case completed(NativeSessionOwnership)
+  }
+  private var reconciliation: Reconciliation?
+  private var profileLoadAttempt: ProfileLoadAttempt? {
+    if case let .profile(attempt, _) = reconciliation { return attempt }
+    return nil
+  }
+  private func isTerminalOwner(_ owner: NativeSessionOwnership?) -> Bool {
+    switch reconciliation {
+    case let .terminal(_, current, _, _), let .completed(current): current == owner
+    default: false
+    }
+  }
   // Matches SplashView's cinematic entrance (JovieMotion.cinematicDuration)
   // so the primary logo reveal completes before the route crossfade starts.
   private let minimumSplashDuration = JovieMotion.cinematicDuration
@@ -239,6 +253,7 @@ final class AppState {
       return
     }
 
+    guard !isTerminalOwner(attempt.context.ownership) else { return }
     let retiredTask = retireProfileLoad()
     activeUserID = userID
     activeSessionOwnership = attempt.context.ownership
@@ -247,7 +262,6 @@ final class AppState {
     Task {
       await pushNotifications.activate()
     }
-    profileLoadAttempt = attempt
     // Repository waits belong to the installed profile, not the initiating view.
     // Keep the owner weak between waits; only terminal cleanup retains it async.
     let task = Task { [weak self, repository] in
@@ -282,7 +296,7 @@ final class AppState {
         self?.presentProfileFailure(error, for: attempt)
       }
     }
-    profileLoadTask = task
+    reconciliation = .profile(attempt, task)
     retiredTask?.cancel()
     await task.value
   }
@@ -290,9 +304,8 @@ final class AppState {
   // Detachment is safe under the token-store lock; cancellation is not, because
   // a task's cancellation handlers can synchronously re-enter that store.
   private func retireProfileLoad() -> Task<Void, Never>? {
-    let task = profileLoadTask
-    profileLoadAttempt = nil
-    profileLoadTask = nil
+    guard case let .profile(_, task) = reconciliation else { return nil }
+    reconciliation = nil
     return task
   }
 
@@ -414,8 +427,10 @@ final class AppState {
     let claim = NativeSessionTokenStore.claimCleanup(invalidatingAuthIntent: true)
     var userID: String?
     var retiredTask: Task<Void, Never>?
-    guard NativeSessionTokenStore.performIfCurrent(claim, { _ in
+    guard NativeSessionTokenStore.performIfCurrent(claim, { context in
       userID = activeUserID
+      if userID == nil, case let .terminal(_, owner, previousUser, _) = reconciliation,
+         owner == context.ownership { userID = previousUser }
       retiredTask = retireProfileLoad()
     }) else { return nil }
     retiredTask?.cancel()
@@ -453,17 +468,42 @@ final class AppState {
   }
 
   func handleExpiredSession(_ receipt: NativeSessionExpiryReceipt) async {
-    var userID: String?
-    var retiredTask: Task<Void, Never>?
-    guard NativeSessionTokenStore.performIfCurrent(receipt.ownership, {
-      let reset = resetSignedOutPresentation()
-      userID = reset.userID
-      retiredTask = reset.task
-    }) else { return }
-    // This receipt may come from the detached task; never cancel or join it early.
-    defer { retiredTask?.cancel() }
-    await pushNotifications.deactivateLocally(ifOwnedBy: receipt.ownership)
-    await clearCaches(for: userID, ifOwnedBy: receipt.ownership)
+    var task: Task<Void, Never>?
+    NativeSessionTokenStore.performIfCurrent(receipt.ownership) {
+      task = installTerminalCleanup(ownedBy: receipt.ownership,
+        userID: receipt.userID ?? activeUserID)
+    }
+    await task?.value
+  }
+
+  private func installTerminalCleanup(
+    ownedBy owner: NativeSessionOwnership, userID: String?
+  ) -> Task<Void, Never>? {
+    switch reconciliation {
+    case let .terminal(_, current, _, task) where current == owner: return task
+    case let .completed(current) where current == owner: return nil
+    default: break
+    }
+    let retired = resetSignedOutPresentation().task
+    let id = UUID()
+    let task = Task { [weak self, pushNotifications, repository, chatCache, audienceHighlightsCache, actionLoopCache] in
+      // A profile task may await us; never join it, or cancel it before cleanup.
+      defer { retired?.cancel(); self?.finishTerminal(id, ownedBy: owner) }
+      await pushNotifications.deactivateLocally(ifOwnedBy: owner)
+      if let userID {
+        await repository.clearCachedUser(userID, ifOwnedBy: owner)
+        await chatCache.remove(for: userID, ifOwnedBy: owner)
+        await audienceHighlightsCache.remove(for: userID, ifOwnedBy: owner)
+        await actionLoopCache.remove(for: userID, ifOwnedBy: owner)
+      }
+    }
+    reconciliation = .terminal(id, owner, userID, task)
+    return task
+  }
+
+  private func finishTerminal(_ id: UUID, ownedBy owner: NativeSessionOwnership) {
+    guard case let .terminal(current, _, _, _) = reconciliation, current == id else { return }
+    reconciliation = .completed(owner)
   }
 
   private func finishCleanup(
