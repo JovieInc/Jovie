@@ -107,6 +107,7 @@ function parseFailureDescription(description) {
   };
 }
 
+/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[] }} [input] */
 export function classifyMergeGroupFailure({
   conclusion,
   failedSteps = [],
@@ -225,6 +226,7 @@ export function parseTrustedRetryStatus(status, repository) {
 
 // The exact commit endpoint scopes failures: deterministic blocks immediately;
 // other failures receive one queue-authority retry.
+/** @param {{ statuses?: unknown[], repository?: string, currentMainSha?: string }} input */
 export function revisionFailureDisposition({
   statuses,
   repository,
@@ -382,6 +384,10 @@ function validateRun(run, repository) {
 
 // Persist the exact-source failure before removing native merge intent. A new
 // head keeps the old receipt and receives no dequeue/disable mutation.
+/**
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string }} input
+ * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
+ */
 export async function applyMergeGroupFailure(
   {
     repository,

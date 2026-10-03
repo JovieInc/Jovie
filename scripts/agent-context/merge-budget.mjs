@@ -34,6 +34,7 @@ export function mergedBudgetExcesses(sizes) {
 /** Byte-check budget files as they would exist after merging head onto base.
  * PRs that do not touch those files skip the check, so an already-over base
  * does not fail every other pull request.
+ * @param {{ cwd?: string, base?: string, head?: string, run?: (cwd: string, args: string[]) => string }} [input]
  */
 export function evaluateMergedBudgets({
   cwd = process.cwd(),

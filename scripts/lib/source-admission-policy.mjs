@@ -78,6 +78,7 @@ export function evaluateLinearReferencePolicy({ title, body }) {
  * @property {AdmissionReview[]} [reviews]
  * @property {AdmissionStatus[]} [statuses]
  * @property {boolean} [complete]
+ * @property {string} [currentMainSha]
  *
  * @typedef {{allowed: boolean, blockers?: string[]}} AdmissionDecision
  * @typedef {{repository: string, prNumber: number, expectedHead: string, token?: string}} AdmissionRequest
