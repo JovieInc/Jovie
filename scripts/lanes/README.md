@@ -544,6 +544,15 @@ and is never re-run. Linked `Design brief:` docs are never overwritten.
 `needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
 `rejectedByProvider["needs-design-brief"]`.
 
+Design loop (JOV-7759): a gated issue's build prompt carries
+`DESIGN_LOOP_CONTRACT`. The lane plans from the brief, builds, and iterates
+privately until `pnpm design:conformance:gate`, `pnpm invariants:check` and the
+copy gate are green; `scripts/funnel-judge` also runs on funnel surfaces. The
+conformance gate includes `scripts/design-frontend-skill-check.mjs`, the
+deterministic subset of the frontend-skill contract, applied to added UI lines
+only. `scripts/automation-verify.sh affected` runs it as well, so the lane's
+own gate fails before CI does.
+
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
 is truthy, and unreadable briefs stay warnings even then.
