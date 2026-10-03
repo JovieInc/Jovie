@@ -62,6 +62,37 @@ struct NativeSessionExpiryReceipt: Equatable, Sendable {
   fileprivate let originalRevision: UUID?
 }
 
+struct NativeAuthAttempt: Equatable, Sendable {
+  fileprivate let intent: UUID
+}
+
+struct NativeAuthResolution: Equatable, Sendable {
+  enum Outcome: Equatable, Sendable { case persisted, preserved, consumed, unknown }
+  enum Origin: Equatable, Sendable { case persistence, cancellation }
+  let outcome: Outcome
+  let origin: Origin
+  let storageWasUntouched: Bool
+  let ownership: NativeSessionOwnership
+  let cleanupUserID: String?
+  fileprivate let intent: UUID
+  fileprivate let delivery = UUID()
+}
+
+/// Only the raw Security calls are replaceable; classification always runs here.
+struct NativeSessionSecurityOperations: Sendable {
+  var delete: @Sendable (CFDictionary) -> OSStatus
+  var add: @Sendable (CFDictionary) -> OSStatus
+  var copy: @Sendable (CFDictionary) -> (OSStatus, Data?)
+  static let live = Self(
+    delete: { SecItemDelete($0) }, add: { SecItemAdd($0, nil) },
+    copy: { query in
+      var item: CFTypeRef?
+      let status = SecItemCopyMatching(query, &item)
+      return (status, item as? Data)
+    }
+  )
+}
+
 enum NativeSessionRequestError: Error, Equatable {
   case expired(NativeSessionExpiryReceipt)
   case superseded
@@ -76,6 +107,9 @@ enum NativeSessionTokenStore {
     var bearerRevision = UUID()
     var intent = UUID()
     var expiryReceipt: NativeSessionExpiryReceipt?
+    var pendingAuth: UUID?
+    var delivery: UUID?
+    var security = NativeSessionSecurityOperations.live
   }
 
   private static let state = State()
@@ -89,6 +123,8 @@ enum NativeSessionTokenStore {
   static func save(token: String, userID: String, expiresAt: Date) {
     withLock {
       state.intent = UUID()
+      state.pendingAuth = nil
+      state.delivery = nil
       state.generation = UUID()
       state.bearerRevision = UUID()
       state.expiryReceipt = nil
@@ -96,21 +132,23 @@ enum NativeSessionTokenStore {
     }
   }
 
-  private static func saveLocked(token: String, userID: String, expiresAt: Date) {
-    guard let data = token.data(using: .utf8) else { return }
+  private struct WriteResult { let deleted: OSStatus; let added: OSStatus }
 
-    clearToken()
+  @discardableResult
+  private static func saveLocked(token: String, userID: String, expiresAt: Date) -> WriteResult {
+    let data = Data(token.utf8)
+    let deleted = clearToken()
 
     var addQuery = baseQuery()
     addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
     addQuery[kSecValueData as String] = data
-    let status = SecItemAdd(addQuery as CFDictionary, nil)
+    let status = state.security.add(addQuery as CFDictionary)
 
     if status == errSecSuccess {
       UserDefaults.standard.removeObject(forKey: fallbackTokenKey)
       UserDefaults.standard.set(userID, forKey: userIDKey)
       UserDefaults.standard.set(expiresAt.timeIntervalSince1970, forKey: expiresAtKey)
-      return
+      return WriteResult(deleted: deleted, added: status)
     }
 
 #if targetEnvironment(simulator)
@@ -120,6 +158,263 @@ enum NativeSessionTokenStore {
       UserDefaults.standard.set(expiresAt.timeIntervalSince1970, forKey: expiresAtKey)
     }
 #endif
+    return WriteResult(deleted: deleted, added: status)
+  }
+
+  // Accepted typed returns share the same intent as logout; passive expiry and
+  // bearer rotation never supersede an accepted return.
+  static func beginAuthAttempt() -> NativeAuthAttempt {
+    withLock {
+      state.intent = UUID()
+      state.pendingAuth = state.intent
+      state.delivery = nil
+      return NativeAuthAttempt(intent: state.intent)
+    }
+  }
+
+  static var hasPendingAuth: Bool { withLock { state.pendingAuth == state.intent } }
+
+  @discardableResult
+  static func performIfNoPendingAuth(_ operation: () -> Void) -> Bool {
+    withLock {
+      guard state.pendingAuth != state.intent else { return false }
+      operation()
+      return true
+    }
+  }
+
+  private static func isCurrentLocked(_ attempt: NativeAuthAttempt) -> Bool {
+    state.intent == attempt.intent && state.pendingAuth == attempt.intent
+  }
+
+  @discardableResult
+  static func performIfCurrent(_ attempt: NativeAuthAttempt, _ operation: () -> Void) -> Bool {
+    withLock {
+      guard isCurrentLocked(attempt) else { return false }
+      operation()
+      return true
+    }
+  }
+
+  static func commit(_ attempt: NativeAuthAttempt, session: NativeStoredSession) -> NativeAuthResolution? {
+    withLock {
+      guard isCurrentLocked(attempt) else { return nil }
+      let before = storageSnapshotLocked()
+      if Task.isCancelled { return cancelAuthLocked(before) }
+      guard before.readable else { return resolveAuthLocked(.unknown, userID: nil, untouched: true) }
+      // This is the last cancellation check. Once delete/add starts, read back
+      // and hand off its real outcome even if the caller becomes cancelled.
+      if Task.isCancelled { return cancelAuthLocked(before) }
+      let write = saveLocked(token: session.token, userID: session.userID, expiresAt: session.expiresAt)
+      let after = storageSnapshotLocked()
+      var persisted = write.added == errSecSuccess && after.backend == .keychain
+#if targetEnvironment(simulator)
+      persisted = persisted || (write.added == errSecMissingEntitlement && after.backend == .fallback)
+#endif
+      if persisted, let stored = after.session, stored.userID == session.userID,
+         stored.token == session.token, after.expiry == session.expiresAt.timeIntervalSince1970 {
+        advanceGenerationLocked()
+        return resolveAuthLocked(.persisted, userID: nil)
+      }
+      if before == after, before.validSession != nil {
+        return resolveAuthLocked(.preserved, userID: nil)
+      }
+      if after.readable, after.status == errSecItemNotFound, after.fallback == nil {
+        let receipt = currentReceiptLocked()
+        if receipt == nil { advanceGenerationLocked() }
+        clearMetadataLocked()
+        return resolveAuthLocked(.consumed, userID: before.userID ?? receipt?.userID)
+      }
+      // Mixed/readback-unknown bytes are not evidence for another deletion.
+      fenceMetadataLocked()
+      return resolveAuthLocked(.unknown, userID: nil)
+    }
+  }
+
+  /// Cancellation/disappearance can finish a still-pending exchange even when
+  /// its network dependency ignores cancellation and never returns.
+  static func cancelAuthAttempt(_ attempt: NativeAuthAttempt) -> NativeAuthResolution? {
+    withLock {
+      guard isCurrentLocked(attempt) else { return nil }
+      return cancelAuthLocked(storageSnapshotLocked())
+    }
+  }
+
+  private static func cancelAuthLocked(_ snapshot: StorageSnapshot) -> NativeAuthResolution {
+    if snapshot.readable, let session = snapshot.session,
+       session.expiresAt.timeIntervalSinceNow <= expiryLeeway {
+      _ = expireLocked(userID: session.userID)
+    }
+    return resolveAuthLocked(snapshot.validSession == nil ? .unknown : .preserved,
+      userID: nil, origin: .cancellation, untouched: true)
+  }
+
+  /// Genuine exchange failure consumes the lease into the existing cleanup
+  /// pipeline. Its pending phase ends only when that owned cleanup finishes.
+  static func claimCleanup(for attempt: NativeAuthAttempt) -> NativeSessionCleanupClaim? {
+    withLock {
+      guard isCurrentLocked(attempt), !Task.isCancelled else { return nil }
+      let context = captureSessionContextLocked()
+      // Failed B must join A's existing expiry, not clear away its authority.
+      guard currentReceiptLocked() == nil else { return nil }
+      state.intent = UUID()
+      state.pendingAuth = state.intent
+      state.delivery = nil
+      return NativeSessionCleanupClaim(context: context, intent: state.intent)
+    }
+  }
+
+  static func finishAuthCleanup(_ completion: NativeSessionCleanupCompletion) {
+    withLock {
+      guard state.intent == completion.intent else { return }
+      state.pendingAuth = nil
+    }
+  }
+
+  private static func resolveAuthLocked(
+    _ outcome: NativeAuthResolution.Outcome, userID: String?,
+    origin: NativeAuthResolution.Origin = .persistence, untouched: Bool = false
+  ) -> NativeAuthResolution {
+    state.intent = UUID()
+    state.pendingAuth = nil
+    let result = NativeAuthResolution(outcome: outcome, origin: origin, storageWasUntouched: untouched,
+      ownership: NativeSessionOwnership(generation: state.generation), cleanupUserID: userID,
+      intent: state.intent)
+    state.delivery = result.delivery
+    return result
+  }
+
+  private static func isCurrentLocked(_ result: NativeAuthResolution) -> Bool {
+    state.intent == result.intent && (state.generation == result.ownership.generation ||
+      currentReceiptLocked()?.originalGeneration == result.ownership.generation)
+  }
+
+  /// One dispatch; the reusable result guard below does not grant a second one.
+  /// The synchronous body must not call back into this store.
+  @discardableResult
+  static func consume(
+    _ result: NativeAuthResolution,
+    _ operation: (NativeStoredSession?, NativeSessionExpiryReceipt?) -> Void
+  ) -> Bool {
+    withLock {
+      guard state.delivery == result.delivery, isCurrentLocked(result) else { return false }
+      state.delivery = nil
+      let session = result.outcome == .persisted || result.outcome == .preserved ? loadLocked() : nil
+      operation(session, currentReceiptLocked())
+      return true
+    }
+  }
+
+  @discardableResult
+  static func performIfCurrent(_ result: NativeAuthResolution, _ operation: () -> Void) -> Bool {
+    withLock {
+      guard isCurrentLocked(result) else { return false }
+      operation()
+      return true
+    }
+  }
+
+  /// All ordinary profile presentation observes pending intent atomically.
+  @discardableResult
+  static func performProfileMutation(
+    ownedBy ownership: NativeSessionOwnership, result: NativeAuthResolution? = nil,
+    _ operation: () -> Void
+  ) -> Bool {
+    withLock {
+      guard state.pendingAuth != state.intent else { return false }
+      if let result, !isCurrentLocked(result) { return false }
+      guard state.generation == ownership.generation ||
+        currentReceiptLocked()?.originalGeneration == ownership.generation else { return false }
+      operation()
+      return true
+    }
+  }
+
+  /// Receipt cleanup keeps its authority during pending auth, but presentation
+  /// belongs to that pending attempt. No ownership is manufactured by a clear.
+  @discardableResult
+  static func performIfCurrent(
+    _ receipt: NativeSessionExpiryReceipt, _ operation: (Bool) -> Void
+  ) -> Bool {
+    withLock {
+      guard currentReceiptLocked() == receipt else { return false }
+      operation(state.pendingAuth == state.intent)
+      return true
+    }
+  }
+
+  // Tests hold NativeSessionTokenStoreTestLock across replacement and restore.
+  // These raw synchronous callbacks must never re-enter the store.
+  static func replaceSecurityOperationsForTesting(
+    _ operations: NativeSessionSecurityOperations
+  ) -> NativeSessionSecurityOperations {
+    withLock {
+      let previous = state.security
+      state.security = operations
+      return previous
+    }
+  }
+
+  private struct StorageSnapshot: Equatable {
+    enum Backend { case keychain, fallback }
+    let status: OSStatus
+    let data: Data?
+    let userID: String?
+    let expiry: Double?
+    let fallback: String?
+    var readable: Bool {
+#if targetEnvironment(simulator)
+      (status == errSecSuccess && data != nil) || status == errSecItemNotFound || status == errSecMissingEntitlement
+#else
+      (status == errSecSuccess && data != nil) || status == errSecItemNotFound
+#endif
+    }
+    var backend: Backend? {
+      if status == errSecSuccess { return .keychain }
+#if targetEnvironment(simulator)
+      if readable, fallback != nil { return .fallback }
+#endif
+      return nil
+    }
+    var session: NativeStoredSession? {
+      guard readable, let backend, let userID, !userID.isEmpty, let expiry, expiry.isFinite else { return nil }
+      let token = backend == .keychain ? data.flatMap { String(data: $0, encoding: .utf8) } : fallback
+      guard let token, !token.isEmpty else { return nil }
+      return NativeStoredSession(userID: userID, token: token, expiresAt: Date(timeIntervalSince1970: expiry))
+    }
+    var validSession: NativeStoredSession? {
+      guard let session, session.expiresAt.timeIntervalSinceNow > expiryLeeway else { return nil }
+      return session
+    }
+  }
+
+  private static func storageSnapshotLocked() -> StorageSnapshot {
+    let (status, data) = copyToken()
+#if targetEnvironment(simulator)
+    let fallback = UserDefaults.standard.string(forKey: fallbackTokenKey)
+#else
+    let fallback: String? = nil
+#endif
+    return StorageSnapshot(status: status, data: data,
+      userID: UserDefaults.standard.string(forKey: userIDKey),
+      expiry: UserDefaults.standard.object(forKey: expiresAtKey) as? Double,
+      fallback: fallback)
+  }
+
+  private static func advanceGenerationLocked() {
+    state.generation = UUID()
+    state.bearerRevision = UUID()
+    state.expiryReceipt = nil
+  }
+
+  private static func fenceMetadataLocked() {
+    advanceGenerationLocked()
+    clearMetadataLocked()
+  }
+
+  private static func clearMetadataLocked() {
+    UserDefaults.standard.removeObject(forKey: userIDKey)
+    UserDefaults.standard.removeObject(forKey: expiresAtKey)
   }
 
   static func load() -> NativeStoredSession? {
@@ -253,9 +548,20 @@ enum NativeSessionTokenStore {
     )
   }
 
+  static func claimOrdinaryCleanup() -> NativeSessionCleanupClaim? {
+    withLock {
+      guard state.pendingAuth != state.intent else { return nil }
+      return NativeSessionCleanupClaim(context: captureSessionContextLocked(), intent: state.intent)
+    }
+  }
+
   static func claimCleanup(invalidatingAuthIntent: Bool = false) -> NativeSessionCleanupClaim {
     withLock {
-      if invalidatingAuthIntent { state.intent = UUID() }
+      if invalidatingAuthIntent {
+        state.intent = UUID()
+        state.pendingAuth = nil
+        state.delivery = nil
+      }
       return NativeSessionCleanupClaim(context: captureSessionContextLocked(), intent: state.intent)
     }
   }
@@ -380,6 +686,8 @@ enum NativeSessionTokenStore {
   static func clear() {
     withLock {
       state.intent = UUID()
+      state.pendingAuth = nil
+      state.delivery = nil
       clearLocked()
     }
   }
@@ -435,12 +743,8 @@ enum NativeSessionTokenStore {
   }
 
   private static func loadToken() -> String? {
-    var query = baseQuery()
-    query[kSecReturnData as String] = true
-    query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-    var item: CFTypeRef?
-    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess else {
+    let (status, data) = copyToken()
+    guard status == errSecSuccess else {
 #if targetEnvironment(simulator)
       return UserDefaults.standard.string(forKey: fallbackTokenKey)
 #else
@@ -448,15 +752,23 @@ enum NativeSessionTokenStore {
 #endif
     }
 
-    guard let data = item as? Data else {
+    guard let data else {
       return nil
     }
 
     return String(data: data, encoding: .utf8)
   }
 
-  private static func clearToken() {
-    SecItemDelete(baseQuery() as CFDictionary)
+  private static func copyToken() -> (OSStatus, Data?) {
+    var query = baseQuery()
+    query[kSecReturnData as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    return state.security.copy(query as CFDictionary)
+  }
+
+  @discardableResult
+  private static func clearToken() -> OSStatus {
+    state.security.delete(baseQuery() as CFDictionary)
   }
 
   private static func baseQuery() -> [String: Any] {
