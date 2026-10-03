@@ -1821,9 +1821,32 @@ ${selectedGateScript}`,
         '--arg',
         'run',
         runUrl,
+        '--arg',
+        'risk_level',
+        'medium',
+        '--arg',
+        'rules',
+        'api-write',
+        '--argjson',
+        'requires_smoke',
+        'true',
+        '--argjson',
+        'requires_preview',
+        'false',
+        '--argjson',
+        'blocks_unattended',
+        'false',
         query,
       ],
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_SHA: 'a'.repeat(40),
+          GITHUB_RUN_ID: '7',
+          GITHUB_RUN_ATTEMPT: '1',
+        },
+      }
     );
     expect(
       result.status,
@@ -1835,6 +1858,7 @@ ${selectedGateScript}`,
       lanes: {
         web: ['success', 'success', 'success'],
       },
+      riskReceipt: { risk_level: 'medium', requires_smoke: true },
     });
   });
 
