@@ -25,6 +25,7 @@
 import {
   isInternalOrTestAccountEmail,
   normalizeEmail,
+  PRODUCTION_CANARY_EMAIL_TAG,
   SYNTHETIC_PRINCIPAL_EMAIL_TAG,
 } from '@/lib/utils/email';
 
@@ -107,7 +108,14 @@ export function parseSyntheticPrincipalEmail(
   const atIndex = normalized.lastIndexOf('@');
   if (atIndex <= 0 || atIndex === normalized.length - 1) return null;
 
-  const match = SYNTHETIC_TAG_PATTERN.exec(normalized.slice(0, atIndex));
+  const localPart = normalized.slice(0, atIndex);
+  // The production waitlist canary keeps its reserved identity; it is the
+  // roster's `canary` actor rather than a second synthetic marker.
+  if (localPart.endsWith(PRODUCTION_CANARY_EMAIL_TAG)) {
+    return { actorId: 'canary', runTag: null };
+  }
+
+  const match = SYNTHETIC_TAG_PATTERN.exec(localPart);
   if (!match) return null;
   const runTag = match[2] ?? null;
   if (runTag !== null && !RUN_TAG_PATTERN.test(runTag)) return null;

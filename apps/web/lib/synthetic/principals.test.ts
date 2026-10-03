@@ -40,6 +40,7 @@ describe('parseSyntheticPrincipalEmail', () => {
       '2026.10.03-a',
     ],
     ['ops+synthetic-unknownbot@mail.example', 'unknownbot', null],
+    ['ops+jovie-prod-waitlist-canary@mail.example', 'canary', null],
   ])('parses %s', (email, actorId, runTag) => {
     expect(parseSyntheticPrincipalEmail(email)).toEqual({ actorId, runTag });
   });
@@ -99,6 +100,8 @@ describe('metrics quarantine composes with the JOV-7362 classifier', () => {
     ...SYNTHETIC_PRINCIPALS.map(p => `ops+synthetic-${p.actorId}@gmail.com`),
     // Unknown or revoked actors stay quarantined; status never un-hides them.
     'ops+synthetic-retiredbot-run1@gmail.com',
+    // The existing production waitlist canary identity.
+    'ops+jovie-prod-waitlist-canary@gmail.com',
   ])('excludes %s from customer metrics in JS and SQL', email => {
     expect(isInternalOrTestAccountEmail(email)).toBe(true);
     expect(sqlPattern.test(email.toLowerCase())).toBe(true);
