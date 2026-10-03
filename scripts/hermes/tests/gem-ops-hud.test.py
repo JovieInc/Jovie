@@ -299,7 +299,7 @@ class VersionedHudContractTests(unittest.TestCase):
         self.assertEqual(graphql.call_count, 3)
         self.assertEqual(graphql.call_args_list[2].args[1]["after"], "next")
 
-    def test_retired_github_fallback_keeps_linear_as_degraded_source(self):
+    def test_github_fallback_is_explicitly_degraded(self):
         with (
             mock.patch.object(
                 HUD,

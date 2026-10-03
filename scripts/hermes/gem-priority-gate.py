@@ -1113,11 +1113,6 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and 1 <= measured_target <= 8
         else 0
     )
-    remediation_concurrency = (
-        gem_concurrency
-        if gem_concurrency > 0
-        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
-    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1272,7 +1267,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "pushAllowed": remediation_push_allowed,
             "activities": remediation_local_activities
             + (["expected-head-pr-update"] if remediation_push_allowed else []),
-            "maxConcurrent": remediation_concurrency,
+            "maxConcurrent": gem_concurrency,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -1526,7 +1521,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
+            "maxConcurrent": 0,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {

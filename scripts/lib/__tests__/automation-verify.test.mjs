@@ -737,6 +737,7 @@ describe('automation-verify affected scope', () => {
     expect(plan).toMatchObject({
       mode: 'selected',
       selectedTests: [],
+      pythonTests: ['scripts/tests/test_symphony_reconciler_runtime.py'],
       pythonUnittestTests: [
         'scripts/hermes/tests/gem-priority-gate.test.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
@@ -768,6 +769,9 @@ describe('automation-verify affected scope', () => {
       expect(plan.mode).toBe('selected');
       expect(plan.pythonUnittestTests).toContain(
         'scripts/hermes/tests/symphony-reconciler.test.py'
+      );
+      expect(plan.pythonTests).toContain(
+        'scripts/tests/test_symphony_reconciler_runtime.py'
       );
     }
   });

@@ -12,6 +12,7 @@ repair emits a terminal receipt naming the external GitHub-runner handoff.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import fcntl
 import hashlib
@@ -19,11 +20,15 @@ import json
 import os
 import pathlib
 import re
+import select
 import shlex
 import shutil
+import socket
+import socketserver
 import subprocess
 import sys
 import tempfile
+import threading
 import urllib.error
 import urllib.request
 
@@ -38,6 +43,8 @@ DEFAULT_WORKSPACES = "~/symphony-workspaces"
 DEFAULT_STATE = "~/.local/state/symphony-reconciler"
 DEFAULT_CAPABILITY_MANIFEST = "config/symphony-reconciler-capabilities.json"
 DEFAULT_FLEET_GATE_RECEIPT = "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json"
+DEFAULT_REPAIR_AGENT_ROOT = "/home/timwhite/.hermes/hermes-agent"
+DEFAULT_REPAIR_BWRAP = "/usr/bin/bwrap"
 MODEL_ID = "qwen-coder-local"
 MODEL_TIMEOUT_SECONDS = 12 * 60
 RETRY_MINUTES = 15
@@ -53,6 +60,7 @@ CONSUMED_LOCAL_REPAIR_STATUSES = frozenset(
     }
 )
 FLEET_GATE_RECEIPT_MAX_AGE = dt.timedelta(minutes=10)
+FLEET_GATE_RECEIPT_FUTURE_SKEW = dt.timedelta(seconds=60)
 SYMPHONY_SERVICE = "symphony-ui-pilot.service"
 REQUIRED_RUNTIME_CAPABILITIES = frozenset(
     {
@@ -69,7 +77,11 @@ def _stale_capacity_local_remediation_limit(
     receipt_path: pathlib.Path | None = None,
 ) -> tuple[int, str]:
     """Admit only the fail-closed, local-only stale-capacity recovery lane."""
-    path = receipt_path or pathlib.Path(DEFAULT_FLEET_GATE_RECEIPT)
+    path = receipt_path or pathlib.Path(
+        os.path.expanduser(
+            os.environ.get("GEM_FLEET_GATE_RECEIPT", DEFAULT_FLEET_GATE_RECEIPT)
+        )
+    )
     try:
         receipt = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError):
@@ -100,15 +112,18 @@ def _stale_capacity_local_remediation_limit(
         and remediation.get("allowed") is True
         and remediation.get("localAllowed") is True
         and remediation.get("pushAllowed") is False
-        and remediation.get("maxConcurrent") == 1
+        and remediation.get("maxConcurrent") == 0
         and evidence.get("accepted") is False
         and gem.get("evidenceAccepted") is False
         and gem.get("newMutationAllowed") is False
         and gem.get("maxConcurrent") == 0
+        and gem.get("runtimeFloor") == 1
         and work.get("newIssueLeaseAllowed") is False
         and work.get("newImplementationAllowed") is False
         and age is not None
-        and dt.timedelta(0) <= age <= FLEET_GATE_RECEIPT_MAX_AGE
+        and -FLEET_GATE_RECEIPT_FUTURE_SKEW
+        <= age
+        <= FLEET_GATE_RECEIPT_MAX_AGE
     )
     if not safe_stale_lane:
         return 0, "fleet_gate_local_remediation_not_admitted"
@@ -130,6 +145,253 @@ def _acquire_local_remediation_lease():
 def _release_local_remediation_lease(handle) -> None:
     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
     handle.close()
+
+
+class _ThreadingUnixStreamServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+    daemon_threads = True
+
+
+def _proxy_stream(left: socket.socket, right: socket.socket) -> None:
+    sockets = [left, right]
+    try:
+        while sockets:
+            readable, _, _ = select.select(sockets, [], [], 1.0)
+            for source in readable:
+                data = source.recv(64 * 1024)
+                if not data:
+                    return
+                target = right if source is left else left
+                target.sendall(data)
+    except OSError:
+        return
+
+
+@contextlib.contextmanager
+def _local_model_loopback_proxy():
+    """Expose only Gem's loopback Ollama socket to the network-isolated sandbox."""
+    root = _state_root()
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with tempfile.TemporaryDirectory(prefix="ollama-proxy-", dir=root) as tmp:
+        directory = pathlib.Path(tmp)
+        socket_path = directory / "ollama.sock"
+        port = int(os.environ.get("SYMPHONY_OLLAMA_PORT", "11434"))
+        if not 1 <= port <= 65535:
+            raise ValueError("SYMPHONY_OLLAMA_PORT must be a valid TCP port")
+
+        class Handler(socketserver.BaseRequestHandler):
+            def handle(self) -> None:
+                try:
+                    upstream = socket.create_connection(("127.0.0.1", port), timeout=10)
+                except OSError:
+                    return
+                with upstream:
+                    _proxy_stream(self.request, upstream)
+
+        server = _ThreadingUnixStreamServer(str(socket_path), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield directory
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
+
+SANDBOX_PROXY_BOOTSTRAP = r"""
+import select
+import socket
+import subprocess
+import sys
+import threading
+
+socket_path = sys.argv[1]
+command = sys.argv[2:]
+stop = threading.Event()
+ready = threading.Event()
+
+def bridge(left, right):
+    sockets = [left, right]
+    try:
+        while sockets and not stop.is_set():
+            readable, _, _ = select.select(sockets, [], [], 0.5)
+            for source in readable:
+                data = source.recv(65536)
+                if not data:
+                    return
+                (right if source is left else left).sendall(data)
+    except OSError:
+        return
+    finally:
+        left.close()
+        right.close()
+
+def serve():
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 11434))
+    listener.listen(8)
+    listener.settimeout(0.5)
+    ready.set()
+    while not stop.is_set():
+        try:
+            client, _ = listener.accept()
+        except TimeoutError:
+            continue
+        upstream = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            upstream.connect(socket_path)
+        except OSError:
+            client.close()
+            upstream.close()
+            continue
+        threading.Thread(target=bridge, args=(client, upstream), daemon=True).start()
+    listener.close()
+
+thread = threading.Thread(target=serve, daemon=True)
+thread.start()
+if not ready.wait(5):
+    raise SystemExit(78)
+completed = subprocess.run(command, check=False)
+stop.set()
+thread.join(timeout=2)
+raise SystemExit(completed.returncode)
+"""
+
+
+def _sandbox_parent_directories(path: pathlib.Path) -> list[str]:
+    parents = list(path.parents)[:-1]
+    precreated = {"/", "/home", "/run", "/tmp", "/usr"}
+    return [
+        str(parent)
+        for parent in reversed(parents)
+        if str(parent) not in precreated
+    ]
+
+
+def _sandboxed_executor_command(
+    executable: str,
+    argv: list[str],
+    workspace: pathlib.Path,
+    proxy_directory: pathlib.Path,
+) -> tuple[list[str] | None, str]:
+    """Build a credential-free, exact-workspace Bubblewrap command or fail closed."""
+    bwrap_value = os.environ.get("SYMPHONY_REPAIR_BWRAP", DEFAULT_REPAIR_BWRAP)
+    bwrap = pathlib.Path(bwrap_value)
+    if not bwrap.is_file() or not os.access(bwrap, os.X_OK):
+        return None, "local_repair_sandbox_missing"
+    agent_root = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get("SYMPHONY_REPAIR_AGENT_ROOT", DEFAULT_REPAIR_AGENT_ROOT)
+        )
+    ).resolve()
+    executable_path = pathlib.Path(executable).resolve()
+    workspace_path = workspace.resolve()
+    proxy_path = proxy_directory.resolve()
+    try:
+        executable_path.relative_to(agent_root)
+    except ValueError:
+        return None, "local_repair_executor_outside_sandbox_root"
+    if not agent_root.is_dir() or not workspace_path.is_dir() or not proxy_path.is_dir():
+        return None, "local_repair_sandbox_path_missing"
+
+    python_link = agent_root / "venv/bin/python"
+    python_root = python_link.resolve().parent.parent if python_link.exists() else None
+    sandbox_directories = set(_sandbox_parent_directories(agent_root))
+    if python_root is not None and not python_root.is_relative_to(agent_root):
+        sandbox_directories.update(_sandbox_parent_directories(python_root))
+    directory_args: list[str] = []
+    for parent in sorted(sandbox_directories, key=lambda value: value.count("/")):
+        directory_args.extend(["--dir", parent])
+    bind_args = ["--ro-bind", str(agent_root), str(agent_root)]
+    if python_root is not None and not python_root.is_relative_to(agent_root):
+        bind_args.extend(["--ro-bind", str(python_root), str(python_root)])
+
+    return (
+        [
+            str(bwrap),
+            "--die-with-parent",
+            "--new-session",
+            "--unshare-all",
+            "--unshare-user",
+            "--disable-userns",
+            "--cap-drop",
+            "ALL",
+            "--ro-bind",
+            "/usr",
+            "/usr",
+            "--symlink",
+            "usr/bin",
+            "/bin",
+            "--symlink",
+            "usr/sbin",
+            "/sbin",
+            "--symlink",
+            "usr/lib",
+            "/lib",
+            "--symlink",
+            "usr/lib64",
+            "/lib64",
+            "--proc",
+            "/proc",
+            "--dev",
+            "/dev",
+            "--tmpfs",
+            "/tmp",
+            "--dir",
+            "/tmp/home",
+            "--dir",
+            "/tmp/config",
+            "--dir",
+            "/tmp/state",
+            "--dir",
+            "/tmp/cache",
+            "--dir",
+            "/run",
+            "--dir",
+            "/home",
+            *directory_args,
+            *bind_args,
+            "--bind",
+            str(workspace_path),
+            "/workspace",
+            "--ro-bind",
+            str(proxy_path),
+            "/run/symphony-proxy",
+            "--chdir",
+            "/workspace",
+            "--clearenv",
+            "--setenv",
+            "PATH",
+            "/usr/bin:/bin",
+            "--setenv",
+            "HOME",
+            "/tmp/home",
+            "--setenv",
+            "XDG_CONFIG_HOME",
+            "/tmp/config",
+            "--setenv",
+            "XDG_STATE_HOME",
+            "/tmp/state",
+            "--setenv",
+            "XDG_CACHE_HOME",
+            "/tmp/cache",
+            "--setenv",
+            "PYTHONDONTWRITEBYTECODE",
+            "1",
+            "--setenv",
+            "OLLAMA_HOST",
+            "http://127.0.0.1:11434",
+            "--",
+            "/usr/bin/python3",
+            "-c",
+            SANDBOX_PROXY_BOOTSTRAP,
+            "/run/symphony-proxy/ollama.sock",
+            str(executable_path),
+            *argv,
+        ],
+        "local_repair_sandbox_ready",
+    )
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -1274,14 +1536,31 @@ Work only in the current workspace. Diagnose this exact failure, make the smalle
     executable = str(executor["executable"])
     argv = [value.format(model=selected["model"], prompt=prompt) for value in executor["argv"]]
     try:
-        completed = subprocess.run(
-            [executable, *argv],
-            cwd=workspace,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=_model_timeout_seconds(),
-        )
+        with _local_model_loopback_proxy() as proxy_directory:
+            command, sandbox_reason = _sandboxed_executor_command(
+                executable,
+                argv,
+                workspace,
+                proxy_directory,
+            )
+            if command is None:
+                result.update(
+                    {
+                        "finishedAt": _iso(_now()),
+                        "result": "repair_not_started",
+                        "reason": sandbox_reason,
+                    }
+                )
+                return result, state
+            completed = subprocess.run(
+                command,
+                cwd=workspace,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=_model_timeout_seconds(),
+                env={"PATH": "/usr/bin:/bin"},
+            )
         summary = (completed.stdout or completed.stderr).strip()[-4000:]
         result.update(
             {
@@ -1377,6 +1656,7 @@ def _reconcile_item(
                 },
             }
             _write_receipt(identifier, previous)
+            previous_status = "repair_interrupted"
         _event(
             identifier,
             "completed_local_repair_held",
@@ -1729,6 +2009,8 @@ def main() -> int:
         )
         return 0
     local_slot_available = bool(local_limit)
+    local_repair_attempted = False
+    local_repair_failed = False
     try:
         for source, item in items:
             try:
@@ -1740,9 +2022,11 @@ def main() -> int:
                 attempted = _reconcile_item(item, source, permitted, runtime)
                 if attempted:
                     local_slot_available = False
+                    local_repair_attempted = True
             except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
                 if permitted:
                     local_slot_available = False
+                    local_repair_failed = True
                 _event(
                     str(item.get("issue_identifier") or "unknown"),
                     "item_reconciliation_failed",
@@ -1750,11 +2034,16 @@ def main() -> int:
                     next="retry_timer",
                 )
         if local_limit:
+            transition = (
+                "bounded_local_remediation_admitted"
+                if local_repair_attempted
+                else "bounded_local_remediation_failed"
+                if local_repair_failed
+                else "bounded_local_remediation_available"
+            )
             _event(
                 "control-plane",
-                "bounded_local_remediation_admitted"
-                if local_lease is not None
-                else "bounded_local_remediation_busy",
+                transition,
                 reason=local_reason,
                 capacity=local_limit,
                 observed=len(items),

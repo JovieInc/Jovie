@@ -766,7 +766,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
         self.assertNotIn(
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
@@ -790,8 +790,9 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
                 self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
     def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
         signals = dict(GREEN_SIGNALS)

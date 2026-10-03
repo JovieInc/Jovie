@@ -833,7 +833,7 @@ export function buildAffectedTestPlan(
       mandatoryTests: [],
       selectedTests: [],
       rootVitestTests: [],
-      pythonTests: [],
+      pythonTests: ['scripts/tests/test_symphony_reconciler_runtime.py'],
       pythonUnittestTests: GEM_PR_REHABILITATION_PYTHON_TESTS,
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',

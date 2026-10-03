@@ -9,6 +9,9 @@ Environment=SYMPHONY_MODEL_ROUTER=%h/.local/lib/symphony-reconciler/model-router
 Environment=SYMPHONY_MODEL_REGISTRY=%h/.local/lib/symphony-reconciler/model-registry.json
 Environment=SYMPHONY_RUNTIME_CAPABILITY_MANIFEST=%h/.local/lib/symphony-reconciler/symphony-reconciler-capabilities.json
 Environment=SYMPHONY_RUNTIME_RECEIPT=%h/.local/lib/symphony-reconciler/runtime-receipt.json
+Environment=GEM_FLEET_GATE_RECEIPT=%h/gem-workspace/state/gem-priority-gate/latest.json
+Environment=SYMPHONY_REPAIR_BWRAP=/usr/bin/bwrap
+Environment=SYMPHONY_REPAIR_AGENT_ROOT=%h/.hermes/hermes-agent
 TimeoutStartSec=15min
 Nice=10
 

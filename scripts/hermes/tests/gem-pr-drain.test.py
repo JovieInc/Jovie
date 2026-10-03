@@ -80,6 +80,25 @@ def stale_capacity_receipt():
     )
 
 
+def accepted_capacity_receipt():
+    receipt = stale_capacity_receipt()
+    receipt["signals"]["concurrencyEvidence"]["accepted"] = True
+    receipt["concurrency"]["gem"].update(
+        {
+            "maxConcurrent": 4,
+            "evidenceAccepted": True,
+            "newMutationAllowed": True,
+        }
+    )
+    receipt["remediationAdmission"].update(
+        {"pushAllowed": True, "maxConcurrent": 4}
+    )
+    receipt["remediationAdmission"]["activities"].append(
+        "expected-head-pr-update"
+    )
+    return receipt
+
+
 class JovieOwnershipTests(unittest.TestCase):
     def test_jovie_and_legacy_alias_can_be_stabilized_when_allowlisted(self):
         for repo in ("JovieInc/Jovie", "itstimwhite/Jovie"):
@@ -94,13 +113,19 @@ class JovieOwnershipTests(unittest.TestCase):
         gate = {"remediationAdmission": {"maxConcurrent": 1}}
         self.assertEqual(MODULE.effective_capacity(4, gate), 1)
         self.assertEqual(MODULE.effective_capacity(1, gate), 1)
-        for maximum in (None, 0, -1, True, 1.5):
+        self.assertEqual(
+            MODULE.effective_capacity(
+                4, {"remediationAdmission": {"maxConcurrent": 0}}
+            ),
+            0,
+        )
+        for maximum in (None, -1, True, 1.5):
             with self.subTest(maximum=maximum), self.assertRaises(ValueError):
                 MODULE.effective_capacity(
                     4, {"remediationAdmission": {"maxConcurrent": maximum}}
                 )
 
-    def test_stale_capacity_receipt_processes_one_bounded_item_without_remote_mutation(self):
+    def test_stale_capacity_dry_run_exits_cleanly_without_pr_inventory(self):
         receipt = stale_capacity_receipt()
         first = self._open_pr(
             1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
@@ -137,15 +162,16 @@ class JovieOwnershipTests(unittest.TestCase):
 
         document = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0, document)
-        self.assertEqual(document["capacity"], 1)
-        self.assertEqual([item["number"] for item in document["selected"]], [1])
-        self.assertEqual(len(document["processed"]), 1)
-        self.assertEqual(document["processed"][0]["reason"], "dry_run_no_mutation")
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
+        self.assertEqual(document["processed"], [])
+        self.assertEqual(document["remediation_admission"], "local_only")
+        self.assertEqual(document["intake"], "blocked_missing_capacity_evidence")
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
         update_one.assert_not_called()
 
-    def test_stale_capacity_non_dry_drain_processes_one_without_remote_mutation(self):
+    def test_stale_capacity_non_dry_drain_exits_cleanly_without_remote_mutation(self):
         receipt = stale_capacity_receipt()
         first = self._open_pr(
             1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
@@ -186,13 +212,11 @@ class JovieOwnershipTests(unittest.TestCase):
 
         document = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0, document)
-        self.assertEqual(document["capacity"], 1)
-        self.assertEqual([item["number"] for item in document["selected"]], [1])
-        self.assertEqual(len(document["processed"]), 1)
-        self.assertEqual(document["processed"][0]["action"], "work_admission_blocked")
-        self.assertEqual(
-            document["processed"][0]["reason"], "remediation_push_gate_green"
-        )
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
+        self.assertEqual(document["processed"], [])
+        self.assertEqual(document["remediation_admission"], "local_only")
+        self.assertEqual(document["intake"], "blocked_missing_capacity_evidence")
         remote_run.assert_not_called()
 
     def test_stale_capacity_receipt_rejects_remote_mutation(self):
@@ -206,25 +230,114 @@ class JovieOwnershipTests(unittest.TestCase):
         ):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
 
-    def test_stale_capacity_receipt_rejects_more_than_one_local_repair(self):
+    def test_stale_capacity_receipt_rejects_remote_remediation_capacity(self):
         receipt = stale_capacity_receipt()
         receipt["remediationAdmission"]["maxConcurrent"] = 2
 
         with self.assertRaisesRegex(
             RuntimeError,
-            "stale capacity must bound local remediation to one",
+            "stale capacity must block remote remediation concurrency",
         ):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
 
-    def test_stale_capacity_zero_remediation_reproduces_original_contract_failure(self):
+    def test_stale_capacity_receipt_rejects_more_than_one_local_runtime_repair(self):
         receipt = stale_capacity_receipt()
-        receipt["remediationAdmission"]["maxConcurrent"] = 0
+        receipt["concurrency"]["gem"]["runtimeFloor"] = 2
 
         with self.assertRaisesRegex(
             RuntimeError,
-            "remediation concurrency must be a positive integer",
+            "stale capacity must bound local runtime repair to one",
         ):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_stale_capacity_zero_remote_remediation_keeps_one_local_runtime_floor(self):
+        receipt = stale_capacity_receipt()
+        validated = MODULE.validate_gate_result(
+            0, json.dumps(receipt), "remediation"
+        )
+        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(validated["concurrency"]["gem"]["runtimeFloor"], 1)
+
+    def test_capacity_contract_rejects_missing_or_mismatched_admission_fields(self):
+        cases = (
+            (
+                lambda receipt: receipt.update({"concurrency": None}),
+                "capacity evidence acceptance is missing or is not boolean",
+            ),
+            (
+                lambda receipt: receipt["concurrency"]["gem"].update(
+                    {"evidenceAccepted": None}
+                ),
+                "capacity evidence acceptance is missing or is not boolean",
+            ),
+            (
+                lambda receipt: receipt["concurrency"]["gem"].update(
+                    {"newMutationAllowed": None}
+                ),
+                "new mutation admission is missing or is not boolean",
+            ),
+            (
+                lambda receipt: receipt["concurrency"]["gem"].update(
+                    {"newMutationAllowed": True}
+                ),
+                "new mutation admission bypasses capacity evidence",
+            ),
+            (
+                lambda receipt: receipt["signals"]["concurrencyEvidence"].update(
+                    {"accepted": True}
+                ),
+                "capacity evidence signal and admission disagree",
+            ),
+        )
+        for mutate, expected in cases:
+            with self.subTest(expected=expected):
+                receipt = stale_capacity_receipt()
+                mutate(receipt)
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    MODULE.validate_gate_result(
+                        0, json.dumps(receipt), "remediation"
+                    )
+
+    def test_accepted_capacity_contract_rejects_zero_or_excess_limits(self):
+        cases = (
+            (
+                lambda receipt: receipt["remediationAdmission"].update(
+                    {"maxConcurrent": 0}
+                ),
+                "accepted capacity must provide remediation concurrency",
+            ),
+            (
+                lambda receipt: receipt["concurrency"]["gem"].update(
+                    {"maxConcurrent": 0}
+                ),
+                "accepted capacity must provide positive concurrency",
+            ),
+            (
+                lambda receipt: receipt["remediationAdmission"].update(
+                    {"maxConcurrent": 5}
+                ),
+                "remediation concurrency exceeds accepted capacity",
+            ),
+        )
+        for mutate, expected in cases:
+            with self.subTest(expected=expected):
+                receipt = accepted_capacity_receipt()
+                mutate(receipt)
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    MODULE.validate_gate_result(
+                        0, json.dumps(receipt), "remediation"
+                    )
+
+    def test_failed_gate_receipt_preserves_typed_local_repair_contract(self):
+        receipt = GATE_MODULE.failed_evaluation_receipt(
+            ValueError("capacity evidence unavailable")
+        )
+        validated = MODULE.validate_gate_result(
+            0, json.dumps(receipt), "remediation"
+        )
+        self.assertEqual(validated["state"], "RED")
+        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(validated["concurrency"]["gem"]["runtimeFloor"], 1)
 
     def test_null_capacity_evidence_fails_closed_with_typed_contract_error(self):
         receipt = stale_capacity_receipt()

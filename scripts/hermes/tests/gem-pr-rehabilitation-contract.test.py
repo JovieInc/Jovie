@@ -414,6 +414,23 @@ exit 0
 
 
 class ModelPolicyContractTests(unittest.TestCase):
+    def test_local_repair_agent_requires_safe_mode_and_sandboxable_runtime(self):
+        registry = json.loads(
+            (HERMES / "config/model-registry.json").read_text(encoding="utf-8")
+        )
+        qwen = next(
+            model for model in registry["models"] if model["id"] == "qwen-coder-local"
+        )
+        arguments = qwen["agent_argv"]
+        self.assertEqual(
+            qwen["agent_executable_default"],
+            "/home/timwhite/.hermes/hermes-agent/venv/bin/hermes",
+        )
+        self.assertIn("--safe-mode", arguments)
+        self.assertIn("--ignore-rules", arguments)
+        self.assertIn("--toolsets", arguments)
+        self.assertIn("terminal", arguments)
+
     def test_grok_is_current_and_bounded_to_edit_only_tools(self):
         registry = json.loads(
             (HERMES / "config/model-registry.json").read_text(encoding="utf-8")

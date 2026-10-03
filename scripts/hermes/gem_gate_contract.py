@@ -230,13 +230,15 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     if remote_update_listed is not push_allowed:
         raise GateContractError("remote remediation activity contradicts push admission")
     maximum = remediation.get("maxConcurrent")
-    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
-        raise GateContractError("remediation concurrency must be a positive integer")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
+        raise GateContractError("remediation concurrency must be a non-negative integer")
     if not capacity_accepted:
-        if maximum != 1:
-            raise GateContractError("stale capacity must bound local remediation to one")
+        if maximum != 0:
+            raise GateContractError("stale capacity must block remote remediation concurrency")
         if gem_concurrency.get("maxConcurrent") != 0:
             raise GateContractError("stale capacity must block new mutation concurrency")
+        if gem_concurrency.get("runtimeFloor") != 1:
+            raise GateContractError("stale capacity must bound local runtime repair to one")
         if new_issue_lease:
             raise GateContractError("stale capacity must block new issue leases")
         if receipt.get("workAdmission", {}).get("newImplementationAllowed") is not False:
@@ -244,6 +246,8 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         if "approved-issue-lease" in receipt.get("workAdmission", {}).get("activities", []):
             raise GateContractError("stale capacity must not advertise new issue leases")
     else:
+        if maximum < 1:
+            raise GateContractError("accepted capacity must provide remediation concurrency")
         gem_maximum = gem_concurrency.get("maxConcurrent")
         if (
             isinstance(gem_maximum, bool)
