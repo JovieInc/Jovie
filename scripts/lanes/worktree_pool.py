@@ -6,12 +6,15 @@ load: pnpm materialises ~230k files per worktree and every one is a filesystem o
 whatever the import method. A pooled slot already has `node_modules` and a warm
 `apps/web/.cache/tsbuildinfo`; taking one is a rename (`git worktree move`), a checkout
 of the diff since the slot was built, and an incremental install (~35s measured).
+Finished clean worktrees go back into the pool (`recycle`) instead of being deleted:
+removing 230k files took 3 to 32 minutes per worktree under load (JOV-7723).
 
 This is the local analogue of a Cursor cloud-agent Build snapshot: prepare the disk
 once in the background, start every agent from the prepared disk.
 
     scripts/agent/worktree-new <dest> -b <branch> [--base origin/main]
     scripts/agent/worktree-new --fill [--size N]     # build slots (background-safe)
+    scripts/agent/worktree-new --recycle <dir>       # done with a clean worktree: back to the pool
     scripts/agent/worktree-new --drain               # remove every idle slot
     scripts/agent/worktree-new --status
 
@@ -42,6 +45,10 @@ SLOT_MAX_AGE_S = 3 * 24 * 3600
 INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline", "--package-import-method=hardlink"]
 WARM = ["pnpm", "--filter", "@jovie/web", "run", "typecheck"]
 READY = ".ready"
+PRESERVED_REPAIR = ".jovie-preserved-repair.json"  # disk_guard's marker; never recycle those
+# Build output that would otherwise ride along into the next agent's checkout. Installed
+# dependencies and the tsc cache (`.cache/`) are what make a slot worth keeping.
+RECYCLE_KEEP = ["node_modules", ".cache"]
 CLAIMED = ".claimed"
 CLAIM_GRACE_S = 15 * 60
 
@@ -192,6 +199,33 @@ def take(repo: Path, dest: Path, branch: str | None, base: str = "origin/main", 
     return "fresh"
 
 
+def recycle(repo: Path, path: Path, base: str = "origin/main", size: int = POOL_SIZE, log=None,
+            root: Path | None = None, min_free_gb: float = MIN_FREE_GB) -> str | None:
+    """Return a finished worktree to the pool instead of deleting it. Returns the slot name,
+    or None when it must be removed the normal way: pool off or full, low disk, another
+    volume, a preserved repair, or any uncommitted change. The caller decides whether its
+    commits are published; the branch ref itself survives in the repository either way."""
+    repo, path = Path(repo), Path(path)
+    try:
+        if not enabled() or not path.is_dir() or (path / PRESERVED_REPAIR).exists() or not is_clean(path):
+            return None
+        pool = pool_dir(repo, root)
+        if not same_volume(pool, path) or len(ready_slots(pool)) >= size or free_gb(pool) < min_free_gb:
+            return None
+        slot = pool / f"slot-{uuid.uuid4().hex[:8]}"
+        run(["git", "checkout", "-q", "--detach", base], cwd=path, log=log, timeout=300)
+        run(["git", "clean", "-ffdxq"] + [arg for keep in RECYCLE_KEEP for arg in ("-e", keep)],
+            cwd=path, log=log, timeout=900)
+        pool.mkdir(parents=True, exist_ok=True)
+        run(["git", "worktree", "move", str(path), str(slot)], cwd=repo, log=log, timeout=120)
+    except (subprocess.SubprocessError, OSError) as error:
+        if log is not None:
+            log.write(f"worktree-pool: not recycled: {error}\n")
+        return None
+    (pool / f"{slot.name}{READY}").touch()
+    return slot.name
+
+
 def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: bool = True, log=None,
          root: Path | None = None, min_free_gb: float = MIN_FREE_GB) -> list[str]:
     """Top the pool up to `size` slots. One filler per pool (non-blocking lock); refuses
@@ -301,6 +335,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--size", type=int, default=POOL_SIZE)
     parser.add_argument("--no-warm", action="store_true")
     parser.add_argument("--drain", action="store_true")
+    parser.add_argument("--recycle", type=Path, metavar="DIR")
     parser.add_argument("--status", action="store_true")
     args = parser.parse_args(argv)
     repo = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=args.repo, capture_output=True,
@@ -314,13 +349,24 @@ def main(argv: list[str] | None = None) -> int:
     if args.drain:
         print("\n".join(drain(repo)) or "pool empty")
         return 0
+    if args.recycle:
+        slot = recycle(repo, args.recycle, args.base, args.size, log=sys.stdout)
+        if slot:
+            print(f"worktree-new: {args.recycle} recycled into the pool as {slot}")
+            return 0
+        if not is_clean(args.recycle):
+            print(f"worktree-new: {args.recycle} has uncommitted changes; left in place", file=sys.stderr)
+            return 1
+        remove_worktree(repo, args.recycle, sys.stdout)
+        print(f"worktree-new: {args.recycle} removed (pool full, off, or low on disk)")
+        return 0
     if args.fill:
         if not args.no_fetch:
             subprocess.run(["git", "fetch", "-q", "origin", "main"], cwd=repo)
         print("\n".join(fill(repo, args.size, args.base, warm=not args.no_warm, log=sys.stdout)) or "pool full")
         return 0
     if args.dest is None:
-        parser.error("dest is required unless --fill, --drain or --status")
+        parser.error("dest is required unless --fill, --drain, --recycle or --status")
     started = time.monotonic()
     if not args.no_fetch:
         run(["git", "fetch", "-q", "origin", "main"], cwd=repo, timeout=300)

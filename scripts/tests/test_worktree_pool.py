@@ -167,6 +167,62 @@ class PoolTest(unittest.TestCase):
         self.assertEqual(pool_mod.ready_slots(self.pool()), [])
         self.assertEqual(pool_mod.shed(self.out, self.root, min_free_gb=10**9), [])
 
+    def finished(self, name="done") -> Path:
+        path = self.out / name
+        pool_mod.take(self.repo, path, f"feat/{name}", "main", root=self.root)
+        (path / "node_modules").mkdir()
+        (path / "node_modules" / "dep.js").write_text("installed")
+        (path / ".next").mkdir()
+        git(self.repo, "config", "core.excludesFile", str(self.out / "ignore"))
+        (self.out / "ignore").write_text("node_modules\n.next\n")
+        return path
+
+    def test_a_clean_finished_worktree_is_recycled_with_its_install_and_without_build_output(self):
+        path = self.finished()
+        slot = pool_mod.recycle(self.repo, path, "main", root=self.root)
+        self.assertIsNotNone(slot)
+        self.assertFalse(path.exists())
+        moved = self.pool() / slot
+        self.assertEqual(pool_mod.ready_slots(self.pool()), [moved])
+        self.assertEqual((moved / "node_modules" / "dep.js").read_text(), "installed")
+        self.assertFalse((moved / ".next").exists())
+        self.assertEqual(git(moved, "branch", "--show-current"), "")
+        self.assertIn("feat/done", git(self.repo, "branch", "--list", "feat/done"))  # the work survives
+        self.assertEqual(pool_mod.take(self.repo, self.out / "next", "feat/next", "main", root=self.root), "pool")
+        self.assertTrue((self.out / "next" / "node_modules" / "dep.js").exists())
+
+    def test_dirty_preserved_full_or_disabled_worktrees_are_not_recycled(self):
+        path = self.finished()
+        (path / "a.txt").write_text("uncommitted\n")
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        git(path, "checkout", "--", "a.txt")
+        (path / pool_mod.PRESERVED_REPAIR).write_text("{}")
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        (path / pool_mod.PRESERVED_REPAIR).unlink()
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root, min_free_gb=10**9))
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", size=0, root=self.root))
+        with patch.dict(os.environ, {"JOVIE_WORKTREE_POOL": "0"}):
+            self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        self.assertIsNone(pool_mod.recycle(self.repo, self.out / "missing", "main", root=self.root))
+        log = io.StringIO()
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "no-such-base", log=log, root=self.root))
+        self.assertIn("not recycled", log.getvalue())
+        self.assertTrue(path.exists())
+
+    def test_cli_recycles_removes_or_refuses(self):
+        clean, full, dirty = self.finished("clean"), self.finished("full"), self.finished("dirty")
+        (dirty / "a.txt").write_text("uncommitted\n")
+        with patch.object(pool_mod, "CACHE_ROOT", self.root), redirect_stdout(io.StringIO()) as out, \
+             patch("sys.stderr", new_callable=io.StringIO):
+            common = ["--repo", str(self.repo), "--base", "main", "--size", "1"]
+            self.assertEqual(pool_mod.main(["--recycle", str(clean), *common]), 0)
+            self.assertEqual(pool_mod.main(["--recycle", str(full), *common]), 0)
+            self.assertEqual(pool_mod.main(["--recycle", str(dirty), *common]), 1)
+        self.assertIn("recycled into the pool", out.getvalue())
+        self.assertIn("removed (pool full", out.getvalue())
+        self.assertFalse(full.exists())
+        self.assertTrue(dirty.exists())
+
     def test_cli_creates_a_worktree_and_reports_status(self):
         self.fill()
         with patch.object(pool_mod, "CACHE_ROOT", self.root), redirect_stdout(io.StringIO()) as out:

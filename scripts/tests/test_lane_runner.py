@@ -2079,6 +2079,26 @@ class DispatchTest(unittest.TestCase):
             self.assertEqual(rows[-1]["verdict"], "removed")
             self.assertEqual(rows[-1]["worktree"], str(path))
 
+    def test_a_recycled_worktree_is_journaled_and_never_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            path = Path(tmp) / "worktrees/done"
+            path.mkdir(parents=True)
+            calls = []
+
+            def shell(args, **kwargs):
+                calls.append(args)
+                if args[:2] == ["git", "rev-list"]:
+                    return SimpleNamespace(returncode=0, stdout="0", stderr="")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(lane, "sh", side_effect=shell), \
+                 patch.object(lane.worktree_pool, "recycle", return_value="slot-1") as recycle:
+                lane.remove_worktree(host, path)
+            recycle.assert_called_once_with(host.repo, path)
+            self.assertNotIn(["git", "worktree", "remove", "--force", str(path)], calls)
+            row = json.loads((host.state / "runs/worktree-removals.jsonl").read_text().splitlines()[-1])
+            self.assertEqual((row["verdict"], row["reason"]), ("recycled", "slot-1"))
+
     def test_prune_keeps_a_worktree_while_a_process_runs_inside(self):
         """PID reuse cannot fake this: liveness is a live cwd, not a remembered PID."""
         with tempfile.TemporaryDirectory() as tmp:
