@@ -1,8 +1,4 @@
-"""Claude Code lane adapter: subscription-only auth, quota bank, run receipts (JOV-7706).
-
-Run with:
-    python3 -m pytest scripts/tests/test_claude_lane.py -v
-"""
+"""Claude Code lane adapter: subscription-only auth, quota bank, run receipts (JOV-7706)."""
 from __future__ import annotations
 
 import io
