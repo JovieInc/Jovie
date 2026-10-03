@@ -878,7 +878,7 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:notify-failure
-    jobCount: 5
+    jobCount: 6
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
