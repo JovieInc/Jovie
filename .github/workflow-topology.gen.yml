@@ -1054,6 +1054,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:find
     jobCount: 1
+  - name: Quarantine Recovery
+    path: .github/workflows/quarantine-recovery.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:recover-quarantine
+    jobCount: 1
   - name: Remediation Sweep
     path: .github/workflows/remediation-sweep.yml
     active: true

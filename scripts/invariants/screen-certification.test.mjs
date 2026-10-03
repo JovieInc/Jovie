@@ -144,6 +144,16 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('registers the money route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/money/page.tsx',
+      'apps/web/app/app/money/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.money');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers the admin chat playground route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
