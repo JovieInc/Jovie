@@ -171,6 +171,12 @@ describe('normalizeKernelCertificationRow', () => {
       available: false,
       reason: 'A founder decision already exists for this evidence.',
       evidenceDigest: digest,
+      currentDecision: {
+        kind: 'approved',
+        decidedAt: '2026-09-27T07:30:00.000Z',
+        reviewer: 'founder@example.test',
+        notes: null,
+      },
     });
     expect(row.history).toContainEqual({
       at: '2026-09-27T07:30:00.000Z',
@@ -243,6 +249,7 @@ describe('normalizeKernelCertificationRow', () => {
       available: false,
       reason: 'The packet does not use the current kernel contract.',
       evidenceDigest: null,
+      currentDecision: null,
     });
   });
 

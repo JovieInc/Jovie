@@ -11,6 +11,7 @@ import {
 } from '@/lib/agent-os/certification';
 import { MarketingCertificationStore } from '@/lib/agent-os/certification-adapter';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
+import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
 import {
   FIXTURE_NOW,
   fixturePacket,
@@ -75,6 +76,12 @@ function deps(
         },
       ],
     }),
+    featureRegistry: {
+      list: async () => ({
+        items: [],
+        sourceUpdatedAt: FIXTURE_NOW,
+      }),
+    },
   };
 }
 
@@ -111,6 +118,7 @@ describe('readOvieCertificationInventory', () => {
       marketing: 'empty',
       lyb: 'connected',
       acquisition: 'not_connected',
+      feature_registry: 'empty',
     });
     expect(inventory.counts.total).toBe(
       MARKETING_COMPONENT_REGISTRY.length + 2
@@ -568,5 +576,169 @@ describe('customers certification domain', () => {
         d
       )
     ).resolves.toMatchObject({ ok: false, status: 404 });
+  });
+});
+
+describe('feature registry certification domain', () => {
+  const registryPacket = fixturePacket('feature.ready', {
+    subject: { id: 'feature.ready', kind: 'feature', title: 'Ready feature' },
+  });
+  const registryDigest = buildCertificationDecisionDigest(registryPacket);
+  const registryItem = founderReviewItemFixture({
+    id: 'feature.ready',
+    title: 'Ready feature',
+    readiness: 'ready',
+    certificationPacket: registryPacket,
+    decisionEvidenceDigest: registryDigest,
+  });
+  const registrySource = {
+    list: async () => ({
+      items: [registryItem],
+      sourceUpdatedAt: '2026-09-27T07:00:00.000Z',
+    }),
+  };
+
+  it('projects registry items and lands a durable, replay-safe decision', async () => {
+    const d = { ...deps([]), featureRegistry: registrySource };
+    const before = await readOvieCertificationInventory(d, FIXTURE_NOW);
+    const row = before.rows.find(
+      candidate => candidate.id === 'feature_registry:feature.ready'
+    );
+    expect(row).toMatchObject({
+      domain: 'feature_registry',
+      state: 'review_ready',
+      decision: {
+        available: true,
+        evidenceDigest: registryDigest,
+        currentDecision: null,
+      },
+    });
+
+    const request = {
+      rowId: 'feature_registry:feature.ready',
+      evidenceDigest: registryDigest,
+      decision: 'approved' as const,
+      notes: null,
+      actionId: 'action-fr-1',
+    };
+    const outcome = await recordOvieCertificationDecision(
+      request,
+      'founder@example.test',
+      d,
+      '2026-09-27T08:00:00.000Z'
+    );
+    expect(outcome).toMatchObject({
+      ok: true,
+      row: {
+        id: 'feature_registry:feature.ready',
+        state: 'founder_locked',
+        decision: {
+          available: false,
+          currentDecision: {
+            kind: 'approved',
+            reviewer: 'founder@example.test',
+          },
+        },
+      },
+    });
+
+    // A second read — what another authenticated client would see.
+    const after = await readOvieCertificationInventory(d, FIXTURE_NOW);
+    expect(
+      after.rows.find(
+        candidate => candidate.id === 'feature_registry:feature.ready'
+      )
+    ).toMatchObject({
+      state: 'founder_locked',
+      decision: {
+        available: false,
+        currentDecision: { kind: 'approved' },
+      },
+    });
+
+    // Replays of the same action or the same digest cannot double-record.
+    await expect(
+      recordOvieCertificationDecision(
+        request,
+        'founder@example.test',
+        d,
+        '2026-09-27T08:01:00.000Z'
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 409,
+      error: 'duplicate_founder_decision',
+    });
+    await expect(
+      recordOvieCertificationDecision(
+        { ...request, actionId: 'action-fr-2' },
+        'founder@example.test',
+        d,
+        '2026-09-27T08:01:00.000Z'
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 409,
+      error: 'duplicate_founder_decision',
+    });
+  });
+
+  it('fails closed on stale digests, unknown items, and unreadable sources', async () => {
+    const d = { ...deps([]), featureRegistry: registrySource };
+    const request = {
+      rowId: 'feature_registry:feature.ready',
+      evidenceDigest: registryDigest,
+      decision: 'approved' as const,
+      notes: null,
+      actionId: 'action-fr-3',
+    };
+    await expect(
+      recordOvieCertificationDecision(
+        { ...request, evidenceDigest: `sha256:${'c'.repeat(64)}` },
+        'founder',
+        d,
+        '2026-09-27T08:00:00.000Z'
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 409,
+      error: 'decision_digest_mismatch',
+    });
+    await expect(
+      recordOvieCertificationDecision(
+        { ...request, rowId: 'feature_registry:feature.missing' },
+        'founder',
+        d,
+        '2026-09-27T08:00:00.000Z'
+      )
+    ).resolves.toMatchObject({ ok: false, status: 404 });
+    await expect(
+      recordOvieCertificationDecision(
+        request,
+        'founder',
+        {
+          ...d,
+          featureRegistry: {
+            list: async () => {
+              throw new Error('registry gone');
+            },
+          },
+        },
+        '2026-09-27T08:00:00.000Z'
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 409,
+      error: 'feature_registry_unavailable',
+    });
+    // Failed attempts may initialize the ledger but never record a decision.
+    const ledger = JSON.parse(
+      String(
+        d.backendInstance.records.get(
+          'jovie:certification:v1:packet-decisions:feature_registry'
+        ) ?? '{"records":{}}'
+      )
+    );
+    expect(ledger.records).toEqual({});
   });
 });
