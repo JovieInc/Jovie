@@ -1620,6 +1620,18 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
   });
 
+  it('uses the maintained Node-only config for the complete runtime contract lane', () => {
+    expect(NODE_RUNTIME_CONTRACT_COMMAND).toBe(
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts'
+    );
+    expect(NODE_RUNTIME_CONTRACT_PATHS).toEqual(
+      expect.arrayContaining([
+        'apps/web/vitest.config.ci-contracts.mts',
+        'apps/web/vitest.config.fast.mts',
+      ])
+    );
+  });
+
   it('executes the selected Node runtime lane and its three contract suites', () => {
     const previousEvent = process.env.GITHUB_EVENT_NAME;
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';

@@ -51,7 +51,12 @@ export function ComparisonPageContent({
           <h2 className='text-2xl font-semibold text-primary-token'>
             Feature Comparison
           </h2>
-          <div className='mt-8 overflow-x-auto'>
+          <section
+            className='mt-8 overflow-x-auto'
+            aria-label={`${APP_NAME} vs ${data.competitor} feature comparison`}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region needs a keyboard entry point for native scrolling (axe scrollable-region-focusable)
+            tabIndex={0}
+          >
             <table className='w-full text-sm'>
               <thead>
                 <tr className='border-b border-border-primary'>
@@ -119,7 +124,7 @@ export function ComparisonPageContent({
                 ))}
               </tbody>
             </table>
-          </div>
+          </section>
         </section>
       </MarketingContainer>
 

@@ -18,6 +18,7 @@ import {
 } from '@/components/atoms/InvisibleTurnstile';
 
 type Status = 'idle' | 'submitting' | 'success' | 'subscribed' | 'error';
+type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
 export interface ChangelogEmailSignupCopy {
   readonly idleHeading: string;
@@ -64,8 +65,17 @@ export function ChangelogEmailSignup({
   const formId = useId();
   const statusRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState(initialEmail);
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [resendState, setResendState] = useState<ResendState>('idle');
+  const [resendMessage, setResendMessage] = useState('');
+  const latestStatusRef = useRef<Status>('idle');
+  const focusEmailOnIdleRef = useRef(false);
+
+  useEffect(() => {
+    latestStatusRef.current = status;
+  }, [status]);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const turnstileFailureActiveRef = useRef(false);
@@ -91,7 +101,10 @@ export function ChangelogEmailSignup({
 
   useEffect(() => {
     if (settled) statusRef.current?.focus({ preventScroll: true });
-    else if (status === 'error' && !turnstileFailed)
+    else if (status === 'idle' && focusEmailOnIdleRef.current) {
+      focusEmailOnIdleRef.current = false;
+      inputRef.current?.focus({ preventScroll: true });
+    } else if (status === 'error' && !turnstileFailed)
       inputRef.current?.focus({ preventScroll: true });
   }, [settled, status, turnstileFailed]);
 
@@ -111,12 +124,35 @@ export function ChangelogEmailSignup({
         if (state.status === 'verified' || state.status === 'bypassed') {
           if (turnstileFailureActiveRef.current) {
             turnstileFailureActiveRef.current = false;
-            setStatus('idle');
-            setErrorMessage('');
+            if (latestStatusRef.current !== 'success') {
+              setStatus('idle');
+              setErrorMessage('');
+            }
           }
           setTurnstileFailed(false);
           setTurnstileRetryable(false);
+          if (latestStatusRef.current === 'success') {
+            setResendState('idle');
+            setResendMessage('');
+          }
         }
+        return;
+      }
+
+      if (latestStatusRef.current === 'success') {
+        // Keep the confirmation-required panel; surface the failure on the
+        // resend path instead of collapsing back to the form error state.
+        setTurnstileFailed(true);
+        setTurnstileRetryable(
+          state.status === 'error' ||
+            state.status === 'expired' ||
+            state.status === 'timeout'
+        );
+        setTurnstileToken('');
+        setResendState('error');
+        setResendMessage(
+          state.message ?? 'Security check unavailable. Please try again.'
+        );
         return;
       }
 
@@ -140,9 +176,79 @@ export function ChangelogEmailSignup({
     turnstileFailureActiveRef.current = false;
     setTurnstileFailed(false);
     setTurnstileRetryable(false);
+    if (latestStatusRef.current !== 'success') {
+      setStatus('idle');
+      setErrorMessage('');
+    } else {
+      setResendState('idle');
+      setResendMessage('');
+    }
+    setTurnstileResetSignal(signal => signal + 1);
+  }
+
+  function handleChangeEmail() {
+    focusEmailOnIdleRef.current = true;
+    emailEditedRef.current = true;
+    setEmail(submittedEmail);
     setStatus('idle');
     setErrorMessage('');
-    setTurnstileResetSignal(signal => signal + 1);
+    setResendState('idle');
+    setResendMessage('');
+  }
+
+  async function handleResend() {
+    if (status !== 'success' || !submittedEmail) return;
+    if (resendState === 'sending') return;
+
+    if (turnstileRequired && !turnstileToken) {
+      setResendState('error');
+      setResendMessage('Security check is still loading. Please try again.');
+      return;
+    }
+
+    setResendState('sending');
+    setResendMessage('');
+
+    try {
+      const res = await fetch('/api/changelog/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: submittedEmail,
+          turnstileToken,
+          source,
+        }),
+      });
+
+      const data = (await res.json()) as {
+        state?: 'confirmation_required' | 'subscribed';
+        error?: string;
+      };
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Something went wrong');
+      }
+
+      if (data.state === 'subscribed') {
+        setStatus('subscribed');
+        return;
+      }
+
+      if (data.state !== 'confirmation_required') {
+        throw new Error('Confirmation could not be sent. Please try again.');
+      }
+
+      setResendState('sent');
+      setResendMessage(`Confirmation email sent again to ${submittedEmail}.`);
+    } catch (err) {
+      setResendState('error');
+      setResendMessage(
+        err instanceof Error ? err.message : 'Something went wrong'
+      );
+    } finally {
+      setTurnstileToken('');
+      setTurnstileResetSignal(signal => signal + 1);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -193,7 +299,16 @@ export function ChangelogEmailSignup({
         );
       }
       setStatus(data.state === 'subscribed' ? 'subscribed' : 'success');
+      setSubmittedEmail(
+        data.state === 'confirmation_required' ? email.trim() : ''
+      );
+      setResendState('idle');
+      setResendMessage('');
       setEmail('');
+      // The token was consumed by this submission; issue a fresh one so a
+      // resend or corrected-address submit can pass server verification.
+      setTurnstileToken('');
+      setTurnstileResetSignal(signal => signal + 1);
     } catch (err) {
       setStatus('error');
       setErrorMessage(
@@ -292,7 +407,7 @@ export function ChangelogEmailSignup({
               {copy.buttonLabel}
             </Button>
           </div>
-          {settled ? null : (
+          {status === 'subscribed' ? null : (
             <InvisibleTurnstile
               onToken={setTurnstileToken}
               onStateChange={handleTurnstileStateChange}
@@ -300,6 +415,51 @@ export function ChangelogEmailSignup({
             />
           )}
         </form>
+        {status === 'success' ? (
+          <div
+            data-testid='changelog-confirmation-sent'
+            className='col-start-1 row-start-1 flex flex-col gap-4'
+          >
+            <p className='text-sm text-primary-token'>
+              We sent a confirmation link to{' '}
+              <span className='break-all font-medium'>{submittedEmail}</span>.
+            </p>
+            <div className='flex min-h-11 flex-wrap items-center gap-x-4 gap-y-2'>
+              <Button
+                type='button'
+                size='marketing'
+                onClick={handleResend}
+                loading={resendState === 'sending'}
+                disabled={
+                  resendState === 'sending' ||
+                  (turnstileRequired && !turnstileToken)
+                }
+              >
+                Resend Confirmation
+              </Button>
+              <Button
+                type='button'
+                variant='link'
+                size='sm'
+                onClick={handleChangeEmail}
+              >
+                Use A Different Email
+              </Button>
+            </div>
+            {resendMessage ? (
+              <p
+                role={resendState === 'error' ? 'alert' : undefined}
+                className={
+                  resendState === 'error'
+                    ? 'text-sm text-accent-red'
+                    : 'text-sm text-secondary-token'
+                }
+              >
+                {resendMessage}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div
           ref={statusRef}
           tabIndex={-1}
@@ -309,7 +469,9 @@ export function ChangelogEmailSignup({
           className='sr-only'
         >
           {settled
-            ? successMessage
+            ? `${successMessage}${
+                status === 'success' && resendMessage ? ` ${resendMessage}` : ''
+              }`
             : status === 'submitting'
               ? 'Subscribing…'
               : ''}

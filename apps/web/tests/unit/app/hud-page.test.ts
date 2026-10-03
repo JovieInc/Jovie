@@ -4,6 +4,8 @@ vi.mock('@/lib/ovie/privacy-lock/server', () => ({
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HudPage from '@/app/hud/page';
+import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
+import { env } from '@/lib/env-server';
 
 const {
   redirectMock,
@@ -268,5 +270,34 @@ describe('/hud page auth', () => {
     expect(findElementByName(result, 'HudDashboardClient')).not.toBeNull();
     expect(findElementByName(result, 'AdminPage')).not.toBeNull();
     expect(findElementByName(result, 'OvieMacHud')).toBeNull();
+  });
+});
+
+describe('HUD fixture payload selection', () => {
+  it('omits fixture payloads by default and supplies them only when explicitly enabled', async () => {
+    getCurrentAdminPageAccessMock.mockResolvedValue({
+      isAuthenticated: true,
+      hasAdminRole: true,
+      userId: 'admin',
+    });
+    getHudMetricsMock.mockResolvedValue({ agentRuns: [] });
+    getFounderFunnelDataMock.mockResolvedValue(null);
+    const before = env.HUD_AGENT_RUNS_FIXTURES;
+    try {
+      env.HUD_AGENT_RUNS_FIXTURES = '0';
+      const production = await HudPage({ searchParams: Promise.resolve({}) });
+      expect(
+        findElementByName(production, 'HudDashboardClient')?.props
+          ?.initialFixtureAgentRuns
+      ).toBeUndefined();
+      env.HUD_AGENT_RUNS_FIXTURES = '1';
+      const fixture = await HudPage({ searchParams: Promise.resolve({}) });
+      expect(
+        findElementByName(fixture, 'HudDashboardClient')?.props
+          ?.initialFixtureAgentRuns
+      ).toEqual(AGENT_OS_ADMIN_FIXTURE_ARTIFACTS);
+    } finally {
+      env.HUD_AGENT_RUNS_FIXTURES = before;
+    }
   });
 });

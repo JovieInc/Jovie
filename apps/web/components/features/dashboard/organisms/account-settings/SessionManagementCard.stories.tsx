@@ -1,5 +1,7 @@
+import '@/app/globals.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SessionManagementCard } from './SessionManagementCard';
 
 const CURRENT_SESSION = {
@@ -21,7 +23,13 @@ const OTHER_SESSION = {
   expiresAt: '2026-10-25T12:00:00.000Z',
 };
 
-type MockMode = 'pending' | 'sessions' | 'empty' | 'error';
+type MockMode =
+  | 'pending'
+  | 'sessions'
+  | 'empty'
+  | 'error'
+  | 'recover'
+  | 'reauth';
 
 type ApiMockWindow = Window & {
   __jovieApiMock?: (request: {
@@ -34,10 +42,21 @@ function createSessionsApiMock(
   mode: MockMode,
   sessions: ReadonlyArray<Record<string, unknown>>
 ): NonNullable<ApiMockWindow['__jovieApiMock']> {
+  let attempts = 0;
   return ({ url }) => {
     if (url.pathname.endsWith('/list-sessions')) {
       if (mode === 'pending') return new Promise<Response>(() => undefined);
-      if (mode === 'error') {
+      if (mode === 'reauth')
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              code: 'SESSION_NOT_FRESH',
+              message: 'Session is not fresh',
+            }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          )
+        );
+      if (mode === 'error' || (mode === 'recover' && attempts++ === 0)) {
         return Promise.resolve(new Response('Internal error', { status: 500 }));
       }
       return Promise.resolve(
@@ -96,7 +115,9 @@ const meta = {
   decorators: [
     Story => (
       <div className='max-w-2xl'>
-        <Story />
+        <SettingsPanel title='Active Sessions'>
+          <Story />
+        </SettingsPanel>
       </div>
     ),
   ],
@@ -156,4 +177,27 @@ export const ErrorState: Story = {
       </WithSessionsFetch>
     ),
   ],
+};
+
+export const RecoverAfterRetry: Story = {
+  decorators: [
+    Story => (
+      <WithSessionsFetch mode='recover' sessions={[CURRENT_SESSION]}>
+        <Story />
+      </WithSessionsFetch>
+    ),
+  ],
+};
+export const SignInRequired: Story = {
+  decorators: [
+    Story => (
+      <WithSessionsFetch mode='reauth'>
+        <Story />
+      </WithSessionsFetch>
+    ),
+  ],
+};
+export const ErrorLight: Story = {
+  ...ErrorState,
+  parameters: { themes: { themeOverride: 'light' } },
 };

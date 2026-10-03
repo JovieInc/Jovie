@@ -80,6 +80,13 @@ import {
   shouldRunWakeUpdateCheck,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
+import {
+  createDesktopLaunchReadiness,
+  createLaunchReadinessWriter,
+  DESKTOP_COMPOSER_READINESS_CHANNEL,
+  DESKTOP_LAUNCH_READINESS_FILE,
+  type ReadinessSender,
+} from './desktop-launch-readiness';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   parseDesktopNotificationRequest,
@@ -115,6 +122,8 @@ import {
   summarizeUnhandledRejection,
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
+import { DesktopNavigationCoordinator } from './navigation-coordinator';
+import { createStartupMaintenanceGate } from './startup-maintenance';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -173,6 +182,12 @@ import {
   shouldRestoreNativeFullscreen,
   type WindowState,
 } from './window-state';
+import {
+  GET_VISUAL_ACTIVITY_CHANNEL,
+  observeWindowVisualActivity,
+  trustedVisualActivityRequest,
+  VISUAL_ACTIVITY_CHANNEL,
+} from './visual-activity';
 import {
   createWindowStateStore,
   WINDOW_STATE_SHUTDOWN_FLUSH_MS,
@@ -294,6 +309,8 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
+const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
@@ -353,6 +370,8 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
+const desktopNavigation = new DesktopNavigationCoordinator();
+const visualActivityReaders = new Map<number, () => boolean>();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
@@ -394,6 +413,8 @@ app.on('web-contents-created', (_event, contents) => {
   });
 });
 let lastDesktopUpdateCheckMs: number | null = null;
+let startupMaintenance: ReturnType<typeof createStartupMaintenanceGate> | null =
+  null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
 
@@ -2385,7 +2406,54 @@ function attachRendererRecovery(
   });
 }
 
+let launchReadiness: ReturnType<typeof createDesktopLaunchReadiness> | null =
+  null;
+
+function readinessSender(
+  event: IpcMainEvent | IpcMainInvokeEvent
+): ReadinessSender {
+  const frame = event.senderFrame;
+  const win = mainWindow;
+  const live = Boolean(win && !win.isDestroyed());
+  return {
+    isMainWindow: live && win?.webContents === event.sender,
+    frame: frame
+      ? {
+          isMainFrame: frame === event.sender.mainFrame,
+          detached: frame.detached,
+          url: frame.url,
+        }
+      : null,
+    appOrigin: APP_ORIGIN,
+    visible: live && Boolean(win?.isVisible()),
+    minimized: !live || Boolean(win?.isMinimized()),
+    focused: live && Boolean(win?.isFocused()),
+  };
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
+  if (!launchReadiness) {
+    const writeReceipt = createLaunchReadinessWriter(
+      path.join(app.getPath('userData'), DESKTOP_LAUNCH_READINESS_FILE),
+      error =>
+        console.warn(
+          '[desktop-launch-readiness] Could not persist receipt',
+          error
+        )
+    );
+    launchReadiness = createDesktopLaunchReadiness({
+      pid: process.pid,
+      processTimeOrigin: new Date(performance.timeOrigin).toISOString(),
+      nativeBuild: desktopBuildIdentity,
+      now: () => performance.now(),
+      onChange: receipt => {
+        void writeReceipt(receipt);
+        if (receipt.composerVisibleEditableAfterPaintOpportunityMs !== null) {
+          startupMaintenance?.composerUsable();
+        }
+      },
+    });
+  }
   const windowState = windowStateStore.peek();
 
   const win = new BrowserWindow({
@@ -2440,6 +2508,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   }, 6000);
 
   win.once('ready-to-show', () => {
+    launchReadiness?.nativeWindowReadyToShow();
     clearTimeout(initialVisibilityFallback);
     if (isAuthHandoffInteractive()) {
       mainWindowHiddenForAuthHandoff = true;
@@ -2452,6 +2521,25 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  const navigationContentsId = win.webContents.id;
+  win.webContents.on('render-process-gone', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  win.webContents.on('destroyed', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  const visualActivity = observeWindowVisualActivity(
+    win,
+    powerMonitor,
+    active => {
+      if (!win.webContents.isDestroyed()) {
+        win.webContents.send(VISUAL_ACTIVITY_CHANNEL, active);
+      }
+    }
+  );
+  const visualContentsId = win.webContents.id;
+  visualActivityReaders.set(visualContentsId, visualActivity.read);
+  win.once('closed', () => visualActivityReaders.delete(visualContentsId));
   const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
   const authNavigationContentsId = win.webContents.id;
   authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
@@ -2462,6 +2550,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('did-start-navigation', (...args: unknown[]) => {
     const navigation = parseDidStartNavigation(args);
     if (!navigation) return;
+    if (navigation.isMainFrame && !navigation.isInPlace) {
+      desktopNavigation.setReady(navigationContentsId, false);
+    }
     authNavigationRecovery.navigationStarted({
       ...navigation,
       currentUrl: win.webContents.getURL(),
@@ -2569,7 +2660,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     if (disposition === 'profile-preview') {
       showPublicProfilePreview(url);
     } else if (disposition === 'in-app') {
-      void win.loadURL(url);
+      navigateInApp(win, url);
     } else if (disposition === 'external') {
       void openExternalUrl(url);
     }
@@ -2631,6 +2722,21 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   return win;
 }
 
+function navigateInApp(win: BrowserWindow, url: string): void {
+  if (win.isDestroyed()) return;
+  const action = desktopNavigation.resolve(
+    win.webContents.id,
+    win.webContents.getURL(),
+    url,
+    URL_DISPOSITION_OPTIONS
+  );
+  if (action?.kind === 'client') {
+    win.webContents.send(CLIENT_NAVIGATION_CHANNEL, action.path);
+  } else if (action?.kind === 'document') {
+    void win.loadURL(action.url);
+  }
+}
+
 function openPreferences(): void {
   // Mid-handoff the focused window is the small, non-resizable auth window and
   // the main window is intentionally hidden — loading settings into either
@@ -2642,7 +2748,7 @@ function openPreferences(): void {
     return;
   }
 
-  void mainWindow.loadURL(SETTINGS_URL);
+  navigateInApp(mainWindow, SETTINGS_URL);
   showWindow(mainWindow);
 }
 
@@ -2708,6 +2814,9 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
     return;
   }
 
+  // An explicit check before startup settles also fulfills queued auto work.
+  startupMaintenance?.cancelPending('update-check');
+
   if (mode === 'notify') {
     pendingManualUpdateCheck = true;
   }
@@ -2725,14 +2834,22 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
   });
 }
 
+function requestAutomaticDesktopUpdateCheck(): void {
+  const check = () => runDesktopUpdateCheck('silent');
+  if (startupMaintenance) startupMaintenance.request('update-check', check);
+  else check();
+}
+
 function scheduleDesktopAutoUpdate(): void {
   configureDesktopAutoUpdater();
-  runDesktopUpdateCheck('silent');
+  // The application menu is available while window-state/assets hydrate,
+  // before the startup gate exists. Honor an explicit check made there too.
+  if (lastDesktopUpdateCheckMs === null) requestAutomaticDesktopUpdateCheck();
 
   const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
   const interval = setInterval(() => {
     void installDownloadedUpdateIfIdle();
-    runDesktopUpdateCheck('silent');
+    requestAutomaticDesktopUpdateCheck();
   }, UPDATE_INTERVAL_MS);
   interval.unref?.();
 
@@ -2744,7 +2861,7 @@ function scheduleDesktopAutoUpdate(): void {
         lastCheckMs: lastDesktopUpdateCheckMs,
       })
     ) {
-      runDesktopUpdateCheck('silent');
+      requestAutomaticDesktopUpdateCheck();
     }
   };
   powerMonitor.on('resume', checkAfterWake);
@@ -2801,16 +2918,28 @@ function scheduleNightlyUpdateLaunchAgent(): void {
   });
 }
 
+function requestAutomaticWebBuildCheck(): void {
+  // The initial call normally sees only the local splash. Preserve that no-op
+  // instead of queuing an earlier poll when the composer becomes usable.
+  if (!BrowserWindow.getAllWindows().some(isWebBuildReloadWindow)) {
+    webBuildReloadPending.clear();
+    return;
+  }
+  const check = () => void checkHudBuildAndReload();
+  if (startupMaintenance) startupMaintenance.request('web-build-check', check);
+  else check();
+}
+
 function scheduleHudBuildAutoReload(): void {
-  void checkHudBuildAndReload();
+  requestAutomaticWebBuildCheck();
 
   const interval = setInterval(() => {
-    void checkHudBuildAndReload();
+    requestAutomaticWebBuildCheck();
   }, HUD_BUILD_INFO_POLL_INTERVAL_MS);
 
   interval.unref?.();
   powerMonitor.on('resume', () => {
-    void checkHudBuildAndReload();
+    requestAutomaticWebBuildCheck();
   });
 }
 
@@ -3028,6 +3157,31 @@ autoUpdater.on('error', error => {
   }
 });
 
+// Native visibility stays truthful when backgroundThrottling disables Page Visibility.
+ipcMain.handle(GET_VISUAL_ACTIVITY_CHANNEL, (event, ...args: unknown[]) => {
+  const frame = event.senderFrame;
+  if (
+    !trustedVisualActivityRequest({
+      args,
+      isMainWindow: Boolean(
+        mainWindow &&
+          !mainWindow.isDestroyed() &&
+          event.sender === mainWindow.webContents
+      ),
+      isCurrentMainFrame: Boolean(
+        frame &&
+          !frame.detached &&
+          frame === event.sender.mainFrame &&
+          frame.parent === null
+      ),
+      senderUrl: frame?.url ?? '',
+      appOrigin: APP_ORIGIN,
+    })
+  )
+    return null;
+  return visualActivityReaders.get(event.sender.id)?.() ?? null;
+});
+
 // Return only the already-validated identity, and only to the trusted app origin.
 ipcMain.handle(
   GET_BUILD_IDENTITY_CHANNEL,
@@ -3100,9 +3254,38 @@ ipcMain.handle(DESKTOP_UPDATE_INSTALL_CHANNEL, event => {
   return { ok: true };
 });
 
+// Only the live main document may announce a mounted client router.
+ipcMain.on(CLIENT_NAVIGATION_READY_CHANNEL, (event, ready: unknown) => {
+  if (
+    typeof ready !== 'boolean' ||
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== mainWindow.webContents ||
+    !event.senderFrame ||
+    event.senderFrame.detached ||
+    event.senderFrame !== mainWindow.webContents.mainFrame ||
+    event.senderFrame.parent !== null ||
+    parseUrl(getIpcSenderUrl(event))?.origin !== APP_ORIGIN
+  ) {
+    return;
+  }
+  desktopNavigation.setReady(event.sender.id, ready);
+});
+
+// Optional composer evidence does not change the renderer recovery watchdog.
+ipcMain.handle(
+  DESKTOP_COMPOSER_READINESS_CHANNEL,
+  (event, ...args: unknown[]) => {
+    return (
+      launchReadiness?.composerReady(readinessSender(event), args) ?? false
+    );
+  }
+);
+
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
 // missing main handler on a stale binary cannot reject the renderer promise.
 ipcMain.on(APP_BOOTED_CHANNEL, event => {
+  launchReadiness?.reactMounted(readinessSender(event));
   const parsed = parseUrl(getIpcSenderUrl(event));
   if (parsed?.origin !== APP_ORIGIN) return;
   rendererBootControllers.get(event.sender.id)?.markBooted();
@@ -3125,6 +3308,7 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
 });
 
 app.on('before-quit', event => {
+  startupMaintenance?.dispose();
   mainLivenessMonitor?.dispose();
   mainLivenessMonitor = null;
   summerRuntimeBridge?.stop();
@@ -3567,6 +3751,7 @@ app.whenReady().then(async () => {
     menuBarTray = new MenuBarTray(handleTrayAction);
   }
 
+  startupMaintenance = createStartupMaintenanceGate();
   createWindow(
     pendingAuthCompletion
       ? buildAuthCompletionUrl(pendingAuthCompletion)
@@ -3655,7 +3840,7 @@ function routeDesktopNotificationClick(urlString: string | undefined): void {
     URL_DISPOSITION_OPTIONS
   );
   if (action.kind === 'load-url') {
-    void win.loadURL(action.url);
+    navigateInApp(win, action.url);
   } else if (action.kind === 'profile-preview') {
     showPublicProfilePreview(action.url);
   } else if (action.kind === 'open-external') {

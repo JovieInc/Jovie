@@ -2,7 +2,7 @@
   {
     "file": ".claude/rules/auth.md",
     "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
-    "bodySha256": "977d28661a368d7ff8617026b4cbbed677705f31c007041fe455e9c3af373ee8"
+    "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
   },
   {
     "file": ".claude/rules/ci-branching.md",
@@ -59,7 +59,7 @@
   {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "6e5b4bcfb76d0beefd2e2a46f1614e85358ef71100cce15f77894d9c35be7596"
+    "bodySha256": "8064a84295f7bac353ab5ca2858863bee4f7e82be6e12c0e8c2df8b7d305ad7d"
   },
   {
     "file": ".claude/rules/linear.md",
@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "61546096d949fab333264a7dc4a34a40edfe5d61502f01e85f6910398b1ba9d9"
+    "bodySha256": "c095a5c80b805429d92dfb98fa96e3b66bce96d552b5d4fa980d61d6b3067aea"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -80,7 +80,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "857b479a05f02e635aa5b779bea8f800f5c83bc8e724b2abeeda7d4710be8cf0"
+    "bodySha256": "d1f70045679136a6f2e7c273318e1d606163d570cdedb03094c7934d8b83ebd5"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -112,7 +112,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "5419d37583492f3865eba90376ce096fd22d4d9ff2b81374e7143dc157b6f373"
+    "bodySha256": "7cd69dc11cfe4f4f784611444631ca17a2394514791a66c844de301a5545e2b7"
   },
   {
     "file": ".claude/rules/security.md",

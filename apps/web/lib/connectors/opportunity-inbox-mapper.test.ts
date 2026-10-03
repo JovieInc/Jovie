@@ -487,6 +487,44 @@ describe('social reply drafts (JOV-5128)', () => {
     expect(card.socialReply?.executionState).toBe('ambiguous');
   });
 
+  it('orders social replies by ROI instead of creation time (JOV-5859)', () => {
+    const data = buildOpportunityInboxData(
+      [
+        {
+          id: 'fresh-fire',
+          kind: 'social_reply.draft',
+          payload: {
+            ...socialReplyPayload,
+            title: 'Fresh emoji',
+            authorKind: 'anonymous',
+            inboundText: '🔥',
+            inboundAt: '2026-10-02T11:55:00.000Z',
+          },
+          rationale: null,
+          createdAt: new Date('2026-10-02T11:55:00.000Z'),
+        },
+        {
+          id: 'older-collab',
+          kind: 'social_reply.draft',
+          payload: {
+            ...socialReplyPayload,
+            title: 'Older collab',
+            inboundAt: '2026-09-29T12:00:00.000Z',
+          },
+          rationale: null,
+          createdAt: new Date('2026-09-29T12:00:00.000Z'),
+        },
+      ],
+      undefined,
+      { now: new Date('2026-10-02T12:00:00.000Z') }
+    );
+
+    expect(data.cards.map(card => card.id)).toEqual([
+      'older-collab',
+      'fresh-fire',
+    ]);
+  });
+
   it('drops malformed social reply drafts instead of rendering them', () => {
     const data = buildOpportunityInboxData([
       {

@@ -246,3 +246,56 @@ describe('public CTA guard', () => {
     expect(headerNav).toContain('key={`${link.href}:${link.label}`}');
   });
 });
+
+vi.mock('next/link', async () => {
+  const { createElement, forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      import('react').ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, href, ...props }, ref) {
+      return createElement('a', {
+        ...props,
+        href: href ?? '#',
+        ref,
+        'data-test-prefetch': String(prefetch),
+      });
+    }),
+  };
+});
+
+it.each(['marketing-glass', 'default'] as const)(
+  'keeps auth prefetch off and public navigation defaults in the %s header',
+  presentation => {
+    const view = render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        authMode: 'public-static',
+        presentation,
+        publicCta: { href: '/signup', label: 'Get started' },
+      })
+    );
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'data-test-prefetch',
+      'false'
+    );
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+      'data-test-prefetch',
+      'false'
+    );
+    view.rerender(
+      createElement<HeaderNavProps>(HeaderNav, {
+        authMode: 'public-static',
+        presentation,
+        publicCta: { href: '/pricing', label: 'See plans' },
+      })
+    );
+    expect(screen.getByRole('link', { name: 'See plans' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
+    expect(screen.getByRole('link', { name: 'See plans' })).toHaveAttribute(
+      'data-test-prefetch',
+      'undefined'
+    );
+  }
+);

@@ -88,15 +88,17 @@ describe('shell alias redirects', () => {
   });
 
   it('routes profile aliases through shell pages to the chat profile panel', () => {
-    for (const Page of [
-      CanonicalProfilePage,
-      DashboardLinksPage,
-      DashboardProfilePage,
-    ]) {
+    for (const Page of [CanonicalProfilePage, DashboardProfilePage]) {
       expect(() => Page()).toThrow(`REDIRECT:${APP_ROUTES.CHAT_PROFILE_PANEL}`);
     }
 
-    expect(redirectMock).toHaveBeenCalledTimes(3);
+    expect(redirectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('routes the legacy dashboard links alias to the canonical Links workspace', () => {
+    expect(() => DashboardLinksPage()).toThrow(`REDIRECT:${APP_ROUTES.LINKS}`);
+
+    expect(redirectMock).toHaveBeenCalledTimes(1);
   });
 
   it('routes tipping aliases through shell pages to artist pay settings', () => {

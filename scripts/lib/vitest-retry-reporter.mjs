@@ -12,10 +12,12 @@
  * It is observability only: every side effect is best-effort and it never
  * changes the run outcome.
  */
+
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const FLAKY_REPORT_SCHEMA_VERSION = 1;
+export const FLAKY_REPORT_SCHEMA_VERSION = 2;
 
 function escapeAnnotationProperty(value) {
   return String(value)
@@ -76,6 +78,64 @@ export function formatStepSummary(entries, label) {
   return `${lines.join('\n')}\n`;
 }
 
+export function executionReceipt(module, workspaceRoot, initialHash) {
+  const file = path
+    .relative(workspaceRoot, module.moduleId)
+    .split(path.sep)
+    .join('/');
+  if (file.startsWith('../') || path.isAbsolute(file) || !initialHash)
+    return null;
+  let source;
+  try {
+    source = fs.readFileSync(module.moduleId);
+  } catch {
+    return null;
+  }
+  if (createHash('sha256').update(source).digest('hex') !== initialHash)
+    return null;
+  const cases = [...module.children.allTests()];
+  let executedCount = 0;
+  let skippedCount = 0;
+  let retryCount = 0;
+  let failed = false;
+  const failures = [];
+  for (const item of cases) {
+    const result = item.result();
+    if (!['passed', 'failed'].includes(result.state)) {
+      skippedCount++;
+      continue;
+    }
+    executedCount++;
+    const retries = item.diagnostic()?.retryCount ?? 0;
+    if (!Number.isSafeInteger(retries) || retries < 0) return null;
+    retryCount += retries;
+    failed ||= result.state === 'failed';
+    for (const error of result.errors ?? []) {
+      if (typeof error.message === 'string' && error.message.trim())
+        failures.push({
+          name: item.fullName,
+          error: error.message.slice(0, 2000),
+          outcome: result.state === 'failed' ? 'failed' : 'flaky',
+        });
+    }
+  }
+  const complete =
+    ['passed', 'failed'].includes(module.state()) &&
+    module.errors().length === 0 &&
+    executedCount > 0 &&
+    skippedCount === 0;
+  return {
+    file,
+    fileHash: initialHash,
+    executedCount,
+    skippedCount,
+    retryCount,
+    outcome: failed ? 'failed' : retryCount > 0 ? 'flaky' : 'clean',
+    complete,
+    failures,
+  };
+}
+
 export default class RetryVisibilityReporter {
   /**
    * @param {{ outputFile?: string, label?: string, workspaceRoot?: string,
@@ -89,6 +149,27 @@ export default class RetryVisibilityReporter {
       options.workspaceRoot ?? this.env.GITHUB_WORKSPACE ?? process.cwd();
     this.log = options.log ?? (line => process.stdout.write(`${line}\n`));
     this.entries = [];
+    this.moduleHashes = new Map();
+    this.evidenceIncomplete = false;
+  }
+
+  onTestModuleStart(module) {
+    try {
+      const relative = path.relative(
+        this.workspaceRoot,
+        fs.realpathSync(module.moduleId)
+      );
+      if (relative.startsWith('../') || path.isAbsolute(relative))
+        throw new Error('Foreign test module');
+      this.moduleHashes.set(
+        module.moduleId,
+        createHash('sha256')
+          .update(fs.readFileSync(module.moduleId))
+          .digest('hex')
+      );
+    } catch {
+      this.evidenceIncomplete = true;
+    }
   }
 
   onTestCaseResult(testCase) {
@@ -100,7 +181,7 @@ export default class RetryVisibilityReporter {
     }
   }
 
-  onTestRunEnd() {
+  onTestRunEnd(modules = [], unhandledErrors = []) {
     const entries = [...this.entries].sort(
       (a, b) => a.file.localeCompare(b.file) || a.name.localeCompare(b.name)
     );
@@ -112,6 +193,25 @@ export default class RetryVisibilityReporter {
           formatStepSummary(entries, this.label)
         );
       }
+      const executions = modules.map(module =>
+        executionReceipt(
+          module,
+          this.workspaceRoot,
+          this.moduleHashes.get(module.moduleId)
+        )
+      );
+      const positive = value =>
+        /^[1-9]\d*$/.test(value ?? '') && Number.isSafeInteger(Number(value))
+          ? Number(value)
+          : null;
+      const run = {
+        repository: this.env.GITHUB_REPOSITORY ?? null,
+        headSha: this.env.GITHUB_SHA ?? null,
+        runId: positive(this.env.GITHUB_RUN_ID),
+        runAttempt: positive(this.env.GITHUB_RUN_ATTEMPT),
+        event: this.env.GITHUB_EVENT_NAME ?? null,
+        job: this.env.GITHUB_JOB ?? null,
+      };
       if (this.outputFile) {
         fs.mkdirSync(path.dirname(path.resolve(this.outputFile)), {
           recursive: true,
@@ -123,6 +223,14 @@ export default class RetryVisibilityReporter {
               schemaVersion: FLAKY_REPORT_SCHEMA_VERSION,
               label: this.label,
               flaky: entries,
+              run,
+              generatedAt: new Date().toISOString(),
+              complete:
+                !this.evidenceIncomplete &&
+                unhandledErrors.length === 0 &&
+                modules.length > 0 &&
+                executions.every(Boolean),
+              executions: executions.filter(Boolean),
             },
             null,
             2

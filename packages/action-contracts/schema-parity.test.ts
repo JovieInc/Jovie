@@ -62,11 +62,14 @@ describe('generated artifact parity', () => {
     }
   });
 
-  it('does not advertise dispatcher implementation in the contracts foundation', () => {
+  it('advertises only implemented internal fleet dispatchers', () => {
     const api = JSON.parse(artifacts['openapi.json']);
     for (const path of Object.values(api.paths)) {
       const operation = (path as { post?: Record<string, unknown> }).post;
-      if (operation) expect(operation['x-jovie-implemented']).toBe(false);
+      if (operation)
+        expect(operation['x-jovie-implemented']).toBe(
+          /^invoke_(fleet|work|defect)_/.test(String(operation.operationId))
+        );
     }
   });
 });

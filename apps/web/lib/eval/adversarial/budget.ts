@@ -1,13 +1,35 @@
 /**
  * Budget tracking for real-model eval lanes.
+ *
+ * Every run of this lane spends metered provider credits, so the cap must be
+ * an explicit, in-range value. An out-of-range or malformed cap falls back to
+ * the conservative default instead of the caller's value (JOV-6234).
  */
 
 const SONNET_INPUT_USD_PER_TOKEN = 3 / 1_000_000;
 const SONNET_OUTPUT_USD_PER_TOKEN = 15 / 1_000_000;
 
-export function parseBudgetCapUsd(raw: string | undefined): number {
-  const parsed = Number.parseFloat(raw ?? '2');
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 2;
+/** Conservative default spend cap for one real-model eval run (USD). */
+export const DEFAULT_BUDGET_CAP_USD = 2;
+/**
+ * Absolute ceiling for a single run's declared cap (USD). A higher declared
+ * cap is treated as out-of-range and replaced with the conservative default
+ * rather than honored.
+ */
+export const MAX_BUDGET_CAP_USD = 25;
+
+export function parseBudgetCapUsd(
+  raw: string | undefined,
+  fallback: number = DEFAULT_BUDGET_CAP_USD
+): number {
+  const safeFallback =
+    Number.isFinite(fallback) && fallback > 0 && fallback <= MAX_BUDGET_CAP_USD
+      ? fallback
+      : DEFAULT_BUDGET_CAP_USD;
+  const parsed = Number(raw ?? safeFallback);
+  const bounded =
+    Number.isFinite(parsed) && parsed > 0 && parsed <= MAX_BUDGET_CAP_USD;
+  return bounded ? parsed : safeFallback;
 }
 
 export class EvalBudgetTracker {
