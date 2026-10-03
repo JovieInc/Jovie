@@ -107,7 +107,7 @@ const protectedJobs: Record<string, string[]> = {
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
   'canary-health-gate.yml': 1,
-  'ci.yml': 16,
+  'ci.yml': 17,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
@@ -1177,6 +1177,10 @@ ${fixtureCheckout}
               expect.stringContaining(
                 '--only-secrets=CRON_SECRET --no-fallback'
               ),
+              // Authenticated billing-health HTTP probe; it produces no browser artifacts.
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
             ]
           : []),
       ];
@@ -1186,6 +1190,18 @@ ${fixtureCheckout}
       expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual(
         expectedNonPlaywrightCommands
       );
+      if (file === 'synthetic-monitoring.yml') {
+        const billingProbe = jobBlock(
+          readFileSync(join(workflowsRoot, file), 'utf8'),
+          'billing-sync-stale'
+        );
+        expect(billingProbe).toContain(
+          'doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback --'
+        );
+        expect(billingProbe).toContain('env -u DOPPLER_TOKEN sh -c');
+        expect(billingProbe).toContain('https://jov.ie/api/billing/health');
+        expect(billingProbe).not.toMatch(/playwright|run test:e2e/);
+      }
     }
     const screenshots = readFileSync(
       join(workflowsRoot, 'screenshots.yml'),

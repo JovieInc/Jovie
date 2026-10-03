@@ -443,18 +443,11 @@ private struct AppContentView: View {
   }
 
   private func makeChatRepository(identity: NativeChatIdentity) -> ChatRepository {
-    ChatRepository(
-      client: MobileChatClient(
-        baseURL: appState.configuration.apiBaseURL,
-        tokenProvider: NativeSessionTokenProvider(),
-        workspace: identity.workspace,
-        identity: identity
-      ),
-      cache: ChatCache(),
-      userID: identity.userID,
-      webBaseURL: appState.configuration.webBaseURL,
-      workspace: identity.workspace,
+    NativeChatRepositoryFactory.make(
       identity: identity,
+      apiBaseURL: appState.configuration.apiBaseURL,
+      webBaseURL: appState.configuration.webBaseURL,
+      cache: ChatCache(),
       onSessionExpired: { [appState] receipt in await appState.handleExpiredSession(receipt) }
     )
   }

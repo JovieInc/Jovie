@@ -53,6 +53,55 @@ describe('POST /api/webhooks/sentry', () => {
     vi.resetModules();
   });
 
+  it('dedupes repeated resolutions without suppressing a regression inside the TTL', async () => {
+    vi.stubEnv('SUMMER_SENTRY_INTAKE_LIVE', 'true');
+    const acquired = new Set<string>();
+    mockAcquireRecentDispatch.mockImplementation(
+      async (_source: string, key: string) => {
+        if (acquired.has(key)) return { acquired: false, reason: 'duplicate' };
+        acquired.add(key);
+        return { acquired: true, reason: 'acquired' };
+      }
+    );
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    try {
+      const { POST } = await import('@/app/api/webhooks/sentry/route');
+      const postAction = async (action: string) => {
+        const body = JSON.stringify({
+          action,
+          data: {
+            issue: {
+              id: 'regression-123',
+              title: 'Database statement timed out',
+              culprit: 'POST /api/artist',
+              project: { slug: 'jovie-web' },
+            },
+          },
+        });
+        return POST(
+          new Request('https://example.com/api/webhooks/sentry', {
+            method: 'POST',
+            headers: { 'sentry-hook-signature': sign(body) },
+            body,
+          }) as never
+        );
+      };
+      expect(await (await postAction('resolved')).json()).toMatchObject({
+        resolved: true,
+      });
+      expect(await (await postAction('resolved')).json()).toMatchObject({
+        deduplicated: true,
+      });
+      expect((await postAction('regressed')).status).toBe(200);
+      expect(mockServerFetch).toHaveBeenCalledTimes(1);
+      const keys = mockAcquireRecentDispatch.mock.calls.map(([, key]) => key);
+      expect(keys[0]).toBe(keys[1]);
+      expect(keys[0]).toBe(`${keys[2]}:resolved`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('skips autofix for transient Degraded HTTP Operation on POST /pipeline', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
@@ -677,9 +726,11 @@ describe('POST /api/webhooks/sentry', () => {
     const firstDispatch = JSON.parse(
       String(mockServerFetch.mock.calls[0]?.[1]?.body)
     );
-    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(8);
+    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(10);
     expect(firstDispatch.client_payload).toMatchObject({
       issue_id: '101',
+      short_id: '',
+      linear_identifier: '',
       dedupe_key: dedupeKeys[0],
       context: {
         root_cause_fingerprint: dedupeKeys[0],
