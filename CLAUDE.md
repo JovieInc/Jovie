@@ -52,7 +52,6 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 | Tests/coverage | [testing.md](.claude/rules/testing.md) |
 | PR, CI, merge, deploy | [PR_FLOW.md](docs/PR_FLOW.md), [MERGE_QUEUE.md](.github/MERGE_QUEUE.md), [BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md), [release.md](.claude/rules/release.md) |
 | iOS / macOS | [ios.md](.claude/rules/ios.md) / [macos.md](.claude/rules/macos.md) |
-| Release channels / update IA | [RELEASE_CHANNELS.md](canon/RELEASE_CHANNELS.md) |
 | Pen canvas/registry | [pen.md](.claude/rules/pen.md) |
 | Skills | [gstack.md](.claude/rules/gstack.md) |
 
