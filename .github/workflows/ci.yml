@@ -5221,6 +5221,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true' && matrix.shard == '7/14'
         continue-on-error: true
         env:
+          VITEST_JUNIT_OUTPUT_FILE: test-report.quarantine.junit.xml
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -5255,8 +5256,10 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'
         run: pnpm turbo test --filter=@jovie/ui
 
-      - name: Preserve failed unit-shard diagnosis
-        if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+      - name: Preserve completed unit-shard diagnosis
+        # Successful retries are evidence too; cancellation cannot certify a
+        # completed execution. Keep the existing artifact identity for readers.
+        if: ${{ always() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
