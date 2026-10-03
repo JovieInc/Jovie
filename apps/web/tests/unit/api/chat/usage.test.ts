@@ -86,15 +86,6 @@ const snapshot = {
   isNearLimit: false,
   observedAt: now,
 };
-function entitlements(
-  plan: UserPlan = 'free',
-  billingVerification = 'verified'
-) {
-  return makeEntitlements({
-    plan,
-    billingVerification: billingVerification as 'verified' | 'unavailable',
-  });
-}
 function cache(value: unknown) {
   const redis = {
     get: vi.fn().mockResolvedValue(value),
@@ -319,7 +310,7 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
     async plan => {
       const limit = getEntitlements(plan).limits.aiWeeklyMessageLimit;
       hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
-        entitlements(plan)
+        makeEntitlements({ plan })
       );
       hoisted.readStatusMock.mockResolvedValue(liveStatus(4, limit));
       const response = await request();
@@ -350,7 +341,7 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
     async failure => {
       if (failure === 'billing')
         hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
-          entitlements('free', 'unavailable')
+          makeEntitlements({ billingVerification: 'unavailable' })
         );
       else
         hoisted.readStatusMock.mockResolvedValue({
@@ -372,7 +363,7 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
     async failure => {
       if (failure === 'billing')
         hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
-          entitlements('free', 'unavailable')
+          makeEntitlements({ billingVerification: 'unavailable' })
         );
       else if (failure === 'throw')
         hoisted.readStatusMock.mockRejectedValue(new Error('read failed'));
@@ -412,7 +403,7 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
   it('does not return old plan counts when verified entitlements changed', async () => {
     cache(snapshot);
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
-      entitlements('pro')
+      makeEntitlements({ plan: 'pro' })
     );
     hoisted.readStatusMock.mockResolvedValue({
       available: false,
@@ -437,7 +428,7 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
 
   it('rejects unauthenticated entitlements', async () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
-      ...entitlements(),
+      ...makeEntitlements(),
       isAuthenticated: false,
     });
     expect((await request()).status).toBe(401);
