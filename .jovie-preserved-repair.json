@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261002T093325Z-PR19932-devin-fix-9dc242",
+ "pr": 19932,
+ "issue": null,
+ "reason": [
+  "target-head-superseded"
+ ],
+ "branch": "dependabot/npm_and_yarn/tiptap/extension-placeholder-3.31.4",
+ "headBefore": "638e794db3d88ea56f2b5b796c04d30ca34995e4",
+ "at": "2026-10-02T09:37:13Z"
+}
