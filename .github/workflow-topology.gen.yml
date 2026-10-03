@@ -308,6 +308,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:evaluate
     jobCount: 1
+  - name: Native Security Advisory
+    path: .github/workflows/deepsec-native.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:native
+    jobCount: 1
   - name: Delivery Control Receipts
     path: .github/workflows/delivery-control-receipts.yml
     active: true

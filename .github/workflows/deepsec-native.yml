@@ -1,0 +1,92 @@
+name: Native Security Advisory
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# necessary-trust-boundary: Native subscription authentication lives on a commissioned runner; trusted controller and recorder credentials must remain outside the isolated source checkout and scanner subprocess environment.
+# removal-trigger: Remove this hosted hop when Summer's native scanner tool proves source leases, canonical reconciliation, and bounded native execution for 30 consecutive days.
+# clock-class: temporal-resource
+# Native execution requires an explicitly commissioned subscription runner.
+# No variable means no scan, no ledger/comment write, and no Linear mutation.
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Optional same-repository PR for an advisory scan'
+        required: false
+        type: string
+      head_sha:
+        description: 'Exact PR head SHA; required when pr_number is supplied'
+        required: false
+        type: string
+permissions: {}
+concurrency:
+  group: deepsec-native-ledger
+  cancel-in-progress: false
+jobs:
+  native:
+    if: ${{ vars.DEEPSEC_NATIVE_ENABLED == 'true' }}
+    runs-on: [self-hosted, linux, jovie-native-subscription]
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted native controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: trusted
+          persist-credentials: false
+      - name: Validate requested source identity
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PR_NUMBER" ]; then
+            [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            [[ "$HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]
+          else
+            test -z "$HEAD_SHA"
+          fi
+      - name: Checkout isolated source without installed dependencies
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.head_sha || 'main' }}
+          path: source
+          persist-credentials: false
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: trusted/.nvmrc
+      - name: Install pinned scanner tools outside source
+        run: |
+          set -euo pipefail
+          runtime="$(mktemp -d "$RUNNER_TEMP/deepsec-native-tools.XXXXXX")"
+          scan_workspace="$(mktemp -d "$RUNNER_TEMP/deepsec-native-scan.XXXXXX")"
+          cp trusted/scripts/security/deepsec/package.json trusted/scripts/security/deepsec/package-lock.json "$runtime/"
+          npm ci --ignore-scripts --prefix "$runtime"
+          echo "$runtime/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "NATIVE_SCAN_WORKSPACE=$scan_workspace" >> "$GITHUB_ENV"
+          echo "NATIVE_RUNTIME_TOOLS=$runtime" >> "$GITHUB_ENV"
+      - name: Generate scoped native recorder token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Scan and reconcile the current source
+        env:
+          DEEPSEC_NATIVE_ENABLED: ${{ vars.DEEPSEC_NATIVE_ENABLED }}
+          NATIVE_SOURCE_ROOT: ${{ github.workspace }}/source
+          NATIVE_PR_NUMBER: ${{ inputs.pr_number }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node trusted/scripts/security/deepsec-native-controller.mjs
+      - name: Remove scanner workspace and tools
+        if: ${{ always() }}
+        run: |
+          if [ -n "${NATIVE_SCAN_WORKSPACE:-}" ]; then rm -rf -- "$NATIVE_SCAN_WORKSPACE"; fi
+          if [ -n "${NATIVE_RUNTIME_TOOLS:-}" ]; then rm -rf -- "$NATIVE_RUNTIME_TOOLS"; fi
