@@ -240,12 +240,12 @@ describe('CommandPalette', () => {
     );
     const origin = screen.getByRole('button', { name: 'Return target' });
     origin.focus();
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    fireEvent.keyDown(window, { key: 'Escape' });
     await waitFor(() => expect(origin).toHaveFocus());
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
 
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
