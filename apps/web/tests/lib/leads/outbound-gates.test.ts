@@ -36,7 +36,7 @@ describe('isOutreachQuietHours', () => {
   const at = (hour: number) => new Date(Date.UTC(2026, 9, 3, hour, 30));
 
   it('uses the default quiet window (01:00-15:00 UTC) when env is unset', () => {
-    const env = {} as NodeJS.ProcessEnv;
+    const env = {};
     expect(isOutreachQuietHours(at(5), env)).toBe(true);
     expect(isOutreachQuietHours(at(16), env)).toBe(false);
     expect(isOutreachQuietHours(at(0), env)).toBe(false);
@@ -46,7 +46,7 @@ describe('isOutreachQuietHours', () => {
     const env = {
       OUTREACH_QUIET_HOURS_START_UTC: '22',
       OUTREACH_QUIET_HOURS_END_UTC: '6',
-    } as NodeJS.ProcessEnv;
+    };
     expect(isOutreachQuietHours(at(23), env)).toBe(true);
     expect(isOutreachQuietHours(at(3), env)).toBe(true);
     expect(isOutreachQuietHours(at(12), env)).toBe(false);
@@ -56,7 +56,7 @@ describe('isOutreachQuietHours', () => {
     const env = {
       OUTREACH_QUIET_HOURS_START_UTC: '0',
       OUTREACH_QUIET_HOURS_END_UTC: '0',
-    } as NodeJS.ProcessEnv;
+    };
     expect(isOutreachQuietHours(at(5), env)).toBe(false);
   });
 
@@ -64,7 +64,7 @@ describe('isOutreachQuietHours', () => {
     const env = {
       OUTREACH_QUIET_HOURS_START_UTC: 'bogus',
       OUTREACH_QUIET_HOURS_END_UTC: '99',
-    } as NodeJS.ProcessEnv;
+    };
     expect(isOutreachQuietHours(at(5), env)).toBe(true);
     expect(isOutreachQuietHours(at(16), env)).toBe(false);
   });
