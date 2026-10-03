@@ -394,6 +394,58 @@ describe('Statsig server initialization', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it('keeps the release plan demo on outside production when nothing is published', async () => {
+    mockGetFlagOverrideMap.mockResolvedValue({});
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: { RELEASE_PLAN_DEMO: { run } },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(getAppFlagValue('RELEASE_PLAN_DEMO')).resolves.toBe(true);
+
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+    await expect(getAppFlagValue('RELEASE_PLAN_DEMO')).resolves.toBe(true);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('keeps the release plan demo off in production when nothing is published', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    mockGetFlagOverrideMap.mockResolvedValue({});
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: { RELEASE_PLAN_DEMO: { run } },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(getAppFlagValue('RELEASE_PLAN_DEMO')).resolves.toBe(false);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('honors a personal override cookie for admins in production', async () => {
     process.env.NODE_ENV = 'production';
     process.env.VERCEL_ENV = 'production';

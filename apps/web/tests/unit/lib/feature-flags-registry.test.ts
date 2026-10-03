@@ -90,6 +90,7 @@ function readRepoFile(relativePath: string): string {
 
 describe('feature flag registry integrity', () => {
   it('keeps runtime app flags default-on for internal v1 access', () => {
+    // RELEASE_PLAN_DEMO is off in production; dev/preview turns it on in getAppFlagValue.
     // INBOX_HOME is an intentional default-off rollout gate (JOV-3931 / GH #13171).
     // MERCH_QA_GATE ships fail-closed until a real visual reviewer lands (JOV-4739).
     // CREATOR_FINANCE is a release-blocking gate that stays dark until the
@@ -104,6 +105,7 @@ describe('feature flag registry integrity', () => {
             'PAID_WELCOME_EMAIL',
             'MERCH_QA_GATE',
             'CREATOR_FINANCE',
+            'RELEASE_PLAN_DEMO',
           ].includes(name)
       )
       .map(([, value]) => value);
@@ -114,6 +116,7 @@ describe('feature flag registry integrity', () => {
     expect(APP_FLAG_DEFAULTS.PAID_WELCOME_EMAIL).toBe(false);
     expect(APP_FLAG_DEFAULTS.MERCH_QA_GATE).toBe(false);
     expect(APP_FLAG_DEFAULTS.CREATOR_FINANCE).toBe(false);
+    expect(APP_FLAG_DEFAULTS.RELEASE_PLAN_DEMO).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {
