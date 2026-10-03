@@ -198,7 +198,6 @@ const settingsRoutes = [
   ['retargeting-ads', 'Retargeting Ads', '/app/settings/retargeting-ads'],
   ['billing', 'Billing', '/app/settings/billing'],
   ['usage', 'Usage', '/app/settings/usage'],
-  ['referral', 'Referral', '/app/settings/referral'],
   ['payments', 'Payments', '/app/settings/payments'],
   ['touring', 'Touring', '/app/settings/touring'],
   ['analytics', 'Analytics settings', '/app/settings/analytics'],

@@ -139,7 +139,13 @@ Gaps closed after the first week (no PR may sit unowned):
   Once per stuck episode; a second removal goes to a model with the merge group's failing log.
 - Every 30 minutes the tick reconciles all open PRs in a few GraphQL pages (missed events
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
-  draft idle for 48h gets `stale`; exhausted attempts retain a bounded repair disposition, and a PR that went CLEAN or entered the queue starts a fresh episode.
+  draft idle for 48h gets `stale` when it is still eligible. CLEAN/queued observations clear
+  only synchronization bookkeeping, never consumed attempts or exhaustion labels. Terminal
+  work, explicit holds and active repairs survive stale/supersession retirement and event
+  ready/update-branch handlers. A genuine external head needing repair re-enters only after
+  the existing fenced claim writes its linked receipt, retained across later attempts.
+  An exhausted CLEAN external head without that receipt stays held; observing green is not
+  a repair attempt or new authority.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent

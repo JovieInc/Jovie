@@ -30,6 +30,8 @@ function fixture({
   candidates = [candidate()],
   first = pr(),
   second = first,
+  third = undefined,
+  failLabel = false,
   parents = [{ sha: old }],
   files = reports,
   ancestor = true,
@@ -46,9 +48,19 @@ function fixture({
       if (failClose) throw new Error('close denied');
       return '';
     }
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      if (failLabel) throw new Error('label denied');
+      return '';
+    }
     if (args.includes('--paginate')) return files;
     if (args[1].includes('/git/commits/')) return JSON.stringify({ parents });
-    return JSON.stringify(reads++ === 0 ? first : second);
+    return JSON.stringify(
+      reads++ === 0
+        ? first
+        : reads === 2
+          ? second
+          : (third ?? { ...second, labels: [{ name: 'duplicate' }] })
+    );
   };
   const run = () =>
     retireCoverageReports({
@@ -76,9 +88,39 @@ test('retires only the older measured-source report after checking ancestry, par
   assert.deepEqual(f.closed(), [['pr', 'close', '1', '--repo', repo]]);
   assert.equal(
     f.calls.filter(args => args[1] === `repos/${repo}/pulls/1`).length,
-    2
+    3
   );
   assert.ok(f.calls.some(args => args.includes('--paginate')));
+});
+
+test('closure requires an explicit duplicate label on the same proven report head', () => {
+  const f = fixture();
+  assert.deepEqual(f.run(), [1]);
+  const label = ['pr', 'edit', '1', '--repo', repo, '--add-label', 'duplicate'];
+  assert.deepEqual(
+    f.calls.find(args => args[1] === 'edit'),
+    label
+  );
+  assert.ok(
+    f.calls.findIndex(args => args[1] === 'edit') <
+      f.calls.findIndex(args => args[1] === 'close')
+  );
+  assert.throws(() => fixture({ failLabel: true }).run(), /label denied/);
+  for (const override of [
+    { labels: [] },
+    { labels: [{ name: 'duplicate' }, { name: 'hold' }] },
+    { labels: [{ name: 'duplicate' }, { name: 'queue-poison' }] },
+    { head: { ...pr().head, sha: source } },
+    { state: 'closed' },
+    { draft: false },
+    { body: 'writer takeover' },
+  ]) {
+    const held = fixture({
+      third: { ...pr(), labels: [{ name: 'duplicate' }], ...override },
+    });
+    assert.deepEqual(held.run(), []);
+    assert.deepEqual(held.closed(), []);
+  }
 });
 
 test('preserves the replacement, newer runs, held/ready PRs and non-report branches', () => {
