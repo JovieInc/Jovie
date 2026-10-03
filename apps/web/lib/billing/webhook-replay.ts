@@ -15,7 +15,6 @@ import { STUCK_WEBHOOK_AFTER_MS } from './sync-remediation-policy';
 // Match the longer merch claim (10 min). The subscription route leases for 5.
 const REPLAY_LEASE_MS = 10 * 60 * 1000;
 const REPLAY_BATCH_LIMIT = 10;
-
 type ReplayRow = {
   id: string;
   stripeEventId: string;
@@ -23,10 +22,8 @@ type ReplayRow = {
   payload: unknown;
   stripeCreatedAt: Date | null;
 };
-
 type ReplayHit = { stripeEventId: string; type: string; action: string };
 type ReplayMiss = { stripeEventId: string; type: string; error: string };
-
 /** Replay stored events that never reached processed_at. No Stripe writes. */
 export async function replayUnprocessedStripeWebhooks(
   now = new Date()
@@ -64,7 +61,6 @@ export async function replayUnprocessedStripeWebhooks(
   }
   return summary;
 }
-
 async function replayOne(
   candidate: ReplayRow,
   now: Date,
@@ -115,7 +111,6 @@ async function replayOne(
     });
   }
 }
-
 function claimable(now: Date): SQL | undefined {
   const leaseCutoff = new Date(now.getTime() - REPLAY_LEASE_MS);
   return or(
@@ -123,7 +118,6 @@ function claimable(now: Date): SQL | undefined {
     lt(stripeWebhookEvents.processingStartedAt, leaseCutoff)
   );
 }
-
 function owned(id: string, startedAt: Date): SQL | undefined {
   return and(
     eq(stripeWebhookEvents.id, id),
@@ -131,7 +125,6 @@ function owned(id: string, startedAt: Date): SQL | undefined {
     isNull(stripeWebhookEvents.processedAt)
   );
 }
-
 export function parseStoredEvent(candidate: {
   stripeEventId: string;
   type: string;
@@ -157,7 +150,6 @@ export function parseStoredEvent(candidate: {
   if (created === null) return null;
   return { ...(payload as Stripe.Event), id: record.id, created };
 }
-
 async function dispatchStoredEvent(event: Stripe.Event): Promise<void> {
   if (isMerchCheckout(event)) {
     await handleMerchCheckoutCompleted(
@@ -173,7 +165,6 @@ async function dispatchStoredEvent(event: Stripe.Event): Promise<void> {
     stripeWritesAllowed: false,
   });
 }
-
 function isMerchCheckout(event: Stripe.Event): boolean {
   if (event.type !== 'checkout.session.completed') return false;
   const session = event.data.object as {
@@ -181,7 +172,6 @@ function isMerchCheckout(event: Stripe.Event): boolean {
   };
   return Boolean(session.metadata?.merch_order_id);
 }
-
 async function isMerchRefund(event: Stripe.Event): Promise<boolean> {
   const charge = event.data.object as Stripe.Charge;
   const paymentIntentId =

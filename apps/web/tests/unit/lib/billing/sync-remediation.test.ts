@@ -5,7 +5,6 @@ const mockInsertValues = vi.hoisted(() => vi.fn());
 const envState = vi.hoisted(() => ({
   LINEAR_API_KEY: 'lin_test' as string | undefined,
 }));
-
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockSelect,
@@ -20,7 +19,6 @@ vi.mock('@/lib/utils/logger', () => ({
 import { runBillingSyncRemediation } from '@/lib/billing/sync-remediation';
 
 const now = new Date('2026-10-02T23:00:00.000Z');
-
 function limitChain(rows: unknown[]) {
   return {
     from: () => ({
@@ -30,7 +28,6 @@ function limitChain(rows: unknown[]) {
     }),
   };
 }
-
 function snapshot(lastRun: Date | null, stuck: unknown[] = []) {
   mockSelect
     .mockReturnValueOnce(limitChain(lastRun ? [{ createdAt: lastRun }] : []))
@@ -39,11 +36,9 @@ function snapshot(lastRun: Date | null, stuck: unknown[] = []) {
       from: () => ({ where: () => Promise.resolve([]) }),
     });
 }
-
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200 });
 }
-
 function linear(handlers: Record<string, unknown>) {
   return vi.fn(async (_url: string, init?: RequestInit) => {
     const query = JSON.parse(String(init?.body)).query as string;
@@ -55,7 +50,6 @@ function linear(handlers: Record<string, unknown>) {
     return json({ data: value });
   });
 }
-
 describe('runBillingSyncRemediation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,7 +57,6 @@ describe('runBillingSyncRemediation', () => {
     mockInsertValues.mockResolvedValue(undefined);
   });
   afterEach(() => vi.unstubAllGlobals());
-
   it('does nothing when reconciliation is fresh', async () => {
     snapshot(new Date('2026-10-02T00:00:00.000Z'));
     await expect(runBillingSyncRemediation(now)).resolves.toEqual({
@@ -73,7 +66,6 @@ describe('runBillingSyncRemediation', () => {
     });
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
-
   it('fails closed without LINEAR_API_KEY when a finding exists', async () => {
     envState.LINEAR_API_KEY = undefined;
     snapshot(new Date('2026-07-27T00:00:23.000Z'));
@@ -81,7 +73,6 @@ describe('runBillingSyncRemediation', () => {
       'LINEAR_API_KEY is not configured'
     );
   });
-
   it('creates a labeled issue and records the filing', async () => {
     snapshot(null);
     const fetchImpl = linear({
@@ -111,7 +102,6 @@ describe('runBillingSyncRemediation', () => {
       })
     );
   });
-
   it('adds the remediation label instead of replacing labels', async () => {
     snapshot(now, [
       {

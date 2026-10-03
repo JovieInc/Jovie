@@ -1,5 +1,4 @@
 /** 48h reconciliation freshness, 30m stuck webhooks, 12h Linear refire. */
-
 export const RECONCILIATION_STALE_AFTER_MS = 48 * 60 * 60 * 1000;
 export const STUCK_WEBHOOK_AFTER_MS = 30 * 60 * 1000;
 export const REMEDIATION_REFIRING_MS = 12 * 60 * 60 * 1000;
@@ -7,25 +6,21 @@ export const BILLING_SYNC_STALE_FINGERPRINT = 'billing-sync-stale';
 export const BILLING_WEBHOOKS_STUCK_FINGERPRINT = 'billing-webhooks-stuck';
 export const RECONCILIATION_RUN_EVENT = 'reconciliation_run';
 export const REMEDIATION_FILED_EVENT = 'billing_sync_remediation_filed';
-
 export function remediationLabel(fingerprint: string): string {
   return `remediation:${fingerprint}`;
 }
-
 export interface StuckWebhookSnapshot {
   stripeEventId: string;
   type: string;
   createdAt: Date;
   dashboardAction: string | null;
 }
-
 export interface BillingSyncFinding {
   fingerprint: string;
   label: string;
   title: string;
   description: string;
 }
-
 export function evaluateBillingSyncRemediation(input: {
   now: Date;
   lastReconciliationAt: Date | null;
@@ -67,7 +62,6 @@ export function evaluateBillingSyncRemediation(input: {
   }
   return findings;
 }
-
 function finding(fingerprint: string, detail: string): BillingSyncFinding {
   const label = remediationLabel(fingerprint);
   const title =
@@ -81,7 +75,6 @@ function finding(fingerprint: string, detail: string): BillingSyncFinding {
     description: `${detail} Fingerprint: ${fingerprint}. Label: ${label}.`,
   };
 }
-
 function shouldFile(
   input: {
     now: Date;
@@ -93,7 +86,6 @@ function shouldFile(
   if (!lastFiled) return true;
   return input.now.getTime() - lastFiled.getTime() >= REMEDIATION_REFIRING_MS;
 }
-
 export function dashboardActionForStoredEvent(input: {
   type: string;
   payload: unknown;
@@ -116,7 +108,6 @@ export function dashboardActionForStoredEvent(input: {
   const charge = chargeId ? ` for charge ${chargeId}` : '';
   return `Open ${subscription}${charge} and cancel the subscription. Do not refund, create a charge, or change the price. Replay will not call subscriptions.cancel.`;
 }
-
 function readSubscriptionId(
   object: Record<string, unknown> | null
 ): string | null {
@@ -124,7 +115,6 @@ function readSubscriptionId(
   if (!invoice || typeof invoice !== 'object') return null;
   return stringOf((invoice as { subscription?: unknown }).subscription);
 }
-
 function stringOf(value: unknown): string | null {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object' && 'id' in value) {
@@ -133,7 +123,6 @@ function stringOf(value: unknown): string | null {
   }
   return null;
 }
-
 function eventObject(payload: unknown): Record<string, unknown> | null {
   if (!payload || typeof payload !== 'object') return null;
   const data = (payload as { data?: unknown }).data;

@@ -117,9 +117,7 @@ export async function GET(request: Request) {
     return { latencyMs: Date.now() - pingStart };
   });
 
-  // Billing sync detector. Lives on the 15-minute cron so a dead daily
-  // reconciliation cannot take the alert with it. Reads the database; it
-  // does not call /api/billing/health.
+  // 15-minute detector. Database only; it does not call /api/billing/health.
   results.billingSyncRemediation = await runSubJob(
     'billingSyncRemediation',
     async () => {

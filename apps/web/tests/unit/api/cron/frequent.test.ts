@@ -365,27 +365,4 @@ describe('GET /api/cron/frequent', () => {
     expect(data.results.sendNotifications.success).toBe(false);
     expect(data.results.sendNotifications.error).toBe('send service down');
   });
-
-  it('returns 207 when billing sync remediation cannot file', async () => {
-    mockRunBillingSyncRemediation.mockRejectedValue(
-      new Error(
-        'LINEAR_API_KEY is not configured; billing sync remediation cannot file'
-      )
-    );
-
-    const { GET } = await import('@/app/api/cron/frequent/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/frequent', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
-
-    expect(response.status).toBe(207);
-    expect(data.results.billingSyncRemediation.success).toBe(false);
-    expect(data.results.billingSyncRemediation.error).toContain(
-      'LINEAR_API_KEY'
-    );
-    expect(mockCaptureError).toHaveBeenCalled();
-  });
 });

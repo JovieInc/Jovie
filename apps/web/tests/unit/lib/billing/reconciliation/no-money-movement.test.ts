@@ -11,7 +11,6 @@ const SOURCES = [
   'lib/billing/reconciliation/subscription-error-classifier.ts',
   'lib/billing/webhook-replay.ts',
 ];
-
 describe('billing reconciliation money movement', () => {
   it('does not charge, refund, or cancel from reconciliation or replay', () => {
     const money =

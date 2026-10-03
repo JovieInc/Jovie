@@ -18,13 +18,11 @@ import {
 const LINEAR_API = 'https://api.linear.app/graphql';
 /** Same Jovie team as scripts/lib/linear-issue-intake.mjs. */
 const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
-
 export interface BillingSyncRemediationResult {
   findings: number;
   filed: string[];
   skipped: boolean;
 }
-
 /** DB-backed detector. Does not call `/api/billing/health`. */
 export async function runBillingSyncRemediation(
   now = new Date()
@@ -54,7 +52,6 @@ export async function runBillingSyncRemediation(
   logger.info('[billing-sync-remediation] filed', { filed });
   return { findings: findings.length, filed, skipped: false };
 }
-
 export async function loadBillingSyncSnapshot(now: Date): Promise<{
   now: Date;
   lastReconciliationAt: Date | null;
@@ -126,13 +123,11 @@ export async function loadBillingSyncSnapshot(now: Date): Promise<{
     lastFiledAtByFingerprint,
   };
 }
-
 function readFingerprint(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== 'object') return null;
   const fingerprint = (metadata as { fingerprint?: unknown }).fingerprint;
   return typeof fingerprint === 'string' ? fingerprint : null;
 }
-
 export async function fileBillingSyncFinding(
   finding: BillingSyncFinding,
   apiKey: string,
@@ -180,7 +175,6 @@ export async function fileBillingSyncFinding(
   }
   return { action: 'updated', id: existing.id };
 }
-
 async function ensureRemediationLabel(
   name: string,
   apiKey: string,
@@ -210,7 +204,6 @@ async function ensureRemediationLabel(
   }
   return id;
 }
-
 async function findIssueByFingerprint(
   fingerprint: string,
   apiKey: string,
@@ -232,7 +225,6 @@ async function findIssueByFingerprint(
   const chosen = open ?? matches[0];
   return chosen?.id ? { id: chosen.id } : null;
 }
-
 interface GqlData {
   issueCreate?: { success?: boolean; issue?: { id?: string } | null };
   issueUpdate?: { success?: boolean; issue?: { id?: string } | null };
@@ -242,7 +234,6 @@ interface GqlData {
     nodes?: Array<{ id?: string; title?: string; state?: { type?: string } }>;
   };
 }
-
 async function linearGraphql(
   query: string,
   variables: Record<string, unknown>,

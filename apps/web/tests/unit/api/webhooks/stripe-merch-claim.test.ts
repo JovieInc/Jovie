@@ -6,7 +6,6 @@ const mockInsert = vi.hoisted(() => vi.fn());
 const mockSelect = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockHandleCheckout = vi.hoisted(() => vi.fn());
-
 vi.mock('@/lib/env-server', () => ({
   env: { STRIPE_WEBHOOK_SECRET_MERCH: 'whsec_test' },
 }));
@@ -24,7 +23,6 @@ vi.mock('@/lib/error-tracking', () => ({ captureCriticalError: vi.fn() }));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-
 describe('POST /api/webhooks/stripe-merch claim', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,7 +48,6 @@ describe('POST /api/webhooks/stripe-merch claim', () => {
       set: () => ({ where: () => ({ returning: () => Promise.resolve([]) }) }),
     });
   });
-
   it('returns 503 when another worker already holds the lease', async () => {
     const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
     const response = await POST(

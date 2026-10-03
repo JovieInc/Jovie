@@ -8,7 +8,6 @@ import {
 } from '@/lib/billing/sync-remediation-policy';
 
 const now = new Date('2026-10-02T23:00:00.000Z');
-
 function input(
   overrides: Partial<Parameters<typeof evaluateBillingSyncRemediation>[0]> = {}
 ) {
@@ -23,7 +22,6 @@ function input(
     ...overrides,
   };
 }
-
 describe('evaluateBillingSyncRemediation', () => {
   it('stays quiet inside 48 hours and throttles a recent filing', () => {
     expect(evaluateBillingSyncRemediation(input())).toEqual([]);
@@ -41,7 +39,6 @@ describe('evaluateBillingSyncRemediation', () => {
       )
     ).toEqual([]);
   });
-
   it('files a stale run and a never-recorded run', () => {
     const stale = evaluateBillingSyncRemediation(
       input({ lastReconciliationAt: new Date('2026-07-27T00:00:23.000Z') })
@@ -57,7 +54,6 @@ describe('evaluateBillingSyncRemediation', () => {
       )
     ).toEqual([BILLING_SYNC_STALE_FINGERPRINT]);
   });
-
   it('includes the dashboard action on stuck refunds', () => {
     const findings = evaluateBillingSyncRemediation(
       input({
@@ -77,7 +73,6 @@ describe('evaluateBillingSyncRemediation', () => {
     expect(findings[0]?.description).toContain('Do not refund');
   });
 });
-
 describe('dashboardActionForStoredEvent', () => {
   it('names the cancel and forbids refunds, charges, and price changes', () => {
     const action = dashboardActionForStoredEvent({
