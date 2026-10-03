@@ -225,6 +225,7 @@ web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|de
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.app-shell|web|app-shell|apps/web/app/app/(shell)/layout.tsx|desktop,mobile
+web.money|web|screen.money|apps/web/app/app/money/page.tsx,apps/web/app/app/money/layout.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
 web.exp-right-rail-shotgun|web|exp-right-rail-shotgun|apps/web/app/exp/right-rail-shotgun/page.tsx|desktop,mobile
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx|desktop,mobile

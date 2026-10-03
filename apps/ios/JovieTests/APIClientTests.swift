@@ -1446,3 +1446,73 @@ extension APIClientTests {
   }
 #endif
 }
+
+// Callers hold the existing shared token-store test lease across the session.
+final class NativeExchangeReplyProtocol: URLProtocol {
+  private static let lock = NSLock()
+  private static var response = (status: 401, body: Data())
+  private static var captured: [URLRequest] = []
+  static var requests: [URLRequest] { lock.withLock { captured } }
+
+  static func session(status: Int, body: String) -> URLSession {
+    lock.withLock { response = (status, Data(body.utf8)); captured = [] }
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [Self.self]
+    return URLSession(configuration: configuration)
+  }
+
+  override class func canInit(with request: URLRequest) -> Bool { true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func startLoading() {
+    let reply = Self.lock.withLock { Self.captured.append(request); return Self.response }
+    client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: reply.status,
+      httpVersion: nil, headerFields: nil)!, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: reply.body)
+    client?.urlProtocolDidFinishLoading(self)
+  }
+  override func stopLoading() {}
+}
+
+extension APIClientTests {
+  @Test(arguments: ["missing", "wrong_code", "wrong_client", "wrong_state", "wrong_verifier", "expired", "replayed"])
+  func nativeExchangeRecognizesExplicitPreconsumeRejection(reason: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let session = NativeExchangeReplyProtocol.session(status: 401,
+        body: "{\"exchangePhase\":\"preconsume\",\"reason\":\"\(reason)\"}")
+      defer { session.invalidateAndCancel() }
+      let client = NativeAuthExchangeClient(baseURL: URL(string: "https://jov.ie")!, session: session)
+      await #expect(throws: NativeAuthExchangeError.rejectedBeforeConsume(reason: reason)) {
+        _ = try await client.exchange(MobileAuthReturn(code: "code", state: "state", codeVerifier: "verifier"))
+      }
+      let request = try #require(NativeExchangeReplyProtocol.requests.first)
+      #expect(NativeExchangeReplyProtocol.requests.count == 1)
+      #expect(request.url?.path == "/api/auth/native/exchange" && request.httpMethod == "POST")
+      let body = try #require(JSONSerialization.jsonObject(with: requestBodyData(request)) as? [String: String])
+      #expect(body == ["client": "ios", "code": "code", "state": "state", "codeVerifier": "verifier"])
+    }
+  }
+
+  @Test(arguments: [
+    (401, "{\"reason\":\"missing\"}", "missing"),
+    (401, "{\"exchangePhase\":\"consumed\",\"reason\":\"missing\"}", "missing"),
+    (401, "{\"exchangePhase\":\"preconsume\",\"reason\":\"ott_invalid\"}", "ott_invalid"),
+    (401, "{\"exchangePhase\":\"preconsume\",\"reason\":\"future_reason\"}", "future_reason"),
+    (401, "{\"exchangePhase\":\"preconsume\",\"reason\":\" missing \"}", "missing"),
+    (401, "{\"exchangePhase\":true,\"reason\":\"missing\"}", "missing"),
+    (401, "{\"exchangePhase\":\"preconsume\",\"reason\":42}", nil),
+    (401, "{", nil),
+    (400, "{\"exchangePhase\":\"preconsume\",\"reason\":\"missing\"}", "missing"),
+    (500, "{\"exchangePhase\":\"preconsume\",\"reason\":\"missing\"}", "missing"),
+  ] as [(Int, String, String?)])
+  func nativeExchangeDoesNotInferPreconsumeFromOtherFailures(status: Int, body: String, reason: String?) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let session = NativeExchangeReplyProtocol.session(status: status, body: body)
+      defer { session.invalidateAndCancel() }
+      let client = NativeAuthExchangeClient(baseURL: URL(string: "https://jov.ie")!, session: session)
+      await #expect(throws: NativeAuthExchangeError.requestFailed(statusCode: status, reason: reason)) {
+        _ = try await client.exchange(MobileAuthReturn(code: "code", state: "state", codeVerifier: "verifier"))
+      }
+      #expect(NativeExchangeReplyProtocol.requests.count == 1)
+    }
+  }
+}
