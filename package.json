@@ -188,6 +188,8 @@
     "skill-governance:check": "node scripts/skill-governance-guard.mjs",
     "skill-governance:test": "node --test scripts/skill-governance-guard.test.mjs",
     "agent-web:test": "node --test scripts/agent-web-contract.test.mjs",
+    "desktop:visual-qa": "node scripts/desktop/visual-qa.mjs",
+    "desktop:visual-qa:test": "node --test scripts/desktop/visual-qa-lib.test.mjs",
     "ci:taste-guard": "node scripts/taste-label-guard.mjs",
     "ci:taste-guard:sweep": "node scripts/taste-label-guard.mjs sweep",
     "pr:conflict:dry-run": "node scripts/pr-conflict-handler.mjs --dry-run",

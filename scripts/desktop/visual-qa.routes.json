@@ -1,0 +1,27 @@
+{
+  "$comment": "Routes the Mac visual QA pass captures at every size in visual-qa-lib.mjs DEFAULT_SIZES. Paths mirror apps/web/constants/routes.ts and admin-navigation.ts.",
+  "routes": [
+    { "route": "/app", "surface": "Artist home" },
+    { "route": "/app/chat", "surface": "Artist chat" },
+    { "route": "/app/presence", "surface": "Presence" },
+    { "route": "/app/library", "surface": "Library" },
+    { "route": "/app/releases", "surface": "Releases" },
+    { "route": "/app/settings", "surface": "Settings" },
+    { "route": "/app/ov/chat", "surface": "Ovie chat" },
+    { "route": "/hud", "surface": "Ops HUD" },
+    { "route": "/app/ov/people", "surface": "People" },
+    { "route": "/app/ov/growth", "surface": "Growth" },
+    {
+      "route": "/app/ov/platform-connections",
+      "surface": "Platform Connections"
+    },
+    { "route": "/app/ov/activity", "surface": "Activity" },
+    { "route": "/app/ov/investors", "surface": "Investors" },
+    { "route": "/app/ov/screenshots", "surface": "Screenshots" },
+    { "route": "/app/ov/costs", "surface": "Costs" },
+    { "route": "/app/ov/revenue-lift", "surface": "Revenue Lift" },
+    { "route": "/app/ov/share-studio", "surface": "Share Studio" },
+    { "route": "/app/ov/system", "surface": "System Map" },
+    { "route": "/app/ov/features", "surface": "Features" }
+  ]
+}
