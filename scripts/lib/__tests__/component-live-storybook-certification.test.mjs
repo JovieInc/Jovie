@@ -28,6 +28,7 @@ import {
   validateCanonicalStoryInventory,
 } from '../../component-live-storybook-certification.mjs';
 import {
+  createStorybookVitestLease,
   findOwnedPlaywrightBrowsers,
   isProcessGone,
   killProcessGroup,
@@ -752,6 +753,41 @@ describe('live Storybook component certification', () => {
 });
 
 describe('live Storybook lifecycle', () => {
+  it('omits invalid controller receipts so repeated owner setup can read its lease', () => {
+    const tempRoot = mkdtempSync(
+      join(tmpdir(), 'jovie-storybook-vitest-receipt-')
+    );
+    const leaseDir = mkdtempSync(
+      join(tmpdir(), 'storybook-controller-receipts-')
+    );
+    temps.push(tempRoot, leaseDir);
+    const valid = {
+      pid: 120,
+      pgid: 120,
+      startedAt: 'Sat Oct  3 19:24:08 2026',
+      commandHash: 'a'.repeat(64),
+    };
+    const options = {
+      token: randomUUID(),
+      tempRoot,
+      leaseDir,
+      ownerPid: 121,
+      ownerPgid: 120,
+      ownerStartedAt: valid.startedAt,
+      ownerCommandHash: 'b'.repeat(64),
+      deadlineAt: null,
+      controllers: [valid, { ...valid, pid: 517, pgid: 0 }],
+    };
+
+    const first = createStorybookVitestLease(options);
+    expect(first.controllers).toEqual([valid]);
+    expect(createStorybookVitestLease(options)).toMatchObject({
+      created: false,
+      leasePath: first.leasePath,
+      controllers: [valid],
+    });
+  });
+
   it('selects only the exact owned Playwright profile and never normal Chrome', () => {
     const token = randomUUID();
     const tempRoot = mkdtempSync(

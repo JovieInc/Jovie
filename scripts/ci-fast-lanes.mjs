@@ -491,6 +491,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/lighthouse-production-collect.test.mjs',
   'scripts/lib/__tests__/lighthouse-retry.test.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/__tests__/validation-lifecycle.test.mjs',
   'scripts/lib/__tests__/m2-revenue-path-canary-intake.test.mjs',
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
@@ -2104,6 +2105,7 @@ export async function runStructural(opts = {}) {
       ? ['pnpm invariants:check']
       : [];
   const operationsParts = [
+    'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-reconcile.test.mjs',
@@ -2130,7 +2132,7 @@ export async function runStructural(opts = {}) {
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
     // merge-group-workflow-contract runs in ci:control:test's Vitest run.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
