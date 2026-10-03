@@ -374,16 +374,76 @@ test('deadline kills both the real parent and its SDK-style descendant', async (
     [
       process.execPath,
       '-e',
-      "const c=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});process.stdout.write(String(c.pid));setInterval(()=>{},1000)",
+      String.raw`
+        const fs = require('node:fs');
+        const child = require('node:child_process').spawn(
+          process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore' }
+        );
+        const stat = fs.readFileSync('/proc/' + child.pid + '/stat', 'utf8');
+        const fields = stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/);
+        process.stdout.write(JSON.stringify({
+          pid: child.pid, pgid: Number(fields[2]), startTime: fields[19],
+        }));
+        setInterval(()=>{},1000);
+      `,
     ],
     { cwd: tmpdir(), env: process.env, timeoutMs: 500 }
   );
-  assert.match(result.error.message, /timed out/);
-  const pid = Number(result.stdout);
-  assert.ok(pid > 0);
+  // Identity is recorded by the fixture before timeout, never inferred from a reused PID.
+  const owned = JSON.parse(result.stdout);
+  const pid = owned.pid;
+  assert.ok(Number.isSafeInteger(pid) && pid > 0);
+  assert.ok(Number.isSafeInteger(owned.pgid) && owned.pgid > 0);
+  assert.match(owned.startTime, /^\d+$/);
+  const ownedIdentity = `${owned.pgid}:${owned.startTime}`;
+  const readStat = () => {
+    try {
+      return readFileSync(`/proc/${pid}/stat`, 'utf8');
+    } catch (error) {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
+  };
+  const identity = stat => {
+    const fields = stat
+      .slice(stat.lastIndexOf(')') + 2)
+      .trim()
+      .split(/\s+/);
+    return `${fields[2]}:${fields[19]}`; // process group and kernel start time
+  };
   try {
-    assert.match(readFileSync(`/proc/${pid}/stat`, 'utf8'), /\) Z /);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+    assert.match(result.error.message, /timed out/);
+    let stat = readStat();
+    // Parent close is not a barrier for the group's descendant exit transitions.
+    const deadline = performance.now() + 5_000;
+    while (
+      stat !== null &&
+      identity(stat) === ownedIdentity &&
+      !/\) Z /.test(stat) &&
+      performance.now() < deadline
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+      stat = readStat();
+    }
+    // A different identity means the original descendant was reaped and the PID reused.
+    if (stat !== null && identity(stat) === ownedIdentity)
+      assert.match(
+        stat,
+        /\) Z /,
+        `Descendant ${pid} remained live after 5s: ${stat}`
+      );
+  } finally {
+    const stat = readStat();
+    if (
+      stat !== null &&
+      identity(stat) === ownedIdentity &&
+      !/\) Z /.test(stat)
+    ) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+      }
+    }
   }
 });
