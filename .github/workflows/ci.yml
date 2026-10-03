@@ -6100,6 +6100,9 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          # Flaky retries leave error-context.md. Scan and redact it; do not
+          # classify it as unknown-binary after a passing Playwright run.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -6108,6 +6111,7 @@ jobs:
           name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 3
 
   ci-golden-path:
@@ -6347,6 +6351,7 @@ jobs:
           name: golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             apps/web/test-results/
+            !apps/web/test-results/**/*.png
           retention-days: 3
 
       - name: Upload golden-path visual review evidence
@@ -6709,6 +6714,9 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
+          # Failed attempts leave error-context.md. Redact it before the
+          # producer stages evidence; the failure upload scans the same files.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -6743,6 +6751,7 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
           SENTRY_RELEASE: ${{ github.sha }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
           cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
@@ -6753,6 +6762,7 @@ jobs:
         with:
           name: ${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 7
 
   ci-test-performance:
@@ -7853,6 +7863,7 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
@@ -7861,6 +7872,7 @@ jobs:
           name: smoke-required-report-${{ github.run_id }}
           path: |
             apps/web/test-results/
+          allow-markdown: 'true'
           retention-days: 3
 
   # Homepage smoke is a blocking probe of the immutable production deployment.

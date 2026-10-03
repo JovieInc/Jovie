@@ -11,7 +11,7 @@
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq, not } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
@@ -64,9 +64,75 @@ export function buildPublicReleaseApprovalSeedRow(
   };
 }
 
+const PROMO_DOWNLOAD_ATTESTATION_COLUMNS = [
+  'rights_control_attested',
+  'rights_control_attested_by',
+  'rights_control_attested_at',
+] as const;
+
+export type PromoDownloadAttestationColumn =
+  (typeof PROMO_DOWNLOAD_ATTESTATION_COLUMNS)[number];
+
+/**
+ * Fill a missing rights receipt from the inserted row. Leave an existing
+ * receipt untouched so the immutable attestation trigger accepts a rerun.
+ */
+export function promoDownloadSeedAttestationAssignment(
+  column: PromoDownloadAttestationColumn
+) {
+  return drizzleSql.raw(
+    `CASE WHEN promo_downloads.rights_control_attested THEN promo_downloads.${column} ELSE excluded.${column} END`
+  );
+}
+
+export interface PromoDownloadSeedWrite {
+  readonly isActive: boolean;
+  readonly rightsControlAttested: boolean;
+  readonly rightsControlAttestedBy: string | null;
+  readonly rightsControlAttestedAt: Date | null;
+}
+
+/**
+ * Row state after one seed write. Inserts the incoming attested row. On
+ * conflict, reactivates and backfills attestation only when the stored row
+ * has none.
+ */
+export function applyPromoDownloadSeedWrite(
+  existing: PromoDownloadSeedWrite | null,
+  incoming: PromoDownloadSeedWrite
+): PromoDownloadSeedWrite {
+  if (!existing) return incoming;
+  const keepReceipt = existing.rightsControlAttested;
+  return {
+    ...incoming,
+    isActive: true,
+    rightsControlAttested: keepReceipt
+      ? existing.rightsControlAttested
+      : incoming.rightsControlAttested,
+    rightsControlAttestedBy: keepReceipt
+      ? existing.rightsControlAttestedBy
+      : incoming.rightsControlAttestedBy,
+    rightsControlAttestedAt: keepReceipt
+      ? existing.rightsControlAttestedAt
+      : incoming.rightsControlAttestedAt,
+  };
+}
+
 /** Reruns may reactivate a fixture, but may never replace its rights receipt. */
 export function buildPromoDownloadSeedConflictUpdate(now = new Date()) {
-  return { isActive: true, updatedAt: now };
+  return {
+    isActive: true,
+    updatedAt: now,
+    rightsControlAttested: promoDownloadSeedAttestationAssignment(
+      'rights_control_attested'
+    ),
+    rightsControlAttestedBy: promoDownloadSeedAttestationAssignment(
+      'rights_control_attested_by'
+    ),
+    rightsControlAttestedAt: promoDownloadSeedAttestationAssignment(
+      'rights_control_attested_at'
+    ),
+  };
 }
 
 interface TestProfile {
@@ -1748,41 +1814,48 @@ async function seedReleasesForProfile(
       .select({ userId: creatorProfiles.userId })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId));
-    try {
-      await db
-        .insert(promoDownloads)
-        .values({
-          creatorProfileId: profileId,
-          releaseId: promoReleaseId,
-          title: 'Neon Skyline Radio Edit',
-          slug: 'neon-skyline-radio-edit',
-          description: 'Deterministic promo download fixture for public QA.',
-          fileUrl: 'fixtures/promo-downloads/neon-skyline-radio-edit.mp3',
-          fileName: 'neon-skyline-radio-edit.mp3',
-          fileMimeType: 'audio/mpeg',
-          fileSizeBytes: 4_600_000,
-          artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
-          isActive: true,
-          rightsControlAttested: true,
-          rightsControlAttestedBy: profileOwner?.userId ?? null,
-          rightsControlAttestedAt: new Date(),
-          position: 0,
-          metadata: { fixture: true },
-        })
-        .onConflictDoUpdate({
-          target: [promoDownloads.releaseId, promoDownloads.slug],
-          set: buildPromoDownloadSeedConflictUpdate(),
-        });
-      console.log('    ✓ Ensured promo download fixture for Neon Skyline');
-    } catch (error) {
-      if (isMissingPromoDownloadsRelationError(error)) {
-        console.warn(
-          `    ⚠ promo_downloads is missing; skipping promo download fixture: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
-      } else {
-        throw error;
+    const attestedBy = profileOwner?.userId ?? null;
+    if (!attestedBy) {
+      console.warn(
+        '    ⚠ Skipping promo download fixture; profile has no owner to attest rights control'
+      );
+    } else {
+      try {
+        await db
+          .insert(promoDownloads)
+          .values({
+            creatorProfileId: profileId,
+            releaseId: promoReleaseId,
+            title: 'Neon Skyline Radio Edit',
+            slug: 'neon-skyline-radio-edit',
+            description: 'Deterministic promo download fixture for public QA.',
+            fileUrl: 'fixtures/promo-downloads/neon-skyline-radio-edit.mp3',
+            fileName: 'neon-skyline-radio-edit.mp3',
+            fileMimeType: 'audio/mpeg',
+            fileSizeBytes: 4_600_000,
+            artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
+            isActive: true,
+            rightsControlAttested: true,
+            rightsControlAttestedBy: attestedBy,
+            rightsControlAttestedAt: new Date(),
+            position: 0,
+            metadata: { fixture: true },
+          })
+          .onConflictDoUpdate({
+            target: [promoDownloads.releaseId, promoDownloads.slug],
+            set: buildPromoDownloadSeedConflictUpdate(),
+          });
+        console.log('    ✓ Ensured promo download fixture for Neon Skyline');
+      } catch (error) {
+        if (isMissingPromoDownloadsRelationError(error)) {
+          console.warn(
+            `    ⚠ promo_downloads is missing; skipping promo download fixture: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        } else {
+          throw error;
+        }
       }
     }
   }
@@ -1910,8 +1983,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
   // Use Neon HTTP driver (same as the app) instead of WebSocket driver
   // This ensures we write to the same connection pool the app reads from
-  const sql = neon(databaseUrl);
-  const db = drizzle(sql, { schema });
+  const db = drizzle(neon(databaseUrl), { schema });
   const seedRetryOptions = {
     attempts: process.env.CI ? 6 : 2,
     initialDelayMs: process.env.CI ? 2_000 : 1_500,

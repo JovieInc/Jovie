@@ -29,6 +29,15 @@ lane = importlib.util.module_from_spec(SPEC)
 sys.modules["lane_runner"] = lane
 SPEC.loader.exec_module(lane)
 
+# Positive flow fixtures declare healthy capacity. Real low/critical admission
+# remains exercised by the explicit free_pct overrides and test_disk_guard.py;
+# these unit tests must neither depend on host capacity nor sweep host caches.
+_disk_capacity_fixture = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+def setUpModule():
+    _disk_capacity_fixture.start()
+def tearDownModule():
+    _disk_capacity_fixture.stop()
+
 
 def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels=()):
     # Distinct titles: identical titles are one unit of work (pool_rejections).
@@ -169,6 +178,29 @@ class SelectionTest(unittest.TestCase):
             issue("JOV-4", priority=1),
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
+
+    def test_remediation_label_is_not_skipped_for_no_symphony(self):
+        self.assertIsNone(lane.pick_issue([issue("JOV-7540", labels=["no-symphony"])], {}))
+        picked = lane.pick_issue([
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]),
+            issue("JOV-7551", labels=["no-symphony", "remediation:billing-health"]),
+        ], {})
+        self.assertEqual(picked.identifier, "JOV-7540")
+        self.assertIsNone(lane.admission_rejection(
+            issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000))
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation:router", "type:epic"]), {}, 10000),
+            "excluded-label:type:epic")
+        self.assertEqual(lane.admission_rejection(
+            issue("JOV-1", labels=["no-symphony", "remediation"]), {}, 10000),
+            "excluded-label:no-symphony")
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            self.assertEqual(lane.admission_rejection(
+                issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000),
+                "excluded-label:no-symphony")
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
 
     def test_issues_with_an_open_lane_pr_anywhere_are_skipped(self):
         picked = lane.pick_issue([issue("JOV-1", priority=1), issue("JOV-2", priority=2)], {},
@@ -465,7 +497,24 @@ class VerifyAndLandTest(unittest.TestCase):
         result = self.run_gate(fake)
         self.assertEqual(result["verdict"], "landing")
         self.assertIn(["gh", "pr", "ready", "7", "--repo", lane.REPO_SLUG], fake.calls)
-        self.assertIn(["gh", "pr", "merge", "7", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "abc"], fake.calls)
+        self.assertIn(["gh", "pr", "merge", "7", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", self.pr["headRefOid"]], fake.calls)
+
+    def test_failed_queue_records_retry_under_inventory_lock(self):
+        fake = FakeShell([self.pr], failing=("merge",))
+        update = lane.update_json; observed = []
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
+            path.write_text(json.dumps({"9": "concurrent"}))
+            def synchronized(path, change):
+                contender = lane.Locked(host.state / "claim.lock", blocking=False)
+                try:
+                    if path.name == "requeue.json": observed.append(contender.held)
+                finally: contender.release()
+                update(path, change)
+            with patch.object(lane, "sh", side_effect=fake), patch.object(lane, "update_json", side_effect=synchronized):
+                result = lane.gate_pr(host, self.pr, Path("/tmp"), None)
+            self.assertEqual(result["verdict"], "verified-not-queued"); self.assertEqual(observed, [False])
+            self.assertEqual(json.loads(path.read_text()), {"9": "concurrent", "7": self.pr["headRefOid"]})
 
     def test_failing_check_holds_the_pr_as_draft(self):
         fake = FakeShell([self.pr], failing=("scripts/hooks/pre-push-gate.sh",))
@@ -609,6 +658,24 @@ class FakeLinear:
 
 
 class LinearClientTest(unittest.TestCase):
+    def test_comment_rejects_malformed_success_payloads_as_known_failure(self):
+        for payload in (None, {"commentCreate": None}, {"commentCreate": []}, {"commentCreate": {"success": None}}):
+            with self.subTest(payload=payload), patch.object(lane.Linear, "gql", return_value=payload):
+                with self.assertRaises(RuntimeError): lane.Linear.__new__(lane.Linear).comment("id-JOV-3", "held")
+
+    def test_claim_comment_shape_errors_are_diagnostic_and_operator_stop_propagates(self):
+        import io
+        client = lane.Linear.__new__(lane.Linear)
+        with patch.object(client, "comment", side_effect=AttributeError("private-shape-message")), patch("sys.stderr", new_callable=io.StringIO) as diagnostic:
+            lane.notify_issue_claim(client, issue(), "devin", {"model": "m"})
+            self.assertEqual(diagnostic.getvalue(), "lane claim comment unavailable: AttributeError\n")
+        with patch.object(client, "comment", side_effect=KeyboardInterrupt("operator-stop")):
+            with self.assertRaises(KeyboardInterrupt): lane.notify_issue_claim(client, issue(), "devin", {"model": "m"})
+
+    def test_comment_rejects_false_success(self):
+        with patch.object(lane.Linear, "gql", return_value={"commentCreate": {"success": False}}):
+            with self.assertRaises(RuntimeError): lane.Linear.__new__(lane.Linear).comment("id-JOV-3", "held")
+
     def test_reads_key_and_maps_lane_issues(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = Path(tmp) / "linear.env"
@@ -762,7 +829,7 @@ class RunIssueTest(unittest.TestCase):
 
     def test_agent_that_never_worked_is_a_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
-        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"]}, FakeLinear([]), issue())
+        receipt = lane.run_issue(self.host, "devin", {"cmd": ["false"]}, FakeLinear([]), issue())
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
 
     def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
@@ -955,6 +1022,18 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_notification_error_releases_the_slot_even_while_traceback_is_retained(self):
+        lane.run_issue = lambda *args: {"verdict": "landing", "prUrl": "u"}
+        error = RuntimeError("notification unavailable")
+        with patch.object(self.linear, "comment", side_effect=error):
+            try: lane.worker(self.host, "devin")
+            except RuntimeError as caught: retained = caught
+            else: self.fail("notification failure must remain visible")
+        self.assertIs(retained, error)
+        contender = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+        try: self.assertTrue(contender.held)
+        finally: contender.release()
+
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
         disk.start()
@@ -987,6 +1066,24 @@ class WorkerTest(unittest.TestCase):
          lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
          lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget) = self.saved
         self.tmp.cleanup()
+
+    def test_initial_claim_failure_is_nonfatal_without_fabricating_delivery(self):
+        import io
+        client = self.saved[0].__new__(self.saved[0]); comment = self.linear.comment
+        for failure in (None, OSError("private-network-message")):
+            with self.subTest(failure=type(failure).__name__), patch.object(client, "gql", side_effect=failure, return_value={"commentCreate": {"success": False}}), patch.object(self.linear, "comment", side_effect=lambda ident, body: client.comment(ident, body) if "claimed this issue" in body else comment(ident, body)), patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as run, patch("sys.stderr", new_callable=io.StringIO) as diagnostic:
+                lane.worker(self.host, "devin"); run.assert_called_once()
+                self.assertEqual(diagnostic.getvalue(), f"lane claim comment unavailable: {'OSError' if failure else 'RuntimeError'}\n")
+                self.assertFalse(any("claimed this issue" in body for _, body in self.linear.comments))
+                slot = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+                try: self.assertTrue(slot.held)
+                finally: slot.release()
+
+    def test_verified_enqueue_retry_is_reported_without_false_queue_claim(self):
+        lane.run_issue = lambda *args: {"verdict": "verified-not-queued", "prUrl": "u"}
+        lane.worker(self.host, "devin")
+        self.assertTrue(any("verified; enqueue retry pending" in body for _, body in self.linear.comments))
+        self.assertFalse(any("is queued;" in body for _, body in self.linear.comments))
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
         lane.run_issue = lambda *a: {"verdict": "landing", "prUrl": "u"}
@@ -3059,6 +3156,22 @@ class GateSingleflightTest(unittest.TestCase):
 
 
 class RequeueTest(unittest.TestCase):
+    def test_partial_inventory_retains_unknown_and_reconciles_exact_publishable_head(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
+            pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-3-retry"}
+            for live in (None, {**pr, "state": "CLOSED"}, {**pr, "headRefOid": "head-B"}, pr):
+                with self.subTest(live=live), patch.object(lane, "reconcile_fix_target", return_value=live), patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0)) as command:
+                    path.write_text(json.dumps({"5": "head-A"})); lane.requeue_verified(host, [])
+                    self.assertEqual(json.loads(path.read_text()), {"5": "head-A"} if live is None else {})
+                    if live == pr:
+                        self.assertEqual(command.call_args_list, [unittest.mock.call(["gh", "pr", "ready", "5", "--repo", lane.REPO_SLUG]), unittest.mock.call(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "head-A"])])
+                    else: command.assert_not_called()
+            lane.revoke_publication(host, branch=pr["headRefName"], reason="run-stopped")
+            with patch.object(lane, "reconcile_fix_target", return_value=pr), patch.object(lane, "sh") as command:
+                path.write_text(json.dumps({"5": "head-A"})); lane.requeue_verified(host, []); command.assert_not_called()
+                self.assertEqual(json.loads(path.read_text()), {})
+
     def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
@@ -3082,6 +3195,23 @@ class RequeueTest(unittest.TestCase):
             self.assertNotIn("7", [c[3] for c in calls])
             self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto", "--match-head-commit", "h1"], calls)
 
+
+    def test_retained_head_push_race_retains_retry_without_queueing_unverified_head(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
+            path.write_text(json.dumps({"5": "head-A"})); live = {"head": "head-A"}; queued = []
+            def command(cmd, **kwargs):
+                if cmd[:3] == ["gh", "pr", "ready"]: live["head"] = "head-B"
+                pin = cmd[cmd.index("--match-head-commit") + 1] if "--match-head-commit" in cmd else None
+                rejected = cmd[:3] == ["gh", "pr", "merge"] and pin != live["head"] and pin is not None
+                if cmd[:3] == ["gh", "pr", "merge"] and not rejected: queued.append(live["head"])
+                return SimpleNamespace(returncode=int(rejected), stdout="", stderr="")
+            pr = {"number": 5, "headRefOid": "head-A", "headRefName": "devin/jov-5", "state": "OPEN"}
+            with patch.object(lane, "sh", side_effect=command), patch.object(lane, "reconcile_fix_target", side_effect=lambda _pr: {**pr, "headRefOid": live["head"]}):
+                lane.requeue_verified(host, [pr])
+            self.assertEqual(live["head"], "head-B"); self.assertEqual(queued, [])
+            self.assertEqual(json.loads(path.read_text()), {"5": "head-A"})
     def test_requeue_rechecks_authority_changed_during_ready(self):
         for change in ("revoked", "sensitive", "head", "unreadable", "held"):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
@@ -3119,7 +3249,7 @@ class OnePrPerIssueTest(unittest.TestCase):
 
     def pr(self, number, issue="jov-7", draft=True, state="BLOCKED", pushed_ago=0, lane_name="devin"):
         return {"number": number, "headRefName": f"{lane_name}/{issue}-20260927t0{number:05d}", "isDraft": draft,
-                "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago}
+                "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago, "headRefOid": f"h{number}", "labels": []}
 
     def test_in_flight_reads_branches_and_markers_and_fails_closed(self):
         saved = lane.sh
@@ -3187,6 +3317,91 @@ class OnePrPerIssueTest(unittest.TestCase):
         self.assertEqual(closed, ["1", "3", "4"])
         self.assertIn("superseded by #2", next(a for a in calls if a[:3] == ["gh", "pr", "close"])[-1])
         self.assertEqual(linear.moves, [("JOV-8", "Todo")])
+
+
+    def test_sweep_preserves_terminal_holds_and_active_repairs_before_any_close(self):
+        targets = [self.pr(1), self.pr(2, draft=False, state="CLEAN"),
+                   self.pr(3, issue="jov-8"), self.pr(4, issue="jov-9"),
+                   self.pr(5, issue="jov-10"), self.pr(6, issue="jov-11")]
+        targets[2]["labels"] = [{"name": "lane-fix-exhausted"}]
+        targets[3]["labels"] = [{"name": "Tim:Hold"}]
+        attempts = {"1": {"sha": "h1", "count": 2},
+                    "5": {"sha": "h5", "count": 1, "at": self.NOW - 1}}
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0,stdout="",stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            host=lane.Host(state=Path(tmp))
+            (host.state/"fix-attempts.json").write_text(json.dumps(attempts))
+            with patch.dict(sys.modules, {"lane_runner": SimpleNamespace()}), \
+                 patch.object(lane,"sh",side_effect=shell), patch.object(lane,"lane_prs",return_value=targets), \
+                 patch.object(lane,"last_pushes",return_value={p["number"]:self.NOW-lane.STALE_DRAFT_S-1 for p in targets}), \
+                 patch.object(lane,"claimed_elsewhere",side_effect=lambda n,*args:n==6):
+                lane.sweep_lane_prs(host,"devin",FakeLinear([]),now=self.NOW)
+            self.assertEqual(json.loads((host.state/"fix-attempts.json").read_text()),attempts)
+        self.assertFalse(any(c[:3]==["gh","pr","close"] for c in calls))
+
+    def test_red_selector_blocks_exhaustion_without_history_and_missing_head(self):
+        target={**self.pr(1),"mergeStateStatus":"DIRTY","labels":[{"name":"lane-fix-exhausted"}]}
+        self.assertIsNone(lane.red_pr([target],{}))
+        self.assertIsNone(lane.red_pr([{**target,"labels":[],"headRefOid":""}],{}))
+        history={"1":{"sha":"external-before","count":2,"endedAt":1}}
+        self.assertEqual(lane.red_pr([target],history),target,"a proven external dirty head still enters the existing claim path")
+
+
+    def test_red_claim_writes_linked_receipt_before_consuming_exhaustion(self):
+        target={**self.pr(1),"mergeStateStatus":"DIRTY","labels":[{"name":"lane-fix-exhausted"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            host=lane.Host(state=Path(tmp));path=host.state/"fix-attempts.json"
+            path.write_text(json.dumps({"1":{"sha":"h0","count":2,"endedAt":1}}))
+            calls=[]
+            def shell(args,**kwargs):
+                calls.append(args)
+                if args[-1].endswith("/lane-fix-exhausted"):
+                    receipt=json.loads(path.read_text())["1"]
+                    self.assertEqual(receipt["count"],1)
+                    self.assertEqual(receipt["reentry"]["fromGeneration"]["head"],"h0")
+                    self.assertEqual(receipt["reentry"]["toGeneration"]["head"],"h1")
+                return SimpleNamespace(returncode=0,stdout="",stderr="")
+            with patch.dict(sys.modules, {"lane_runner": SimpleNamespace()}), \
+                 patch.object(lane,"sh",side_effect=shell), patch.object(lane,"load_providers",return_value={"devin":{"slots":4}}), \
+                 patch.object(lane,"claimed_elsewhere",return_value=False), patch.object(lane,"post_claim"), \
+                 patch.object(lane,"reconcile_fix_target",side_effect=lambda pr:{**pr,"state":"OPEN"}):
+                self.assertEqual(lane.claim_red_pr(host,"devin",[target])["number"],1)
+            self.assertTrue(any(c[-1].endswith("/lane-fix-exhausted") for c in calls))
+
+
+    def test_red_claim_rejects_stale_head_or_unreadable_reentry_without_spending(self):
+        target={**self.pr(1),"headRefOid":"cached-h1","mergeStateStatus":"DIRTY", "labels":[{"name":"lane-fix-exhausted"}]}
+        history={"1":{"sha":"current-h2","count":2,"endedAt":1}}
+        for observed in [None,{**target,"headRefOid":"current-h2","state":"OPEN"},
+                         {**target,"state":"OPEN","labels":[{"name":"hold"}]}]:
+            with self.subTest(observed=observed), tempfile.TemporaryDirectory() as tmp:
+                host=lane.Host(state=Path(tmp));path=host.state/"fix-attempts.json";path.write_text(json.dumps(history))
+                with patch.object(lane,"load_providers",return_value={"devin":{"slots":4}}), \
+                     patch.object(lane,"claimed_elsewhere",return_value=False), patch.object(lane,"reconcile_fix_target",return_value=observed), \
+                     patch.object(lane,"sh") as writes,patch.object(lane,"post_claim") as claims:
+                    self.assertIsNone(lane.claim_red_pr(host,"devin",[target]))
+                self.assertEqual(json.loads(path.read_text()),history)
+                writes.assert_not_called();claims.assert_not_called()
+
+    def test_red_claim_rechecks_fresh_clean_state_before_spending(self):
+        target = {**self.pr(1), "mergeStateStatus": "DIRTY", "labels": [{"name": "lane-fix-exhausted"}]}
+        history = {"1": {"sha": "h0", "count": 2, "endedAt": 1}}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps(history))
+            live = {**target, "state": "OPEN", "mergeStateStatus": "CLEAN", "statusCheckRollup": []}
+            with patch.object(lane, "load_providers", return_value={"devin": {"slots": 4}}), \
+                 patch.object(lane, "claimed_elsewhere", return_value=False), \
+                 patch.object(lane, "reconcile_fix_target", return_value=live), \
+                 patch.object(lane, "sh") as writes, patch.object(lane, "post_claim") as claims:
+                self.assertIsNone(lane.claim_red_pr(host, "devin", [target]))
+            self.assertEqual(json.loads(path.read_text()), history)
+            writes.assert_not_called()
+            claims.assert_not_called()
 
 
 class LockfileConflictTest(unittest.TestCase):
@@ -3277,6 +3492,158 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
 
 
+class GateOutcomeTest(unittest.TestCase):
+    real_adopt = lane.adopt_pr
+
+    @staticmethod
+    def produce(adopt, host, name, pr, *, sensitive=False, verdict="verified-not-queued"):
+        # Execute the real producer and its ledger append; mock only expensive/external edges.
+        outcome = {"verdict": verdict, "pr": pr["number"], "prUrl": pr.get("url"),
+                   "headSha": pr["headRefOid"], "changedFiles": 2, "gateWaitS": 4, "reasons": []}
+        with patch.object(lane, "require_disk"), patch.object(lane, "reconcile_fix_target", return_value={**pr, "state": "OPEN", "labels": [], "isCrossRepository": False}), patch.object(lane, "sh"), patch.object(lane, "add_worktree"), patch.object(lane, "install_dependencies"), patch.object(lane, "remove_worktree"), patch.object(lane, "gate_pr", return_value=outcome):
+            return adopt(host, name, pr, sensitive=sensitive)
+
+    def test_real_adoption_envelope_preserves_enclosing_identity_and_links_distinct_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            pr = {"number": 7, "headRefOid": "a" * 40, "headRefName": "devin/jov-7", "url": "https://github.com/JovieInc/Jovie/pull/7"}
+            adopted = self.produce(lane.adopt_pr, host, "devin", pr)
+            execution = {"fencingToken": "source-fence"}; qualification = {"fencingToken": "gate-fence"}
+            adopted.update(execution=execution, qualificationExecution=qualification, sourceFencingToken="source-fence", remoteThreadId="thread-1", gateSensitive=False, revocation={"reason": "fixture"}, dependencies=["fixture"], next_action="retry")
+            identity = {"runId": "issue-run", "kind": "issue", "provider": "source", "startedAt": "source-start", "branch": "source-branch", "worktree": "source-tree", "issue": "JOV-7", "attribution": {"category": "autonomous-created"}}
+            outer = {**identity, **lane.gate_outcome(adopted)}
+            for key, value in identity.items(): self.assertEqual(outer[key], value)
+            self.assertEqual(outer["adoptRunId"], adopted["runId"])
+            for key in ("verdict", "pr", "prUrl", "headSha", "changedFiles", "gateWaitS", "reasons", "execution", "qualificationExecution", "sourceFencingToken", "remoteThreadId", "gateSensitive", "revocation", "dependencies", "next_action"):
+                self.assertEqual(outer[key], adopted[key])
+            self.assertNotIn("result", outer); self.assertNotIn("endedAt", outer)
+            first = lane.qualification_receipt("source", issue("JOV-7"), adopted)
+            second = lane.qualification_receipt("source", issue("JOV-7"), adopted)
+            self.assertEqual(first["kind"], "qualification"); self.assertEqual(first["adoptRunId"], adopted["runId"])
+            self.assertEqual(len({first["runId"], second["runId"], adopted["runId"]}), 3)
+            self.assertEqual(json.loads((host.state / "runs/ledger.jsonl").read_text())["runId"], adopted["runId"])
+
+
+class DeferredRequeueTest(unittest.TestCase):
+    def test_unrecognized_branch_retains_the_exact_retry_without_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            pr = {"number": 5, "headRefOid": "head-A", "headRefName": "feature/manual"}
+            slot = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+            with patch.object(lane, "run_deferred_requeue", return_value=None):
+                self.assertIsNone(lane.finish_deferred_retry(host, "devin", pr, Mock(), lambda pr: {"active": True}, slot=slot))
+            self.assertTrue(slot.handle.closed)
+            self.assertEqual(json.loads((host.state / "worker-idle.json").read_text())["devin"]["deferredRequeue"]["5"]["pr"], pr)
+
+    def test_legacy_deferred_markers_without_terminal_are_transient(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "worker-idle.json"
+            path.write_text(json.dumps({"devin": {"deferredRequeue": {"5": {"pr": {"headRefOid": "a"}}}}}))
+            lane.record_idle_exit(host, "devin", "ordinary-scan")
+            self.assertNotIn("deferredRequeue", json.loads(path.read_text())["devin"])
+            path.write_text(json.dumps({"devin": {"deferredRequeue": {"5": {"pr": {"headRefOid": "a"}}}}}))
+            lane.yield_deferred_requeues(host, "devin")
+            self.assertEqual(json.loads(path.read_text())["devin"]["deferredRequeue"], {})
+
+    @staticmethod
+    def concurrent_update(test, host, values):
+        claim = lane.Locked(host.state / "claim.lock", blocking=False)
+        try:
+            test.assertTrue(claim.held, "qualification must permit other workers to claim")
+            lane.update_json(host.state / "requeue.json", lambda rows: rows.update(values))
+        finally: claim.release()
+
+
+    def test_deferred_dispositions_yield_transient_holds_and_retain_exact_terminal_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); queue = host.state / "requeue.json"
+            prs = [{"number": n, "headRefOid": "head-A", "headRefName": f"devin/jov-{n}"} for n in (5, 6)]
+            queue.write_text(json.dumps({"5": "head-A", "6": "head-A"}))
+            context = {"active": True, "digest": "generation-A"}
+            for pr, terminal in zip(prs, (False, True)):
+                lane.record_idle_exit(host, "devin", "fixture", deferred={"pr": pr, "issue": f"JOV-{pr['number']}", "context": context, "terminal": terminal})
+            inactive = lambda pr: {"active": False, "digest": "generation-A"} if pr["number"] == 6 else context
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", inactive)), {"5", "6"})
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", lambda pr: context)), {"5"})
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", lambda pr: {"active": True, "digest": "generation-B"})), set())
+            lock = lane.Locked(host.state / "claim.lock", blocking=True)
+            try: lane.yield_deferred_requeues(host, "devin")
+            finally: lock.release()
+            self.assertEqual(set(lane.deferred_requeue_blocks(host, "devin", inactive)), {"6"})
+            queue.write_text(json.dumps({"6": "head-B"}))
+            self.assertFalse(lane.deferred_requeue_blocks(host, "devin", inactive))
+            self.assertEqual(json.loads((host.state / "worker-idle.json").read_text())["devin"]["deferredRequeue"]["6"]["pr"]["headRefOid"], "head-A")
+
+    def test_deferred_held_errors_and_operator_stop_release_the_slot_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-5-20260930t123000"}
+            (host.state / "requeue.json").write_text(json.dumps({"5": "head-A"}))
+            for result in (None, {"verdict": "remote-held"}, RuntimeError("fixture"), KeyboardInterrupt(), lane.subprocess.TimeoutExpired("gh", 600), lane.subprocess.CalledProcessError(1, "gh")):
+                with self.subTest(result=type(result).__name__), patch.object(lane, "reconcile_fix_target", return_value=pr), patch.object(lane, "sh") as command:
+                    slot = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+                    with patch.object(slot, "release", wraps=slot.release) as release:
+                        retry = Mock(side_effect=result) if isinstance(result, BaseException) else Mock(return_value=(issue("JOV-5"), result))
+                        if isinstance(result, KeyboardInterrupt):
+                            with self.assertRaises(KeyboardInterrupt): lane.finish_deferred_retry(host, "devin", pr, retry, lambda pr: {"active": True}, slot=slot)
+                        else:
+                            self.assertIsNone(lane.finish_deferred_retry(host, "devin", pr, retry, lambda pr: {"active": True}, slot=slot))
+                            self.assertEqual(json.loads((host.state / "worker-idle.json").read_text())["devin"]["reason"], "deferred-held")
+                        release.assert_called_once()
+                    command.assert_not_called(); self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "head-A"})
+                    contender = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+                    try: self.assertTrue(contender.held)
+                    finally: contender.release()
+
+    def test_selects_one_exact_target_and_removes_only_unchanged_landed_head(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
+            prs = [{"number": n, "state": "OPEN", "headRefOid": "head-A", "headRefName": f"devin/jov-{n}"} for n in (5, 6)]
+            for moved in (False, True):
+                with self.subTest(moved=moved), patch.object(lane, "sh") as command, patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: dict(pr)):
+                    path.write_text(json.dumps({"5": "head-A", "6": "head-A"}))
+                    claim = lane.Locked(host.state / "claim.lock", blocking=True)
+                    try:
+                        selected = lane.requeue_verified(host, prs, defer=lambda pr: True)
+                        self.assertEqual(selected, prs[0]); command.assert_not_called()
+                        self.assertEqual(json.loads(path.read_text()), {"5": "head-A", "6": "head-A"})
+                    finally: claim.release()
+                    def retry(pr):
+                        self.concurrent_update(self, host, {"9": "concurrent", **({"5": "head-B"} if moved else {})})
+                        return {"verdict": "landing"}
+                    self.assertEqual(lane.run_deferred_requeue(host, selected, retry), {"verdict": "landing"})
+                    self.assertEqual(json.loads(path.read_text()), {"6": "head-A", "9": "concurrent", **({"5": "head-B"} if moved else {})})
+                    command.assert_not_called()
+
+    def test_deferred_unknown_moved_closed_revoked_and_held_do_not_remove_or_enqueue(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); path = host.state / "requeue.json"
+            pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-5"}
+            for live in (None, {**pr, "state": "CLOSED"}, {**pr, "headRefOid": "head-B"}, {**pr, "headRefName": "other"}, pr):
+                with self.subTest(live=live), patch.object(lane, "reconcile_fix_target", return_value=live), patch.object(lane, "sh") as command, patch.object(lane, "publication_revocation", return_value=None):
+                    path.write_text(json.dumps({"5": "head-A"}))
+                    for outcome in (None, {"verdict": "remote-held"}):
+                        with patch("builtins.print"), patch.object(lane, "gate_pr") as gate:
+                            retry = unittest.mock.Mock(return_value=outcome)
+                            result = lane.run_deferred_requeue(host, pr, retry)
+                            self.assertEqual(result, outcome if live == pr else None)
+                            self.assertEqual(retry.call_count, int(live == pr)); gate.assert_not_called()
+                    self.assertEqual(json.loads(path.read_text()), {"5": "head-A"}); command.assert_not_called()
+            lane.revoke_publication(host, branch=pr["headRefName"], reason="run-stopped")
+            with patch.object(lane, "reconcile_fix_target", return_value=pr):
+                retry = unittest.mock.Mock(); self.assertIsNone(lane.run_deferred_requeue(host, pr, retry)); retry.assert_not_called()
+
+    def test_deferred_error_and_operator_stop_release_owned_slot_and_propagate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); pr = {"number": 5, "state": "OPEN", "headRefOid": "head-A", "headRefName": "devin/jov-5"}
+            for error in (RuntimeError("fixture"), KeyboardInterrupt()):
+                with self.subTest(error=type(error).__name__), patch.object(lane, "reconcile_fix_target", return_value=pr):
+                    slot = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+                    with self.assertRaises(type(error)):
+                        lane.run_deferred_requeue(host, pr, unittest.mock.Mock(side_effect=error), slot=slot)
+                    contender = lane.Locked(host.state / "slots/devin.0.lock", blocking=False)
+                    try: self.assertTrue(contender.held)
+                    finally: contender.release()
 class TimerInstallerNodePathTests(unittest.TestCase):
     def test_generated_timers_use_installer_node_and_keep_current_receipts(self):
         import plistlib

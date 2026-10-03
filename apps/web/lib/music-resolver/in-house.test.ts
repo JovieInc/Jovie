@@ -36,6 +36,24 @@ const apple = {
 };
 
 describe('in-house cross-DSP resolver', () => {
+  it('loads the default source adapter when no source is injected', async () => {
+    const result = await resolveInHouse({
+      kind: 'artist',
+      url: 'https://music.apple.com/us/artist/the-artist/42',
+    });
+
+    expect(result).toMatchObject({
+      status: 'resolved',
+      kind: 'artist',
+      links: [
+        expect.objectContaining({
+          provider: 'apple_music',
+          provenance: 'input_url',
+        }),
+      ],
+    });
+  });
+
   it('resolves a track ISRC across Spotify, Apple Music, Deezer, and MusicBrainz', async () => {
     const result = await resolveInHouse(
       { kind: 'track', isrc: 'USRC17607839' },

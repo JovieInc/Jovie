@@ -113,3 +113,41 @@ describe('VoicePageContent source contract', () => {
     expect(Web041Voice).toEqual({});
   });
 });
+
+vi.mock('next/link', async () => {
+  const { createElement, forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      import('react').ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, href, ...props }, ref) {
+      return createElement('a', {
+        ...props,
+        href: href ?? '#',
+        ref,
+        'data-test-prefetch': String(prefetch),
+      });
+    }),
+  };
+});
+
+it('loads all voice auth destinations on intent while retaining public link defaults', () => {
+  render(<VoicePageContent />);
+  for (const id of [
+    'voice-hero-primary-cta',
+    'voice-trust-cta',
+    'voice-final-cta',
+  ]) {
+    expect(screen.getByTestId(id)).toHaveAttribute('href', APP_ROUTES.START);
+    expect(screen.getByTestId(id)).toHaveAttribute(
+      'data-test-prefetch',
+      'false'
+    );
+  }
+  for (const name of ['See pricing', 'Talk to the team']) {
+    expect(screen.getByRole('link', { name })).toHaveAttribute(
+      'data-test-prefetch',
+      'undefined'
+    );
+  }
+});

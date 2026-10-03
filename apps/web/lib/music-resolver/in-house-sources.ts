@@ -10,7 +10,7 @@ import {
   type InHouseSources,
   PROVENANCE_CONFIDENCE,
   type ResolvedDspLink,
-} from './in-house';
+} from './in-house-contracts';
 
 /**
  * Official DSP and MusicBrainz calls only. A third-party link aggregator

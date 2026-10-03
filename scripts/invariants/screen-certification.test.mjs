@@ -334,6 +334,33 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the canonical Links workspace and its legacy redirect', () => {
+    const sources = [
+      'apps/web/app/app/(shell)/links/page.tsx',
+      'apps/web/app/app/(shell)/dashboard/links/page.tsx',
+    ];
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.links');
+
+    assert.deepEqual(screen, {
+      id: 'web.links',
+      platform: 'web',
+      owner: 'links',
+      sources,
+      viewports: ['desktop', 'mobile'],
+    });
+    for (const source of sources) assert.equal(kindOf(source), 'registered');
+
+    const result = evaluateChangedScreens({
+      changedFiles: sources.map(path => ({ path, status: 'M' })),
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(
+      result.changedScreens.map(changed => changed.id),
+      ['web.links']
+    );
+  });
+
   it('registers every protected revenue screen source', () => {
     assert.deepEqual(protectedSources(), [
       'apps/web/app/(dynamic)/start/page.tsx',

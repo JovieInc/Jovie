@@ -89,7 +89,7 @@ describe('AuthBrandPanel', () => {
     ).toBeInTheDocument();
     expect(DEFAULT_AUTH_BRAND_HEADLINE).toBe('Be found. Be understood.');
     expect(DEFAULT_AUTH_BRAND_DESCRIPTION).toBe(
-      'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.'
+      'Claim your name. Jovie makes you easy to reach, for people and for agents.'
     );
   });
 });

@@ -907,3 +907,126 @@ struct NativeSessionRefreshTests {
     }
   }
 }
+
+func nativeExpiryReceipt(
+  from operation: () throws -> NativeRequestAuthorization
+) throws -> NativeSessionExpiryReceipt {
+  do {
+    _ = try operation()
+    Issue.record("Expected a native expiry receipt")
+    throw APIClientError.invalidResponse
+  } catch let NativeSessionRequestError.expired(receipt) {
+    return receipt
+  }
+}
+
+extension NativeSessionRefreshTests {
+  @Test(arguments: ["unauthorized", "passive", "acquisition"])
+  func ownedExpiryKeepsOneReceiptAcrossReadersAndParallelFailures(source: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let authorization = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      if source != "unauthorized" {
+        UserDefaults.standard.set(1.0, forKey: "ie.jov.Jovie.nativeSession.expiresAt")
+        #expect(NativeSessionTokenStore.captureOwnership() == owner)
+        if source == "passive" { #expect(NativeSessionTokenStore.load() == nil) }
+      }
+      let receipt = try nativeExpiryReceipt {
+        if source == "unauthorized" {
+          return try NativeSessionTokenStore.resolveUnauthorized(
+            authorizedBy: authorization, allowRetry: true
+          )
+        }
+        return try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      }
+      #expect(receipt.userID == "a")
+      #expect(receipt.ownership != owner)
+      #expect(NativeSessionTokenStore.captureOwnership() == receipt.ownership)
+      #expect(try nativeExpiryReceipt {
+        try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      } == receipt)
+      #expect(try nativeExpiryReceipt {
+        try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorization, allowRetry: true)
+      } == receipt)
+      #expect(try nativeExpiryReceipt {
+        try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: receipt.ownership)
+      } == receipt)
+      #expect(NativeSessionTokenStore.requestAuthorization() == nil)
+      #expect(NativeSessionTokenStore.captureOwnership() == receipt.ownership)
+    }
+  }
+
+  @Test(arguments: ["clear", "same-login", "later-expiry"])
+  func anOldRequestCannotAdoptAnotherEmptyOrReplacementState(change: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let authorization = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      _ = try nativeExpiryReceipt {
+        try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorization, allowRetry: true)
+      }
+      if change == "clear" {
+        NativeSessionTokenStore.clear()
+      } else {
+        NativeSessionTokenStore.save(token: "a", userID: "a", expiresAt: .distantFuture)
+        if change == "later-expiry" {
+          UserDefaults.standard.set(1.0, forKey: "ie.jov.Jovie.nativeSession.expiresAt")
+          #expect(NativeSessionTokenStore.load() == nil)
+        }
+      }
+      let replacement = NativeSessionTokenStore.captureSessionContext()
+      #expect(throws: NativeSessionRequestError.superseded) {
+        try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      }
+      #expect(throws: NativeSessionRequestError.superseded) {
+        try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorization, allowRetry: true)
+      }
+      #expect(NativeSessionTokenStore.captureSessionContext() == replacement)
+    }
+  }
+
+  @Test func missingAcquisitionUsesTheObservedEmptyGenerationUntilExplicitClear() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let emptyOwner = NativeSessionTokenStore.captureOwnership()
+      let receipt = try nativeExpiryReceipt {
+        try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: emptyOwner)
+      }
+      #expect(receipt.ownership == emptyOwner)
+      #expect(receipt.userID == nil)
+      #expect(try nativeExpiryReceipt {
+        try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: emptyOwner)
+      } == receipt)
+      NativeSessionTokenStore.clear()
+      #expect(throws: NativeSessionRequestError.superseded) {
+        try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: emptyOwner)
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func revisedBearerCannotBeClearedByOldOrRetriedRejection(sameBearer: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "t0", userID: "a", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let first = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: owner)
+      NativeSessionTokenStore.refresh(from: response(token: sameBearer ? "t0" : "t1"), authorizedBy: first)
+      var rejected = first
+      if !sameBearer {
+        rejected = try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: first, allowRetry: true)
+        #expect(rejected.bearerToken == "t1")
+        NativeSessionTokenStore.refresh(from: response(token: "t0"), authorizedBy: rejected)
+      }
+      let current = NativeSessionTokenStore.captureSessionContext()
+      #expect(throws: NativeSessionRequestError.superseded) {
+        try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: rejected, allowRetry: sameBearer)
+      }
+      #expect(throws: NativeSessionRequestError.superseded) {
+        try NativeSessionTokenStore.resolveUnauthorized(
+          authorizedBy: NativeRequestAuthorization(unmanagedBearerToken: "t0"), allowRetry: true
+        )
+      }
+      #expect(NativeSessionTokenStore.captureSessionContext() == current)
+    }
+  }
+}

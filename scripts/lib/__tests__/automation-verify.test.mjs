@@ -27,6 +27,86 @@ import {
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
 
+describe('lane Python qualification coverage', () => {
+  it.each([
+    ['lane source', ['scripts/lanes/hyperagent_lane.py']],
+    ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['falsy inputs', [null, false, '', 'scripts/lanes/execution_attempt.py']],
+    ['missing pinned dependencies', ['scripts/lanes/hyperagent_lane.py'], true],
+    [
+      'mixed full fallback',
+      ['scripts/lanes/hyperagent_lane.py', 'apps/web/lib/unknown.ts'],
+    ],
+    [
+      'global full fallback',
+      ['scripts/lanes/execution_attempt.py', 'package.json'],
+    ],
+    [
+      'unknown Python peer',
+      ['scripts/lanes/hyperagent_lane.py', 'scripts/lanes/unknown-new.py'],
+    ],
+  ])(
+    'fails the real %s qualifier when lane Python coverage fails',
+    async (_, files, missingDependencies = false) => {
+      const dir = mkdtempSync(resolve(tmpdir(), 'lane-python-qualification-'));
+      const marker = resolve(dir, 'python-covered');
+      try {
+        for (const binary of ['node', 'pnpm']) {
+          writeFileSync(resolve(dir, binary), '#!/bin/sh\nexit 0\n', {
+            mode: 0o755,
+          });
+        }
+        writeFileSync(
+          resolve(dir, 'python3'),
+          missingDependencies
+            ? '#!/bin/sh\nexit 1\n'
+            : '#!/bin/sh\ncase "$*" in *"coverage run"*) touch "$LANE_PYTHON_MARKER"; exit 73;; esac\nexit 0\n',
+          { mode: 0o755 }
+        );
+        const child = spawn(
+          process.execPath,
+          [
+            resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+            '--changed-files-json',
+            JSON.stringify(files),
+            '--shard-concurrency',
+            '1',
+          ],
+          {
+            env: {
+              ...process.env,
+              PATH: `${dir}:${process.env.PATH}`,
+              LANE_PYTHON_MARKER: marker,
+            },
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
+        );
+        // Drain output so a child cannot block on an inherited pipe buffer.
+        child.stdout.resume();
+        child.stderr.resume();
+        const status = await new Promise((resolveExit, reject) => {
+          child.once('error', reject);
+          child.once('exit', resolveExit);
+        });
+        expect(status).toBe(missingDependencies ? 1 : 73);
+        expect(existsSync(marker)).toBe(!missingDependencies);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+});
+
+describe('lane coverage full fallback', () => {
+  it('does not treat an unknown Python peer as covered by the known lane suite', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/lanes/hyperagent_lane.py',
+      'scripts/lanes/unknown-new.py',
+    ]);
+    expect(plan.mode).toBe('full');
+  });
+});
+
 describe('affected-test selector inventory', () => {
   it('fails closed to the full suite when the real blog Git diff cannot be classified', () => {
     const receipt = classifyBlogContentForAffectedTests(
@@ -256,6 +336,22 @@ describe('affected-test selector inventory', () => {
 });
 
 describe('structural control stage execution', () => {
+  it('enforces coverage for public CLI artifact routing in the canonical control stage', () => {
+    const [nativeControl] = buildControlCoverageCommands();
+    expect(nativeControl[1]).toContain(
+      'lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(nativeControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=lib/product-lane-classifier.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.branches=75',
+        '--coverage.thresholds.functions=82',
+      ])
+    );
+  });
+
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
     expect(stages).toHaveLength(23);

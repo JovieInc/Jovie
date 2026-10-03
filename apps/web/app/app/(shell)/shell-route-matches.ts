@@ -119,6 +119,14 @@ export function isLibraryShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isLinksShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.LINKS,
+    APP_ROUTES.DASHBOARD_LINKS
+  );
+}
+
 export function isTasksShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(
     pathname,
@@ -205,6 +213,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
+    isLinksShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
     isInsightsShellRoute(pathname) ||
     isPresenceShellRoute(pathname) ||
@@ -227,6 +236,7 @@ export function shouldRedirectToOnboarding(pathname: string | null): boolean {
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
+    isLinksShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
     isInsightsShellRoute(pathname) ||
     isPresenceShellRoute(pathname) ||

@@ -36,6 +36,14 @@ export const CODE_FLAGS = {
   // does not call MusicFetch either way. FEATURE_IN_HOUSE_RESOLVER=true
   // turns the product cutover on; false is the kill switch.
   IN_HOUSE_RESOLVER: false,
+  // JOV-6202: signup/signin offer recap. Default off so auth pages and copy
+  // stay unchanged. FEATURE_AUTH_OFFER_SUMMARY=true shows the 14-day Pro
+  // trial recap. No price, trial-length, Stripe, or entitlement effect.
+  AUTH_OFFER_SUMMARY: false,
+  // Fundraising YC section order. Default off until Tim approves the
+  // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the
+  // existing brief sentences and shows only sourced traction stats.
+  INVESTOR_PORTAL_YC_DECK: false,
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;
