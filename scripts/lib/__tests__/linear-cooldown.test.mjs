@@ -62,14 +62,10 @@ describe('shared linear cooldown', () => {
       const first = await linearRequest({
         key,
         query: 'query { viewer { id } }',
+        variables: {},
         fetchImpl: async () => {
           calls += 1;
-          return {
-            status: body.status,
-            ok: body.status === 200,
-            headers: { get: () => undefined },
-            text: async () => JSON.stringify(body.data),
-          };
+          return new Response(JSON.stringify(body.data), { status: body.status });
         },
         random: () => 0,
       });
@@ -78,9 +74,10 @@ describe('shared linear cooldown', () => {
       const second = await linearRequest({
         key,
         query: 'query { viewer { id } }',
+        variables: {},
         fetchImpl: async () => {
           calls += 1;
-          return { status: 200, ok: true, headers: { get: () => undefined }, text: async () => '{"data":{"ok":true}}' };
+          return new Response('{"data":{"ok":true}}', { status: 200 });
         },
       });
       assert.equal(second.rateLimited, true);

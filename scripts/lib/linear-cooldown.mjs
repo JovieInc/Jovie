@@ -49,9 +49,7 @@ export function legacyCooldownRoots(canonical, env = process.env, home = homedir
 }
 
 function stateError() {
-  const error = new Error(STATE_ERROR);
-  error.code = 'BACKOFF_STATE_INVALID';
-  return error;
+  return Object.assign(new Error(STATE_ERROR), { code: 'BACKOFF_STATE_INVALID' });
 }
 
 function privateDirectory(path, repair = false) {

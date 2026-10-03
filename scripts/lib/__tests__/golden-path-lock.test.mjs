@@ -781,7 +781,7 @@ describe('golden-path Linear-only intake', () => {
 
     expect(result).toMatchObject({
       ok: false,
-      reason: 'linear_search_429',
+      reason: 'linear_rate_limited',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
