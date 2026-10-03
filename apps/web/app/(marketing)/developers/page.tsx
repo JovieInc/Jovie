@@ -48,6 +48,7 @@ const RESOURCE_LINKS = [
   },
   {
     href: '/cli',
+    // ui-casing-allow: existing link label; MCP is the product acronym
     label: 'Jovie CLI and MCP server',
     description:
       'Anonymous `jovie` commands for agents: read public profile data and create claimable profiles.',
