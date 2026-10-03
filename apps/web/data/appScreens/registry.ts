@@ -222,6 +222,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
   'apps/web/app/app/(shell)/admin/certifications/page.tsx',
   'apps/web/app/app/(shell)/admin/chat/page.tsx',
+  'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
   'apps/web/app/app/(shell)/admin/costs/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
   'apps/web/app/app/(shell)/admin/feature-registry/page.tsx',
@@ -312,7 +313,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
   'apps/web/app/app/(shell)/settings/profile/page.tsx',
-  'apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx',
   'apps/web/app/app/(shell)/settings/touring/page.tsx',
   'apps/web/app/app/(shell)/settings/usage/page.tsx',
   'apps/web/app/app/(shell)/tasks/page.tsx',
@@ -349,6 +349,7 @@ const ALIAS_SOURCES = new Set<string>([
 const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/algorithm-health/page.tsx',
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
+  'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
   'apps/web/app/app/(shell)/admin/feedback/page.tsx',
   'apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx',

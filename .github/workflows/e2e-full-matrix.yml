@@ -3,22 +3,9 @@ name: E2E Full Browser Matrix
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/web/app/**'
-      - 'apps/web/components/**'
-      - 'apps/web/drizzle/**'
-      - 'apps/web/lib/auth/**'
-      - 'apps/web/lib/db/**'
-      - 'apps/web/playwright*.ts'
-      - 'apps/web/tests/e2e/**'
-      - 'apps/web/tests/helpers/**'
-      - 'apps/web/tests/seed-test-data.ts'
-      - 'packages/action-contracts/**'
-      - 'packages/auth-routing/**'
-      - '.github/actions/setup-playwright/**'
-      - '.github/workflows/e2e-full-matrix.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+    # Every main push must enter the concurrency group below. A path-filtered
+    # push cannot supersede an older matrix, leaving the external stale-run
+    # sweep to kill its runners and misreport the cancellation as a failure.
   workflow_dispatch:
     inputs:
       test_filter:
@@ -97,13 +84,15 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps
 
       - name: Run E2E tests (${{ matrix.browser }})
+        id: e2e-matrix
         run: |
           cd apps/web
+          log="$RUNNER_TEMP/e2e-full.log"
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line 2>&1 | tee "$log"
           else
             # The nightly-tagged chaos lane remains owned by nightly-tests.yml.
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line 2>&1 | tee "$log"
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -131,6 +120,18 @@ jobs:
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
+
+      - name: File login-timeout remediation
+        if: ${{ always() && steps.e2e-matrix.outcome != 'skipped' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: login
+          REMEDIATION_SOURCE: e2e-full-matrix.yml:${{ matrix.browser }}
+          REMEDIATION_CONCLUSION: ${{ steps.e2e-matrix.outcome }}
+          REMEDIATION_EVIDENCE_LOG: ${{ runner.temp }}/e2e-full.log
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
 
       - name: Upload failure results or filtered public review captures
         if: ${{ always() && (failure() || (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts')) && hashFiles('apps/web/test-results/**') != '' }}

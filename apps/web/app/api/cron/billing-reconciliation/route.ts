@@ -102,7 +102,23 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
     });
   }
 
+  await recordReconciliationHeartbeat();
+
   return result;
+}
+
+async function recordReconciliationHeartbeat(): Promise<void> {
+  try {
+    await db.insert(billingAuditLog).values({
+      eventType: 'reconciliation_run',
+      source: 'reconciliation',
+      metadata: { action: 'reconciliation_run' },
+    });
+  } catch (error) {
+    logger.warn('[billing-reconciliation] Heartbeat insert failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**

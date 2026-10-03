@@ -258,6 +258,8 @@ test('DeepSec config refuses to load unless the policy is advisory', () => {
     'utf8'
   );
   assert.match(config, /execution\.status !== 'advisory'/);
-  assert.match(config, /mode: 'gateway'/);
+  assert.match(config, /mode: 'local', provider: 'local'/);
+  assert.match(config, /defaultAgent: 'codex'/);
+  assert.doesNotMatch(config, /mode: 'gateway'|provider: 'vercel'/);
   assert.match(config, /DEEPSEC_SOURCE_ROOT/);
 });
