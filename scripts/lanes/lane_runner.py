@@ -46,6 +46,7 @@ import hyperagent_lane  # noqa: E402
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
+import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -89,6 +90,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
+              "scripts/tests/test_worktree_sweep.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
@@ -4243,6 +4245,11 @@ def dispatch(host: Host) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
     try:
         tick["disk"] = disk_guard.check(host)
+        try:
+            # Before admission: a critically full disk is exactly when the sweep must still run.
+            tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
+        except Exception as error:  # the sweep never takes dispatch down
+            tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
