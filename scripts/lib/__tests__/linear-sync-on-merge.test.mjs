@@ -750,7 +750,7 @@ describe('linear sync on merge', () => {
     );
     const localImports = [
       ...script.matchAll(/from '\.\/([a-z0-9-]+\.mjs)'/g),
-    ].map((match) => `scripts/lib/${match[1]}`);
+    ].map(match => `scripts/lib/${match[1]}`);
     expect(localImports.length).toBeGreaterThan(0);
     for (const dependency of localImports) {
       expect(workflow).toContain(dependency);
