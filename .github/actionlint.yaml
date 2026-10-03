@@ -8,6 +8,7 @@ self-hosted-runner:
     - jovie-ephemeral
     - jovie-fixed
     - jovie-mac
+    - jovie-native-subscription
     - jovie-runner
     - jovie-runner-image-canary
     - ubicloud-standard-2

@@ -52,16 +52,6 @@ jobs:
         with:
           package_cache: 'false'
 
-      - name: Download optional source risk classification
-        continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: ci-risk-classification-*
-          merge-multiple: true
-          path: ${{ runner.temp }}/risk
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-
       - name: Download learned model outcomes
         continue-on-error: true
         env:
@@ -79,7 +69,6 @@ jobs:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           GITHUB_TOKEN: ${{ github.token }}
           PR_REVIEW_AI_GATEWAY_API_KEY: ${{ secrets.PR_REVIEW_AI_GATEWAY_API_KEY }}
-          RISK_JSON: ${{ runner.temp }}/risk/ci-risk-classification.json
           PR_REVIEW_OUTCOMES: ${{ runner.temp }}/outcomes/model-outcomes.json
           OUT: ${{ runner.temp }}/pr-review-receipt.json
         run: node scripts/pr-review/cli.mjs

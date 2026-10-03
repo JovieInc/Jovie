@@ -388,6 +388,13 @@ describe('product lane classifier', () => {
     expect(
       classifyProductLanes(['packages/auth-routing/index.ts']).selectedLanes
     ).toEqual(ALL);
+    const releaseChannels = classifyProductLanes([
+      'packages/release-channel-contracts/index.ts',
+    ]);
+    expect(releaseChannels.selectedLanes).toEqual(ALL);
+    expect(
+      releaseChannels.requiredGates['cross-product'].tests.split(' && ')
+    ).toContain('pnpm --filter @jovie/release-channel-contracts test');
     expect(
       classifyProductLanes([
         '.github/workflows/ci.yml',

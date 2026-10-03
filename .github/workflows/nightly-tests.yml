@@ -333,6 +333,18 @@ jobs:
             wait "$pid" 2>/dev/null || true
           fi
 
+      - name: File login-timeout remediation
+        if: ${{ always() && steps.nightly-e2e.outcome != 'skipped' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: login
+          REMEDIATION_SOURCE: nightly-tests.yml
+          REMEDIATION_CONCLUSION: ${{ steps.nightly-e2e.outcome }}
+          REMEDIATION_EVIDENCE_JSON: apps/web/test-results/nightly-results.json
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
       - name: Upload Test Results on Failure
         if: ${{ always() && steps.nightly-e2e.outcome == 'failure' && hashFiles('apps/web/test-results/nightly-results.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact

@@ -32,7 +32,7 @@ const GATE_RECEIPTS = {
   },
   'cross-product': {
     tests:
-      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test',
+      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test',
     artifact: 'cross-product shared-contract gate receipt',
   },
 };

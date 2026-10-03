@@ -131,6 +131,7 @@ test('current-head clean, no-candidate and nullable-issue findings receipts are 
   );
   assert.equal(receipt().headSha, sha);
   assert.equal(receipt().route, 'native-subscription');
+  assert.equal(receipt().nativeRunId, 'native-1');
 });
 
 test('ambiguous native output, quota failure and incomplete exported findings are not a clean scan', () => {
@@ -157,6 +158,21 @@ test('ambiguous native output, quota failure and incomplete exported findings ar
       },
     },
     { result: result(0, 2) },
+    {
+      result: {
+        ...result(),
+        stdout: result().stdout.replace(
+          '  Analyses:',
+          'Processing complete. Run: native-2\n  Analyses:'
+        ),
+      },
+    },
+    {
+      result: {
+        ...result(),
+        stdout: result().stdout.replace('Run: native-1', 'Run: invalid/run'),
+      },
+    },
     {
       result: {
         ...result(),
