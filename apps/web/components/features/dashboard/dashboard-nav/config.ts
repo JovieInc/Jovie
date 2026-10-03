@@ -81,7 +81,7 @@ export const contactsNavItem: NavItem = {
   icon: IdCard,
   iconName: 'IdCard',
   tier: 'core',
-  description: 'Manage artist contacts',
+  description: 'Manage contacts',
 };
 
 export const presenceNavItem: NavItem = {

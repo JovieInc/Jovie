@@ -615,7 +615,7 @@ test.describe('central runtime notifications', () => {
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
     await expect(
-      page.getByRole('link', { name: 'Inbox — App Update Available' })
+      page.getByRole('link', { name: 'Home — App Update Available' })
     ).toHaveAttribute('href', '/app');
     await page.evaluate(() =>
       (window as unknown as { downloaded: () => void }).downloaded()

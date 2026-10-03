@@ -59,18 +59,16 @@ describe('DashboardNav route warming', () => {
       appFlags: { PROFILES_WORKSPACE: true },
     });
 
-    for (const label of [
-      'Inbox',
-      'New Chat',
-      'Home',
-      'Identity',
-      'Work',
-      'Audience',
-    ]) {
+    for (const label of ['New Chat', 'Identity', 'Work', 'Audience']) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
         'true'
       );
+    }
+    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
+    expect(homeLinks).toHaveLength(2);
+    for (const link of homeLinks) {
+      expect(link).toHaveAttribute('data-prefetch', 'true');
     }
     for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
@@ -139,16 +137,20 @@ describe('DashboardNav route warming', () => {
     }
   });
 
-  it.each(['Inbox', 'New Chat', 'Home'])(
+  it.each(['inbox', 'chat', 'home'] as const)(
     'clears a stalled %s acknowledgment and accepts a retry without replacing the source content',
-    label => {
+    itemId => {
       vi.useFakeTimers();
       mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
-      renderDashboardNav({
+      const view = renderDashboardNav({
         renderFn: render,
         children: <main data-testid='retained-route'>Source content</main>,
       });
-      const link = screen.getByRole('link', { name: label });
+      const link = view.container.querySelector(
+        `[data-navigation-item-id="${itemId}"]`
+      );
+      expect(link).toBeInstanceOf(HTMLElement);
+      if (!(link instanceof HTMLElement)) return;
       link.addEventListener('click', event => event.preventDefault());
       fireEvent.click(link);
       expect(link).toHaveAttribute('aria-busy', 'true');
@@ -187,7 +189,7 @@ describe('DashboardNav route warming', () => {
       },
     });
     expect(
-      pending.getByRole('link', { name: 'Inbox — App Update Available' })
+      pending.getByRole('link', { name: 'Home — App Update Available' })
     ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(
       pending.getByRole('status', { name: '3 pending items' })
@@ -206,7 +208,7 @@ describe('DashboardNav route warming', () => {
       },
     });
     const updateLink = updateOnly.getByRole('link', {
-      name: 'Inbox — App Update Available',
+      name: 'Home — App Update Available',
     });
     expect(updateLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
@@ -221,9 +223,23 @@ describe('DashboardNav route warming', () => {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
       },
     });
-    const link = caughtUp.getByRole('link', { name: 'Inbox' });
+    const link = caughtUp.container.querySelector(
+      '[data-navigation-item-id="inbox"]'
+    );
+    expect(link).toHaveAccessibleName('Home');
+    if (!(link instanceof HTMLElement)) return;
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
+  });
+
+  it('labels the header bell Inbox only when INBOX_HOME is on', () => {
+    const view = renderDashboardNav({
+      renderFn: render,
+      appFlags: { INBOX_HOME: true },
+    });
+    expect(
+      view.container.querySelector('[data-navigation-item-id="inbox"]')
+    ).toHaveAccessibleName('Inbox');
   });
 
   // JOV-6181: the rail's New Chat affordance must never carry the terminal
