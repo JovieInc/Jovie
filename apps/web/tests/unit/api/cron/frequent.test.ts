@@ -21,6 +21,7 @@ const {
   mockReconcileOrphanedAcceptedActions,
   mockProbeRedisOperability,
   mockCaptureError,
+  mockRunBillingSyncRemediation,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -42,6 +43,7 @@ const {
   mockReconcileOrphanedAcceptedActions: vi.fn(),
   mockProbeRedisOperability: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockRunBillingSyncRemediation: vi.fn(),
 }));
 
 vi.mock(
@@ -50,6 +52,10 @@ vi.mock(
     reconcileOrphanedAcceptedActions: mockReconcileOrphanedAcceptedActions,
   })
 );
+
+vi.mock('@/lib/billing/sync-remediation', () => ({
+  runBillingSyncRemediation: mockRunBillingSyncRemediation,
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -214,6 +220,11 @@ describe('GET /api/cron/frequent', () => {
       status: 'healthy',
       latencyMs: 5,
     });
+    mockRunBillingSyncRemediation.mockResolvedValue({
+      findings: 0,
+      filed: [],
+      skipped: false,
+    });
   });
 
   afterEach(() => {
@@ -252,6 +263,11 @@ describe('GET /api/cron/frequent', () => {
     });
     expect(data.results.scheduleNotifications.success).toBe(true);
     expect(data.results.sendNotifications.success).toBe(true);
+    expect(data.results.billingSyncRemediation).toEqual({
+      success: true,
+      data: { findings: 0, filed: [], skipped: false },
+    });
+    expect(mockRunBillingSyncRemediation).toHaveBeenCalledOnce();
     expect(data.results.redisOperability).toEqual({
       success: true,
       skipped: true,

@@ -1,15 +1,6 @@
 /**
- * Billing Reconciliation Cron Job
- *
- * Runs hourly to reconcile database subscription status with Stripe
- * Ensures no user is stuck in wrong subscription state for >1 hour
- *
- * What it does:
- * 1. Fetches all users with stripeSubscriptionId from DB
- * 2. Compares DB isPro status with Stripe subscription status
- * 3. Fixes any mismatches and logs to audit table
- *
- * Schedule: Every hour (configured in vercel.json)
+ * Daily billing reconciliation (also callable with the cron secret).
+ * Replays unprocessed stored events, then fixes DB/Stripe status drift.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
@@ -21,6 +12,8 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
+import { RECONCILIATION_RUN_EVENT } from '@/lib/billing/sync-remediation-policy';
+import { replayUnprocessedStripeWebhooks } from '@/lib/billing/webhook-replay';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -68,11 +61,46 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
   };
   const errors: string[] = [];
 
+  // Replay is idempotent and does not call Stripe write APIs. A throw fails
+  // the job so a pass that never saw the stuck rows does not look fresh.
+  const replay = await replayUnprocessedStripeWebhooks();
+  if (replay.blocked.length > 0 || replay.failed.length > 0) {
+    logger.info('[billing-reconciliation] stored webhook replay left rows', {
+      processed: replay.processed,
+      blocked: replay.blocked.length,
+      failed: replay.failed.length,
+    });
+  }
+
   await reconcileUsersWithSubscriptions(stats, errors);
   await reconcileProUsersWithoutSubscription(stats, errors);
   await checkStaleCustomers(stats);
 
   const duration = Date.now() - startTime;
+
+  if (stats.errors === 0) {
+    await db.insert(billingAuditLog).values({
+      userId: null,
+      eventType: RECONCILIATION_RUN_EVENT,
+      previousState: {},
+      newState: {
+        usersChecked: stats.usersChecked,
+        mismatches: stats.mismatches,
+        fixed: stats.fixed,
+        errors: stats.errors,
+      },
+      source: 'reconciliation',
+      metadata: {
+        heartbeat: true,
+        durationMs: duration,
+        replay: {
+          processed: replay.processed,
+          blocked: replay.blocked.length,
+          failed: replay.failed.length,
+        },
+      },
+    });
+  }
 
   const result: ReconciliationResult = {
     success: stats.errors === 0,

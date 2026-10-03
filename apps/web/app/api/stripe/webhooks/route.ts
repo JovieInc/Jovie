@@ -319,14 +319,16 @@ export async function POST(request: NextRequest) {
  *
  * Uses the handler registry to find the correct domain-specific handler
  * for the event type. Unhandled events are acknowledged but not processed.
+ * Replay passes stripeWritesAllowed false; live delivery leaves it allowed.
  *
  * @param event - The Stripe webhook event
  * @param stripeCreatedAt - When Stripe created the event (for event ordering)
  * @throws If the handler throws (leaves event unprocessed for Stripe retry)
  */
-async function processWebhookEvent(
+export async function processWebhookEvent(
   event: Stripe.Event,
-  stripeCreatedAt: Date
+  stripeCreatedAt: Date,
+  options?: { stripeWritesAllowed?: boolean }
 ): Promise<void> {
   // Get the handler for this event type
   const handler = getHandler(event.type);
@@ -347,6 +349,7 @@ async function processWebhookEvent(
     event,
     stripeEventId: event.id,
     stripeEventTimestamp: stripeCreatedAt,
+    stripeWritesAllowed: options?.stripeWritesAllowed,
   };
 
   // Delegate to the domain-specific handler

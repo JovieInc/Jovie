@@ -21,6 +21,7 @@ import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import { hasBetterAuthSessionCookie } from '@/lib/auth/auth-session-cookies';
+import { RECONCILIATION_STALE_AFTER_MS } from '@/lib/billing/sync-remediation-policy';
 import { extractBearerToken, verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -136,7 +137,9 @@ export async function GET(request: Request) {
   try {
     const now = new Date();
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const reconciliationStaleBefore = new Date(
+      now.getTime() - RECONCILIATION_STALE_AFTER_MS
+    );
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Run all checks in parallel for efficiency
@@ -207,7 +210,7 @@ export async function GET(request: Request) {
     const noStuckWebhooks = checkNoStuckWebhooks(unprocessedWebhookCount);
     const recentReconciliation = checkRecentReconciliation(
       lastReconciliationAt,
-      twoHoursAgo
+      reconciliationStaleBefore
     );
     const proCountSync = checkProCountSync(
       proUsersInDb,

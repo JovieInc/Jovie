@@ -8,6 +8,7 @@ const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockStripeList = vi.hoisted(() => vi.fn());
+const mockReplayUnprocessedStripeWebhooks = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -57,6 +58,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
 
+vi.mock('@/lib/billing/webhook-replay', () => ({
+  replayUnprocessedStripeWebhooks: mockReplayUnprocessedStripeWebhooks,
+}));
+
 describe('GET /api/cron/billing-reconciliation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,6 +73,11 @@ describe('GET /api/cron/billing-reconciliation', () => {
     mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
     mockDbInsertValues.mockResolvedValue(undefined);
     mockStripeList.mockResolvedValue({ data: [], has_more: false });
+    mockReplayUnprocessedStripeWebhooks.mockResolvedValue({
+      processed: 0,
+      blocked: [],
+      failed: [],
+    });
   });
 
   afterEach(() => {
@@ -134,6 +144,15 @@ describe('GET /api/cron/billing-reconciliation', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBeDefined();
     expect(data.stats).toBeDefined();
+    expect(mockReplayUnprocessedStripeWebhooks).toHaveBeenCalledOnce();
+    expect(mockDbInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: null,
+        eventType: 'reconciliation_run',
+        source: 'reconciliation',
+        metadata: expect.objectContaining({ heartbeat: true }),
+      })
+    );
   });
 
   it('links trialing subscriptions for pro users missing stripeSubscriptionId', async () => {
@@ -290,13 +309,17 @@ describe('GET /api/cron/billing-reconciliation', () => {
         stats: expect.objectContaining({ errors: 1 }),
       })
     );
+    expect(mockDbInsertValues).not.toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'reconciliation_run' })
+    );
   });
 
   it('continues reconciliation when audit log insert fails', async () => {
     vi.stubEnv('NODE_ENV', 'production');
 
-    // Audit log insert fails
-    mockDbInsertValues.mockRejectedValue(new Error('Audit insert failed'));
+    // The per-user audit insert fails once. The run itself succeeded, so the
+    // heartbeat insert still records that reconciliation ran.
+    mockDbInsertValues.mockRejectedValueOnce(new Error('Audit insert failed'));
 
     mockStripeList.mockResolvedValueOnce({
       data: [
@@ -365,6 +388,40 @@ describe('GET /api/cron/billing-reconciliation', () => {
       expect.objectContaining({ userId: 'user_1' })
     );
     expect(mockCaptureWarning).not.toHaveBeenCalled();
+    expect(mockDbInsertValues).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        userId: null,
+        eventType: 'reconciliation_run',
+        source: 'reconciliation',
+      })
+    );
+  });
+
+  it('fails the run when stored-event replay throws', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockReplayUnprocessedStripeWebhooks.mockRejectedValue(
+      new Error('database unavailable')
+    );
+
+    const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
+    const request = new Request(
+      'http://localhost/api/cron/billing-reconciliation',
+      {
+        headers: { Authorization: 'Bearer test-secret' },
+      }
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.success).toBe(false);
+    expect(mockDbInsertValues).not.toHaveBeenCalled();
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Billing reconciliation failed',
+      expect.any(Error),
+      {}
+    );
   });
 
   it('handles reconciliation errors gracefully', async () => {
