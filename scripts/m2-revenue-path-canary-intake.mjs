@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
+import {
+  logRemediationDryRun,
+  remediationTriggersEnabled,
+  upsertLinearIssueByTitleFingerprint,
+} from './lib/linear-issue-intake.mjs';
 
 export function fingerprintM2RevenuePathFailure(failedSteps) {
   const normalized = String(failedSteps ?? '')
@@ -99,6 +103,15 @@ function parseReceipt(raw) {
 
 async function main() {
   const receipt = parseReceipt(process.env.M2_CANARY_RECEIPT_JSON);
+  if (!remediationTriggersEnabled()) {
+    const dry = logRemediationDryRun({
+      action: 'upsert',
+      key: 'm2-revenue-path',
+      fingerprint: 'm2-revenue-path',
+    });
+    console.log(JSON.stringify(dry));
+    return;
+  }
   const result = await fileM2RevenuePathLinearIssue({
     receipt,
     runUrl: process.env.RUN_URL,
