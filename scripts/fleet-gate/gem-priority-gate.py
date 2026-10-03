@@ -904,6 +904,11 @@ def observe_production(url: str) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise ValueError("production health was not an object")
         reported_status = value.get("status")
+        # Anonymous deploy liveness is {healthy: true|false} with no status.
+        # Keep accepting the legacy {status: healthy|ok} body until every
+        # production deploy has the new handler.
+        if reported_status is None and isinstance(value.get("healthy"), bool):
+            reported_status = "healthy" if value.get("healthy") else "unhealthy"
         observed: dict[str, Any] = {
             "status": "green" if reported_status in ("healthy", "ok") else "red",
             "url": url,
