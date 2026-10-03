@@ -178,7 +178,8 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     expect(webManifest.shortcuts?.[0]?.name).toBe('Find yourself');
 
     const specialist = readWebSource(SPECIALIST_API_IDENTITY_SURFACES[0].path);
-    expect(specialist).toContain('public artist API');
+    expect(specialist).toContain('public profile API');
+    expect(specialist).not.toMatch(/\bfans?\b/i);
     expect(specialist).toContain('read-only');
     expect(isArtistOnlyCompanyDefinition(specialist)).toBe(false);
   });

@@ -48,7 +48,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('/api/mcp/{username}');
     expect(body).toContain('https://docs.jov.ie');
     expect(body).toContain(
-      'the public artist API and anonymous MCP tools are read-only'
+      'the public profile API and anonymous MCP tools are read-only'
     );
     expect(body).toContain(
       'owner-only merch and video tools are listed in the manifest and require authenticated ownership'

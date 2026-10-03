@@ -61,7 +61,10 @@ describe('negotiateAgentMarkdown', () => {
 
     const body = await res?.text();
     expect(body).toContain(`# ${HOMEPAGE_IDENTITY_COPY.hero.headline}`);
+    expect(body).toContain(HOMEPAGE_IDENTITY_COPY.hero.subhead);
     expect(body).toContain('## When to use Jovie');
+    expect(body).not.toMatch(/\bfans?\b/i);
+    expect(body).not.toContain('public artist API');
     expect(body).toContain('/openapi.json');
   });
 
