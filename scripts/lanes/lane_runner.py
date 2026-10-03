@@ -1907,6 +1907,22 @@ def require_gate_authority(host: Host, pr: dict, stage: str, sensitive: bool) ->
     return live
 
 
+def require_gate_command_authority(host: Host, pr: dict, worktree: Path, stage: str, sensitive: bool) -> None:
+    """Waiting for a seat is not permission to run checks for stale authority."""
+    try:
+        if any(claimed_elsewhere(pr["number"], pr["headRefOid"], kind, timeout=30)
+               for kind in ("fix", "gate")):
+            raise RepairStopped("gate-owner-active-or-unavailable", None, stage)
+        live = require_gate_authority(host, pr, stage, sensitive)
+        head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
+        if head.returncode or head.stdout.strip() != pr["headRefOid"]:
+            raise RepairStopped("gate-checkout-head-mismatch", live, stage)
+    except (OSError, ValueError, TypeError, AttributeError, KeyError, subprocess.SubprocessError) as error:
+        # Only admission reads are normalized here. Gate-command timeouts and
+        # operator stops keep their existing charging and drain behavior.
+        raise RepairStopped(f"gate-authority-unavailable:{type(error).__name__}", None, stage) from error
+
+
 def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
     """Consecutive gate timeouts for this PR head; a new head resets the count."""
     path = host.state / "gate-timeouts.json"
@@ -1946,7 +1962,7 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
                     "gateResult": prior}
         if reason := gate_deferral(host, live):
             raise RepairStopped(reason, live, "before-gate")
-        result = _gate_pr(host, live, worktree, log, sensitive, claim)
+        result = _gate_pr(host, live, worktree, log, sensitive, claim, result=result)
         if result.get("verdict") in {"landing", "verified-not-queued", "held"}:
             proof = {**result, "schema": GATE_RESULT_SCHEMA, "completedAt": now_iso(),
                      "policyDigest": GATE_POLICY_DIGEST, "sensitive": sensitive}
@@ -1955,13 +1971,14 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
     except RepairStopped as error:
         return {**result, "verdict": "gate-deferred", "reasons": [str(error)], "stage": error.stage}
     except PublicationRevoked as error:
-        return {**result, "verdict": "revoked", "reasons": [str(error)], "revocation": error.receipt}
+        return {**result, "verdict": "revoked", "reasons": [str(error)], "revocation": error.receipt,
+                "stage": error.stage}
     finally:
         if owned:
             claim.lock.release()
 
 
-def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: GateClaim) -> dict:
+def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: GateClaim, *, result: dict) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     revoked = publication_revocation(host, pr.get("headRefName"))
     if revoked:
@@ -1980,8 +1997,8 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
     changes = parse_numstat(numstat)
     reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
     evidence = []
-    result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
-              "changedFiles": len(changes), "reasons": reasons}
+    # The caller retains this same receipt if a later authority read refuses.
+    result.update(changedFiles=len(changes), reasons=reasons)
     if not reasons:
         commands = check_commands([change.path for change in changes])
         seat = None
@@ -1990,6 +2007,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
             result["gateWaitS"] = round(waited)
         try:
             for command in commands:
+                require_gate_command_authority(host, pr, worktree, "before-gate-command", sensitive)
                 try:
                     ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True,
                              pass_fds=(claim.lock.handle.fileno(), seat.handle.fileno()))
@@ -2008,6 +2026,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
                     evidence += [line for line in log_tail(log).splitlines()
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
             if sensitive and not reasons:
+                require_gate_command_authority(host, pr, worktree, "before-sensitive-review", sensitive)
                 passed, review_reasons = sensitive_review(host, pr, worktree, log,
                     pass_fds=(claim.lock.handle.fileno(), *([seat.handle.fileno()] if seat else [])))
                 if not passed:
@@ -2156,7 +2175,7 @@ def update_json(path: Path, change) -> None:
 
 def gate_outcome(receipt: dict) -> dict:
     """Project gate evidence without importing the producer's enclosing run identity."""
-    fields = ("verdict", "pr", "prUrl", "headSha", "reasons", "changedFiles", "gateWaitS", "revocation",
+    fields = ("verdict", "pr", "prUrl", "headSha", "reasons", "changedFiles", "gateWaitS", "revocation", "stage",
               "gateSensitive", "dependencies", "next_action", "execution", "qualificationExecution",
               "sourceFencingToken", "remoteThreadId", "remoteAgentId", "modelSettingsProof", "adoptRunId")
     result = {key: receipt[key] for key in fields if key in receipt}
