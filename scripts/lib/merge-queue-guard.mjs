@@ -513,6 +513,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Path Changes',
   'CI / ci-fast',
   'ci-fast',
+  'CI / Blog Content Qualification',
+  'Blog Content Qualification',
   'CI / Typecheck',
   'Typecheck',
   'CI / Lint',

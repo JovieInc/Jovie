@@ -1,10 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   globSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -28,6 +31,13 @@ const { default: getIgnoreFilter } = buildUtilsRequire(
     downloadPath: string,
     rootDirectory?: string
   ) => Promise<(filePath: string) => boolean>;
+};
+
+const { getLambdaOptionsFromFunction } = buildUtilsRequire(buildUtilsEntry) as {
+  getLambdaOptionsFromFunction: (input: {
+    sourceFile: string;
+    config: VercelConfig;
+  }) => Promise<{ maxDuration?: number }>;
 };
 
 type VercelConfig = {
@@ -213,6 +223,32 @@ describe('Vercel function config', () => {
     }
   });
 
+  it('gives only the fleet event batch enough time through the actual first-match builder', async () => {
+    const sourceFile = 'app/api/internal/ovie/fleet/events/route.ts';
+    const route = readFileSync(resolve(appWebRoot, sourceFile), 'utf8');
+    const duration = Number(
+      /export const maxDuration = (\d+);/.exec(route)?.[1]
+    );
+    // At most five sequential 15s Linear reads plus 25s for auth, CAS and reply.
+    expect(duration).toBe(5 * 15 + 25);
+    for (const path of ['vercel.json', 'apps/web/vercel.json']) {
+      const config = readVercelConfig(path);
+      expect(
+        await getLambdaOptionsFromFunction({ sourceFile, config }),
+        path
+      ).toMatchObject({ maxDuration: duration });
+      for (const unrelated of [
+        'app/api/internal/ovie/fleet/control/route.ts',
+        'app/api/v1/actions/[actionId]/invoke/route.ts',
+      ]) {
+        expect(
+          await getLambdaOptionsFromFunction({ sourceFile: unrelated, config }),
+          path
+        ).toMatchObject({ maxDuration: 30 });
+      }
+    }
+  });
+
   it('always builds production branches and skips every other ref', () => {
     const configs = ['vercel.json', 'apps/web/vercel.json'];
     const ignoreCommands = configs.map(configPath => {
@@ -314,6 +350,30 @@ describe('Vercel function config', () => {
     }
     for (const excludedPath of excludedPaths) {
       expect(isIgnored(excludedPath), excludedPath).toBe(true);
+    }
+  });
+
+  it('packages public blog assets needed by request-time catalog validation', async () => {
+    const { loadBlogCatalog } = await import('@/lib/blog/getBlogPosts');
+    const runtimeRoot = mkdtempSync(resolve(tmpdir(), 'jovie-blog-trace-'));
+    try {
+      const includes =
+        loadNextConfigForTracingTest().outputFileTracingIncludes?.['/*'] ?? [];
+      const tracedPublicFiles = includes
+        .flatMap(pattern => globSync(pattern, { cwd: appWebRoot }))
+        .filter(file => file.startsWith('public/') && !file.endsWith('/'));
+      for (const file of tracedPublicFiles) {
+        const destination = resolve(runtimeRoot, file);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(resolve(appWebRoot, file), destination);
+      }
+      const catalog = await loadBlogCatalog({
+        directory: resolve(appWebRoot, 'content/blog'),
+        publicDirectory: resolve(runtimeRoot, 'public'),
+      });
+      expect(catalog.publicPosts.length).toBeGreaterThan(0);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
     }
   });
 

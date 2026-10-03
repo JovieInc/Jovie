@@ -1,10 +1,15 @@
 /**
  * Billing Sync Health Check Endpoint
  *
- * Verifies the health of the billing synchronization system
- * Used for monitoring and alerting on billing sync issues
+ * Anonymous callers receive process liveness only: `{ healthy, timestamp }`.
+ * That path does not read the database or Stripe.
  *
- * Checks:
+ * Full sync detail (webhook counts, reconciliation timestamps, Pro/Stripe
+ * counts, and check messages) requires an authorized caller:
+ * `Authorization: Bearer ${CRON_SECRET}` (same secret as cron and
+ * `/api/health/redis`) or an admin Better Auth session.
+ *
+ * Checks (authorized only):
  * 1. Recent webhook events are being processed
  * 2. No stuck/unprocessed webhooks
  * 3. Recent reconciliation ran successfully
@@ -14,6 +19,9 @@
 import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin';
+import { hasBetterAuthSessionCookie } from '@/lib/auth/auth-session-cookies';
+import { extractBearerToken, verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
@@ -29,7 +37,12 @@ import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const BILLING_HEALTH_ROUTE = '/api/billing/health';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'private, no-store',
+  Vary: 'Authorization, Cookie',
+} as const;
 
 // Cache Stripe subscription count to prevent API fan-out on every health check hit
 const STRIPE_CACHE_REVALIDATE_SECONDS = 120;
@@ -71,12 +84,55 @@ interface HealthCheck {
 }
 
 /**
+ * Cron bearer (same CRON_SECRET as other internal probes) or an admin
+ * session. Anonymous requests skip both the session lookup and the
+ * detailed checks.
+ */
+async function canReadBillingHealthDetail(request: Request): Promise<boolean> {
+  if (extractBearerToken(request.headers.get('authorization'))) {
+    const cronError = verifyCronRequest(request, {
+      route: BILLING_HEALTH_ROUTE,
+    });
+    if (!cronError) return true;
+  }
+
+  const cookieHeader = request.headers.get('cookie') ?? '';
+  if (!hasBetterAuthSessionCookie(cookieHeader)) return false;
+
+  const adminError = await requireAdmin();
+  return adminError === null;
+}
+
+function publicLivenessResponse() {
+  return NextResponse.json(
+    {
+      healthy: true,
+      timestamp: new Date().toISOString(),
+    },
+    { status: 200, headers: NO_STORE_HEADERS }
+  );
+}
+
+/**
  * GET /api/billing/health
  *
- * Health check endpoint for billing sync status
- * Returns detailed health information for monitoring
+ * Anonymous: `{ healthy, timestamp }` and 200. No counts, check messages,
+ * or Stripe/DB work.
+ * Authorized: detailed billing sync health for monitors.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  let authorized = false;
+  try {
+    authorized = await canReadBillingHealthDetail(request);
+  } catch (error) {
+    logger.error('Billing health authorization failed:', error);
+    return publicLivenessResponse();
+  }
+
+  if (!authorized) {
+    return publicLivenessResponse();
+  }
+
   try {
     const now = new Date();
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
@@ -195,7 +251,7 @@ export async function GET() {
     if (hasCritical) {
       await captureWarning('Billing health check critical', undefined, {
         service: 'billing',
-        route: '/api/billing/health',
+        route: BILLING_HEALTH_ROUTE,
         checks: result.checks,
         metrics: result.metrics,
       });
@@ -214,7 +270,7 @@ export async function GET() {
     logger.error('Billing health check failed:', error);
     void captureWarning('Billing health check failed', error, {
       service: 'billing',
-      route: '/api/billing/health',
+      route: BILLING_HEALTH_ROUTE,
     });
 
     return NextResponse.json(

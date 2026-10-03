@@ -718,9 +718,6 @@ importers:
       '@storybook/nextjs-vite':
         specifier: 10.6.1
         version: 10.6.1(@babel/core@8.0.6)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(babel-plugin-macros@3.1.0)(next@16.3.8(@babel/core@8.0.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.3)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rollup@4.63.6)(storybook@10.6.1(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(typescript@6.0.3)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      '@storybook/react-vite':
-        specifier: 10.6.1
-        version: 10.6.1(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rollup@4.63.6)(storybook@10.6.1(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(typescript@6.0.3)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
       '@stryker-mutator/core':
         specifier: 10.0.0
         version: 10.0.0(@types/node@26.6.3)
@@ -817,6 +814,9 @@ importers:
       postcss:
         specifier: 8.5.28
         version: 8.5.28
+      postgres:
+        specifier: 3.4.8
+        version: 3.4.8
       promptfoo:
         specifier: 0.121.20
         version: 0.121.20(@aws-sdk/credential-provider-node@3.972.83)(@cloudflare/workers-types@5.20261002.1)(@neondatabase/serverless@1.1.0)(@smithy/signature-v4@5.7.4)(@swc/helpers@0.5.23)(@types/json-schema@7.0.15)(@types/node@26.6.3)(@types/pg@8.20.0)(@upstash/redis@1.39.0)(babel-plugin-macros@3.1.0)(better-sqlite3@12.10.0)(bufferutil@4.1.0)(kysely@0.28.17)(pg@8.23.0)(playwright-core@1.60.0)(postgres@3.4.8)(socks@2.8.10)(utf-8-validate@6.0.6)
@@ -32245,8 +32245,7 @@ snapshots:
       xtend: 4.0.2
     optional: true
 
-  postgres@3.4.8:
-    optional: true
+  postgres@3.4.8: {}
 
   posthog-node@5.24.17:
     dependencies:

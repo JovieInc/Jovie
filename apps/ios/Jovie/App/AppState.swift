@@ -10,11 +10,20 @@ enum DashboardLoadState: Equatable {
 
 protocol AppStateRepository: Sendable {
   func loadMe(for userID: String) async throws -> MeRepositoryResult
+  func loadMe(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) async throws
+    -> MeRepositoryResult
   func clearCachedUser(_ userID: String) async
+  func clearCachedUser(_ userID: String, ifOwnedBy ownership: NativeSessionOwnership) async
   func cachedSnapshot(for userID: String) async -> MobileMeResponse?
 }
 
 extension AppStateRepository {
+  func loadMe(for userID: String, ifOwnedBy _: NativeSessionOwnership) async throws
+    -> MeRepositoryResult
+  {
+    try await loadMe(for: userID)
+  }
+
   /// Default: no cached snapshot. Concrete repositories that persist profiles
   /// (e.g. ``MeRepository``) override this to enable instant cache-first paint.
   func cachedSnapshot(for _: String) async -> MobileMeResponse? { nil }
@@ -26,12 +35,30 @@ extension MeRepository: AppStateRepository {}
 protocol PushNotificationCoordinating {
   func activate() async
   func deactivate() async
+  func deactivateLocally(ifOwnedBy ownership: NativeSessionOwnership) async
 }
 
 @MainActor
 struct NoopPushNotificationCoordinator: PushNotificationCoordinating {
   func activate() async {}
   func deactivate() async {}
+  func deactivateLocally(ifOwnedBy _: NativeSessionOwnership) async {}
+}
+
+struct ProfileLoadContext {
+  let ownership: NativeSessionOwnership?
+  let canContinue: () -> Bool
+
+  static func live(for userID: String) -> Self? {
+    guard let ownership = NativeSessionTokenStore.captureOwnership(for: userID) else { return nil }
+    return Self(ownership: ownership) {
+      NativeSessionTokenStore.canContinueProfileLoad(ownedBy: ownership)
+    }
+  }
+
+  static func unmanaged(canContinue: @escaping () -> Bool = { true }) -> Self {
+    Self(ownership: nil, canContinue: canContinue)
+  }
 }
 
 @MainActor
@@ -46,6 +73,7 @@ final class AppState {
   var isOffline = false
   var didInitializeAuth = false
   var activeUserID: String?
+  private(set) var activeSessionOwnership: NativeSessionOwnership?
 
   private let repository: AppStateRepository
   private let sessionRevoker: NativeSessionRevoking
@@ -54,7 +82,15 @@ final class AppState {
   private let audienceHighlightsCache: AudienceHighlightsCache
   private let actionLoopCache: ActionLoopCache
   private let launchDate = Date()
-  private var loadingUserID: String?
+  private struct ProfileLoadAttempt {
+    let id = UUID()
+    let userID: String
+    let context: ProfileLoadContext
+    var canContinue: () -> Bool { context.canContinue }
+  }
+
+  private let captureProfileLoadCurrentness: (String) -> ProfileLoadContext?
+  private var profileLoadAttempt: ProfileLoadAttempt?
   // Matches SplashView's cinematic entrance (JovieMotion.cinematicDuration)
   // so the primary logo reveal completes before the route crossfade starts.
   private let minimumSplashDuration = JovieMotion.cinematicDuration
@@ -68,7 +104,10 @@ final class AppState {
     pushNotifications: PushNotificationCoordinating? = nil,
     chatCache: ChatCache? = nil,
     audienceHighlightsCache: AudienceHighlightsCache? = nil,
-    actionLoopCache: ActionLoopCache? = nil
+    actionLoopCache: ActionLoopCache? = nil,
+    captureProfileLoadCurrentness: @escaping (String) -> ProfileLoadContext? = {
+      ProfileLoadContext.live(for: $0)
+    }
   ) {
     self.configuration = configuration
     self.launchMode = launchMode
@@ -79,6 +118,7 @@ final class AppState {
     self.chatCache = chatCache ?? ChatCache()
     self.audienceHighlightsCache = audienceHighlightsCache ?? AudienceHighlightsCache()
     self.actionLoopCache = actionLoopCache ?? ActionLoopCache()
+    self.captureProfileLoadCurrentness = captureProfileLoadCurrentness
   }
 
   func completeLaunch() async {
@@ -162,19 +202,29 @@ final class AppState {
   func handleSignedInUserChange(_ userID: String?) async {
     guard launchMode.usesLiveAuth, didInitializeAuth else { return }
 
-    if let userID, loadingUserID == userID {
+    let newAttempt: ProfileLoadAttempt?
+    if let userID {
+      guard let context = captureProfileLoadCurrentness(userID) else { return }
+      newAttempt = ProfileLoadAttempt(userID: userID, context: context)
+    } else {
+      newAttempt = nil
+    }
+
+    if let userID, let attempt = profileLoadAttempt,
+       attempt.userID == userID, attempt.canContinue() {
       return
     }
 
     let previousUserID = activeUserID
     activeUserID = userID
+    activeSessionOwnership = newAttempt?.context.ownership
 
-    guard let userID else {
+    guard let userID, let attempt = newAttempt else {
       if previousUserID != nil {
         await pushNotifications.deactivate()
       }
       Observability.clearUser()
-      loadingUserID = nil
+      profileLoadAttempt = nil
       route = .signedOut
       dashboardState = .idle
       isOffline = false
@@ -187,10 +237,10 @@ final class AppState {
     Task {
       await pushNotifications.activate()
     }
-    loadingUserID = userID
+    profileLoadAttempt = attempt
     defer {
-      if loadingUserID == userID {
-        loadingUserID = nil
+      if profileLoadAttempt?.id == attempt.id {
+        profileLoadAttempt = nil
       }
     }
 
@@ -198,7 +248,7 @@ final class AppState {
     // users never wait on the network to see their dashboard. The network
     // revalidation below silently swaps in fresh data when it lands.
     let cachedSnapshot = await repository.cachedSnapshot(for: userID)
-    guard activeUserID == userID, loadingUserID == userID else { return }
+    guard isActive(attempt), attempt.canContinue() else { return }
 
     if let cachedSnapshot {
       apply(response: cachedSnapshot)
@@ -217,8 +267,13 @@ final class AppState {
     }
 
     do {
-      let result = try await repository.loadMe(for: userID)
-      guard activeUserID == userID, loadingUserID == userID else { return }
+      let result: MeRepositoryResult
+      if let ownership = attempt.context.ownership {
+        result = try await repository.loadMe(for: userID, ifOwnedBy: ownership)
+      } else {
+        result = try await repository.loadMe(for: userID)
+      }
+      guard isActive(attempt), attempt.canContinue() else { return }
       isOffline = result.isStale
 
       switch result.response.state {
@@ -251,15 +306,23 @@ final class AppState {
         )
       }
     } catch {
-      guard activeUserID == userID, loadingUserID == userID else { return }
+      // The receipt, not a still-active load UUID, authorizes terminal effects.
+      if let error = error as? NativeSessionRequestError {
+        if case let .expired(receipt) = error { await handleExpiredSession(receipt) }
+        return
+      }
+      if error is CancellationError { return }
+      guard isActive(attempt) else { return }
 
       var didTransportFail = false
 
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
-          await handleExpiredSession()
-          return
+          if attempt.context.ownership == nil {
+            await handleExpiredSession()
+            return
+          }
         case .transportFailed:
           didTransportFail = true
         case .decodingFailed, .invalidResponse, .requestFailed, .profileCompletionFailed:
@@ -267,11 +330,16 @@ final class AppState {
         }
       }
 
+      guard attempt.canContinue() else { return }
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
       isOffline = didTransportFail
       MobileAuthDiagnostics.record("mobile_me_error", detail: error.localizedDescription)
     }
+  }
+
+  private func isActive(_ attempt: ProfileLoadAttempt) -> Bool {
+    activeUserID == attempt.userID && profileLoadAttempt?.id == attempt.id
   }
 
   /// Maps a resolved profile response onto the navigation route and dashboard
@@ -329,22 +397,40 @@ final class AppState {
     await resetToSignedOut()
   }
 
-  private func resetToSignedOut() async {
+  func handleExpiredSession(_ receipt: NativeSessionExpiryReceipt) async {
+    var userID: String?
+    guard NativeSessionTokenStore.performIfCurrent(receipt.ownership, {
+      userID = resetSignedOutPresentation()
+    }) else { return }
+    await pushNotifications.deactivateLocally(ifOwnedBy: receipt.ownership)
+    await clearCaches(for: userID, ifOwnedBy: receipt.ownership)
+  }
 
+  private func resetToSignedOut() async {
+    let cleanupOwnership = NativeSessionTokenStore.captureSessionContext().ownership
+    let userID = resetSignedOutPresentation()
+    await clearCaches(for: userID, ifOwnedBy: cleanupOwnership)
+  }
+
+  private func resetSignedOutPresentation() -> String? {
     let userID = activeUserID
     Observability.clearUser()
     activeUserID = nil
-    loadingUserID = nil
+    activeSessionOwnership = nil
+    profileLoadAttempt = nil
     route = .signedOut
     dashboardState = .idle
     isOffline = false
     MobileAuthDiagnostics.record("route_signed_out")
+    return userID
+  }
 
+  private func clearCaches(for userID: String?, ifOwnedBy cleanupOwnership: NativeSessionOwnership) async {
     if let userID {
-      await repository.clearCachedUser(userID)
-      await chatCache.remove(for: userID)
-      await audienceHighlightsCache.remove(for: userID)
-      await actionLoopCache.remove(for: userID)
+      await repository.clearCachedUser(userID, ifOwnedBy: cleanupOwnership)
+      await chatCache.remove(for: userID, ifOwnedBy: cleanupOwnership)
+      await audienceHighlightsCache.remove(for: userID, ifOwnedBy: cleanupOwnership)
+      await actionLoopCache.remove(for: userID, ifOwnedBy: cleanupOwnership)
     }
   }
 

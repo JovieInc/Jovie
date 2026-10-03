@@ -214,6 +214,26 @@ describe('route publication policy — real registry', () => {
     expect(isCapabilityIndexable(r)).toBe(false);
   });
 
+  it('profile summary and public Ask are certified and unbound from marketing routes', () => {
+    for (const capabilityId of [
+      'agent-readable-profile-summary',
+      'public-ask',
+    ] as const) {
+      const record = getCapabilityRecord(capabilityId);
+      expect(record?.maturity).toBe('general_availability');
+      expect(record?.publication).toBe('public');
+      expect(record?.access).toBe('open');
+      expect(record?.proofAuthorized).toBe(true);
+      expect(isPublicationPermitted(record)).toBe(true);
+      expect(isFeatureUsable(record)).toBe(true);
+      expect(isCapabilityPurchasable(record)).toBe(false);
+      expect(describeFeatureAccess(record)).toBe('Available now.');
+      expect(Object.values(ROUTE_CAPABILITY_BINDINGS)).not.toContain(
+        capabilityId
+      );
+    }
+  });
+
   it('selective-reach stays gated: registered but never public (JOV-6299)', () => {
     const selectiveReach = getCapabilityRecord('selective-reach');
     expect(selectiveReach).toBeDefined();

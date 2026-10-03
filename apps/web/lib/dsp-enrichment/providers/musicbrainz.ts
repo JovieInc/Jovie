@@ -176,6 +176,113 @@ export async function getMusicBrainzArtist(
   }
 }
 
+interface MusicBrainzNamedSearchHit {
+  id?: string;
+  name?: string;
+  title?: string;
+  barcode?: string;
+  score?: number;
+}
+
+function exactName(left: string, right: string): boolean {
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  return normalize(left) === normalize(right);
+}
+
+/**
+ * Name search, then url-rels only when one artist name matches exactly.
+ * Several exact names stay unresolved here so the caller can ask for a choice.
+ */
+export async function matchMusicBrainzArtistByName(
+  name: string
+): Promise<
+  | { status: 'found'; artist: MusicBrainzArtist }
+  | { status: 'ambiguous'; count: number }
+  | { status: 'none' }
+> {
+  const trimmed = name.trim();
+  if (!trimmed) return { status: 'none' };
+  const response = await executeWithCircuitBreaker(() =>
+    musicBrainzRequest<{ artists?: MusicBrainzNamedSearchHit[] }>(
+      `/artist?query=${encodeURIComponent(`artist:"${trimmed.replace(/["\\]/g, ' ')}"`)}&limit=5`
+    )
+  );
+  const exact = (response.artists ?? []).filter(
+    hit => hit.id && hit.name && exactName(hit.name, trimmed)
+  );
+  if (exact.length > 1) return { status: 'ambiguous', count: exact.length };
+  const only = exact[0];
+  if (!only?.id) return { status: 'none' };
+  const artist = await getMusicBrainzArtist(only.id);
+  if (!artist) return { status: 'none' };
+  return { status: 'found', artist };
+}
+
+export async function lookupMusicBrainzReleaseByBarcode(
+  barcode: string
+): Promise<{
+  id: string;
+  title: string;
+  artist: string | null;
+  barcode: string;
+  relations: MusicBrainzArtist['relations'];
+} | null> {
+  const digits = barcode.replace(/\D/g, '');
+  if (!digits) return null;
+  const response = await executeWithCircuitBreaker(() =>
+    musicBrainzRequest<{ releases?: MusicBrainzNamedSearchHit[] }>(
+      `/release?query=${encodeURIComponent(`barcode:${digits}`)}&limit=5`
+    )
+  );
+  const hit = (response.releases ?? []).find(
+    release => release.id && release.barcode?.replace(/\D/g, '') === digits
+  );
+  const releaseId = hit?.id;
+  if (!releaseId) return null;
+  const release = await executeWithCircuitBreaker(() =>
+    musicBrainzRequest<{
+      id?: string;
+      title?: string;
+      barcode?: string;
+      relations?: MusicBrainzArtist['relations'];
+      'artist-credit'?: Array<{ name?: string; artist?: { name?: string } }>;
+    }>(`/release/${encodeURIComponent(releaseId)}?inc=artist-credits+url-rels`)
+  );
+  const artist =
+    release['artist-credit']?.find(credit => credit.name || credit.artist?.name)
+      ?.name ??
+    release['artist-credit']?.[0]?.artist?.name ??
+    null;
+  return {
+    id: release.id ?? releaseId,
+    title: release.title ?? hit?.title ?? '',
+    artist,
+    barcode: digits,
+    relations: release.relations ?? [],
+  };
+}
+
+export async function lookupMusicBrainzRecordingUrlRels(
+  isrc: string
+): Promise<NonNullable<MusicBrainzArtist['relations']>> {
+  const recordings = await lookupMusicBrainzByIsrc(isrc);
+  const recording = recordings[0];
+  if (!recording?.id) return [];
+  const detail = await executeWithCircuitBreaker(() =>
+    musicBrainzRequest<{ relations?: MusicBrainzArtist['relations'] }>(
+      `/recording/${encodeURIComponent(recording.id)}?inc=url-rels`
+    )
+  );
+  return detail.relations ?? [];
+}
+
 export function isMusicBrainzAvailable(): boolean {
   return musicBrainzCircuitBreaker.getState() !== 'OPEN';
 }

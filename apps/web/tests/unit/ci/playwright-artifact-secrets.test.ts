@@ -77,9 +77,12 @@ const imageUploads =
     '|'
   );
 const markdownUploads = [
+  'ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:smoke-required-report-${{ github.run_id }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
@@ -894,6 +897,38 @@ describe('Playwright artifact secret boundary', () => {
       'uses: ./.github/actions/upload-safe-playwright-artifact'
     );
     expect(upload).toContain("allow-markdown: 'true'");
+  });
+
+  it('redacts smoke and full E2E error context and keeps golden-path keyframes off the failure upload', () => {
+    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    for (const [jobId, stepName] of [
+      ['ci-e2e-smoke', 'Run E2E Smoke (Chromium)'],
+      ['ci-smoke-required', 'Run Required Smoke Tests'],
+      ['ci-e2e-tests', 'E2E Full (Main Branch)'],
+      ['ci-e2e-tests', 'E2E Quarantine (retries)'],
+    ] as const) {
+      const job = jobBlock(source, jobId);
+      const step = stepBlock(job, stepName);
+      expect(step, `${jobId}:${stepName}`).toContain(
+        "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+      );
+      expect(yamlPropertyBlock(job, 'env', 4), jobId).not.toContain(
+        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+      );
+    }
+    const golden = jobBlock(source, 'ci-golden-path');
+    const failureUpload = stepBlock(
+      golden,
+      'Upload Playwright Artifacts on Failure'
+    );
+    expect(failureUpload).toContain('!apps/web/test-results/**/*.png');
+    expect(failureUpload).not.toMatch(/allow-images:\s*['"]?true/);
+    const visualUpload = stepBlock(
+      golden,
+      'Upload golden-path visual review evidence'
+    );
+    expect(visualUpload).toContain("allow-images: 'true'");
+    expect(visualUpload).toContain("public-images: 'true'");
   });
 
   it('routes the exact upload and producer inventory through staged-only guards', () => {

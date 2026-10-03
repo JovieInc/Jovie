@@ -28,10 +28,18 @@ defines the binding a future `jovie` CLI must implement.
   - `in_progress` prints `retryAfterMs` guidance;
   - `unavailable` / `failed` render the structured error.
 - Documented exit codes: `0` for `completed`/`handoff`, `1` for
-  `failed`/`requires_input`, `2` for `unavailable`, `3` for transport/usage
+  `failed`/`requires_input`, `2` for `unavailable`, `3` for `in_progress` and transport/usage
   errors. Scripts branch on `error.code` from the stable vocabulary, never on
   message text.
 - Auth: owner-workspace token (device flow or env var, designed in the
   dispatcher phase). The CLI holds no entitlement logic; `ENTITLEMENT_REQUIRED`
   and `QUOTA_EXHAUSTED` are rendered (with `upgrade` metadata when present),
   not predicted.
+
+## Internal fleet transport
+
+The fleet/work/defect commands bind the same canonical actions with a scoped
+worker credential and an explicit stable idempotency key. Their `--input` is a
+JSON object string. Canonical statuses use the exit codes above. Public read
+commands retain their existing usage/transport error codes for compatibility;
+product write/navigation action bindings remain contract-only.

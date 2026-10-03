@@ -222,7 +222,6 @@ describe('route hero audit', () => {
         "/download": "unbound: - -> left-buttons",
         "/instant-merch": "unbound: - -> left-buttons",
         "/launch": "unbound: - -> left-buttons",
-        "/new": "unbound: - -> left-buttons",
         "/pay": "unbound: - -> split-link-claim",
         "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
         "/product": "unbound: - -> split-link-claim",

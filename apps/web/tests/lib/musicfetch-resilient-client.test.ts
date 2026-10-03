@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
@@ -39,6 +39,13 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 describe('musicfetch resilient client', () => {
+  afterEach(async () => {
+    const { resetMusicfetchDormantForTests } = await import(
+      '@/lib/music-resolver/musicfetch-gate'
+    );
+    resetMusicfetchDormantForTests();
+  });
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -402,5 +409,65 @@ describe('musicfetch resilient client', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('does not call MusicFetch again after a 401 subscription failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: { get: () => null },
+      text: async () =>
+        JSON.stringify({ error: { message: 'subscription not active' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { musicfetchRequest } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    const { musicfetchDormantReason, musicfetchRemediation } = await import(
+      '@/lib/music-resolver/musicfetch-gate'
+    );
+
+    await expect(
+      musicfetchRequest(
+        '/url',
+        new URLSearchParams({ url: 'https://open.spotify.com/track/1' }),
+        { timeoutMs: 2000 }
+      )
+    ).rejects.toThrow(/subscription not active/);
+
+    await expect(
+      musicfetchRequest(
+        '/url',
+        new URLSearchParams({ url: 'https://open.spotify.com/track/2' }),
+        { timeoutMs: 2000 }
+      )
+    ).rejects.toThrow(/remediation:musicfetch-subscription-inactive/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(musicfetchDormantReason()).toBe('subscription_inactive');
+    expect(musicfetchRemediation('subscription_inactive')).toEqual({
+      fingerprint: 'remediation:musicfetch-subscription-inactive',
+      issue: 'JOV-7323',
+      renewal: false,
+    });
+  });
+
+  it('does not call MusicFetch when the token is missing', async () => {
+    token = undefined;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { musicfetchRequest } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    await expect(
+      musicfetchRequest(
+        '/isrc',
+        new URLSearchParams({ isrc: 'USUM72212345' }),
+        {
+          timeoutMs: 2000,
+        }
+      )
+    ).rejects.toThrow(/remediation:musicfetch-missing-token JOV-7323/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

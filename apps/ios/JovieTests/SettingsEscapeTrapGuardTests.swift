@@ -126,3 +126,63 @@ struct SettingsStyleGuardTests {
     #expect(SettingsExternalURL.terms?.absoluteString == "https://jov.ie/legal/terms")
   }
 }
+
+// JOV-7534: Settings reports Apple-controlled release provenance (App Store vs
+// TestFlight) and exact commit identity; it never implies an in-app channel
+// switch is possible.
+struct ReleaseChannelGuardTests {
+  @Test func channelDerivationMatchesAppleReceiptNames() {
+    #expect(AppBuildInfo.channel(receiptName: "receipt") == .appStore)
+    #expect(AppBuildInfo.channel(receiptName: "sandboxReceipt") == .testFlight)
+    #expect(AppBuildInfo.channel(receiptName: nil) == .development)
+    #expect(AppBuildInfo.channel(receiptName: "unexpected") == .development)
+  }
+
+  @Test func channelDisplayNamesAreHonest() {
+    #expect(ReleaseChannel.appStore.displayName == "App Store")
+    #expect(ReleaseChannel.testFlight.displayName == "TestFlight")
+    #expect(ReleaseChannel.development.displayName == "Development")
+  }
+
+  @Test func shortCommitOnlyTruncatesLongSHAs() {
+    let long = AppBuildInfo(
+      version: "1.0", build: "1", channel: .testFlight,
+      commit: "d12f22983e2ec0a4ea2a3b411708a181633b6a2c"
+    )
+    #expect(long.shortCommit == "d12f229")
+    let short = AppBuildInfo(version: "1.0", build: "1", channel: .appStore, commit: "abc123")
+    #expect(short.shortCommit == "abc123")
+    let none = AppBuildInfo(version: "1.0", build: "1", channel: .development, commit: nil)
+    #expect(none.shortCommit == nil)
+  }
+
+  @Test func currentBuildInfoCarriesChannel() {
+    #if DEBUG
+      #expect(AppBuildInfo.current().channel == .development)
+    #endif
+  }
+
+  @Test func settingsSourceExposesProvenanceAndAdminOnlyTestFlightEntry() throws {
+    let url = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Settings/SettingsView.swift")
+    let source = try String(contentsOf: url, encoding: .utf8)
+
+    #expect(source.contains("LabeledContent(\"Channel\", value: buildInfo.channel.displayName)"))
+    #expect(source.contains("settings-release-channel"))
+    #expect(source.contains("settings-build-commit"))
+    #expect(source.contains("https://testflight.apple.com"))
+    // Admin gate + Apple-controlled install surface; no in-app channel toggle.
+    #expect(source.contains("showsWorkspaceSwitch, buildInfo.channel != .testFlight"))
+    #expect(source.contains("settings-open-testflight"))
+    #expect(!source.contains("switchChannel"))
+    #expect(!source.contains("Join Beta"))
+    #expect(!source.contains("appStoreReceiptURL?.lastPathComponent == \"sandboxReceipt\""),
+            "Channel derivation must stay inside AppBuildInfo.channel(receiptName:).")
+  }
+
+  @Test func testflightURLOpensAppleEnrollmentSurface() {
+    #expect(SettingsExternalURL.testflight?.absoluteString == "https://testflight.apple.com")
+  }
+}

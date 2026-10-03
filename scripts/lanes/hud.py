@@ -149,7 +149,7 @@ def ledger_rows(state: Path) -> list[dict]:
 
 def ledger_window(state: Path, hours: int = 24) -> list[dict]:
     since = (utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return [row for row in ledger_rows(state) if row.get("endedAt", "") >= since]
+    return [row for row in ledger_rows(state) if (row.get("endedAt") or "") >= since]
 
 
 def local_model(host) -> dict:
@@ -161,10 +161,13 @@ def local_model(host) -> dict:
     current = (state / "current").resolve()
     all_receipts = ledger_rows(state)
     since = (utcnow() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    receipts = [row for row in all_receipts if row.get("endedAt", "") >= since]
-    verdicts = Counter(r.get("verdict") for r in receipts)
+    receipts = [row for row in all_receipts if (row.get("endedAt") or "") >= since]
+    # Display classification only: a receipt missing verdict metadata is "unclassified",
+    # never inferred as success or failure. The raw receipt is preserved in receipts24h.
+    verdicts = Counter(r["verdict"] if isinstance(r.get("verdict"), str) and r["verdict"].strip()
+                       else "unclassified" for r in receipts)
     landed = sorted((r for r in receipts if r.get("verdict") in ("landing", "verified-not-queued")),
-                    key=lambda r: r.get("endedAt", ""), reverse=True)
+                    key=lambda r: r.get("endedAt") or "", reverse=True)
     cooldowns = {}
     for path in (state / "cooldown").glob("*"):
         try:
@@ -612,13 +615,13 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                               f"productive {metric['productiveRuns']} PR {metric['prsCreated']} "
                               f"first-pass {'n/a' if first_pass is None else f'{round(first_pass * 100)}%'} "
                               f"repair {metric['remediationRuns']} landed {metric['landedOutput']}")
-    counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items())) or "no runs"
+    counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items(), key=lambda item: str(item[0]))) or "no runs"
     lines.append(rgb(DIM, f"  24h verdicts: {counts}"))
     lines.append(rgb(DIM, "  THROUGHPUT 24h · " + " | ".join(provider_parts)))
 
     # backlog
     for name in local["slots"]:
-        lines.append(rgb(FG, f"CLAIMABLE {name}  ", bold=True) + rgb(DIM, pool_hint(name, local)))
+        lines.append(rgb(FG, f"NEW ISSUES {name}  ", bold=True) + rgb(DIM, pool_hint(name, local)))
     if linear.get("ok"):
         pool = linear["pool"]
         backlog = " · ".join(f"{label} {pool.get(label, 0)}" for label in LANE_LABELS)
@@ -647,18 +650,25 @@ def pool_hint(name: str, local: dict) -> str:
         stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
         elapsed = (utcnow() - stamp).total_seconds()
         if elapsed < 0 or elapsed > 3 * REFRESH_REMOTE_S:
-            return "claimable unknown (doctor stale)"
+            return "new issues unknown (doctor stale)"
     except (KeyError, TypeError, ValueError):
-        return "claimable unknown (doctor unread)"
+        return "new issues unknown (doctor unread)"
     if admission.get("error"):
-        return "claimable unknown (" + admission["error"] + ")"
+        return "new issues unknown (" + admission["error"] + ")"
     qualified = (admission.get("poolByProvider") or {}).get(name)
     candidates = (admission.get("candidatePoolByProvider") or {}).get(name)
-    if qualified is None or candidates is None:
-        return "claimable unknown (admission unread)"
+    budget = (admission.get("newIssueBudgetByProvider") or {}).get(name)
+    eligible = (admission.get("eligiblePoolByProvider") or {}).get(name)
+    if not budget:
+        return "new issues unknown (PR budget unread)"
+    if budget.get("reason") == "pr-inventory-unavailable":
+        return f"new issues unknown (PR inventory unread) · eligible {eligible}/{candidates}"
+    if qualified is None or candidates is None or eligible is None:
+        return "new issues unknown (admission unread)"
     reasons = (admission.get("rejectedByProvider") or {}).get(name) or {}
     distribution = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
-    return f"claimable {qualified}/{candidates}" + (" · " + distribution if distribution else "")
+    capacity = f"PRs {budget['used']}/{budget['cap']} {budget['reason']}"
+    return f"new issues {qualified} · eligible {eligible}/{candidates} · {capacity}" + (" · " + distribution if distribution else "")
 
 
 def vacancy_hint(name: str, local: dict, linear: dict) -> str:

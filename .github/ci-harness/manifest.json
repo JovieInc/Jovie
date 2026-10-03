@@ -81,6 +81,15 @@
       "remediation": "Fix TypeScript, Biome, ESLint server-boundary, proxy guard, or component-ship-gate failures (tests + matching stories for shippable UI) before expanding the change."
     },
     {
+      "id": "ci-blog-content",
+      "name": "Blog Content Qualification",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "node scripts/run-affected-tests.mjs --base origin/main",
+      "remediation": "Repair the JOV-7396 publication contract, JOV-7397 factory certification, or exact candidate build. Mixed and untrusted diffs must retain full Web qualification; see docs/operations/BLOG_CONTENT_CI.md."
+    },
+    {
       "id": "ci-risk-classifier",
       "name": "CI Risk Classifier",
       "tier": "structural-contract",

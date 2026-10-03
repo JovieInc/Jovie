@@ -33,6 +33,22 @@ const VALID_INPUTS: Record<string, unknown> = {
     availability: 'available',
   },
   'fleet.status': {},
+  'fleet.directory': {},
+  'work.request': {
+    requestId: UUID,
+    kind: 'dogfood',
+    proposal: {
+      issueId: 'JOV-7393',
+      title: 'Read public contract',
+      acceptanceCriteria: ['Valid OpenAPI'],
+      existingWorkRefs: [],
+      command: 'api.openapi',
+      requiredTools: ['jovie'],
+      requiredConnectors: [],
+      maxDurationSeconds: 30,
+      notAfter: '2026-10-31T12:00:00.000Z',
+    },
+  },
   'work.next': {},
   'work.claim': { leaseId: UUID },
   'work.report': {

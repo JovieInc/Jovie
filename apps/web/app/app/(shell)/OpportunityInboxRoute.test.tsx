@@ -1,8 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useEffect, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
 const mocks = vi.hoisted(() => ({
+  pendingFailure: null as null | (() => void),
   getCanonicalProfileDSPs: vi.fn(),
   getDashboardShellData: vi.fn(),
   getProfileSocialLinks: vi.fn(),
@@ -28,7 +30,7 @@ vi.mock(
     }: {
       readonly connectedDSPs: readonly { readonly id: string }[];
       readonly inbox: {
-        readonly cards: readonly unknown[];
+        readonly cards: readonly { readonly id: string }[];
         readonly availability?: {
           readonly suggestedActions: string;
           readonly tourDates: string;
@@ -36,17 +38,36 @@ vi.mock(
         readonly tourDates?: { readonly pending: readonly unknown[] };
       };
       readonly initialLinks: readonly { readonly id: string }[];
-    }) => (
-      <div
-        data-testid='opportunity-inbox-client'
-        data-card-count={inbox.cards.length}
-        data-suggestion-availability={inbox.availability?.suggestedActions}
-        data-tour-availability={inbox.availability?.tourDates}
-        data-connected-dsp-count={connectedDSPs.length}
-        data-initial-link-count={initialLinks.length}
-        data-pending-tour-date-count={inbox.tourDates?.pending.length ?? 0}
-      />
-    ),
+    }) => {
+      const [cards, setCards] = useState(inbox.cards);
+      useEffect(() => setCards(inbox.cards), [inbox.cards]);
+      return (
+        <div
+          data-testid='opportunity-inbox-client'
+          data-card-count={cards.length}
+          data-suggestion-availability={inbox.availability?.suggestedActions}
+          data-tour-availability={inbox.availability?.tourDates}
+          data-connected-dsp-count={connectedDSPs.length}
+          data-initial-link-count={initialLinks.length}
+          data-pending-tour-date-count={inbox.tourDates?.pending.length ?? 0}
+        >
+          {cards.map(card => (
+            <span key={card.id}>{card.id}</span>
+          ))}
+          <button
+            type='button'
+            onClick={() => {
+              const card = cards[0];
+              setCards([]);
+              mocks.pendingFailure = () =>
+                setCards(current => [card, ...current]);
+            }}
+          >
+            Approve
+          </button>
+        </div>
+      );
+    },
   })
 );
 
@@ -104,6 +125,7 @@ async function flushPromises() {
 describe('OpportunityInboxRoute', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pendingFailure = null;
     mocks.loadAuthenticatedAppShellUserId.mockResolvedValue('user-1');
     mocks.getDashboardShellData.mockResolvedValue({
       dashboardLoadError: null,
@@ -113,6 +135,38 @@ describe('OpportunityInboxRoute', () => {
     mocks.getProfileSocialLinks.mockResolvedValue([{ id: 'link-1' }]);
     mocks.loadOpportunityInboxTourDateSections.mockResolvedValue(TOUR_DATES);
     mocks.getCanonicalProfileDSPs.mockReturnValue([{ id: 'spotify' }]);
+  });
+
+  it('does not restore a previous account card when its pending mutation fails after an identity switch', async () => {
+    mocks.loadAuthenticatedAppShellUserId.mockResolvedValue('founder');
+    mocks.loadOpportunityInboxData.mockResolvedValue({
+      ...BASE_INBOX,
+      cards: [{ id: 'founder-card' }],
+    });
+    const view = render(await OpportunityInboxRoute());
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(screen.queryByText('founder-card')).not.toBeInTheDocument();
+
+    mocks.loadAuthenticatedAppShellUserId.mockResolvedValue('customer');
+    mocks.loadOpportunityInboxData.mockResolvedValue({
+      ...BASE_INBOX,
+      cards: [{ id: 'customer-card' }],
+    });
+    view.rerender(await OpportunityInboxRoute());
+    expect(screen.getByText('customer-card')).toBeInTheDocument();
+    act(() => mocks.pendingFailure?.());
+    expect(screen.queryByText('founder-card')).not.toBeInTheDocument();
+    expect(screen.getByText('customer-card')).toBeInTheDocument();
+    expect(mocks.loadOpportunityInboxData).toHaveBeenLastCalledWith('customer');
+  });
+
+  it('preserves pending mutation recovery for the same identity during a route refresh', async () => {
+    const view = render(await OpportunityInboxRoute());
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    view.rerender(await OpportunityInboxRoute());
+    expect(screen.queryByText('card-1')).not.toBeInTheDocument();
+    act(() => mocks.pendingFailure?.());
+    expect(screen.getByText('card-1')).toBeInTheDocument();
   });
 
   it('forwards failed and missing attempted-read metadata without losing loaded cards', async () => {

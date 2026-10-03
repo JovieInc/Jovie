@@ -1,10 +1,19 @@
 import type { CreatorType } from '@/types/db';
 
-/** Solo music artists resolve as MusicGroup + Person for entity-home signals. */
+export type ProfileSchemaEntityType = 'Person' | ['MusicGroup', 'Person'];
+
+/** Music artists resolve as MusicGroup + Person. Other creator types are Person. */
 export function resolveArtistEntityType(
   creatorType: CreatorType
-): 'MusicGroup' | ['MusicGroup', 'Person'] {
-  return creatorType === 'artist' ? ['MusicGroup', 'Person'] : 'MusicGroup';
+): ProfileSchemaEntityType {
+  return creatorType === 'artist' ? ['MusicGroup', 'Person'] : 'Person';
+}
+
+/** Fragment that matches the profile entity @id for this creator type. */
+export function profileEntityAnchor(
+  creatorType: CreatorType | null | undefined
+): 'musicgroup' | 'person' {
+  return creatorType === 'artist' ? 'musicgroup' : 'person';
 }
 
 /** Releases map to MusicAlbum + MusicRelease; tracks stay MusicRecording. */

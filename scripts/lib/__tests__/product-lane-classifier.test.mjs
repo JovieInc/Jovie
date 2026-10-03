@@ -21,6 +21,49 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes the published CLI skill artifacts through the CLI web gate and rejects unknown skill paths', () => {
+    const receipt = classifyProductLanes([
+      'skills/jovie/SKILL.md',
+      'skills/jovie/README.md',
+      'skills/jovie/LICENSE',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    for (const path of [
+      'skills/other/SKILL.md',
+      'skills/jovie/setup.sh',
+      'skills/jovie/../private.md',
+      'skills/jovie/SKILL.md.extra',
+    ]) {
+      expect(() => classifyProductLanes([path])).toThrow(
+        ProductLaneClassificationError
+      );
+    }
+  });
+
+  it('records the bounded blog qualification without admitting mixed paths', () => {
+    const receipt = classifyProductLanes(
+      ['apps/web/content/blog/a-safe-article.md'],
+      { qualificationProfile: 'content-only' }
+    );
+
+    expect(receipt.qualificationProfile).toBe('content-only');
+    expect(receipt.requiredGates.web.tests).toContain(
+      'JOV-7396 publication contract'
+    );
+    expect(() =>
+      classifyProductLanes(
+        [
+          'apps/web/content/blog/a-safe-article.md',
+          'apps/web/lib/blog/getBlogPosts.ts',
+        ],
+        { qualificationProfile: 'content-only' }
+      )
+    ).toThrow('approved blog content paths');
+  });
+
   it('builds and releases canonical changelog content through web while ordinary docs stay operational', () => {
     expect(classifyProductLanes(['CHANGELOG.md']).selectedLanes).toEqual([
       'web',

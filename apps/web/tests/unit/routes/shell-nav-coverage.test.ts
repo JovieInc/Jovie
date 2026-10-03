@@ -29,6 +29,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/chat': 'New Chat utility and contextual Identity link editor',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/library': 'Canonical Work surface with stable library route ownership',
+  '/app/links':
+    'Contextual smart-link workspace reached from the G then K shortcut and the legacy /app/dashboard/links redirect. Desktop rail placement stays founder-locked',
   '/app/calendar':
     'Contextual moments workspace reached from event and release links',
   '/app/tasks':
@@ -45,13 +47,10 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Sub-tool reached from Investors workspace actions',
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
-  '/app/ov/interviews': 'Internal admin review workspace (manual entry)',
   '/app/ov/wiki':
     'Internal admin wiki index reached from the /hud/wiki rewrite into the OV app shell',
   '/app/ov/wiki/[...slug]':
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
-  '/app/ov/playlists': 'Internal admin workflow (manual entry)',
-  '/app/ov/presence': 'Internal admin workspace pending Ovie IA placement',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
   '/app/ov/system':
@@ -80,8 +79,6 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Unified autonomous work feed is reachable from direct app links until nav placement is finalised',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
-  '/app/settings/referral':
-    'Referral code page reached from share/referral flows; Settings IA nav placement lands with the Settings sidebar consolidation (#13134)',
   '/app/youtube':
     'YouTube revival queue workspace (GH-10921); reachable from direct app links until nav placement is finalised',
 };
