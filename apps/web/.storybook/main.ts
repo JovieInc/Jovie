@@ -201,6 +201,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./release-task-actions-mock.ts'),
         },
         {
+          find: '@/lib/leads/reporting',
+          replacement: require.resolve('./leads-reporting-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions/dashboard-data',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },

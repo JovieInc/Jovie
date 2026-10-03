@@ -8,6 +8,9 @@ const profile = {
   userId: 'story-user',
   username: 'midnightsignal',
   displayName: 'Midnight Signal',
+  // Every real creator_profiles row has createdAt; the analytics adapter
+  // serializes it.
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
 } as DashboardData['creatorProfiles'][0];
 
 const dashboardData = {
