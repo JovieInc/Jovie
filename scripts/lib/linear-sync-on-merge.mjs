@@ -187,6 +187,7 @@ export function pullRequestLinksIssue(pull, issue) {
  *   labels: string[],
  *   description: string,
  *   comments: string[],
+ *   commentRecords: { body: string, createdAt: string }[],
  *   children: string[],
  *   hasChildren: boolean,
  *   acceptanceMetadataVerified: boolean,
@@ -228,6 +229,20 @@ export function readIssueSnapshot(issue) {
       ? /** @type {{ states?: { nodes?: unknown } }} */ (record.team)
       : {};
   const states = Array.isArray(team.states?.nodes) ? team.states.nodes : [];
+  const commentRecords = commentNodes
+    .map(comment => {
+      if (typeof comment === 'string') {
+        return { body: comment, createdAt: '' };
+      }
+      if (!comment || typeof comment !== 'object') return null;
+      const body = Reflect.get(comment, 'body');
+      const createdAt = Reflect.get(comment, 'createdAt');
+      return {
+        body: typeof body === 'string' ? body : '',
+        createdAt: typeof createdAt === 'string' ? createdAt : '',
+      };
+    })
+    .filter(comment => comment !== null && comment.body !== '');
   const children = childNodes
     .map(child => {
       if (typeof child === 'string') return child.toUpperCase();
@@ -254,6 +269,7 @@ export function readIssueSnapshot(issue) {
         return typeof body === 'string' ? body : '';
       })
       .filter(Boolean),
+    commentRecords,
     children,
     hasChildren: childNodes.length > 0,
     acceptanceMetadataVerified:
@@ -511,7 +527,7 @@ const ISSUE_QUERY = `query IssueDoneState($issueId: String!) {
     title
     description
     labels(first: 50) { nodes { name } }
-    comments(first: 50) { nodes { body } }
+    comments(first: 50) { nodes { body createdAt } }
     children(first: 50) { nodes { identifier } }
     team { states { nodes { id name type } } }
   }
