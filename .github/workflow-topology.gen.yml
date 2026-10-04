@@ -1496,6 +1496,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
     jobCount: 2
+  - name: VOC Mine
+    path: .github/workflows/voc-mine.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:mine
+    jobCount: 1
 edges:
   - from: CI
     to: iOS CI

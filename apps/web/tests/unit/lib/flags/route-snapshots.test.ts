@@ -31,6 +31,8 @@ describe('route flag snapshots', () => {
         expect.arrayContaining([
           'STRIPE_CONNECT_ENABLED',
           'INBOX_HOME',
+          'YOUTUBE_WORKSPACE_NAV',
+          'JOVIE_WORK_NAV',
           'PROFILES_WORKSPACE',
         ])
       );

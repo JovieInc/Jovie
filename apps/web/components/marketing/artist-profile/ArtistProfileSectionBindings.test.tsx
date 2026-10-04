@@ -28,22 +28,22 @@ vi.mock('next/image', () => ({
 }));
 
 describe('Artist profile section delegation', () => {
-  it('keeps the hero, distribution strip, and adaptive product split as distinct semantic roots', () => {
+  it('keeps the hero and adaptive product split as distinct semantic roots, with no unpermissioned logo strip', () => {
     render(
       <ArtistProfileHeroAdaptiveIntro
         hero={ARTIST_PROFILE_COPY.hero}
         adaptive={ARTIST_PROFILE_COPY.adaptive}
+        logoPlacement={{ page: '/artist-profiles' }}
       />
     );
     const hero = screen.getByTestId('marketing-section-hero');
-    const logos = screen.getByTestId('marketing-section-logo-cloud');
     const adaptive = screen.getByTestId('marketing-section-feature-split');
     expect(hero.tagName).toBe('SECTION');
-    expect(logos.tagName).toBe('SECTION');
     expect(adaptive.tagName).toBe('SECTION');
-    expect(hero.contains(logos)).toBe(false);
     expect(hero.contains(adaptive)).toBe(false);
     expect(adaptive).toHaveAttribute('data-marketing-occurrence', 'adaptive');
+    // No brand has granted permission for this page (JOV-7795).
+    expect(screen.queryByTestId('marketing-section-logo-cloud')).toBeNull();
   });
   it('visibly identifies sample fan opt-ins without pretending to send a message', () => {
     render(

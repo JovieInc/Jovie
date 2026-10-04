@@ -3157,7 +3157,10 @@ class FixRedTest(unittest.TestCase):
                 attempts = host.state / "fix-attempts.json"
                 attempts.write_text(json.dumps({"5": {"sha": "h1", "count": 2, "at": time.time() - 1}}))
                 with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)):
-                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {**self.pr(), "isDraft": False})
+                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {
+                        **self.pr(), "isDraft": False,
+                        "labels": [{"name": "lane-fix-conflict"}, {"name": "lane-fix-red"}],
+                    })
                 self.assertEqual(receipt["verdict"], "fix-pushed")
                 self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "h9"})
                 record = json.loads(attempts.read_text())["5"]
@@ -3167,6 +3170,9 @@ class FixRedTest(unittest.TestCase):
             finally:
                 lane.sh, lane.failure_excerpt = real, real_excerpt
         self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in calls))
+        deleted = {call[-1] for call in calls if call[:3] == ["gh", "api", "-X"] and "DELETE" in call}
+        self.assertIn(f"repos/{lane.REPO_SLUG}/issues/5/labels/lane-fix-conflict", deleted)
+        self.assertIn(f"repos/{lane.REPO_SLUG}/issues/5/labels/lane-fix-red", deleted)
 
     def test_a_pr_merged_before_its_fix_run_installs_nothing_and_records_cancellation(self):
         real_sh, real_agent = lane.sh, lane.run_agent
@@ -3632,6 +3638,13 @@ class FixRedTest(unittest.TestCase):
 class UpdateTest(unittest.TestCase):
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+    def test_release_selftest_never_sees_host_tuning(self):
+        knobs = {"LANES_SLOTS_DEVIN": "2", "SYMPHONY_FILE_OVERLAP_GUARD": "flag", "LANES_PARKED_RETIRE": "0"}
+        with patch.dict(os.environ, {**knobs, "PATH": "/bin"}):
+            env = lane.selftest_env(Path("/scratch"))
+        self.assertFalse(set(knobs) & set(env))
+        self.assertEqual((env["PATH"], env["LANES_SELFTEST"], env["LANES_STATE"]), ("/bin", "1", "/scratch"))
 
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -39,6 +39,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
@@ -84,7 +85,7 @@ SENSITIVE_RED_LINES = re.compile(
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
 MAX_GATE_TIMEOUTS = 3
-CLAIM_TTL_S = 2 * 3600
+CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
@@ -97,8 +98,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_claude_lane.py",
-              "scripts/tests/test_issue_routing.py"]
+              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
+              "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
@@ -464,8 +465,11 @@ class Host:
     # once only makes all of them time out.
     gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
 
-    def slots(self, provider: str, default: int) -> int:
+    def base_slots(self, provider: str, default: int) -> int:
         return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+
+    def slots(self, provider: str, default: int) -> int:
+        return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
 
 
 def load_providers(path: Path = HERE / "providers.json") -> dict:
@@ -2749,20 +2753,7 @@ def requeue_verified(host: Host, prs: list[dict] | None, *, defer=None) -> dict 
 def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None, *, timeout: float = 600) -> bool:
     """True when another host recorded a live claim for this exact head and kind on the PR.
     Local state files are per host; the PR's comments are the truth every host can see."""
-    now = time.time() if now is None else now
-    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
-                 "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
-    if listed.returncode != 0:
-        return True  # fail closed: an unreadable claim list is not permission to take the head
-    for line in (listed.stdout or "").splitlines():
-        fields = dict(part.split("=", 1) for part in line.split()[3:] if "=" in part)
-        try:
-            age = now - datetime.fromisoformat(fields.get("at", "").replace("Z", "+00:00")).timestamp()
-        except ValueError:
-            continue
-        if fields.get("sha") == sha and fields.get("kind") == kind and fields.get("host") != HOST and age < CLAIM_TTL_S:
-            return True
-    return False
+    return pr_events.claim_active(number, sha, sh, now, kind=kind, exclude_host=HOST, timeout=timeout)
 
 
 def post_claim(number: int, sha: str, kind: str) -> None:
@@ -4040,6 +4031,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed:
                 verify_target({**pr, "headRefOid": after}, "before-push-effects")
+                labels = {label.lower() for label in pr_events.label_names(pr)}
+                resolved = [kind for kind in pr_events.FIX_KINDS if pr_events.PREFIX + kind in labels]
+                if resolved:
+                    pr_events.consume(THIS, pr, resolved)
                 # A new fix head earns another queue try; a repeat failure re-marks it. The PR
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
@@ -4757,7 +4752,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         issue = labeled
         if local:
             sweep_lane_prs(host, name, linear)
-        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
         overlap_blocked = False
@@ -4946,6 +4941,13 @@ def dispatch(host: Host) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
     try:
         tick["disk"] = disk_guard.check(host)
+        if autoscale.mode() != "off":
+            try:
+                bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
+                         for name, spec in load_providers().items()}
+                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases)
+            except Exception as error:  # a bad sample never blocks the spawn loop
+                tick["autoscaleError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             # Before admission: a critically full disk is exactly when the sweep must still run.
             tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
@@ -5141,6 +5143,16 @@ def release_identity(host: Host) -> dict:
             "bundleDigest": digest, "objects": manifest}
 
 
+# Per-host tuning (LANES_SLOTS_DEVIN=2, SYMPHONY_FILE_OVERLAP_GUARD=flag, ...) must not reach the
+# release self-test: the fixtures assume defaults, so a tuned host refused every release.
+HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_")
+
+
+def selftest_env(scratch: Path) -> dict:
+    env = {key: value for key, value in os.environ.items() if not key.startswith(HOST_KNOB_PREFIXES)}
+    return {**env, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+
+
 def install_release(host: Host) -> int:
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
@@ -5174,7 +5186,7 @@ def install_release(host: Host) -> int:
         try:
             test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                                   cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                                  env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+                                  env=selftest_env(scratch))
         except subprocess.TimeoutExpired:
             refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
             raise

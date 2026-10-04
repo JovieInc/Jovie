@@ -8,11 +8,20 @@
 import { join } from 'node:path';
 import { type CopyTier, type JudgeTransport, selectJudges } from '@jovie/copy';
 import { pickRoleModel, visionAvailability } from '../design-ci-judge-dispatch';
+import {
+  createCodexImageAdapter,
+  resolveCodexBinary,
+} from '../marketing-media/codex-image-adapter';
+import {
+  type ArtGate,
+  createArtEvaluatorGate,
+} from '../marketing-media/generate-image';
 import type {
   ImageGenerationOutcome,
   ImageGenerationRequest,
 } from '../marketing-media/image-adapter';
 import type { FactoryPageBrief } from './brief';
+import { failedCalibrationJudges } from './judge-calibration';
 import { FACTORY_RUNS_DIR } from './receipts';
 import {
   fixtureCaptures,
@@ -76,6 +85,10 @@ export interface FactoryProviders {
   generateAsset(
     request: ImageGenerationRequest
   ): Promise<ImageGenerationOutcome>;
+  /** Model family of generateAsset, so the art judge can refuse to share it. */
+  readonly imageFamily: string;
+  /** Art evaluator every generated asset must pass (generate-image.ts). */
+  readonly artGate: ArtGate;
   /** Judge panel. Defaults to @jovie/copy selectJudges (producer family excluded). */
   selectJudges(
     tier: CopyTier,
@@ -173,6 +186,13 @@ export function dryProviders(
         height: request.height,
       };
     },
+    imageFamily: 'fixture',
+    artGate: async () => ({
+      ok: true,
+      modes: ['focal'],
+      judgeModel: 'fixture:openai/gpt-5.5',
+      notes: ['focal: fixture pass'],
+    }),
     selectJudges,
     label: model => `fixture:${model}`,
     now: () => new Date(`${brief.asOf}T00:00:00.000Z`),
@@ -199,11 +219,14 @@ function fixtureVisionJudge(producerModel: string): string | null {
   });
 }
 
+/** Cross-family art judge for Codex (openai) images, on the claude CLI. */
+const LIVE_ART_JUDGE_MODEL = 'anthropic/claude-opus-5.5';
+
 /**
  * Live wiring: subscription CLIs for anthropic/openai, the AI Gateway for
  * allowlisted families. Render measurement needs a served production build
- * (render-measurer.ts); image generation is not wired, so it reports
- * credentials-unavailable.
+ * (render-measurer.ts). Images come from the Codex CLI on the ChatGPT
+ * subscription (codex-image-adapter.ts), never an API key, capped per run.
  */
 export function liveProviders(
   transport: JudgeTransport | null,
@@ -214,12 +237,14 @@ export function liveProviders(
     FACTORY_RENDER_OUT_DIR,
     WEB_APP_DIR
   );
+  // Subscription image generation, capped per run (one provider set per run).
+  const images = createCodexImageAdapter();
   return {
     mode: 'live',
     capabilities: {
       // Only with a served build (or a local build) to measure.
       renderMeasurer: Boolean(render.baseUrl || render.build),
-      imageGeneration: false,
+      imageGeneration: resolveCodexBinary() !== null,
     },
     transport,
     async generate(request) {
@@ -240,16 +265,17 @@ export function liveProviders(
     async reviewVisual(request) {
       return runVisualReview(
         request,
-        await liveVisualJudges(transport, request.producerModel)
+        await liveVisualJudges(
+          transport,
+          request.producerModel,
+          failedCalibrationJudges()
+        )
       );
     },
-    async generateAsset() {
-      return {
-        status: 'credentials-unavailable',
-        provider: 'none',
-        reason: 'no image adapter wired for factory:run',
-      };
-    },
+    generateAsset: request => images.generate(request),
+    imageFamily: images.family,
+    // The art judge must sit outside the image model's family.
+    artGate: createArtEvaluatorGate({ judgeModel: LIVE_ART_JUDGE_MODEL }),
     selectJudges,
     label: model => model,
     now: () => new Date(),
