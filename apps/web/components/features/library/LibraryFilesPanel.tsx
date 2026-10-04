@@ -44,7 +44,6 @@ import { cn } from '@/lib/utils';
 import { StatefulAssetSlot } from './StatefulAssetSlot';
 
 const IMAGE_ACCEPT = SUPPORTED_IMAGE_MIME_TYPES.join(',');
-
 const FILE_ICONS: Record<WorkFileKind, LucideIcon> = {
   audio: FileAudio2,
   artwork: ImageIcon,
@@ -92,12 +91,7 @@ export interface LibraryFilesPanelProps {
   readonly onArtworkUploaded?: (assetId: string, artworkUrl: string) => void;
 }
 
-/**
- * Flat, real-file list for the work inspector's Files view. Only files that
- * actually exist render as rows; clicking a row opens a focused detail with a
- * Back path. Missing media types surface as quiet "Add File" entries instead
- * of empty accordions.
- */
+/** Populated work files, focused detail and one acquisition section. */
 export function LibraryFilesPanel({
   asset,
   downloads,
@@ -114,8 +108,14 @@ export function LibraryFilesPanel({
   }, [downloads, releaseId]);
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [localArtworkUrl, setLocalArtworkUrl] = useState(asset.artworkUrl);
-  const artworkUrl = localArtworkUrl ?? asset.artworkUrl;
+  const [localArtwork, setLocalArtwork] = useState({
+    assetId: asset.id,
+    url: asset.artworkUrl,
+  });
+  const artworkUrl =
+    localArtwork.assetId === asset.id
+      ? (localArtwork.url ?? asset.artworkUrl)
+      : asset.artworkUrl;
   const files = useMemo(
     () => deriveWorkFiles({ ...asset, artworkUrl }, stems),
     [asset, artworkUrl, stems]
@@ -123,7 +123,7 @@ export function LibraryFilesPanel({
 
   useEffect(() => {
     setFocusedId(null);
-    setLocalArtworkUrl(asset.artworkUrl);
+    setLocalArtwork({ assetId: asset.id, url: asset.artworkUrl });
   }, [asset.id, asset.artworkUrl]);
 
   const focused =
@@ -143,7 +143,7 @@ export function LibraryFilesPanel({
       if (!releaseId) return;
       void uploadLibraryArtwork(releaseId, file)
         .then(nextUrl => {
-          setLocalArtworkUrl(nextUrl);
+          setLocalArtwork({ assetId: asset.id, url: nextUrl });
           onArtworkUploaded?.(asset.id, nextUrl);
           toast.success('Artwork attached');
         })
@@ -165,47 +165,39 @@ export function LibraryFilesPanel({
     readonly label: string;
     readonly href?: string;
     readonly focusId?: string;
+    readonly missing: boolean;
   }> = [
-    ...(asset.previewUrl
-      ? []
-      : [{ id: 'add-audio', label: 'Add Audio', focusId: 'add:audio' }]),
-    ...(artworkUrl
-      ? []
-      : [
-          {
-            id: 'add-artwork',
-            label: 'Add Artwork',
-            focusId: releaseId ? 'add:artwork' : undefined,
-          },
-        ]),
-    ...(files.some(file => file.kind === 'video')
-      ? []
-      : [
-          {
-            id: 'add-video',
-            label: 'Add Video',
-            href: buildLibraryViewRoute('videos'),
-          },
-        ]),
-    ...(asset.itemKind === 'document'
-      ? []
-      : [
-          {
-            id: 'add-document',
-            label: 'Add Document',
-            href: buildLibraryViewRoute('documents'),
-          },
-        ]),
-    ...(stemsHref
-      ? [
-          {
-            id: 'add-download',
-            label: 'Add Stems Or Downloads',
-            href: stemsHref,
-          },
-        ]
-      : []),
-  ];
+    {
+      id: 'add-audio',
+      label: 'Add Audio',
+      focusId: 'add:audio',
+      missing: !asset.previewUrl,
+    },
+    {
+      id: 'add-artwork',
+      label: 'Add Artwork',
+      focusId: releaseId ? 'add:artwork' : undefined,
+      missing: !artworkUrl,
+    },
+    {
+      id: 'add-video',
+      label: 'Add Video',
+      href: buildLibraryViewRoute('videos'),
+      missing: !files.some(file => file.kind === 'video'),
+    },
+    {
+      id: 'add-document',
+      label: 'Add Document',
+      href: buildLibraryViewRoute('documents'),
+      missing: asset.itemKind !== 'document',
+    },
+    {
+      id: 'add-download',
+      label: 'Add Stems Or Downloads',
+      href: stemsHref,
+      missing: Boolean(stemsHref),
+    },
+  ].filter(entry => entry.missing);
 
   const backButton = (
     <button

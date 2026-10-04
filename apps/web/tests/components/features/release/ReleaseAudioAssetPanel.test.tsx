@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudioWaveformEditor } from '@/components/features/release/AudioWaveformEditor';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
+import { AudioPreviewError } from '@/lib/audio/decode-waveform-peaks';
 
 const blobUploadMock = vi.fn();
 const decodeWaveformPeaksMock = vi.fn();
@@ -28,6 +29,15 @@ vi.mock('sonner', () => ({
 }));
 
 describe('ReleaseAudioAssetPanel', () => {
+  const renderAttachedPreview = () =>
+    render(
+      <ReleaseAudioAssetPanel
+        releaseId='release-1'
+        releaseTitle='Take Me Over'
+        previewUrl='https://cdn.example.com/preview.mp3'
+        durationMs={120_000}
+      />
+    );
   afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
     vi.clearAllMocks();
@@ -170,29 +180,13 @@ describe('ReleaseAudioAssetPanel', () => {
   });
 
   it('shows "Audio preview unavailable" with retry when preview fetch fails', async () => {
-    const { AudioPreviewError } = await import(
-      '@/lib/audio/decode-waveform-peaks'
-    );
     decodeWaveformPeaksMock.mockRejectedValueOnce(
       new AudioPreviewError('network')
     );
 
-    render(
-      <ReleaseAudioAssetPanel
-        releaseId='release-1'
-        releaseTitle='Take Me Over'
-        previewUrl='https://cdn.example.com/preview.mp3'
-        durationMs={120_000}
-      />
-    );
+    renderAttachedPreview();
+    await screen.findByTestId('audio-preview-unavailable');
 
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('audio-preview-unavailable')
-      ).toBeInTheDocument();
-    });
-
-    // The attachment stays attached — no raw transport text, no reupload ask.
     expect(screen.getByTestId('release-audio-ready')).toBeInTheDocument();
     expect(screen.queryByTestId('release-audio-dropzone')).toBeNull();
     expect(screen.queryByText(/Failed to fetch/)).toBeNull();
@@ -204,34 +198,24 @@ describe('ReleaseAudioAssetPanel', () => {
     });
     fireEvent.click(screen.getByTestId('audio-preview-retry'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('audio-waveform-editor')).toBeInTheDocument();
-    });
+    await screen.findByTestId('audio-waveform-editor');
     expect(decodeWaveformPeaksMock).toHaveBeenCalledTimes(2);
   });
 
-  it('does not offer retry when the source file was removed', async () => {
-    const { AudioPreviewError } = await import(
-      '@/lib/audio/decode-waveform-peaks'
-    );
-    decodeWaveformPeaksMock.mockRejectedValueOnce(
-      new AudioPreviewError('removed', 404)
-    );
+  it.each([
+    ['removed', 404, 'File no longer available'],
+    ['permission', 403, 'Preview not permitted'],
+  ] as const)(
+    'does not offer retry for %s sources',
+    async (reason, status, title) => {
+      decodeWaveformPeaksMock.mockRejectedValueOnce(
+        new AudioPreviewError(reason, status)
+      );
 
-    render(
-      <ReleaseAudioAssetPanel
-        releaseId='release-1'
-        releaseTitle='Take Me Over'
-        previewUrl='https://cdn.example.com/preview.mp3'
-      />
-    );
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('audio-preview-unavailable')
-      ).toBeInTheDocument();
-    });
-    expect(screen.getByText('File no longer available')).toBeInTheDocument();
-    expect(screen.queryByTestId('audio-preview-retry')).toBeNull();
-  });
+      renderAttachedPreview();
+      await screen.findByTestId('audio-preview-unavailable');
+      expect(screen.getByText(title)).toBeInTheDocument();
+      expect(screen.queryByTestId('audio-preview-retry')).toBeNull();
+    }
+  );
 });

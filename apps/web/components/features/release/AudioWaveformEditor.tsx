@@ -36,32 +36,27 @@ type TrimHandle = 'start' | 'end';
 
 const PREVIEW_FAILURE_COPY: Record<
   AudioPreviewFailureReason,
-  { readonly title: string; readonly hint: string; readonly retryable: boolean }
+  { readonly title: string; readonly hint: string }
 > = {
   network: {
     title: 'Audio preview unavailable',
     hint: 'The file is still attached — the preview could not be loaded. Check your connection and try again.',
-    retryable: true,
   },
   unavailable: {
     title: 'Audio preview unavailable',
     hint: 'The file is still attached — the preview could not be loaded.',
-    retryable: true,
   },
   permission: {
     title: 'Preview not permitted',
     hint: 'Your session does not have access to this file.',
-    retryable: true,
   },
   removed: {
     title: 'File no longer available',
     hint: 'The source file was removed. Upload a new file to restore the preview.',
-    retryable: false,
   },
   unsupported: {
     title: 'Preview not supported',
     hint: 'This file cannot be previewed here.',
-    retryable: false,
   },
 };
 
@@ -378,7 +373,7 @@ export function AudioWaveformEditor({
         <p className='mt-0.5 text-2xs leading-4 text-tertiary-token'>
           {copy.hint}
         </p>
-        {copy.retryable ? (
+        {previewError === 'network' || previewError === 'unavailable' ? (
           <button
             type='button'
             onClick={handleRetryPreview}

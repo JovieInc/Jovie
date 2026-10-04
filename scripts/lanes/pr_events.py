@@ -1324,8 +1324,9 @@ def ledger(host, receipt: dict) -> None:
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
-pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title url isDraft
-headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt labels(first:30){nodes{name}}
+pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
+baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt
+labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
@@ -1349,6 +1350,21 @@ def open_prs_state(lane) -> list[dict] | None:
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
             node["labels"] = node.get("labels", {}).get("nodes", [])
+            files = node.pop("files", {}) or {}
+            node["files"] = files.get("nodes") or []
+            total = files.get("totalCount")
+            node["filesComplete"] = isinstance(total, int) and total == len(node["files"])
+            if isinstance(total, int) and not node["filesComplete"]:
+                listed = lane.sh(["gh", "api", "--paginate", "--slurp",
+                                  f"repos/{lane.REPO_SLUG}/pulls/{node['number']}/files?per_page=100"], timeout=120)
+                try:
+                    pages = json.loads(listed.stdout) if listed.returncode == 0 else None
+                    node["files"] = [{"path": row["filename"], "additions": row.get("additions", 0),
+                                      "deletions": row.get("deletions", 0), "changeType": row.get("status", "")}
+                                     for page_rows in pages for row in page_rows]
+                    node["filesComplete"] = total == len(node["files"])
+                except (ValueError, KeyError, TypeError):
+                    node["filesComplete"] = False
             prs.append(node)
         if not page["pageInfo"]["hasNextPage"]:
             return prs
@@ -1562,6 +1578,12 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     swept = reconcile(host, lane, linear_factory, now)
     prs = queued_prs(lane, TICK_KINDS + ("dequeued",))
     outcomes = {"reconciled": swept["counts"]} if swept else {}
+    overlap = getattr(lane, "file_overlap", None)
+    inventory = getattr(lane, "overlap_prs_summary", None)
+    if overlap is not None and callable(inventory):
+        overlap_prs = inventory()
+        outcomes["fileOverlap"] = (overlap.reconcile_open_prs(host, lane, overlap_prs)
+                                   if overlap_prs is not None else {"status": "inventory-unavailable"})
     intake = convert_intake(lane, linear_factory, lane.sh, now)
     if intake:
         outcomes["intake"] = intake

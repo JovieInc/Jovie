@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { LibraryFilesPanel } from './LibraryFilesPanel';
@@ -154,46 +154,73 @@ describe('LibraryFilesPanel', () => {
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
   });
 
-  it('keeps uploaded artwork in Files without refreshed asset props', async () => {
-    const artworkUrl = 'https://cdn.example.com/uploaded.jpg';
-    const upload = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(Response.json({ artworkUrl }));
-    try {
-      render(
-        <LibraryFilesPanel
-          asset={asset({ artworkUrl: null, hasArtwork: false })}
-          downloads={[]}
-        />
-      );
-      expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
-      fireEvent.click(screen.getByTestId('library-add-artwork-acquisition'));
-      expect(
-        screen.getByTestId('library-artwork-dropzone')
-      ).toBeInTheDocument();
-      fireEvent.change(screen.getByLabelText('Drop artwork'), {
-        target: {
-          files: [new File(['art'], 'uploaded.jpg', { type: 'image/jpeg' })],
-        },
-      });
-      await screen.findByTestId('library-artwork-object');
-      expect(upload).toHaveBeenCalledWith(
-        '/api/images/artwork/upload?releaseId=release-1',
-        expect.objectContaining({ method: 'POST' })
-      );
-      fireEvent.click(screen.getByTestId('library-file-back'));
-      const row = screen.getByTestId('library-file-artwork:release-1');
-      expect(row).toHaveTextContent('uploaded.jpg');
-      expect(
-        screen.queryByTestId('library-add-artwork-acquisition')
-      ).toBeNull();
-      fireEvent.click(row);
-      expect(screen.getByAltText('Artwork for Take Me Over')).toHaveAttribute(
-        'src',
-        artworkUrl
-      );
-    } finally {
-      upload.mockRestore();
+  it.each([false, true])(
+    'keeps uploads bound to their work when switching during upload: %s',
+    async switchWork => {
+      const artworkUrl = 'https://cdn.example.com/uploaded.jpg';
+      const emptyAsset = asset({ artworkUrl: null, hasArtwork: false });
+      const response = Promise.withResolvers<Response>();
+      const onArtworkUploaded = vi.fn();
+      const upload = vi
+        .spyOn(globalThis, 'fetch')
+        .mockReturnValue(response.promise);
+      try {
+        const { rerender } = render(
+          <LibraryFilesPanel
+            asset={emptyAsset}
+            downloads={[]}
+            onArtworkUploaded={onArtworkUploaded}
+          />
+        );
+        expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
+        fireEvent.click(screen.getByTestId('library-add-artwork-acquisition'));
+        expect(
+          screen.getByTestId('library-artwork-dropzone')
+        ).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Drop artwork'), {
+          target: {
+            files: [new File(['art'], 'uploaded.jpg', { type: 'image/jpeg' })],
+          },
+        });
+        if (switchWork)
+          rerender(
+            <LibraryFilesPanel
+              asset={{ ...emptyAsset, id: 'release-2' }}
+              downloads={[]}
+            />
+          );
+        response.resolve(Response.json({ artworkUrl }));
+        await waitFor(() =>
+          expect(onArtworkUploaded.mock.calls).toEqual([
+            ['release-1', artworkUrl],
+          ])
+        );
+        if (switchWork) {
+          expect(screen.queryByText('uploaded.jpg')).toBeNull();
+          expect(
+            screen.queryByTestId('library-file-artwork:release-2')
+          ).toBeNull();
+          return;
+        }
+        await screen.findByTestId('library-artwork-object');
+        expect(upload).toHaveBeenCalledWith(
+          '/api/images/artwork/upload?releaseId=release-1',
+          expect.objectContaining({ method: 'POST' })
+        );
+        fireEvent.click(screen.getByTestId('library-file-back'));
+        const row = screen.getByTestId('library-file-artwork:release-1');
+        expect(row).toHaveTextContent('uploaded.jpg');
+        expect(
+          screen.queryByTestId('library-add-artwork-acquisition')
+        ).toBeNull();
+        fireEvent.click(row);
+        expect(screen.getByAltText('Artwork for Take Me Over')).toHaveAttribute(
+          'src',
+          artworkUrl
+        );
+      } finally {
+        upload.mockRestore();
+      }
     }
-  });
+  );
 });
