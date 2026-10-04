@@ -47,7 +47,7 @@ const DARK_CAPABILITY_PUBLIC_TERMS: Record<
 
 function mdxSources(relativeDirectory: string): string[] {
   const directory = resolve(webRoot, relativeDirectory);
-  return readdirSync(directory, { recursive: true })
+  return readdirSync(directory, { encoding: 'utf8', recursive: true })
     .filter(path => path.endsWith('.mdx'))
     .map(path => readFileSync(resolve(directory, path), 'utf8'));
 }
