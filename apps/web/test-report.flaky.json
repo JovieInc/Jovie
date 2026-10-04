@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "label": "",
+  "flaky": [],
+  "run": {
+    "repository": null,
+    "headSha": null,
+    "runId": null,
+    "runAttempt": null,
+    "event": null,
+    "job": null
+  },
+  "generatedAt": "2026-10-04T16:00:17.990Z",
+  "complete": true,
+  "executions": [
+    {
+      "file": "tests/unit/utils/capitalizeFirst.test.ts",
+      "fileHash": "2652c70cae54eeab7e450bf011aabf79deb64a2631d40bcb969987c393c0fb3c",
+      "executedCount": 6,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    },
+    {
+      "file": "tests/unit/utils/public-url.test.ts",
+      "fileHash": "7937736800c0e73c2f9b81124d7e524c90dd6ff07be0cd1c55de16cc23004027",
+      "executedCount": 7,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    }
+  ]
+}
