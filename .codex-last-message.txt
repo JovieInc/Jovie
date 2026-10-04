@@ -1,0 +1,19 @@
+Implemented and opened draft PR [#19832](https://github.com/JovieInc/Jovie/pull/19832).
+
+- Added six founder-gated Linear/GitHub MCP tools, scoped to JOV and `JovieInc/Jovie`.
+- Reused Ovie OAuth, Summer identity boundaries, and Linear readback receipts.
+- Added bounded requests and untrusted-content markers.
+- Added GitHub App `issues: read` permission.
+- Added regression coverage and documentation.
+
+Verification:
+
+- 45 focused tests passed.
+- Root affected typecheck: 8/8 tasks passed.
+- Biome and documentation freshness passed.
+- All exact-head hosted CI checks are green.
+- Branch is clean and PR remains draft as required.
+
+Commits: `ca404ee022`, `33a54de960`.
+
+GBrain was unavailable. Deployment and exact-runtime ChatGPT OAuth dogfood await the normal post-merge lifecycle.
