@@ -26,11 +26,9 @@ const previous = {
   backoff: process.env.LINEAR_BACKOFF_STATE_DIR,
   key: process.env.LINEAR_API_KEY,
 };
-
 process.env.LINEAR_COOLDOWN_STATE_DIR = root;
 delete process.env.LANES_STATE;
 delete process.env.LINEAR_BACKOFF_STATE_DIR;
-
 afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
   fs.mkdirSync(root, { recursive: true });

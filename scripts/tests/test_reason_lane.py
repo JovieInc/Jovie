@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -600,6 +601,7 @@ class DrainAndTickTest(unittest.TestCase):
         self.assertEqual(linear.moves[-1], ("i-1", "Done"))
 
     def test_rate_limited_queue_claim_and_tick_exit_without_a_crash_or_duplicate_job(self):
+        sys.path.insert(0, str(ROOT / "scripts/lanes"))
         import lane_runner as lane
         job = {"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "1"}
         for phase in ("queue", "claim", "tick"):
@@ -609,8 +611,10 @@ class DrainAndTickTest(unittest.TestCase):
                 host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
                 if phase == "claim":
                     linear.state_of = lambda _id: (_ for _ in ()).throw(error)
-                with patch.object(reason, "queued_jobs", side_effect=error if phase != "claim" else None,
-                                  return_value=[job]), patch.object(FakeLock, "release", autospec=True) as release:
+                with patch.object(linear, "gql", side_effect=error if phase != "claim" else None,
+                                  wraps=linear.gql), patch.object(FakeLock, "release", autospec=True) as release, \
+                        patch.object(lane, "SHARED_CACHE_DIR", Path(tmp) / "shared"), \
+                        patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": ""}):
                     if phase == "tick":
                         result = reason.tick(host, self.lane(linear), lambda: linear, CONFIG,
                                              spawn=lambda *a, **k: self.fail("cooldown must not spawn"))

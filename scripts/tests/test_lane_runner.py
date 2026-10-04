@@ -936,9 +936,15 @@ class LinearRateLimitTest(unittest.TestCase):
         for child in scope.iterdir():
             child.unlink()
         expired = int((time.time() - 5) * 1000)
-        (scope / f"{expired}-expired.json").write_text(json.dumps({"schema": 1, "resetAt": expired}))
+        record = scope / f"{expired}-dead.json"
+        record.write_text(json.dumps({"schema": 1, "resetAt": expired}))
+        record.chmod(0o644)
+        self.assertEqual(lane._scan_scope(scope, int(time.time() * 1000)), 0)
+        self.assertTrue(record.exists(), "cleanup must preserve nonprivate records")
+        record.chmod(0o600)
         self.assertEqual(other.gql("query", {})["ok"], True)
         self.assertEqual(len(calls), 1)
+        self.assertFalse(record.exists())
 
     def test_later_cooldown_is_kept_when_a_shorter_one_arrives(self):
         long_headers = self.headers()

@@ -99,6 +99,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
+                  "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -1177,7 +1178,7 @@ def _scan_scope(scope: Path, now_ms: int, *, limit: int = 1000) -> int:
         return 0
     latest = 0
     for path in names[:limit]:
-        if not path.is_file() or not re.fullmatch(r"\d+-[0-9a-f-]+\.json", path.name):
+        if path.is_symlink() or not path.is_file() or not re.fullmatch(r"\d+-[0-9a-f-]+\.json", path.name):
             continue
         try:
             reset_ms = _reset_ms(json.loads(path.read_text()))
@@ -1187,6 +1188,13 @@ def _scan_scope(scope: Path, now_ms: int, *, limit: int = 1000) -> int:
             continue
         if reset_ms > now_ms:
             latest = max(latest, reset_ms)
+        else:
+            try:
+                metadata = path.lstat()
+                if metadata.st_uid == os.getuid() and not metadata.st_mode & 0o077:
+                    path.unlink()
+            except OSError:
+                pass  # Cleanup is advisory; another worker may have already pruned it.
     return latest
 
 
