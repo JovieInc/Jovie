@@ -58,6 +58,19 @@ describe('ovie list model', () => {
     );
   });
 
+  it('logs a cleared rating without a value', () => {
+    const list = run(
+      collab(),
+      { type: 'add', creatorId: 'a' },
+      { type: 'rate', creatorId: 'a', rating: 4 },
+      { type: 'rate', creatorId: 'a', rating: null }
+    );
+    const cleared = list.labels.at(-1);
+    expect(cleared).toMatchObject({ creatorId: 'a', signal: 'rate' });
+    expect(cleared).not.toHaveProperty('value');
+    expect(list.members.find(m => m.creatorId === 'a')?.rating).toBeNull();
+  });
+
   it('rejects out-of-range ratings', () => {
     expect(() =>
       run(collab(), { type: 'rate', creatorId: 'a', rating: 6 })

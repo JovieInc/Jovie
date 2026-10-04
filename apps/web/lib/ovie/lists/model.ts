@@ -235,7 +235,7 @@ export function applyListAction(
       labels.push({
         creatorId: action.creatorId,
         signal: 'rate',
-        value: action.rating ?? 0,
+        ...(action.rating == null ? {} : { value: action.rating }),
         at: now,
       });
       break;
