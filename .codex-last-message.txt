@@ -1,0 +1,19 @@
+Implemented and opened [draft PR #19861](https://github.com/JovieInc/Jovie/pull/19861) at commit `985916b8`.
+
+Changes:
+
+- Added the Markdown-first blog factory adapter and digest-bound certification receipts.
+- Reused existing factory stages, product-truth registry, copy rubric, render budgets, evaluator contracts, SEO evidence, and eligibility policies.
+- Added publication authorization, live verification, idempotency, and tested withdrawal contracts.
+- Added nine behavioral tests covering the canary and deliberate-red scenarios.
+- Extended `factory:verify` with `--blog-record`.
+
+Verification passed:
+
+- Biome on changed files.
+- 17 focused Vitest tests.
+- Web and full-repository typechecks.
+- Commit/push security hooks.
+- Exact-head CI: Source Validation, coverage, security, migration, size, and publication behavior checks.
+
+The PR remains draft and JOV-7397 is In Review. No publication or indexing action was performed; the canary correctly reports `authorization-required`. GBrain was unavailable, so current repository source and executable tests were used as evidence.
