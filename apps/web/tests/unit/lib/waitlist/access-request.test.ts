@@ -279,9 +279,9 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
       status: 'waitlisted',
       outcome: 'waitlisted_gate_on',
     });
-    expect(insertedEntries.some(entry => 'emailNormalized' in entry.vals)).toBe(
-      false
-    );
+    expect(
+      insertedEntries.some(entry => 'emailNormalized' in (entry.vals as object))
+    ).toBe(false);
     expect(
       updatedRows.find(row => row.statusReason === 'chat_started')
     ).toMatchObject({ source: 'waitlist_form', fullName: 'Test Creator' });
