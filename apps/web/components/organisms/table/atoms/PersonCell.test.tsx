@@ -1,9 +1,31 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import {
+  inspectLoadingOwners,
+  loadingOwnerIssueCodes,
+} from '@/tests/utils/loading-owner';
 import { PersonCell, PersonCellSkeleton } from './PersonCell';
 import { SkeletonRow } from './SkeletonRow';
 
 describe('PersonCell', () => {
+  it('uses canonical placeholders under the containing loading owner', () => {
+    const { container } = render(
+      <div
+        role='status'
+        aria-busy='true'
+        aria-live='polite'
+        aria-label='Loading people'
+      >
+        <PersonCellSkeleton />
+      </div>
+    );
+
+    expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([]);
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
+      2
+    );
+  });
+
   it('shows a neutral face for an unidentified person', () => {
     const { container } = render(<PersonCell name='Anonymous Fan' anonymous />);
 

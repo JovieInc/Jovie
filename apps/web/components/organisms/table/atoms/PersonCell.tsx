@@ -1,5 +1,6 @@
 'use client';
 
+import { LoadingSkeleton } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
 import { Avatar } from '@/components/molecules/Avatar';
@@ -69,14 +70,18 @@ export const PersonCell = React.memo(function PersonCell({
 
 /**
  * Loading geometry for PersonCell: the same 20px face and one name line.
- * Uses the canonical `.skeleton` shimmer directly, as Avatar does, because the
- * shared Skeleton owns no size variants for these slots.
+ * Canonical LoadingSkeleton supplies the loading attributes without announcing
+ * again; table CSS reserves each placeholder's geometry.
  */
 export function PersonCellSkeleton({ width }: Readonly<{ width?: string }>) {
   return (
     <div className='flex items-center gap-2' style={{ width }} aria-hidden>
-      <span className='skeleton system-b-table-skeleton-person-face shrink-0 rounded-full motion-reduce:animate-none' />
-      <span className='skeleton system-b-table-skeleton-person-name rounded-sm motion-reduce:animate-none' />
+      <div className='system-b-table-skeleton-person-face shrink-0'>
+        <LoadingSkeleton announce={false} height='h-5' rounded='full' />
+      </div>
+      <div className='system-b-table-skeleton-person-name'>
+        <LoadingSkeleton announce={false} height='h-3' />
+      </div>
     </div>
   );
 }
