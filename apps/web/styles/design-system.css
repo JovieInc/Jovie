@@ -68,10 +68,12 @@
   --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
   --ds-marketing-display-leading: 0.94;
   --ds-marketing-display-tracking: -0.045em;
+  /* Section titles cap at the 56px marketing hero headline so no h2 ever
+     outranks the page h1 (route DOM heading-hierarchy-inversion). */
   --ds-marketing-title-size: clamp(
     var(--text-4xl),
     4.6vw,
-    calc(var(--text-5xl) + var(--space-4))
+    calc(var(--text-5xl) + var(--space-2))
   );
   --ds-marketing-title-leading: 1.08;
   --ds-marketing-title-tracking: 0;
@@ -3065,6 +3067,13 @@ html:not(.dark) .smart-link-powered-by {
 
 html:not(.dark) .smart-link-powered-by {
   color: rgb(64 64 64) !important;
+}
+
+/* Marketing headings balance their lines so no headline strands one word on
+   its last line (route DOM orphaned-line). Zero specificity: an explicit
+   text-wrap on a heading still wins. */
+:where(.system-b-marketing) :where(h1, h2, h3) {
+  text-wrap: balance;
 }
 
 /* Marketing typography: headings use Satoshi (display font). Product controls

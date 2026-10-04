@@ -178,7 +178,7 @@ const AUTHENTICATED_ROUTES = [
   },
   {
     id: 'settings-artist-profile',
-    path: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    path: APP_ROUTES.SETTINGS_PROFILE,
     readySelectors: ['section#artist-profile', 'main'],
   },
   {

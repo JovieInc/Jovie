@@ -789,6 +789,7 @@ test.describe('sidebar attention and Settings header', () => {
       // canonical destination exposed by this default-flags story.
       for (const [name, href] of [
         ['Home', '/app'],
+        ['Identity', '/app/presence'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
       ]) {
@@ -798,7 +799,7 @@ test.describe('sidebar attention and Settings header', () => {
       }
       await expect(
         page.getByRole('link', { name: 'Identity', exact: true })
-      ).toHaveCount(0);
+      ).toHaveCount(1);
     });
   }
 });

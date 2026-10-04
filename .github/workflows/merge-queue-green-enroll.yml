@@ -51,6 +51,7 @@ jobs:
     name: Hold failed source revision
     outputs:
       failure_receipt: ${{ steps.failure-hold.outputs.failure_receipt }}
+      admission_recovery_receipt: ${{ steps.failure-hold.outputs.admission_recovery_receipt }}
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.workflow_id == 178737329 &&
@@ -154,6 +155,7 @@ jobs:
         env:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
+          ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -188,6 +190,14 @@ jobs:
                 if (run.event === 'merge_group' && receipt) {
                   numbers = [failurePolicy.readFailureReceipt(receipt, `${owner}/${repo}`).prNumber];
                 }
+                const recovery = process.env.ADMISSION_RECOVERY_RECEIPT;
+                if (run.event === 'merge_group' && recovery) {
+                  const parsed = JSON.parse(recovery);
+                  failurePolicy.admissionRecoveryReceiptStatus(recovery, {
+                    repository: `${owner}/${repo}`, prNumber: parsed.prNumber, headSha: parsed.sourceHeadSha,
+                  });
+                  numbers = [parsed.prNumber];
+                }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
                 // GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls is
@@ -218,12 +228,13 @@ jobs:
               if (candidate.draft || candidate.head.repo?.full_name !== `${owner}/${repo}`) continue;
               if (candidate.labels.some(l => BLOCKING.has(l.name.toLowerCase()))) continue;
               // Read one current PR at a time. The roster never authorizes enqueue.
-              const { repository } = await github.graphql(`
+              const readCurrent = async () => (await github.graphql(`
                 query($owner: String!, $repo: String!, $number: Int!) {
                   repository(owner: $owner, name: $repo) {
                     pullRequest(number: $number) {
                       id number state isDraft baseRefName headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
+                      autoMergeRequest { enabledAt }
                       labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
@@ -231,14 +242,16 @@ jobs:
                       }
                     }
                   }
-                }`, { owner, repo, number: candidate.number });
-              const pr = repository.pullRequest;
-              if (!pr || pr.state !== 'OPEN' || pr.baseRefName !== 'main') continue;
-              if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) continue;
-              if (pr.headRefOid !== candidate.head.sha || pr.mergeStateStatus !== 'CLEAN') continue;
-              if (pr.labels.pageInfo.hasNextPage) continue;
-              const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
-              if (labels.some(l => BLOCKING.has(l))) continue;
+                }`, { owner, repo, number: candidate.number })).repository.pullRequest;
+              const eligible = pr => {
+                if (!pr || pr.state !== 'OPEN' || pr.baseRefName !== 'main') return false;
+                if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) return false;
+                if (pr.headRefOid !== candidate.head.sha || pr.mergeStateStatus !== 'CLEAN') return false;
+                if (pr.labels.pageInfo.hasNextPage) return false;
+                return !pr.labels.nodes.some(l => BLOCKING.has(l.name.toLowerCase()));
+              };
+              const pr = await readCurrent();
+              if (!eligible(pr)) continue;
               const statuses = await github.paginate(
                 github.rest.repos.listCommitStatusesForRef,
                 { owner, repo, ref: pr.headRefOid, per_page: 100 }
@@ -250,11 +263,17 @@ jobs:
                 { repository: `${owner}/${repo}`, prNumber: pr.number, headSha: pr.headRefOid }
               );
               if (directHold) statuses.unshift(directHold);
-              const failure = failurePolicy.revisionFailureDisposition({
+              const directRecovery = failurePolicy.admissionRecoveryReceiptStatus(
+                process.env.ADMISSION_RECOVERY_RECEIPT,
+                { repository: `${owner}/${repo}`, prNumber: pr.number, headSha: pr.headRefOid }
+              );
+              if (directRecovery) statuses.unshift(directRecovery);
+              const sourceFailure = failurePolicy.revisionFailureDisposition({
                 statuses,
                 repository: `${owner}/${repo}`,
                 currentMainSha,
               });
+              let failure = sourceFailure;
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);
                 continue;
@@ -264,6 +283,11 @@ jobs:
               // consume the one typed non-deterministic retry.
               const lastRemoval = pr.timelineItems.nodes[0]?.createdAt;
               const headCommittedAt = pr.commits.nodes[0]?.commit.committedDate;
+              failure = failurePolicy.reenrollmentDisposition({
+                failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
+                autoMergeEnabled: Number.isFinite(Date.parse(pr.autoMergeRequest?.enabledAt)),
+              });
+              if (failure.action === 'block') continue;
               const removedUnchangedHead = lastRemoval &&
                 (!headCommittedAt || headCommittedAt <= lastRemoval);
               if (removedUnchangedHead && failure.action !== 'retry-once') continue;
@@ -271,16 +295,40 @@ jobs:
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
               }
+              const admissionRecovery = failure.reason === 'bounded-admission-recovery';
+              const recoveryStillCurrent = async () => {
+                const fresh = await readCurrent();
+                if (!eligible(fresh) || fresh.id !== pr.id || fresh.number !== pr.number) return false;
+                const currentRecovery = failurePolicy.reenrollmentDisposition({
+                  failure: sourceFailure, statuses, repository: `${owner}/${repo}`, prNumber: fresh.number,
+                  lastRemoval: fresh.timelineItems.nodes[0]?.createdAt,
+                  headCommittedAt: fresh.commits.nodes[0]?.commit.committedDate,
+                  autoMergeEnabled: Number.isFinite(Date.parse(fresh.autoMergeRequest?.enabledAt)),
+                });
+                return currentRecovery.action === 'retry-once' &&
+                  currentRecovery.reason === 'bounded-admission-recovery' &&
+                  currentRecovery.latest.runId === failure.latest.runId &&
+                  currentRecovery.latest.runAttempt === failure.latest.runAttempt &&
+                  currentRecovery.latest.completedAt === failure.latest.completedAt;
+              };
               const writeRetry = description => github.rest.repos.createCommitStatus({
                 owner, repo, sha: pr.headRefOid, state: 'success',
                 context: failurePolicy.FAILURE_RETRY_CONTEXT,
                 description, target_url: failure.latest.targetUrl,
               });
+              let enqueueAttempted = false;
               try {
+                // A source SHA cannot attest merge intent or a later manual removal.
+                // Re-read after statuses before spending a recovery reservation.
+                if (admissionRecovery && !await recoveryStillCurrent()) continue;
                 if (failure.action === 'retry-once') {
                   await writeRetry(failurePolicy.retrySpentDescription(failure.latest));
                   core.notice(`RESERVED bounded retry for #${pr.number}@${pr.headRefOid}`);
                 }
+                // The reservation write is another await. A stale recovery keeps
+                // that reservation spent and never reaches enqueue or a refund.
+                if (admissionRecovery && !await recoveryStillCurrent()) continue;
+                enqueueAttempted = true;
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
                     enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid }) {
@@ -290,7 +338,7 @@ jobs:
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
               } catch (error) {
-                if (failure.action === 'retry-once' && failurePolicy.enqueueWasRejected(error)) {
+                if (enqueueAttempted && failure.action === 'retry-once' && failurePolicy.enqueueWasRejected(error)) {
                   await writeRetry(failurePolicy.retryReleasedDescription(failure.latest));
                   core.notice(`RELEASED rejected enqueue reservation for #${pr.number}@${pr.headRefOid}`);
                 }
@@ -414,4 +462,5 @@ jobs:
       - name: Rearm green victims of this merge group
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
         run: node scripts/merge-group-victim-rearm.mjs --event-path "$GITHUB_EVENT_PATH"

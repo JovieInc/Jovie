@@ -58,6 +58,8 @@ export interface LibraryRightsholderEvidenceView {
     | 'mlc'
     | 'catalog'
     | 'other';
+  readonly sourceWorkId?: string | null;
+  readonly sourceUrl?: string | null;
   readonly shareBps: number | null;
 }
 

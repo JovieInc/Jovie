@@ -12,6 +12,7 @@ const meta = {
   args: {
     copy: ARTIST_PROFILE_COPY,
     flags: ARTIST_PROFILE_FLAGS,
+    logoPlacement: { page: '/artist-profiles' },
   },
 } satisfies Meta<typeof ArtistProfileLandingPage>;
 
