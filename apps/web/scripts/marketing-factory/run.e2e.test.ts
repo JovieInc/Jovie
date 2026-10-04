@@ -323,6 +323,89 @@ describe('factory:run generated assets', () => {
   });
 });
 
+describe('factory:run proof-landed rework', () => {
+  const CLAIM = 'capability.artist-profiles.audience-capture';
+  // No metric proof exists for this claim, so the proof stage files a request.
+  const needsMetric = {
+    ...brief,
+    proof: [
+      {
+        sectionInstanceId: 'capture-1',
+        kind: 'metric' as const,
+        claimId: CLAIM,
+      },
+    ],
+  };
+  const landedMetric = {
+    recordType: 'proof' as const,
+    id: 'metric-audience-capture',
+    kind: 'metric' as const,
+    claimId: CLAIM,
+    evidence: 'dogfood' as const,
+    value: 3,
+    unit: 'subscribers',
+    reproducingQuery: 'select 3',
+    measuredAt: brief.asOf,
+    sample: { size: 3, population: 'fixture' },
+    source: 'fixture',
+  };
+
+  it('reruns from proof when a requested proof lands, recorded as a proof-landed rework', async () => {
+    const first = await run({
+      brief: needsMetric,
+      providers: dryProviders(needsMetric),
+    });
+    expect(first.status).toBe('complete');
+    expect(first.reworks ?? []).toEqual([]);
+    expect(record('07-proof.attempt-1.json').notes.proofRequests).toMatchObject(
+      [{ claimId: CLAIM, kind: 'metric', pagesBlocked: [PAGE_ID] }]
+    );
+    const firstRender = first.chain.find(
+      link => link.stage === 'render'
+    )?.outputDigest;
+
+    const second = await run({
+      brief: needsMetric,
+      providers: dryProviders(needsMetric),
+      proofRegistry: [landedMetric],
+    });
+
+    expect(second.reworks).toEqual([
+      {
+        iteration: 1,
+        trigger: 'proof-landed',
+        rejectedAt: 'proof',
+        reworkFrom: 'proof',
+        rejectedRenderDigest: firstRender,
+        findings: [`proof landed for ${CLAIM}`],
+      },
+    ]);
+    // Truth through gap-detection were kept; proof onward reran.
+    expect(existsSync(join(runDir(), '07-proof.rework-1.attempt-1.json'))).toBe(
+      true
+    );
+    expect(
+      existsSync(join(runDir(), '13-render.rework-1.attempt-1.json'))
+    ).toBe(true);
+    // The proof stage reads the shipped registry, which still lacks the
+    // metric, so the page is unchanged and the run refuses to re-judge it.
+    expect(second).toMatchObject({ status: 'failed', stoppedAt: 'render' });
+    expect(second.reason).toMatch(/no new render/);
+  });
+
+  it('starts fresh when no requested proof has landed', async () => {
+    await run({ brief: needsMetric, providers: dryProviders(needsMetric) });
+    const again = await run({
+      brief: needsMetric,
+      providers: dryProviders(needsMetric),
+      proofRegistry: [],
+    });
+
+    expect(again.status).toBe('complete');
+    expect(again.reworks ?? []).toEqual([]);
+  });
+});
+
 describe('factory:run copy directions', () => {
   it('judges every copy direction and records the winner with its rationale', async () => {
     const seen: number[] = [];
@@ -390,6 +473,7 @@ describe('factory:run visual rework', () => {
     expect(manifest.reworks).toEqual([
       {
         iteration: 1,
+        trigger: 'visual-rejection',
         rejectedAt: 'adversarial-trust',
         reworkFrom: 'copy',
         rejectedRenderDigest: expect.stringMatching(/^sha256:/),

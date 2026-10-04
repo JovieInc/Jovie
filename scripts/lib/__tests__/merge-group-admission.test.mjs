@@ -491,8 +491,9 @@ describe('merge-group admission evidence', () => {
       },
     });
 
-    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(3);
-    expect(loadQueueRef).toHaveBeenCalledTimes(3);
+    // First proof plus the final reread; the pending poll reads only checks.
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(2);
+    expect(loadQueueRef).toHaveBeenCalledTimes(2);
     expect(loadCheckRuns).toHaveBeenCalledTimes(4);
     expect(statuses).toHaveLength(2);
     expect(statuses.at(-1)).toMatch(/admission passed/);
@@ -760,6 +761,58 @@ describe('merge-group admission evidence', () => {
     ).toBe(true);
   });
 
+  it('backs off pending polls exponentially with bounded jitter', async () => {
+    const delays = [];
+    let elapsed = 0;
+    const loadLiveQueueEntries = vi.fn(async () => [liveEntry()]);
+    const loadQueueRef = vi.fn(async () => queueRef());
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns: async ({ checkName }) =>
+        elapsed < 300_000
+          ? checkPage(checkName, 'in_progress')
+          : checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries,
+      loadQueueRef,
+      now: () => elapsed,
+      onStatus: () => {},
+      random: () => 1,
+      sleep: async delayMs => {
+        delays.push(delayMs);
+        elapsed += delayMs;
+      },
+    });
+    expect(result.admitted).toBe(true);
+    // 15 s, then doubling with +20% jitter, capped at 60 s (+20%).
+    expect(delays.slice(0, 5)).toEqual([
+      15_000, 36_000, 72_000, 72_000, 72_000,
+    ]);
+    expect(Math.max(...delays)).toBe(72_000);
+    // Twelve concurrent groups at 15 s each used to read the live queue every poll.
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(2);
+    expect(loadQueueRef).toHaveBeenCalledTimes(2);
+
+    const low = [];
+    elapsed = 0;
+    await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns: async ({ checkName }) =>
+        elapsed < 100_000
+          ? checkPage(checkName, 'in_progress')
+          : checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries,
+      loadQueueRef,
+      now: () => elapsed,
+      onStatus: () => {},
+      random: () => 0,
+      sleep: async delayMs => {
+        low.push(delayMs);
+        elapsed += delayMs;
+      },
+    });
+    expect(low.slice(0, 3)).toEqual([15_000, 24_000, 48_000]);
+  });
+
   it('still fails fast when an in_progress check concludes with failure', async () => {
     let elapsed = 0;
     await expect(
@@ -777,6 +830,7 @@ describe('merge-group admission evidence', () => {
         now: () => elapsed,
         onStatus: () => {},
         pollIntervalMs: 3,
+        random: () => 0.5,
         sleep: async delayMs => {
           elapsed += delayMs;
         },
@@ -1314,7 +1368,8 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
           state.requests
             .filter(request => request.kind === 'graphql')
             .map(request => request.at)
-        ).toEqual([0, 15_000, 30_000, 45_000, 60_000, 60_000]);
+          // The pending poll at 60 s reads only check pages; the final proof rereads.
+        ).toEqual([0, 15_000, 30_000, 45_000, 60_000]);
       }
     );
   });
