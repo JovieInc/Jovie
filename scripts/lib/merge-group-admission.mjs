@@ -44,6 +44,10 @@ const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
 // repository's shared GITHUB_TOKEN quota. A 3 s cadence across ten queue
 // groups drained it within minutes on 2026-10-03 (JOV-7744).
 const POLL_INTERVAL_MS = 15_000;
+// Pending polls back off exponentially with ±20% jitter, so a dozen concurrent
+// groups stop polling in lockstep (2026-10-04 quota storms, JOV-7743).
+const MAX_POLL_INTERVAL_MS = 60_000;
+const POLL_JITTER = 0.2;
 const RATE_LIMIT_PATTERN = /\b(?:secondary )?rate limit\b/i;
 const MAX_API_REQUEST_MS = 10_000;
 const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
@@ -95,14 +99,19 @@ function fail(message) {
   throw new MergeGroupAdmissionError(message);
 }
 
+function matchesLegacyGraphqlQuotaMessage(error) {
+  return (
+    typeof error?.message === 'string' &&
+    /^API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
+      error.message
+    )
+  );
+}
+
 function isGraphqlQuotaError(error) {
   return (
     error?.type === 'RATE_LIMITED' ||
-    (error?.type === undefined &&
-      typeof error?.message === 'string' &&
-      /^API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
-        error.message
-      ))
+    (error?.type === undefined && matchesLegacyGraphqlQuotaMessage(error))
   );
 }
 
@@ -251,17 +260,56 @@ function requireNullableSha(value, field) {
 
 export function normalizeLiveQueueEntriesPage(
   payload,
-  { branch = 'main' } = {}
+  { branch = 'main', httpStatus = /** @type {number | null} */ (null) } = {}
 ) {
   if (payload?.errors !== undefined && !Array.isArray(payload.errors)) {
     fail('live merge queue GraphQL errors must be an array when present');
   }
   if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-    throw new MergeGroupAdmissionError(
-      `live merge queue GraphQL returned errors: ${payload.errors
-        .map(error => error?.message ?? String(error))
-        .join('; ')}`,
-      { rateLimit: payload.errors.every(isGraphqlQuotaError) }
+    const rateLimit = payload.errors.every(isGraphqlQuotaError);
+    throw Object.assign(
+      new MergeGroupAdmissionError(
+        `live merge queue GraphQL returned errors: ${payload.errors
+          .map(error => error?.message ?? String(error))
+          .join('; ')}`,
+        { rateLimit }
+      ),
+      {
+        // Categories only: a quota-looking message must not hide its rejected
+        // shape, and diagnostics must not echo arbitrary response fields.
+        graphqlDiagnostic: {
+          httpStatus:
+            httpStatus !== null &&
+            Number.isInteger(httpStatus) &&
+            httpStatus >= 100 &&
+            httpStatus <= 599
+              ? httpStatus
+              : null,
+          errorCount: payload.errors.length,
+          entries: payload.errors.slice(0, 8).map(error => ({
+            kind:
+              error === null
+                ? 'null'
+                : typeof error === 'string'
+                  ? 'string'
+                  : typeof error === 'object' && !Array.isArray(error)
+                    ? 'object'
+                    : 'other',
+            typeCategory:
+              error?.type === undefined
+                ? 'absent'
+                : error.type === null
+                  ? 'null'
+                  : error.type === 'RATE_LIMITED'
+                    ? 'RATE_LIMITED'
+                    : 'other',
+            exactLegacyQuotaMessageMatch:
+              matchesLegacyGraphqlQuotaMessage(error),
+          })),
+          omittedEntries: Math.max(0, payload.errors.length - 8),
+          retryable: rateLimit,
+        },
+      }
     );
   }
 
@@ -514,13 +562,26 @@ export function isTransientApiError(error) {
     return true;
   }
   return (
-    error.status === null &&
-    (/^live merge queue GraphQL returned errors: API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
-      error.message
-    ) ||
-      /^GitHub API request failed for \S+: The operation was aborted due to timeout$/.test(
-        error.message
-      ))
+    error.status === null && isTransientAdmissionFailureMessage(error.message)
+  );
+}
+
+const TRANSIENT_ADMISSION_MESSAGES = [
+  /^live merge queue GraphQL returned errors: API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i,
+  /^GitHub API request failed for \S+: The operation was aborted due to timeout$/,
+];
+const TRANSIENT_ADMISSION_HTTP_MESSAGE =
+  /^GitHub API (?:(?:403|429) for \S+: .*\b(?:secondary )?rate limit\b|(?:502|503|504) for \S+: )/i;
+
+// The admission step's printed error when it gave up on a quota or gateway
+// failure, not on the combined head. The merge-group failure hold reads it from
+// the job's annotations so infrastructure never spends a source revision (JOV-7780).
+/** @param {unknown} message */
+export function isTransientAdmissionFailureMessage(message) {
+  const text = String(message ?? '').trim();
+  return (
+    TRANSIENT_ADMISSION_MESSAGES.some(pattern => pattern.test(text)) ||
+    TRANSIENT_ADMISSION_HTTP_MESSAGE.test(text)
   );
 }
 
@@ -537,6 +598,7 @@ export async function waitForMergeGroupAdmission({
   now = Date.now,
   onStatus = message => console.log(message),
   pollIntervalMs = POLL_INTERVAL_MS,
+  random = Math.random,
   runContext = undefined,
   sleep = defaultSleep,
 }) {
@@ -556,6 +618,18 @@ export async function waitForMergeGroupAdmission({
   let lastGateStatus = null;
   let observedSourceHeadSha = null;
   let recoverySourceHeadSha = null;
+  // Live membership and the exact queue ref are proved on the first poll and
+  // re-proved before admitting; pending polls only read the two check pages.
+  let provenQueue = null;
+  let pendingPolls = 0;
+  const pendingDelayMs = () => {
+    if (pendingPolls <= 1) return pollIntervalMs;
+    const backoff = Math.min(
+      Math.max(pollIntervalMs, MAX_POLL_INTERVAL_MS),
+      pollIntervalMs * 2 ** Math.min(pendingPolls - 1, 16)
+    );
+    return Math.round(backoff * (1 - POLL_JITTER + 2 * POLL_JITTER * random()));
+  };
   const failStillPending = () => {
     fail(
       `required merge-group checks did not pass within ${maxWaitMs}ms${
@@ -612,7 +686,7 @@ export async function waitForMergeGroupAdmission({
     };
   };
 
-  const poll = async () => {
+  const proveQueue = async () => {
     const liveReceipt = await readLiveReceipt();
     if (!liveReceipt.admitted) {
       return { ...evidence, admitted: false, receipt: liveReceipt };
@@ -628,6 +702,16 @@ export async function waitForMergeGroupAdmission({
     if (!SHA_PATTERN.test(String(sourceHeadSha ?? ''))) {
       fail('live merge queue entry omitted its exact source head');
     }
+    return { liveReceipt, sourceHeadSha };
+  };
+
+  const poll = async () => {
+    if (!provenQueue) {
+      const proven = await proveQueue();
+      if (!('sourceHeadSha' in proven)) return proven;
+      provenQueue = proven;
+    }
+    const { liveReceipt, sourceHeadSha } = provenQueue;
     const pages = await Promise.all(
       REQUIRED_CHECKS.map(checkName =>
         loadCheckRuns({ ...evidence, checkName, deadlineMs })
@@ -689,11 +773,16 @@ export async function waitForMergeGroupAdmission({
     }
 
     let outcome;
-    let delayMs = pollIntervalMs;
+    let delayMs;
     try {
       outcome = await poll();
+      pendingPolls += 1;
+      delayMs = pendingDelayMs();
     } catch (error) {
+      delayMs = pollIntervalMs;
       if (!isTransientApiError(error)) throw error;
+      // Every proof repeats after an API recovery.
+      provenQueue = null;
       recoverySourceHeadSha ??= observedSourceHeadSha;
       if (error.retryAtMs !== undefined && error.retryAtMs !== null) {
         delayMs = Math.max(pollIntervalMs, error.retryAtMs - now());
@@ -784,7 +873,7 @@ async function githubRequest(
     // Classify the structured error array before its messages are flattened.
     // Mixed permission/quota responses never enter the retry path.
     try {
-      normalizeLiveQueueEntriesPage(data);
+      normalizeLiveQueueEntriesPage(data, { httpStatus: response.status });
     } catch (error) {
       if (isTransientApiError(error)) {
         error.retryAtMs = quotaRetryAt(response.headers, now());
@@ -1001,6 +1090,14 @@ if (
       console.error(
         `::error::${error instanceof Error ? error.message : String(error)}`
       );
+      if (
+        error instanceof MergeGroupAdmissionError &&
+        'graphqlDiagnostic' in error
+      ) {
+        console.error(
+          `::notice::merge-group GraphQL diagnostic ${JSON.stringify(error.graphqlDiagnostic)}`
+        );
+      }
       process.exitCode = 1;
     });
   }

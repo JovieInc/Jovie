@@ -744,6 +744,30 @@ describe('production marker attempt state', () => {
       }
     });
 
+    it('hands an interrupted run 37144574062 to the in-band heal inputs (JOV-7773)', () => {
+      const jobs = run37144574062.map(([name, result]): [string, string] => [
+        name,
+        name === 'File post-deploy smoke remediation' ? 'failure' : result,
+      ]);
+      // The heal job dispatches marker recovery with exactly these fields;
+      // recovery admission requires this classification and identity.
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [replayMarker(jobs)],
+            latestRun: run(1, 'completed', 'failure'),
+            descendantHeads: [head],
+          })
+        )
+      ).toMatchObject({
+        state: 'recovery_available',
+        reason: 'one_interrupted_marker_safe_to_rerun',
+        controllerRun,
+        controllerAttempt: 1,
+        deploymentId: 'dpl_primary123',
+      });
+    });
+
     it('never tolerates publication failure after an executed rollback', () => {
       const jobs = run37144574062.map(([name, result]): [string, string] => [
         name,

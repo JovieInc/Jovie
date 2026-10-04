@@ -185,6 +185,13 @@ describe('PageToolbar buttons', () => {
     expect(tab).toHaveAttribute('tabIndex', '0');
   });
 
+  it('keeps tab labels on one line instead of wrapping or shrinking', () => {
+    // A narrow toolbar scrolls its tab rail; a tab must never clip to
+    // "In Progre" or wrap onto a second line.
+    expect(PAGE_TOOLBAR_TAB_BUTTON_CLASS).toContain('shrink-0');
+    expect(PAGE_TOOLBAR_TAB_BUTTON_CLASS).toContain('whitespace-nowrap');
+  });
+
   it('keeps inactive view tabs quiet and gives the active view a surface, not a ring', () => {
     expect(PAGE_TOOLBAR_TAB_BUTTON_CLASS).toContain('text-tertiary-token');
     expect(PAGE_TOOLBAR_TAB_ACTIVE_CLASS).toContain('bg-surface-1');

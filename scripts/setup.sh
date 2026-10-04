@@ -488,6 +488,25 @@ if [[ "$(uname -s)" == "Darwin" && "${CI:-false}" != "true" && "$IS_WORKTREE" !=
   success "Filling the worktree pool in the background (scripts/agent/worktree-new --status)"
 fi
 
+# ─── 5.2. Git object maintenance ────────────────────────────────────────────
+# Agent fetches leave one small pack each: the main clone reached 1311 packs and
+# 122k loose objects (JOV-7723). `git maintenance start` registers the clone and
+# schedules git's own hourly prefetch + commit-graph and daily loose-objects +
+# incremental-repack. That strategy never prunes unreachable objects, which matters
+# because lanes clones borrow this object store through alternates; registering also
+# turns off the auto-gc that would prune them.
+if [[ "$(uname -s)" == "Darwin" && "${CI:-false}" != "true" && "$IS_WORKTREE" != "true" ]]; then
+  echo ""
+  echo "── Git maintenance ─────────────────────────────────────────────────────"
+  if git config --global --get-all maintenance.repo 2>/dev/null | grep -qxF "$REPO_ROOT"; then
+    success "Git maintenance already scheduled for $REPO_ROOT"
+  elif git -C "$REPO_ROOT" maintenance start 2>/dev/null; then
+    success "Scheduled git maintenance (incremental strategy) for $REPO_ROOT"
+  else
+    warn "Could not schedule git maintenance; run: git -C \"$REPO_ROOT\" maintenance start"
+  fi
+fi
+
 # ─── 5.5. Turbopack cache ──────────────────────────────────────────────────
 echo ""
 echo "── Turbopack cache ─────────────────────────────────────────────────"
