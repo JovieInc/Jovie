@@ -1,0 +1,18 @@
+Implemented and published as draft PR [#19799](https://github.com/JovieInc/Jovie/pull/19799).
+
+- [Pre-commit hook](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T080457Z-JOV-5057-codex-4409bf/.husky/pre-commit) now runs `lint-staged --no-stash`; configured tasks are unchanged.
+- [Regression test](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T080457Z-JOV-5057-codex-4409bf/scripts/gate-ladder/gate-ladder.test.mjs) proves two linked worktrees commit concurrently, create no stash, and pass only staged files to tasks.
+- Removed obsolete commit serialization and stash-cleanup guidance.
+- Commit: `3023b1c6c6`
+- Linear JOV-5057 transitioned to In Review.
+
+Verification passed:
+
+- Concurrent worktree test: 4/4
+- Dev-loop tests: 3/3
+- Biome and documentation freshness
+- Full typecheck: 17/17 packages
+- Real pre-commit and pre-push hooks
+- Hosted CI, including Source Validation and PR Ready
+
+The PR remains draft, clean, and mergeable as required. No temporary worktrees remain. No scope deviations; GBrain was unavailable as noted in the task context.
