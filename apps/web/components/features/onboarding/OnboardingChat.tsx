@@ -1156,7 +1156,9 @@ export function OnboardingChat({
         onScroll={onScroll}
         className={cn(
           'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
-          headerOverlay ? 'pt-16' : 'pt-5'
+          // Under the floating sign-in row, scrolled-away messages fade out
+          // instead of hard-clipping at the panel edge (JOV-7192).
+          headerOverlay ? 'pt-16 system-b-chat-thread-top-fade' : 'pt-5'
         )}
         aria-live='polite'
       >

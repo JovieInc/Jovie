@@ -76,6 +76,22 @@ describe('billing detector plans', () => {
     }
   });
 
+  it('keeps a failed reconciliation open even when its receipt is fresh', () => {
+    const receipt = {
+      lastReconciliationAt: new Date(NOW - 60_000).toISOString(),
+      lastReconciliationSuccess: false,
+      now: NOW,
+    };
+    expect(planBillingSyncIntake(receipt)).toMatchObject({
+      action: 'upsert',
+      reconciliationFailed: true,
+    });
+    expect(
+      planBillingSyncIntake({ ...receipt, lastReconciliationSuccess: true })
+        .action
+    ).toBe('resolve');
+  });
+
   it('files reconciliation older than 36 hours or webhooks older than 2 hours', () => {
     expect(
       planBillingSyncIntake({

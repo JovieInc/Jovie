@@ -1,4 +1,13 @@
-import { and, asc, eq, isNull, lt, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  sql as drizzleSql,
+  eq,
+  isNull,
+  lt,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
@@ -64,7 +73,13 @@ export async function replayUnprocessedStripeWebhooks(
         claimable(now)
       )
     )
-    .orderBy(asc(stripeWebhookEvents.createdAt))
+    .orderBy(
+      asc(
+        drizzleSql`coalesce(${stripeWebhookEvents.processingStartedAt}, ${stripeWebhookEvents.createdAt})`
+      ),
+      asc(stripeWebhookEvents.createdAt),
+      asc(stripeWebhookEvents.id)
+    )
     .limit(WEBHOOK_REDRIVE_LIMIT);
 
   const summary: WebhookReplaySummary = {
@@ -118,10 +133,9 @@ async function replayOne(
     }
     summary.processed++;
   } catch (error) {
-    await db
-      .update(stripeWebhookEvents)
-      .set({ processingStartedAt: null })
-      .where(owned(candidate.id, now));
+    // Keep this attempt's timestamp until the existing lease expires. Retrying
+    // oldest attempts first prevents blocked/poison events from occupying every
+    // batch forever, without marking them processed or claiming healthy recovery.
 
     const reason = error instanceof Error ? error.message : String(error);
     const issue = {

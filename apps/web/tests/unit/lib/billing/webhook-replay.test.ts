@@ -1,3 +1,5 @@
+import { DatabaseSync } from 'node:sqlite';
+import { drizzle } from 'drizzle-orm/pg-proxy';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSelect = vi.hoisted(() => vi.fn());
@@ -187,5 +189,82 @@ describe('replayUnprocessedStripeWebhooks', () => {
         },
       ],
     });
+  });
+
+  it('makes progress past a full batch of blocked events on the next run', async () => {
+    // Execute the real Drizzle selection and compare-and-set statements against
+    // an isolated SQL fixture. These statements use SQL shared by SQLite/Postgres;
+    // handlers stay mocked, and no network or production database is involved.
+    const fixture = new DatabaseSync(':memory:');
+    fixture.exec(`CREATE TABLE stripe_webhook_events (
+      id TEXT PRIMARY KEY, stripe_event_id TEXT, type TEXT, payload TEXT,
+      stripe_created_at TEXT, created_at TEXT, processed_at TEXT,
+      processing_started_at TEXT
+    )`);
+    try {
+      const insert = fixture.prepare(
+        'INSERT INTO stripe_webhook_events (id, stripe_event_id, type, payload, stripe_created_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      );
+      for (let index = 0; index < 11; index++) {
+        const blocked = index < 10;
+        const row = candidate(
+          `evt_${index}`,
+          blocked ? 'charge.dispute.created' : 'customer.subscription.updated',
+          { id: blocked ? `dp_${index}` : 'sub_recoverable' }
+        );
+        insert.run(
+          `row_${index}`,
+          row.stripeEventId,
+          row.type,
+          JSON.stringify(row.payload),
+          row.stripeCreatedAt.toISOString(),
+          new Date(now.getTime() - (24 * 60 - index) * 60_000).toISOString()
+        );
+      }
+      const database = drizzle(async (query, params) => {
+        const statement = fixture.prepare(query);
+        statement.setReturnArrays(true);
+        const bindings = Object.fromEntries(
+          params.map((value, index) => [`$${index + 1}`, value])
+        );
+        return { rows: statement.all(bindings).map(row => Object.values(row)) };
+      });
+      mockSelect.mockImplementation(database.select.bind(database));
+      mockUpdate.mockImplementation(database.update.bind(database));
+
+      const first = await replayUnprocessedStripeWebhooks(now);
+      expect(first.processed).toBe(0);
+      expect(first.blocked).toHaveLength(10);
+      const second = await replayUnprocessedStripeWebhooks(now);
+
+      expect(second.processed).toBe(1);
+      expect(second.blocked).toEqual([]);
+      expect(mockProcessStripeWebhookEvent).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ id: 'evt_10' }),
+        expect.any(Date)
+      );
+      expect(
+        fixture
+          .prepare(
+            'SELECT processed_at FROM stripe_webhook_events WHERE id = ?'
+          )
+          .get('row_10')
+      ).toMatchObject({ processed_at: expect.any(String) });
+      expect(
+        fixture
+          .prepare(
+            'SELECT count(*) AS remaining FROM stripe_webhook_events WHERE processed_at IS NULL'
+          )
+          .get()
+      ).toMatchObject({ remaining: 10 });
+      const retry = await replayUnprocessedStripeWebhooks(
+        new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      );
+      expect(retry.blocked).toHaveLength(10);
+      expect(retry.processed).toBe(0);
+      expect(mockProcessStripeWebhookEvent).toHaveBeenCalledOnce();
+    } finally {
+      fixture.close();
+    }
   });
 });
