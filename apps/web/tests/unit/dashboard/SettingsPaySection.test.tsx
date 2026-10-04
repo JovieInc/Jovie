@@ -18,7 +18,7 @@ const {
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/app/settings/artist-profile',
+  usePathname: () => '/app/settings/profile',
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
