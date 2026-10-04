@@ -289,9 +289,8 @@ export async function lookupMusicBrainzArtistsByUrl(
 /** Provider IDs survive share parameters, Spotify locales and Apple URL aliases. */
 function musicBrainzArtistResources(url: URL): string[] {
   if (url.hostname === 'open.spotify.com') {
-    const id = /^\/(?:intl-[a-z]{2}\/)?artist\/([A-Za-z0-9]{22})\/?$/.exec(
-      url.pathname
-    )?.[1];
+    const artistPath = url.pathname.replace(/^\/intl-([a-z]{2})\//, '/');
+    const id = /^\/artist\/([A-Za-z0-9]{22})\/?$/.exec(artistPath)?.[1];
     if (id) return [`https://open.spotify.com/artist/${id}`];
   }
   if (['music.apple.com', 'itunes.apple.com'].includes(url.hostname)) {
