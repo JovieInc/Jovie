@@ -44,7 +44,7 @@ const labelSchema = z.object({
     'accept_suggestion',
     'reject_suggestion',
   ]),
-  value: z.number().optional(),
+  value: z.number().int().min(1).max(MAX_RATING).optional(),
   at: z.string(),
 });
 
