@@ -63,6 +63,10 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // Factory-record solution section headlines are the record's value
   // proposition; a clamp would truncate authored copy (JOV-7284).
   'apps/web/app/(marketing)/solutions/[audience]/sections.tsx',
+  // /download and /launch section headlines are authored value propositions;
+  // the two-line clamp hid copy (JOV-7713).
+  'apps/web/app/(marketing)/download/page.tsx',
+  'apps/web/app/(marketing)/launch/page.tsx',
 ]);
 
 function hasEditorialTitleContract(
