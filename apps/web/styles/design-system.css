@@ -2755,6 +2755,10 @@
      Always prefer these over hardcoded numbers; they pick up reduced-motion. */
   --duration-subtle: var(--ds-motion-subtle-duration);
   --duration-cinematic: var(--ds-motion-cinematic-duration);
+  /* Step between sibling blocks entering in sequence (hero children, scroll
+     reveals, chat cards). Zeroed with the durations under reduced motion so
+     nothing waits on a step that no longer animates. */
+  --stagger-block: 80ms;
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -2807,6 +2811,7 @@
     --duration-slowest: 0ms;
     --duration-subtle: 0ms;
     --duration-cinematic: 0ms;
+    --stagger-block: 0ms;
   }
 }
 

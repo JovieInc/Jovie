@@ -4,6 +4,7 @@ import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { trackServerEvent } from '@/lib/server-analytics';
+import type { AccountMetricCohort } from '@/lib/utils/email';
 import {
   isSignupFunnelStep,
   normalizeSignupFunnelReason,
@@ -32,6 +33,7 @@ export async function recordFunnelStep<F extends SignupFunnelId>(
         input.outcome && input.outcome !== 'reached'
           ? normalizeSignupFunnelReason(input.reason)
           : undefined,
+      cohort: input.cohort ?? 'unattributed',
     });
   } catch {
     // trackServerEvent reports its own failures to Sentry.
@@ -42,7 +44,7 @@ export async function recordFunnelStep<F extends SignupFunnelId>(
 // Summer aggregate
 // ---------------------------------------------------------------------------
 
-export const SUMMER_FUNNEL_CONTRACT_VERSION = 'summer-funnel/v1';
+export const SUMMER_FUNNEL_CONTRACT_VERSION = 'summer-funnel/v2';
 
 /**
  * A step needs this many events at the previous step before its conversion
@@ -53,6 +55,7 @@ export const FUNNEL_BOTTLENECK_MIN_SAMPLE = 20;
 export type FunnelWindowKey = '24h' | '7d';
 
 export interface FunnelAggregateRow {
+  readonly cohort?: AccountMetricCohort | null;
   readonly funnelId: string | null;
   readonly step: string | null;
   readonly outcome: string | null;
@@ -102,7 +105,19 @@ export interface SummerFunnelResponse {
   readonly eventContract: typeof SIGNUP_FUNNEL_CONTRACT_VERSION;
   readonly observedAt: string;
   readonly unit: 'events';
+  /** Customer-only view used for business reporting. */
+  readonly metricScope: 'customer_only';
   readonly windows: Readonly<Record<FunnelWindowKey, FunnelWindowReport>>;
+  /** All events, including historical events without a cohort tag. */
+  readonly rawWindows: Readonly<Record<FunnelWindowKey, FunnelWindowReport>>;
+  /** Operational dogfood/QA events, kept outside customer metrics. */
+  readonly syntheticHealth: Readonly<{
+    windows: Readonly<Record<FunnelWindowKey, FunnelWindowReport>>;
+  }>;
+  /** Events that cannot safely be classified as customer or synthetic. */
+  readonly unattributed: Readonly<{
+    windows: Readonly<Record<FunnelWindowKey, FunnelWindowReport>>;
+  }>;
 }
 
 const ratio = (numerator: number, denominator: number): number | null =>
@@ -198,28 +213,39 @@ export function buildSummerFunnelResponse(
   rows: readonly FunnelAggregateRow[],
   now: Date
 ): SummerFunnelResponse {
-  const buildWindow = (
-    window: FunnelWindowKey,
-    hours: number,
-    pick: (row: FunnelAggregateRow) => number
-  ): FunnelWindowReport => ({
-    window,
-    since: new Date(now.getTime() - hours * 3_600_000).toISOString(),
-    funnels: SIGNUP_FUNNEL_IDS.map(funnelId =>
-      buildFunnelReport(funnelId, rows, pick)
-    ),
-  });
-  const windows = {
-    '24h': buildWindow('24h', 24, row => row.count24h),
-    '7d': buildWindow('7d', 24 * 7, row => row.count7d),
+  const buildWindows = (
+    selectedRows: readonly FunnelAggregateRow[]
+  ): Readonly<Record<FunnelWindowKey, FunnelWindowReport>> => {
+    const buildWindow = (
+      window: FunnelWindowKey,
+      hours: number,
+      pick: (row: FunnelAggregateRow) => number
+    ): FunnelWindowReport => ({
+      window,
+      since: new Date(now.getTime() - hours * 3_600_000).toISOString(),
+      funnels: SIGNUP_FUNNEL_IDS.map(funnelId =>
+        buildFunnelReport(funnelId, selectedRows, pick)
+      ),
+    });
+    return {
+      '24h': buildWindow('24h', 24, row => row.count24h),
+      '7d': buildWindow('7d', 24 * 7, row => row.count7d),
+    };
   };
+  const rowsFor = (cohort: AccountMetricCohort) =>
+    rows.filter(row => (row.cohort ?? 'unattributed') === cohort);
+  const windows = buildWindows(rowsFor('customer'));
 
   return {
     contractVersion: SUMMER_FUNNEL_CONTRACT_VERSION,
     eventContract: SIGNUP_FUNNEL_CONTRACT_VERSION,
     observedAt: now.toISOString(),
     unit: 'events',
+    metricScope: 'customer_only',
     windows,
+    rawWindows: buildWindows(rows),
+    syntheticHealth: { windows: buildWindows(rowsFor('synthetic')) },
+    unattributed: { windows: buildWindows(rowsFor('unattributed')) },
   };
 }
 
@@ -234,6 +260,7 @@ export async function getSummerFunnel(
   const step = drizzleSql<string | null>`${props}->>'step'`;
   const outcome = drizzleSql<string | null>`${props}->>'outcome'`;
   const reason = drizzleSql<string | null>`${props}->>'reason'`;
+  const cohort = drizzleSql<AccountMetricCohort | null>`${props}->>'cohort'`;
 
   const rows = await db
     .select({
@@ -241,6 +268,7 @@ export async function getSummerFunnel(
       step,
       outcome,
       reason,
+      cohort,
       count24h: drizzleSql<number>`(count(*) filter (where ${serverAnalyticsEvents.occurredAt} >= ${since24h}))::int`,
       count7d: drizzleSql<number>`count(*)::int`,
     })
@@ -251,7 +279,7 @@ export async function getSummerFunnel(
         gte(serverAnalyticsEvents.occurredAt, since7d)
       )
     )
-    .groupBy(funnelId, step, outcome, reason);
+    .groupBy(funnelId, step, outcome, reason, cohort);
 
   return buildSummerFunnelResponse(
     rows.map(row => ({
