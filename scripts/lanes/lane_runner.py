@@ -5019,7 +5019,7 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     # App installation tokens cannot touch user gists (403), and the status feed is Tim's gist:
     # `gh gist` keeps the host's own login.
     shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
-                    f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"})" || exit 1\n'
+                    f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
                     f'export GH_TOKEN\nexec {real} "$@"\n')
     shim.chmod(0o755)
     os.environ["PATH"] = f"{shim_dir}{os.pathsep}{os.environ.get('PATH', '')}"

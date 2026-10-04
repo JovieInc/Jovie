@@ -309,6 +309,9 @@ does not retain a removed runtime directory.
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.
+With the Jovie Bot key, every `gh` call (workers, doctor, reconcile, agents) passes the shim's
+shared budget guard: below `JOVIE_GITHUB_FLOOR` (600) GraphQL points, read-only polling exits 75
+until GitHub's reset while writes still go through; the budget is re-read at most once a minute.
 State and receipts live under `~/.local/state/jovie-lanes`. Every gated run records
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
