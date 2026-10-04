@@ -592,6 +592,19 @@ nodes:
       - pull_request_target
     terminalReceipt: job:review
     jobCount: 1
+  - name: iOS App Store Graphics
+    path: .github/workflows/ios-app-store-graphics.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_call
+      - workflow_dispatch
+    terminalReceipt: job:graphics
+    jobCount: 1
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -623,11 +636,12 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - iOS CI
+      - iOS App Store Graphics
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-upload
-    jobCount: 4
+    jobCount: 5
   - name: Jovie artist agent Eve release and rollback
     path: .github/workflows/jovie-agent-release.yml
     active: true
@@ -1471,6 +1485,9 @@ edges:
     type: workflow_run
   - from: iOS TestFlight
     to: iOS CI
+    type: workflow_call
+  - from: iOS TestFlight
+    to: iOS App Store Graphics
     type: workflow_call
   - from: Source Validation
     to: Lane Fix Relay

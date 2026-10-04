@@ -1,0 +1,85 @@
+# Regenerates the iOS App Store graphics from the real app (JOV-4481).
+# Captures fixture screens on the 6.9-inch simulator, composites them with the
+# Pen-bound template in apps/ios/app-store/storefront.json, and verifies the
+# receipt matches the exact app source. Uploads artifacts only; App Store
+# Connect upload has no approved deliver lane yet.
+name: iOS App Store Graphics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ios/Jovie/**'
+      - 'apps/ios/Jovie.xcodeproj/project.pbxproj'
+      - 'apps/ios/app-store/**'
+      - 'apps/ios/scripts/app-store-graphics.mjs'
+      - 'apps/web/design/ziawi-color-sot.json'
+      - 'apps/web/public/fonts/Satoshi-Variable.woff2'
+      - 'packages/copy/**'
+      - '.github/workflows/ios-app-store-graphics.yml'
+  workflow_call:
+    inputs:
+      checkout-ref:
+        description: Exact release SHA to render; empty uses the event SHA.
+        required: false
+        type: string
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-app-store-graphics-${{ inputs.checkout-ref || github.ref }}
+  # Only the newest source matters; release SHAs get their own group.
+  cancel-in-progress: ${{ inputs.checkout-ref == '' }}
+
+jobs:
+  graphics:
+    name: Render App Store Graphics
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install Chromium for the compositor
+        run: pnpm exec playwright install chromium
+
+      - name: Build simulator app
+        timeout-minutes: 20
+        run: |
+          bash apps/ios/scripts/ensure-configuration.sh
+          xcodebuild build \
+            -project apps/ios/Jovie.xcodeproj \
+            -scheme Jovie \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath .build/app-store-graphics \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Capture fixture screens
+        timeout-minutes: 10
+        run: >-
+          node apps/ios/scripts/app-store-graphics.mjs capture
+          --app .build/app-store-graphics/Build/Products/Debug-iphonesimulator/Jovie.app
+
+      - name: Render App Store graphics
+        run: node apps/ios/scripts/app-store-graphics.mjs render
+
+      - name: Verify graphics are fresh for this app source
+        run: node apps/ios/scripts/app-store-graphics.mjs verify
+
+      - name: Upload App Store graphics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-app-store-graphics-${{ inputs.checkout-ref || github.sha }}
+          path: |
+            artifacts/app-store-graphics/en-US/*.png
+            artifacts/app-store-graphics/raw/*.png
+            artifacts/app-store-graphics/receipt.json
+          if-no-files-found: error
+          retention-days: 90

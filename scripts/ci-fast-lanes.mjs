@@ -636,7 +636,7 @@ const LANES = [
   {
     id: 'ios-fast',
     name: 'iOS Fast Contract',
-    nextLocalCommand: 'pnpm run ios:lint',
+    nextLocalCommand: 'pnpm run ios:lint && pnpm run ios:app-store:test',
     run: runIosFast,
   },
   {
@@ -1704,7 +1704,7 @@ function runIosFast() {
       skipped: true,
     };
   }
-  return shell('pnpm run ios:lint');
+  return shell('pnpm run ios:lint && pnpm run ios:app-store:test');
 }
 
 function runProfileAdmission() {

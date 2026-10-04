@@ -1,0 +1,60 @@
+{
+  "schema": "ios-app-store-storefront/v1",
+  "issue": "JOV-4481",
+  "locale": "en-US",
+  "device": {
+    "simulator": "iPhone 17 Pro Max",
+    "displayType": "6.9-inch iPhone",
+    "width": 1320,
+    "height": 2868
+  },
+  "pen": {
+    "file": "Jovie Design Studio — canonical.lib.pen",
+    "section": "App Store / iOS screenshots (STAGING)",
+    "status": "requested",
+    "sectionNodeId": null,
+    "frames": {}
+  },
+  "layout": {
+    "canvas": "canvas",
+    "headlineTop": 200,
+    "headlineSize": 96,
+    "headlineMaxWidth": 1080,
+    "deviceTop": 560,
+    "deviceWidth": 1056,
+    "bezel": 22,
+    "deviceRadius": 150
+  },
+  "screens": [
+    {
+      "id": "chat",
+      "launchArgument": "-ui-testing-chat-all-components",
+      "headline": "Merch ideas, ready in one chat.",
+      "accent": "ion"
+    },
+    {
+      "id": "audience",
+      "launchArgument": "-ui-testing-audience",
+      "headline": "Your fans, at a glance.",
+      "accent": "ultra"
+    },
+    {
+      "id": "calendar",
+      "launchArgument": "-ui-testing-calendar",
+      "headline": "Shows and releases on one calendar.",
+      "accent": "pulse"
+    },
+    {
+      "id": "work",
+      "launchArgument": "-ui-testing-library",
+      "headline": "All your work in one place.",
+      "accent": "ion"
+    },
+    {
+      "id": "identity",
+      "launchArgument": "-ui-testing-ready",
+      "headline": "Share your profile with one scan.",
+      "accent": "ultra"
+    }
+  ]
+}
