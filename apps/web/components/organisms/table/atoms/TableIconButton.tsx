@@ -9,6 +9,8 @@ export interface TableIconButtonProps {
   readonly ariaLabel: string;
   readonly tooltip?: string;
   readonly variant?: 'ghost' | 'danger';
+  /** 24px control for 32px dense rows; the hit area stays 44px. */
+  readonly dense?: boolean;
   readonly className?: string;
 }
 
@@ -24,14 +26,19 @@ export function TableIconButton({
   ariaLabel,
   tooltip,
   variant = 'ghost',
+  dense = false,
   className,
 }: TableIconButtonProps) {
   const button = (
     <IconButton
       variant='secondary'
-      size='lg'
+      size={dense ? 'xs' : 'lg'}
       destructive={variant === 'danger'}
-      onClick={onClick}
+      onClick={event => {
+        // A row action never also activates the row.
+        event.stopPropagation();
+        onClick();
+      }}
       ariaLabel={ariaLabel}
       className={className}
     >

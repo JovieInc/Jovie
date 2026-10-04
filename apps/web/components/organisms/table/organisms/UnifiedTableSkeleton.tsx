@@ -45,6 +45,9 @@ export interface UnifiedTableSkeletonProps<TData extends RowData> {
    */
   readonly rowHeight?: number;
 
+  /** Named row geometry; wins over rowHeight. Match the loaded table. */
+  readonly rowMode?: TableRowMode;
+
   /**
    * Row mode. Must match the loaded table's rowMode; it owns row and cell
    * content height together, which a bare rowHeight cannot.

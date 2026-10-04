@@ -21,6 +21,7 @@ import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
 import { createContactColumns } from './columns';
 import { buildContactActions } from './contact-actions';
+import { CONTACTS_SKELETON_COLUMN_CONFIG } from './skeleton-config';
 
 interface ContactsTableProps {
   readonly contacts: EditableContact[];
@@ -234,6 +235,8 @@ export const ContactsTable = memo(function ContactsTable({
               data={contacts}
               columns={columns}
               isLoading={isLoading}
+              rowMode='dense'
+              skeletonColumnConfig={CONTACTS_SKELETON_COLUMN_CONFIG}
               getRowId={contact => contact.id}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-app'

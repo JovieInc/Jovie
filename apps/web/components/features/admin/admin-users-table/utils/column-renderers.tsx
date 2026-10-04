@@ -12,6 +12,7 @@ import {
   DateCell,
   TableCheckboxCell,
 } from '@/components/organisms/table';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
@@ -19,7 +20,7 @@ import type { AdminUserPlan } from '@/lib/admin/users';
 import type { CellContext, HeaderContext, Table } from '@/lib/tanstack-table';
 
 /**
- * Renders the name cell with name and email (truncated with tooltip).
+ * Renders the name cell on the shared people row: face, name, and email.
  * Falls back to "Email Subscriber" when no name is available, since names
  * are not collected during signup and the email is shown in its own column.
  */
@@ -35,12 +36,12 @@ export function renderNameCell({
     : null;
 
   return (
-    <div className='min-w-0'>
-      <div className='group flex min-w-0 items-center gap-1.5'>
-        <TruncatedText lines={1} className='font-semibold text-primary-token'>
-          {displayName}
-        </TruncatedText>
-        {profileUrl ? (
+    <PersonCell
+      name={displayName}
+      secondary={name ? user.email : null}
+      className='group'
+      trailing={
+        profileUrl ? (
           <span className='flex shrink-0 items-center gap-0.5'>
             <InlineIconButton
               aria-label={`Copy link for @${user.profileUsername}`}
@@ -71,14 +72,9 @@ export function renderNameCell({
               <ExternalLink className='h-3 w-3' />
             </InlineIconButton>
           </span>
-        ) : null}
-      </div>
-      {name && user.email ? (
-        <TruncatedText lines={1} className='text-xs text-secondary-token'>
-          {user.email}
-        </TruncatedText>
-      ) : null}
-    </div>
+        ) : null
+      }
+    />
   );
 }
 

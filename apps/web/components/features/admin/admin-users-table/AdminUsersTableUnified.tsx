@@ -33,7 +33,6 @@ import {
   TableBulkActionsToolbar,
   useRowSelection,
 } from '@/components/organisms/table';
-import { TABLE_CELL_MULTILINE_CONTENT_CLASSNAME } from '@/components/organisms/table/atoms/TableCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
@@ -473,7 +472,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       // Name column
       columnHelper.accessor('name', {
         id: 'name',
-        meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
         header: 'Name',
         cell: renderNameCell,
         size: 260,
@@ -651,7 +649,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             </div>
           ) : (
             <AdminDataTable
-              rowMode='two-line'
+              rowMode='dense'
               data={users}
               columns={columns}
               rowSelection={rowSelection}

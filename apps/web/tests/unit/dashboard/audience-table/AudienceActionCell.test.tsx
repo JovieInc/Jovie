@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { TooltipProvider } from '@jovie/ui';
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AudienceTableStableProvider } from '@/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
 import { AudienceActionCell } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells';
@@ -47,6 +49,11 @@ function makeStableContext(
       lastSeen: false,
     },
   };
+}
+
+// The action is a canonical TableIconButton with a tooltip, as in the app shell.
+function render(ui: ReactElement) {
+  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
 }
 
 describe('AudienceActionCell', () => {
@@ -106,5 +113,17 @@ describe('AudienceActionCell', () => {
       </AudienceTableStableProvider>
     );
     expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
+  });
+
+  it('fits the 24px dense content height', () => {
+    const ctx = makeStableContext();
+    render(
+      <AudienceTableStableProvider value={ctx}>
+        <AudienceActionCell member={baseMember} />
+      </AudienceTableStableProvider>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Message Tim' }).className
+    ).toContain('h-6');
   });
 });

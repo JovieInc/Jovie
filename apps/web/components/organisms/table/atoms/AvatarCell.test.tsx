@@ -4,7 +4,7 @@ import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { AvatarCell } from './AvatarCell';
 
 describe('AvatarCell', () => {
-  it('renders the creator name and profile link with a read-only avatar', () => {
+  it('renders the creator name, profile link, and a read-only face on one line', () => {
     const { container } = render(
       <AvatarCell
         profileId='creator'
@@ -23,7 +23,12 @@ describe('AvatarCell', () => {
     expect(
       container.querySelector('[data-slot="app-avatar"]')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button')).toBeDisabled();
+    // One-line people row: a 20px face, never an upload control in a table.
+    expect(
+      container.querySelector('[data-slot="app-avatar-frame"]')
+    ).toHaveAttribute('data-size', 'sm');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Featured')).toBeInTheDocument();
   });
 
   it('keeps row actions usable when the username is plain text', () => {

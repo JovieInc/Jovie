@@ -2,6 +2,7 @@
 
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
+import { CONTACTS_SKELETON_COLUMN_CONFIG } from '@/features/dashboard/organisms/contacts-table/skeleton-config';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 
@@ -32,17 +33,17 @@ function createLoadingHeader(width: string) {
 }
 
 const CONTACTS_LOADING_COLUMNS = [
+  contactLoadingColumnHelper.accessor('name', {
+    id: 'name',
+    header: createLoadingHeader('w-32'),
+    size: 240,
+    minSize: 240,
+  }),
   contactLoadingColumnHelper.accessor('role', {
     id: 'role',
     header: createLoadingHeader('w-28'),
     size: 180,
     minSize: 180,
-  }),
-  contactLoadingColumnHelper.accessor('name', {
-    id: 'name',
-    header: createLoadingHeader('w-32'),
-    size: 200,
-    minSize: 200,
   }),
   contactLoadingColumnHelper.accessor('territories', {
     id: 'territories',
@@ -69,15 +70,6 @@ const CONTACTS_LOADING_COLUMNS = [
     minSize: 48,
   }),
 ] as ColumnDef<ContactsLoadingRow, unknown>[];
-
-const CONTACTS_LOADING_SKELETON_CONFIG = [
-  { width: '112px', variant: 'text' as const },
-  { width: '128px', variant: 'text' as const },
-  { width: '96px', variant: 'badge' as const },
-  { width: '144px', variant: 'text' as const },
-  { width: '96px', variant: 'text' as const },
-  { width: '24px', variant: 'avatar' as const },
-];
 
 const CONTACTS_MOBILE_ROW_KEYS = Array.from(
   { length: SKELETON_ROW_COUNT.MOBILE },
@@ -143,8 +135,8 @@ export default function ContactsLoading() {
         <UnifiedTableSkeleton<ContactsLoadingRow>
           columns={CONTACTS_LOADING_COLUMNS}
           skeletonRows={SKELETON_ROW_COUNT.TABLE}
-          skeletonColumnConfig={CONTACTS_LOADING_SKELETON_CONFIG}
-          rowHeight={44}
+          skeletonColumnConfig={CONTACTS_SKELETON_COLUMN_CONFIG}
+          rowMode='dense'
           minWidth='0'
           containerClassName='h-full'
           hideHeader={false}

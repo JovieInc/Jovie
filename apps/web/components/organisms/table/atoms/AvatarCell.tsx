@@ -3,8 +3,7 @@
 import { Star } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
-import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { cn } from '../table.styles';
+import { PersonCell } from './PersonCell';
 
 interface AvatarCellProps {
   /**
@@ -54,41 +53,14 @@ interface AvatarCellProps {
 }
 
 /**
- * AvatarCell - Avatar with badges for verified and featured status
+ * AvatarCell - a creator on the shared one-line people row (PersonCell):
+ * a 20px face with the verified badge, the display name, and the @username as
+ * the secondary fact (a profile link unless disabled). Featured profiles carry
+ * a star after the name; row actions sit in the trailing slot.
  *
- * **Performance Optimization**: Memoized with React.memo to prevent unnecessary re-renders
- * in virtualized tables. When tables render hundreds of rows, this component can be called
- * many times per scroll event. Memoization ensures the component only re-renders when its
- * props actually change, reducing render time by 20-30%.
- *
- * **Why memoization helps here**:
- * - Used in large tables with 100+ rows (waitlist, creators, users)
- * - Props are primitive values or stable references (strings, booleans, null)
- * - Shallow equality check is sufficient for all props
- * - Component has moderate rendering cost (avatar, badges, text layout)
- *
- * Features:
- * - Avatar image or fallback initials
- * - Verification badge (blue checkmark)
- * - Featured badge (star icon)
- * - Display name and username
- * - Username link to profile
- * - Perfect vertical alignment with other cells
- *
- * Example:
- * ```tsx
- * <AvatarCell
- *   profileId={profile.id}
- *   username={profile.username}
- *   avatarUrl={profile.avatarUrl}
- *   displayName={profile.displayName}
- *   verified={profile.isVerified}
- *   isFeatured={profile.isFeatured}
- * />
- * ```
+ * Memoized: rendered for every visible row of large virtualized tables.
  */
 export const AvatarCell = React.memo(function AvatarCell({
-  profileId,
   username,
   avatarUrl,
   displayName,
@@ -98,70 +70,38 @@ export const AvatarCell = React.memo(function AvatarCell({
   disableUsernameLink = false,
   usernameActions,
 }: AvatarCellProps) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-3',
-        isFeatured && 'pl-1',
-        Boolean(usernameActions) && 'pr-1',
-        className
-      )}
+  const handle = disableUsernameLink ? (
+    `@${username}`
+  ) : (
+    <Link
+      href={`/${username}`}
+      className='transition-colors hover:text-primary-token'
+      onClick={event => event.stopPropagation()}
     >
-      {/* Avatar with badges */}
-      <div className='relative'>
-        <AvatarUploadable
-          src={avatarUrl}
-          alt={`Avatar for @${username}`}
-          name={username}
-          size='sm'
-          uploadable={false}
-          verified={verified}
-        />
+      @{username}
+    </Link>
+  );
 
-        {/* Featured badge - star icon */}
-        {isFeatured && (
-          <div className='absolute -top-1 -left-1'>
-            <Star className='h-3 w-3 text-yellow-400 dark:text-yellow-300 fill-current' />
-          </div>
-        )}
-      </div>
-
-      {/* Name and username */}
-      <div className='min-w-0 flex-1'>
-        {displayName && (
-          <div className='font-caption text-primary-token line-clamp-1 overflow-hidden text-ellipsis text-app leading-4'>
-            {displayName}
-          </div>
-        )}
-        <div className='flex min-w-0 items-center gap-1.5 leading-4'>
-          {disableUsernameLink ? (
-            <span
-              className={cn(
-                'line-clamp-1 overflow-hidden text-ellipsis',
-                displayName
-                  ? 'text-2xs text-secondary-token'
-                  : 'text-app font-caption text-primary-token'
-              )}
-            >
-              @{username}
-            </span>
-          ) : (
-            <Link
-              href={`/${username}`}
-              className={cn(
-                'line-clamp-1 overflow-hidden text-ellipsis text-secondary-token transition-colors hover:text-primary-token',
-                displayName
-                  ? 'text-2xs'
-                  : 'text-app font-caption text-primary-token'
-              )}
-              onClick={event => event.stopPropagation()}
-            >
-              @{username}
-            </Link>
-          )}
-        </div>
-      </div>
-      {usernameActions}
-    </div>
+  return (
+    <PersonCell
+      name={displayName || `@${username}`}
+      secondary={displayName ? handle : null}
+      avatarUrl={avatarUrl}
+      verified={verified}
+      className={className ? `group ${className}` : 'group'}
+      trailing={
+        isFeatured || usernameActions ? (
+          <span className='flex items-center gap-1.5'>
+            {isFeatured ? (
+              <Star
+                aria-label='Featured'
+                className='h-3 w-3 fill-current text-yellow-400 dark:text-yellow-300'
+              />
+            ) : null}
+            {usernameActions}
+          </span>
+        ) : null
+      }
+    />
   );
 });
