@@ -1,8 +1,16 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  closeSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -16,17 +24,48 @@ import { crc32 } from 'node:zlib';
 
 export const GH_FAKE_HOST = 'github.localhost';
 
-/** Absolute path of the real gh binary, or null when it is not installed. */
-export function resolveRealGh() {
+/** True when `path` is an interpreted script (a `#!` shim) rather than a
+ * compiled binary. Lane environments shadow `gh` with a shell shim that mints
+ * an App token via gh_app_token.py before re-exec'ing the real binary; that
+ * shim needs `~/.config/jovie-lanes/jovie-bot.pem`, which the harness's
+ * isolated HOME deliberately does not provide. */
+function isScriptShim(path) {
   try {
-    return (
-      execFileSync('sh', ['-c', 'command -v gh'], {
-        encoding: 'utf8',
-      }).trim() || null
-    );
+    const fd = openSync(path, 'r');
+    try {
+      const head = Buffer.alloc(2);
+      return (
+        readSync(fd, head, 0, 2, 0) === 2 && head.toString('latin1') === '#!'
+      );
+    } finally {
+      closeSync(fd);
+    }
   } catch {
-    return null;
+    return false;
   }
+}
+
+/** Absolute path of the real gh binary, or null when it is not installed.
+ * Prefers a compiled binary over `#!` script shims on PATH. */
+export function resolveRealGh() {
+  const names = process.platform === 'win32' ? ['gh.exe', 'gh'] : ['gh'];
+  const candidates = [];
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    for (const name of names) {
+      const candidate = join(dir, name);
+      try {
+        if (statSync(candidate).isFile()) candidates.push(candidate);
+      } catch {
+        // not in this directory
+      }
+    }
+  }
+  return (
+    candidates.find(candidate => !isScriptShim(candidate)) ??
+    candidates[0] ??
+    null
+  );
 }
 
 /** First line of `gh --version`, recorded as the exercised boundary version. */
@@ -116,7 +155,9 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
+          // The resolved binary's directory leads PATH so `gh` calls inside
+          // the script reach it ahead of any earlier PATH shim.
+          PATH: `${dirname(binary)}${delimiter}${process.env.PATH}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
