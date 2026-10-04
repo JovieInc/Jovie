@@ -535,6 +535,12 @@ class GateTest(unittest.TestCase):
     def test_code_changes_run_the_one_canonical_gate(self):
         self.assertEqual(lane.check_commands(["apps/web/lib/a.ts", "docs/readme.md"]), [lane.CANONICAL_GATE])
         self.assertEqual(lane.check_commands(["docs/readme.md"]), [])
+        pr = {"number": 7, "headRefOid": "a" * 40, "headRefName": "feat/x"}
+        self.assertEqual(lane.check_commands(["apps/web/app/claim/page.tsx"], pr),
+                         [lane.CANONICAL_GATE,
+                          ["node", "scripts/funnel-judge/preview-gate.mjs", "--pr", "7",
+                           "--sha", "a" * 40, "--ref", "feat/x"]])
+        self.assertEqual(lane.check_commands(["docs/readme.md"], pr), [])
 
     @unittest.skipUnless((ROOT / "scripts/automation-verify.sh").exists(), "release copy has no repo gates")
     def test_canonical_gate_carries_the_ci_component_contract(self):
@@ -3946,7 +3952,9 @@ class GateSingleflightTest(unittest.TestCase):
             result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
         self.assertEqual(result["verdict"], "gate-deferred")
         self.assertEqual(self.fake.calls.count(lane.CANONICAL_GATE), 1)
-        self.assertEqual(result["stage"], "after-gate")
+        # The moved head is caught before the next gate command (the funnel gate) runs.
+        self.assertEqual(result["stage"], "before-gate-command")
+        self.assertFalse(any("scripts/funnel-judge/preview-gate.mjs" in c for c in self.fake.calls))
         self.assertIn("gateWaitS", result)
         self.assertFalse((self.host.state / "verified.json").exists())
         self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in self.fake.calls))

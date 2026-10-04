@@ -24,7 +24,7 @@ The harness, not the model, owns:
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards a proven clean, published checkout is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`), else removed | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
-| Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
+| Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected`, then the funnel judge on the head's preview when a funnel surface changed (`scripts/funnel-judge/preview-gate.mjs`; no preview or exit 2 holds) | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
 | Host-local exact-head gate reservation before adoption setup or original verification; claims are never proof | `reserve_gate()`, `claim_adoptable_pr()`, `gate_pr()` |
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |

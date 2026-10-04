@@ -871,10 +871,17 @@ CANONICAL_GATE = ["bash", "scripts/hooks/pre-push-gate.sh", "affected"]
 SENSITIVE_PR_LABEL = "sensitive-surface"
 
 
-def check_commands(paths: list[str]) -> list[list[str]]:
-    """Code changes run the canonical gate; docs-only changes need nothing locally."""
+def funnel_gate(pr: dict) -> list[str]:
+    """JOV-7765: judge the funnel on this exact head's preview. The script owns the funnel
+    path list and exits 0 when no funnel surface changed; no preview or exit 2 holds."""
+    return ["node", "scripts/funnel-judge/preview-gate.mjs", "--pr", str(pr["number"]),
+            "--sha", pr["headRefOid"], "--ref", pr["headRefName"]]
+
+
+def check_commands(paths: list[str], pr: dict | None = None) -> list[list[str]]:
+    """Code changes run the canonical gate, then the funnel gate; docs-only changes need nothing locally."""
     if any(not DOC_FILE.search(p) for p in paths):
-        return [CANONICAL_GATE]
+        return [CANONICAL_GATE, *([funnel_gate(pr)] if pr else [])]
     return []
 
 
@@ -2299,7 +2306,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
     # The caller retains this same receipt if a later authority read refuses.
     result.update(changedFiles=len(changes), reasons=reasons)
     if not reasons:
-        commands = check_commands([change.path for change in changes])
+        commands = check_commands([change.path for change in changes], pr)
         seat = None
         if commands:
             seat, waited = gate_slot(host)
