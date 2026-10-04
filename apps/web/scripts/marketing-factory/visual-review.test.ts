@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ArtDirection } from '@/lib/agent-os/design-reference-corpus/refs-context';
 import type {
   JudgeScore,
   RouteJudges,
@@ -17,6 +18,26 @@ import {
 } from './visual-review';
 
 const PRODUCER = 'anthropic/claude-opus-5.5';
+const ONE_LIGHT: ArtDirection = {
+  schema: 'jovie.art-direction/v1',
+  id: 'one-light',
+  title: 'One Light',
+  status: 'active',
+  surfaces: ['marketing'],
+  thesis: 'One light finds one focal element.',
+  referenceIds: ['raycast-com'],
+  principles: {
+    light: ['One source sets every highlight.'],
+    composition: ['One focal element per fold.'],
+    type: ['One dominant step, then a compressed tail.'],
+    motion: ['The light moves, not the layout.'],
+    color: ['One accent hue per section.'],
+  },
+  tokenMap: [{ principle: 'near-black', jovie: '--color-bg-surface-0' }],
+  antiGoals: [],
+  decidedBy: 'test',
+  updatedAt: '2026-10-03T00:00:00.000Z',
+};
 const DIGEST = `sha256:${'c'.repeat(64)}`;
 const captures = fixtureCaptures('/solutions/founders', {
   cls: 0,
@@ -149,6 +170,60 @@ describe('runVisualReview', () => {
       status: 'credentials-unavailable',
       reason: 'visual review at 390 undecided: judge-error',
     });
+  });
+
+  it('fails on a reference copy before any judge is paid', async () => {
+    const pair = judges(0.9);
+    const findCopies = vi.fn(async () => [
+      {
+        image: captures[0].screenshot.path,
+        referenceId: 'raycast-com',
+        window: { left: 0, top: 0, width: 1440, height: 900 },
+        distance: 12,
+      },
+    ]);
+    const review = await runVisualReview(request, pair, {
+      references: [],
+      direction: null,
+      findCopies,
+    });
+
+    expect(review).toMatchObject({
+      status: 'reviewed',
+      verdict: 'fail',
+      judgeModel: 'design-refs/anti-copy',
+    });
+    expect(review.status === 'reviewed' && review.findings[0]).toMatch(
+      /^ref-copy: .* 12 bits from reference raycast-com$/u
+    );
+    expect(pair.cheap.run).not.toHaveBeenCalled();
+    expect(admit(review)).not.toEqual([]);
+  });
+
+  it('adds the active direction to the judge rubric when no ref is copied', async () => {
+    const pair = judges(0.9);
+    await runVisualReview(request, pair, {
+      references: [],
+      direction: ONE_LIGHT,
+      findCopies: async () => [],
+    });
+
+    const [input] = vi.mocked(pair.cheap.run).mock.calls[0] as unknown as [
+      { row: { policyFingerprintSource: { direction?: string } } },
+    ];
+    expect(input.row.policyFingerprintSource.direction).toContain('One Light:');
+    expect(
+      JSON.stringify(input.row.policyFingerprintSource).length
+    ).toBeLessThan(4_000);
+  });
+
+  it('keeps the base rubric without a direction', async () => {
+    const pair = judges(0.9);
+    await runVisualReview(request, pair);
+    const [input] = vi.mocked(pair.cheap.run).mock.calls[0] as unknown as [
+      { row: { policyFingerprintSource: { direction?: string } } },
+    ];
+    expect(input.row.policyFingerprintSource.direction).toBeUndefined();
   });
 });
 
