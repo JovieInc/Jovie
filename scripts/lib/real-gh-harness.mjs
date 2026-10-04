@@ -3,6 +3,7 @@ import {
   accessSync,
   closeSync,
   constants,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   openSync,
@@ -11,7 +12,7 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -155,11 +156,18 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
+  // The resolved binary must win `gh` lookup even when the caller supplies its
+  // own PATH (e.g. to shadow `node`): a harness-owned dir holding only the
+  // real gh is prepended after the caller's env is merged. Caller dirs still
+  // shadow everything else. Copy, don't symlink, so wrapper detection and
+  // platform quirks can't resurrect a shim.
+  const ghDir = mkdtempSync(join(tmpdir(), 'real-gh-bin-'));
+  copyFileSync(binary, join(ghDir, basename(binary)));
+  const { PATH: callerPath, ...restEnv } = env;
   try {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: `${dirname(binary)}${delimiter}${process.env.PATH ?? ''}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
@@ -169,7 +177,11 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
           GH_PROMPT_DISABLED: '1',
           HTTP_PROXY: proxy,
           http_proxy: proxy,
-          ...env,
+          ...restEnv,
+          PATH: `${ghDir}${delimiter}${
+            callerPath ??
+            `${dirname(binary)}${delimiter}${process.env.PATH ?? ''}`
+          }`,
         },
       });
       let stdout = '';
@@ -190,5 +202,6 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   } finally {
     server.close();
     rmSync(home, { recursive: true, force: true });
+    rmSync(ghDir, { recursive: true, force: true });
   }
 }
