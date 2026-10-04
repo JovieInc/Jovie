@@ -82,6 +82,18 @@ export const musicResolveOutputSchema = z
     provenance: z.record(z.string(), z.string()),
     candidateCount: z.number().int().nonnegative(),
     artistMetadata: artistMetadataSchema.optional(),
+    sourceErrors: z
+      .array(
+        z
+          .object({
+            source: z.enum(['catalog_isrc', 'musicbrainz_isrc']),
+            code: z.literal('UPSTREAM_FAILURE'),
+            retryable: z.boolean(),
+          })
+          .strict()
+      )
+      .max(2)
+      .optional(),
   })
   .strict();
 

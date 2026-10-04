@@ -459,7 +459,7 @@ describe('createDefaultInHouseSources', () => {
     ]);
   });
 
-  it('returns null or empty results for invalid URLs and upstream failures', async () => {
+  it('rejects enrichment failures and keeps invalid URLs as absence', async () => {
     fetchMock.mockRejectedValue(new Error('offline'));
     mocks.getMusicBrainzArtist.mockRejectedValue(new Error('offline'));
     mocks.lookupMusicBrainzRecordingUrlRels.mockRejectedValue(
@@ -473,8 +473,8 @@ describe('createDefaultInHouseSources', () => {
     ).resolves.toBeNull();
     await expect(sources.searchAlbums('Artist', 'Album')).resolves.toEqual([]);
     await expect(sources.artistByMbid(MBID)).rejects.toThrow('offline');
-    await expect(sources.urlRelsForIsrc('US-FAIL-12-34567')).resolves.toEqual(
-      []
+    await expect(sources.urlRelsForIsrc('US-FAIL-12-34567')).rejects.toThrow(
+      'offline'
     );
   });
   it('retains storefronts for URL reads and honors explicit territories for searches', async () => {

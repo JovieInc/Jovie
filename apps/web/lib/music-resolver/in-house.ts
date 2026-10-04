@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 import {
   type ArtistCandidate,
   type CatalogTrack,
@@ -8,6 +9,7 @@ import {
   type InHouseResolution,
   type InHouseSources,
   type ResolutionCandidate,
+  type ResolutionSourceError,
   type ResolvedArtistMetadata,
   type ResolvedDspLink,
 } from './in-house-contracts';
@@ -21,6 +23,7 @@ export type {
   InHouseResolution,
   InHouseSources,
   ResolutionCandidate,
+  ResolutionSourceError,
   ResolvedDspLink,
 } from './in-house-contracts';
 export { PROVENANCE_CONFIDENCE } from './in-house-contracts';
@@ -89,7 +92,8 @@ function finish(
     readonly artistMetadata?: ResolvedArtistMetadata;
   },
   links: readonly ResolvedDspLink[],
-  candidates: readonly ResolutionCandidate[] = []
+  candidates: readonly ResolutionCandidate[] = [],
+  sourceErrors: readonly ResolutionSourceError[] = []
 ): InHouseResolution {
   const byProvider = new Map<string, ResolvedDspLink>();
   for (const link of links) {
@@ -110,7 +114,9 @@ function finish(
       unique.length === 0 &&
       status === 'resolved' &&
       !(kind === 'artist' && entity.mbid)
-        ? 'no_match'
+        ? sourceErrors.length > 0
+          ? 'upstream_error'
+          : 'no_match'
         : status,
     kind,
     title: entity.title,
@@ -126,6 +132,7 @@ function finish(
     ),
     candidateCount: Math.max(candidates.length, unique.length),
     ...(entity.artistMetadata ? { artistMetadata: entity.artistMetadata } : {}),
+    ...(sourceErrors.length > 0 ? { sourceErrors } : {}),
   };
 }
 
@@ -143,12 +150,41 @@ async function fanOutIsrc(
   isrc: string,
   territory: string,
   seed: readonly ResolvedDspLink[]
-): Promise<ResolvedDspLink[]> {
-  const [tracks, rels] = await Promise.all([
-    sources.trackByIsrc(isrc, territory),
-    sources.urlRelsForIsrc(isrc),
+): Promise<{
+  tracks: readonly CatalogTrack[];
+  links: readonly ResolvedDspLink[];
+  sourceErrors: readonly ResolutionSourceError[];
+}> {
+  const [catalog, musicbrainz] = await Promise.allSettled([
+    Promise.resolve().then(() => sources.trackByIsrc(isrc, territory)),
+    Promise.resolve().then(() => sources.urlRelsForIsrc(isrc)),
   ]);
-  return [...seed, ...linksFromTracks(tracks), ...rels];
+  const sourceErrors: ResolutionSourceError[] = [];
+  for (const [source, outcome] of [
+    ['catalog_isrc', catalog],
+    ['musicbrainz_isrc', musicbrainz],
+  ] as const) {
+    if (outcome.status === 'fulfilled') continue;
+    const error: unknown = outcome.reason;
+    if (
+      error instanceof CallerCancellationError ||
+      (typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'AbortError')
+    ) {
+      throw error;
+    }
+    // Never expose exception messages, request URLs, or upstream bodies.
+    sourceErrors.push({ source, code: 'UPSTREAM_FAILURE', retryable: true });
+  }
+  const tracks = catalog.status === 'fulfilled' ? catalog.value : [];
+  const rels = musicbrainz.status === 'fulfilled' ? musicbrainz.value : [];
+  return {
+    tracks,
+    links: [...seed, ...linksFromTracks(tracks), ...rels],
+    sourceErrors,
+  };
 }
 
 async function resolveTrack(
@@ -157,10 +193,12 @@ async function resolveTrack(
 ): Promise<InHouseResolution> {
   const territory = territoryOf(query);
   if ('isrc' in query) {
-    const [tracks, rels] = await Promise.all([
-      sources.trackByIsrc(query.isrc, territory),
-      sources.urlRelsForIsrc(query.isrc),
-    ]);
+    const { tracks, links, sourceErrors } = await fanOutIsrc(
+      sources,
+      query.isrc,
+      territory,
+      []
+    );
     const first = tracks[0];
     return finish(
       'track',
@@ -172,7 +210,9 @@ async function resolveTrack(
         upc: first?.upc ?? null,
         mbid: null,
       },
-      [...linksFromTracks(tracks), ...rels]
+      links,
+      [],
+      sourceErrors
     );
   }
   if ('url' in query) {
@@ -186,9 +226,9 @@ async function resolveTrack(
         confidence: direct.confidence,
       },
     ];
-    const links = direct.isrc
+    const enrichment = direct.isrc
       ? await fanOutIsrc(sources, direct.isrc, territory, seed)
-      : seed;
+      : { links: seed, sourceErrors: [] };
     return finish(
       'track',
       'resolved',
@@ -199,7 +239,9 @@ async function resolveTrack(
         upc: direct.upc,
         mbid: null,
       },
-      links
+      enrichment.links,
+      [],
+      enrichment.sourceErrors
     );
   }
   const hits = await sources.searchTracks(query.artist, query.title, territory);
@@ -254,9 +296,9 @@ async function resolveTrack(
     );
   }
   const isrc = [...isrcs][0] ?? null;
-  const links = isrc
+  const enrichment = isrc
     ? await fanOutIsrc(sources, isrc, territory, linksFromTracks(exact))
-    : linksFromTracks(exact);
+    : { links: linksFromTracks(exact), sourceErrors: [] };
   return finish(
     'track',
     'resolved',
@@ -267,7 +309,9 @@ async function resolveTrack(
       upc: exact.find(hit => hit.upc)?.upc ?? null,
       mbid: null,
     },
-    links
+    enrichment.links,
+    [],
+    enrichment.sourceErrors
   );
 }
 

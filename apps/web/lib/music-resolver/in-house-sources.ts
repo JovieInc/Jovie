@@ -553,9 +553,7 @@ export function createDefaultInHouseSources(
       const { lookupMusicBrainzRecordingUrlRels } = await import(
         '@/lib/dsp-enrichment/providers/musicbrainz'
       );
-      const relations = await lookupMusicBrainzRecordingUrlRels(isrc).catch(
-        () => []
-      );
+      const relations = await lookupMusicBrainzRecordingUrlRels(isrc);
       return linksFromRelations(relations);
     },
   };

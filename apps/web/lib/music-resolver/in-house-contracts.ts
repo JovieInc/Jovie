@@ -21,6 +21,13 @@ export interface ResolutionCandidate {
 
 export type InHouseEntityKind = 'track' | 'album' | 'artist';
 
+/** Aggregate enrichment sources; provider-specific outcomes remain separate work. */
+export interface ResolutionSourceError {
+  readonly source: 'catalog_isrc' | 'musicbrainz_isrc';
+  readonly code: 'UPSTREAM_FAILURE';
+  readonly retryable: boolean;
+}
+
 export interface InHouseResolution {
   readonly status: 'resolved' | 'no_match' | 'ambiguous' | 'upstream_error';
   readonly kind: InHouseEntityKind;
@@ -35,6 +42,7 @@ export interface InHouseResolution {
   readonly provenance: Readonly<Record<string, string>>;
   readonly candidateCount: number;
   readonly artistMetadata?: ResolvedArtistMetadata;
+  readonly sourceErrors?: readonly ResolutionSourceError[];
 }
 
 /** Core MusicBrainz facts; tags, ratings, images and biographies are excluded. */
