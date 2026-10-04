@@ -17,6 +17,7 @@ import {
   processDspArtistDiscoveryJob,
   processMusicFetchEnrichmentJob,
 } from '@/lib/dsp-enrichment/jobs';
+import { musicFetchEnrichmentPayloadSchema } from '@/lib/dsp-enrichment/jobs/musicfetch-enrichment';
 import { processReleaseEnrichmentJob } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
@@ -27,6 +28,7 @@ import { processLinktreeJob } from './jobs/linktree';
 import { processTikTokJob } from './jobs/tiktok';
 import { processTwitterJob } from './jobs/twitter';
 import { processYouTubeJob } from './jobs/youtube';
+import { IngestionStatusManager } from './status-manager';
 
 // Re-export followup functions
 export { enqueueFollowupIngestionJobs } from './followup';
@@ -100,8 +102,29 @@ export async function processJob(
       return processDspArtistDiscoveryJob(tx, job.payload);
     case 'dsp_track_enrichment':
       return processReleaseEnrichmentJob(tx, job.payload);
-    case 'musicfetch_enrichment':
-      return processMusicFetchEnrichmentJob(tx, job.payload);
+    case 'musicfetch_enrichment': {
+      const parsed = musicFetchEnrichmentPayloadSchema.safeParse(job.payload);
+      const recoveryProfileId =
+        parsed.success && parsed.data.recoveryClaimed
+          ? parsed.data.creatorProfileId
+          : null;
+      if (recoveryProfileId) {
+        await IngestionStatusManager.markProcessing(tx, recoveryProfileId);
+      }
+      const result = await processMusicFetchEnrichmentJob(tx, job.payload);
+      if (recoveryProfileId) {
+        if (result.status === 'complete') {
+          await IngestionStatusManager.markIdle(tx, recoveryProfileId);
+        } else {
+          await IngestionStatusManager.markFailed(
+            tx,
+            recoveryProfileId,
+            result.errors.join('; ') || 'MusicFetch enrichment failed'
+          );
+        }
+      }
+      return result;
+    }
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }
