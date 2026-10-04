@@ -17,6 +17,12 @@ import {
 import { COMMANDS, findCommand } from './commands.js';
 import { installSkill } from './init.js';
 import { serveMcp } from './mcp.js';
+import {
+  MESH_FLAG_NAMES,
+  MESH_USAGE,
+  type MeshDependencies,
+  runMesh,
+} from './mesh.js';
 import { SKILL_MD } from './skill.js';
 
 export const CLI_VERSION_FALLBACK = '0.0.0-private';
@@ -66,11 +72,13 @@ export interface CliDependencies {
   readonly stdin?: NodeJS.ReadableStream;
   readonly homeDir?: string;
   readonly workerToken?: string;
+  readonly mesh?: MeshDependencies;
 }
 
 type CliValues = {
   readonly baseUrl?: string;
   readonly flags: Readonly<Record<string, string | undefined>>;
+  readonly meshFlags: Readonly<Record<string, string | undefined>>;
   readonly dir?: string;
   readonly full?: boolean;
   readonly help?: boolean;
@@ -107,6 +115,8 @@ ${lines.join('\n')}
   ${'mcp'.padEnd(width)} Run as an MCP server over stdio (same tools as above)
   ${'init'.padEnd(width)} Install the Jovie skill into Claude, Codex, OpenClaw, Hermes
   ${'skill'.padEnd(width)} Print the Jovie SKILL.md
+
+${MESH_USAGE}
 
 Options:
   --base-url <url>       Compatible Jovie deployment origin (default: ${DEFAULT_BASE_URL})
@@ -167,7 +177,12 @@ const COMMAND_FLAG_NAMES = [
 ];
 
 function commandFamily(argv: readonly string[]): string | undefined {
-  const stringOptions = new Set(['base-url', 'dir', ...COMMAND_FLAG_NAMES]);
+  const stringOptions = new Set([
+    'base-url',
+    'dir',
+    ...COMMAND_FLAG_NAMES,
+    ...MESH_FLAG_NAMES,
+  ]);
   for (let index = 0; index < argv.length; index++) {
     const token = argv[index];
     if (token === '--') return argv[index + 1];
@@ -196,7 +211,10 @@ function parseCliArgs(argv: readonly string[]): {
       json: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
       ...Object.fromEntries(
-        COMMAND_FLAG_NAMES.map(name => [name, { type: 'string' as const }])
+        [...COMMAND_FLAG_NAMES, ...MESH_FLAG_NAMES].map(name => [
+          name,
+          { type: 'string' as const },
+        ])
       ),
     },
     allowPositionals: true,
@@ -219,6 +237,12 @@ function parseCliArgs(argv: readonly string[]): {
         COMMAND_FLAG_NAMES.filter(name => values[name] !== undefined).map(
           name => [name, String(values[name])]
         )
+      ),
+      meshFlags: Object.fromEntries(
+        MESH_FLAG_NAMES.filter(name => values[name] !== undefined).map(name => [
+          name,
+          String(values[name]),
+        ])
       ),
       dir: values.dir,
       full: values.full,
@@ -246,6 +270,16 @@ async function execute(
     )
       throw new UsageError('Unsupported option for this command.');
   }
+  if (first === 'mesh') {
+    if (values.full || values.dir || Object.keys(values.flags).length)
+      throw new UsageError('Unsupported option for mesh.');
+    return runMesh(positionals, values.meshFlags, {
+      userAgent: `jovie-cli/${CLI_VERSION}`,
+      ...dependencies.mesh,
+    });
+  }
+  if (Object.keys(values.meshFlags).length)
+    throw new UsageError('Mesh options are only supported by mesh commands.');
   if (positionals.length === 1 && first === 'skill') return SKILL_MD;
   if (positionals.length === 1 && first === 'init') {
     return installSkill(dependencies.homeDir ?? homedir(), values.dir);
