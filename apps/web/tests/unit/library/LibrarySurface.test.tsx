@@ -1665,20 +1665,29 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
-  it('closes the inspector on Escape from anywhere and returns focus to the opener', () => {
-    renderLibrary([buildAsset()]);
+  it.each(['inside', 'outside'] as const)(
+    'closes the inspector on Escape with focus %s and returns focus to the opener',
+    focusLocation => {
+      renderLibrary([buildAsset()]);
 
-    const row = screen.getByTestId('library-release-row-release-1');
-    row.focus();
-    fireEvent.click(row);
-    const drawer = screen.getByTestId('library-asset-drawer');
-    expect(drawer).toHaveAttribute('aria-hidden', 'false');
+      const row = screen.getByTestId('library-release-row-release-1');
+      row.focus();
+      fireEvent.click(row);
+      const drawer = screen.getByTestId('library-asset-drawer');
+      expect(drawer).toHaveAttribute('aria-hidden', 'false');
 
-    fireEvent.keyDown(document.body, { key: 'Escape' });
+      const focused =
+        focusLocation === 'inside'
+          ? within(drawer).getByRole('tab', { name: 'Files' })
+          : screen.getByRole('button', { name: /^Show filters/i });
+      focused.focus();
+      expect(focused).toHaveFocus();
+      fireEvent.keyDown(focused, { key: 'Escape' });
 
-    expect(drawer).toHaveAttribute('aria-hidden', 'true');
-    expect(row).toHaveFocus();
-  });
+      expect(drawer).toHaveAttribute('aria-hidden', 'true');
+      expect(row).toHaveFocus();
+    }
+  );
 
   it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
     renderLibrary([buildAsset()]);

@@ -2922,6 +2922,12 @@ export function LibrarySurface({
     setDrawerOpen(true);
   }
 
+  const closeAssetDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    const opener = inspectorOpenerRef.current;
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+  }, []);
+
   // Escape closes the inspector from anywhere on the surface, not only when
   // focus is inside it, and returns focus to the item that opened it. Menus,
   // dialogs and popovers keep their own Escape; the inspector's handler marks
@@ -2933,13 +2939,11 @@ export function LibrarySurface({
       if (resolveTableNavAction(event.key, event.target) !== 'close') return;
       if (isInteractiveOverlayTarget(event.target)) return;
       event.preventDefault();
-      setDrawerOpen(false);
-      const opener = inspectorOpenerRef.current;
-      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      closeAssetDrawer();
     }
     globalThis.addEventListener('keydown', handleKeyDown);
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
-  }, [drawerOpen]);
+  }, [closeAssetDrawer, drawerOpen]);
 
   const handleApprovalStatusChange = useCallback(
     async (
@@ -3321,7 +3325,7 @@ export function LibrarySurface({
       <AssetDrawer
         asset={selectedAsset}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onClose={closeAssetDrawer}
         activePreviewId={activePreviewId}
         playingPreviewId={playingPreviewId}
         onTogglePreview={handleTogglePreview}
@@ -3351,6 +3355,7 @@ export function LibrarySurface({
       activePreviewId,
       approvalSavingIds,
       artistHandle,
+      closeAssetDrawer,
       drawerOpen,
       effectiveAssets,
       getContextMenuItems,
