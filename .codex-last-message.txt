@@ -1,0 +1,18 @@
+Implemented and pushed JOV-7396 as [draft PR #19862](https://github.com/JovieInc/Jovie/pull/19862), head `0b2b8ea7d3`. Linear is In Review.
+
+Key changes:
+
+- Added strict typed metadata validation in [metadata.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T192447Z-JOV-7396-codex-29a0bc/apps/web/lib/blog/metadata.ts).
+- Added an external publication registry separating eligibility, indexing, and certification in [publication.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T192447Z-JOV-7396-codex-29a0bc/apps/web/lib/blog/publication.ts).
+- Routed articles, listings, related posts, generated paths, sitemap, metadata, Open Graph, and share endpoints through one fail-closed catalog.
+- Removed the missing-date “today” fallback and migrated all four existing posts without changing URLs, dates, or order.
+- Documented the promotion/deployment and confidentiality contract in [BLOG_PUBLISHING.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T192447Z-JOV-7396-codex-29a0bc/docs/marketing/BLOG_PUBLISHING.md).
+
+Verification:
+
+- Exact coverage suite: 21 files, 173 tests passed; 92.3% changed-line coverage.
+- Biome, web typecheck, documentation freshness, hooks, and secret scans passed.
+- Hosted Source Validation, PR Ready, Exact-head Coverage, Security, Migration, size, and exact-head visual production-build/route-capture gates are green.
+- Worktree is clean and the reviewable diff is 1,359 lines.
+
+Limitation: the draft head has no deployment record and was not merged, as required. Exact production-route proof therefore remains with the normal post-merge deployment controller; the current production baseline routes return 200 but do not represent this head.
