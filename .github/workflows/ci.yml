@@ -5307,6 +5307,16 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
+      - name: Annotate quarantined unit lane
+        # Fail-open lane: surface the tracking Linear issue on the check run so
+        # a quarantined failure is never an unexplained neutral result.
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true' && matrix.shard == '7/14'
+        run: |
+          URLS="${{ steps.quarantine.outputs.unit_issue_urls }}"
+          for url in $URLS; do
+            echo "::notice title=Quarantined unit test (non-blocking)::This lane runs quarantined tests fail-open — failures are tracked by ${url}"
+          done
+
       - name: Run Ovie route and private-boundary coverage
         # One deterministic app suite, never repeated across the web shards
         # (cost preloaded on 1/14 by CI_RESERVED_MS in the duration sequencer).
@@ -6838,6 +6848,16 @@ jobs:
         run: |
           RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
           cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
+
+      - name: Annotate quarantined E2E lane
+        # Fail-open lane: surface the tracking Linear issue on the check run so
+        # a quarantined failure is never an unexplained neutral result.
+        if: always() && matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true'
+        run: |
+          URLS="${{ steps.quarantine.outputs.e2e_issue_urls }}"
+          for url in $URLS; do
+            echo "::notice title=Quarantined E2E spec (non-blocking)::This lane runs quarantined specs fail-open — failures are tracked by ${url}"
+          done
 
       - name: Upload Playwright Test Results on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') && hashFiles('apps/web/test-results/**') != '' }}
