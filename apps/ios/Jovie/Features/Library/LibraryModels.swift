@@ -337,5 +337,32 @@ enum LibraryFeed {
       liveStatLabel: "3 assets",
       publicURL: nil
     ),
+    LibraryAsset(
+      id: "lib-release-afterglow",
+      name: "Afterglow",
+      type: .release,
+      isPublic: true,
+      coverURL: nil,
+      liveStatLabel: "Out Aug 1",
+      publicURL: "https://jov.ie/a/afterglow"
+    ),
+    LibraryAsset(
+      id: "lib-merch-hoodie",
+      name: "Summer Run Hoodie",
+      type: .merch,
+      isPublic: true,
+      coverURL: nil,
+      liveStatLabel: "31 orders",
+      publicURL: "https://jov.ie/a/summer-run-hoodie"
+    ),
+    LibraryAsset(
+      id: "lib-photo-tour",
+      name: "Tour Visuals",
+      type: .photo,
+      isPublic: false,
+      coverURL: nil,
+      liveStatLabel: "12 photos",
+      publicURL: nil
+    ),
   ]
 }

@@ -112,7 +112,7 @@ test('the committed storefront is valid', async () => {
   assert.deepEqual(await validateStorefront(loadStorefront(), context), []);
 });
 
-test('storefront validation rejects banned copy, fake fixtures and accent repeats', async () => {
+test('storefront validation rejects banned copy, fake fixtures and off-rotation accents', async () => {
   const base = loadStorefront().screens;
   const problems = await validateStorefront(
     withScreens([
@@ -120,15 +120,20 @@ test('storefront validation rejects banned copy, fake fixtures and accent repeat
       { ...base[1], launchArgument: '-ui-testing-invented' },
       { ...base[2], accent: 'orange' },
       { ...base[3], accent: 'ion' },
-      { ...base[4], accent: 'ion', id: base[3].id },
+      { ...base[4], accent: 'red', id: base[3].id },
     ]),
     context
   );
   const text = problems.join('\n');
   assert.match(text, /chat: headline em-dash/);
   assert.match(text, /-ui-testing-invented is not a LaunchMode fixture/);
-  assert.match(text, /calendar: accent must be one of ion, ultra, pulse/);
-  assert.match(text, /neighbours must not share an accent/);
+  // Rotation is positional: blue, purple, pink, orange, then repeat.
+  assert.match(
+    text,
+    /calendar: accent must be pulse \(rotation ion, ultra, pulse, orange\)/
+  );
+  assert.match(text, /work: accent must be orange/);
+  assert.match(text, /work: accent must be ion/);
   assert.match(text, /duplicate id/);
 });
 

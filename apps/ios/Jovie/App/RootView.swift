@@ -69,6 +69,7 @@ private struct AppContentView: View {
     switch launchMode {
     case .uiTestingAudience,
          .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingChat,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
@@ -448,6 +449,7 @@ private struct AppContentView: View {
     switch appState.launchMode {
     case .uiTestingAudience,
          .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingChat,
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,

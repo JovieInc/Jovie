@@ -43,13 +43,13 @@
   },
   "layout": {
     "canvas": "canvas",
-    "headlineTop": 200,
+    "marginX": 110,
+    "headlineTop": 176,
     "headlineSize": 96,
-    "headlineMaxWidth": 1080,
-    "deviceTop": 560,
-    "deviceWidth": 1056,
-    "bezel": 22,
-    "deviceRadius": 150
+    "deviceTop": 600,
+    "deviceWidth": 1220,
+    "bezel": 20,
+    "deviceRadius": 168
   },
   "contentCheck": {
     "top": 0.15,
@@ -79,13 +79,13 @@
       "id": "work",
       "launchArgument": "-ui-testing-library",
       "headline": "All your work\nin one place.",
-      "accent": "ion"
+      "accent": "orange"
     },
     {
       "id": "identity",
-      "launchArgument": "-ui-testing-venue-mode",
+      "launchArgument": "-ui-testing-storefront-identity",
       "headline": "Share your profile\nwith one scan.",
-      "accent": "ultra"
+      "accent": "ion"
     }
   ]
 }

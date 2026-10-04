@@ -8,6 +8,7 @@ enum LaunchMode: Equatable, CaseIterable {
   case uiTestingAuthCallback
   case uiTestingSignedOut
   case uiTestingReady
+  case uiTestingStorefrontIdentity
   case uiTestingProfileError
   case uiTestingChat
   case uiTestingChatOffline
@@ -40,6 +41,7 @@ enum LaunchMode: Equatable, CaseIterable {
          .uiTestingAuthCallback,
          .uiTestingSignedOut,
          .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingProfileError,
          .uiTestingChat,
          .uiTestingChatOffline,
@@ -129,6 +131,7 @@ enum LaunchMode: Equatable, CaseIterable {
   var defaultInitialTab: AppShellTab {
     switch self {
     case .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingSettings,
          .uiTestingQRUnavailable,
          .uiTestingAuthCallback,
@@ -193,6 +196,10 @@ enum LaunchMode: Equatable, CaseIterable {
 
     if arguments.contains("-ui-testing-ready") {
       return .uiTestingReady
+    }
+
+    if arguments.contains("-ui-testing-storefront-identity") {
+      return .uiTestingStorefrontIdentity
     }
 
     if arguments.contains("-ui-testing-profile-error") {
