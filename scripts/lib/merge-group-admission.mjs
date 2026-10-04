@@ -76,16 +76,75 @@ const REQUIRED_ENV_MESSAGE =
 export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v2';
 
 export class MergeGroupAdmissionError extends Error {
-  constructor(message, { path = null, status = null } = {}) {
+  constructor(message, { path = null, status = null, rateLimit } = {}) {
     super(message);
     this.name = 'MergeGroupAdmissionError';
     this.path = path;
     this.status = status;
+    this.rateLimit = rateLimit;
   }
 }
 
 function fail(message) {
   throw new MergeGroupAdmissionError(message);
+}
+
+function isGraphqlQuotaError(error) {
+  return (
+    error?.type === 'RATE_LIMITED' ||
+    (error?.type === undefined &&
+      typeof error?.message === 'string' &&
+      /^API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
+        error.message
+      ))
+  );
+}
+
+function unsignedHeader(value, multiplier = 1) {
+  if (value === null) return null;
+  if (!/^[0-9]+$/.test(value)) return Number.NaN;
+  const parsed = Number(value) * multiplier;
+  return Number.isSafeInteger(parsed) ? parsed : Number.NaN;
+}
+
+function httpDateHeader(value) {
+  if (value === null) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toUTCString() === value
+    ? parsed
+    : Number.NaN;
+}
+
+function quotaRetryAt(headers, receivedAtMs) {
+  const remaining = unsignedHeader(headers.get('x-ratelimit-remaining'));
+  const reset = unsignedHeader(headers.get('x-ratelimit-reset'), 1_000);
+  const date = httpDateHeader(headers.get('date'));
+  const rawRetry = headers.get('retry-after');
+  const seconds = rawRetry !== null && /^[0-9]+$/.test(rawRetry);
+  const retry = seconds
+    ? unsignedHeader(rawRetry, 1_000)
+    : httpDateHeader(rawRetry);
+  if ([remaining, reset, date, retry].some(Number.isNaN)) {
+    fail('GitHub rate-limit response has malformed retry metadata');
+  }
+  // Translate absolute server times using Date from this same response; start
+  // at body receipt so response latency cannot make us retry before the bound.
+  const serverNow = date ?? receivedAtMs;
+  const bounds = [];
+  if (remaining === 0 && reset !== null) {
+    bounds.push(receivedAtMs + reset - serverNow);
+  }
+  if (retry !== null) {
+    bounds.push(
+      seconds ? receivedAtMs + retry : receivedAtMs + retry - serverNow
+    );
+  }
+  if (bounds.length === 0) return null; // Preserve legacy 15s recovery.
+  const retryAt = Math.max(receivedAtMs, ...bounds) + 1_000;
+  if (!Number.isSafeInteger(retryAt)) {
+    fail('GitHub rate-limit retry bound is outside the supported range');
+  }
+  return retryAt;
 }
 
 function requireSha(value, field) {
@@ -184,11 +243,15 @@ export function normalizeLiveQueueEntriesPage(
   payload,
   { branch = 'main' } = {}
 ) {
+  if (payload?.errors !== undefined && !Array.isArray(payload.errors)) {
+    fail('live merge queue GraphQL errors must be an array when present');
+  }
   if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-    fail(
+    throw new MergeGroupAdmissionError(
       `live merge queue GraphQL returned errors: ${payload.errors
         .map(error => error?.message ?? String(error))
-        .join('; ')}`
+        .join('; ')}`,
+      { rateLimit: payload.errors.every(isGraphqlQuotaError) }
     );
   }
 
@@ -433,6 +496,7 @@ function requireTimingBound(value, field, maximum) {
 // failing a valid group.
 export function isTransientApiError(error) {
   if (!(error instanceof MergeGroupAdmissionError)) return false;
+  if (error.rateLimit !== undefined) return error.rateLimit === true;
   if (error.status === 403 || error.status === 429) {
     return RATE_LIMIT_PATTERN.test(error.message);
   }
@@ -441,7 +505,7 @@ export function isTransientApiError(error) {
   }
   return (
     error.status === null &&
-    (/^live merge queue GraphQL returned errors: .*rate limit/i.test(
+    (/^live merge queue GraphQL returned errors: API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
       error.message
     ) ||
       /^GitHub API request failed for \S+: The operation was aborted due to timeout$/.test(
@@ -480,6 +544,8 @@ export async function waitForMergeGroupAdmission({
   const deadlineMs = now() + maxWaitMs;
   let attempt = 0;
   let lastGateStatus = null;
+  let observedSourceHeadSha = null;
+  let recoverySourceHeadSha = null;
   const failStillPending = () => {
     fail(
       `required merge-group checks did not pass within ${maxWaitMs}ms${
@@ -494,6 +560,13 @@ export async function waitForMergeGroupAdmission({
       evidence,
       runContext,
     });
+    const sourceHeadSha = receipt.liveEntry?.sourceHeadSha;
+    if (receipt.admitted && SHA_PATTERN.test(String(sourceHeadSha ?? ''))) {
+      if (recoverySourceHeadSha && sourceHeadSha !== recoverySourceHeadSha) {
+        fail('live merge queue source head changed during API recovery');
+      }
+      observedSourceHeadSha = sourceHeadSha;
+    }
     if (!receipt.admitted) {
       onStatus(
         `Merge-group admission neutralized obsolete synthetic head ${
@@ -606,10 +679,20 @@ export async function waitForMergeGroupAdmission({
     }
 
     let outcome;
+    let delayMs = pollIntervalMs;
     try {
       outcome = await poll();
     } catch (error) {
       if (!isTransientApiError(error)) throw error;
+      recoverySourceHeadSha ??= observedSourceHeadSha;
+      if (error.retryAtMs !== undefined && error.retryAtMs !== null) {
+        delayMs = Math.max(pollIntervalMs, error.retryAtMs - now());
+        if (delayMs + MAX_API_REQUEST_MS > deadlineMs - now()) {
+          fail(
+            'GitHub rate-limit recovery does not fit within the admission budget'
+          );
+        }
+      }
       outcome = `GitHub API unavailable (${
         error instanceof Error ? error.message : String(error)
       })`;
@@ -624,7 +707,7 @@ export async function waitForMergeGroupAdmission({
     onStatus(
       `Merge-group admission pending (attempt ${attempt}): ${gateStatus}`
     );
-    await sleep(Math.min(pollIntervalMs, remainingMs));
+    await sleep(Math.min(delayMs, remainingMs));
   }
 }
 
@@ -682,12 +765,36 @@ async function githubRequest(
   } catch {
     fail(`GitHub API returned non-JSON for ${path}`);
   }
+  if (
+    path === '/graphql' &&
+    [200, 403, 429, 502, 503, 504].includes(response.status) &&
+    data?.errors !== undefined &&
+    (!Array.isArray(data.errors) || data.errors.length > 0)
+  ) {
+    // Classify the structured error array before its messages are flattened.
+    // Mixed permission/quota responses never enter the retry path.
+    try {
+      normalizeLiveQueueEntriesPage(data);
+    } catch (error) {
+      if (isTransientApiError(error)) {
+        error.retryAtMs = quotaRetryAt(response.headers, now());
+      }
+      throw error;
+    }
+  }
   if (!response.ok) {
     const message = data?.message ?? 'unknown error';
-    throw new MergeGroupAdmissionError(
+    const error = new MergeGroupAdmissionError(
       `GitHub API ${response.status} for ${path}: ${message}`,
       { path, status: response.status }
     );
+    if (
+      (response.status === 403 || response.status === 429) &&
+      isTransientApiError(error)
+    ) {
+      error.retryAtMs = quotaRetryAt(response.headers, now());
+    }
+    throw error;
   }
   return { data, link: response.headers.get('link') };
 }
@@ -705,6 +812,7 @@ function createGitHubAdmissionApi({
   env,
   fetchImpl,
   headRef,
+  now,
   repository,
   token,
 }) {
@@ -725,7 +833,7 @@ function createGitHubAdmissionApi({
             owner,
             pageSize: LIVE_QUEUE_PAGE_SIZE,
           },
-          { deadlineMs, env, fetchImpl, token }
+          { deadlineMs, env, fetchImpl, now, token }
         );
         const parsed = normalizeLiveQueueEntriesPage(payload);
         entries.push(...parsed.entries);
@@ -738,7 +846,7 @@ function createGitHubAdmissionApi({
       try {
         const result = await githubRequest(
           `/repos/${encodedRepository}/git/ref/${encodedHeadRef}`,
-          { deadlineMs, env, fetchImpl, token }
+          { deadlineMs, env, fetchImpl, now, token }
         );
         return result.data;
       } catch (error) {
@@ -760,7 +868,7 @@ function createGitHubAdmissionApi({
       });
       return githubRequest(
         `/repos/${encodedRepository}/commits/${headSha}/check-runs?${query}`,
-        { deadlineMs, env, fetchImpl, token }
+        { deadlineMs, env, fetchImpl, now, token }
       );
     },
   };
@@ -828,7 +936,7 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
 
 export async function runAdmissionFromEnv(
   env = process.env,
-  { fetchImpl = fetch } = {}
+  { fetchImpl = fetch, now = Date.now, sleep = defaultSleep, onStatus } = {}
 ) {
   const eventPath = env.GITHUB_EVENT_PATH;
   const token = env.GH_TOKEN || env.GITHUB_TOKEN;
@@ -847,11 +955,15 @@ export async function runAdmissionFromEnv(
     ...evidence,
     env,
     fetchImpl,
+    now,
     token,
   });
   const result = await waitForMergeGroupAdmission({
     event,
     ...api,
+    now,
+    sleep,
+    onStatus,
     runContext: createRunContextFromEnv(env),
   });
   await writeAdmissionOutputs(result.receipt, env);
