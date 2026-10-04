@@ -39,17 +39,17 @@ export { PROVENANCE_CONFIDENCE } from './in-house-contracts';
  */
 
 export function normalizeCatalogName(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
+  const normalized = value.normalize('NFKC').toLowerCase();
+  if (!/[\p{L}\p{N}]/u.test(normalized)) return '';
+  return normalized
     .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, ' ')
     .trim();
 }
 
 export function sameCatalogName(left: string, right: string): boolean {
-  return normalizeCatalogName(left) === normalizeCatalogName(right);
+  const normalized = normalizeCatalogName(left);
+  return normalized.length > 0 && normalized === normalizeCatalogName(right);
 }
 
 function territoryOf(query: { readonly territory?: string }): string {
