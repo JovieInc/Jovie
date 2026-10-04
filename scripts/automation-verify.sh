@@ -36,6 +36,9 @@ case "$SCOPE" in
     # UI components), so every pusher — human, Symphony or lane — fails here, not in CI.
     # Server-backed Storybook and rendered certification stay in CI.
     pnpm component-ship-gate --diff-base="$BASE_REF" --skip-live-storybook --skip-rendered-cert
+    # JOV-7759: frontend-skill machine checks on added UI lines, so a lane's own
+    # gate fails before CI's Design Conformance lane does.
+    node scripts/design-frontend-skill-check.mjs --diff-base "$BASE_REF"
     ;;
   full)
     echo "[automation-verify] Running full verify bundle"

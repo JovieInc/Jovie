@@ -273,6 +273,18 @@ nodes:
       - issue_comment
     terminalReceipt: job:claude
     jobCount: 1
+  - name: CLI Chaos Nightly
+    path: .github/workflows/cli-chaos-nightly.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:remediation
+    jobCount: 2
   - name: CODEOWNERS Path Drift
     path: .github/workflows/codeowners-drift.yml
     active: true
@@ -750,7 +762,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
-    jobCount: 3
+    jobCount: 4
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -859,7 +871,7 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 1
+    jobCount: 3
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -1020,8 +1032,8 @@ nodes:
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:remediation-customer-changelog
-    jobCount: 13
+    terminalReceipt: job:heal-interrupted-marker
+    jobCount: 14
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1045,6 +1057,18 @@ nodes:
       - workflow_call
     terminalReceipt: job:release-result
     jobCount: 16
+  - name: Public Profile Benchmark
+    path: .github/workflows/public-benchmark.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:benchmark
+    jobCount: 1
   - name: Quality Gap Finder
     path: .github/workflows/quality-gap-finder.yml
     active: true

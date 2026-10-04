@@ -3,11 +3,15 @@ import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { listProductTruthClaims } from './claims';
 import {
   createProofPageContext,
+  createProofRequest,
+  DOGFOOD_METRIC_PROOF,
+  findProofReadyPages,
   findUnresolvedProofClaims,
   LOGO_ASSET_SOURCE,
   MARKETING_PROOF_AUDIT_BASELINE,
   PROOF_REGISTRY,
   type ProofCandidate,
+  proofEvidenceClass,
   proofFreshnessDate,
   selectProof,
   validateProof,
@@ -365,6 +369,92 @@ describe('proof registry', () => {
         '/solutions/artists',
       ],
       suggestedLane: 'product-capture',
+      generator: 'dogfood',
     });
+  });
+});
+
+describe('proof evidence classes and the ProofRequest loop (JOV-7750)', () => {
+  const metric = (evidence?: 'dogfood' | 'pilot'): ProofCandidate => ({
+    recordType: 'proof',
+    id: `metric-${evidence ?? 'market'}`,
+    kind: 'metric',
+    claimId: 'dogfood.fixture',
+    ...(evidence ? { evidence } : {}),
+    value: 3,
+    unit: 'subscribers',
+    reproducingQuery: 'select 3',
+    measuredAt: AS_OF,
+    sample: { size: 3, population: 'fixture' },
+    source: 'fixture',
+  });
+
+  it('classifies proof by whose outcome it shows', () => {
+    expect(proofEvidenceClass(metric('dogfood'))).toBe('dogfood');
+    expect(proofEvidenceClass(metric('pilot'))).toBe('pilot');
+    expect(proofEvidenceClass(metric())).toBe('none');
+    expect(
+      PROOF_REGISTRY.filter(item => item.kind === 'product-proof').map(
+        proofEvidenceClass
+      )
+    ).toEqual(['dogfood', 'dogfood']);
+    expect(
+      proofEvidenceClass({
+        recordType: 'proof',
+        id: 'press',
+        kind: 'third-party',
+        claimId: 'x',
+        url: 'https://example.com',
+        publisher: 'Example',
+        date: AS_OF,
+      })
+    ).toBe('none');
+  });
+
+  it('registers every dogfood receipt as valid dogfood metric proof', () => {
+    for (const proof of DOGFOOD_METRIC_PROOF) {
+      expect(proofEvidenceClass(proof)).toBe('dogfood');
+      expect(validateProof(proof, proof.measuredAt).valid).toBe(true);
+      expect(Number(proof.value)).toBeGreaterThan(0);
+    }
+  });
+
+  it('names the generator that can fill each request', () => {
+    const generator = (kind: ProofCandidate['kind']) =>
+      createProofRequest({ kind, claimId: 'c', pagesBlocked: ['/'] }).generator;
+    expect(generator('metric')).toBe('dogfood');
+    expect(generator('product-proof')).toBe('dogfood');
+    expect(generator('quote')).toBe('pilot');
+    expect(generator('logo')).toBe('pilot');
+    expect(generator('third-party')).toBe('research');
+    expect(
+      createProofRequest({
+        kind: 'metric',
+        claimId: 'c',
+        pagesBlocked: ['/'],
+        generator: 'computed',
+      }).generator
+    ).toBe('computed');
+  });
+
+  it('reports the pages to re-render once admissible proof lands', () => {
+    const requests = [
+      createProofRequest({
+        kind: 'metric',
+        claimId: 'dogfood.fixture',
+        pagesBlocked: ['/pricing', '/'],
+      }),
+      createProofRequest({
+        kind: 'quote',
+        claimId: 'customer.outcome',
+        pagesBlocked: ['/pricing'],
+      }),
+    ];
+    expect(findProofReadyPages(requests, AS_OF, [])).toEqual([]);
+    expect(findProofReadyPages(requests, AS_OF, [metric()])).toEqual([]);
+    expect(findProofReadyPages(requests, AS_OF, [metric('dogfood')])).toEqual([
+      { pageId: '/', claimIds: ['dogfood.fixture'] },
+      { pageId: '/pricing', claimIds: ['dogfood.fixture'] },
+    ]);
   });
 });

@@ -35,6 +35,10 @@ import {
   SpotifyProfileIdentityConflictError,
 } from '@/lib/profile/spotify-profile-identity';
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
+import {
+  type AccountMetricCohort,
+  getAccountMetricCohort,
+} from '@/lib/utils/email';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
@@ -485,11 +489,14 @@ export async function materializeClaimedOnboardingProfile({
   // A reserved (waitlist-pending) profile only holds the handle. Publishing
   // ownership signals — activeProfileId and the owner claim row — happens on
   // the admitted claim path so nothing treats the reservation as admission.
+  let claimCohort: AccountMetricCohort = 'unattributed';
   if (!reserved) {
-    await db
+    const [owner] = await db
       .update(users)
       .set({ activeProfileId: profileId, updatedAt: now })
-      .where(eq(users.id, verifiedUserId));
+      .where(eq(users.id, verifiedUserId))
+      .returning({ email: users.email });
+    claimCohort = getAccountMetricCohort(owner?.email);
 
     // "Manage as owner" claim row — only after verified ownership above.
     await db
@@ -557,7 +564,11 @@ export async function materializeClaimedOnboardingProfile({
   });
 
   if (!reserved) {
-    await recordFunnelStep({ funnel: 'artist_signup', step: 'claim_complete' });
+    await recordFunnelStep({
+      funnel: 'artist_signup',
+      step: 'claim_complete',
+      cohort: claimCohort,
+    });
   }
 
   return { profileId, handle, status };

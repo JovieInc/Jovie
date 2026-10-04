@@ -6,6 +6,8 @@ const DESIGN_GOVERNANCE_PATHS = new Set([
   'scripts/design-conformance-check.mjs',
   'scripts/design-conformance-check.test.mjs',
   'scripts/design-conformance-paths.mjs',
+  'scripts/design-frontend-skill-check.mjs',
+  'scripts/design-frontend-skill-check.test.mjs',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/oklch.mjs',

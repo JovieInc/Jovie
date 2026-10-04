@@ -2502,8 +2502,16 @@ class TestGhRetryHelper:
         result = _run_bash(script)
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
 
+    @pytest.mark.parametrize(
+        "quota_error",
+        [
+            "GraphQL: API rate limit already exceeded for installation ID 112037986.",
+            # Actions GITHUB_TOKEN wording seen in the JOV-7744 storm.
+            "GraphQL: API rate limit already exceeded for site ID installation.",
+        ],
+    )
     def test_does_not_retry_exhausted_installation_quota(
-        self, tmp_path: Path
+        self, tmp_path: Path, quota_error: str
     ) -> None:
         counter = tmp_path / "calls"
         counter.write_text("0", encoding="utf-8")
@@ -2516,7 +2524,7 @@ class TestGhRetryHelper:
                 count_file="${GH_RETRY_TEST_COUNTER:?}"
                 count=$(<"$count_file")
                 echo "$((count + 1))" >"$count_file"
-                echo "GraphQL: API rate limit already exceeded for installation ID 112037986." >&2
+                echo "${GH_RETRY_TEST_ERROR:?}" >&2
                 exit 1
                 """
             ),
@@ -2533,10 +2541,11 @@ class TestGhRetryHelper:
             export GH_RETRY_ATTEMPTS=8
             export GH_RETRY_BASE_DELAY=0
             export GH_RETRY_TEST_COUNTER="{counter}"
+            export GH_RETRY_TEST_ERROR="{quota_error}"
             if gh_retry api graphql 2>"{stderr_file}"; then
               exit 2
             fi
-            grep -q "rate limit already exceeded for installation ID" "{stderr_file}"
+            grep -qF "{quota_error}" "{stderr_file}"
             test "$(wc -l <"{stderr_file}" | tr -d ' ')" = "1"
             """
         )

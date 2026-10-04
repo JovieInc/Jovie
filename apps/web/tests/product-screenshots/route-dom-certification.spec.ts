@@ -17,6 +17,7 @@ import {
   ROUTE_DOM_CERTIFICATION_SCHEMA,
   type RouteDomFindingKind,
 } from '../e2e/utils/route-dom-detector';
+import { inspectShellMaterial } from '../e2e/utils/shell-material-detector';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import {
   isExternalBaseUrl,
@@ -165,6 +166,47 @@ async function expectDeliberateRed(
 }
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
+  // JOV-7710 / AM-017: one semantic level reads as one material.
+  const plane = (inner: string) =>
+    `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
+
+  test('rejects an inset header strip on the main plane (JOV-7207)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      plane(
+        '<header style="height:40px;background:rgb(24,25,30)">Inbox</header><div style="height:400px">rows</div>'
+      )
+    );
+    const report = await inspectShellMaterial(page);
+    expect(report.findings.map(finding => finding.element)).toEqual(['header']);
+  });
+
+  test('rejects a boxed table region on the main plane', async ({ page }) => {
+    await page.setContent(
+      plane(
+        '<div style="height:40px">Releases</div><div data-testid="boxed" style="width:900px;height:300px;background:rgba(255,255,255,0.03)">table</div>'
+      )
+    );
+    const report = await inspectShellMaterial(page);
+    expect(report.findings.map(finding => finding.element)).toEqual([
+      'div[data-testid="boxed"]',
+    ]);
+  });
+
+  test('passes controls and declared surfaces on one plane', async ({
+    page,
+  }) => {
+    await page.setContent(
+      plane(
+        '<header style="height:40px;background:rgb(16,17,20)"><button style="width:80px;height:28px;background:rgb(60,60,70)">New</button></header><div role="menu" style="width:900px;height:200px;background:rgb(30,31,36)"><div style="width:880px;height:40px;background:rgb(40,41,46)">item</div></div><div style="width:900px;height:200px;background:transparent">table</div>'
+      )
+    );
+    const report = await inspectShellMaterial(page);
+    expect(report.plane).toBe('rgb(16 17 20)');
+    expect(report.findings).toEqual([]);
+  });
+
   test('reproduces R01 sibling overlap', async ({ page }) => {
     await page.setContent(
       '<main><section><h1>R01</h1><p>Overlap proposal</p></section><section style="position:relative;height:200px"><article style="position:absolute;inset:0 0 auto 0;height:100px">Card A</article><article style="position:absolute;inset:40px 0 auto 0;height:100px">Card B</article></section></main>'
@@ -668,4 +710,94 @@ test('certifies every marketing route and public-profile open state', async ({
     routeCount: MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.length,
     receipts,
   });
+});
+
+// JOV-7710 / AM-017: the composed app shell's main plane (header + route
+// content) is one material. Ratcheted per route like the marketing taste
+// kinds; regenerate after fixes with UPDATE_SHELL_MATERIAL_BASELINE=1.
+const shellMaterialRoutes = [
+  '/demo',
+  '/demo/audience',
+  '/demo/showcase/analytics',
+  '/demo/showcase/earnings',
+  '/demo/showcase/links',
+  '/demo/showcase/releases',
+  '/demo/showcase/settings',
+  '/demo/showcase/release-tracked-links',
+] as const;
+const shellMaterialBaselinePath = path.resolve(
+  'tests/product-screenshots/shell-material-baseline.json'
+);
+
+test('certifies a single-material main plane on composed shell routes', async ({
+  page,
+}, testInfo) => {
+  test.skip(certificationScope === 'public-profile', 'profile-only scope');
+  test.setTimeout(10 * 60_000);
+  const baseUrl = exactBaseUrl(testInfo);
+  const baseline: Record<string, number> = JSON.parse(
+    readFileSync(shellMaterialBaselinePath, 'utf8')
+  );
+  const update = process.env.UPDATE_SHELL_MATERIAL_BASELINE === '1';
+  const next: Record<string, number> = {};
+  const receipts: Array<Record<string, string | number>> = [];
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize(SCREENSHOT_VIEWPORTS.desktop);
+  for (const route of shellMaterialRoutes) {
+    const response = await page.goto(route, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    expect.soft(response?.status(), route).toBeLessThan(400);
+    await expect(page.locator('main#main-content')).toBeVisible({
+      timeout: 30_000,
+    });
+    await waitForHydration(page);
+    await page.waitForTimeout(500);
+    const report = await inspectShellMaterial(page);
+    expect.soft(report.plane, `${route} main plane`).not.toBeNull();
+    const snapshotPath = `${safeName(route)}-desktop.json`;
+    await writeSnapshot(path.join('shell', snapshotPath), {
+      schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+      sourceGitSha,
+      deploymentUrl: baseUrl,
+      route,
+      viewport: 'desktop',
+      state: 'default',
+      plane: report.plane,
+      findings: report.findings,
+    });
+    receipts.push({
+      route,
+      viewport: 'desktop',
+      state: 'default',
+      snapshotPath,
+      findingCount: report.findings.length,
+    });
+    if (report.findings.length > 0) next[route] = report.findings.length;
+    if (!update) {
+      expect
+        .soft(
+          report.findings.length,
+          `${route} nested surface materials: ${JSON.stringify(report.findings)}`
+        )
+        .toBeLessThanOrEqual(baseline[route] ?? 0);
+    }
+  }
+  await writeSnapshot(path.join('shell', 'receipt.json'), {
+    schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+    capturedAt: new Date().toISOString(),
+    certificationMode: 'local-production-build',
+    deploymentUrl: baseUrl,
+    deploymentId,
+    sourceGitSha,
+    routeCount: shellMaterialRoutes.length,
+    receipts,
+  });
+  if (update) {
+    await writeFile(
+      shellMaterialBaselinePath,
+      `${JSON.stringify(next, null, 2)}\n`
+    );
+  }
 });

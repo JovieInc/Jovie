@@ -143,6 +143,31 @@ describe('GET /api/billing/health', () => {
     );
   });
 
+  it('reports a fresh failed reconciliation instead of healthy sync', async () => {
+    const createdAt = new Date().toISOString();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt, metadata: { success: false } }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: createdAt }],
+    ]);
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(cronRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.healthy).toBe(false);
+    expect(data.checks.recentReconciliation.status).toBe('critical');
+    expect(data.metrics.lastReconciliationSuccess).toBe(false);
+    expect(data.metrics.lastReconciliationAt).toBe(createdAt);
+  });
+
   it('serializes neon-http string timestamps without throwing', async () => {
     const lastReconciliationAt = new Date().toISOString();
     const lastBillingEventAt = new Date(Date.now() - 60_000).toISOString();
