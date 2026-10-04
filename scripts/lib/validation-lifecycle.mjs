@@ -56,7 +56,8 @@ const COMMISSIONING_HEADING = /^#{1,6}\s.*commission/im;
 // evidence", "Acceptance checks" and "Evaluation / completion" sections.
 const ACCEPTANCE_SECTION =
   /^\s*(?:#{1,6}\s+|\*\*)\s*(?:acceptance|completion|evaluation|success criteria|exit criteria|definition of done|done (?:when|means)|verification|proof)\b/i;
-const ANY_HEADING = /^\s*#{1,6}\s/;
+// A `#` heading or a bold-only line (`**Notes**`) ends a section.
+const ANY_HEADING = /^\s*(?:#{1,6}\s|\*\*[^*]+\*\*:?\s*$)/;
 const CHECKED_BOX = /^\s*[-*] \[[xX]\]/;
 const DECLARED_REQUIREMENT =
   /validation-required:\s*([a-z-]+(?:\s*,\s*[a-z-]+)*)/gi;
