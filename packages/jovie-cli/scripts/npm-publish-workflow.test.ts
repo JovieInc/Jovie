@@ -232,7 +232,7 @@ describe('canonical source validation discovers CLI publication changes', () => 
   );
   function runSourceGate(changed: string, failure: string = '') {
     const step = source.match(
-      /- name: Verify changed CLI publication behavior\n        shell: bash\n        run: \|\n([\s\S]*?)(?=^  security:)/m
+      /- name: Verify changed CLI publication behavior\n(?:        if: [^\n]+\n)?        shell: bash\n        run: \|\n([\s\S]*?)(?=^  security:)/m
     );
     expect(
       step,
