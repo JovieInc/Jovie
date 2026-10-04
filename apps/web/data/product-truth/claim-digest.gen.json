@@ -163,6 +163,7 @@
   "capabilityDigests": {
     "ab-testing": "a9cc2cf841081926",
     "ad-pixels": "51e68849a02a7a7b",
+    "agent-readable-profile-summary": "18222df5c47bb00a",
     "ai-assistant": "2ebc8a50be9cc99c",
     "ai-retouching": "3fd544f1d67bbb36",
     "album-art-generation": "a2b07544f3100e7a",
@@ -181,6 +182,7 @@
     "pay": "aae7c467b3101462",
     "priority-support": "4b7dfca7659937f3",
     "profile-monitoring": "5c40ff043b35292d",
+    "public-ask": "d945d6893b629475",
     "public-profile": "42229e882fcc134f",
     "release-launch": "c1d5683d621bab6e",
     "selective-reach": "2298506e3549b7c4",
@@ -194,6 +196,7 @@
   "capabilityRoutes": {
     "ab-testing": [],
     "ad-pixels": ["/pricing"],
+    "agent-readable-profile-summary": ["/{username}/llms.txt"],
     "ai-assistant": ["/pricing"],
     "ai-retouching": [],
     "album-art-generation": [],
@@ -212,6 +215,7 @@
     "pay": ["/pay"],
     "priority-support": ["/pricing"],
     "profile-monitoring": [],
+    "public-ask": ["/api/profile/{username}/ask", "/{username}"],
     "public-profile": ["/pricing", "/product"],
     "release-launch": ["/launch", "/new"],
     "selective-reach": [],
