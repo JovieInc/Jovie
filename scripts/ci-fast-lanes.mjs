@@ -546,6 +546,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/taste-label-guard.test.mjs',
   'scripts/lib/__tests__/tracker.test.mjs',
   'scripts/lib/__tests__/typecheck-singleflight-diagnostics.test.mjs',
+  'scripts/lib/__tests__/typecheck-singleflight.test.mjs',
   'scripts/lib/__tests__/typecheck-performance.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
