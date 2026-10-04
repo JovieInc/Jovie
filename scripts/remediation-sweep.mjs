@@ -31,7 +31,20 @@ async function gh(args) {
   return stdout;
 }
 
-function normalizePull(node) {
+function reviewerName(review) {
+  return (
+    review?.login ??
+    review?.slug ??
+    review?.name ??
+    review?.author?.login ??
+    null
+  );
+}
+
+export function normalizePull(node) {
+  const reviewers = [...(node.reviewRequests ?? []), ...(node.reviews ?? [])]
+    .map(reviewerName)
+    .filter(name => typeof name === 'string' && name.length > 0);
   return {
     number: node.number,
     isDraft: node.isDraft === true,
@@ -43,6 +56,7 @@ function normalizePull(node) {
       .filter(name => typeof name === 'string'),
     reviewRequestCount: node.reviewRequests?.length ?? 0,
     reviewCount: node.reviews?.length ?? 0,
+    reviewers: [...new Set(reviewers)].sort(),
   };
 }
 

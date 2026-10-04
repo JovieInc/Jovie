@@ -50,6 +50,7 @@ function hasHoldLabel(pull) {
 
 function hasReviewer(pull) {
   return (
+    (pull?.reviewers?.length ?? 0) > 0 ||
     Number(pull?.reviewRequestCount ?? 0) > 0 ||
     Number(pull?.reviewCount ?? 0) > 0
   );
@@ -58,6 +59,54 @@ function hasReviewer(pull) {
 function ageMs(iso, nowMs) {
   const parsed = Date.parse(iso ?? '');
   return Number.isFinite(parsed) ? nowMs - parsed : null;
+}
+
+function draftAge(createdAt, nowMs) {
+  const age = ageMs(createdAt, nowMs);
+  if (age == null) return 'unknown';
+  return `${Math.max(0, Math.floor(age / DAY_MS))}d`;
+}
+
+function draftReviewers(pull) {
+  const reviewers = [...new Set(pull?.reviewers ?? [])].sort();
+  if (reviewers.length > 0)
+    return reviewers.map(reviewer => `\`${reviewer}\``).join(', ');
+  const knownReviewerCount =
+    Number(pull?.reviewRequestCount ?? 0) + Number(pull?.reviewCount ?? 0);
+  return knownReviewerCount > 0 ? `${knownReviewerCount} reviewer(s)` : 'none';
+}
+
+function draftDisposition(pull) {
+  const holds = labelNames(pull)
+    .filter(name => HOLD_LABELS.has(name.toLowerCase()))
+    .map(name => {
+      const normalized = name.toLowerCase();
+      return normalized.startsWith('hold:') ? normalized : `hold:${normalized}`;
+    })
+    .sort();
+  return holds.length > 0 ? holds.join(', ') : 'draft';
+}
+
+function draftRollupTable(drafts, nowMs) {
+  const rows = [...drafts].sort((left, right) => {
+    const leftCreatedAt = Date.parse(left.createdAt ?? '');
+    const rightCreatedAt = Date.parse(right.createdAt ?? '');
+    if (!Number.isFinite(leftCreatedAt) && !Number.isFinite(rightCreatedAt))
+      return 0;
+    if (!Number.isFinite(leftCreatedAt)) return 1;
+    if (!Number.isFinite(rightCreatedAt)) return -1;
+    return leftCreatedAt - rightCreatedAt;
+  });
+  return [
+    '| Draft | Age | Reviewer | Lane disposition |',
+    '| --- | ---: | --- | --- |',
+    ...rows.map(pull => {
+      const reference = pull.url
+        ? `[#${pull.number}](${pull.url})`
+        : `#${pull.number}`;
+      return `| ${reference} | ${draftAge(pull.createdAt, nowMs)} | ${draftReviewers(pull)} | \`${draftDisposition(pull)}\` |`;
+    }),
+  ].join('\n');
 }
 
 function issue({ fingerprint, summary, description, priority, reason }) {
@@ -102,10 +151,6 @@ export function planStaleDraftRollup(pulls, nowMs) {
       `${staleUnreviewed.length} draft(s) older than 7d with no reviewer and no hold label`
     );
   }
-  const listed = staleUnreviewed
-    .slice(0, 30)
-    .map(pull => `#${pull.number}`)
-    .join(', ');
   return issue({
     fingerprint,
     summary: 'Open draft rollup',
@@ -113,7 +158,12 @@ export function planStaleDraftRollup(pulls, nowMs) {
     reason: reasons.join('; '),
     description: note(
       fingerprint,
-      `JOV-7548. ${reasons.join('; ')}. ${listed ? `Drafts: ${listed}. ` : ''}Reopens at 20+ open drafts or a draft older than 7d with no reviewer and no hold.`
+      [
+        `JOV-7548. ${reasons.join('; ')}.`,
+        'Reopens at 20+ open drafts or a draft older than 7d with no reviewer and no hold.',
+        '',
+        draftRollupTable(drafts, nowMs),
+      ].join('\n')
     ),
   });
 }

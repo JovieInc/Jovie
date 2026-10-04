@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { normalizePull } from '../../remediation-sweep.mjs';
 import {
   DAY_MS,
   DRAFT_STALE_MS,
@@ -62,6 +63,74 @@ describe('remediation sweep selection', () => {
       NOW
     );
     expect(stale.description).toContain('#10');
+  });
+
+  it('lists every draft with age, reviewer, and lane disposition', () => {
+    const rollup = planStaleDraftRollup(
+      [
+        pull({
+          number: 30,
+          isDraft: true,
+          createdAt: ago(3 * DAY_MS),
+          reviewers: ['review-team', 'alice'],
+        }),
+        pull({
+          number: 10,
+          isDraft: true,
+          createdAt: ago(9 * DAY_MS),
+        }),
+        pull({
+          number: 20,
+          isDraft: true,
+          createdAt: ago(8 * DAY_MS),
+          labels: ['incident'],
+        }),
+        pull({ number: 40, isDraft: false }),
+      ],
+      NOW
+    );
+
+    expect(rollup.description).toContain(
+      '| Draft | Age | Reviewer | Lane disposition |'
+    );
+    expect(rollup.description).toContain('| 9d | none | `draft` |');
+    expect(rollup.description).toContain('| 8d | none | `hold:incident` |');
+    expect(rollup.description).toContain(
+      '| 3d | `alice`, `review-team` | `draft` |'
+    );
+    expect(rollup.description).not.toContain('#40');
+    expect(rollup.description.indexOf('#10')).toBeLessThan(
+      rollup.description.indexOf('#20')
+    );
+    expect(rollup.description.indexOf('#20')).toBeLessThan(
+      rollup.description.indexOf('#30')
+    );
+  });
+
+  it('retains unique requested and completed reviewer names', () => {
+    expect(
+      normalizePull({
+        number: 7548,
+        isDraft: true,
+        createdAt: '2026-09-20T00:00:00.000Z',
+        updatedAt: '2026-10-04T00:00:00.000Z',
+        url: 'https://github.com/JovieInc/Jovie/pull/7548',
+        labels: [{ name: 'incident' }],
+        reviewRequests: [
+          { login: 'requested-reviewer' },
+          { slug: 'review-team' },
+        ],
+        reviews: [
+          { author: { login: 'completed-reviewer' } },
+          { author: { login: 'completed-reviewer' } },
+        ],
+      })
+    ).toMatchObject({
+      labels: ['incident'],
+      reviewRequestCount: 2,
+      reviewCount: 2,
+      reviewers: ['completed-reviewer', 'requested-reviewer', 'review-team'],
+    });
   });
 
   it('ages exhausted labels and idle holds strictly past the deadline', () => {
