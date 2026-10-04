@@ -1881,6 +1881,16 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
 
+    def test_new_issue_budget_uses_base_slots_not_autoscaled(self):
+        """JOV-7514: parked-PR caps stay on configured slots as autoscale capacity rises."""
+        seen = []
+        lane.read_new_issue_budget = lambda name, slots: seen.append(slots) or {"allowed": True}
+        lane.run_issue = lambda *a: {"verdict": "landing", "prUrl": "u"}
+        with patch.object(self.host, "base_slots", return_value=2), \
+                patch.object(lane.autoscale, "effective_slots", return_value=5):
+            lane.worker(self.host, "devin")
+        self.assertEqual(seen, [2])
+
     def test_unknown_budget_defers_without_claim_or_failure_charge(self):
         lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, None)
         lane.run_issue = lambda *a: self.fail("unknown inventory cannot authorize new work")
