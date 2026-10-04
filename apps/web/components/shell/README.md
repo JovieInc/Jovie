@@ -77,6 +77,7 @@ that caller boundary instead of widening the component contract.
 | Module | Purpose |
 |--------|---------|
 | `@/lib/shortcuts` | `SHORTCUTS` registry + `ShortcutHint` interface. Every keyboard shortcut lives here, surfaced via `Tooltip` `kbd` chip. |
+| `./rail-motion` | Canonical shell rail-motion contract (JOV-4522): shared allocation/main-plane/sheet/staged-label classes and `SHELL_RAIL_MOTION_MS`. `./useRailMotionPhase` resolves the shared `closed`/`opening`/`open`/`closing` lifecycle — interruptible, reduced-motion aware — surfaced on rails as `data-rail-phase` for certification. |
 
 ## Conventions
 

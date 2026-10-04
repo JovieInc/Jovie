@@ -469,6 +469,23 @@ function validateRun(run, repository) {
   return front;
 }
 
+function liveEntryHeadSha(pr) {
+  const oid = pr?.mergeQueueEntry?.headCommit?.oid;
+  return typeof oid === 'string' ? oid.toLowerCase() : null;
+}
+
+// The exact source is still queued, but its live entry is not the failed
+// group: either rebuilt on a new combined head or waiting for one (null).
+export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
+  return (
+    pr?.state === 'OPEN' &&
+    String(pr?.headRefOid ?? '').toLowerCase() === sourceHeadSha &&
+    pr.isInMergeQueue === true &&
+    Boolean(pr.mergeQueueEntry) &&
+    liveEntryHeadSha(pr) !== groupHeadSha
+  );
+}
+
 // Persist the exact-source failure before removing native merge intent. A new
 // head keeps the old receipt and receives no dequeue/disable mutation.
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
@@ -502,6 +519,29 @@ export async function applyMergeGroupFailure(
   if (classification === 'base-branch' && !SHA.test(recordedMainSha)) {
     fail('current main sha is unavailable');
   }
+  const groupHeadSha = String(run.head_sha).toLowerCase();
+  let current = await readPullRequest(front.prNumber);
+  // A run whose group GitHub already rebuilt says nothing about the live
+  // entry. Disabling auto-merge then ejects the fresh group and rebuilds
+  // every group behind it, whose stale runs fail in turn (2026-10-03 churn).
+  if (supersededByLiveEntry(current, sourceHeadSha, groupHeadSha)) {
+    return {
+      schema: FAILURE_HOLD_SCHEMA,
+      repository,
+      prNumber: front.prNumber,
+      sourceHeadSha,
+      mergeGroupHeadSha: groupHeadSha,
+      liveMergeGroupHeadSha: liveEntryHeadSha(current),
+      workflowRunId: run.id,
+      workflowRunAttempt: run.run_attempt,
+      classification,
+      superseded: true,
+      statusWritten: false,
+      dequeued: false,
+      dequeueOutcome: 'not-attempted',
+      autoMergeDisabled: false,
+    };
+  }
   const existing = revisionFailureDisposition({ statuses, repository });
   const duplicate = existing.failures.find(
     item => item.runId === run.id && item.runAttempt === run.run_attempt
@@ -525,7 +565,7 @@ export async function applyMergeGroupFailure(
     });
   }
 
-  let current = await readPullRequest(front.prNumber);
+  current = await readPullRequest(front.prNumber);
   let dequeued = false;
   let autoMergeDisabled = false;
   let dequeueOutcome = 'not-attempted';
@@ -577,7 +617,7 @@ export async function applyMergeGroupFailure(
     repository,
     prNumber: front.prNumber,
     sourceHeadSha,
-    mergeGroupHeadSha: String(run.head_sha).toLowerCase(),
+    mergeGroupHeadSha: groupHeadSha,
     mergeGroupBaseSha: front.baseSha,
     workflowRunId: run.id,
     workflowRunAttempt: run.run_attempt,
@@ -643,7 +683,7 @@ function graphql(query, variables) {
 }
 
 const TIMELINE_QUERY = `query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){timelineItems(first:100,after:$cursor,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{createdAt} ... on RemovedFromMergeQueueEvent{createdAt reason beforeCommit{oid}} ... on PullRequestCommit{commit{oid}} ... on HeadRefForcePushedEvent{createdAt afterCommit{oid}}} pageInfo{hasNextPage endCursor}}}}}`;
-const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id} autoMergeRequest{enabledAt}}}}`;
+const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id headCommit{oid}} autoMergeRequest{enabledAt}}}}`;
 
 function readTimeline(repository, prNumber) {
   const [owner, name] = repository.split('/');
@@ -845,7 +885,8 @@ async function main(argv) {
     }
   );
   const serialized = JSON.stringify(result);
-  if (process.env.GITHUB_OUTPUT) {
+  // A superseded run holds nothing, so enrollment receives no receipt.
+  if (process.env.GITHUB_OUTPUT && !result.superseded) {
     appendFileSync(
       process.env.GITHUB_OUTPUT,
       `failure_receipt=${serialized}\n`

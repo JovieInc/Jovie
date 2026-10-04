@@ -2,6 +2,8 @@
 
 import { Sheet, SheetContent } from '@jovie/ui';
 import React from 'react';
+import { SHELL_RAIL_ALLOCATION } from '@/components/shell/rail-motion';
+import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './context';
 
@@ -25,6 +27,9 @@ export const Sidebar = React.forwardRef<
     ref
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    // Shared rail lifecycle: certification samples data-rail-phase to prove
+    // opening/closing resolve toward the latest requested state (JOV-4522).
+    const railPhase = useRailMotionPhase(state === 'open');
 
     if (collapsible === 'none') {
       return (
@@ -78,13 +83,15 @@ export const Sidebar = React.forwardRef<
           ref={ref}
           className='group peer max-lg:hidden h-full min-h-0 shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10'
           data-state={state}
+          data-rail-phase={railPhase}
           data-collapsible={state === 'closed' ? collapsible : ''}
           data-variant={variant}
           data-side={side}
         >
           <div
             className={cn(
-              'duration-cinematic relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-cinematic motion-reduce:transition-none',
+              'relative h-full w-(--sidebar-width) overflow-hidden',
+              SHELL_RAIL_ALLOCATION,
               'group-data-[collapsible=offcanvas]:w-0',
               state === 'closed' &&
                 collapsible === 'offcanvas' &&

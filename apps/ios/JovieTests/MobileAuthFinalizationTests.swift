@@ -2,6 +2,40 @@ import Foundation
 import Testing
 @testable import Jovie
 
+extension MobileAuthFinalizationTests {
+  @Test(arguments: ["nil-to-B", "A-to-B", "same-bytes", "external-change", "consume", "clear"])
+  @MainActor func pendingSnapshotsFenceReplacementAndConsumeOnlyOnce(change: String) throws {
+    let suite = "MobileAuthPendingSnapshotTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let store = MobileAuthPendingStore(defaults: defaults)
+    if change != "nil-to-B" { store.save(codeVerifier: "verifier-A") }
+    let original = store.snapshot()
+    switch change {
+    case "nil-to-B", "A-to-B": store.save(codeVerifier: "verifier-B")
+    case "same-bytes": store.save(codeVerifier: "verifier-A")
+    case "external-change":
+      defaults.set("verifier-B", forKey: "ie.jov.Jovie.auth.pendingCodeVerifier")
+    case "consume":
+      #expect(store.consumeCodeVerifier(matching: original) == "verifier-A")
+      #expect(store.consumeCodeVerifier(matching: original) == nil)
+      #expect(!store.clear(matching: original) && !store.hasCodeVerifier())
+      return
+    default:
+      #expect(store.clear(matching: original))
+      #expect(!store.clear(matching: original))
+      #expect(store.consumeCodeVerifier(matching: original) == nil && !store.hasCodeVerifier())
+      return
+    }
+    let replacement = store.snapshot()
+    #expect(!store.isCurrent(original))
+    #expect(store.consumeCodeVerifier(matching: original) == nil)
+    #expect(!store.clear(matching: original))
+    #expect(store.isCurrent(replacement) && store.hasCodeVerifier())
+    #expect(store.consumeCodeVerifier(matching: replacement) == (change == "same-bytes" ? "verifier-A" : "verifier-B"))
+  }
+}
+
 @Suite(.serialized)
 struct MobileAuthFinalizationTests {
   @Test func sessionTokenPlanUsesBetterAuthSession() {
@@ -417,6 +451,95 @@ extension MobileAuthFinalizationTests {
       #expect(resolutions == (rejected ? 1 : 0) && failures == (rejected ? 0 : 1))
       #expect(settled == (rejected ? 1 : 0))
       if rejected { #expect(NativeSessionTokenStore.captureSessionContext() == previous) }
+    }
+  }
+}
+
+extension MobileAuthFinalizationTests {
+  @Test(arguments: ["matching", "universal", "missing", "wrong", "duplicate", "empty", "malformed",
+    "foreign-origin", "legacy", "wrong-family", "bad-version", "corrupt"])
+  @MainActor func correlatedPendingSurvivesColdIngressWithoutAcceptingAnotherAttempt(change: String) throws {
+    let suite = "NativeAttemptTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let baseURL = URL(string: "https://jov.ie")!
+    let nonce = String(repeating: "A", count: 43)
+    let store = MobileAuthPendingStore(defaults: defaults)
+    #expect(store.save(codeVerifier: "verifier", nativeAttempt: nonce, baseURL: baseURL))
+    let key = "ie.jov.Jovie.auth.pendingCodeVerifier"
+    if change == "legacy" { store.save(codeVerifier: "verifier") }
+    if change == "wrong-family" || change == "bad-version" {
+      let data = try #require(defaults.data(forKey: key))
+      var value = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+      if change == "wrong-family" { value["client"] = "electron" }
+      else { value["version"] = 2 }
+      defaults.set(try JSONSerialization.data(withJSONObject: value), forKey: key)
+    }
+    if change == "corrupt" { defaults.set(Data("{".utf8), forKey: key) }
+    let coldStore = MobileAuthPendingStore(defaults: defaults)
+    let before = coldStore.snapshot(), bytes = defaults.object(forKey: key) as? Data
+    let origin = change == "foreign-origin" ? "https://staging.jov.ie/auth/ios/complete"
+      : change == "universal" ? "https://jov.ie/auth/ios/complete" : "ie.jov.jovie://auth/complete"
+    var components = try #require(URLComponents(string: origin))
+    components.queryItems = [URLQueryItem(name: "code", value: "code"), URLQueryItem(name: "state", value: "state")]
+    if change != "missing" {
+      let value = change == "wrong" ? String(repeating: "B", count: 43)
+        : change == "empty" ? "" : change == "malformed" ? nonce + "\n" : nonce
+      components.queryItems?.append(URLQueryItem(name: "native_attempt", value: value))
+    }
+    if change == "duplicate" { components.queryItems?.append(URLQueryItem(name: "native_attempt", value: nonce)) }
+    let url = try #require(components.url)
+    let claim = coldStore.claim(url, matching: before, baseURL: baseURL)
+    if change == "matching" || change == "universal" {
+      let accepted = try #require(claim)
+      #expect(accepted.authReturn == MobileAuthReturn(code: "code", state: "state",
+        codeVerifier: "verifier", nativeAttempt: nonce))
+      #expect(!coldStore.hasCodeVerifier() && coldStore.isCurrent(accepted))
+      #expect(coldStore.claim(url, matching: before, baseURL: baseURL) == nil)
+      #expect(coldStore.consumeCodeVerifier() == nil && coldStore.isCurrent(accepted))
+      let afterCrash = MobileAuthPendingStore(defaults: defaults)
+      #expect(afterCrash.claim(url, matching: afterCrash.snapshot(), baseURL: baseURL) == nil)
+    } else {
+      #expect(claim == nil && coldStore.isCurrent(before))
+      #expect(defaults.object(forKey: key) as? Data == bytes)
+      if change == "legacy" { #expect(defaults.string(forKey: key) == "verifier") }
+    }
+  }
+
+  @Test(arguments: ["rearm", "finish", "replacement", "same-bytes", "reclaimed"])
+  @MainActor func pendingClaimCleanupAndRearmConsumeOnlyTheirExactLease(change: String) throws {
+    let suite = "NativeAttemptLeaseTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let store = MobileAuthPendingStore(defaults: defaults)
+    let baseURL = URL(string: "https://jov.ie")!, nonce = String(repeating: "A", count: 43)
+    let url = URL(string: "ie.jov.jovie://auth/complete?code=code&state=state&native_attempt=\(nonce)")!
+    #expect(store.save(codeVerifier: "A", nativeAttempt: nonce, baseURL: baseURL))
+    let original = try #require(store.claim(url, matching: store.snapshot(), baseURL: baseURL))
+    if change == "finish" {
+      store.finish(original)
+      #expect(!store.rearm(original) && !store.hasCodeVerifier())
+      let empty = store.snapshot()
+      store.finish(original)
+      #expect(store.isCurrent(empty))
+      return
+    }
+    if change == "rearm" || change == "reclaimed" {
+      #expect(store.rearm(original) && store.hasCodeVerifier())
+      if change == "reclaimed" {
+        _ = try #require(store.claim(url, matching: store.snapshot(), baseURL: baseURL))
+      }
+    } else {
+      #expect(store.save(codeVerifier: "A", nativeAttempt: change == "same-bytes" ? nonce
+        : String(repeating: "B", count: 43), baseURL: baseURL))
+    }
+    let current = store.snapshot()
+    #expect(!store.rearm(original))
+    store.finish(original)
+    #expect(store.isCurrent(current))
+    if change == "rearm" {
+      let cold = MobileAuthPendingStore(defaults: defaults)
+      #expect(cold.claim(url, matching: cold.snapshot(), baseURL: baseURL) != nil)
     }
   }
 }

@@ -17,10 +17,12 @@ The harness, not the model, owns:
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
+| Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
-| Fresh worktree from `origin/main`, shared-store hardlink install, removal after | `run_issue()` |
+| Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; removal after | `run_issue()`, `worktree_pool.take()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
 | Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
@@ -36,6 +38,7 @@ The harness, not the model, owns:
 | Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
+| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `backup/<host>/<name>-<date>` first, else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
@@ -59,6 +62,17 @@ HUD labels this count as new issues; it is not total company demand or a claim o
 available worker capacity. Slot occupancy, account leases and PR work remain
 separate facts. Empty-demand alerts require known zero eligibility and no open
 PR maintenance; unknown evidence and backpressure reset the empty timer.
+
+The file-overlap guard is on by default. `SYMPHONY_FILE_OVERLAP_GUARD=flag` keeps
+classification, ledger, doctor, and HUD visibility without holds; `=0` disables it
+and releases automation-owned holds. Existing non-draft PR overlaps are ordered by
+an explicit stack/dependency first, then foundational/shared work, smaller diffs,
+creation time, and PR number. The later PR receives `hold`; after the earlier PR
+lands, Symphony removes only the hold it applied and queues `lane-fix-dequeued` for
+the existing rebase lane. A stacked child is retargeted to `main`, never merged into
+its parent branch. Generated workflow topology and migration journals are regenerated
+after rebasing rather than hand-merged. `doctor.json.fileOverlap` publishes active
+pairs, files, actions, and the prevention/flag/rebase counters.
 
 Account attribution uses the existing status rows without changing account
 admission. Lease occupancy and cooldown are independent; an account can be both
@@ -175,7 +189,14 @@ Gaps closed after the first week (no PR may sit unowned):
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
   drafts receive `repair`, or `hold:dependency` while a named dependency is open.
   A landed dependency releases repair; it never grants authority to discard the branch.
-  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement. Every
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
+  exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
+  carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
+  latest `labeled` event) sends its issue to Todo + `agent-ready` with a rebuild-from-main note,
+  unless the issue is done or another open PR carries it. The PR stays open and gets
+  `lane-rebuild` (once), which stops it holding the issue in `in_flight_issues()`; label it
+  `duplicate` once the rebuild lands. Holds, the merge queue and live repair claims skip it;
+  `LANES_PARKED_REQUEUE=0` turns it off (`requeue_parked()`). Every
   close path re-reads the live source head, state, complete labels, fork and queue status;
   revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
@@ -292,6 +313,20 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+## Worktree pool and shared caches (JOV-7705)
+
+`worktree_pool.py` (CLI: `scripts/agent/worktree-new`) keeps `JOVIE_WORKTREE_POOL_SIZE`
+(default 2) detached worktrees per repository, each installed and with a warm web
+`tsbuildinfo`, under `$JOVIE_CACHE_ROOT/worktree-pool/<hash of git common dir>/`
+(default `~/.cache/jovie`). Taking a slot is `git worktree move` + checkout of the new
+branch + an incremental install. A fill is one detached process per pool (flock), runs
+after every take, rebuilds slots older than 3 days, and never builds below
+`JOVIE_WORKTREE_POOL_MIN_FREE_GB` (default 30). `disk_guard` drains idle slots once free
+space is under that same floor, so a sweep and a refill never fight. Disk-cleanup agents
+must leave `~/.cache/jovie` and the pnpm store (`pnpm store path`) alone; use
+`scripts/agent/worktree-new --drain` to reclaim pool space. Tests and
+`JOVIE_WORKTREE_POOL=0` never touch the pool.
 
 ## Preserved repairs (JOV-7347)
 
@@ -459,7 +494,7 @@ alert `escalation-needs-human`.
 ```sh
 python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
   scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py \
-  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py \
+  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py scripts/tests/test_worktree_sweep.py \
   scripts/tests/test_remediation.py
 ```
 
@@ -518,19 +553,55 @@ checked-in projection of `apps/web/data/product-truth/registry.ts`:
 publication `public`, `marketing.proofAuthorized` true, maturity not
 `proposed`, access not `unavailable`.
 
-`design_gate.py` is pure stdlib, no I/O at import. An issue is gated on
-`ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or when title or
-description names a `GATED_PATH_PREFIXES` path or clearly targets a
-homepage, landing, or marketing page. `worker()` calls
-`design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
-gated issue with an incomplete brief is not claimed, and the runner writes
-`needs-design-brief` plus the matching Linear label at most once. The label
-routes a design pass — it does not itself block — and the next claim admits
-the issue once steps 1–9 are complete.
+`design_gate.py` is pure stdlib, with no I/O at import.
 
-`doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
-`needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
-`rejectedByProvider["needs-design-brief"]`.
+**What is gated.** Only visible-UI work. An issue is gated when it has
+`ws:ui-ia`, `ws:profiles-marketing` or `ws:design-gate`, when its description
+names a `GATED_PATH_PREFIXES` path, or when its title targets a homepage,
+landing or marketing page. A homepage mentioned only in passing in the
+description does not gate. Neither does a plumbing title: a redirect, alias,
+orphan, route handler, endpoint, webhook, cron, migration or backend.
+
+**Which template.** Marketing and landing issues use
+`docs/design/design-brief-template.md`. App-surface issues use
+`docs/design/app-ui-brief-template.md`. Its steps 5–7 are screens and states
+(JOV-7713 class 6), canonical primitives, and viewports. Primitives are
+checked against `app-ui-primitives.gen.json`, a projection of
+`DESIGN_SYSTEM_COMPONENT_IDS` and `AppScreenComponentId` that a test keeps
+in sync with those registries.
+
+**What happens to a held issue (JOV-7717: a brief must never block forever).**
+`worker()` calls `design_gate.pick_build_issue(...)` with the existing
+`pick_issue`. That call does five things:
+
+1. **First claim.** A held issue goes ahead of build work: among issues whose
+   brief run is due, `pick_issue` order and eligibility choose one. The gate
+   adds `needs-design-brief` and a `held-at` marker once.
+2. **Brief run.** `run_brief` runs the same provider with a brief-only prompt.
+   The prompt says to write `.design-brief.md` and not to invent artifacts.
+   The runner appends the result inline under
+   `<!-- design-gate:brief-lane -->`, even if the run produced nothing, and
+   opens no PR. The issue returns to Todo.
+3. **Frontier retry.** If steps are still missing, the next claim runs one
+   retry on the `codex` lane (if healthy, otherwise the same lane). It fills
+   the steps from canon (DESIGN.md and the registries) and replaces the draft
+   under `<!-- design-gate:brief-retry -->`.
+4. **Auto-admission.** After the retry, or 24h after `held-at`, an incomplete
+   brief is admitted as `brief-auto`. The gate labels it, comments a warning,
+   and appends one founder `jovie.work-order/v1` block for the taste call.
+   Summer's founder path (JOV-7739) posts that block to Ovie with no model
+   turn.
+5. **Linked briefs.** A linked `Design brief:` doc is never overwritten. It
+   gets no brief run and follows the 24h rule.
+
+`doctor.py` adds `designGate` to the admission census, deduped:
+
+- `gated`, `admitted`, `autoAdmitted`, `needsBrief` and `missingSteps`;
+- `ageHistogram`: time since `held-at` for issues still held or labeled;
+- `stale`: issues held past 25h. Any entry raises the `design-brief-stale`
+  alert.
+
+Incomplete briefs also increment `rejectedByProvider["needs-design-brief"]`.
 
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`

@@ -1,4 +1,8 @@
 name: GitHub AI Orchestrator (retired)
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: Retired GitHub-issue dispatch kept as an unreachable replay shell; every job is gated off.
+# removal-trigger: Delete this workflow when the linear-only intake contract stops pinning its retired jobs.
 # JOV-INV-028: legacy human-hold labels never remove work from intake.
 
 on:
@@ -109,8 +113,8 @@ jobs:
           fi
 
           # shellcheck disable=SC2016 # $label is a jq variable, not a shell variable.
-          HAS_AGENT_READY=$(gh issue view "$ISSUE_NUMBER" --json labels --jq \
-            --arg label "$AGENT_READY_LABEL" '[.labels[].name] | any(. == $label)')
+          HAS_AGENT_READY=$(gh issue view "$ISSUE_NUMBER" --json labels \
+            | jq -r --arg label "$AGENT_READY_LABEL" '[.labels[].name] | any(. == $label)')
           if [[ "$HAS_AGENT_READY" != "true" ]]; then
             echo "Issue #${ISSUE_NUMBER} is not labeled ${AGENT_READY_LABEL}; skipping"
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -155,7 +159,7 @@ jobs:
           fi
 
           # shellcheck disable=SC2016 # $num is a jq variable, not a shell variable.
-          EXISTING_PR=$(gh pr list --state open --json number,title,body --jq --arg num "$ISSUE_NUMBER" '
+          EXISTING_PR=$(gh pr list --state open --json number,title,body | jq -r --arg num "$ISSUE_NUMBER" '
             map(
               select(
                 ((.title // "") + "\n" + (.body // "")) as $text

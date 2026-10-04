@@ -13,6 +13,7 @@ import tempfile
 import time
 import unittest
 from unittest.mock import patch, Mock
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -216,6 +217,151 @@ class RetirementAuthorityTest(unittest.TestCase):
             {"id": "issue", "state": {"type": "completed", "name": "Done"}}]}})
         self.assertEqual(events.retire_orphan(fake_lane(shell), linear, candidate, [candidate], host=self.host, now=NOW), "adopted")
         self.assertEqual(shell.made("gh", "pr", "close"), [])
+
+
+class ParkedRequeueTest(unittest.TestCase):
+    """JOV-7708: parked work past 48h sends its issue back to rebuild from main. The PR stays
+    open; only an explicit duplicate label retires it (JOV-INV-011)."""
+    OLD = "2033-05-10T00:00:00Z"  # created eight days before NOW
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = SimpleNamespace(state=Path(self.tmp.name), name="mac")
+
+    def parked(self, number=5, labels=("lane-fix-exhausted",), branch="devin/jov-7-20261001t0900", **extra):
+        return pr(number=number, branch=branch, labels=list(labels), createdAt=self.OLD,
+                  updatedAt=self.OLD, title="fix: thing", **extra)
+
+    def events_since(self, hours, label="lane-fix-exhausted"):
+        at = datetime.fromtimestamp(NOW - hours * 3600, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return f"lane-fix-conflict\t2033-05-01T00:00:00Z\n{label}\t{at}\n"
+
+    def linear(self, state="started"):
+        calls = []
+        def gql(query, variables):
+            calls.append((query, variables))
+            if "issues(filter" in query:
+                return {"issues": {"nodes": [{"id": "issue-7", "state": {"type": state, "name": state}}]}}
+            if "issueLabels" in query:
+                return {"issueLabels": {"nodes": [{"id": "label-agent-ready"}]}}
+            return {}
+        moved, comments = [], []
+        return SimpleNamespace(gql=gql, calls=calls, moved=moved, comments=comments,
+                               move=lambda issue_id, state_name: moved.append((issue_id, state_name)),
+                               comment=lambda issue_id, body: comments.append((issue_id, body)))
+
+    def test_only_unheld_unrequeued_agent_owned_parked_prs_older_than_48h_are_candidates(self):
+        young = pr(number=6, labels=["lane-fix-exhausted"], createdAt="2033-05-17T00:00:00Z")
+        keep = [young,
+                self.parked(7, labels=("lane-fix-exhausted", "hold")),
+                self.parked(8, labels=("lane-fix-conflict",)),
+                self.parked(9, branch="feat/founder-work"),
+                self.parked(10, isCrossRepository=True),
+                self.parked(11, isInMergeQueue=True),
+                self.parked(13, labels=("lane-fix-exhausted", events.REBUILD_LABEL))]
+        take = [self.parked(5), self.parked(12, labels=("queue-poison",), branch="cursor/agent-fix-ab12")]
+        self.assertEqual([row["number"] for row in events.parked_candidates(keep + take, NOW)], [5, 12])
+
+    def test_parked_since_uses_the_latest_labeling_of_each_parked_label(self):
+        out = ("lane-fix-exhausted\t2033-05-01T00:00:00Z\nqueue-poison\t2033-05-16T00:00:00Z\n"
+               "lane-fix-exhausted\t2033-05-15T00:00:00Z\nhold\t2033-05-02T00:00:00Z\n")
+        shell = Shell({("gh", "api", "--paginate"): out})
+        self.assertEqual(events.parked_since(5, {"lane-fix-exhausted", "queue-poison"}, shell),
+                         events.iso_ts("2033-05-15T00:00:00Z"))
+        self.assertEqual(events.parked_since(5, {"queue-poison"}, shell), events.iso_ts("2033-05-16T00:00:00Z"))
+        self.assertIsNone(events.parked_since(5, {"lane-fix-exhausted"}, Shell({("gh", "api", "--paginate"): (1, "")})))
+
+    def test_issue_identity_comes_from_lane_branch_head_or_title(self):
+        self.assertEqual(events.pr_issue({"headRefName": "devin/jov-7-20261001t0900"}), "JOV-7")
+        self.assertEqual(events.pr_issue({"headRefName": "cursor/jov-7580-nav-857c"}), "JOV-7580")
+        self.assertEqual(events.pr_issue({"headRefName": "codex/x", "title": "fix(nav): thing (JOV-12)"}), "JOV-12")
+        self.assertIsNone(events.pr_issue({"headRefName": "codex/x", "title": "fix thing"}))
+
+    def test_sweep_requeues_the_issue_and_never_closes_the_pr(self):
+        candidate = self.parked()
+        shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
+                       ("gh", "api", "--paginate"): self.events_since(60)})
+        linear = self.linear()
+        with patch.object(events, "open_prs_state", return_value=[candidate]):
+            record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertEqual(record["parkedRequeued"], [5])
+        self.assertEqual(record["closed"], [])
+        self.assertEqual(shell.made("gh", "pr", "close"), [], "JOV-INV-011: age and exhaustion never close")
+        labeled = shell.made("gh", "api", "-X", "POST", "repos/JovieInc/Jovie/issues/5/labels")
+        self.assertEqual(labeled[0][-1], f"labels[]={events.REBUILD_LABEL}")
+        self.assertIn("this PR stays open", shell.made("gh", "pr", "comment")[0][-1])
+        self.assertEqual(linear.moved, [("issue-7", "Todo")])
+        self.assertTrue(any("issueAddLabel" in query and variables["l"] == "label-agent-ready"
+                            for query, variables in linear.calls))
+        self.assertIn("Rebuild from current main", linear.comments[0][1])
+        row = next(row for row in record["dispositions"] if row["pr"] == 5)
+        self.assertNotEqual(row["state"], "closing")
+        self.assertIn("issue requeued", row["reason"])
+        self.assertIn('"kind": "parked-requeue"', (self.host.state / "runs" / "ledger.jsonl").read_text())
+
+    def test_a_requeued_pr_is_not_requeued_again(self):
+        candidate = self.parked(labels=("lane-fix-exhausted", events.REBUILD_LABEL))
+        shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
+                       ("gh", "api", "--paginate"): self.events_since(60)})
+        linear = self.linear()
+        with patch.object(events, "open_prs_state", return_value=[candidate]):
+            record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertEqual(record["parkedRequeued"], [])
+        self.assertEqual(linear.moved, [])
+
+    def test_inside_48h_or_kill_switch_nothing_happens(self):
+        candidate = self.parked()
+        for hours, env in ((47, {}), (60, {"LANES_PARKED_REQUEUE": "0"})):
+            with self.subTest(hours=hours, env=env):
+                shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
+                               ("gh", "api", "--paginate"): self.events_since(hours)})
+                linear = self.linear()
+                with patch.dict(os.environ, env), patch.object(events, "open_prs_state", return_value=[candidate]):
+                    record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+                self.assertEqual(record["parkedRequeued"], [])
+                self.assertEqual(linear.moved, [])
+                self.assertEqual(shell.made("gh", "pr", "close"), [])
+
+    def test_live_revalidation_and_repair_claims_leave_everything_as_is(self):
+        candidate = self.parked()
+        nodes = lambda *names: {"nodes": [{"name": n} for n in names], "pageInfo": {"hasNextPage": False}}
+        cases = [({}, False, "unreadable"),
+                 (retirement_page(candidate, headRefOid="new-head"), False, "head moved"),
+                 (retirement_page(candidate, state="CLOSED"), False, "closed"),
+                 (retirement_page(candidate, isInMergeQueue=True), False, "queued"),
+                 (retirement_page(candidate, labels=nodes("lane-fix-exhausted", "hold")), False, "hold added"),
+                 (retirement_page(candidate, labels=nodes("lane-fix-conflict")), False, "unparked"),
+                 (retirement_page(candidate), True, "foreign repair claim")]
+        for response, claimed, why in cases:
+            with self.subTest(why=why):
+                shell = Shell({("gh", "api", "graphql"): response})
+                linear = self.linear()
+                self.assertFalse(events.requeue_parked(fake_lane(shell, claimed=claimed), linear, candidate,
+                                                       NOW - 60 * 3600, [candidate], host=self.host, now=NOW))
+                self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
+                self.assertEqual(linear.moved, [])
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"5": {"sha": "h1", "count": 1, "at": NOW - 60}}))
+        shell = Shell({("gh", "api", "graphql"): retirement_page(candidate)})
+        linear = self.linear()
+        self.assertFalse(events.requeue_parked(fake_lane(shell), linear, candidate, NOW - 60 * 3600,
+                                               [candidate], host=self.host, now=NOW), "local repair in flight")
+        self.assertEqual(linear.moved, [])
+
+    def test_done_issue_or_sibling_pr_is_not_requeued(self):
+        candidate = self.parked()
+        sibling = pr(number=9, branch="codex/jov-7-20261002t0900")
+        for linear, open_prs, why in ((self.linear(state="completed"), [candidate], "issue done"),
+                                      (self.linear(), [candidate, sibling], "another PR carries the issue")):
+            with self.subTest(why=why):
+                shell = Shell({("gh", "api", "graphql"): retirement_page(candidate)})
+                self.assertFalse(events.requeue_parked(fake_lane(shell), linear, candidate, NOW - 60 * 3600,
+                                                       open_prs, host=self.host, now=NOW))
+                self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
+                self.assertEqual(linear.moved, [])
+
+    def test_pool_label_matches_the_runner_shared_label(self):
+        self.assertEqual(events.POOL_LABEL, runner.SHARED_LABEL)
 
 
 class RelayTest(unittest.TestCase):
@@ -1059,14 +1205,34 @@ class GapTest(unittest.TestCase):
     def test_open_prs_are_read_page_by_page(self):
         pages = iter([
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"},
-                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]}}]}}}},
+                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]},
+                                                                 "files": {"totalCount": 1, "nodes": [
+                                                                     {"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}]}}]}}}},
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
                                                       "nodes": [{"number": 2}]}}}},
         ])
         shell = Shell({("gh", "api", "graphql"): lambda args: next(pages)})
         prs = events.open_prs_state(fake_lane(shell))
         self.assertEqual([(p["number"], p["labels"], p["rollup"]) for p in prs], [(1, [{"name": "hold"}], None), (2, [], None)])
+        self.assertEqual(prs[0]["files"], [{"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}])
+        self.assertTrue(prs[0]["filesComplete"])
+        self.assertIn("files(first:100)", next(arg for arg in shell.calls[0] if arg.startswith("query=")))
         self.assertIn("cursor=c1", shell.calls[1])
+
+    def test_unreadable_large_file_list_preserves_metadata_without_certifying_overlap_inventory(self):
+        page = {"data": {"repository": {"pullRequests": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [{"number": 1, "files": {"totalCount": 101, "nodes": []}},
+                      {"number": 2, "files": {"totalCount": 1, "nodes": [{"path": "README.md"}]}}]}}}}
+        shell = Shell({("gh", "api", "graphql"): page,
+                       ("gh", "api", "--paginate"): (1, "unavailable")})
+        prs = events.open_prs_state(fake_lane(shell))
+        self.assertEqual([row["number"] for row in prs], [1, 2])
+        self.assertFalse(prs[0]["filesComplete"])
+        self.assertTrue(prs[1]["filesComplete"])
+        with patch.object(runner, "open_prs_summary", return_value=prs), \
+                patch.dict(runner._SUMMARY, {"readable": True}):
+            self.assertIsNone(runner.overlap_prs_summary())
 
     def test_fix_prompt_carries_stale_and_queue_log_and_lockfile_recipe(self):
         prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "stale"], merge="DIRTY"), "title": "t",
@@ -1074,6 +1240,7 @@ class GapTest(unittest.TestCase):
         self.assertIn("boom", prompt)
         self.assertIn("no activity for 48 hours", prompt)
         self.assertIn("pnpm install --lockfile-only", prompt)
+        self.assertIn("Never hand-merge generated files", prompt)
 
 
 class RunnerHookTest(unittest.TestCase):
