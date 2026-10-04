@@ -70,14 +70,29 @@ async function fixture(
     eventName = 'workflow_dispatch',
     payload = {},
     associatedPages,
+    beforeStatusResponse,
+    afterStatusWrite,
+    readCurrentSnapshot,
+    effectSink,
   } = {}
 ) {
   const mutations = [];
   const reads = [];
   const warnings = [];
+  const notices = [];
   const statusWrites = [];
   const inventories = [];
   const gets = [];
+  const effects = {
+    reads,
+    mutations,
+    warnings,
+    notices,
+    statusWrites,
+    inventories,
+    gets,
+  };
+  if (effectSink) Object.assign(effectSink, effects);
   const github = {
     rest: {
       git: {
@@ -106,12 +121,18 @@ async function fixture(
       repos: {
         listPullRequestsAssociatedWithCommit: Symbol('associated'),
         listCommitStatusesForRef: Symbol('statuses.list'),
-        createCommitStatus: async receipt => statusWrites.push(receipt),
+        createCommitStatus: async receipt => {
+          statusWrites.push(receipt);
+          if (afterStatusWrite) await afterStatusWrite(receipt);
+          return statusWrites.length;
+        },
       },
     },
     paginate: async (endpoint, params) => {
-      if (endpoint === github.rest.repos.listCommitStatusesForRef)
+      if (endpoint === github.rest.repos.listCommitStatusesForRef) {
+        if (beforeStatusResponse) await beforeStatusResponse();
         return statuses;
+      }
       inventories.push(endpoint);
       if (endpoint === github.rest.repos.listPullRequestsAssociatedWithCommit) {
         assert.deepEqual(params, {
@@ -144,14 +165,10 @@ async function fixture(
       assert.ok(query.includes('labels(first: 100)'));
       reads.push(params.number);
       if (failRead) throw new Error('Resource limits for this query exceeded');
-      return {
-        repository: {
-          pullRequest: {
-            ...current(params.number),
-            ...overrides[params.number],
-          },
-        },
-      };
+      const snapshot = readCurrentSnapshot
+        ? await readCurrentSnapshot(params.number, reads.length)
+        : { ...current(params.number), ...overrides[params.number] };
+      return { repository: { pullRequest: structuredClone(snapshot) } };
     },
   };
   await run(
@@ -159,7 +176,7 @@ async function fixture(
     { repo: { owner: 'JovieInc', repo: 'Jovie' }, eventName, payload },
     {
       info() {},
-      notice() {},
+      notice: message => notices.push(message),
       warning: message => warnings.push(message),
     },
     {
@@ -172,7 +189,7 @@ async function fixture(
     },
     createRequire(import.meta.url)
   );
-  return { reads, mutations, warnings, statusWrites, inventories, gets };
+  return effects;
 }
 
 test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue head', async () => {
@@ -808,3 +825,145 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.equal(workflow.jobs.enroll['timeout-minutes'], 5);
 });
+
+function recoveryDeferred() {
+  /** @type {() => void} */
+  let resolve = () => {};
+  /** @type {Promise<void>} */
+  const promise = new Promise(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+async function exerciseRecoveryBoundary(boundary, change) {
+  const reached = recoveryDeferred();
+  const released = recoveryDeferred();
+  /** @type {ReturnType<typeof current> & { autoMergeRequest: { enabledAt: string } | null }} */
+  const live = {
+    ...current(1),
+    autoMergeRequest: { enabledAt: '2026-10-02T12:50:00Z' },
+    timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z' }] },
+  };
+  const recovery = {
+    context: 'jovie-queue-admission-recovery/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: `pr=1;run=789;try=1;at=${Date.parse('2026-10-02T13:00:01Z')}`,
+    target_url: 'https://github.com/JovieInc/Jovie/actions/runs/789',
+  };
+  /** @type {{ mutations: { id: string, oid: string }[], notices: string[],
+   * warnings: string[], statusWrites: { description: string }[] }} */
+  const effects = {
+    mutations: [],
+    notices: [],
+    warnings: [],
+    statusWrites: [],
+  };
+  const readError = new Error('current recovery read denied');
+  let failFreshRead = false;
+  let paused = false;
+  async function pause(point) {
+    if (point !== boundary || paused) return;
+    paused = true;
+    reached.resolve();
+    await released.promise;
+  }
+  const pending = fixture({
+    eventName: 'schedule',
+    statuses: [recovery],
+    effectSink: effects,
+    beforeStatusResponse: () => pause('statuses'),
+    afterStatusWrite: () => pause('reservation'),
+    readCurrentSnapshot: () => {
+      if (failFreshRead) throw readError;
+      return live;
+    },
+  });
+  // Capture rejection immediately; either workflow-level or per-PR read failure
+  // is acceptable provided it cannot authorize enqueue or refund a reservation.
+  const settled = pending.then(
+    result => ({ result, error: undefined }),
+    error => ({ result: undefined, error })
+  );
+  try {
+    const didReach = await Promise.race([
+      reached.promise.then(() => true),
+      settled.then(() => false),
+    ]);
+    assert.equal(
+      didReach,
+      true,
+      'fixture must reach its held recovery boundary'
+    );
+    assert.deepEqual(effects.mutations, []);
+    if (change === 'intent-cleared') live.autoMergeRequest = null;
+    if (change === 'newer-removal') {
+      live.timelineItems.nodes = [{ createdAt: '2026-10-02T13:01:00Z' }];
+    }
+    if (change === 'replacement-head') live.headRefOid = 'b'.repeat(40);
+    if (change === 'blocking-label') live.labels.nodes = [{ name: 'hold' }];
+    if (change === 'read-failure') failFreshRead = true;
+    released.resolve();
+    const completion = await settled;
+    return { ...effects, error: completion.error, readError };
+  } finally {
+    released.resolve();
+    await Promise.allSettled([pending]);
+  }
+}
+
+function assertNoRecoveryEnqueue(result, boundary) {
+  assert.deepEqual(result.mutations, []);
+  assert.deepEqual(
+    result.notices.filter(message => message.startsWith('ENQUEUED ')),
+    []
+  );
+  assert.deepEqual(
+    result.statusWrites.map(status => status.description),
+    boundary === 'reservation' ? ['spent:run=789;try=1'] : []
+  );
+}
+
+for (const boundary of ['statuses', 'reservation']) {
+  test(`unchanged recovery survives the awaited ${boundary} boundary`, async () => {
+    const result = await exerciseRecoveryBoundary(boundary, 'unchanged');
+    assert.equal(result.error, undefined);
+    assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
+    assert.deepEqual(
+      result.statusWrites.map(status => status.description),
+      ['spent:run=789;try=1']
+    );
+    assert.deepEqual(result.warnings, []);
+    assert.equal(
+      result.notices.filter(message => message.startsWith('ENQUEUED ')).length,
+      1
+    );
+  });
+
+  for (const change of [
+    'intent-cleared',
+    'newer-removal',
+    'replacement-head',
+    'blocking-label',
+  ]) {
+    test(`recovery fences ${change} during awaited ${boundary}`, async () => {
+      const result = await exerciseRecoveryBoundary(boundary, change);
+      assert.equal(result.error, undefined);
+      assertNoRecoveryEnqueue(result, boundary);
+      assert.deepEqual(result.warnings, []);
+    });
+  }
+
+  test(`a fresh read failure after ${boundary} cannot enqueue or refund`, async () => {
+    const result = await exerciseRecoveryBoundary(boundary, 'read-failure');
+    assertNoRecoveryEnqueue(result, boundary);
+    assert.ok(
+      result.error === result.readError ||
+        result.warnings.some(message =>
+          message.includes(result.readError.message)
+        ),
+      'the fresh read failure must remain visible'
+    );
+  });
+}
