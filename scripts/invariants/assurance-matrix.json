@@ -1097,12 +1097,16 @@
           {
             "ref": "apps/web/lib/canonical-surface-drift.test.tsx",
             "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/tests/e2e/utils/shell-material-detector.ts",
+            "enforcement": "scheduled"
           }
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
-          "No composed real-shell route (tables, library, tasks, chat, entity rail) is checked for single-material main surface.",
-          "No computed-background assertion across header+body of one semantic level."
+          "Single-material main plane is measured on composed /demo shell routes at desktop only, after merge (screenshots.yml) and on PR Visual Review (advisory); authenticated routes (tasks, contacts, chat, library), mobile and the entity rail are not measured.",
+          "shell-material-baseline.json ratchets 10 known nested materials (earnings 6, release-tracked-links 2, links 1, settings 1)."
         ],
         "remediationOwner": "JOV-7710"
       }
