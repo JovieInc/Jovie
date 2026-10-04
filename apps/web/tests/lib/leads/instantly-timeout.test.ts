@@ -16,6 +16,13 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
   pipelineLog: mockPipelineLog,
 }));
 
+const APPROVED_COPY = {
+  channel: 'email' as const,
+  subject: 'Your Jovie page is ready',
+  body: 'Hey Test, here is your page: https://app/claim/tok',
+  revision: 'rev-1',
+};
+
 describe('Instantly push timeout', () => {
   it('fetch call includes AbortSignal.timeout(15000)', async () => {
     // We verify the timeout is configured by checking that the fetch
@@ -42,6 +49,7 @@ describe('Instantly push timeout', () => {
       claimLink: 'https://app/claim/tok',
       artistName: 'Test',
       priorityScore: 50,
+      approvedCopy: APPROVED_COPY,
     });
 
     expect(mockFetch).toHaveBeenCalledOnce();
@@ -69,6 +77,7 @@ describe('Instantly push timeout', () => {
         claimLink: 'https://app/claim/tok',
         artistName: 'Test',
         priorityScore: 50,
+        approvedCopy: APPROVED_COPY,
       })
     ).rejects.toThrow(/disabled/i);
     expect(mockFetch).not.toHaveBeenCalled();

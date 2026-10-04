@@ -113,7 +113,7 @@ describe('Notification Preferences', () => {
 
   describe('mergePreferences', () => {
     const basePreferences: NotificationPreferences = {
-      channels: { email: true, sms: true, push: false, in_app: true },
+      channels: { email: true, sms: true, push: false },
       marketingEmails: true,
       dismissedNotificationIds: ['old-notification'],
       email: 'base@example.com',
@@ -133,7 +133,7 @@ describe('Notification Preferences', () => {
 
     it('should merge channel overrides', () => {
       const overrides: Partial<NotificationPreferences> = {
-        channels: { email: true, sms: true, push: true, in_app: true },
+        channels: { email: true, sms: true, push: true },
       };
 
       const result = mergePreferences(basePreferences, overrides);
@@ -142,7 +142,6 @@ describe('Notification Preferences', () => {
         email: true,
         sms: true,
         push: true, // overridden from false to true
-        in_app: true,
       });
     });
 
@@ -223,7 +222,7 @@ describe('Notification Preferences', () => {
 
     it('should handle base with undefined optional fields', () => {
       const minimalBase: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: false },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -256,7 +255,7 @@ describe('Notification Preferences', () => {
   describe('Default channel values', () => {
     it('should have email enabled by default', () => {
       const defaults: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -266,7 +265,7 @@ describe('Notification Preferences', () => {
 
     it('should have push disabled by default', () => {
       const defaults: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -292,7 +291,6 @@ describe('Notification Preferences', () => {
         email: true,
         sms: true,
         push: false,
-        in_app: false,
       });
     });
   });
@@ -309,7 +307,7 @@ describe('Notification Preferences', () => {
           status: 'claimed',
         },
         notifications: {
-          channels: { email: true, sms: true, push: false, in_app: true },
+          channels: { email: true, sms: true, push: false },
           dismissedIds: ['old-notification'],
           preferredChannel: 'sms',
         },
@@ -346,7 +344,7 @@ describe('Notification Preferences', () => {
         value => typeof value === 'string' && value.includes('dismissedIds')
       );
       expect(JSON.parse(notificationsJson as string)).toEqual({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         dismissedIds: ['old-notification', 'new-notification'],
         lastDismissedAt: expect.any(String),
         preferredChannel: 'sms',
@@ -359,7 +357,7 @@ describe('Notification Preferences', () => {
       await updateNotificationPreferences(
         { creatorProfileId: 'profile-123' },
         {
-          channels: { email: false, sms: true, push: true, in_app: true },
+          channels: { email: false, sms: true, push: true },
           marketingEmails: false,
         }
       );
@@ -376,7 +374,7 @@ describe('Notification Preferences', () => {
         value => typeof value === 'string' && value.includes('dismissedIds')
       );
       expect(JSON.parse(notificationsJson as string)).toEqual({
-        channels: { email: false, sms: true, push: true, in_app: true },
+        channels: { email: false, sms: true, push: true },
         dismissedIds: ['old-notification'],
         preferredChannel: 'sms',
       });

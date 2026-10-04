@@ -615,7 +615,7 @@ test.describe('central runtime notifications', () => {
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
     await expect(
-      page.getByRole('link', { name: 'Inbox — App Update Available' })
+      page.getByRole('link', { name: 'Home — App Update Available' })
     ).toHaveAttribute('href', '/app');
     await page.evaluate(() =>
       (window as unknown as { downloaded: () => void }).downloaded()
@@ -638,10 +638,15 @@ test.describe('central runtime notifications', () => {
 });
 
 test.describe('sidebar attention and Settings header', () => {
-  test('legacy admin keeps its fallback Inbox link', async ({ page }) => {
+  test('legacy admin keeps its default-flags fallback Home link', async ({
+    page,
+  }) => {
     await openStory(page, 'organisms-unifiedsidebar--legacy-admin', 'light');
     await expect(
-      page.getByRole('link', { name: 'Inbox', exact: true })
+      page.locator('[data-sidebar-search-slot]').getByRole('link', {
+        name: 'Home',
+        exact: true,
+      })
     ).toHaveAttribute('href', '/app');
     await expect(page.locator('[data-sidebar-search-divider]')).toHaveCount(0);
   });
@@ -694,7 +699,7 @@ test.describe('sidebar attention and Settings header', () => {
       Math.abs(line.x - trigger.x - trigger.width - gap)
     ).toBeLessThanOrEqual(2);
     await expect(
-      page.getByRole('link', { name: 'Inbox', exact: true })
+      slot.getByRole('link', { name: 'Home', exact: true })
     ).toBeVisible();
   });
 
@@ -784,7 +789,6 @@ test.describe('sidebar attention and Settings header', () => {
       // canonical destination exposed by this default-flags story.
       for (const [name, href] of [
         ['Home', '/app'],
-        ['Identity', '/app/presence'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
       ]) {
@@ -792,6 +796,9 @@ test.describe('sidebar attention and Settings header', () => {
         await expect(destination).toBeVisible();
         await expect(destination).toHaveAttribute('href', href);
       }
+      await expect(
+        page.getByRole('link', { name: 'Identity', exact: true })
+      ).toHaveCount(0);
     });
   }
 });
