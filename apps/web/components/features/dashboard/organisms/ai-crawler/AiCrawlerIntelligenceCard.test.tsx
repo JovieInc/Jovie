@@ -63,7 +63,7 @@ describe('AiCrawlerIntelligenceCard', () => {
 
     expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveAttribute(
       'aria-label',
-      'View AI crawler read details'
+      'View AI Crawler Read Details'
     );
     expect(screen.getByText('AI Crawler Reads')).toBeInTheDocument();
     expect(
@@ -83,9 +83,11 @@ describe('AiCrawlerIntelligenceCard', () => {
 
     render(<AiCrawlerIntelligenceCard onOpenDetail={() => undefined} />);
 
-    expect(screen.getByTestId('ai-crawler-card-skeleton')).toHaveClass(
-      'min-h-12'
-    );
+    const skeleton = screen.getByTestId('ai-crawler-card-skeleton');
+    expect(skeleton).toHaveClass('min-h-12');
+    // JOV-7710: the row sits on the main plane's material; only its border
+    // outlines it (no nested surface-1 fill).
+    expect(skeleton.className).not.toMatch(/(^|\s)bg-/);
     expect(screen.getAllByTestId('loading-skeleton')).toHaveLength(3);
   });
 

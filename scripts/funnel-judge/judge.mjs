@@ -3,14 +3,18 @@
 
 import { spawn } from 'node:child_process';
 import {
+  buildCoherencePrompt,
+  buildCoherenceSchema,
   buildJudgePrompt,
   buildJudgeSchema,
+  parseCoherenceOutput,
   parseJudgeOutput,
 } from './rubric.mjs';
 
 export const JUDGES = {
   primary: { id: 'opus-5.5', model: 'claude-opus-5-5', focus: 'full' },
   emotional: { id: 'fable-5.1', model: 'claude-fable-5-1', focus: 'emotional' },
+  coherence: { id: 'opus-5.5-coherence', model: 'claude-opus-5-5' },
 };
 
 /** CLI args: Read-only tools, no user/project settings or MCP, so repo hooks never run. */
@@ -68,6 +72,13 @@ function runClaude(args, cwd, timeoutMs) {
   });
 }
 
+async function runJudge(args, cwd, timeoutMs) {
+  const envelope = JSON.parse(await runClaude(args, cwd, timeoutMs));
+  if (envelope.is_error)
+    throw new Error(`judge error: ${envelope.result ?? 'unknown'}`);
+  return envelope;
+}
+
 /**
  * @param {{ persona: any, judge: { id: string, model: string, focus: 'full' | 'emotional' }, steps: Array<any>, imageDir: string, timeoutMs?: number }} args
  */
@@ -85,10 +96,7 @@ export async function judgePersona({
     schema: buildJudgeSchema(stepIds),
     imageDir,
   });
-  const stdout = await runClaude(args, imageDir, timeoutMs);
-  const envelope = JSON.parse(stdout);
-  if (envelope.is_error)
-    throw new Error(`judge error: ${envelope.result ?? 'unknown'}`);
+  const envelope = await runJudge(args, imageDir, timeoutMs);
   const verdict = parseJudgeOutput(envelope.structured_output, stepIds);
   return {
     personaId: persona.id,
@@ -96,5 +104,28 @@ export async function judgePersona({
     model: judge.model,
     costUsd: envelope.total_cost_usd ?? null,
     ...verdict,
+  };
+}
+
+/**
+ * One run over the whole sequence that scores every step-to-step hand-off.
+ *
+ * @param {{ steps: Array<any>, imageDir: string, timeoutMs?: number }} args
+ */
+export async function judgeCoherence({ steps, imageDir, timeoutMs = 600_000 }) {
+  const stepIds = steps.map(step => step.id);
+  const judge = JUDGES.coherence;
+  const args = buildClaudeArgs({
+    model: judge.model,
+    prompt: buildCoherencePrompt(steps),
+    schema: buildCoherenceSchema(stepIds),
+    imageDir,
+  });
+  const envelope = await runJudge(args, imageDir, timeoutMs);
+  return {
+    judge: judge.id,
+    model: judge.model,
+    costUsd: envelope.total_cost_usd ?? null,
+    ...parseCoherenceOutput(envelope.structured_output, stepIds),
   };
 }

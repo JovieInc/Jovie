@@ -8,6 +8,7 @@ import {
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { aiChatWeeklyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
 import { getRedis } from '@/lib/redis';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 import type { UserPlan } from '@/types';
 
@@ -22,27 +23,64 @@ type ChatUsageSnapshot = {
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
+  observedAt: number;
 };
 
-type StaleChatUsageSnapshot = ChatUsageSnapshot & {
-  _stale: true;
-};
+// Never reuse v2 snapshots synthesized from unrelated process-local counters.
+const CHAT_USAGE_CACHE_KEY_PREFIX = 'chat:usage:v3:';
+const CHAT_USAGE_CACHE_TTL_SECONDS = 60 * 60;
+const CACHE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
+const CACHE_TIMEOUT = {
+  timeoutMs: 750,
+  context: 'chat-usage-cache',
+  timeoutMessage: 'Chat usage cache timeout',
+} as const;
 
-const CHAT_USAGE_CACHE_KEY_PREFIX = 'chat:usage:v2:';
-const CHAT_USAGE_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
+function isVerifiedSnapshot(value: unknown): value is ChatUsageSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as Partial<ChatUsageSnapshot>;
+  if (!['free', 'trial', 'pro', 'max'].includes(data.plan ?? '')) return false;
+  const { weeklyLimit, used, remaining, observedAt } = data;
+  if (
+    typeof weeklyLimit !== 'number' ||
+    !Number.isSafeInteger(weeklyLimit) ||
+    weeklyLimit < 0 ||
+    typeof used !== 'number' ||
+    !Number.isSafeInteger(used) ||
+    used < 0 ||
+    typeof remaining !== 'number' ||
+    !Number.isSafeInteger(remaining) ||
+    remaining < 0 ||
+    used + remaining !== weeklyLimit ||
+    typeof observedAt !== 'number' ||
+    !Number.isFinite(observedAt) ||
+    observedAt > Date.now() ||
+    Date.now() - observedAt > CHAT_USAGE_CACHE_TTL_SECONDS * 1000
+  )
+    return false;
+  const warningThreshold = Math.max(1, Math.ceil(weeklyLimit * 0.2));
+  return (
+    (data.resetAt === null ||
+      (typeof data.resetAt === 'string' &&
+        Number.isFinite(Date.parse(data.resetAt)))) &&
+    data.warningThreshold === warningThreshold &&
+    data.isExhausted === (remaining === 0) &&
+    data.isNearLimit === (remaining > 0 && remaining <= warningThreshold)
+  );
+}
 
 async function readCachedChatUsage(
   userId: string
 ): Promise<ChatUsageSnapshot | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-
   try {
-    const cached = await redis.get<ChatUsageSnapshot>(
-      `${CHAT_USAGE_CACHE_KEY_PREFIX}${userId}`
+    const redis = getRedis();
+    if (!redis) return null;
+    const raw = await withTimeout(
+      redis.get<unknown>(`${CHAT_USAGE_CACHE_KEY_PREFIX}${userId}`),
+      CACHE_TIMEOUT
     );
-    if (!cached) return null;
-    return typeof cached === 'string' ? JSON.parse(cached) : cached;
+    const cached: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return isVerifiedSnapshot(cached) ? cached : null;
   } catch {
     return null;
   }
@@ -52,50 +90,53 @@ function writeChatUsageCache(
   userId: string,
   snapshot: ChatUsageSnapshot
 ): void {
-  const redis = getRedis();
-  if (!redis) return;
-
-  redis
-    .set(`${CHAT_USAGE_CACHE_KEY_PREFIX}${userId}`, JSON.stringify(snapshot), {
-      ex: CHAT_USAGE_CACHE_TTL_SECONDS,
-    })
-    .catch(() => {});
+  try {
+    const redis = getRedis();
+    if (!redis) return;
+    // Advisory cache failure never invalidates the fresh quota observation.
+    void withTimeout(
+      redis.set(
+        `${CHAT_USAGE_CACHE_KEY_PREFIX}${userId}`,
+        JSON.stringify(snapshot),
+        { ex: CHAT_USAGE_CACHE_TTL_SECONDS }
+      ),
+      CACHE_TIMEOUT
+    ).catch(() => {});
+  } catch {
+    // A synchronous cache client failure is advisory too.
+  }
 }
 
-const CACHE_HEADERS = {
-  'Cache-Control': 'private, max-age=30, stale-while-revalidate=120',
-} as const;
-
-function formatResetAt(resetTime: number): string | null {
-  if (!Number.isFinite(resetTime)) return null;
-  return new Date(resetTime).toISOString();
-}
-
-export function buildChatUsageSnapshot(params: {
+export async function buildChatUsageSnapshot(params: {
   readonly userId: string;
   readonly entitlementPlan: UserPlan;
-}): ChatUsageSnapshot {
+}): Promise<ChatUsageSnapshot | null> {
   const plan = resolveChatUsagePlan(params.entitlementPlan);
-  const entitlements = getEntitlements(params.entitlementPlan);
-  const weeklyLimit = entitlements.limits.aiWeeklyMessageLimit;
-  const status = aiChatWeeklyPlanAwareLimiter.getStatus(
+  const expectedLimit = getEntitlements(params.entitlementPlan).limits
+    .aiWeeklyMessageLimit;
+  const status = await aiChatWeeklyPlanAwareLimiter.readStatus(
     params.userId,
     params.entitlementPlan
   );
-  const remaining = Math.max(0, Math.min(weeklyLimit, status.remaining));
-  const used = Math.max(0, weeklyLimit - remaining);
+  if (!status.available || status.limit !== expectedLimit) return null;
+  const weeklyLimit = status.limit;
+  const remaining = status.remaining;
   const warningThreshold = Math.max(1, Math.ceil(weeklyLimit * 0.2));
-
-  return {
+  const response: ChatUsageSnapshot = {
     plan,
     weeklyLimit,
-    used,
+    used: weeklyLimit - remaining,
     remaining,
-    resetAt: formatResetAt(status.resetTime),
-    isExhausted: remaining <= 0,
+    resetAt:
+      status.resetTime === null
+        ? null
+        : new Date(status.resetTime).toISOString(),
+    isExhausted: remaining === 0,
     warningThreshold,
     isNearLimit: remaining > 0 && remaining <= warningThreshold,
+    observedAt: status.observedAt,
   };
+  return isVerifiedSnapshot(response) ? response : null;
 }
 
 export async function GET() {
@@ -103,49 +144,46 @@ export async function GET() {
   try {
     ({ userId } = await getCachedAuth());
   } catch (error) {
-    // Clerk throws when middleware didn't run (e.g., matcher misconfiguration).
-    // Return 401 for that case, but let unexpected errors propagate to Sentry.
     const message = error instanceof Error ? error.message : '';
-    if (message.includes('clerkMiddleware')) {
+    if (message.includes('clerkMiddleware'))
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     throw error;
   }
-  if (!userId) {
+  if (!userId)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
+  if (!entitlements.isAuthenticated || !entitlements.userId)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
 
   const billingUnavailable = entitlements.billingVerification === 'unavailable';
-
-  if (billingUnavailable) {
-    const cached = await readCachedChatUsage(userId);
-    if (cached) {
-      const stale: StaleChatUsageSnapshot = { ...cached, _stale: true };
-      return NextResponse.json(stale, { headers: CACHE_HEADERS });
+  if (!billingUnavailable) {
+    try {
+      const snapshot = await buildChatUsageSnapshot({
+        userId,
+        entitlementPlan: entitlements.plan,
+      });
+      if (snapshot) {
+        writeChatUsageCache(userId, snapshot);
+        return NextResponse.json(snapshot, { headers: CACHE_HEADERS });
+      }
+    } catch {
+      logger.warn('Chat usage observation unavailable');
     }
-
-    logger.warn('Chat usage billing unavailable; serving degraded snapshot', {
-      userId,
-    });
-    const degraded = buildChatUsageSnapshot({
-      userId,
-      entitlementPlan: entitlements.plan,
-    });
-    const stale: StaleChatUsageSnapshot = { ...degraded, _stale: true };
-    return NextResponse.json(stale, { headers: CACHE_HEADERS });
   }
-
-  const response = buildChatUsageSnapshot({
-    userId,
-    entitlementPlan: entitlements.plan,
-  });
-
-  writeChatUsageCache(userId, response);
-
-  return NextResponse.json(response, { headers: CACHE_HEADERS });
+  const cached = await readCachedChatUsage(userId);
+  const cacheMatchesPlan =
+    cached &&
+    cached.plan === resolveChatUsagePlan(entitlements.plan) &&
+    cached.weeklyLimit ===
+      getEntitlements(entitlements.plan).limits.aiWeeklyMessageLimit;
+  if (cached && (billingUnavailable || cacheMatchesPlan)) {
+    return NextResponse.json(
+      { ...cached, _stale: true },
+      { headers: CACHE_HEADERS }
+    );
+  }
+  return NextResponse.json(
+    { error: 'Usage unavailable' },
+    { status: 503, headers: CACHE_HEADERS }
+  );
 }
