@@ -24,11 +24,13 @@ const UI_FILE =
 const NOT_UI = /(?:\.test\.|\.spec\.|\.stories\.|\/__tests__\/|\/fixtures?\/)/;
 const COMMENT = /^\s*(?:\/\/|\/\*|\*|\{\s*\/\*)/;
 const ALLOW = /frontend-skill-allow (FS-\d{3}):\s*\S/g;
+/** Lines either side of a hit that a multi-line `cn()` call can span. */
+const NEARBY = 4;
 /** A trailing `// ...` comment (not a URL's `://`). */
 const TRAILING_COMMENT = /(^|[^:])\/\/.*$/;
 
 /**
- * @typedef {{ id: string, severity: 'error' | 'warning', rule: string, test: (line: string) => boolean }} Rule
+ * @typedef {{ id: string, severity: 'error' | 'warning', rule: string, test: (line: string, nearby: string) => boolean }} Rule
  * @typedef {{ id: string, severity: string, rule: string, file: string, line: number, text: string }} Finding
  */
 
@@ -77,10 +79,13 @@ export const RULES = [
     id: 'FS-006',
     severity: 'error',
     rule: 'No hover-only affordance: a control revealed on hover must also reveal on focus',
-    test: line =>
+    // The focus reveal may sit on another line of the same class list.
+    test: (line, nearby) =>
       /\bopacity-0\b/.test(line) &&
       /\b(?:group-)?hover:opacity-100\b/.test(line) &&
-      !/\b(?:group-)?focus(?:-visible|-within)?:opacity-100\b/.test(line),
+      !/\b(?:group-)?focus(?:-visible|-within)?:opacity-100\b/.test(
+        `${line}\n${nearby}`
+      ),
   },
   {
     id: 'FS-007',
@@ -115,22 +120,23 @@ export function isUiFile(path) {
  * @param {string} file
  * @param {number} lineNumber
  * @param {string} text
+ * @param {string} [nearby] surrounding source lines, for multi-line class lists
  * @returns {Finding[]}
  */
-export function checkLine(file, lineNumber, text) {
+export function checkLine(file, lineNumber, text, nearby = '') {
   if (COMMENT.test(text)) return [];
   const allowed = new Set([...text.matchAll(ALLOW)].map(match => match[1]));
   const code = text.replace(TRAILING_COMMENT, '$1');
-  return RULES.filter(rule => !allowed.has(rule.id) && rule.test(code)).map(
-    rule => ({
-      id: rule.id,
-      severity: rule.severity,
-      rule: rule.rule,
-      file,
-      line: lineNumber,
-      text: text.trim().slice(0, 200),
-    })
-  );
+  return RULES.filter(
+    rule => !allowed.has(rule.id) && rule.test(code, nearby)
+  ).map(rule => ({
+    id: rule.id,
+    severity: rule.severity,
+    rule: rule.rule,
+    file,
+    line: lineNumber,
+    text: text.trim().slice(0, 200),
+  }));
 }
 
 /**
@@ -166,17 +172,39 @@ export function addedLines(diff) {
 
 /**
  * @param {Map<string, Array<[number, string]>>} lines
+ * @param {(file: string) => string[] | null} [source] the whole file's lines,
+ *   so an added line is read with its unchanged neighbours
  * @returns {Finding[]}
  */
-export function checkLines(lines) {
+export function checkLines(lines, source = () => null) {
   /** @type {Finding[]} */
   const findings = [];
   for (const [file, rows] of lines) {
     if (!isUiFile(file)) continue;
-    for (const [lineNumber, text] of rows)
-      findings.push(...checkLine(file, lineNumber, text));
+    const whole = source(file);
+    const at = new Map(rows);
+    /** @param {number} n */
+    const lineAt = n => (whole ? whole[n - 1] : at.get(n)) ?? '';
+    for (const [lineNumber, text] of rows) {
+      const nearby = [];
+      for (let n = lineNumber - NEARBY; n <= lineNumber + NEARBY; n += 1)
+        if (n !== lineNumber) nearby.push(lineAt(n));
+      findings.push(...checkLine(file, lineNumber, text, nearby.join('\n')));
+    }
   }
   return findings;
+}
+
+/**
+ * @param {string} file
+ * @returns {string[] | null}
+ */
+function readSource(file) {
+  try {
+    return readFileSync(file, 'utf8').split('\n');
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -231,7 +259,7 @@ export function main(argv) {
     );
     lines = addedLines(diff);
   }
-  const findings = checkLines(lines);
+  const findings = checkLines(lines, readSource);
   const errors = findings.filter(finding => finding.severity === 'error');
   if (args.json) {
     process.stdout.write(

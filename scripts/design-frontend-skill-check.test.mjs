@@ -119,3 +119,35 @@ test('diff mode checks added lines only, with their new line numbers', () => {
     ]
   );
 });
+
+/**
+ * @param {Array<[number, string]>} rows
+ */
+const added = rows => new Map([[FILE, rows]]);
+
+test('FS-006 reads a focus reveal on another line of a multi-line class list', () => {
+  const cn = [
+    'className={cn(',
+    "  'opacity-0 group-hover:opacity-100',",
+    "  'group-focus-within:opacity-100'",
+    ')}',
+  ];
+  const hover = /** @type {[number, string]} */ ([2, cn[1] ?? '']);
+  const focus = /** @type {[number, string]} */ ([3, cn[2] ?? '']);
+  // Only the hover line was added; the focus line is unchanged source.
+  assert.deepEqual(
+    checkLines(added([hover]), () => cn).map(finding => finding.id),
+    []
+  );
+  // Without a focus reveal anywhere nearby, it still fires.
+  const bare = cn.filter(line => !line.includes('focus'));
+  assert.deepEqual(
+    checkLines(added([hover]), () => bare).map(finding => finding.id),
+    ['FS-006']
+  );
+  // Added rows alone are the fallback when the file cannot be read.
+  assert.deepEqual(
+    checkLines(added([hover, focus])).map(finding => finding.id),
+    []
+  );
+});
