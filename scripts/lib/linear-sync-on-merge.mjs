@@ -339,6 +339,20 @@ export function selectDoneStateId(states) {
 }
 
 /**
+ * @param {{ id?: string, name?: string, type?: string }[]} states
+ * @returns {string}
+ */
+export function selectValidatingStateId(states) {
+  const match = (states ?? []).find(
+    state =>
+      String(state?.name ?? '')
+        .trim()
+        .toLowerCase() === 'validating'
+  );
+  return typeof match?.id === 'string' ? match.id : '';
+}
+
+/**
  * @param {string | null | undefined} header
  * @returns {string}
  */
@@ -369,7 +383,7 @@ export function nextLink(header) {
  *   readonly scanComplete?: boolean,
  *   readonly checkGreen?: boolean,
  * }} input
- * @returns {{ action: 'close' | 'skip', comment: string, blockingNumbers: number[] }}
+ * @returns {{ action: 'close' | 'validate' | 'skip', comment: string, blockingNumbers: number[] }}
  */
 export function decideLinearCloseOnMerge(input) {
   const identifier = String(input.issue.identifier ?? '').toUpperCase();
@@ -414,6 +428,16 @@ export function decideLinearCloseOnMerge(input) {
     );
   }
   const lead = `Did not mark ${identifier} Done after ${input.mergingPull.url} merged (merge SHA: ${input.mergingPull.sha}).`;
+  if (escapedDefect.applicable) {
+    return {
+      action: 'validate',
+      comment: [
+        `Moved ${identifier} to Validating after ${input.mergingPull.url} merged (merge SHA: ${input.mergingPull.sha}).`,
+        ...reasons,
+      ].join('\n'),
+      blockingNumbers: blocking.map(pull => pull.number),
+    };
+  }
   if (reasons.length > 0) {
     return {
       action: 'skip',
@@ -610,6 +634,26 @@ export async function syncLinearIssueOnMerge(options = {}) {
     if (updated.issueUpdate?.success !== true) {
       throw new Error(`Linear refused to mark ${issue.identifier} Done`);
     }
+  } else if (decision.action === 'validate') {
+    const stateId = selectValidatingStateId(issue.states);
+    if (!stateId) {
+      throw new Error(
+        `No Validating Linear state for ${issue.identifier}; left the issue open`
+      );
+    }
+    const updated = await linearGraphql(
+      fetchImpl,
+      apiKey,
+      `mutation SetIssueValidating($issueId: String!, $stateId: String!) {
+        issueUpdate(id: $issueId, input: { stateId: $stateId }) { success }
+      }`,
+      { issueId: issue.id, stateId }
+    );
+    if (updated.issueUpdate?.success !== true) {
+      throw new Error(
+        `Linear refused to move ${issue.identifier} to Validating`
+      );
+    }
   }
   const commented = await linearGraphql(
     fetchImpl,
@@ -630,7 +674,9 @@ export async function syncLinearIssueOnMerge(options = {}) {
   log(
     decision.action === 'close'
       ? `Marked ${issue.identifier} Done`
-      : `Left ${issue.identifier} open`
+      : decision.action === 'validate'
+        ? `Moved ${issue.identifier} to Validating`
+        : `Left ${issue.identifier} open`
   );
   return {
     action: decision.action,

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SidebarMenuItem } from '@/components/organisms/sidebar';
+import { SHELL_RAIL_LABEL_OVERLAY } from '@/components/shell/rail-motion';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
@@ -81,7 +82,8 @@ export function CustomerNavMoreMenu({
                   'min-w-0 w-full justify-self-stretch truncate overflow-hidden whitespace-nowrap text-left',
                   '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
                   '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
-                  'group-data-[collapsible=icon]:hidden'
+                  // Staged rail-motion exit (JOV-4522) — see NavMenuItem.
+                  SHELL_RAIL_LABEL_OVERLAY
                 )}
               >
                 More
