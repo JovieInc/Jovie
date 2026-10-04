@@ -42,7 +42,7 @@ describe('legacy dashboard redirect stubs', () => {
     TippingRedirect();
 
     expect(redirectMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+      `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
     );
   });
 

@@ -60,7 +60,7 @@ describe('LibraryPageClient stages', () => {
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     expect(replace).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?rules=1`
+      `${APP_ROUTES.SETTINGS_PROFILE}?rules=1`
     );
   });
 
