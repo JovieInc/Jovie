@@ -812,11 +812,11 @@ class RunTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "test"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {"count": 0, "available": [], "accounts": {}})})
             tracker = FakeTracker()
-            os.environ["LANES_SELFTEST"] = "1"  # no gist from a unit test
-            try:
+            # No gist from a unit test, and the host's own overlap-guard knob (a lane host may run
+            # SYMPHONY_FILE_OVERLAP_GUARD=flag) must not leak into the release self-test.
+            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+                os.environ.pop("SYMPHONY_FILE_OVERLAP_GUARD", None)
                 result = doctor.run(host, lane, codex, tracker)
-            finally:
-                os.environ.pop("LANES_SELFTEST", None)
             self.assertIn("provider-down:devin", result["alerts"])
             self.assertIn("linear-down", result["alerts"])
             self.assertEqual(result["eventsOpen"], 0)
