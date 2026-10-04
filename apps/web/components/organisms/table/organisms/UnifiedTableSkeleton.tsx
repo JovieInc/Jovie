@@ -34,7 +34,8 @@ export interface UnifiedTableSkeletonProps<TData extends RowData> {
       | 'badge'
       | 'button'
       | 'release'
-      | 'meta';
+      | 'meta'
+      | 'person';
   }>;
 
   /**
