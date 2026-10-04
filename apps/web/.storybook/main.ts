@@ -382,6 +382,8 @@ const config: StorybookConfig = {
           'react/jsx-runtime',
           'react/jsx-dev-runtime',
           'react-dom/client',
+          // Sentry's browser entry imports this CommonJS module by name.
+          'next/constants.js',
         ]),
       ],
       esbuildOptions: {

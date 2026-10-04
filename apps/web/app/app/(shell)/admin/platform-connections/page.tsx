@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
@@ -19,33 +20,6 @@ const TAB_OPTIONS = [
   { value: 'engine' as const, label: 'Playlist Engine' },
 ] as const;
 
-const FALLBACK_PLATFORM_CONNECTIONS_DATA: AdminPlatformConnectionsData = {
-  spotifyStatus: {
-    connected: false,
-    healthy: false,
-    source: 'missing',
-    clerkUserId: null,
-    accountLabel: null,
-    approvedScopes: [],
-    missingScopes: [],
-    updatedAt: null,
-    updatedByUserId: null,
-    error: null,
-  },
-  engineSettings: {
-    enabled: false,
-    intervalValue: 3,
-    intervalUnit: 'days',
-    lastGeneratedAt: null,
-    nextEligibleAt: null,
-  },
-  currentUser: {
-    hasSpotify: false,
-    label: null,
-    missingScopes: [],
-  },
-};
-
 export default async function AdminPlatformConnectionsPage({
   searchParams,
 }: Readonly<{
@@ -58,7 +32,7 @@ export default async function AdminPlatformConnectionsPage({
     ['spotify', 'engine'].includes(tab) ? tab : 'spotify'
   ) as PlatformConnectionsTab;
 
-  let data = FALLBACK_PLATFORM_CONNECTIONS_DATA;
+  let data: AdminPlatformConnectionsData | null = null;
   try {
     data = await loadAdminPlatformConnectionsData();
   } catch (error) {
@@ -83,12 +57,16 @@ export default async function AdminPlatformConnectionsPage({
       testId='admin-platform-connections'
       viewTestId={`admin-platform-connections-${currentTab}`}
     >
-      <PlatformConnectionsClient
-        currentTab={currentTab}
-        spotifyStatus={data.spotifyStatus}
-        engineSettings={data.engineSettings}
-        currentUser={data.currentUser}
-      />
+      {data === null ? (
+        <AdminReadUnavailable message='Publisher connection and playlist settings could not be read. Their status is unknown; changes are unavailable until the current settings can be verified.' />
+      ) : (
+        <PlatformConnectionsClient
+          currentTab={currentTab}
+          spotifyStatus={data.spotifyStatus}
+          engineSettings={data.engineSettings}
+          currentUser={data.currentUser}
+        />
+      )}
     </AdminPage>
   );
 }

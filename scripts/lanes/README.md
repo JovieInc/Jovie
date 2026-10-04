@@ -22,7 +22,7 @@ The harness, not the model, owns:
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
-| Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; removal after | `run_issue()`, `worktree_pool.take()` |
+| Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards a proven clean, published checkout is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`), else removed | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
 | Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
@@ -328,6 +328,12 @@ must leave `~/.cache/jovie` and the pnpm store (`pnpm store path`) alone; use
 `scripts/agent/worktree-new --drain` to reclaim pool space. Tests and
 `JOVIE_WORKTREE_POOL=0` never touch the pool.
 
+Finished worktrees go back instead of being deleted (JOV-7723): `remove_worktree()` keeps
+its idle, clean and published checks, then `worktree_pool.recycle()` detaches HEAD at
+`origin/main`, runs `git clean -ffdx` except `node_modules` and `.cache`, and moves the
+checkout into the pool while there is room and disk. Deleting one installed worktree
+took 3 to 32 minutes under load; recycling takes seconds.
+
 ## Preserved repairs (JOV-7347)
 
 Repair retries reuse a registered preserved checkout only after its ended run,
@@ -602,6 +608,15 @@ in sync with those registries.
   alert.
 
 Incomplete briefs also increment `rejectedByProvider["needs-design-brief"]`.
+
+Design loop (JOV-7759): a gated issue's build prompt carries
+`DESIGN_LOOP_CONTRACT`. The lane plans from the brief, builds, and iterates
+privately until `pnpm design:conformance:gate`, `pnpm invariants:check` and the
+copy gate are green; `scripts/funnel-judge` also runs on funnel surfaces. The
+conformance gate includes `scripts/design-frontend-skill-check.mjs`, the
+deterministic subset of the frontend-skill contract, applied to added UI lines
+only. `scripts/automation-verify.sh affected` runs it as well, so the lane's
+own gate fails before CI does.
 
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
