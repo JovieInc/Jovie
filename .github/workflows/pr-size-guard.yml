@@ -60,9 +60,11 @@ jobs:
     # The same compare + member pull reads also decide the fork policy; the
     # dependent `Fork PR Gate` job below consumes this verdict instead of a
     # second workflow re-reading every member from the shared GITHUB_TOKEN
-    # quota on every group rebuild (JOV-7744).
+    # quota on every group rebuild (JOV-7744). The pinned exact-base bootstrap
+    # predates --also and publishes no verdict, so that unreachable base fails
+    # Fork PR Gate closed.
     outputs:
-      fork_verdict: ${{ steps.bootstrap-policy.outputs.fork_verdict || steps.member-policy.outputs.fork_verdict }}
+      fork_verdict: ${{ steps.member-policy.outputs.fork_verdict }}
     # The trusted policy has a 45s aggregate API deadline. Keep this producer
     # terminal well before merge-group admission's 6-minute external-check deadline.
     # The job clock starts at runner assignment, before image provisioning: a
@@ -85,7 +87,6 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Run exact-base bootstrap size policy
-        id: bootstrap-policy
         if: github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,7 +109,7 @@ jobs:
             timeout --kill-after=5s 40s bash --noprofile --norc <<'BOOTSTRAP_POLICY'
           set -euo pipefail
           git fetch --refetch --filter=blob:limit=1g --no-tags --depth=1 origin "$BOOTSTRAP_HEAD"
-          node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
+          node scripts/lib/merge-group-member-policy.mjs --policy=size
           BOOTSTRAP_POLICY
 
       - name: Enforce combined-tree payload and member size and fork policy
@@ -122,12 +123,12 @@ jobs:
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
         run: node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
 
-  # Active native-queue required-context producer for `Fork PR Gate` on the
-  # exact combined head. It reads only the verdict above: a missing verdict
-  # (policy error, cancellation) fails closed. Outside merge groups the job is
-  # skipped under a distinct name so a skipped check can never satisfy the
-  # jovie-bot `Fork PR Gate` source status.
   merge-group-fork:
+    # Active native-queue required-context producer for `Fork PR Gate` on the
+    # exact combined head. It reads only the verdict above: a missing verdict
+    # (policy error, cancellation) fails closed. Outside merge groups the job
+    # is skipped under a distinct name so a skipped check can never satisfy
+    # the jovie-bot `Fork PR Gate` source status.
     name: ${{ github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)' }}
     needs: [merge-group-size]
     if: always() && github.event_name == 'merge_group'

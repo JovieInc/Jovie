@@ -2803,7 +2803,7 @@ ${selectedGateScript}`,
       'node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork'
     );
     expect(sizeGuard).toContain(
-      'fork_verdict: ${{ steps.bootstrap-policy.outputs.fork_verdict || steps.member-policy.outputs.fork_verdict }}'
+      'fork_verdict: ${{ steps.member-policy.outputs.fork_verdict }}'
     );
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');

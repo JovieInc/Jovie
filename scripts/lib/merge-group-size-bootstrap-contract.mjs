@@ -72,7 +72,8 @@ function expectedCheckoutStep(exactBase) {
 
 function expectedNormalStep(otherBase) {
   return [
-    '      - name: Enforce combined-tree payload and member size policy',
+    '      - name: Enforce combined-tree payload and member size and fork policy',
+    '        id: member-policy',
     `        if: ${otherBase}`,
     '        env:',
     '          # The synthetic head controls this workflow definition. Never expose',
@@ -80,7 +81,7 @@ function expectedNormalStep(otherBase) {
     '          GH_TOKEN: ${{ github.token }}',
     "          MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}",
     "          MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}",
-    '        run: node scripts/lib/merge-group-member-policy.mjs --policy=size',
+    '        run: node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork',
   ].join('\n');
 }
 
@@ -95,7 +96,7 @@ export function validateSizeGuardBootstrapWorkflow(workflow) {
   const bootstrap = stepBlock(job, 'Run exact-base bootstrap size policy');
   const normal = stepBlock(
     job,
-    'Enforce combined-tree payload and member size policy'
+    'Enforce combined-tree payload and member size and fork policy'
   );
   const exactBase = `github.event.merge_group.base_sha == '${TRUSTED_SIZE_BOOTSTRAP_BASE}'`;
   const otherBase = `github.event.merge_group.base_sha != '${TRUSTED_SIZE_BOOTSTRAP_BASE}'`;
@@ -192,7 +193,7 @@ export function validateSizeGuardBootstrapWorkflow(workflow) {
   }
   if (
     !normal.includes(
-      'node scripts/lib/merge-group-member-policy.mjs --policy=size'
+      'node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork'
     )
   ) {
     errors.push('normal policy does not execute the protected-main policy');
