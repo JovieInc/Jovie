@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
+import { CircuitBreaker } from '@/lib/spotify/circuit-breaker';
 
 vi.mock('server-only', () => ({}));
 
@@ -247,7 +249,7 @@ describe('MusicBrainz Provider', () => {
   it('hydrates one exact normalized name, and leaves approximate names unresolved', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
-        Response.json({ artists: [{ id: TIM_ID, name: 'Tím White' }] })
+        Response.json({ artists: [{ id: TIM_ID, name: 'TIM WHITE' }] })
       )
       .mockResolvedValueOnce(Response.json({ id: TIM_ID, name: 'Tim White' }));
     await expect(
@@ -390,15 +392,16 @@ describe('MusicBrainz Provider', () => {
       .mockResolvedValueOnce(
         Response.json({
           releases: [
-            { id: 'wrong', barcode: '123' },
-            { id: 'right', title: 'Release', barcode: '123456789012' },
+            { id: OTHER_TIM_ID, barcode: '123' },
+            { id: TIM_ID, title: 'Release', barcode: '123456789012' },
           ],
         })
       )
       .mockResolvedValueOnce(
         Response.json({
-          id: 'right',
+          id: TIM_ID,
           title: 'Release',
+          barcode: '123456789012',
           'artist-credit': [{ artist: { name: 'Tim White' } }],
           relations: [],
         })
@@ -406,7 +409,7 @@ describe('MusicBrainz Provider', () => {
     await expect(
       lookupMusicBrainzReleaseByBarcode('123-456-789-012')
     ).resolves.toMatchObject({
-      id: 'right',
+      id: TIM_ID,
       title: 'Release',
       artist: 'Tim White',
       barcode: '123456789012',
@@ -500,11 +503,203 @@ describe('MusicBrainz Provider', () => {
     });
     await expect(
       getMusicBrainzArtist(TIM_ID, { signal: controller.signal })
-    ).rejects.toMatchObject({ errorCode: 'CANCELLED' });
+    ).rejects.toBeInstanceOf(CallerCancellationError);
     expect(fetch).toHaveBeenCalledTimes(1);
     await expect(
       getMusicBrainzArtist(TIM_ID, { signal: controller.signal })
-    ).rejects.toMatchObject({ errorCode: 'CANCELLED' });
+    ).rejects.toBeInstanceOf(CallerCancellationError);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the real circuit breaker healthy after repeated caller cancellations', async () => {
+    const breaker = new CircuitBreaker({
+      name: 'musicbrainz',
+      failureThreshold: 5,
+      minimumRequestCount: 10,
+      resetTimeout: 90_000,
+      failureWindow: 120_000,
+      successThreshold: 2,
+    });
+    mockExecute.mockImplementation(fn => breaker.execute(fn));
+    const controller = new AbortController();
+    controller.abort();
+    for (let index = 0; index < 10; index++) {
+      await expect(
+        getMusicBrainzArtist(TIM_ID, { signal: controller.signal })
+      ).rejects.toThrow('Request cancelled');
+    }
+    expect(breaker.getStats()).toMatchObject({
+      state: 'CLOSED',
+      failures: 0,
+      totalFailures: 0,
+    });
+    expect(mockLimit).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    mockResponse({ id: TIM_ID, name: 'Tim White' });
+    await expect(getMusicBrainzArtist(TIM_ID)).resolves.toMatchObject({
+      id: TIM_ID,
+      name: 'Tim White',
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops a caller cancelled during quota waiting before spending another quota decision', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    mockLimit.mockResolvedValue({
+      success: false,
+      reset: new Date(Date.now() + 1000),
+    });
+    const result = getMusicBrainzArtist(TIM_ID, {
+      waitForQuota: true,
+      signal: controller.signal,
+    });
+    // Handle the promise immediately while fake timers advance its rejection.
+    void result.catch(() => {});
+    await vi.advanceTimersByTimeAsync(100);
+    controller.abort();
+    await vi.runAllTimersAsync();
+    await expect(result).rejects.toBeInstanceOf(CallerCancellationError);
+    expect(mockLimit).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['東京', '大阪'],
+    ['東京', 'Tim White'],
+    ['سلام', 'حياة'],
+    ['क', 'कि'],
+    ['Bébé', 'Bebe'],
+    ['!!!', '???'],
+    ['&', 'and'],
+  ])(
+    'does not match different names through an empty or stripped key: %s / %s',
+    async (query, candidate) => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(
+          Response.json({ artists: [{ id: TIM_ID, name: candidate }] })
+        )
+        .mockResolvedValueOnce(Response.json({ id: TIM_ID, name: candidate }));
+      await expect(matchMusicBrainzArtistByName(query)).resolves.toEqual({
+        status: 'none',
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([
+    ['Bébé', 'Be\u0301be\u0301'],
+    ['東京', '東京'],
+    ['سلام', 'سلام'],
+    ['ＦＯＯ', 'foo'],
+  ])(
+    'matches canonically equivalent names without losing script identity: %s / %s',
+    async (query, candidate) => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(
+          Response.json({ artists: [{ id: TIM_ID, name: candidate }] })
+        )
+        .mockResolvedValueOnce(Response.json({ id: TIM_ID, name: candidate }));
+      await expect(matchMusicBrainzArtistByName(query)).resolves.toMatchObject({
+        status: 'found',
+        artist: { id: TIM_ID, name: candidate },
+      });
+    }
+  );
+
+  it('accepts a merged artist ID only through a verified MusicBrainz canonical redirect', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      Object.defineProperties(
+        Response.json({ id: TIM_ID, name: 'Tim White' }),
+        {
+          redirected: { value: true },
+          url: {
+            value: `https://musicbrainz.org/ws/2/artist/${TIM_ID}?fmt=json`,
+          },
+        }
+      )
+    );
+    await expect(getMusicBrainzArtist(OTHER_TIM_ID)).resolves.toMatchObject({
+      id: TIM_ID,
+      name: 'Tim White',
+    });
+  });
+
+  it.each([
+    `https://example.com/ws/2/artist/${TIM_ID}`,
+    `http://musicbrainz.org/ws/2/artist/${TIM_ID}`,
+    `https://musicbrainz.org/ws/2/recording/${TIM_ID}`,
+    `https://musicbrainz.org/ws/2/artist/${OTHER_TIM_ID}`,
+    'https://musicbrainz.org/ws/2/artist/invalid-id',
+    'not-a-url',
+  ])(
+    'rejects an artist response with an unverified redirect: %s',
+    async url => {
+      vi.mocked(fetch).mockResolvedValue(
+        Object.defineProperties(
+          Response.json({ id: TIM_ID, name: 'Tim White' }),
+          {
+            redirected: { value: true },
+            url: { value: url },
+          }
+        )
+      );
+      await expect(getMusicBrainzArtist(OTHER_TIM_ID)).rejects.toMatchObject({
+        errorCode: 'INVALID_RESPONSE',
+      });
+    }
+  );
+
+  it.each([
+    { id: OTHER_TIM_ID, barcode: '123456789012' },
+    { id: TIM_ID, barcode: '999999999999' },
+    { id: TIM_ID, barcode: null },
+  ])('rejects contradictory release detail identity: %j', async detail => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({
+          releases: [{ id: TIM_ID, title: 'Release', barcode: '123456789012' }],
+        })
+      )
+      .mockResolvedValueOnce(
+        Response.json({ ...detail, title: 'Wrong album' })
+      );
+    await expect(
+      lookupMusicBrainzReleaseByBarcode('123456789012')
+    ).rejects.toMatchObject({
+      errorCode: 'INVALID_RESPONSE',
+    });
+  });
+
+  it('accepts a merged release ID only when its canonical redirect and detail barcode agree', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({
+          releases: [
+            { id: OTHER_TIM_ID, title: 'Release', barcode: '123456789012' },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        Object.defineProperties(
+          Response.json({
+            id: TIM_ID,
+            title: 'Release',
+            barcode: '123456789012',
+          }),
+          {
+            redirected: { value: true },
+            url: {
+              value: `https://musicbrainz.org/ws/2/release/${TIM_ID}?fmt=json`,
+            },
+          }
+        )
+      );
+    await expect(
+      lookupMusicBrainzReleaseByBarcode('123456789012')
+    ).resolves.toMatchObject({
+      id: TIM_ID,
+      barcode: '123456789012',
+    });
   });
 });
