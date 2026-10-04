@@ -44,7 +44,6 @@
 @source "../components/features/opportunity-inbox";
 @source "../components/features/pay";
 @source "../components/features/releases";
-@source "../components/features/settings";
 @source "../components/features/tracking";
 @source "../components/features/ui";
 @source "../components/jovie";
@@ -3420,6 +3419,24 @@
 
 :where(.system-b-chat-pitch-count[data-over-limit="true"]) {
   color: var(--color-error);
+}
+
+/* Hide scrolled-away thread content under a floating header row (JOV-7192).
+   The clearance band above the first resting message stays fully clear and
+   only its last --space-4 ramps in, so a half-scrolled bubble dissolves
+   instead of reading as a clipped control. Resting content starts at
+   --space-16 (the scroll region's pt-16) and is never masked. */
+:where(.system-b-chat-thread-top-fade) {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent var(--space-12),
+    black var(--space-16)
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent var(--space-12),
+    black var(--space-16)
+  );
 }
 
 :where(.system-b-chat-prompt-rail-scroll) {

@@ -144,4 +144,52 @@ describe('ovie lists API', () => {
     expect(response.status).toBe(404);
     expect(mocks.suggestForList).toHaveBeenCalledWith('list-1');
   });
+
+  it.each([
+    [mocks.getSidebarLists, () => ListsRoute.GET()],
+    [
+      mocks.insertList,
+      () =>
+        ListsRoute.POST(req('/api/admin/ov-lists', 'POST', { name: 'Press' })),
+    ],
+    [
+      mocks.getListDetail,
+      () => ListRoute.GET(req('/api/admin/ov-lists/list-1'), ctx),
+    ],
+    [
+      mocks.updateList,
+      () =>
+        ListRoute.PATCH(
+          req('/api/admin/ov-lists/list-1', 'PATCH', {
+            actions: [{ type: 'pin', pinned: false }],
+          }),
+          ctx
+        ),
+    ],
+    [
+      mocks.deleteList,
+      () => ListRoute.DELETE(req('/api/admin/ov-lists/list-1', 'DELETE'), ctx),
+    ],
+    [
+      mocks.suggestForList,
+      () =>
+        SuggestRoute.POST(
+          req('/api/admin/ov-lists/list-1/suggest', 'POST'),
+          ctx
+        ),
+    ],
+    [
+      mocks.search,
+      () => CreatorsRoute.GET(req('/api/admin/ov-lists/creators?q=artist')),
+    ],
+  ] as const)(
+    'reports unavailable persistence without leaking internal details: %#',
+    async (operation, invoke) => {
+      operation.mockRejectedValueOnce(new Error('private database detail'));
+      const response = await invoke();
+      expect(response.status).toBe(500);
+      expect(response.headers.get('cache-control')).toBe('private, no-store');
+      expect(await response.text()).not.toContain('private database detail');
+    }
+  );
 });

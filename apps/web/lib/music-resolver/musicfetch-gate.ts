@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -21,6 +22,34 @@ export interface MusicfetchRemediation {
 }
 
 let dormant: MusicfetchDormantReason | null = null;
+
+export type MusicResolverFamily = 'provider_links' | 'release_facts';
+
+const MUSIC_RESOLVER_FAMILY_FLAGS = {
+  provider_links: 'MUSIC_RESOLVER_PROVIDER_LINKS',
+  release_facts: 'MUSIC_RESOLVER_RELEASE_FACTS',
+} as const;
+
+export const MUSICFETCH_RESIDUAL_ADAPTERS = [
+  'app/onboarding/actions/connect-spotify.ts',
+  'app/onboarding/actions/enrich-profile.ts',
+  'lib/agent-acquisition/release-resolution.ts',
+  'lib/discography/discovery.ts',
+  'lib/discography/provider-links.ts',
+  'lib/discography/unclaimed-artist-enrichment.ts',
+  'lib/dsp-enrichment/jobs/musicfetch-enrichment.ts',
+  'lib/ingestion/jobs.ts',
+  'lib/onboarding/claim-profile.ts',
+] as const;
+
+export function isMusicResolverFamilyEnabled(
+  family: MusicResolverFamily
+): boolean {
+  return (
+    isCodeFlagEnabled(MUSIC_RESOLVER_FAMILY_FLAGS[family]) ||
+    isCodeFlagEnabled('IN_HOUSE_RESOLVER')
+  );
+}
 
 export function musicfetchRemediationFingerprint(
   reason: MusicfetchDormantReason
@@ -48,9 +77,16 @@ export function isMusicfetchSubscriptionInactive(detail: string): boolean {
   return /subscription not active/i.test(detail);
 }
 
-/** False after a 401. A missing token is checked by the caller, not latched. */
+export function isMusicfetchFallbackEnabled(): boolean {
+  const allFamiliesCutOver =
+    isCodeFlagEnabled('MUSIC_RESOLVER_PROVIDER_LINKS') &&
+    isCodeFlagEnabled('MUSIC_RESOLVER_RELEASE_FACTS');
+  return isCodeFlagEnabled('MUSICFETCH_FALLBACK') || !allFamiliesCutOver;
+}
+
+/** False when vendor-off is configured or after a 401. */
 export function musicfetchNetworkAllowed(): boolean {
-  return dormant === null;
+  return isMusicfetchFallbackEnabled() && dormant === null;
 }
 
 export function musicfetchDormantReason(): MusicfetchDormantReason | null {
@@ -89,4 +125,29 @@ export function noteMusicfetchMissingToken(): MusicfetchRemediation {
 
 export function resetMusicfetchDormantForTests(): void {
   dormant = null;
+}
+
+/** Safe startup receipt for exact deployed cutover/rollback configuration. */
+export function musicResolverCutoverReceipt() {
+  return {
+    schema: 'jovie.music-resolver-cutover/v1',
+    buildSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    families: {
+      provider_links: isMusicResolverFamilyEnabled('provider_links'),
+      release_facts: isMusicResolverFamilyEnabled('release_facts'),
+      smart_link_creation: true,
+    },
+    musicfetch: {
+      dormantReason: dormant,
+      fallbackEnabled: isMusicfetchFallbackEnabled(),
+      networkAllowed: musicfetchNetworkAllowed(),
+      vendorOffRequested: !isCodeFlagEnabled('MUSICFETCH_FALLBACK'),
+    },
+    residualVendorAdapters: MUSICFETCH_RESIDUAL_ADAPTERS,
+    rollback: {
+      enableVendorFallback: 'FEATURE_MUSICFETCH_FALLBACK=true',
+      providerLinks: 'FEATURE_MUSIC_RESOLVER_PROVIDER_LINKS=false',
+      releaseFacts: 'FEATURE_MUSIC_RESOLVER_RELEASE_FACTS=false',
+    },
+  } as const;
 }
