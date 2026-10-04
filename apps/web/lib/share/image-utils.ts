@@ -52,9 +52,40 @@ export async function loadShareFonts(): Promise<{
   return { satoshi };
 }
 
+// Satori (next/og) only decodes PNG and JPEG rasters. Ingested avatars are
+// mostly AVIF, which made every such profile's OG card 500 (JOV-7753), so any
+// other raster format is transcoded to PNG before it reaches ImageResponse.
+const SATORI_NATIVE_IMAGE_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+]);
+const TRANSCODE_MAX_EDGE_PX = 1200;
+
+async function toSatoriImage(
+  bytes: Uint8Array,
+  contentType: string
+): Promise<{ readonly bytes: Uint8Array; readonly contentType: string }> {
+  const mime = contentType.split(';')[0]?.trim().toLowerCase() ?? '';
+  if (SATORI_NATIVE_IMAGE_TYPES.has(mime)) return { bytes, contentType: mime };
+
+  const { default: sharp } = await import('sharp');
+  const png = await sharp(bytes, { failOn: 'none' })
+    .resize({
+      width: TRANSCODE_MAX_EDGE_PX,
+      height: TRANSCODE_MAX_EDGE_PX,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .png()
+    .toBuffer();
+  return { bytes: new Uint8Array(png), contentType: 'image/png' };
+}
+
 /**
  * Convert a remote image URL to a data URL for embedding in ImageResponse.
- * Returns null on failure (timeout, oversized, non-image).
+ * Formats Satori cannot decode (AVIF, WebP, ...) are transcoded to PNG.
+ * Returns null on failure (timeout, oversized, non-image, undecodable).
  */
 export async function toDataUrl(
   imageUrl: string,
@@ -91,13 +122,13 @@ export async function toDataUrl(
     const arrayBuffer = await response.arrayBuffer();
     if (arrayBuffer.byteLength > maxBytes) return null;
 
-    const bytes = new Uint8Array(arrayBuffer);
+    const image = await toSatoriImage(new Uint8Array(arrayBuffer), ct);
     const CHUNK = 8192;
     const chunks: string[] = [];
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-      chunks.push(String.fromCodePoint(...bytes.subarray(i, i + CHUNK)));
+    for (let i = 0; i < image.bytes.length; i += CHUNK) {
+      chunks.push(String.fromCodePoint(...image.bytes.subarray(i, i + CHUNK)));
     }
-    return `data:${ct};base64,${btoa(chunks.join(''))}`;
+    return `data:${image.contentType};base64,${btoa(chunks.join(''))}`;
   } catch {
     return null;
   }

@@ -140,7 +140,7 @@ describe('OnboardingChat empty intro', () => {
       />
     );
 
-    expect(screen.getByText('Getting This Ready')).toBeTruthy();
+    expect(screen.getByText('Getting this ready')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });

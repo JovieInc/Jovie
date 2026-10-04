@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { normalizePull } from '../../remediation-sweep.mjs';
 import {
   DAY_MS,
   DRAFT_STALE_MS,
@@ -6,6 +8,7 @@ import {
   planExhaustedConflicts,
   planIdleHolds,
   planStaleDraftRollup,
+  planSummerConfigRedPulls,
   planSummerReceipts,
   planVercelFailure,
   RECEIPT_STALE_MS,
@@ -31,6 +34,64 @@ function pull(overrides) {
 }
 
 describe('remediation sweep selection', () => {
+  it('files red non-draft summer-config PRs without touching green or draft PRs', () => {
+    const check = (name, conclusion, startedAt) => ({
+      __typename: 'CheckRun',
+      conclusion,
+      name,
+      startedAt,
+      workflowName: 'ci',
+    });
+    const plans = planSummerConfigRedPulls([
+      {
+        number: 138,
+        isDraft: false,
+        autoMergeRequest: { mergeMethod: 'SQUASH' },
+        headRefOid: '7c999fa1',
+        url: 'https://github.com/JovieInc/summer-config/pull/138',
+        statusCheckRollup: [
+          check('test (3.9)', 'FAILURE', '2026-10-02T22:27:00Z'),
+          check('test (3.11)', 'FAILURE', '2026-10-02T22:27:01Z'),
+          check('test (3.12)', 'FAILURE', '2026-10-02T22:27:02Z'),
+        ],
+      },
+      {
+        number: 143,
+        isDraft: false,
+        autoMergeRequest: { mergeMethod: 'SQUASH' },
+        statusCheckRollup: [
+          check('test (3.11)', 'CANCELLED', '2026-10-02T23:42:46Z'),
+          check('test (3.11)', 'SUCCESS', '2026-10-02T23:43:23Z'),
+          check('test (3.12)', 'SUCCESS', '2026-10-02T23:44:21Z'),
+        ],
+      },
+      {
+        number: 144,
+        isDraft: false,
+        statusCheckRollup: [
+          check('verify', 'FAILURE', '2026-10-02T23:40:00Z'),
+          check('verify', 'SUCCESS', '2026-10-02T23:45:00Z'),
+        ],
+      },
+      {
+        number: 145,
+        isDraft: true,
+        statusCheckRollup: [
+          check('test (3.12)', 'FAILURE', '2026-10-02T23:45:00Z'),
+        ],
+      },
+    ]);
+
+    expect(plans).toHaveLength(1);
+    expect(plans[0]).toMatchObject({
+      fingerprint: 'remediation:summer-config-pr-138-red',
+      priority: 2,
+      reason:
+        'failed checks: test (3.11), test (3.12), test (3.9); auto-merge enabled',
+    });
+    expect(plans[0].description).toContain('JovieInc/Jovie only');
+  });
+
   it('files the draft rollup at 20 drafts or one stale unreviewed draft', () => {
     const reviewed = count =>
       Array.from({ length: count }, (_, index) =>
@@ -62,6 +123,74 @@ describe('remediation sweep selection', () => {
       NOW
     );
     expect(stale.description).toContain('#10');
+  });
+
+  it('lists every draft with age, reviewer, and lane disposition', () => {
+    const rollup = planStaleDraftRollup(
+      [
+        pull({
+          number: 30,
+          isDraft: true,
+          createdAt: ago(3 * DAY_MS),
+          reviewers: ['review-team', 'alice'],
+        }),
+        pull({
+          number: 10,
+          isDraft: true,
+          createdAt: ago(9 * DAY_MS),
+        }),
+        pull({
+          number: 20,
+          isDraft: true,
+          createdAt: ago(8 * DAY_MS),
+          labels: ['incident'],
+        }),
+        pull({ number: 40, isDraft: false }),
+      ],
+      NOW
+    );
+
+    expect(rollup.description).toContain(
+      '| Draft | Age | Reviewer | Lane disposition |'
+    );
+    expect(rollup.description).toContain('| 9d | none | `draft` |');
+    expect(rollup.description).toContain('| 8d | none | `hold:incident` |');
+    expect(rollup.description).toContain(
+      '| 3d | `alice`, `review-team` | `draft` |'
+    );
+    expect(rollup.description).not.toContain('#40');
+    expect(rollup.description.indexOf('#10')).toBeLessThan(
+      rollup.description.indexOf('#20')
+    );
+    expect(rollup.description.indexOf('#20')).toBeLessThan(
+      rollup.description.indexOf('#30')
+    );
+  });
+
+  it('retains unique requested and completed reviewer names', () => {
+    expect(
+      normalizePull({
+        number: 7548,
+        isDraft: true,
+        createdAt: '2026-09-20T00:00:00.000Z',
+        updatedAt: '2026-10-04T00:00:00.000Z',
+        url: 'https://github.com/JovieInc/Jovie/pull/7548',
+        labels: [{ name: 'incident' }],
+        reviewRequests: [
+          { login: 'requested-reviewer' },
+          { slug: 'review-team' },
+        ],
+        reviews: [
+          { author: { login: 'completed-reviewer' } },
+          { author: { login: 'completed-reviewer' } },
+        ],
+      })
+    ).toMatchObject({
+      labels: ['incident'],
+      reviewRequestCount: 2,
+      reviewCount: 2,
+      reviewers: ['completed-reviewer', 'requested-reviewer', 'review-team'],
+    });
   });
 
   it('ages exhausted labels and idle holds strictly past the deadline', () => {
@@ -194,6 +323,7 @@ describe('remediation sweep selection', () => {
       nowMs: NOW,
       loadPulls: async () => pulls,
       loadHealth: async () => ({ commissioned: false }),
+      loadSummerPulls: async () => [],
       loadDeployments: async () => ({
         'jovie-docs': { readyState: 'ERROR', uid: 'dpl_docs' },
         'jovie-web': { readyState: 'READY' },
@@ -243,5 +373,22 @@ describe('remediation sweep selection', () => {
     });
     expect(loadDeployments).not.toHaveBeenCalled();
     expect(skipped.warnings).toEqual([VERCEL_TOKEN_MISSING_WARNING]);
+  });
+
+  it('wires the summer-config scan to the existing daily workflow', () => {
+    const workflow = readFileSync(
+      new URL(
+        '../../../.github/workflows/remediation-sweep.yml',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(workflow).toMatch(/repositories: \|\n\s+Jovie\n\s+summer-config/);
+    expect(workflow).toContain(
+      'GH_TOKEN: ${{ steps.github-read-token.outputs.token }}'
+    );
+    expect(workflow).toContain('permission-checks: read');
+    expect(workflow).toContain('permission-pull-requests: read');
+    expect(workflow).toContain('run_mode summer-config');
   });
 });
