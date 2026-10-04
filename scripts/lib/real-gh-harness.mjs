@@ -8,10 +8,11 @@ import {
   openSync,
   readSync,
   rmSync,
+  symlinkSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -122,6 +123,11 @@ export function storedZip(files) {
  * `route(pathWithQuery)` returns `{ status?, body }` (string, Buffer or JSON
  * value) or null for a 404. Resolves with exit code, output and the API paths
  * gh actually requested.
+ * @param {object} opts
+ * @param {string} opts.script
+ * @param {Record<string, string | undefined>} [opts.env]
+ * @param {(path: string) => { status?: number, body: unknown } | null} opts.route
+ * @param {string} [opts.gh]
  */
 export async function runWithRealGh({ script, env = {}, route, gh }) {
   const binary = gh ?? resolveRealGh();
@@ -155,6 +161,19 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
+  // `gh` in the script must be the resolved real binary, but caller PATH
+  // fixtures (e.g. a deliberate fake `gh` stub) must still win. So the real
+  // binary goes after any directories the caller prepended to PATH and
+  // before the inherited PATH, where lane-level `gh` wrapper shims live.
+  const realBin = join(home, 'bin');
+  mkdirSync(realBin);
+  symlinkSync(binary, join(realBin, 'gh'));
+  const basePath = process.env.PATH ?? '';
+  const callerPath = env.PATH ?? basePath;
+  const callerPrefix = callerPath.endsWith(basePath)
+    ? callerPath.slice(0, callerPath.length - basePath.length)
+    : '';
+  const childPath = `${callerPrefix}${realBin}${delimiter}${basePath}`;
   try {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
@@ -169,10 +188,7 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
           HTTP_PROXY: proxy,
           http_proxy: proxy,
           ...env,
-          // The resolved real gh must win over any caller-supplied PATH: lane
-          // hosts prepend a `gh` shim that mints an app token from a key that
-          // does not exist under the harness HOME.
-          PATH: `${dirname(binary)}${delimiter}${env.PATH ?? process.env.PATH ?? ''}`,
+          PATH: childPath,
         },
       });
       let stdout = '';

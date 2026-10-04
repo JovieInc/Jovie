@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/components/organisms/AuthShellWrapper.search-state.test.tsx
 import { TooltipProvider } from '@jovie/ui';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
@@ -42,7 +43,6 @@ import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
 import { CommandPalette, CommandPaletteMainSurface } from './CommandPalette';
-import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
   type PendingShellRoute,
@@ -50,6 +50,14 @@ import {
 } from './PendingShellContext';
 
 export { TableMetaProvider, usePendingShell, useTableMeta };
+
+const KeyboardShortcutsSheet = dynamic(
+  () =>
+    import('./keyboard-shortcuts-sheet').then(
+      module => module.KeyboardShortcutsSheet
+    ),
+  { ssr: false }
+);
 
 export interface AuthShellWrapperProps {
   readonly mode?: AppShellMode;
@@ -64,10 +72,10 @@ export interface AuthShellWrapperProps {
  * KeyboardShortcutsHandler - Handles keyboard shortcuts with access to context
  */
 function KeyboardShortcutsHandler() {
-  const { open } = useKeyboardShortcuts();
+  const { open, isOpen } = useKeyboardShortcuts();
   useDashboardShortcuts({ onOpenShortcutsModal: open });
   useGlobalShortcutActions();
-  return <KeyboardShortcutsSheet />;
+  return isOpen ? <KeyboardShortcutsSheet /> : null;
 }
 
 /**
