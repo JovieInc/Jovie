@@ -1,0 +1,8 @@
+The ship workflow found gstack v1.91.16.0 available; current version is v0.14.5.0. Upgrading is unrelated to PR #20027, so I recommend **C** to keep scope tight.
+
+- A) Upgrade now
+- B) Upgrade and enable automatic updates
+- C) Not now (recommended)
+- D) Never ask again
+
+Which option?
