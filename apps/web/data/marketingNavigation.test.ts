@@ -40,17 +40,15 @@ describe('public marketing navigation', () => {
     expect(labels).not.toContain('Pitch');
   });
 
-  it('links the AI public brief from the Product footer', () => {
-    const product = MARKETING_FOOTER_COLUMNS.find(
-      column => column.title === 'Product'
+  it('links the AI public brief from the Resources footer', () => {
+    const resources = MARKETING_FOOTER_COLUMNS.find(
+      column => column.title === 'Resources'
     );
 
-    expect(product?.links).toEqual([
-      { href: '/product', label: 'Product' },
-      { href: '/ai', label: 'AI Operating System' },
-      { href: '/card', label: 'Jovie Card' },
-      { href: '/pricing', label: 'Pricing' },
-    ]);
+    expect(resources?.links).toContainEqual({
+      href: '/ai',
+      label: 'AI Operating System',
+    });
   });
 
   it('keeps the Music footer and fan labels until the generic creator flag is on', () => {

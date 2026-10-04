@@ -119,7 +119,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     title: 'Product',
     links: [
       { href: APP_ROUTES.PRODUCT, label: 'Product' },
-      { href: APP_ROUTES.AI, label: 'AI Operating System' },
       { href: APP_ROUTES.CARD, label: 'Jovie Card' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
@@ -158,6 +157,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       MARKETING_DEVELOPER_LINK,
       MARKETING_CLI_LINK,
       { href: APP_ROUTES.ENGINEERING, label: 'Engineering' },
+      { href: APP_ROUTES.AI, label: 'AI Operating System' },
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
       { href: APP_ROUTES.COMPARE, label: 'Compare' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
