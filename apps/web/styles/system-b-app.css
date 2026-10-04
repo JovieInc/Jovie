@@ -1001,6 +1001,16 @@
     color-mix(in oklab, var(--color-focus-ring) 45%, transparent);
 }
 
+:where(.system-b-table-skeleton-person-face) {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+:where(.system-b-table-skeleton-person-name) {
+  height: 0.75rem;
+  width: 7rem;
+}
+
 :where(.system-b-table-skeleton-release-title) {
   height: 0.75rem;
   width: 56%;
