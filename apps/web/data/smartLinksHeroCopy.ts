@@ -18,6 +18,13 @@ export const SMART_LINKS_HERO_COPY = {
   },
 } as const;
 
+export const SMART_LINK_MAKER_COPY = {
+  heading: 'Make a Jovie link',
+  limitHeading: 'Three anonymous links each month',
+  limitBody:
+    'Sign in to keep creating. Every link stays unclaimed until the artist verifies ownership.',
+} as const;
+
 export function getSmartLinksHeroCopy(genericCreatorNav: boolean): {
   readonly title: string;
   readonly intro: string;

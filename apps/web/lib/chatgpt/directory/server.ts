@@ -8,6 +8,12 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { captureError } from '@/lib/error-tracking';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import { MAKE_LINK_DIRECTORY_INSTRUCTIONS } from '@/lib/smart-link-mvp/contract';
+import {
+  MAKE_LINK_TOOL_NAME,
+  makeLinkToolDefinition,
+} from '@/lib/smart-link-mvp/tool';
 import {
   CHATGPT_DIRECTORY_INSTRUCTIONS,
   CHATGPT_DIRECTORY_TOOL_SPECS,
@@ -56,16 +62,22 @@ function notFound(): CallToolResult {
   return toolResult({ error: { code: 'ARTIST_NOT_FOUND', retryable: false } });
 }
 
-export function createArtistDirectoryMcpServer(reader: ArtistDirectoryReader) {
+export function createArtistDirectoryMcpServer(
+  reader: ArtistDirectoryReader,
+  request?: Request
+) {
+  const makeLink = isCodeFlagEnabled('SMART_LINK_MVP');
   const server = new Server(
     { name: 'jovie-artists', version: '1.0.0' },
     {
       capabilities: { tools: {} },
-      instructions: CHATGPT_DIRECTORY_INSTRUCTIONS,
+      instructions: makeLink
+        ? MAKE_LINK_DIRECTORY_INSTRUCTIONS
+        : CHATGPT_DIRECTORY_INSTRUCTIONS,
     }
   );
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: CHATGPT_DIRECTORY_TOOL_SPECS.map(tool => ({
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const readTools = CHATGPT_DIRECTORY_TOOL_SPECS.map(tool => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,
@@ -74,8 +86,17 @@ export function createArtistDirectoryMcpServer(reader: ArtistDirectoryReader) {
       annotations: PUBLIC_ARTIST_TOOL_ANNOTATIONS,
       securitySchemes: [{ type: 'noauth' }],
       _meta: { securitySchemes: [{ type: 'noauth' }] },
-    })),
-  }));
+    }));
+    return {
+      tools: makeLink
+        ? [
+            ...readTools.slice(0, 3),
+            makeLinkToolDefinition(),
+            ...readTools.slice(3),
+          ]
+        : readTools,
+    };
+  });
   server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
     try {
       if (params.name === 'find_artist') {
@@ -113,6 +134,10 @@ export function createArtistDirectoryMcpServer(reader: ArtistDirectoryReader) {
         const updates = await reader.getUpdates(input.data.username);
         if (!updates) return notFound();
         return toolResult(publicArtistUpdatesSchema.parse(updates));
+      }
+      if (makeLink && params.name === MAKE_LINK_TOOL_NAME && request) {
+        const { callMakeLink } = await import('@/lib/smart-link-mvp/mcp');
+        return callMakeLink(request, params.arguments);
       }
       if (params.name === 'subscribe_to_updates') {
         const input = CHATGPT_DIRECTORY_TOOL_SPECS[3].input.safeParse(

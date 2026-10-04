@@ -5,6 +5,7 @@ import { CODE_FLAGS, isCodeFlagEnabled } from './code-flags';
 describe('code flags', () => {
   afterEach(() => {
     delete process.env.FEATURE_CANVAS_GRAIN;
+    delete process.env.FEATURE_SMART_LINK_MVP;
   });
 
   it('keeps flag keys in alphabetical order so concurrent additions merge cleanly', () => {
@@ -14,6 +15,7 @@ describe('code flags', () => {
 
   it('defaults to the registry value when no env override is set', () => {
     expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(CODE_FLAGS.CANVAS_GRAIN);
+    expect(isCodeFlagEnabled('SMART_LINK_MVP')).toBe(false);
   });
 
   it('honors FEATURE_<FLAG_NAME> env overrides', () => {

@@ -41,6 +41,7 @@ vi.mock('@/lib/error-tracking', () => ({
 import { DELETE, GET, POST } from '@/app/api/chatgpt/mcp/route';
 import { BASE_URL } from '@/constants/app';
 import { CODE_FLAGS } from '@/lib/flags/code-flags';
+import { MAKE_LINK_ANNOTATIONS } from '@/lib/smart-link-mvp/contract';
 import {
   CHATGPT_DIRECTORY_INSTRUCTIONS,
   CHATGPT_DIRECTORY_LISTING,
@@ -135,7 +136,33 @@ describe('ChatGPT artist directory MCP', () => {
 
   afterEach(() => {
     delete process.env.FEATURE_CHATGPT_APP_DIRECTORY_MCP;
+    delete process.env.FEATURE_SMART_LINK_MVP;
     vi.clearAllMocks();
+  });
+
+  it('lists the flagged make_link write beside the read-only tools', async () => {
+    process.env.FEATURE_SMART_LINK_MVP = 'true';
+    const response = await POST(
+      request({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+        params: {},
+      })
+    );
+    const payload = (await response.json()) as {
+      result: { tools: Array<{ name: string; annotations: unknown }> };
+    };
+    expect(payload.result.tools.map(tool => tool.name)).toEqual([
+      'find_artist',
+      'get_profile',
+      'get_updates',
+      'make_link',
+      'subscribe_to_updates',
+    ]);
+    expect(
+      payload.result.tools.find(tool => tool.name === 'make_link')?.annotations
+    ).toEqual(MAKE_LINK_ANNOTATIONS);
   });
 
   it('stays off with dynamic client registration and rejects foreign origins', () => {
@@ -424,8 +451,9 @@ describe('ChatGPT artist directory MCP', () => {
     expect(face.websiteURL).toBe(CHATGPT_DIRECTORY_LISTING.websiteUrl);
     expect(face.screenshots).toBeUndefined();
     expect(openai.review.commerce).toBe(false);
-    expect(openai.review.test_cases.positive).toHaveLength(5);
-    expect(openai.review.test_cases.negative).toHaveLength(3);
+    expect(openai.review.test_cases.positive).toHaveLength(6);
+    expect(openai.review.test_cases.negative).toHaveLength(4);
+    expect(JSON.stringify(openai.review.test_cases)).toContain('make_link');
     expect(openai.review.demo_recording_url).toBeUndefined();
     for (const file of [
       face.logo,

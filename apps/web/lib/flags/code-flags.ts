@@ -50,6 +50,9 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
+  // Public creation API, /l/{code} pages, and make_link MCP tool. Default off.
+  // FEATURE_SMART_LINK_MVP=true enables the source only after its migration.
+  SMART_LINK_MVP: false,
   // Social-network HTML must not be fetched from Jovie server IPs. Default
   // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
   // isolated provider and still fails closed until that provider exists.

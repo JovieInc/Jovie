@@ -91,6 +91,8 @@ interface ReleaseLandingPageProps
     /** URL to the promo download gate page, shown when promo files exist */
     readonly downloadUrl?: string | null;
     readonly initialMenuOpen?: boolean;
+    /** Link-creation attribution, omitted on profile-owned release pages. */
+    readonly makerHref?: string;
   }> {}
 
 function resolveReleaseUtmParams(
@@ -266,6 +268,12 @@ function SmartLinkArtistLine({
 
   const bylineArtists =
     primaryArtists && primaryArtists.length > 0 ? primaryArtists : [artist];
+  if (
+    !hasFeatured &&
+    bylineArtists.every(entry => entry.name.trim().length === 0)
+  ) {
+    return null;
+  }
   const artistByHandle = new Map(
     bylineArtists.map(entry => [entry.name, entry])
   );
@@ -343,6 +351,7 @@ export function ReleaseLandingPage({
   claimBanner = null,
   downloadUrl = null,
   initialMenuOpen = false,
+  makerHref,
 }: Readonly<ReleaseLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
   const [shareOpen, setShareOpen] = useState(false);
@@ -451,9 +460,11 @@ export function ReleaseLandingPage({
       {/* Content — streaming buttons (scrollable) */}
       <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
         <p className='sr-only'>
-          {parentRelease
-            ? `${release.title} by ${artistByline}, from ${parentRelease.title}. Choose a streaming service.`
-            : `${release.title} by ${artistByline}. Choose a streaming service.`}
+          {artistByline
+            ? parentRelease
+              ? `${release.title} by ${artistByline}, from ${parentRelease.title}. Choose a streaming service.`
+              : `${release.title} by ${artistByline}. Choose a streaming service.`
+            : `${release.title}. Choose a streaming service.`}
         </p>
         <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
           {claimBanner && (
@@ -514,6 +525,7 @@ export function ReleaseLandingPage({
         <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
           <SmartLinkPoweredByFooter
             reportHref={`${APP_ROUTES.REPORT}?type=smart_link${tracking?.smartLinkSlug ? `&target=${encodeURIComponent(tracking.smartLinkSlug)}` : ''}`}
+            makerHref={makerHref}
           />
         </div>
       </div>

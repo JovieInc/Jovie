@@ -404,6 +404,20 @@ export const DATA_CLASSES: DataClass[] = [
     vendors: ['Meta/Google/TikTok (forwarded pixel events)'],
   },
   {
+    id: 'unclaimed-jovie-links',
+    title: 'Unclaimed public Jovie links',
+    purpose:
+      'Create public listening pages while enforcing a monthly anonymous limit with a one-way subject hash. The raw IP address is not stored.',
+    owner: 'app/links',
+    classification: 'telemetry',
+    tables: ['smart_links'],
+    retention: 'Kept with the public link page until the row is deleted.',
+    deletion: ['unmanaged'],
+    export: ['none'],
+    notes:
+      'created_by_user_id is optional and does not prove artist ownership. Opening claimUrl does not create an account.',
+  },
+  {
     id: 'audit-logs',
     title: 'Security and admin audit logs',
     purpose: 'Admin action and ingestion audit trails including actor IPs.',

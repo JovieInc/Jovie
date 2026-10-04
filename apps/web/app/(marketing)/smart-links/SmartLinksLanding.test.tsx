@@ -47,4 +47,22 @@ describe('SmartLinksLanding', () => {
       })
     ).toHaveAttribute('href', '/tim/the-deep-end?noredirect=1');
   });
+
+  it('keeps link creation hidden until the MVP flag includes it', () => {
+    const { rerender } = render(<SmartLinksLanding />);
+    expect(
+      screen.queryByLabelText('Paste a song link or type a name')
+    ).toBeNull();
+
+    rerender(<SmartLinksLanding showMaker />);
+    expect(
+      screen.getByLabelText('Paste a song link or type a name')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Make my link' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Three anonymous links each month' })
+    ).toBeInTheDocument();
+  });
 });

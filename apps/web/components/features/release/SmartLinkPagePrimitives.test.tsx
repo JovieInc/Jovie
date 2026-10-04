@@ -43,8 +43,15 @@ describe('SmartLinkPoweredByFooter', () => {
     );
 
     rerender(
-      <SmartLinkPoweredByFooter reportHref='/report?type=smart_link&target=abc' />
+      <SmartLinkPoweredByFooter
+        reportHref='/report?type=smart_link&target=abc'
+        makerHref='/smart-links'
+      />
     );
     expect(link).toHaveAttribute('href', '/report?type=smart_link&target=abc');
+    expect(screen.getByRole('link', { name: 'Make a link' })).toHaveAttribute(
+      'href',
+      '/smart-links'
+    );
   });
 });

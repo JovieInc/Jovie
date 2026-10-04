@@ -7,8 +7,12 @@ import {
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
-import { getSmartLinksHeroCopy } from '@/data/smartLinksHeroCopy';
+import {
+  getSmartLinksHeroCopy,
+  SMART_LINK_MAKER_COPY,
+} from '@/data/smartLinksHeroCopy';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import { SmartLinkMaker } from './SmartLinkMaker';
 import { SmartLinksDemo } from './SmartLinksDemo';
 
 const SMART_LINKS_HERO_PHOTO = {
@@ -35,7 +39,11 @@ const steps = [
   ],
 ] as const;
 
-export function SmartLinksLanding() {
+export function SmartLinksLanding({
+  showMaker = false,
+}: {
+  readonly showMaker?: boolean;
+}) {
   const hero = getSmartLinksHeroCopy(
     isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')
   );
@@ -87,6 +95,32 @@ export function SmartLinksLanding() {
           </div>
         </MarketingContainer>
       </section>
+
+      {showMaker ? (
+        <section
+          id='pricing'
+          aria-labelledby='make-jovie-link'
+          className='border-t border-subtle py-16 sm:py-22'
+        >
+          <MarketingContainer width='page'>
+            <h2
+              id='make-jovie-link'
+              className='text-balance text-3xl font-semibold tracking-tight sm:text-4xl'
+            >
+              {SMART_LINK_MAKER_COPY.heading}
+            </h2>
+            <SmartLinkMaker />
+            <div className='mx-auto mt-10 max-w-xl border-t border-subtle pt-5'>
+              <h3 className='text-lg font-semibold'>
+                {SMART_LINK_MAKER_COPY.limitHeading}
+              </h3>
+              <p className='mt-3 text-sm leading-6 text-secondary-token'>
+                {SMART_LINK_MAKER_COPY.limitBody}
+              </p>
+            </div>
+          </MarketingContainer>
+        </section>
+      ) : null}
 
       <section
         id='how-it-works'

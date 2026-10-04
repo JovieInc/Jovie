@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SmartLinksLanding } from './SmartLinksLanding';
 
 export const revalidate = false;
@@ -25,5 +26,5 @@ export const metadata: Metadata = {
 };
 
 export default function SmartLinksPage() {
-  return <SmartLinksLanding />;
+  return <SmartLinksLanding showMaker={isCodeFlagEnabled('SMART_LINK_MVP')} />;
 }

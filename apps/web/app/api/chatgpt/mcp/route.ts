@@ -80,11 +80,14 @@ export async function POST(request: Request) {
     headers: NO_STORE_HEADERS,
   });
   if (!body.ok) return body.response;
-  const server = createArtistDirectoryMcpServer({
-    findArtists: findPublicArtists,
-    getArtist: getPublicArtist,
-    getUpdates: getPublicArtistUpdates,
-  });
+  const server = createArtistDirectoryMcpServer(
+    {
+      findArtists: findPublicArtists,
+      getArtist: getPublicArtist,
+      getUpdates: getPublicArtistUpdates,
+    },
+    request
+  );
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

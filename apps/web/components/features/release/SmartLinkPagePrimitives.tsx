@@ -102,7 +102,8 @@ const FOOTER_LINK_CLASSES =
 
 export function SmartLinkPoweredByFooter({
   reportHref = `${APP_ROUTES.REPORT}?type=smart_link`,
-}: Readonly<{ reportHref?: string }>) {
+  makerHref,
+}: Readonly<{ reportHref?: string; makerHref?: string }>) {
   return (
     <footer className='shrink-0 pb-5 pt-3 text-center'>
       <div className='inline-flex items-center gap-2'>
@@ -113,6 +114,11 @@ export function SmartLinkPoweredByFooter({
           <span>Powered by</span>
           <span className='font-semibold'>Jovie</span>
         </Link>
+        {makerHref ? (
+          <Link href={makerHref} className={FOOTER_LINK_CLASSES}>
+            <span aria-hidden='true'>{'· '}</span>Make a link
+          </Link>
+        ) : null}
         <Link href={reportHref} className={FOOTER_LINK_CLASSES}>
           <span aria-hidden='true'>{'· '}</span>Report
         </Link>

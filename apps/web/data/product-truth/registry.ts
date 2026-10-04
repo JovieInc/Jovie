@@ -693,6 +693,7 @@ export type FlagCapabilityBinding =
 export const PRODUCT_FLAG_CAPABILITIES = {
   BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
   SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
+  SMART_LINK_MVP: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },
   SPOTIFY_OAUTH: { nonMarketing: 'account connection plumbing' },
   STRIPE_CONNECT_ENABLED: { capabilityId: 'pay' },
