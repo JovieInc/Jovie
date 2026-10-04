@@ -177,7 +177,7 @@ def main():
     for panel in (mark_panel, word_panel, clear_panel, variant_panel):
         part, y = panel(y + 40)
         body += part
-    svg = (f"<svg xmlns='http://www.w3.org/2000/svg' width='{W}' height='{y}' viewBox='0 0 {W} {y}'>"
+    svg = (f"<svg xmlns='http://www.w3.org/2000/svg' width='{W}' height='{y}' viewBox='0 0 {W} {y}' role='img' aria-label='Jovie mark construction'><title>Jovie mark construction</title>"
            f"<rect width='{W}' height='{y}' fill='{INK}'/>{body}</svg>")
     out = PKG / 'svg' / 'construction-sheet.svg'
     out.parent.mkdir(exist_ok=True)
