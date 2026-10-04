@@ -89,7 +89,10 @@ export function createWorld(overrides = {}) {
     clock: Date.parse('2026-10-03T12:00:00Z'),
     updates: [],
     comments: [],
+    /** @type {string[]} */
+    descriptions: [],
     failVersion: false,
+    refuseDescription: false,
     stateChangeDuringRead: null,
     ...overrides,
   };
@@ -222,6 +225,18 @@ export function createWorld(overrides = {}) {
           },
         },
       });
+    }
+    if (query.includes('IssueLifecycleDescription')) {
+      const issue = byKey(variables.issueId);
+      return ok({
+        data: { issue: issue ? { description: issue.description } : null },
+      });
+    }
+    if (query.includes('SetLifecycleDescription')) {
+      const issue = byKey(variables.issueId);
+      issue.description = variables.description;
+      world.descriptions.push(issue.identifier);
+      return ok({ data: { issueUpdate: { success: true } } });
     }
     if (query.includes('issueUpdate')) {
       const issue = byKey(variables.issueId);
@@ -383,6 +398,14 @@ export function portFor(world) {
         createdAt: new Date(world.clock).toISOString(),
       });
       world.comments.push(`${issue.identifier}:${body.split('\n')[0]}`);
+      return true;
+    },
+    readDescription: async id => byId(id).description,
+    setDescription: async (id, description) => {
+      if (world.refuseDescription) return false;
+      const issue = byId(id);
+      issue.description = description;
+      world.descriptions.push(issue.identifier);
       return true;
     },
   };

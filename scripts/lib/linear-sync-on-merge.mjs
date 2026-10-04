@@ -695,6 +695,25 @@ export async function reconcileIssueLifecycle(ctx) {
             { issueId, body }
           )
         ).commentCreate?.success === true,
+      readDescription: async issueId => {
+        const data = await linear(
+          `query IssueLifecycleDescription($issueId: String!) {
+        issue(id: $issueId) { description }
+      }`,
+          { issueId }
+        );
+        if (!data.issue) throw new Error(`Could not re-read ${issueId}`);
+        return String(data.issue.description ?? '');
+      },
+      setDescription: async (issueId, description) =>
+        (
+          await linear(
+            `mutation SetLifecycleDescription($issueId: String!, $description: String!) {
+        issueUpdate(id: $issueId, input: { description: $description }) { success }
+      }`,
+            { issueId, description }
+          )
+        ).issueUpdate?.success === true,
     },
   });
 }

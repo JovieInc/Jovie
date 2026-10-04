@@ -10,6 +10,13 @@ import { uiEvidenceRequirements } from '../invariants/assurance-matrix.mjs';
 import { classifyCiRisk } from './ci-harness.mjs';
 import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
 import {
+  founderTasteOrder,
+  readTasteOrders,
+  renderTasteOrder,
+  tasteOrderId,
+  tasteReceiptsFromResults,
+} from './founder-taste-order.mjs';
+import {
   decideValidationTransition,
   deriveValidationManifest,
   formatLifecycleComment,
@@ -373,6 +380,7 @@ export function selectStateId(name, states) {
  * @typedef {{
  *   id: string,
  *   identifier: string,
+ *   title?: string,
  *   labels: string[],
  *   description: string,
  *   reopenedAfterDone?: boolean,
@@ -385,6 +393,8 @@ export function selectStateId(name, states) {
  *   readStateId: (issueId: string) => Promise<string>,
  *   setState: (issueId: string, stateId: string) => Promise<string>,
  *   addComment: (issueId: string, body: string) => Promise<boolean>,
+ *   readDescription: (issueId: string) => Promise<string>,
+ *   setDescription: (issueId: string, description: string) => Promise<boolean>,
  * }} LinearPort
  */
 
@@ -404,6 +414,7 @@ export function selectStateId(name, states) {
  *   readonly linear: LinearPort,
  *   readonly eventPull?: { number: number },
  *   readonly dryRun?: boolean,
+ *   readonly now?: () => Date,
  *   readonly log: (message: string) => void,
  * }} ctx
  */
@@ -458,10 +469,14 @@ export async function reconcileValidation(ctx) {
   }
 
   const receipts = [];
-  for (const receipt of parseValidationReceipts(
-    issue.commentRecords,
-    issue.identifier
-  )) {
+  for (const receipt of [
+    ...parseValidationReceipts(issue.commentRecords, issue.identifier),
+    ...tasteReceiptsFromResults(
+      issue.description,
+      issue.commentRecords,
+      issue.identifier
+    ),
+  ]) {
     const containsBinding = await ctx.facts.contains(
       manifest.bindingSha,
       receipt.sha
@@ -566,10 +581,60 @@ export async function reconcileValidation(ctx) {
       `Linear refused the lifecycle comment on ${issue.identifier}`
     );
   }
+  if (
+    decision.target === 'Validating' &&
+    decision.missing.includes('founder-taste') &&
+    deployment.status === 'verified' &&
+    deployment.sha
+  ) {
+    await fileTasteOrder(ctx, manifest, deployment.sha);
+  }
   ctx.log(
     move
       ? `Moved ${issue.identifier} from ${issue.state.name} to ${decision.target}`
       : `Kept ${issue.identifier} in ${issue.state.name}`
   );
   return result;
+}
+
+/**
+ * Ask the founder through Ovie (JOV-7739) once per binding merge: append a
+ * sealed taste work order to the issue body, where Summer reads it. The body
+ * is re-read first so a concurrent edit or an earlier filing is kept.
+ *
+ * @param {Parameters<typeof reconcileValidation>[0]} ctx
+ * @param {import('./validation-lifecycle.mjs').ValidationManifest} manifest
+ * @param {string} deploymentSha
+ */
+async function fileTasteOrder(ctx, manifest, deploymentSha) {
+  const { issue } = ctx;
+  const orderId = tasteOrderId(issue.identifier, manifest.bindingSha);
+  const filed = (/** @type {string} */ body) =>
+    readTasteOrders(body, issue.identifier).some(
+      entry => entry.order.orderId === orderId
+    );
+  if (filed(issue.description)) return;
+  const current = await ctx.linear.readDescription(issue.id);
+  if (filed(current)) return;
+  const order = founderTasteOrder({
+    identifier: issue.identifier,
+    issueTitle: issue.title,
+    issueUrl: `https://linear.app/jovie/issue/${issue.identifier}`,
+    bindingSha: manifest.bindingSha,
+    bindingPull: manifest.bindingPull,
+    deploymentSha,
+    productionUrl: 'https://jov.ie',
+    uiEvidence: manifest.uiEvidence ?? [],
+    reason:
+      manifest.required.find(entry => entry.kind === 'founder-taste')?.reason ??
+      'a founder taste receipt is required',
+    now: (ctx.now ?? (() => new Date()))().toISOString(),
+  });
+  const body = `${current.trimEnd()}\n\n### Founder taste (JOV-7759)\n\n${renderTasteOrder(order)}\n`;
+  if (!(await ctx.linear.setDescription(issue.id, body))) {
+    throw new Error(
+      `Linear refused the founder taste order on ${issue.identifier}`
+    );
+  }
+  ctx.log(`Filed founder taste order ${orderId} for ${deploymentSha}`);
 }

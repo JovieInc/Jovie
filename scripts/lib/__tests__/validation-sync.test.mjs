@@ -1,4 +1,21 @@
 import { describe, expect, it } from 'vitest';
+
+// The JOV-7703 contract is TypeScript in another package; load it at runtime
+// so the scripts checkJs pass does not typecheck that package.
+const CONTRACTS = new URL(
+  '../../../packages/agent-transport-contracts',
+  import.meta.url
+).href;
+const {
+  acknowledgeDispatch,
+  extractWorkBlocks,
+  renderWorkBlock,
+  sealWorkOrder,
+} = await import(`${CONTRACTS}/work-order.ts`);
+const { founderCardKey, fromSummerCard } = await import(
+  `${CONTRACTS}/work-order-adapters.ts`
+);
+
 import {
   classifyMergedRisk,
   createProductionFacts,
@@ -42,6 +59,7 @@ function evaluate(world, fetchImpl, options = {}) {
     linear: portFor(world),
     eventPull: options.eventPull,
     dryRun: options.dryRun,
+    now: options.now,
     log: options.log ?? (() => {}),
   });
 }
@@ -318,6 +336,85 @@ describe('validation sync: founder taste (JOV-7759)', () => {
     );
     await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
     expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  /** Summer's JOV-7739 tick: read the order from the body, post the decision. */
+  function summerTick(world, status, comment = null) {
+    const issue = world.issues['JOV-1'];
+    const [raw] = extractWorkBlocks(issue.description).orders;
+    const order = sealWorkOrder(raw);
+    const card = {
+      id: `card-${order.digest.slice(0, 8)}`,
+      idempotencyKey: founderCardKey(order),
+      status,
+      comment,
+      decidedAt: '2026-10-04T02:00:00.000Z',
+    };
+    const ack = acknowledgeDispatch(order, {
+      transportRef: `ovie:summer-card/${card.id}`,
+      dispatchedAt: '2026-10-04T01:30:00.000Z',
+    });
+    const result = fromSummerCard(order, {
+      ack,
+      card,
+      observedAt: card.decidedAt,
+    });
+    world.clock += 1000;
+    issue.comments.push({
+      body: `Founder ${status} in Ovie.\n\n${renderWorkBlock(result)}`,
+      createdAt: new Date(world.clock).toISOString(),
+    });
+  }
+
+  it('files one Ovie taste order per binding and closes on the founder approval', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].description = 'Mirror the rail toggle.';
+    const now = () => new Date('2026-10-04T01:00:00Z');
+    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX, now });
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    expect(world.descriptions).toEqual(['JOV-1']);
+    const body = world.issues['JOV-1'].description;
+    expect(body.startsWith('Mirror the rail toggle.')).toBe(true);
+    const [order] = extractWorkBlocks(body).orders;
+    expect(order).toMatchObject({
+      authorityClass: 'founder',
+      requiredCapabilities: ['taste'],
+      scope: { entityRefs: expect.arrayContaining([`sha:${MAIN[2]}`]) },
+    });
+
+    summerTick(world, 'approved');
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('routes an Ovie rejection to Rework with the note, then asks again for the fix build', async () => {
+    const { world, fetchImpl } = createWorld();
+    const now = () => new Date('2026-10-04T01:00:00Z');
+    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX, now });
+    summerTick(world, 'rejected', 'Too much chrome around the player.');
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Rework');
+    expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+      'Note: Too much chrome around the player.'
+    );
+
+    addMerge(world, 103, MAIN[3], '2026-10-03T14:00:00Z');
+    world.served = MAIN[4].slice(0, 7);
+    await merge(world, fetchImpl, 103, { assuranceMatrix: UI_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    expect(world.descriptions).toEqual(['JOV-1', 'JOV-1']);
+    expect(
+      extractWorkBlocks(world.issues['JOV-1'].description).orders
+    ).toHaveLength(2);
+  });
+
+  it('surfaces a refused order write', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.refuseDescription = true;
+    await expect(
+      merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX })
+    ).rejects.toThrow(/refused the founder taste order/);
   });
 
   it('treats an unreadable matrix as unknown UI evidence, never as no UI change', async () => {

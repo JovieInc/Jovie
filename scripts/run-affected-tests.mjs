@@ -1055,6 +1055,8 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
   'scripts/lib/validation-sync.mjs',
   'scripts/lib/__tests__/validation-sync.test.mjs',
   'scripts/lib/__tests__/fixtures/validation-world.mjs',
+  'scripts/lib/founder-taste-order.mjs',
+  'scripts/lib/__tests__/founder-taste-order.test.mjs',
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
@@ -1210,6 +1212,7 @@ function planAffectedTests(
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
         'scripts/lib/__tests__/validation-lifecycle.test.mjs',
         'scripts/lib/__tests__/validation-sync.test.mjs',
+        'scripts/lib/__tests__/founder-taste-order.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
       scriptVitestCoverageArgs: [
@@ -1217,6 +1220,7 @@ function planAffectedTests(
         '--coverage.include=lib/linear-sync-on-merge.mjs',
         '--coverage.include=lib/validation-lifecycle.mjs',
         '--coverage.include=lib/validation-sync.mjs',
+        '--coverage.include=lib/founder-taste-order.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
         '--coverage.thresholds.perFile=true',

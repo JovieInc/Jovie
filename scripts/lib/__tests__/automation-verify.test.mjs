@@ -3276,6 +3276,7 @@ describe('linear sync on merge selection', () => {
       'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
       'scripts/lib/__tests__/validation-lifecycle.test.mjs',
       'scripts/lib/__tests__/validation-sync.test.mjs',
+      'scripts/lib/__tests__/founder-taste-order.test.mjs',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });
