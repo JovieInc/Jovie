@@ -159,7 +159,6 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: `${dirname(binary)}${delimiter}${process.env.PATH ?? ''}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
@@ -170,6 +169,10 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
           HTTP_PROXY: proxy,
           http_proxy: proxy,
           ...env,
+          // The resolved real gh must win over any caller-supplied PATH: lane
+          // hosts prepend a `gh` shim that mints an app token from a key that
+          // does not exist under the harness HOME.
+          PATH: `${dirname(binary)}${delimiter}${env.PATH ?? process.env.PATH ?? ''}`,
         },
       });
       let stdout = '';
