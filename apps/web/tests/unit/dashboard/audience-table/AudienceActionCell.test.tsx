@@ -63,7 +63,10 @@ describe('AudienceActionCell', () => {
       </AudienceTableStableProvider>,
       withTooltips
     );
-    fireEvent.click(screen.getByRole('button'));
+    const button = screen.getByRole('button', { name: 'Message Tim' });
+    // A 24px icon action that fits the 32px dense row.
+    expect(button.className).toContain('h-6');
+    fireEvent.click(button);
     expect(onSendNotification).toHaveBeenCalledWith(baseMember);
   });
 
@@ -114,18 +117,5 @@ describe('AudienceActionCell', () => {
       withTooltips
     );
     expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
-  });
-
-  it('fits the 24px dense content height', () => {
-    const ctx = makeStableContext();
-    render(
-      <AudienceTableStableProvider value={ctx}>
-        <AudienceActionCell member={baseMember} />
-      </AudienceTableStableProvider>,
-      withTooltips
-    );
-    expect(
-      screen.getByRole('button', { name: 'Message Tim' }).className
-    ).toContain('h-6');
   });
 });
