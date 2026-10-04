@@ -4948,19 +4948,21 @@ describe('production promotion exact-artifact contract', () => {
       'select(.name | startswith("Production Release /"))'
     );
     expect(health).toContain('controller_attempt="$(jq -r');
-    expect(health).toContain('gh run rerun "$run_id"');
-    expect(health).not.toContain('gh run rerun "$run_id" --failed');
+    // JOV-7773: a full controller rerun drops the attempt-1 marker
+    // artifacts, so an interrupted marker heals only through the bounded
+    // marker re-proof, which the recovery admission gates on promotion,
+    // Sentry and skipped-rollback evidence.
+    expect(health).not.toContain('gh run rerun "$run_id"');
     expect(health).toContain('needs_manual=true');
-    expect(health).toContain('runs/$run_id/attempts/1/jobs?per_page=100');
-    expect(health).toContain('endswith("Centralized production rollback")');
     expect(health).toContain('.status == "completed"');
     expect(health).toContain('.conclusion == "skipped"');
-    expect(health).toContain('actions/runs/$run_id/attempts/1');
-    expect(health).toContain('actions/runs/$run_id")');
     expect(health).toContain(
-      '(.conclusion | IN("cancelled", "failure", "startup_failure", "timed_out"))'
+      'recovery_reason=current_marker_recovery_dispatched'
     );
-    expect(health).toContain('recovery_lease_already_exists');
+    expect(health).toContain('incident interrupted_current_marker_not_live');
+    expect(
+      health.match(/gh workflow run production-marker-recovery\.yml/g)
+    ).toHaveLength(2);
     // production-mutation concurrency parks newer generations in pending /
     // waiting / requested; do not treat those as completed-without-marker.
     expect(healthEvaluation).toContain(
@@ -4999,17 +5001,12 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(health).not.toContain('issues: write');
     expect(health).not.toContain('exit 1');
-    expect(health.indexOf('exact_attempt="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
-    );
-    expect(health.indexOf('exact_jobs="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
-    );
-    expect(health.indexOf('latest_run="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
-    );
-    expect(health.indexOf('lease_listing="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
+    const currentDispatch = health.indexOf('-f sha="$current_sha"');
+    expect(currentDispatch).toBeGreaterThan(0);
+    expect(
+      health.lastIndexOf('boundary_marker="$(node', currentDispatch)
+    ).toBeGreaterThan(
+      health.indexOf('incident interrupted_current_marker_not_live')
     );
     expect(health).toContain('incident duplicate_controller_generation');
     expect(healthEvaluation).toContain(
@@ -5248,6 +5245,130 @@ describe('production promotion exact-artifact contract', () => {
   });
 });
 
+describe('in-band interrupted marker heal (JOV-7773)', () => {
+  const sha = 'c75c559a06e94a26a7afb258f85dc951775332bd';
+
+  function healStep() {
+    const parsed = parseYaml(
+      readFileSync(productionControllerWorkflowPath, 'utf8')
+    ) as {
+      jobs: Record<
+        string,
+        {
+          if?: string;
+          needs?: string[];
+          permissions?: Record<string, string>;
+          steps: Array<{ name?: string; run?: string }>;
+        }
+      >;
+    };
+    return parsed.jobs['heal-interrupted-marker'];
+  }
+
+  function runHeal(env: Record<string, string | undefined>) {
+    const script = healStep().steps[0]?.run;
+    expect(script).toBeTruthy();
+    const root = mkdtempSync(resolve(tmpdir(), 'marker-heal-'));
+    try {
+      const bin = resolve(root, 'bin');
+      mkdirSync(bin);
+      const calls = resolve(root, 'calls');
+      writeFileSync(calls, '');
+      writeFileSync(
+        resolve(bin, 'gh'),
+        `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "$CALLS"\n`
+      );
+      chmodSync(resolve(bin, 'gh'), 0o700);
+      const result = spawnSync('bash', ['-c', script!], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          CALLS: calls,
+          EXPECTED_SHA: sha,
+          DEPLOYMENT_ID: 'dpl_37144574062',
+          RUN_WEB: 'true',
+          MARKER_RECOVERY: 'false',
+          VERIFIED_RESULT: 'success',
+          SMOKE_REMEDIATION_RESULT: 'success',
+          AUTH_REMEDIATION_RESULT: 'success',
+          CONTROLLER_RUN: '37144574062',
+          CONTROLLER_ATTEMPT: '1',
+          ...env,
+        },
+      });
+      return { ...result, calls: readFileSync(calls, 'utf8') };
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  }
+
+  it('runs after every verified generation with only dispatch scope', () => {
+    const job = healStep();
+    expect(job.if).toBe(
+      "${{ always() && needs.production-verified.outputs.verified == 'true' }}"
+    );
+    expect(job.needs).toEqual([
+      'authorize-production',
+      'production-release',
+      'production-verified',
+      'remediation-post-deploy-smoke',
+      'remediation-auth-smoke',
+    ]);
+    expect(job.permissions).toEqual({ actions: 'write', contents: 'read' });
+    expect(job.steps[0]?.run).not.toContain('gh run rerun');
+  });
+
+  it('dispatches the bounded re-proof when run 37144574062 is interrupted after its marker', () => {
+    for (const env of [
+      { SMOKE_REMEDIATION_RESULT: 'failure' },
+      { AUTH_REMEDIATION_RESULT: 'cancelled' },
+      { VERIFIED_RESULT: 'failure' },
+    ]) {
+      const result = runHeal(env);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.calls.trim()).toBe(
+        `workflow run production-marker-recovery.yml --ref main -f sha=${sha} -f deployment_id=dpl_37144574062 -f controller_run=37144574062 -f controller_attempt=1`
+      );
+    }
+  }, 30_000);
+
+  it('stays neutral for an uninterrupted or publication-only failure', () => {
+    // Run 37144574062 itself: only the changelog publication failed, which
+    // is not a needs edge here, so the marker stays verified (JOV-7724).
+    for (const env of [{}, { SMOKE_REMEDIATION_RESULT: 'skipped' }]) {
+      const result = runHeal(env);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.calls).toBe('');
+      expect(result.stdout).toContain('nothing to heal');
+    }
+  }, 30_000);
+
+  it('leaves recovery attempts and non-web generations to the health audit', () => {
+    for (const env of [
+      { MARKER_RECOVERY: 'true' },
+      { RUN_WEB: 'false', DEPLOYMENT_ID: '' },
+    ]) {
+      const result = runHeal({ ...env, VERIFIED_RESULT: 'failure' });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.calls).toBe('');
+    }
+  }, 30_000);
+
+  it('fails closed without exact recovery evidence', () => {
+    for (const env of [
+      { DEPLOYMENT_ID: '' },
+      { DEPLOYMENT_ID: 'not-applicable' },
+      { EXPECTED_SHA: 'abc' },
+      { CONTROLLER_ATTEMPT: '0' },
+    ]) {
+      const result = runHeal({ ...env, VERIFIED_RESULT: 'failure' });
+      expect(result.status).toBe(1);
+      expect(result.calls).toBe('');
+    }
+  }, 30_000);
+});
+
 describe('production marker recovery workflow (JOV-4965)', () => {
   it('is event-driven with a bounded manual fallback and never mutates release state', () => {
     const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
@@ -5400,5 +5521,114 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       "run.event === 'workflow_dispatch' || run.event === 'workflow_run'"
     );
     expect(markerState).toContain('unsafe_or_contradictory_rollback');
+  });
+
+  describe('admission binds a descendant controller head (JOV-7724)', () => {
+    const deployed = 'd'.repeat(40);
+    const head = 'c'.repeat(40);
+
+    function runAdmission(compareStatus: string) {
+      const parsed = parseYaml(
+        readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8')
+      ) as {
+        jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>;
+      };
+      const script = parsed.jobs['recover-marker'].steps.find(
+        step => step.name === 'Validate bounded recovery request'
+      )?.run;
+      expect(script).toBeTruthy();
+      const root = mkdtempSync(resolve(tmpdir(), 'marker-admission-'));
+      try {
+        const bin = resolve(root, 'bin');
+        mkdirSync(bin);
+        const jobs = [
+          ['Production Release / Promote to Production', 'success'],
+          ['Production Release / Sentry Error Gate (production)', 'success'],
+          ['Production Release / Centralized production rollback', 'skipped'],
+          ['Production Verified', 'success'],
+          ['Publish verified customer changelog', 'failure'],
+        ].map(([name, conclusion], index) => ({
+          id: index + 1,
+          name,
+          head_sha: head,
+          head_branch: 'main',
+          status: 'completed',
+          conclusion,
+        }));
+        writeFileSync(
+          resolve(root, 'run.json'),
+          JSON.stringify({
+            id: 37144574062,
+            run_attempt: 1,
+            path: '.github/workflows/production-controller.yml',
+            event: 'workflow_run',
+            head_sha: head,
+            head_branch: 'main',
+            head_repository: { full_name: 'JovieInc/Jovie' },
+            status: 'completed',
+            conclusion: 'failure',
+          })
+        );
+        writeFileSync(
+          resolve(root, 'jobs.json'),
+          JSON.stringify({ total_count: jobs.length, jobs })
+        );
+        writeFileSync(
+          resolve(root, 'compare.json'),
+          JSON.stringify({ status: compareStatus, behind_by: 0 })
+        );
+        writeFileSync(
+          resolve(bin, 'gh'),
+          `#!/usr/bin/env bash
+set -euo pipefail
+case "$2" in
+  */compare/*) cat "$FIXTURES/compare.json" ;;
+  */jobs\?*) cat "$FIXTURES/jobs.json" ;;
+  */attempts/*) cat "$FIXTURES/run.json" ;;
+  */artifacts\?name=*) case "$*" in *length*) echo 0 ;; esac ;;
+  *) echo "unexpected gh $*" >&2; exit 2 ;;
+esac
+`
+        );
+        chmodSync(resolve(bin, 'gh'), 0o700);
+        const output = resolve(root, 'output');
+        writeFileSync(output, '');
+        const result = spawnSync('bash', ['-c', script!], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            FIXTURES: root,
+            GITHUB_OUTPUT: output,
+            EXPECTED_SHA: deployed,
+            EXPECTED_DEPLOYMENT_ID: 'dpl_recovery123',
+            SOURCE_CONTROLLER_RUN: '37144574062',
+            SOURCE_CONTROLLER_ATTEMPT: '1',
+            REPO: 'JovieInc/Jovie',
+            REQUEST_MODE: 'workflow_dispatch',
+          },
+        });
+        return { ...result, output: readFileSync(output, 'utf8') };
+      } finally {
+        rmSync(root, { force: true, recursive: true });
+      }
+    }
+
+    it('admits the run 37144574062 shape whose head descends from the deployed SHA', () => {
+      const result = runAdmission('ahead');
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.output).toContain('recovery_required=true');
+    }, 30_000);
+
+    it('refuses a controller head that does not descend from the deployed SHA', () => {
+      for (const status of ['diverged', 'behind', 'identical']) {
+        const result = runAdmission(status);
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(
+          'is not an exact completed Production Controller attempt'
+        );
+        expect(result.output).not.toContain('recovery_required=true');
+      }
+    }, 30_000);
   });
 });

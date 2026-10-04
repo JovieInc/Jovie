@@ -66,9 +66,7 @@ describe('column-heading-line-clamp-1-v1', () => {
     ).toBe(false);
   });
 
-  it('every <th> column heading carries a one-line clamp', {
-    timeout: 60_000,
-  }, () => {
+  it('every <th> column heading carries a one-line clamp', () => {
     const files = collectWebProductSource().filter(file =>
       /<th[\s/>]/.test(read(file))
     );

@@ -92,7 +92,8 @@ for sql_file in "${SQL_FILES[@]}"; do
   filename=$(basename "$sql_file" .sql)
 
   # Check if this migration is in the journal
-  if ! printf '%s\n' "${JOURNAL_TAGS[@]}" | grep -q "^${filename}$"; then
+  # Consume every tag: grep -q can SIGPIPE printf under pipefail after a match.
+  if ! printf '%s\n' "${JOURNAL_TAGS[@]}" | grep -Fx "$filename" > /dev/null; then
     UNREGISTERED_FILES+=("$filename")
     EXIT_CODE=1
   fi

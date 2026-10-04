@@ -51,11 +51,11 @@ describe('Icon', () => {
       'CalendarDays',
       'Search',
       'PanelLeft',
-      'PanelLeftClose',
-      'PanelLeftOpen',
       'PanelRight',
-      'PanelRightClose',
-      'PanelRightOpen',
+      'RailLeftClosed',
+      'RailLeftOpen',
+      'RailRightClosed',
+      'RailRightOpen',
     ] as const;
 
     for (const name of names) {

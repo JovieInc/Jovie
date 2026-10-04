@@ -37,6 +37,12 @@ const BANNED_ICONS = [
   'Disc3',
   'DiscAlbum',
   'CircleDot',
+  // JOV-7207 (Tim, 2026-10-03): arrow-bearing rail glyphs. Rail controls use
+  // the mirrored Jovie rail family (`Rail{Left,Right}{Open,Closed}`).
+  'PanelLeftClose',
+  'PanelLeftOpen',
+  'PanelRightClose',
+  'PanelRightOpen',
 ] as const;
 
 // Whole-word match only — must not fire on `discNumber`, `totalDiscs`,

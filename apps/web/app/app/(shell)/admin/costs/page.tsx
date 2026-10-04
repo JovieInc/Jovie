@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { getAdminCosts, getCostsLastRefreshedAt } from '@/lib/admin/costs';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
@@ -14,28 +15,44 @@ export const runtime = 'nodejs';
 export default async function AdminCostsPage() {
   await requireCurrentAdminPageAccess();
 
-  let items: Awaited<ReturnType<typeof getAdminCosts>> = [];
-  let lastRefreshed: Awaited<ReturnType<typeof getCostsLastRefreshedAt>> = null;
-
-  try {
-    [items, lastRefreshed] = await Promise.all([
-      getAdminCosts(),
-      getCostsLastRefreshedAt(),
-    ]);
-  } catch (error) {
-    await captureError('Admin costs page failed to load optional data', error, {
-      route: 'admin/costs',
-    });
+  const [costsResult, refreshedResult] = await Promise.allSettled([
+    getAdminCosts(),
+    getCostsLastRefreshedAt(),
+  ]);
+  if (costsResult.status === 'rejected') {
+    await captureError(
+      'Admin costs page failed to load cost items',
+      costsResult.reason,
+      {
+        route: 'admin/costs',
+      }
+    );
   }
+  if (refreshedResult.status === 'rejected') {
+    await captureError(
+      'Admin costs page failed to load refresh time',
+      refreshedResult.reason,
+      {
+        route: 'admin/costs',
+      }
+    );
+  }
+  const lastRefreshed =
+    refreshedResult.status === 'fulfilled' ? refreshedResult.value : null;
 
   const refreshedLabel = lastRefreshed
     ? lastRefreshed.toLocaleString('en-US', {
+        year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: 'UTC',
+        timeZoneName: 'short',
       })
-    : 'Not recorded';
+    : refreshedResult.status === 'rejected'
+      ? 'Unavailable'
+      : 'Not recorded';
 
   return (
     <AdminPage
@@ -43,7 +60,17 @@ export default async function AdminCostsPage() {
       description='Manual 30-day line-item view of company infra + AI spend. Lagging data only (v1).'
       testId='admin-costs-page'
     >
-      <CostsTable items={items} lastRefreshedLabel={refreshedLabel} />
+      {costsResult.status === 'rejected' ? (
+        <AdminReadUnavailable message='Manual cost records could not be read. Spend is unknown, not zero.' />
+      ) : (
+        <CostsTable
+          items={costsResult.value}
+          lastRefreshedLabel={refreshedLabel}
+        />
+      )}
+      {refreshedResult.status === 'rejected' ? (
+        <AdminReadUnavailable message='The source refresh time could not be read. Freshness cannot be verified.' />
+      ) : null}
     </AdminPage>
   );
 }

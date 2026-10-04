@@ -46,7 +46,7 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
     mockTrackNavigationImpressions(...args),
 }));
 
-const EXPANDED_LABELS = ['Home', 'Identity', 'Work', 'Audience'] as const;
+const EXPANDED_LABELS = ['Home', 'Work', 'Audience'] as const;
 
 describe('DashboardMobileTabs', () => {
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('DashboardMobileTabs', () => {
     mockTrackNavigationImpressions.mockReset();
   });
 
-  it('keeps the first three job destinations direct and Audience behind More', () => {
+  it('keeps Home, Work, and Audience direct while Identity is flag-gated off', () => {
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
@@ -71,9 +71,10 @@ describe('DashboardMobileTabs', () => {
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'Home',
-      'Identity',
       'Work',
+      'Audience',
     ]);
+    expect(within(tabs).queryByRole('link', { name: 'Identity' })).toBeNull();
     expect(
       within(tabs).getByRole('button', { name: 'More options' })
     ).toHaveClass('min-w-11', 'flex-1');
@@ -87,7 +88,7 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['home', 'presence', 'library'],
+      ['home', 'library', 'audience'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
@@ -121,19 +122,19 @@ describe('DashboardMobileTabs', () => {
     });
     const links = within(menu).getAllByRole('link');
 
-    expect(links.slice(0, 4).map(link => link.textContent?.trim())).toEqual(
+    expect(links.slice(0, 3).map(link => link.textContent?.trim())).toEqual(
       EXPANDED_LABELS
     );
-    expect(links.slice(0, 4).map(link => link.getAttribute('href'))).toEqual([
+    expect(links.slice(0, 3).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.DASHBOARD,
-      APP_ROUTES.PRESENCE,
       APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS_AUDIENCE,
     ]);
-    expect(links.at(4)).toHaveTextContent('Public Profile');
-    expect(links.at(4)).toHaveAttribute('href', '/timwhite');
-    expect(links.at(5)).toHaveTextContent('Settings');
-    expect(links.at(5)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+    expect(within(menu).queryByRole('link', { name: 'Identity' })).toBeNull();
+    expect(links.at(3)).toHaveTextContent('Public Profile');
+    expect(links.at(3)).toHaveAttribute('href', '/timwhite');
+    expect(links.at(4)).toHaveTextContent('Settings');
+    expect(links.at(4)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
 
     for (const label of [
       'Events',
@@ -254,16 +255,19 @@ describe('DashboardMobileTabs', () => {
     ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('promotes Audience into the tab row inside its Contacts context', () => {
-    mockPathname.mockReturnValue(APP_ROUTES.CONTACTS);
-    mockSearchParams.mockReturnValue(new URLSearchParams('tab=audience'));
+  it.each([
+    [APP_ROUTES.CONTACTS, 'tab=audience'],
+    [APP_ROUTES.INSIGHTS, ''],
+  ])('promotes Audience into the tab row for %s', (pathname, search) => {
+    mockPathname.mockReturnValue(pathname);
+    mockSearchParams.mockReturnValue(new URLSearchParams(search));
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
     const directLinks = within(tabs).getAllByRole('link');
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'Home',
-      'Identity',
+      'Work',
       'Audience',
     ]);
     expect(

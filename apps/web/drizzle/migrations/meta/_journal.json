@@ -932,6 +932,27 @@
       "when": 1791008274625,
       "tag": "0132_billing_audit_heartbeat",
       "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1791070522231,
+      "tag": "0133_admit_stranded_waitlist_pending",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "7",
+      "when": 1791078659450,
+      "tag": "0134_signup_waitlist_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1791117635968,
+      "tag": "0135_billing_audit_system_rows",
+      "breakpoints": true
     }
   ]
 }

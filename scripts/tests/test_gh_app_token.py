@@ -43,6 +43,49 @@ class AppTokenTest(unittest.TestCase):
                 net.assert_not_called()
 
 
+class SharedBudgetTest(unittest.TestCase):
+    """JOV-7587: polling on every lanes host yields below one shared GraphQL floor."""
+    NOW = 1_791_000_000.0
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        patcher = mock.patch.object(app, "BUDGET", Path(tmp.name) / "github-budget.json")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.reads = 0
+
+    def limit(self, remaining, reset_in=1800):
+        def fetch():
+            self.reads += 1
+            return {"remaining": remaining,
+                    "resetAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.NOW + reset_in))}
+        return fetch
+
+    def test_polls_are_classified_and_writes_never_wait(self):
+        polls = [["pr", "list"], ["pr", "view", "1"], ["api", "repos/o/r/pulls"], ["search", "prs"],
+                 ["api", "graphql", "-f", "query={repository{id}}"]]
+        writes = [["pr", "merge", "1"], ["pr", "comment", "1", "-b", "x"], ["api", "repos/o/r/pulls", "-f", "title=t"],
+                  ["api", "-X", "DELETE", "repos/o/r/labels/x"], ["api", "graphql", "-f", "query=mutation{x}"],
+                  ["api", "graphql", "-f", app.BUDGET_QUERY], ["gist", "edit"], []]
+        self.assertTrue(all(app.is_poll(args) for args in polls))
+        self.assertFalse(any(app.is_poll(args) for args in writes))
+
+    def test_polling_holds_below_the_floor_until_reset_and_reads_once_a_minute(self):
+        low = self.limit(app.FLOOR - 1)
+        self.assertIn("github-budget-floor", app.hold(["pr", "list"], "t", self.NOW, low))
+        self.assertIsNone(app.hold(["pr", "merge", "1"], "t", self.NOW, low))
+        self.assertIn("github-budget-floor", app.hold(["pr", "view", "2"], "t", self.NOW + 30, low))
+        self.assertEqual(self.reads, 1, "one budget read per minute is shared by every call")
+        self.assertIsNone(app.hold(["pr", "list"], "t", self.NOW + 1801, low), "the reset releases polling")
+
+    def test_healthy_or_unreadable_budget_never_blocks(self):
+        self.assertIsNone(app.hold(["pr", "list"], "t", self.NOW, self.limit(4000)))
+        def broken():
+            raise OSError("offline")
+        self.assertIsNone(app.hold(["pr", "list"], "t", self.NOW + 120, broken))
+
+
 class GithubEnvTest(unittest.TestCase):
     def setUp(self):
         self.env = dict(os.environ)
@@ -69,7 +112,7 @@ class GithubEnvTest(unittest.TestCase):
             with mock.patch.object(lane.shutil, "which", return_value="/usr/bin/gh"):
                 lane.load_github_env(Path(tmp) / "missing.env", key, shim_dir)
             shim = (shim_dir / "gh").read_text()
-            self.assertIn("gh_app_token.py", shim)
+            self.assertIn('gh_app_token.py --guard "$@")" || exit $?', shim)
             self.assertIn("exec /usr/bin/gh", shim)
             self.assertIn("[ \"$1\" = gist ] && exec /usr/bin/gh", shim, "gists keep the host login")
             self.assertIn('"$GH_HOST" != github.com ] && exec /usr/bin/gh', shim,
@@ -81,6 +124,33 @@ class GithubEnvTest(unittest.TestCase):
             before = os.environ.get("PATH")
             lane.load_github_env(Path(tmp) / "missing.env", Path(tmp) / "none.pem", Path(tmp) / "bin")
             self.assertEqual(os.environ.get("PATH"), before)
+
+    def test_other_hosts_keep_the_caller_token_and_github_keeps_the_mint_guard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            key = root / "key.pem"
+            key.write_text("test key")
+            real = root / "real-gh"
+            real.write_text('#!/bin/sh\nprintf "%s" "$GH_TOKEN"\n')
+            real.chmod(0o755)
+            marker = root / "minted"
+            python = root / "python3"
+            python.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > "{marker}"\nprintf "test-bot-token"\n')
+            python.chmod(0o755)
+            with mock.patch.object(lane.shutil, "which", return_value=str(real)):
+                lane.load_github_env(root / "missing.env", key, root / "shim")
+            for host in ("github.localhost", "github.enterprise.example"):
+                result = subprocess.run([str(root / "shim" / "gh"), "pr", "list"],
+                                        env={**os.environ, "GH_HOST": host, "GH_TOKEN": "test-caller-token"},
+                                        capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout, "test-caller-token")
+                self.assertFalse(marker.exists())
+            result = subprocess.run([str(root / "shim" / "gh"), "pr", "list"],
+                                    env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}",
+                                         "GH_HOST": "github.com", "GH_TOKEN": "test-caller-token"},
+                                    capture_output=True, text=True, check=True)
+            self.assertEqual(result.stdout, "test-bot-token")
+            self.assertEqual(marker.read_text().splitlines()[-3:], ["--guard", "pr", "list"])
 
 
 if __name__ == "__main__":

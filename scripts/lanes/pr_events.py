@@ -50,6 +50,9 @@ GREEN_TTL_S = 2 * 3600
 # A fix attempt still running holds its head this long; after it ends (or the lease runs out)
 # the same head may be tried again by the next lane, so a no-push attempt never parks a PR.
 FIX_LEASE_S = 3 * 3600
+# Cross-host repair claims fence the exact head while a worker owns it. Detectors honor the
+# same lease so a temporarily missing queue label cannot recreate its own trigger.
+CLAIM_TTL_S = 2 * 3600
 # The reconcile sweep recovers missed events only; the relay is the primary path.
 RECONCILE_S = 30 * 60
 STALE_DRAFT_S = 48 * 3600
@@ -182,7 +185,8 @@ def relay_targets(event: str, payload: dict) -> list[tuple[int, str, str | None]
 def disabled_lanes(providers: dict | None = None) -> set[str]:
     if providers is None:
         providers = json.loads((HERE / "providers.json").read_text())
-    return {name for name, spec in providers.items() if not spec.get("enabled", True)}
+    # Same set as `providers - cost_order`: remote-only lanes' drafts are maintained locally.
+    return set(providers) - set(cost_order(providers))
 
 
 def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
@@ -326,6 +330,37 @@ def add_label(number: int, kind: str, sh=run) -> bool:
     """The issues API creates a missing label, so the queue needs no setup."""
     return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
+
+
+def claim_active(number: int, sha: str | None, sh=run, now: float | None = None, *, kind: str = "fix",
+                 exclude_host: str | None = None, timeout: float = 30) -> bool:
+    """Whether an unexpired lane claim owns this exact head; unreadable evidence blocks.
+
+    Detectors pass no excluded host because they are observers. A worker excludes itself so
+    its own durable claim comment does not deadlock its local continuation.
+    """
+    if not isinstance(sha, str) or not sha.strip():
+        return True
+    now = time.time() if now is None else now
+    listed = sh(["gh", "api", f"repos/{REPO}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
+                 "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
+    if listed.returncode != 0:
+        return True
+    for line in (listed.stdout or "").splitlines():
+        fields = dict(part.split("=", 1) for part in line.split()[3:] if "=" in part)
+        try:
+            age = now - datetime.fromisoformat(fields.get("at", "").replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        if fields.get("sha") == sha and fields.get("kind") == kind \
+                and fields.get("host") != exclude_host and age < CLAIM_TTL_S:
+            return True
+    return False
+
+
+def terminal_signal(pr: dict) -> bool:
+    """A fix-exhausted PR is parked evidence, not fresh repair-queue inventory."""
+    return PREFIX + EXHAUSTED in {label.lower() for label in label_names(pr)}
 
 
 POISON_LABEL = "queue-poison"
@@ -560,7 +595,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         pr = json.loads(viewed.stdout or "{}")
         if sha and pr.get("headRefOid") != sha:
             continue  # a newer head is already running CI; its own events speak for it
-        if not in_scope(pr, kind, disabled):
+        if terminal_signal(pr) or not in_scope(pr, kind, disabled):
             continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
             added.append((number, POISON_LABEL))
@@ -687,6 +722,8 @@ def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "gre
     """Open PRs already in a state the relay would have labeled, had it been watching."""
     targets = []
     for pr in prs:
+        if terminal_signal(pr):
+            continue
         present = set(label_names(pr))
         wanted = []
         if "conflict" in kinds and pr.get("mergeable") == "CONFLICTING":
@@ -702,7 +739,7 @@ def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "gre
 
 def list_open(sh=run) -> list[dict]:
     listed = sh(["gh", "pr", "list", "--repo", REPO, "--state", "open", "--limit", "300", "--json",
-                 "number,headRefName,isDraft,mergeable,mergeStateStatus,isCrossRepository,labels"], timeout=180)
+                 "number,headRefName,headRefOid,isDraft,mergeable,mergeStateStatus,isCrossRepository,labels"], timeout=180)
     return json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
 
 
@@ -715,7 +752,14 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
     if "conflict" in kinds and any(pr.get("mergeable") == "UNKNOWN" for pr in prs) and settle_s:
         time.sleep(settle_s)
         prs = list_open(sh) or prs
-    return [(number, kind) for number, kind in backlog_targets(prs, disabled, kinds) if add_label(number, kind, sh)]
+    by_number = {pr["number"]: pr for pr in prs}
+    added = []
+    for number, kind in backlog_targets(prs, disabled, kinds):
+        if kind == "conflict" and claim_active(number, by_number[number].get("headRefOid"), sh):
+            continue
+        if add_label(number, kind, sh):
+            added.append((number, kind))
+    return added
 
 
 # ---------------------------------------------------------------- lane side (runs on Gem)
@@ -756,8 +800,11 @@ def iso_ts(stamp: str | None) -> float | None:
 
 
 def cost_order(providers: dict) -> list[str]:
-    """Enabled lanes, cheapest first: providers.json lists them in cost order."""
-    return [name for name, spec in providers.items() if spec.get("enabled", True)]
+    """Enabled lanes that repair locally, cheapest first: providers.json lists them in cost order.
+    A remote-only lane (`repairs: false`) is left out, so its drafts are maintained like a
+    disabled lane's."""
+    return [name for name, spec in providers.items()
+            if spec.get("enabled", True) and spec.get("repairs") is not False]
 
 
 def may_take(name: str, pr: dict, record: dict, order: list[str], now: float) -> bool:
@@ -941,9 +988,10 @@ def queue_failure(lane, number: int, limit: int = 4000) -> str:
 
 def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = None) -> dict | None:
     """Under the claim lock: the first event-queued PR this lane may fix. Records the attempt,
-    posts the cross-host claim and consumes the labels. Resolved or out-of-scope labels wait
-    for bounded cleanup after productive selection declines. Spent and active heads retain
-    their signals, so the PR shows why it is waiting and the relay does not re-add them."""
+    posts the cross-host claim and retains repair labels until a fix pushes. Resolved or
+    out-of-scope labels wait for bounded cleanup after productive selection declines. Spent
+    and active heads retain their signals, so the PR shows why it is waiting and the relay
+    does not re-add them."""
     now = time.time() if now is None else now
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
@@ -994,7 +1042,6 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
             # The linked receipt above is durable before the old exhaustion marker is consumed.
             consume(lane, pr, [EXHAUSTED])
         lane.post_claim(pr["number"], pr["headRefOid"], "fix")
-        consume(lane, pr)
         return pr
     return None
 
@@ -1325,16 +1372,20 @@ def ledger(host, receipt: dict) -> None:
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
 pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
-baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt
+baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
+isCrossRepository createdAt updatedAt
 labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
-def open_prs_state(lane) -> list[dict] | None:
+def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
     """Every open PR's merge state, queue membership, labels and rollup state (not per-check
-    contexts), a few GraphQL pages. None when GitHub is unreadable."""
+    contexts), a few GraphQL pages. None when GitHub is unreadable. `report["complete"]` is
+    false when the page cap is hit, so a hold prune must not treat missing numbers as closed."""
     owner, name = lane.REPO_SLUG.split("/")
     prs, cursor = [], None
+    if report is not None:
+        report["complete"] = False
     for _ in range(10):
         args = ["gh", "api", "graphql", "-f", f"query={OPEN_PRS_QUERY}", "-F", f"owner={owner}", "-F", f"name={name}"]
         if cursor:
@@ -1367,6 +1418,8 @@ def open_prs_state(lane) -> list[dict] | None:
                     node["filesComplete"] = False
             prs.append(node)
         if not page["pageInfo"]["hasNextPage"]:
+            if report is not None:
+                report["complete"] = True
             return prs
         cursor = page["pageInfo"]["endCursor"]
     return prs
@@ -1469,17 +1522,27 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     previous = read_state(host, "reconcile.json")
     if not force and now - float(previous.get("atEpoch") or 0) < RECONCILE_S:
         return None
-    prs = open_prs_state(lane)
+    report: dict = {}
+    prs = open_prs_state(lane, report)
     if prs is None:
         return None
+    prune_held = getattr(lane, "prune_held", None)
+    if prune_held is not None:
+        prune_held(host, prs, now, complete=bool(report.get("complete")))
     providers = lane.load_providers()
     disabled = set(providers) - set(cost_order(providers))
     deps = open_dependencies(prs, now, lane.sh)
     attempts = read_state(host, "fix-attempts.json")
     held = read_state(host, "held.json")
     plan = reconcile_plan(prs, attempts, disabled, lane.MAX_FIX_ATTEMPTS, now, deps, held)
+    by_number = {pr["number"]: pr for pr in prs}
+    labeled = []
     for number, kind in plan["label"]:
-        add_label(number, kind, lane.sh)
+        if kind == "conflict" and claim_active(
+                number, by_number[number].get("headRefOid"), lane.sh, now):
+            continue
+        if add_label(number, kind, lane.sh):
+            labeled.append((number, kind))
     for number, kind in plan["unlabel"]:
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:
@@ -1488,7 +1551,6 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
             for key in reset & set(data):
                 del data[key]
         lane.update_json(host.state / "synced.json", drop)
-    by_number = {pr["number"]: pr for pr in prs}
     # JOV-7066: held PRs whose hold outlived its cause get one alert per stale episode; the
     # opt-in stricter mode lifts automation holds whose head already moved past the hold.
     announced = {row.get("pr") for row in previous.get("staleHolds") or []}
@@ -1563,7 +1625,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
                 if row["pr"] == pr["number"]:
                     row.update(reason=f"parked {int((now - since) // 3600)}h; issue requeued",
                                next="the issue rebuilds from main; label this PR `duplicate` once it lands")
-    record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
+    record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": labeled,
               "closed": closed, "parkedRequeued": parked, "orphans": plan["orphans"],
               "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
               "holdNags": next_nags}

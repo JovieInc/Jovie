@@ -28,9 +28,7 @@ function walk(dir: string, out: string[]): void {
 }
 
 describe('Switch canonicalization ratchet', () => {
-  it('keeps Radix switch imports isolated to the shared UI owner', {
-    timeout: 60_000,
-  }, () => {
+  it('keeps Radix switch imports isolated to the shared UI owner', () => {
     const files: string[] = [];
     for (const dir of RUNTIME_SOURCE_DIRS) walk(dir, files);
 
@@ -44,9 +42,7 @@ describe('Switch canonicalization ratchet', () => {
     expect(violations).toEqual([]);
   });
 
-  it('keeps switch semantics on the canonical owner', {
-    timeout: 60_000,
-  }, () => {
+  it('keeps switch semantics on the canonical owner', () => {
     const detached = filesWithRawSwitchRoles();
     expect(detached).toEqual([]);
   });

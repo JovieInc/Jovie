@@ -29,9 +29,7 @@ async function loadAfterFilesRewrites(): Promise<readonly RewriteRule[]> {
 }
 
 describe('social shortcut alias rewrite (JOV-5072)', () => {
-  it('aliases /{username}/{platform} onto the live /s/{platform} handler', {
-    timeout: 60_000,
-  }, async () => {
+  it('aliases /{username}/{platform} onto the live /s/{platform} handler', async () => {
     const afterFiles = await loadAfterFilesRewrites();
 
     expect(afterFiles).toContainEqual({
