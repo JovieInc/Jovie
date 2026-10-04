@@ -1,3 +1,4 @@
+import { recordResultsStep } from './record-results';
 import type { PlaybookTemplate } from './types';
 
 const FEED_REQUIREMENTS_URL =
@@ -17,8 +18,12 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
     'Guest prep, recording, the edit, show notes and clips, distribution and a share kit your guest will use.',
   targetDateLabel: 'Publish Date',
   projectNamePlaceholder: 'Episode title or guest name',
+  origin: 'researched',
   assistMode: 'checklist_only',
   anchor: 'date',
+  intake: { kind: 'none' },
+  defaultAutonomy: 'review',
+  iterative: true,
   sources: [
     {
       title: 'Podcast RSS feed requirements',
@@ -115,6 +120,7 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
       priority: 'medium',
       explainerText:
         'Export vertical for short-form video and square for feeds. Captions matter: most people watch with the sound off.',
+      channel: 'short_video',
     },
     {
       id: 'episode-artwork',
@@ -142,6 +148,7 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 0,
       owner: 'creator',
       priority: 'urgent',
+      channel: 'platform',
     },
     {
       id: 'email-list',
@@ -150,6 +157,7 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 0,
       owner: 'creator',
       priority: 'high',
+      channel: 'email',
     },
     {
       id: 'guest-share-kit',
@@ -161,6 +169,7 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
       explainerText:
         'The episode link, two clips, a quote card and a suggested post. The easier you make it, the more likely they share.',
       learnMoreUrl: GUEST_PROMOTION_URL,
+      channel: 'partner',
     },
     {
       id: 'tag-guest',
@@ -169,6 +178,7 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 0,
       owner: 'creator',
       priority: 'medium',
+      channel: 'social',
     },
     {
       id: 'second-clip',
@@ -177,6 +187,7 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 2,
       owner: 'creator',
       priority: 'medium',
+      channel: 'short_video',
     },
     {
       id: 'thank-guest',
@@ -186,5 +197,6 @@ export const PODCAST_EPISODE_PLAYBOOK: PlaybookTemplate = {
       owner: 'creator',
       priority: 'low',
     },
+    recordResultsStep(14, 'Guest Amplification'),
   ],
 };

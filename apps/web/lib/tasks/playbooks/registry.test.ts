@@ -1,6 +1,7 @@
 import { lintCopy } from '@jovie/copy';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import { SHIPPED_AGENT_WORKFLOWS } from './autonomy';
 import {
   getDefaultPlaybookId,
   isPlaybookId,
@@ -9,11 +10,7 @@ import {
 } from './registry';
 import { PLAYBOOK_IDS } from './types';
 
-const SHIPPED_AGENT_TYPES = new Set(
-  DEFAULT_RELEASE_TASK_TEMPLATE.flatMap(item =>
-    item.aiWorkflowId ? [item.aiWorkflowId] : []
-  )
-);
+const SHIPPED_AGENT_TYPES = SHIPPED_AGENT_WORKFLOWS;
 
 const templates = Object.values(PLAYBOOK_TEMPLATES);
 
@@ -67,9 +64,27 @@ describe('playbook registry', () => {
     );
   });
 
+  it('tracks every release-plan workflow as shipped', () => {
+    for (const item of DEFAULT_RELEASE_TASK_TEMPLATE) {
+      if (item.aiWorkflowId) {
+        expect(SHIPPED_AGENT_WORKFLOWS.has(item.aiWorkflowId)).toBe(true);
+      }
+    }
+  });
+
+  it.each(templates)('$id defaults to review and closes the loop', template => {
+    expect(template.defaultAutonomy).toBe('review');
+    expect(template.iterative).toBe(true);
+    if (template.anchor === 'date') {
+      expect(template.steps.some(step => step.id === 'record-results')).toBe(
+        true
+      );
+    }
+  });
+
   it('cites https sources on every researched template', () => {
     for (const template of templates) {
-      if (template.id === 'music-release') continue;
+      if (template.origin !== 'researched') continue;
       expect(template.anchor).toBe('date');
       expect(template.sources.length).toBeGreaterThan(0);
       for (const source of template.sources) {
@@ -96,6 +111,8 @@ describe('playbook registry', () => {
       'music-release',
       'youtube-video',
       'book-launch',
+      'song-weekly-drops',
+      'startup-feature-kit',
     ]);
   });
 
@@ -119,6 +136,7 @@ describe('playbook registry', () => {
           template.summary,
           template.targetDateLabel,
           template.projectNamePlaceholder,
+          ...(template.intake.kind === 'none' ? [] : template.intake.prompts),
           ...template.steps.flatMap(step => [
             step.title,
             step.phase,
@@ -133,5 +151,18 @@ describe('playbook registry', () => {
       )
     );
     expect(blocking).toEqual([]);
+  });
+
+  it('turns one song into 17 weekly Friday drops after a story intake', () => {
+    const song = PLAYBOOK_TEMPLATES['song-weekly-drops'];
+    const weekly = song.steps.filter(
+      step => step.offsetDays >= 0 && step.id !== 'record-results'
+    );
+    expect(weekly).toHaveLength(17);
+    expect(weekly.map(step => step.offsetDays)).toEqual(
+      weekly.map((_, week) => week * 7)
+    );
+    expect(song.intake.kind).toBe('story_interview');
+    expect(song.steps[0]?.id).toBe('tell-the-story');
   });
 });

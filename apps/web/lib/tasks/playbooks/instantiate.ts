@@ -3,9 +3,14 @@
  * Shared by the per-release plan (music release) and the Tasks picker.
  */
 
+import type { LaunchDecisionKind } from '@/lib/launch';
 import { computeTaskDueDate } from '@/lib/tasks/task-due-date';
 import type { TaskAssigneeKind, TaskPriority } from '@/lib/tasks/types';
+import { resolveStepAutonomy } from './autonomy';
+import type { PlaybookRunPlan } from './iteration';
 import type {
+  PlaybookAutonomy,
+  PlaybookChannel,
   PlaybookId,
   PlaybookStep,
   PlaybookStepOwner,
@@ -20,7 +25,15 @@ export interface PlaybookTaskMetadata {
   readonly role: 'project' | 'step';
   readonly stepId?: string;
   readonly owner?: PlaybookStepOwner;
+  readonly channel?: PlaybookChannel | null;
+  /** Run-level choice on the project; effective level on each step. */
+  readonly autonomy: PlaybookAutonomy;
   readonly targetDate?: string | null;
+  readonly runNumber?: number;
+  readonly audienceTarget?: number | null;
+  readonly rationale?: readonly string[];
+  readonly intakeAnswers?: readonly string[];
+  readonly launchDecision?: LaunchDecisionKind | null;
 }
 
 export interface PlaybookTaskRow {
@@ -50,12 +63,18 @@ export interface BuildPlaybookStepRowsInput {
   readonly startPosition: number;
   readonly releaseId?: string | null;
   readonly parentTaskId?: string | null;
+  readonly autonomy: PlaybookAutonomy;
+  /** Adapted priorities from the previous runs (iteration.ts). */
+  readonly plan?: PlaybookRunPlan;
+  /** Only these steps, e.g. the subset a launch decision calls for. */
+  readonly stepIds?: readonly string[];
   readonly now?: Date;
 }
 
 function stepMetadata(
   template: PlaybookTemplate,
-  step: PlaybookStep
+  step: PlaybookStep,
+  autonomy: PlaybookAutonomy
 ): Record<string, unknown> {
   const playbook: PlaybookTaskMetadata = {
     id: template.id,
@@ -63,6 +82,8 @@ function stepMetadata(
     role: 'step',
     stepId: step.id,
     owner: step.owner,
+    channel: step.channel ?? null,
+    autonomy,
   };
 
   return {
@@ -85,26 +106,47 @@ export function buildPlaybookStepRows({
   startPosition,
   releaseId = null,
   parentTaskId = null,
+  autonomy,
+  plan,
+  stepIds,
   now,
 }: BuildPlaybookStepRowsInput): PlaybookTaskRow[] {
-  return template.steps.map((step, index) => ({
-    taskNumber: firstTaskNumber + index,
-    creatorProfileId,
-    title: step.title,
-    description: step.description ?? null,
-    status: 'todo',
-    priority: step.priority,
-    assigneeKind: step.agentAssist ? 'jovie' : 'human',
-    agentType: step.agentAssist?.agentType ?? null,
-    agentStatus: 'idle',
-    releaseId,
-    parentTaskId,
-    category: step.phase,
-    dueAt: computeTaskDueDate(targetDate, step.offsetDays, { now }),
-    position: startPosition + index,
-    sourceTemplateId: null,
-    metadata: stepMetadata(template, step),
-  }));
+  const keep = stepIds ? new Set(stepIds) : null;
+  const steps = keep
+    ? template.steps.filter(step => keep.has(step.id))
+    : template.steps;
+
+  return steps.map((step, index) => {
+    const stepAutonomy = resolveStepAutonomy(autonomy, step);
+    return {
+      taskNumber: firstTaskNumber + index,
+      creatorProfileId,
+      title: step.title,
+      description: step.description ?? null,
+      status: 'todo',
+      priority: plan?.stepPriority[step.id] ?? step.priority,
+      assigneeKind: stepAutonomy === 'hands_on' ? 'human' : 'jovie',
+      agentType: step.agentAssist?.agentType ?? null,
+      agentStatus: 'idle',
+      releaseId,
+      parentTaskId,
+      category: step.phase,
+      dueAt: computeTaskDueDate(targetDate, step.offsetDays, { now }),
+      position: startPosition + index,
+      sourceTemplateId: null,
+      metadata: stepMetadata(template, step, stepAutonomy),
+    };
+  });
+}
+
+/** How many step rows a build will produce, for task-number reservation. */
+export function countPlaybookSteps(
+  template: PlaybookTemplate,
+  stepIds?: readonly string[]
+): number {
+  if (!stepIds) return template.steps.length;
+  const keep = new Set(stepIds);
+  return template.steps.filter(step => keep.has(step.id)).length;
 }
 
 export interface BuildPlaybookProjectRowInput {
@@ -114,6 +156,10 @@ export interface BuildPlaybookProjectRowInput {
   readonly targetDate: Date | null;
   readonly taskNumber: number;
   readonly position: number;
+  readonly autonomy: PlaybookAutonomy;
+  readonly plan?: PlaybookRunPlan;
+  readonly intakeAnswers?: readonly string[];
+  readonly launchDecision?: LaunchDecisionKind | null;
 }
 
 /** The parent task that groups a picker-started playbook's steps. */
@@ -124,12 +170,22 @@ export function buildPlaybookProjectRow({
   targetDate,
   taskNumber,
   position,
+  autonomy,
+  plan,
+  intakeAnswers = [],
+  launchDecision = null,
 }: BuildPlaybookProjectRowInput): PlaybookTaskRow {
   const playbook: PlaybookTaskMetadata = {
     id: template.id,
     version: template.version,
     role: 'project',
+    autonomy,
     targetDate: targetDate ? targetDate.toISOString() : null,
+    runNumber: plan?.runNumber ?? 1,
+    audienceTarget: plan?.audienceTarget ?? null,
+    rationale: plan?.rationale ?? [],
+    intakeAnswers,
+    launchDecision,
   };
 
   return {

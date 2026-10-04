@@ -15,6 +15,8 @@ export const PLAYBOOK_IDS = [
   'youtube-video',
   'podcast-episode',
   'book-launch',
+  'song-weekly-drops',
+  'startup-feature-kit',
 ] as const;
 export type PlaybookId = (typeof PLAYBOOK_IDS)[number];
 
@@ -26,6 +28,47 @@ export type PlaybookStepOwner = 'creator' | 'collaborator' | 'guest' | 'jovie';
  * `checklist_only`: Jovie schedules and tracks the steps; you do the work.
  */
 export type PlaybookAssistMode = 'agent_assisted' | 'checklist_only';
+
+/**
+ * How hands-on the user wants a run to be. Chosen per run, default `review`.
+ * - `autopilot`: agent steps run and report back.
+ * - `review`: agent steps draft; the user approves each output.
+ * - `hands_on`: the user does the work; agents only assist.
+ * Steps without a shipped agent workflow are always hands-on.
+ */
+export const PLAYBOOK_AUTONOMY_LEVELS = [
+  'autopilot',
+  'review',
+  'hands_on',
+] as const;
+export type PlaybookAutonomy = (typeof PLAYBOOK_AUTONOMY_LEVELS)[number];
+
+/**
+ * Where a step reaches people. Run outcomes are recorded per channel so the
+ * next run can lean into what grew the audience and drop what did not.
+ */
+export type PlaybookChannel =
+  | 'email'
+  | 'social'
+  | 'short_video'
+  | 'long_video'
+  | 'press'
+  | 'community'
+  | 'partner'
+  | 'platform';
+
+/**
+ * What the playbook needs before it can plan. Creator kits generated from
+ * metadata alone score poorly, so story-driven playbooks ask first.
+ */
+export type PlaybookIntake =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'story_interview'; readonly prompts: readonly string[] }
+  | {
+      /** A merged pull request from a connected repo or agent. */
+      readonly kind: 'merged_pr';
+      readonly prompts: readonly string[];
+    };
 
 export interface PlaybookAgentAssist {
   /** Stored as `tasks.agent_type`; must name a shipped workflow. */
@@ -47,6 +90,7 @@ export interface PlaybookStep {
   readonly learnMoreUrl?: string;
   readonly descriptionHelper?: TaskDescriptionHelperPayload;
   readonly agentAssist?: PlaybookAgentAssist;
+  readonly channel?: PlaybookChannel;
 }
 
 /** Where a researched template's steps come from. Summarized, never quoted. */
@@ -67,12 +111,18 @@ export interface PlaybookTemplate {
   /** Placeholder for the project name field. */
   readonly projectNamePlaceholder: string;
   readonly assistMode: PlaybookAssistMode;
+  /** `researched` templates must cite sources; `jovie` ones are our own plans. */
+  readonly origin: 'researched' | 'jovie';
   /**
    * `release`: steps attach to a release and its date (agent workflows need
    * the release), so the plan starts from the release page.
    * `date`: steps attach to a parent task anchored to a picked date.
    */
   readonly anchor: 'release' | 'date';
+  readonly intake: PlaybookIntake;
+  readonly defaultAutonomy: PlaybookAutonomy;
+  /** True when each run should read the previous run's outcome and adapt. */
+  readonly iterative: boolean;
   readonly sources: readonly PlaybookSource[];
   readonly steps: readonly PlaybookStep[];
 }

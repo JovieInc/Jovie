@@ -1,6 +1,8 @@
 import { BOOK_LAUNCH_PLAYBOOK } from './book-launch';
 import { MUSIC_RELEASE_PLAYBOOK } from './music-release';
 import { PODCAST_EPISODE_PLAYBOOK } from './podcast-episode';
+import { SONG_WEEKLY_DROPS_PLAYBOOK } from './song-weekly-drops';
+import { STARTUP_FEATURE_KIT_PLAYBOOK } from './startup-feature-kit';
 import type { PlaybookId, PlaybookTemplate } from './types';
 import { YOUTUBE_VIDEO_PLAYBOOK } from './youtube-video';
 
@@ -11,6 +13,8 @@ export const PLAYBOOK_TEMPLATES: Readonly<
   'youtube-video': YOUTUBE_VIDEO_PLAYBOOK,
   'podcast-episode': PODCAST_EPISODE_PLAYBOOK,
   'book-launch': BOOK_LAUNCH_PLAYBOOK,
+  'song-weekly-drops': SONG_WEEKLY_DROPS_PLAYBOOK,
+  'startup-feature-kit': STARTUP_FEATURE_KIT_PLAYBOOK,
 };
 
 /** Mirrors the `creator_type` enum without importing server schema. */

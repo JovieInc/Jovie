@@ -14,6 +14,7 @@ describe('buildPlaybookStepRows', () => {
       firstTaskNumber: 10,
       startPosition: 5,
       parentTaskId: 'parent-1',
+      autonomy: 'review',
       now: NOW,
     });
 
@@ -37,6 +38,7 @@ describe('buildPlaybookStepRows', () => {
         role: 'step',
         stepId: 'book-guest',
         owner: 'creator',
+        autonomy: 'hands_on',
       },
     });
   });
@@ -49,6 +51,7 @@ describe('buildPlaybookStepRows', () => {
       firstTaskNumber: 1,
       startPosition: 0,
       releaseId: 'release-1',
+      autonomy: 'autopilot',
     });
     const smartLink = rows.find(row => row.agentType === 'smart-link-create');
 
@@ -60,7 +63,13 @@ describe('buildPlaybookStepRows', () => {
     expect(smartLink?.metadata).toMatchObject({
       dueDaysOffset: -1,
       videoUrl: null,
-      playbook: { id: 'music-release', role: 'step', owner: 'jovie' },
+      playbook: {
+        id: 'music-release',
+        role: 'step',
+        owner: 'jovie',
+        autonomy: 'autopilot',
+        channel: 'platform',
+      },
     });
     expect(rows.some(row => 'descriptionHelper' in row.metadata)).toBe(true);
   });
@@ -76,6 +85,8 @@ describe('buildPlaybookProjectRow', () => {
       targetDate,
       taskNumber: 7,
       position: 3,
+      autonomy: 'review',
+      intakeAnswers: ['A book about quiet launches'],
     });
 
     expect(row).toMatchObject({
@@ -87,9 +98,51 @@ describe('buildPlaybookProjectRow', () => {
         playbook: {
           id: 'book-launch',
           role: 'project',
+          autonomy: 'review',
+          runNumber: 1,
           targetDate: '2027-03-01T00:00:00.000Z',
+          intakeAnswers: ['A book about quiet launches'],
         },
       },
     });
+  });
+});
+
+describe('autonomy and adaptation', () => {
+  const template = PLAYBOOK_TEMPLATES['music-release'];
+  const base = {
+    template,
+    creatorProfileId: 'profile-1',
+    targetDate: null,
+    firstTaskNumber: 1,
+    startPosition: 0,
+  } as const;
+
+  it('hands agent steps back to the user on hands-on runs', () => {
+    const rows = buildPlaybookStepRows({ ...base, autonomy: 'hands_on' });
+    expect(rows.every(row => row.assigneeKind === 'human')).toBe(true);
+    // The assist hook stays so the user can still ask Jovie to help.
+    expect(rows.some(row => row.agentType === 'smart-link-create')).toBe(true);
+  });
+
+  it('applies adapted priorities and step subsets', () => {
+    const rows = buildPlaybookStepRows({
+      ...base,
+      template: PLAYBOOK_TEMPLATES['startup-feature-kit'],
+      autonomy: 'review',
+      stepIds: ['changelog', 'record-results'],
+      plan: {
+        runNumber: 2,
+        audienceTarget: 500,
+        stepPriority: { changelog: 'low' },
+        rationale: [],
+      },
+    });
+    expect(rows.map(row => row.title)).toEqual([
+      'Publish the changelog entry',
+      'Record what this run reached',
+    ]);
+    expect(rows[0]?.priority).toBe('low');
+    expect(rows[1]?.taskNumber).toBe(2);
   });
 });

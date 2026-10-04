@@ -1,3 +1,4 @@
+import { recordResultsStep } from './record-results';
 import type { PlaybookTemplate } from './types';
 
 const FERRISS_HOW_TO_GET_PUBLISHED =
@@ -26,8 +27,12 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
     'Six months of positioning, list building, advance copies and interviews, then launch week and the long tail.',
   targetDateLabel: 'Publication Date',
   projectNamePlaceholder: 'Book title',
+  origin: 'researched',
   assistMode: 'checklist_only',
   anchor: 'date',
+  intake: { kind: 'none' },
+  defaultAutonomy: 'review',
+  iterative: true,
   sources: [
     {
       title: 'How to Write a Bestselling Book This Year',
@@ -82,6 +87,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       priority: 'high',
       explainerText:
         'An email list is the channel you own. It outlasts any one launch and does the heavy lifting on launch day.',
+      channel: 'email',
     },
     {
       id: 'ask-recent-authors',
@@ -103,6 +109,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       explainerText:
         'Bloggers, podcast hosts, newsletter writers and community leads. Meet them where they gather and offer something useful first.',
       learnMoreUrl: FERRISS_GLOBAL_PHENOMENON,
+      channel: 'partner',
     },
     {
       id: 'announce-and-preorders',
@@ -121,6 +128,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       priority: 'medium',
       explainerText:
         'Mention the book in a minority of them. The goal is to be worth following, so the launch lands with people who already trust you.',
+      channel: 'social',
     },
     {
       id: 'book-interviews',
@@ -131,6 +139,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       priority: 'high',
       explainerText:
         'Pitch in layers, smaller outlets first, so each yes makes the next pitch easier. Cluster the interviews in launch week.',
+      channel: 'press',
     },
     {
       id: 'advance-copies',
@@ -141,6 +150,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       priority: 'high',
       explainerText:
         'Getting the book into the right hands early is the cheapest way to make trying it easy and to start word of mouth.',
+      channel: 'partner',
     },
     {
       id: 'bulk-order-bonuses',
@@ -159,6 +169,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       offsetDays: -14,
       owner: 'creator',
       priority: 'medium',
+      channel: 'social',
     },
     {
       id: 'launch-day-email-draft',
@@ -177,6 +188,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 0,
       owner: 'creator',
       priority: 'urgent',
+      channel: 'email',
     },
     {
       id: 'interview-run',
@@ -186,6 +198,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       owner: 'creator',
       priority: 'high',
       learnMoreUrl: FERRISS_4HC_WEEK_ONE,
+      channel: 'press',
     },
     {
       id: 'share-reactions',
@@ -194,6 +207,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 3,
       owner: 'creator',
       priority: 'medium',
+      channel: 'social',
     },
     {
       id: 'follow-up-reviewers',
@@ -213,6 +227,7 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       explainerText:
         'Launch week is a sprint; lasting sales come from word of mouth and steady effort after it. Each chapter can be its own story.',
       learnMoreUrl: HOLIDAY_PERENNIAL_SELLER,
+      channel: 'press',
     },
     {
       id: 'plan-next-push',
@@ -222,5 +237,6 @@ export const BOOK_LAUNCH_PLAYBOOK: PlaybookTemplate = {
       owner: 'creator',
       priority: 'low',
     },
+    recordResultsStep(30, 'Long Tail'),
   ],
 };

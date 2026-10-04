@@ -1,3 +1,4 @@
+import { recordResultsStep } from './record-results';
 import type { PlaybookTemplate } from './types';
 
 const AB_TEST_URL = 'https://support.google.com/youtube/answer/16391400';
@@ -18,8 +19,12 @@ export const YOUTUBE_VIDEO_PLAYBOOK: PlaybookTemplate = {
     'Pre-production, title and thumbnail tests, publish day, the first 48 hours, community and Shorts cutdowns.',
   targetDateLabel: 'Publish Date',
   projectNamePlaceholder: 'Video title',
+  origin: 'researched',
   assistMode: 'checklist_only',
   anchor: 'date',
+  intake: { kind: 'none' },
+  defaultAutonomy: 'review',
+  iterative: true,
   sources: [
     {
       title: 'A/B test titles and thumbnails',
@@ -121,6 +126,7 @@ export const YOUTUBE_VIDEO_PLAYBOOK: PlaybookTemplate = {
       priority: 'high',
       explainerText:
         'Add the description, chapters, end screen and cards, then schedule it for when your audience is usually online.',
+      channel: 'long_video',
     },
     {
       id: 'publish-and-share',
@@ -131,6 +137,7 @@ export const YOUTUBE_VIDEO_PLAYBOOK: PlaybookTemplate = {
       priority: 'urgent',
       explainerText:
         'Send it to your email list and post it where your fans already follow you. Early viewers who care help the video find more like them.',
+      channel: 'email',
     },
     {
       id: 'first-hour-comments',
@@ -139,6 +146,7 @@ export const YOUTUBE_VIDEO_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 0,
       owner: 'creator',
       priority: 'high',
+      channel: 'community',
     },
     {
       id: 'check-48h',
@@ -167,6 +175,7 @@ export const YOUTUBE_VIDEO_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 3,
       owner: 'creator',
       priority: 'low',
+      channel: 'community',
     },
     {
       id: 'reply-and-collect-ideas',
@@ -175,6 +184,7 @@ export const YOUTUBE_VIDEO_PLAYBOOK: PlaybookTemplate = {
       offsetDays: 7,
       owner: 'creator',
       priority: 'medium',
+      channel: 'community',
     },
     {
       id: 'shorts-cutdowns',
@@ -186,16 +196,8 @@ export const YOUTUBE_VIDEO_PLAYBOOK: PlaybookTemplate = {
       explainerText:
         'Shorts made with Edit into a Short link back to the full video. It only works on public videos you uploaded yourself.',
       learnMoreUrl: SHORTS_FROM_VIDEO_URL,
+      channel: 'short_video',
     },
-    {
-      id: 'review-results',
-      title: 'Review the test result and two-week numbers',
-      phase: 'Shorts',
-      offsetDays: 14,
-      owner: 'creator',
-      priority: 'low',
-      explainerText:
-        'Tests usually finish within two weeks. Write down what won so the next video starts from a better guess.',
-    },
+    recordResultsStep(14, 'Shorts'),
   ],
 };

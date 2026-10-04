@@ -2,7 +2,15 @@ import {
   DEFAULT_RELEASE_TASK_TEMPLATE,
   type DefaultTemplateItem,
 } from '@/lib/release-tasks/default-template';
-import type { PlaybookStep, PlaybookTemplate } from './types';
+import type { PlaybookChannel, PlaybookStep, PlaybookTemplate } from './types';
+
+const CHANNEL_BY_CATEGORY: Readonly<Record<string, PlaybookChannel>> = {
+  'DSP Pitching': 'platform',
+  'DSP Profile': 'platform',
+  Platform: 'platform',
+  Press: 'press',
+  'Fan Engagement': 'email',
+};
 
 export function slugifyStepTitle(title: string): string {
   return title
@@ -26,6 +34,7 @@ function toPlaybookStep(item: DefaultTemplateItem): PlaybookStep {
     agentAssist: item.aiWorkflowId
       ? { agentType: item.aiWorkflowId }
       : undefined,
+    channel: CHANNEL_BY_CATEGORY[item.category],
   };
 }
 
@@ -42,8 +51,12 @@ export const MUSIC_RELEASE_PLAYBOOK: PlaybookTemplate = {
     'Distribution, editorial pitching, profile updates and release-day fan alerts for a single or album.',
   targetDateLabel: 'Release Date',
   projectNamePlaceholder: 'Single or album title',
+  origin: 'jovie',
   assistMode: 'agent_assisted',
   anchor: 'release',
+  intake: { kind: 'none' },
+  defaultAutonomy: 'review',
+  iterative: true,
   sources: [],
   steps: DEFAULT_RELEASE_TASK_TEMPLATE.map(toPlaybookStep),
 };

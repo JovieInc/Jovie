@@ -158,6 +158,10 @@ export async function instantiateReleaseTasks(releaseId: string) {
     firstTaskNumber,
     startPosition,
     releaseId,
+    // The shipped release plan runs its agent steps without approval
+    // (smart link, profile feature, fan alert); keep that until review
+    // mode exists in the release workflows.
+    autonomy: 'autopilot',
   });
 
   await db.insert(tasks).values(taskRows);
