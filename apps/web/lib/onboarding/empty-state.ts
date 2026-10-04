@@ -1,6 +1,6 @@
 import type { ChatSuggestion } from '@/components/jovie/types';
 
-export const ONBOARDING_ENTRY_TITLE = 'What Are You Working On?';
+export const ONBOARDING_ENTRY_TITLE = 'What are you working on?';
 export const ONBOARDING_ENTRY_SUPPORT =
   'Start with your artist name, Spotify link, or next release.';
 

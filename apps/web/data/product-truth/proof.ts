@@ -1,5 +1,16 @@
 import { LOGO_ASSET_REGISTRY } from '@/data/design/logoAssets';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
+import {
+  DOGFOOD_RECEIPTS_SCHEMA,
+  DOGFOOD_RECEIPTS_SOURCE,
+  type DogfoodReceiptsFile,
+} from './dogfood';
+import dogfoodReceipts from './dogfood-receipts.gen.json';
+import {
+  DOGFOOD_PROFILE_ROUTES,
+  type EvidenceClass,
+  type ProofGeneratorId,
+} from './evidence';
 
 export const PROOF_KINDS = [
   'logo',
@@ -69,6 +80,11 @@ export interface MetricSample {
 
 export interface MetricProof extends ProofBase {
   readonly kind: 'metric';
+  /**
+   * Whose outcome this measures: Jovie's own (dogfood) or a real user's
+   * (pilot). Omitted means a market fact, never proof that Jovie works.
+   */
+  readonly evidence?: 'dogfood' | 'pilot';
   readonly value: string | number;
   readonly unit: string;
   readonly reproducingQuery: string;
@@ -499,7 +515,73 @@ for (const proof of VERIFIED_PRODUCT_PROOF) {
   }
 }
 
-export const PROOF_REGISTRY: readonly ProofItem[] = VERIFIED_PRODUCT_PROOF;
+const DOGFOOD_RECEIPTS = dogfoodReceipts as DogfoodReceiptsFile;
+if (DOGFOOD_RECEIPTS.schema !== DOGFOOD_RECEIPTS_SCHEMA) {
+  throw new Error(
+    `Unexpected dogfood receipts schema ${DOGFOOD_RECEIPTS.schema}`
+  );
+}
+
+/** Dogfood receipts from `pnpm proof:dogfood`, as measured metric proof. */
+export const DOGFOOD_METRIC_PROOF: readonly MetricProof[] =
+  DOGFOOD_RECEIPTS.receipts.map(receipt => ({
+    recordType: 'proof',
+    id: receipt.id,
+    kind: 'metric',
+    claimId: receipt.claimId,
+    evidence: 'dogfood',
+    strength: 'weak',
+    value: receipt.value,
+    unit: receipt.unit,
+    reproducingQuery: receipt.reproducingQuery,
+    measuredAt: DOGFOOD_RECEIPTS.measuredAt,
+    sample: { size: receipt.value, population: receipt.population },
+    source: `${DOGFOOD_RECEIPTS_SOURCE}#${receipt.id}`,
+  }));
+
+for (const proof of DOGFOOD_METRIC_PROOF) {
+  const validation = validateProof(proof, DOGFOOD_RECEIPTS.measuredAt);
+  if (!validation.valid) {
+    throw new Error(
+      `Invalid dogfood receipt ${proof.id}: ${validation.issues.map(item => item.code).join(', ')}`
+    );
+  }
+}
+
+export const PROOF_REGISTRY: readonly ProofItem[] = [
+  ...VERIFIED_PRODUCT_PROOF,
+  ...DOGFOOD_METRIC_PROOF,
+];
+
+/**
+ * The evidence class a proof item gives an outcome claim (JOV-7750).
+ * Captures of Jovie's own profiles are dogfood; consented quotes and
+ * permissioned customer logos come from real users (pilot); metrics carry
+ * their class explicitly. Third-party citations and press logos are market
+ * facts, not proof that Jovie gets results.
+ */
+export function proofEvidenceClass(proof: ProofCandidate): EvidenceClass {
+  switch (proof.kind) {
+    case 'metric':
+      return proof.evidence ?? 'none';
+    case 'quote':
+      return 'pilot';
+    case 'logo':
+      return proof.relationship === 'customer' ? 'pilot' : 'none';
+    case 'product-proof': {
+      const artifact = proof.artifact;
+      const route =
+        artifact?.kind === 'route' || artifact?.kind === 'screenshot-scenario'
+          ? artifact.route
+          : undefined;
+      return route && DOGFOOD_PROFILE_ROUTES.includes(route)
+        ? 'dogfood'
+        : 'none';
+    }
+    case 'third-party':
+      return 'none';
+  }
+}
 
 /**
  * Claim-registry adapter: returns the proof items whose claimId is missing
@@ -535,8 +617,23 @@ export interface ProofRequest {
   readonly claimId: string;
   readonly pagesBlocked: readonly string[];
   readonly suggestedLane: ProofRequestLane;
+  /** The proof generator that can fill this gap (JOV-7750). */
+  readonly generator: ProofGeneratorId;
   readonly outreach?: ProofOutreachDraft;
 }
+
+/**
+ * Generator per proof kind, in Tim's order: measured product outcomes come
+ * from dogfood receipts first; quotes and customer logos need pilot users.
+ */
+const REQUEST_GENERATOR_BY_KIND: Readonly<Record<ProofKind, ProofGeneratorId>> =
+  {
+    logo: 'pilot',
+    quote: 'pilot',
+    metric: 'dogfood',
+    'product-proof': 'dogfood',
+    'third-party': 'research',
+  };
 
 const REQUEST_LANE_BY_KIND: Readonly<Record<ProofKind, ProofRequestLane>> = {
   logo: 'brand-permission-outreach',
@@ -567,6 +664,8 @@ export function createProofRequest(input: {
   readonly claimId: string;
   readonly pagesBlocked: readonly string[];
   readonly subjectName?: string;
+  /** Overrides the kind's default generator, e.g. a computed claim-time slot. */
+  readonly generator?: ProofGeneratorId;
 }): ProofRequest {
   const pagesBlocked = [...new Set(input.pagesBlocked)].sort();
   const outreach =
@@ -579,6 +678,7 @@ export function createProofRequest(input: {
     claimId: input.claimId,
     pagesBlocked,
     suggestedLane: REQUEST_LANE_BY_KIND[input.kind],
+    generator: input.generator ?? REQUEST_GENERATOR_BY_KIND[input.kind],
     ...(outreach ? { outreach } : {}),
   };
 }
@@ -715,6 +815,43 @@ export function selectProof(
 
   section.page.usedProofIds.add(selected.id);
   return selected as ProofItem;
+}
+
+/**
+ * The ProofRequest loop's landing check (JOV-7750). Given the requests a
+ * factory run recorded, returns the pages whose proof has since landed: a
+ * valid registry item now exists for the request's claim and kind, with
+ * admissible evidence. The JOV-7765 rework loop re-renders those pages from
+ * the proof stage; nothing else re-runs.
+ */
+export function findProofReadyPages(
+  requests: readonly Pick<ProofRequest, 'claimId' | 'kind' | 'pagesBlocked'>[],
+  asOf: string,
+  registry: readonly ProofCandidate[] = PROOF_REGISTRY
+): readonly {
+  readonly pageId: string;
+  readonly claimIds: readonly string[];
+}[] {
+  const landed = (request: (typeof requests)[number]) =>
+    registry.some(
+      candidate =>
+        candidate.claimId === request.claimId &&
+        candidate.kind === request.kind &&
+        proofEvidenceClass(candidate) !== 'none' &&
+        validateProof(candidate, asOf).valid
+    );
+  const byPage = new Map<string, Set<string>>();
+  for (const request of requests) {
+    if (!landed(request)) continue;
+    for (const pageId of request.pagesBlocked) {
+      const claims = byPage.get(pageId) ?? new Set<string>();
+      claims.add(request.claimId);
+      byPage.set(pageId, claims);
+    }
+  }
+  return [...byPage.entries()]
+    .sort(([left], [right]) => compareText(left, right))
+    .map(([pageId, claims]) => ({ pageId, claimIds: [...claims].sort() }));
 }
 
 export interface MarketingProofAuditObservation {

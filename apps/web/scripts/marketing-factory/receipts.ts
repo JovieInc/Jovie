@@ -164,6 +164,19 @@ export const FactoryRunManifestSchema = z.object({
     })
   ),
   attempts: z.array(z.string().min(1)),
+  /** Each rejection routed back to its owning stage, oldest first. */
+  reworks: z
+    .array(
+      z.object({
+        iteration: z.number().int().min(1),
+        rejectedAt: z.enum(FACTORY_STAGES),
+        reworkFrom: z.enum(FACTORY_STAGES),
+        /** The render output the rejection judged; a rework must replace it. */
+        rejectedRenderDigest: z.string().min(1).nullable(),
+        findings: z.array(z.string()),
+      })
+    )
+    .optional(),
   paidBudget: z
     .object({
       id: z.string().min(1),
@@ -185,9 +198,14 @@ export const FactoryRunManifestSchema = z.object({
 
 export type FactoryRunManifest = z.infer<typeof FactoryRunManifestSchema>;
 
-export function attemptFileName(stage: FactoryStage, attempt: number): string {
+export function attemptFileName(
+  stage: FactoryStage,
+  attempt: number,
+  rework = 0
+): string {
   const index = String(FACTORY_STAGES.indexOf(stage) + 1).padStart(2, '0');
-  return `${index}-${stage}.attempt-${attempt}.json`;
+  const pass = rework > 0 ? `.rework-${rework}` : '';
+  return `${index}-${stage}${pass}.attempt-${attempt}.json`;
 }
 
 export function writeJson(path: string, value: unknown): void {

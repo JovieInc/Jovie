@@ -6,11 +6,12 @@ const LIBRARY_ROUTE_ROOTS = [
   APP_ROUTES.LEGACY_DASHBOARD_LIBRARY,
   APP_ROUTES.RELEASES,
   APP_ROUTES.DASHBOARD_RELEASES,
+  APP_ROUTES.YOUTUBE_REVIVAL,
 ] as const;
 
 /**
- * Work owns both the canonical asset surface and release workspaces,
- * including their legacy aliases and nested release-task routes.
+ * Work owns the canonical asset surface, release workspaces, and YouTube
+ * ledger, including legacy aliases and nested release-task routes.
  */
 export function isLibraryNavigationRoute(pathname: string): boolean {
   const normalizedPathname =
@@ -47,6 +48,14 @@ export function isNavigationItemActive(
   }
 
   if (item.id === 'library' && isLibraryNavigationRoute(pathname)) {
+    return true;
+  }
+
+  if (
+    item.id === 'audience' &&
+    (normalizedPathname === APP_ROUTES.INSIGHTS ||
+      normalizedPathname.startsWith(`${APP_ROUTES.INSIGHTS}/`))
+  ) {
     return true;
   }
 
