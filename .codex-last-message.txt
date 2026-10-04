@@ -1,0 +1,10 @@
+PR #20296 is green at `c27cb4b2c5`, matching `origin/devin/jov-6127-20261003t071348`.
+
+- Legacy `discogTracks` fallback is implemented in [queries.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T004545Z-PR20296-codex-fix-6bdff4/apps/web/lib/discography/queries.ts:302).
+- Regression coverage passes: 6/6 focused tests.
+- Monorepo typecheck passes: 18/18 packages.
+- Both GitHub source-validation attempts passed, including Exact-head Coverage and PR Ready.
+- Reviewer thread is resolved.
+- Worktree is clean. No redundant push was needed because the repair was already pushed at the exact verified SHA.
+
+The PR remains draft; the only pending status is the non-required live `jovie-execution` session receipt.
