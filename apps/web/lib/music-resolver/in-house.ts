@@ -514,9 +514,8 @@ function artistUrlIdentity(value: string): string {
       if (id) return `apple_music:${id}`;
     }
     if (url.hostname === 'open.spotify.com') {
-      const id = /^\/(?:intl-[a-z]{2}\/)?artist\/([A-Za-z0-9]{22})\/?$/.exec(
-        url.pathname
-      )?.[1];
+      const artistPath = url.pathname.replace(/^\/intl-([a-z]{2})\//, '/');
+      const id = /^\/artist\/([A-Za-z0-9]{22})\/?$/.exec(artistPath)?.[1];
       if (id) return `spotify:${id}`;
     }
     if (url.hostname === 'www.deezer.com' || url.hostname === 'deezer.com') {
