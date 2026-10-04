@@ -96,11 +96,11 @@ function JudgmentRow({
               href={`${APP_ROUTES.ADMIN_CERTIFICATIONS}?row=${encodeURIComponent(row?.id ?? `${item.domain}:${item.subject.id}`)}`}
               className='group flex min-w-0 items-center gap-1.5'
             >
-              <p className='truncate text-app font-semibold text-primary-token transition-colors group-hover:text-warning'>
+              <p className='truncate text-app font-semibold text-primary-token transition-colors group-hover:text-warning group-focus-visible:text-warning'>
                 {item.subject.title}
               </p>
               <ArrowUpRight
-                className='h-3 w-3 shrink-0 text-tertiary-token opacity-0 transition-opacity group-hover:opacity-100'
+                className='h-3 w-3 shrink-0 text-tertiary-token opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100'
                 aria-hidden='true'
               />
             </Link>
@@ -219,6 +219,8 @@ function JudgmentRow({
 export function CertificationJudgments() {
   const query = useOvieCertificationsQuery();
   const mutation = useOvieCertificationDecisionMutation();
+  const { refetch } = query;
+  const { mutateAsync } = mutation;
   const inFlight = useRef(new Set<string>());
   const [pendingKinds, setPendingKinds] = useState<
     ReadonlyMap<string, OvieCertificationDecisionKind>
@@ -252,7 +254,7 @@ export function CertificationJudgments() {
       inFlight.current.add(row.id);
       setPendingKinds(previous => new Map(previous).set(row.id, kind));
       try {
-        await mutation.mutateAsync({
+        await mutateAsync({
           rowId: row.id,
           evidenceDigest,
           decision: kind,
@@ -263,7 +265,7 @@ export function CertificationJudgments() {
         return true;
       } catch (error) {
         toast.error(getCertificationDecisionErrorMessage(error));
-        void query.refetch();
+        void refetch();
         return false;
       } finally {
         inFlight.current.delete(row.id);
@@ -274,7 +276,7 @@ export function CertificationJudgments() {
         });
       }
     },
-    [mutation, query]
+    [mutateAsync, refetch]
   );
 
   if (query.isLoading && !inventory) {

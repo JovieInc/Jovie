@@ -100,6 +100,7 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | 10 | redisOperability | Hourly (`minute < 15`) | Runs a namespaced `SET` / `GETDEL` / `DEL` canary with a 60-second TTL; emits a stable Sentry failure class on quota exhaustion, mismatch, or unavailability |
 | 11 | workflowApprovalRecovery | Every invocation | Recovers accepted suggested_actions missing workflow_runs enqueue |
 | 12 | youtubeLibraryRefresh | Every invocation | JOV-5136: re-syncs YouTube channels stale >24h via `runScheduledRefreshes`. No-op (`provider: null`) until the OAuth connector lands with JOV-3189 |
+| 13 | billingSyncRemediation | Every invocation | JOV-7558: reads the billing audit log and unprocessed Stripe rows. Files one Linear issue labeled `remediation:billing-sync-stale` or `remediation:billing-webhooks-stuck` when the last reconciliation heartbeat is older than 48 hours or a webhook is stuck. Does not call `/api/billing/health`. |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 
@@ -111,7 +112,7 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 |---|---------|-------------|--------------|
 | 1 | cleanupPhotos | Every day | Deletes orphaned `profilePhotos` (failed uploads >1-24h) + Vercel Blobs |
 | 2 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
-| 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
+| 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe, replays stored unprocessed webhooks without Stripe writes, and records a `reconciliation_run` heartbeat |
 | 4 | cleanupSmsIntents | Every day | Marks expired SMS subscribe intents, hard-deletes rows >24h old (folded from standalone cron per JOV-1901) |
 | 5 | waitlistAutoAccept | Every day | Auto-accepts bounded waitlist capacity when the admin setting enables it |
 | 6 | profileSearchMonitoring | Every day | Runs profile-search monitoring inside a bounded 90-second sub-budget |

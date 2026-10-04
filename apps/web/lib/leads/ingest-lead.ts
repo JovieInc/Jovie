@@ -14,6 +14,8 @@ import {
   enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { logger } from '@/lib/utils/logger';
 
 export interface LeadIngestionResult {
@@ -23,7 +25,16 @@ export interface LeadIngestionResult {
   error?: string;
 }
 
-async function enqueuePostIngestionJobs(profileId: string, leadId: string) {
+/**
+ * Collect the evidence certification reads for a lead-built profile:
+ * project its links into profile surfaces and start DSP enrichment.
+ * The lead's own Spotify link is the fallback when extraction left the
+ * profile without one, which left every lead profile hollow (JOV-7855).
+ */
+export async function refreshLeadProfileEvidence(
+  profileId: string,
+  lead: Pick<Lead, 'id' | 'spotifyUrl'>
+): Promise<{ musicFetch: boolean; dspDiscovery: boolean }> {
   const [createdProfile] = await db
     .select({
       spotifyUrl: creatorProfiles.spotifyUrl,
@@ -33,27 +44,43 @@ async function enqueuePostIngestionJobs(profileId: string, leadId: string) {
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
-  if (createdProfile?.spotifyUrl) {
+  const leadArtistId = lead.spotifyUrl
+    ? extractSpotifyArtistId(lead.spotifyUrl)
+    : null;
+  const spotifyUrl =
+    createdProfile?.spotifyUrl ?? (leadArtistId ? lead.spotifyUrl : null);
+  const spotifyId = createdProfile?.spotifyId ?? leadArtistId;
+
+  try {
+    await reconcileProfileSurfaces(profileId);
+  } catch (err) {
+    await captureError('Lead profile surface reconcile failed', err, {
+      leadId: lead.id,
+    });
+  }
+
+  if (spotifyUrl) {
     void enqueueMusicFetchEnrichmentJob({
       creatorProfileId: profileId,
-      spotifyUrl: createdProfile.spotifyUrl,
+      spotifyUrl,
     }).catch(err =>
       captureError('MusicFetch enrichment enqueue failed for lead', err, {
-        leadId,
+        leadId: lead.id,
       })
     );
   }
-  if (createdProfile?.spotifyId) {
+  if (spotifyId) {
     void enqueueDspArtistDiscoveryJob({
       creatorProfileId: profileId,
-      spotifyArtistId: createdProfile.spotifyId,
+      spotifyArtistId: spotifyId,
       targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
     }).catch(err =>
       captureError('DSP discovery enqueue failed for lead', err, {
-        leadId,
+        leadId: lead.id,
       })
     );
   }
+  return { musicFetch: Boolean(spotifyUrl), dspDiscovery: Boolean(spotifyId) };
 }
 
 /**
@@ -142,7 +169,7 @@ export async function ingestLeadAsCreator(
       // Enqueue MusicFetch enrichment and DSP discovery for the new profile.
       // Wrapped in try/catch so failures don't flip the ingestion result.
       try {
-        await enqueuePostIngestionJobs(body.profile.id, lead.id);
+        await refreshLeadProfileEvidence(body.profile.id, lead);
       } catch (err) {
         await captureError(
           'Post-ingestion enrichment enqueue failed for lead',
