@@ -8,9 +8,13 @@ const mocks = vi.hoisted(() => ({
   institutions: vi.fn(),
   accounts: vi.fn(),
   transactions: vi.fn(),
+  assertEnabled: vi.fn(),
 }));
 vi.mock('@/lib/finance/owner', () => ({
   requireFinancialOwnerId: mocks.requireOwner,
+}));
+vi.mock('@/lib/finance/flags', () => ({
+  assertCreatorFinanceEnabled: mocks.assertEnabled,
 }));
 vi.mock('@/lib/auth/session', () => ({ withDbSessionTx: mocks.setupSession }));
 vi.mock('@/lib/finance/repository', () => ({
@@ -25,6 +29,7 @@ describe('Money overview owner-scoped database session', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.requireOwner.mockResolvedValue(owner);
+    mocks.assertEnabled.mockResolvedValue(undefined);
     mocks.setupSession.mockImplementation(
       async (
         operation: (tx: typeof mocks.tx, userId: string) => Promise<unknown>
@@ -66,6 +71,16 @@ describe('Money overview owner-scoped database session', () => {
       { limit: 10_000 },
       mocks.tx
     );
+  });
+
+  it('does not read finance data when the creator finance flag is off', async () => {
+    const failure = new Error('Creator finance is disabled');
+    mocks.assertEnabled.mockRejectedValue(failure);
+    await expect(getMoneyOverview()).rejects.toBe(failure);
+    expect(mocks.setupSession).not.toHaveBeenCalled();
+    expect(mocks.institutions).not.toHaveBeenCalled();
+    expect(mocks.accounts).not.toHaveBeenCalled();
+    expect(mocks.transactions).not.toHaveBeenCalled();
   });
 
   it.each(['owner', 'session'])(

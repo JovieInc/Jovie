@@ -14,6 +14,7 @@ import {
   robotsAllows,
   runGate,
   summarize,
+  validatePublication,
   validateTargets,
 } from './public-benchmark.mjs';
 
@@ -273,4 +274,82 @@ test('content checks: blocked fetch scores zero, failed render is unmeasured', (
   );
   assert.equal(none.link_extractability, 'na');
   assert.equal(none.identity_in_raw_html, 'na');
+});
+
+const certifiedPublication = {
+  namesCompetitors: true,
+  surface: '/compare/fastest-profile',
+  conversionGoal: 'Artists comparing link-in-bio speed choose Jovie',
+  proofClaimId: 'benchmark.profile.lcp-median-mobile',
+  receipt: 'public-benchmark-receipt-123',
+  certifiedBy: 'founder',
+  certifiedAt: '2026-10-04T00:00:00Z',
+};
+
+test('naming competitors needs a certified claim with a full publication record', () => {
+  const draft = {
+    claims: [
+      {
+        ...lcpClaim,
+        state: 'holding',
+        publication: { namesCompetitors: true },
+      },
+    ],
+  };
+  assert.match(
+    validatePublication(draft).join('\n'),
+    /requires state "certified"/
+  );
+  const thin = {
+    claims: [
+      {
+        ...lcpClaim,
+        state: 'certified',
+        publication: { namesCompetitors: true },
+      },
+    ],
+  };
+  const errors = validatePublication(thin).join('\n');
+  for (const field of [
+    'surface',
+    'conversionGoal',
+    'proofClaimId',
+    'receipt',
+    'certifiedBy',
+  ]) {
+    assert.match(errors, new RegExp(field));
+  }
+  const full = {
+    claims: [
+      { ...lcpClaim, state: 'certified', publication: certifiedPublication },
+    ],
+  };
+  assert.deepEqual(validatePublication(full), []);
+});
+
+test('certified claims fail the gate on a laptop receipt even when they pass', () => {
+  const doc = {
+    claims: [
+      { ...lcpClaim, state: 'certified', publication: certifiedPublication },
+    ],
+  };
+  const passing = receipt([
+    platform('jovie', 1000, 90),
+    platform('platform-a', 2000, 50),
+  ]);
+  const local = runGate(doc, { ...passing, harness: { runner: 'local' } });
+  assert.equal(local.ok, false);
+  assert.deepEqual(local.publicationErrors, [
+    'certified claims need a hosted-runner receipt',
+  ]);
+  const hosted = runGate(doc, {
+    ...passing,
+    harness: { runner: 'github-actions' },
+  });
+  assert.equal(hosted.ok, true);
+});
+
+test('the committed claims file satisfies the publication rule', () => {
+  assert.deepEqual(validatePublication(claimsDoc), []);
+  assert.match(claimsDoc.publicationRule, /certified/);
 });

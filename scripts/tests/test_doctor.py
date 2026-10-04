@@ -721,7 +721,7 @@ class AccountAttributionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "none")
             lane = SimpleNamespace(HOST="test", load_providers=lambda: {}, load_github_env=lambda: None,
-                                   graphql_budget=lambda: None, Linear=mock.Mock(side_effect=OSError("no Linear")))
+                                   graphql_budget=lambda: None, Linear=mock.Mock(side_effect=SystemExit("LINEAR_API_KEY missing")))
             for generated, expected in [(1001, "leases-occupied"), (1002, "unknown")]:
                 report = {"generatedAt": doctor.epoch_iso(generated), "count": 1,
                           "accounts": {"a": {"available": True, "leased": True}}}
@@ -729,6 +729,8 @@ class AccountAttributionTest(unittest.TestCase):
                         mock.patch.object(doctor.time, "time", side_effect=[1000.9, 1001.2]):
                     observation = doctor.observe(host, lane, SimpleNamespace(status=lambda: report))
                 self.assertEqual(observation["codexAttribution"]["state"], expected)
+                self.assertIsNone(observation["pool"])
+                self.assertIn("SystemExit: LINEAR_API_KEY missing", observation["linearError"])
 
 
 class AdmissionBackpressureTest(unittest.TestCase):

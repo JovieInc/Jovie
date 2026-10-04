@@ -100,9 +100,15 @@ export function loadArtifacts(root) {
 }
 
 /** Measurement findings only; provenance belongs to the certification gate. */
-export function proofMeasurementFindings(proof) {
+export function proofMeasurementFindings(proof, requiredViewports = []) {
+  if (!Array.isArray(proof?.viewports) || proof.viewports.length === 0)
+    return ['viewport measurements unmeasured'];
   const findings = [];
-  for (const viewport of proof?.viewports ?? []) {
+  for (const id of requiredViewports) {
+    if (!proof.viewports.some(viewport => viewport?.id === id))
+      findings.push(`viewport ${id}: unmeasured`);
+  }
+  for (const viewport of proof.viewports) {
     const at = `viewport ${viewport?.id ?? '<missing>'}`;
     if (viewport?.rendered !== true) findings.push(`${at}: not rendered`);
     if (viewport?.axe?.violations !== 0)
@@ -110,10 +116,10 @@ export function proofMeasurementFindings(proof) {
         `${at}: ${viewport?.axe?.violations ?? 'unmeasured'} axe violations`
       );
     const overflow = viewport?.overflow?.maxHorizontalPx;
-    if (typeof overflow !== 'number' || overflow > 1)
+    if (!Number.isFinite(overflow) || overflow < 0 || overflow > 1)
       findings.push(`${at}: horizontal overflow ${overflow ?? 'unmeasured'}px`);
     const cls = viewport?.cls?.value;
-    if (typeof cls !== 'number' || cls > CLS_INTERACTION_BUDGET)
+    if (!Number.isFinite(cls) || cls < 0 || cls > CLS_INTERACTION_BUDGET)
       findings.push(
         `${at}: CLS ${cls ?? 'unmeasured'} over ${CLS_INTERACTION_BUDGET}`
       );
@@ -171,7 +177,7 @@ export function auditScreens({
     const proof = proofs.get(screen.id);
     if (proof) {
       evidence = true;
-      findings.push(...proofMeasurementFindings(proof));
+      findings.push(...proofMeasurementFindings(proof, screen.viewports));
     }
     const judged = judge ? specificJudgeFindings(judge[screen.id]) : [];
     for (const item of judged)

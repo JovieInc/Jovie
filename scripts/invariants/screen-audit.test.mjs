@@ -172,6 +172,50 @@ describe('screen audit', () => {
     ]);
   });
 
+  it('does not count empty or incomplete proof measurements as green', () => {
+    for (const viewports of [
+      undefined,
+      [],
+      [{ ...passingViewport, id: 'mobile' }],
+    ]) {
+      const ledger = auditScreens({
+        registry: registry.filter(screen => screen.id === 'web.tasks'),
+        proofs: new Map([['web.tasks', { screenId: 'web.tasks', viewports }]]),
+      });
+      assert.equal(ledger.screens[0].verdict, 'red');
+      assert.match(
+        ledger.screens[0].findings.join('\n'),
+        /viewport.*unmeasured/
+      );
+    }
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      assert.match(
+        proofMeasurementFindings({
+          viewports: [
+            {
+              ...passingViewport,
+              cls: { value },
+              overflow: { maxHorizontalPx: value },
+            },
+          ],
+        }).join('\n'),
+        /CLS/
+      );
+      assert.match(
+        proofMeasurementFindings({
+          viewports: [
+            {
+              ...passingViewport,
+              cls: { value },
+              overflow: { maxHorizontalPx: value },
+            },
+          ],
+        }).join('\n'),
+        /horizontal overflow/
+      );
+    }
+  });
+
   it('blocks on specific judge findings only', () => {
     const judged = specificJudgeFindings([
       {
