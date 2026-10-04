@@ -1,0 +1,35 @@
+{
+  "schema": "jovie-current-head-qualification-result/v1",
+  "head": "2ee1586f5e4f5ecc7c7895ab8d480fb08c6a20a4",
+  "commands": [
+    {
+      "command": "pnpm ci:control:test",
+      "exitCode": 0,
+      "logPath": ".qualification-logs/ci-control-test.log",
+      "startedAt": "2026-10-02T05:47:31.329186Z",
+      "endedAt": "2026-10-02T05:47:46.496438Z",
+      "testCount": 2335,
+      "coverageEvidence": {
+        "status": "passed",
+        "summary": "All configured per-module coverage gates passed. Native-queue overall statements/branches/functions/lines: 90.17/83.14/91.97/91.18 with per-file thresholds lines>=85, branches>=75, functions>=82. Ownerless overall: 71.31/69.68/66.97/72.07 with per-file thresholds statements>=60, lines>=65, branches>=60, functions>=50. Dependabot policy overall: 96.42/94.62/100/98.61 against lines>=95, branches>=90, functions>=95. PR-conflict CLI overall: 70.42/69.46/81.25/70.52 against lines>=55, branches>=60, functions>=65. Rolling-CI FX overall: 71.89/74.10/82.63/73.48 against per-file statements>=60, lines>=60, branches>=60, functions>=70. Node module gates, including 95/90/90, 90/85/90, 90/80/90, 85/75/90, 100/100/100 and other selector-declared line/branch/function thresholds, all passed; exact per-module tables are retained in the log. Workflow topology validated 107 workflows, 15 edges, and 25 normal PR checks."
+      }
+    },
+    {
+      "command": "bash scripts/hooks/pre-push-gate.sh affected",
+      "exitCode": 128,
+      "logPath": ".qualification-logs/pre-push-gate-affected.log",
+      "startedAt": "2026-10-02T05:48:06.419433Z",
+      "endedAt": "2026-10-02T06:12:55.729297Z",
+      "testCount": 25393,
+      "coverageEvidence": {
+        "status": "incomplete",
+        "summary": "Formatting, proxy, Tailwind, web typecheck, component ship gate, affected workspace typecheck/lint, both prerequisite coverage gates, and web shards 1-7 passed. The two prerequisite coverage results were company-registry lines/branches/functions 100/99.21/100 against 95/90/100 and project-creation-policy 100/95.31/100 against 95/90/100. Completed receipts contain 25,393 tests (25,302 passed; skips/todo account for the remainder). The selector correctly chose fail-closed full mode. Web shard 8/8 started but had no terminal test or coverage summary before the command was interrupted at the fixed deadline; downstream steps were not reached."
+      }
+    }
+  ],
+  "allRequiredPassed": false,
+  "blockers": [
+    "The applicable canonical affected pre-push gate did not complete: it was interrupted at 2026-10-02T06:12:55.729297Z before the 2026-10-02T06:13:36.052821Z deadline while web shard 8/8 was running, and exited 128. A required nonterminal gate is not a pass.",
+    "gbrain-unavailable: the bounded read of ops/symphony/gem-runtime-recovery-2026-10-02 timed out after 8 seconds (exit 124); no context was inferred."
+  ]
+}
