@@ -173,7 +173,7 @@ export default function DownloadPage() {
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 text-balance text-5xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
+                    className='mt-5 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
                   >
                     Jovie, Installed Where You Work.
                   </h1>

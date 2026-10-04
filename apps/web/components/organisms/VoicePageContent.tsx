@@ -54,6 +54,8 @@ export function VoicePageContent() {
         }}
         headingId='voice-hero-heading'
         titleTestId='voice-hero-title'
+        // JOV-7772: the two-sentence headline fits two lines at 32/48px.
+        titleClassName='text-3xl md:text-5xl lg:text-4xl xl:text-5xl'
         sectionTestId='voice-hero-section'
         primaryCtaLabel='Start voice cloning'
         primaryCtaHref={APP_ROUTES.START}
