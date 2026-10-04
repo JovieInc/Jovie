@@ -154,7 +154,8 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
 
   // OTP verification hard-navigates to /start as soon as Better Auth returns.
   // The linked app row exists before the sign-in response reaches the
-  // browser, so the first /start mount performs the one authoritative claim.
+  // browser, so the first /start mount performs the one authoritative claim
+  // without racing the start-route auth gate.
   try {
     const automaticStartNavigationPromise = page.waitForURL(
       url => url.pathname === '/start',

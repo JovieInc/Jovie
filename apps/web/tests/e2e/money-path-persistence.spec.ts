@@ -92,7 +92,21 @@ test('persists verified checkout entitlement for a fresh and returning session',
     return commission ?? null;
   };
 
+  const readUserStatus = async () => {
+    const [user] = await sql`
+      SELECT user_status AS "userStatus" FROM users WHERE email = ${email}
+    `;
+    return (user?.userStatus as string | undefined) ?? null;
+  };
+
   try {
+    // The fresh buyer keeps whatever status real provisioning gives it: no DB
+    // approval step. With the waitlist gate on that is waitlist_pending, and
+    // only the verified payment below may admit it (JOV-7701).
+    const [gate] = await sql`
+      SELECT gate_enabled AS "gateEnabled" FROM waitlist_settings WHERE id = 1
+    `;
+    const gateEnabled = gate?.gateEnabled !== false;
     const preparedSignup = await prepareBetterAuthEmailOtp(page, {
       email,
       entryPath: '/signup',
@@ -101,11 +115,10 @@ test('persists verified checkout entitlement for a fresh and returning session',
           .poll(
             async () => {
               const [user] = await sql`
-                UPDATE users
-                SET user_status = 'waitlist_approved', updated_at = NOW()
+                SELECT id, is_pro AS "isPro", plan
+                FROM users
                 WHERE better_auth_user_id = ${candidateBetterAuthUserId}
                   AND email = ${email}
-                RETURNING id, is_pro AS "isPro", plan
               `;
               if (!user) return null;
               if (user.isPro !== false || user.plan !== 'free') {
@@ -138,6 +151,9 @@ test('persists verified checkout entitlement for a fresh and returning session',
 
     const freshUser = await readMoneyUser();
     expect(freshUser).not.toBeNull();
+    expect(await readUserStatus()).toBe(
+      gateEnabled ? 'waitlist_pending' : 'waitlist_approved'
+    );
     appUserId = freshUser?.id ?? null;
     if (!appUserId) {
       throw new Error('Money-path user did not expose its application ID');
@@ -252,6 +268,10 @@ test('persists verified checkout entitlement for a fresh and returning session',
     `;
     expect(invalidEventCount?.count).toBe(0);
     expect(await readMoneyUser()).toMatchObject({ isPro: false, plan: 'free' });
+    // An unverified webhook admits nobody.
+    expect(await readUserStatus()).toBe(
+      gateEnabled ? 'waitlist_pending' : 'waitlist_approved'
+    );
 
     const validResponse = await postStripeWebhook(page, webhook);
     expect(validResponse.ok()).toBeTruthy();
@@ -291,6 +311,14 @@ test('persists verified checkout entitlement for a fresh and returning session',
         auditSource: 'webhook',
         processedAt: expect.anything(),
       });
+
+    // Payment admits: the verified checkout moved the buyer past the gate.
+    await expect
+      .poll(readUserStatus, {
+        message: 'Verified payment did not admit the pending buyer',
+        timeout: 30_000,
+      })
+      .toBe('waitlist_approved');
 
     const currentUsage = await page.request.get('/api/usage/summary');
     expect(currentUsage.ok()).toBeTruthy();
