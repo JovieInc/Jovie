@@ -448,7 +448,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     const releasesNav = screen
       .getAllByRole('option')
       .find(el =>
-        el.textContent?.includes('Manage your release catalog and smart links')
+        el.textContent?.includes('Open the releases view of your work')
       );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);

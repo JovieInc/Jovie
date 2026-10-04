@@ -256,7 +256,7 @@ describe('CmdKPalette', () => {
       screen.getByRole('option', {
         name: segmentedAccessibleName(
           'Identity',
-          'Monitor your identity, public pages, and search presence.',
+          'Who you are and how you are represented.',
           '⌘2'
         ),
       })

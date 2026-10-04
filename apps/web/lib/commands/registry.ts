@@ -282,8 +282,8 @@ export function buildCommands(
     nav(
       'go-presence',
       PRODUCT_ONTOLOGY.identity.label,
-      'Monitor your identity, public pages, and search presence.',
-      'User',
+      PRODUCT_ONTOLOGY.identity.definition,
+      'Waypoints',
       APP_ROUTES.PRESENCE
     ),
     nav(
@@ -324,7 +324,7 @@ export function buildCommands(
     nav(
       'go-releases',
       'Releases',
-      'Manage your release catalog and smart links.',
+      'Open the releases view of your work.',
       'Layers',
       APP_ROUTES.RELEASES
     ),
