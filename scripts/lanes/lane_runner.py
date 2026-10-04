@@ -4815,9 +4815,15 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     shim = shim_dir / "gh"
     # App installation tokens cannot touch user gists (403), and the status feed is Tim's gist:
     # `gh gist` keeps the host's own login.
+    # Mint only when the key exists at call time: harnesses that swap HOME (e.g.
+    # real-gh-harness running workflow shell) must still reach the real gh.
     shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
-                    f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"})" || exit 1\n'
-                    f'export GH_TOKEN\nexec {real} "$@"\n')
+                    'key="${JOVIE_BOT_KEY:-$HOME/.config/jovie-lanes/jovie-bot.pem}"\n'
+                    f'if [ -f "$key" ]; then\n'
+                    f'  GH_TOKEN="$(python3 {HERE / "gh_app_token.py"})" || exit 1\n'
+                    '  export GH_TOKEN\n'
+                    'fi\n'
+                    f'exec {real} "$@"\n')
     shim.chmod(0o755)
     os.environ["PATH"] = f"{shim_dir}{os.pathsep}{os.environ.get('PATH', '')}"
 
