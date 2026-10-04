@@ -1,37 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { RecentlyShippedReleases } from './RecentlyShippedReleases';
+import { RecentlyShippedSection } from './RecentlyShippedSection';
 
-// RecentlyShippedSection reads CHANGELOG.md through node:fs on the server;
-// the story renders its presentational half from parsed releases.
+// Storybook aliases '@/lib/recent-releases' to fixture releases, since the
+// real reader loads CHANGELOG.md through node:fs.
 const meta = {
   title: 'Marketing/RecentlyShippedSection',
-  component: RecentlyShippedReleases,
+  component: RecentlyShippedSection,
   parameters: {
     layout: 'fullscreen',
   },
-  args: {
-    releases: [
-      {
-        version: '26.10.0',
-        date: '2026-10-01',
-        highlights: [
-          'Launch notifications for every release',
-          'Faster public profiles',
-        ],
-      },
-      {
-        version: '26.9.16',
-        date: '2026-09-28',
-        highlights: ['Claim your profile link from the homepage'],
-      },
-      {
-        version: '26.9.15',
-        date: '2026-09-24',
-        highlights: ['Smart links for scheduled releases'],
-      },
-    ],
-  },
-} satisfies Meta<typeof RecentlyShippedReleases>;
+} satisfies Meta<typeof RecentlyShippedSection>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
