@@ -36,7 +36,12 @@ export function evaluateProofGate(report, { judgedStepIds, now = new Date() }) {
     (report.funnelStepIds[step] ?? []).some(id => judged.has(id));
 
   const ageDays = (now.getTime() - Date.parse(report.asOf)) / 86_400_000;
-  if (!(ageDays <= PROOF_REPORT_MAX_AGE_DAYS)) {
+  // A missing, unparseable or future asOf is never fresh.
+  if (!(ageDays >= 0)) {
+    failures.push(
+      `proof report asOf ${report.asOf} is invalid or in the future: regenerate the golden-path report`
+    );
+  } else if (ageDays > PROOF_REPORT_MAX_AGE_DAYS) {
     failures.push(
       `proof report is ${Math.floor(ageDays)} days old: run pnpm proof:dogfood and refresh the golden-path report`
     );

@@ -94,6 +94,14 @@ describe('funnel proof gate', () => {
       evaluateProofGate(null, { judgedStepIds: [], now }).pass,
       false
     );
+    for (const asOf of ['2027-01-01T00:00:00.000Z', 'not-a-date', undefined]) {
+      const result = evaluateProofGate(report({ asOf }), {
+        judgedStepIds: [],
+        now,
+      });
+      assert.equal(result.pass, false, String(asOf));
+      assert.match(result.failures[0], /invalid or in the future/);
+    }
   });
 
   it('reads the committed golden-path report', () => {
