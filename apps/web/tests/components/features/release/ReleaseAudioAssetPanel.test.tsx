@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudioWaveformEditor } from '@/components/features/release/AudioWaveformEditor';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 
@@ -28,6 +28,7 @@ vi.mock('sonner', () => ({
 }));
 
 describe('ReleaseAudioAssetPanel', () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
     vi.clearAllMocks();
     decodeWaveformPeaksMock.mockResolvedValue({
@@ -37,15 +38,23 @@ describe('ReleaseAudioAssetPanel', () => {
   });
 
   it('retries a failed waveform directly without replacing its attachment', async () => {
-    const { AudioPreviewError } = await import(
-      '@/lib/audio/decode-waveform-peaks'
+    const { decodeWaveformPeaks } = await vi.importActual<
+      typeof import('@/lib/audio/decode-waveform-peaks')
+    >('@/lib/audio/decode-waveform-peaks');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: vi.fn().mockRejectedValue(new TypeError('stream dropped')),
+      })
     );
-    decodeWaveformPeaksMock.mockRejectedValueOnce(
-      new AudioPreviewError('network')
-    );
+    decodeWaveformPeaksMock.mockImplementationOnce(decodeWaveformPeaks);
     const audioUrl = 'https://cdn.example.com/preview.mp3';
     render(<AudioWaveformEditor audioUrl={audioUrl} />);
 
+    expect(
+      await screen.findByTestId('audio-preview-unavailable')
+    ).toHaveTextContent('Check your connection');
     fireEvent.click(await screen.findByTestId('audio-preview-retry'));
     await screen.findByTestId('audio-waveform-editor');
 

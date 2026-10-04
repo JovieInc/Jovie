@@ -36,17 +36,13 @@ export function fileNameFromMediaUrl(
   try {
     const { pathname } = new URL(url, 'https://media.invalid');
     const segment = pathname.split('/').filter(Boolean).pop() ?? '';
-    const name = decodeURIComponent(segment).trim();
-    return name.length > 0 ? name : null;
+    return decodeURIComponent(segment).trim() || null;
   } catch {
     return null;
   }
 }
 
-/**
- * Flat list of the real files attached to a work object. Media-type buckets
- * with no underlying file are never emitted — only populated entries appear.
- */
+/** List populated attachments, without empty media-type buckets. */
 export function deriveWorkFiles(
   asset: WorkFileSource,
   downloads: readonly LibraryDownloadView[]

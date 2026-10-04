@@ -214,6 +214,28 @@ describe('AppShellFrame', () => {
     );
   });
 
+  it('composes the shared rail-motion tokens on every shell allocation slot (JOV-4522)', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div>Right rail</div>}
+      />
+    );
+
+    // The allocation and main-plane slots must not re-declare ad-hoc
+    // duration/easing pairs — they all compose rail-motion.ts constants.
+    const frameSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/AppShellFrame.tsx'),
+      'utf8'
+    );
+    expect(frameSource).toContain('SHELL_RAIL_ALLOCATION');
+    expect(frameSource).toContain('SHELL_RAIL_MAIN_PLANE');
+    expect(frameSource).toContain('SHELL_RAIL_FRAME_GAP');
+    expect(frameSource).not.toMatch(/className='[^']*duration-cinematic/);
+  });
+
   it('keeps main-plane geometry on the same reduced-motion-safe rail contract', () => {
     render(
       <AppShellFrame

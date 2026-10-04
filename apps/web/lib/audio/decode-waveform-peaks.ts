@@ -1,9 +1,6 @@
 const DEFAULT_PEAK_COUNT = 160;
 
-/**
- * Reason a waveform preview could not be produced. Consumed by UI to pick
- * recovery copy; never surfaced as a raw transport exception.
- */
+/** Scoped preview recovery reason; raw transport errors stay in the cause. */
 export type AudioPreviewFailureReason =
   | 'network'
   | 'permission'
@@ -12,18 +9,13 @@ export type AudioPreviewFailureReason =
   | 'unavailable';
 
 export class AudioPreviewError extends Error {
-  readonly reason: AudioPreviewFailureReason;
-  readonly status?: number;
-
   constructor(
-    reason: AudioPreviewFailureReason,
-    status?: number,
+    readonly reason: AudioPreviewFailureReason,
+    readonly status?: number,
     options?: { cause?: unknown }
   ) {
     super('Audio preview unavailable', options);
     this.name = 'AudioPreviewError';
-    this.reason = reason;
-    this.status = status;
   }
 }
 
@@ -40,12 +32,9 @@ function previewErrorForStatus(status: number): AudioPreviewError {
 export function isAudioPreviewError(
   error: unknown
 ): error is AudioPreviewError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { name?: unknown }).name === 'AudioPreviewError' &&
-    typeof (error as { reason?: unknown }).reason === 'string'
-  );
+  if (typeof error !== 'object' || error === null) return false;
+  const { name, reason } = error as Partial<AudioPreviewError>;
+  return name === 'AudioPreviewError' && typeof reason === 'string';
 }
 
 function downsamplePeaks(samples: Float32Array, peakCount: number): number[] {
@@ -86,7 +75,9 @@ export async function decodeWaveformPeaks(
     throw previewErrorForStatus(response.status);
   }
 
-  const buffer = await response.arrayBuffer();
+  const buffer = await response.arrayBuffer().catch(error => {
+    throw new AudioPreviewError('network', undefined, { cause: error });
+  });
   const audioContext = new AudioContext();
 
   try {
