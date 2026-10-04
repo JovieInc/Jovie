@@ -1,6 +1,27 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { selectMock, selectResults } = vi.hoisted(() => {
+  const selectResults: unknown[][] = [];
+  const selectMock = vi.fn(() => {
+    const rows = selectResults.shift() ?? [];
+    const promise = Promise.resolve(rows);
+    const builder: Record<string, unknown> = {};
+    for (const method of ['from', 'innerJoin', 'where', 'limit']) {
+      builder[method] = () => builder;
+    }
+    builder.then = promise.then.bind(promise);
+    return builder;
+  });
+  return { selectMock, selectResults };
+});
+
+vi.mock('@/lib/db', () => ({ db: { select: selectMock } }));
+vi.mock('@/lib/db/schema/links', () => ({ socialLinks: {} }));
+vi.mock('@/lib/db/schema/profiles', () => ({ creatorProfiles: {} }));
+
 import {
+  findProfileForSource,
   isSameSourceIdentity,
   youtubeChannelKey,
 } from '@/lib/ingestion/creator-profile-match';
@@ -80,5 +101,90 @@ describe('isSameSourceIdentity', () => {
         'https://www.tiktok.com/@creator'
       )
     ).toBe(false);
+  });
+});
+
+describe('findProfileForSource', () => {
+  beforeEach(() => {
+    selectResults.length = 0;
+    selectMock.mockClear();
+  });
+
+  it('returns null without querying when the source has no usable token', async () => {
+    await expect(
+      findProfileForSource('youtube', 'https://www.youtube.com/')
+    ).resolves.toBeNull();
+    await expect(
+      findProfileForSource('instagram', 'https://www.instagram.com/')
+    ).resolves.toBeNull();
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it('matches an active social link by handle identity', async () => {
+    selectResults.push([
+      {
+        username: 'creator',
+        displayName: 'Creator',
+        url: 'https://instagram.com/@CREATOR',
+      },
+    ]);
+
+    await expect(
+      findProfileForSource('instagram', 'https://www.instagram.com/creator')
+    ).resolves.toEqual({
+      username: 'creator',
+      displayName: 'Creator',
+      profileUrl: expect.stringContaining('/creator'),
+    });
+    expect(selectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefers the canonical youtubeUrl over social link rows', async () => {
+    selectResults.push(
+      [
+        {
+          username: 'link-user',
+          displayName: 'Link',
+          url: 'https://www.youtube.com/@creator',
+        },
+      ],
+      [
+        {
+          username: 'profile-user',
+          displayName: 'Profile',
+          url: 'https://youtube.com/@creator/about',
+        },
+      ]
+    );
+
+    await expect(
+      findProfileForSource('youtube', 'https://www.youtube.com/@creator/videos')
+    ).resolves.toMatchObject({ username: 'profile-user' });
+    expect(selectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips candidates whose URLs name a different channel identity', async () => {
+    selectResults.push(
+      [
+        {
+          username: 'other',
+          displayName: null,
+          url: 'https://www.youtube.com/c/creator',
+        },
+        { username: 'null-url', displayName: null, url: null },
+      ],
+      []
+    );
+
+    await expect(
+      findProfileForSource('youtube', 'https://www.youtube.com/@creator')
+    ).resolves.toBeNull();
+  });
+
+  it('returns null when no candidates exist', async () => {
+    selectResults.push([], []);
+    await expect(
+      findProfileForSource('youtube', 'https://www.youtube.com/@nobody')
+    ).resolves.toBeNull();
   });
 });
