@@ -169,6 +169,8 @@ export const FactoryRunManifestSchema = z.object({
     .array(
       z.object({
         iteration: z.number().int().min(1),
+        /** What started the rework; absent on runs before JOV-7750. */
+        trigger: z.enum(['visual-rejection', 'proof-landed']).optional(),
         rejectedAt: z.enum(FACTORY_STAGES),
         reworkFrom: z.enum(FACTORY_STAGES),
         /** The render output the rejection judged; a rework must replace it. */
