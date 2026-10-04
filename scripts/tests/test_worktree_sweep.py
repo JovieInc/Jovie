@@ -89,6 +89,8 @@ class SweepTest(unittest.TestCase):
         (path / "new.txt").write_text("untracked\n")
         (path / "node_modules/pkg").mkdir(parents=True)
         (path / "node_modules/pkg/index.js").write_text("build output\n")
+        (path / ".pnpm-store-private/v10").mkdir(parents=True)
+        (path / ".pnpm-store-private/v10/blob").write_text("per-checkout store\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
         self.assertEqual(report["backups"], ["backup/mac/dirty-20261003"])
@@ -140,6 +142,21 @@ class SweepTest(unittest.TestCase):
         self.assertEqual(len(report["errors"]), 1)
         self.assertIn("remove:", report["errors"][0])
         self.assertEqual(report["kept"], 1)
+
+    def test_a_timed_out_checkout_is_kept_and_the_sweep_continues(self):
+        slow = self.worktree("slow")
+        (slow / "a.txt").write_text("edited\n")
+        clean = self.worktree("clean-after")
+
+        def run(args, **kw):
+            if args[2:4] == [str(slow), "add"]:
+                raise subprocess.TimeoutExpired(args, kw.get("timeout"))
+            return no_processes(args, **kw)
+
+        report = self.sweep(run=run)
+        self.assertTrue((slow / "a.txt").exists(), "unsaved work stays when its backup cannot finish")
+        self.assertFalse(clean.exists(), "later checkouts are still swept")
+        self.assertEqual(report["errors"], [f"{slow}:TimeoutExpired"])
 
     def test_unreadable_process_inventory_removes_nothing(self):
         path = self.worktree("idle")
@@ -243,6 +260,15 @@ class HostWiringTest(unittest.TestCase):
         self.assertTrue(sweeper.busy(Path("/w/wt-a"), live))
         self.assertFalse(sweeper.busy(Path("/w/wt-b"), live))
         self.assertIsNone(sweeper.live_paths(lambda *a, **k: (_ for _ in ()).throw(OSError("no lsof"))))
+
+    def test_launchd_path_gains_sbin_for_lsof_once(self):
+        env = {"PATH": "/usr/bin:/bin"}
+        sweeper.ensure_sbin_on_path(env)
+        sweeper.ensure_sbin_on_path(env)
+        self.assertEqual(env["PATH"], "/usr/bin:/bin:/usr/sbin")
+        empty = {}
+        sweeper.ensure_sbin_on_path(empty)
+        self.assertEqual(empty["PATH"], "/usr/sbin")
 
     def test_defaults_cover_agent_roots_and_skip_shared_caches(self):
         with tempfile.TemporaryDirectory() as tmp:

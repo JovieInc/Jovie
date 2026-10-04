@@ -395,6 +395,18 @@ class HotspotAdmissionTest(unittest.TestCase):
             self.assertEqual(lane.open_hotspot_holds(), {"scripts/lanes/hud.py": 5})
 
 
+class RebuildInFlightTest(unittest.TestCase):
+    """JOV-7708: a parked PR the sweep requeued stays open but releases its issue."""
+
+    def test_rebuild_labeled_pr_does_not_hold_its_issue(self):
+        listed = json.dumps([
+            {"headRefName": "devin/jov-7-20261001t0900", "body": "", "labels": [{"name": "lane-rebuild"}]},
+            {"headRefName": "codex/jov-8-20261001t0900", "body": "", "labels": [{"name": "lane-fix-exhausted"}]},
+            {"headRefName": "tim/x", "body": "linear-issue-id: JOV-9", "labels": []}])
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=listed, stderr="")):
+            self.assertEqual(lane.in_flight_issues(), frozenset({"JOV-8", "JOV-9"}))
+
+
 class PromptTest(unittest.TestCase):
     def test_contract_names_branch_issue_and_independent_gate(self):
         prompt = lane.render_prompt(issue("JOV-42"), "devin/jov-42-x", "prior decision: use tokens")
@@ -1338,6 +1350,17 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_blocked_last_overlap_candidate_never_runs_or_claims_the_issue(self):
+        self.linear.issues[0].description = "Edit `scripts/lanes/lane_runner.py`."
+        existing = {"number": 1, "files": ["scripts/lanes/lane_runner.py"], "isDraft": False}
+        with patch.object(lane, "overlap_inventory", return_value=([existing], [])), \
+                patch.object(lane, "open_hotspot_holds", return_value={}), \
+                patch.object(lane, "run_issue") as run, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            lane.worker(self.host, "devin")
+        run.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+
     def test_event_cleanup_waits_until_all_productive_selections_decline(self):
         for chosen in ("event", "poll", "adopt", "issue", "idle"):
             with self.subTest(chosen=chosen):
