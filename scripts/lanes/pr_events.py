@@ -55,8 +55,7 @@ RECONCILE_S = 30 * 60
 STALE_DRAFT_S = 48 * 3600
 # A non-lane agent draft this old that is also stalled (idle past STALE_DRAFT_S, or already
 # conflicting/red) needs repair, unless a dependency it names is still open. Age and
-# retry exhaustion alone never authorize closing unfinished work (JOV-INV-011); the one
-# exception is work parked past PARKED_S (JOV-INV-011 v5, retire_parked).
+# retry exhaustion never authorize closing unfinished work (JOV-INV-011).
 AGENT_DRAFT_S = 7 * 24 * 3600
 # A PR updated this recently is between events (CI starting, enroll pending), not an orphan.
 ORPHAN_GRACE_S = 30 * 60
@@ -1182,28 +1181,31 @@ def retire_orphan(lane, linear, pr: dict, open_prs: list[dict], *, host, now: fl
     return "adopted"
 
 
-# JOV-7708 (JOV-INV-011 v5): parked work rots. A PR the lanes gave up on (`lane-fix-exhausted`)
-# or the queue keeps ejecting (`queue-poison`) for longer than PARKED_S, on an agent-owned
-# branch with no hold, is closed and its issue goes back to the pool to rebuild from main.
-# The branch is kept. Rebasing parked branches onto a moving main left 31 of 66 PRs DIRTY.
+# JOV-7708: parked work rots. A PR the lanes gave up on (`lane-fix-exhausted`) or the queue
+# keeps ejecting (`queue-poison`) for longer than PARKED_S, on an agent-owned branch with no
+# hold, sends its issue back to the pool to rebuild from main. The PR stays open (JOV-INV-011:
+# only an explicit `duplicate` label retires it); `lane-rebuild` marks it requeued, once, and
+# lets `lane_runner.in_flight_issues` admit the issue again.
 PARKED_S = 48 * 3600
 PARKED_LABELS = frozenset({PREFIX + EXHAUSTED, POISON_LABEL})
+REBUILD_LABEL = "lane-rebuild"
 ISSUE_REF = re.compile(r"(?i)\bjov-\d+\b")
 POOL_LABEL = "agent-ready"  # lane_runner.SHARED_LABEL; this module does not import the runner
 
 
-def parked_retirement_enabled() -> bool:
-    return os.environ.get("LANES_PARKED_RETIRE", "1").strip().lower() not in ("0", "false", "no", "off")
+def parked_requeue_enabled() -> bool:
+    return os.environ.get("LANES_PARKED_REQUEUE", "1").strip().lower() not in ("0", "false", "no", "off")
 
 
 def parked_candidates(prs: list[dict], now: float) -> list[dict]:
     """Pure first cut: agent-owned same-repo PRs, not queued, unheld, carrying a parked label,
-    open longer than PARKED_S. parked_since then measures how long the label has applied."""
+    not yet requeued, open longer than PARKED_S. parked_since then measures the label's age."""
     rows = []
     for pr in prs:
         labels = {label.lower() for label in label_names(pr)}
         created = iso_ts(pr.get("createdAt"))
         if (agent_owned(pr) and labels & PARKED_LABELS and not labels & HOLD_LABELS
+                and REBUILD_LABEL not in labels
                 and not pr.get("isCrossRepository") and not pr.get("isInMergeQueue")
                 and created is not None and now - created > PARKED_S):
             rows.append(pr)
@@ -1235,10 +1237,15 @@ def pr_issue(pr: dict) -> str | None:
     return ref.group(0).upper() if ref else None
 
 
-def retire_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *, host, now: float) -> bool:
-    """Close one parked PR after revalidating it live, then return its issue to the pool with a
-    rebuild-from-main note. A failed read, a hold, a queue entry or a live repair claim keeps it."""
+def requeue_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *, host, now: float) -> bool:
+    """Return a parked PR's issue to the pool with a rebuild-from-main note. Never closes the PR.
+    A failed read, a hold, a queue entry, a live repair claim, a done issue or another open PR
+    for the same issue leaves everything as it is."""
     number, head = pr["number"], pr.get("headRefOid")
+    identifier = pr_issue(pr)
+    if not identifier or not linear or any(
+            other["number"] != number and pr_issue(other) == identifier for other in open_prs):
+        return False
     owner, name = lane.REPO_SLUG.split("/")
     try:
         read = lane.sh(["gh", "api", "graphql", "-f", f"query={RETIREMENT_QUERY}",
@@ -1249,7 +1256,7 @@ def retire_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *,
         if (data.get("errors") or live["labels"]["pageInfo"]["hasNextPage"] is not False
                 or live["state"] != "OPEN" or not head or live["headRefOid"] != head
                 or live["isCrossRepository"] is not False or live["isInMergeQueue"] is not False
-                or labels & HOLD_LABELS or not labels & PARKED_LABELS):
+                or labels & HOLD_LABELS or REBUILD_LABEL in labels or not labels & PARKED_LABELS):
             return False
     except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.SubprocessError):
         return False
@@ -1258,34 +1265,33 @@ def retire_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *,
         return False
     hours = int((now - since) // 3600)
     parked = ", ".join(f"`{label}`" for label in sorted(labels & PARKED_LABELS))
-    identifier = pr_issue(pr)
-    if lane.sh(["gh", "pr", "close", str(number), "--repo", lane.REPO_SLUG, "--comment",
-                f"🤖 lanes: closing. This PR has been parked ({parked}) for {hours}h while main moved on. "
-                "Rebuilding from main beats rebasing parked work (JOV-7708). The branch "
-                f"`{pr.get('headRefName')}` is kept for reference"
-                + (f"; {identifier} goes back to the pool." if identifier else ".")]).returncode != 0:
-        return False
-    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "parked-retire", "origin": "autonomous-lane",
-                  "pr": number, "head": head, "parkedHours": hours, "issue": identifier,
-                  "endedAt": lane.now_iso()})
-    others = [other for other in open_prs if other["number"] != number and pr_issue(other) == identifier]
-    if not identifier or others or not linear:
-        return True
     try:
         issue = linear_issue(linear, identifier)
-        if issue and issue["state"]["type"] not in ("completed", "canceled"):
-            linear.move(issue["id"], "Todo")
-            found = linear.gql('query($n:String!){issueLabels(filter:{name:{eq:$n}}){nodes{id}}}',
-                               {"n": POOL_LABEL})["issueLabels"]["nodes"]
-            if found:
-                linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
-                           {"id": issue["id"], "l": found[0]["id"]})
-            linear.comment(issue["id"], f"🤖 lanes: PR #{number} sat parked ({parked}) for {hours}h and was "
-                                        "closed (JOV-7708). Rebuild from current main. Use the closed branch "
-                                        f"`{pr.get('headRefName')}` as reference only: check what already landed, "
-                                        "and do not rebase it or copy whole files from it.")
+        if not issue or issue["state"]["type"] in ("completed", "canceled"):
+            return False
+        linear.move(issue["id"], "Todo")
+        found = linear.gql('query($n:String!){issueLabels(filter:{name:{eq:$n}}){nodes{id}}}',
+                           {"n": POOL_LABEL})["issueLabels"]["nodes"]
+        if found:
+            linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                       {"id": issue["id"], "l": found[0]["id"]})
+        linear.comment(issue["id"], f"🤖 lanes: PR #{number} has been parked ({parked}) for {hours}h (JOV-7708). "
+                                    "Rebuild from current main. Use its branch "
+                                    f"`{pr.get('headRefName')}` as reference only: check what already landed, "
+                                    "and do not rebase it or copy whole files from it. The old PR stays open "
+                                    "until the rebuild lands and it is labeled `duplicate`.")
     except Exception:
-        pass
+        return False
+    if lane.sh(["gh", "api", "-X", "POST", f"repos/{lane.REPO_SLUG}/issues/{number}/labels",
+                "-f", f"labels[]={REBUILD_LABEL}"]).returncode != 0:
+        return False
+    lane.sh(["gh", "pr", "comment", str(number), "--repo", lane.REPO_SLUG, "--body",
+             f"🤖 lanes: parked ({parked}) for {hours}h. {identifier} is back in the pool to rebuild from "
+             "main (JOV-7708); this PR stays open. When the rebuild lands, label this PR `duplicate` "
+             "and the sweep retires it (JOV-INV-011)."])
+    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "parked-requeue", "origin": "autonomous-lane",
+                  "pr": number, "head": head, "parkedHours": hours, "issue": identifier,
+                  "endedAt": lane.now_iso()})
     return True
 
 
@@ -1358,7 +1364,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
     every open PR also gets one truthful disposition in `dispositions`, and a stale
     agent-owned draft has a repair or live dependency disposition. Retirement requires
     explicit duplicate authority; age, provider state and retry exhaustion never grant it
-    here (parked work past PARKED_S is retired separately by `retire_parked`, JOV-7708)."""
+    here. Parked work past PARKED_S is requeued, never closed (`requeue_parked`, JOV-7708)."""
     plan = {"label": [], "unlabel": [], "reset": [], "stale": [], "close": [], "orphans": [],
             "depHolds": [], "dispositions": [], "counts": {}}
     lane_groups: dict[str, list[dict]] = {}
@@ -1526,7 +1532,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
                     row.update(state="hold:retirement-unavailable", reason="retirement refused or failed",
                                next="preserve source; revalidate retirement authority")
     parked = []
-    for pr in parked_candidates(prs, now) if parked_retirement_enabled() else []:
+    for pr in parked_candidates(prs, now) if parked_requeue_enabled() else []:
         since = parked_since(pr["number"], {label.lower() for label in label_names(pr)}, lane.sh)
         if since is None or now - since <= PARKED_S:
             continue
@@ -1535,14 +1541,14 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
                 linear = linear_factory()
             except Exception:
                 linear = False
-        if retire_parked(lane, linear, pr, since, prs, host=host, now=now):
+        if requeue_parked(lane, linear, pr, since, prs, host=host, now=now):
             parked.append(pr["number"])
             for row in plan["dispositions"]:
                 if row["pr"] == pr["number"]:
-                    row.update(state="closing", reason=f"parked {int((now - since) // 3600)}h",
-                               next="closed this sweep; the issue rebuilds from main")
+                    row.update(reason=f"parked {int((now - since) // 3600)}h; issue requeued",
+                               next="the issue rebuilds from main; label this PR `duplicate` once it lands")
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
-              "closed": closed, "parkedRetired": parked, "orphans": plan["orphans"],
+              "closed": closed, "parkedRequeued": parked, "orphans": plan["orphans"],
               "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
               "holdNags": next_nags}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
