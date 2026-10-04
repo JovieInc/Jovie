@@ -241,13 +241,43 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   assert.equal(persist.env.GH_TOKEN, '${{ steps.app-token.outputs.token }}');
 });
 
+test('a blocking label on a queued PR dequeues only that PR', () => {
+  const job = workflow.jobs['dequeue-held'];
+  assert.match(job.if, /github\.event\.action == 'labeled'/);
+  for (const label of [
+    'hold',
+    'gated',
+    'incident',
+    'do-not-merge',
+    'queue-poison',
+  ]) {
+    assert.ok(job.if.includes(`"${label}"`), label);
+  }
+  assert.deepEqual(job.permissions, {});
+  const [token, dequeue] = job.steps;
+  assert.equal(token.with['permission-pull-requests'], 'write');
+  assert.equal(
+    dequeue.with['github-token'],
+    '${{ steps.app-token.outputs.token }}'
+  );
+  assert.match(dequeue.with.script, /isInMergeQueue/);
+  assert.match(dequeue.with.script, /dequeuePullRequest/);
+  assert.doesNotMatch(
+    dequeue.with.script,
+    /enqueuePullRequest|disablePullRequestAutoMerge/
+  );
+});
+
 test('wakes on completed Source Validation and on the bounded reconciliation sweep', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
+    'labeled',
     'unlabeled',
     'reopened',
   ]);
+  // A label is never an enroll wake; only a blocking one dequeues its PR.
+  assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
   // JOV-7589: a dequeue while checks are already green emits no completion
   // event, so a periodic full-roster sweep re-arms within the cadence.
   const [sweep] = workflow.on.schedule;
