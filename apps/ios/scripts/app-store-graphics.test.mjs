@@ -132,7 +132,7 @@ test('storefront validation rejects banned copy, fake fixtures and accent repeat
   assert.match(text, /duplicate id/);
 });
 
-test('a bound Pen section must name a frame for every screen', async () => {
+test('a bound Pen section names frame, headline and capture nodes for every screen', async () => {
   const spec = loadStorefront();
   const problems = await validateStorefront(
     {
@@ -141,15 +141,21 @@ test('a bound Pen section must name a frame for every screen', async () => {
         ...spec.pen,
         status: 'bound',
         sectionNodeId: 'abc12',
-        frames: { chat: 'def34' },
+        frames: {
+          ...spec.pen.frames,
+          chat: { frame: 'XC4ox', headline: 'DVed2' },
+          audience: undefined,
+        },
       },
     },
     context
   );
-  assert.deepEqual(
-    problems,
-    spec.screens.slice(1).map(screen => `${screen.id}: no Pen frame id`)
-  );
+  assert.deepEqual(problems, [
+    'chat: no Pen capture node id',
+    'audience: no Pen frame node id',
+    'audience: no Pen headline node id',
+    'audience: no Pen capture node id',
+  ]);
   assert.deepEqual(
     await validateStorefront(
       { ...spec, pen: { ...spec.pen, status: 'drafted' } },
@@ -157,6 +163,23 @@ test('a bound Pen section must name a frame for every screen', async () => {
     ),
     ['pen.status must be requested or bound']
   );
+});
+
+test('headlines mirror the Pen line breaks: at most two non-empty lines', async () => {
+  const base = loadStorefront().screens;
+  assert.ok(base.every(screen => screen.headline.split('\n').length === 2));
+  const problems = await validateStorefront(
+    withScreens([
+      { ...base[0], headline: 'One\ntwo\nthree' },
+      { ...base[1], headline: 'Trailing\n' },
+      ...base.slice(2),
+    ]),
+    context
+  );
+  assert.deepEqual(problems, [
+    'chat: headline must be one or two non-empty lines',
+    'audience: headline must be one or two non-empty lines',
+  ]);
 });
 
 test('storefront validation enforces the App Store screenshot count', async () => {

@@ -108,15 +108,19 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
     );
   }
   // Pen binding: `requested` until studio builds the section, then every
-  // screen maps to its Pen frame id.
+  // screen maps to its Pen frame, headline and capture-slot node ids.
   if (!['requested', 'bound'].includes(spec.pen?.status)) {
     problems.push('pen.status must be requested or bound');
   }
   if (spec.pen?.status === 'bound') {
     if (!spec.pen.sectionNodeId) problems.push('pen.sectionNodeId is missing');
     for (const screen of spec.screens ?? []) {
-      if (!spec.pen.frames?.[screen.id])
-        problems.push(`${screen.id}: no Pen frame id`);
+      const nodes = spec.pen.frames?.[screen.id];
+      for (const role of ['frame', 'headline', 'capture']) {
+        if (!/^[A-Za-z0-9]{5,6}$/.test(nodes?.[role] ?? '')) {
+          problems.push(`${screen.id}: no Pen ${role} node id`);
+        }
+      }
     }
   }
   if (
@@ -153,7 +157,12 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
     if (index > 0 && spec.screens[index - 1].accent === screen.accent) {
       problems.push(`${label}: neighbours must not share an accent`);
     }
-    const copy = lintCopy(screen.headline ?? '', {
+    // Line breaks mirror the Pen headline nodes, which cannot balance wrap.
+    const lines = (screen.headline ?? '').split('\n');
+    if (lines.length > 2 || lines.some(line => !line.trim())) {
+      problems.push(`${label}: headline must be one or two non-empty lines`);
+    }
+    const copy = lintCopy(lines.join(' '), {
       register: 'jovie-marketing',
       headline: true,
     });
@@ -325,7 +334,7 @@ color-mix(in oklch,${accent} 26%,${canvas}) 46%,${canvas} 82%)}
 h1{position:absolute;top:${layout.headlineTop}px;left:50%;transform:translateX(-50%);
 width:${layout.headlineMaxWidth}px;text-align:center;color:#fff;
 font:700 ${layout.headlineSize}px/1.05 Satoshi,Inter,system-ui,sans-serif;
-letter-spacing:-0.02em;text-wrap:balance}
+letter-spacing:-0.02em;white-space:pre-line}
 .device{position:absolute;top:${layout.deviceTop}px;left:50%;transform:translateX(-50%);
 width:${layout.deviceWidth}px;padding:${layout.bezel}px;background:${card};
 border:2px solid ${floating};border-radius:${layout.deviceRadius}px}
@@ -520,7 +529,11 @@ async function render({ out }) {
     marketingVersion: marketingVersion(readRepo(PBXPROJ_PATH)),
     gitSha: run('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT }).trim(),
     device: spec.device,
-    pen: { status: spec.pen.status, sectionNodeId: spec.pen.sectionNodeId },
+    pen: {
+      file: spec.pen.file,
+      status: spec.pen.status,
+      sectionNodeId: spec.pen.sectionNodeId,
+    },
     screens,
   };
   writeFileSync(
