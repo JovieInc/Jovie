@@ -159,7 +159,6 @@ describe('UsageMenuItem', () => {
       ).toBeInTheDocument();
     }
   );
-
   it.each(['success', 'failure', 'outside', 'stale'] as const)(
     'preserves intentional focus during retry: %s',
     async outcome => {

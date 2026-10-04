@@ -121,7 +121,6 @@ beforeEach(() => {
   hoisted.getRedisMock.mockReturnValue(null);
   hoisted.readStatusMock.mockResolvedValue(liveStatus(7));
 });
-
 describe('GET /api/chat/usage', () => {
   it('returns 401 when unauthenticated', async () => {
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: null });
@@ -288,7 +287,6 @@ describe('GET /api/chat/usage', () => {
     expect(body.used).toBe(15);
   });
 });
-
 describe('GET /api/chat/usage authoritative snapshots', () => {
   it('reads the enforcement bucket without consuming quota or consulting memory', async () => {
     const redis = cache(null);
@@ -324,7 +322,6 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
       expect(hoisted.readStatusMock).toHaveBeenCalledWith('user_123', plan);
     }
   );
-
   it('preserves absent reset time for intentionally selected unused memory', async () => {
     hoisted.readStatusMock.mockResolvedValue({
       ...liveStatus(15),
@@ -339,6 +336,17 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
   it.each(['billing', 'quota'])(
     'returns validated cached counts, labeled stale, when %s is unavailable',
     async failure => {
+      const cached =
+        failure === 'billing'
+          ? {
+              ...snapshot,
+              plan: 'pro',
+              weeklyLimit: 70,
+              used: 63,
+              warningThreshold: 14,
+              isNearLimit: true,
+            }
+          : snapshot;
       if (failure === 'billing')
         hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
           makeEntitlements({ billingVerification: 'unavailable' })
@@ -348,10 +356,10 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
           available: false,
           backend: 'unavailable',
         });
-      const redis = cache(JSON.stringify(snapshot));
+      const redis = cache(JSON.stringify(cached));
       const response = await request();
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ ...snapshot, _stale: true });
+      expect(await response.json()).toEqual({ ...cached, _stale: true });
       expect(redis.get).toHaveBeenCalledWith('chat:usage:v3:user_123');
       expect(redis.set).not.toHaveBeenCalled();
       if (failure === 'billing')
@@ -425,7 +433,6 @@ describe('GET /api/chat/usage authoritative snapshots', () => {
     redis.set.mockRejectedValue(new Error('cache unavailable'));
     expect((await request()).status).toBe(200);
   });
-
   it('rejects unauthenticated entitlements', async () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
       ...makeEntitlements(),

@@ -194,7 +194,6 @@ describe('SettingsUsageStatsSection', () => {
     );
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
-
   it.each([null, new Error('offline')])(
     'treats missing data as unavailable and supports retry: %s',
     async error => {
@@ -207,7 +206,6 @@ describe('SettingsUsageStatsSection', () => {
       expect(refetch).toHaveBeenCalledOnce();
     }
   );
-
   it('shows one status, count, remaining balance, real reset and existing plan control', () => {
     mockUsage();
     render(<SettingsUsageStatsSection />);
@@ -230,7 +228,6 @@ describe('SettingsUsageStatsSection', () => {
     ).toBeNull();
     expect(screen.getByText(/^Resets /)).toBeInTheDocument();
   });
-
   it.each([{ _stale: true }, { error: new Error('refresh failed') }])(
     'labels cached observations and retries without asserting current status: %j',
     async state => {
@@ -250,7 +247,6 @@ describe('SettingsUsageStatsSection', () => {
       expect(refetch).toHaveBeenCalledOnce();
     }
   );
-
   it('retains the last known counts and focus while a retry fails, then accepts background recovery without stealing focus', async () => {
     const user = userEvent.setup();
     let resolveRetry!: (value: { data: ChatUsageData; error: Error }) => void;
