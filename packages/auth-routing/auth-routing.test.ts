@@ -4,6 +4,7 @@ import {
   buildDesktopAuthLoopbackUrl,
   buildElectronAuthCompleteUrl,
   buildIosAuthCompleteUrl,
+  buildIosUniversalAuthCompleteUrl,
   buildNativeExchangeCodeRecord,
   buildNativeHandbackBouncePath,
   classifyNavigation,
@@ -11,6 +12,7 @@ import {
   createAuthStateRecord,
   getElectronAuthCompleteProtocolForOrigin,
   isAllowlistedNativeHandbackUrl,
+  isValidNativeAttempt,
   NATIVE_HANDBACK_BOUNCE_PATHS,
   parseDesktopLoopbackPortParam,
   resolveAuthCallback,
@@ -569,4 +571,99 @@ describe('auth routing boundary', () => {
       returnPath: '/app/settings',
     });
   });
+  it.each([
+    null,
+    '',
+    'a'.repeat(42),
+    'a'.repeat(44),
+    '+'.repeat(43),
+    ' '.repeat(43),
+    `${'a'.repeat(43)}\n`,
+  ])(
+    'rejects malformed attempt %s without downgrading to legacy',
+    nativeAttempt => {
+      expect(isValidNativeAttempt('ios', nativeAttempt)).toBe(false);
+    }
+  );
+
+  it('carries iOS correlation through every handback builder and preserves legacy omission', () => {
+    const nativeAttempt = 'a'.repeat(43);
+    const start = {
+      baseUrl: 'https://jov.ie',
+      client: 'ios' as const,
+      intent: 'sign_in' as const,
+      returnTo: '/app',
+      nativeAttempt,
+    };
+    const stateRecord = createAuthStateRecord({
+      ...start,
+      state: 'state',
+      now: 1,
+    });
+    const handback = { code: 'code', state: 'state', nativeAttempt };
+    const urls = [
+      buildAuthStartUrl(start),
+      buildIosAuthCompleteUrl(handback),
+      buildIosUniversalAuthCompleteUrl({
+        ...handback,
+        origin: 'https://jov.ie',
+      }),
+      buildNativeHandbackBouncePath({ ...handback, client: 'ios' }),
+      resolveAuthCallback({ stateRecord, exchangeCode: 'code' }).redirectUrl,
+    ];
+    for (const url of urls) {
+      expect(
+        new URL(url, 'https://jov.ie').searchParams.getAll('native_attempt')
+      ).toEqual([nativeAttempt]);
+    }
+    expect(
+      createAuthStateRecord({
+        ...start,
+        nativeAttempt: undefined,
+        state: 's',
+        now: 1,
+      })
+    ).not.toHaveProperty('nativeAttempt');
+    for (const client of ['web', 'electron'] as const) {
+      expect(() => buildAuthStartUrl({ ...start, client })).toThrow(
+        'Invalid native_attempt'
+      );
+    }
+  });
+
+  it.each([
+    [undefined, 'a'.repeat(43)],
+    ['a'.repeat(43), undefined],
+    ['a'.repeat(43), 'b'.repeat(43)],
+  ])(
+    'rejects attempt mismatch %s / %s before PKCE',
+    (storedAttempt, nativeAttempt) => {
+      const record = buildNativeExchangeCodeRecord({
+        code: 'code',
+        client: 'ios',
+        state: 'state',
+        userId: 'user',
+        returnTo: '/app',
+        codeChallenge: 'challenge',
+        nativeAttempt: storedAttempt,
+        now: 1,
+      });
+      let challengeCalls = 0;
+      const result = validateNativeExchange({
+        record,
+        client: 'ios',
+        code: 'code',
+        state: 'state',
+        nativeAttempt,
+        codeVerifier: 'v',
+        now: 2,
+        createCodeChallenge: () => {
+          challengeCalls++;
+          return 'challenge';
+        },
+      });
+      expect(result).toEqual({ ok: false, reason: 'wrong_attempt' });
+      expect(challengeCalls).toBe(0);
+    }
+  );
 });

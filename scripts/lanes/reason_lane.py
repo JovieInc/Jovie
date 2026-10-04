@@ -629,12 +629,26 @@ def render_comment(record: dict, proposal: dict | None, review: dict | None, res
 
 
 def write_gbrain(slug: str, title: str, body: str, run=subprocess.run) -> bool:
+    """Stored means read back with the body in it (JOV-7715). The page goes on stdin, which
+    both the gbrain CLI and Gem's MCP wrapper read (the wrapper ignored `--content` and stored
+    an empty page). Exit codes are advisory: the wrapper exits 0 on a failed call and the CLI
+    can hang after a successful write, so only the read-back proves the memo exists."""
     page = f"---\ntype: decision\ntitle: {json.dumps(title[:150])}\ntags: [summer, reasoning-router]\n---\n\n{body}\n"
+    lines = [" ".join(line.split()) for line in body.splitlines() if line.strip()]
+    if not lines:
+        return False
     try:
-        return run(["gbrain", "put", slug, "--content", page], capture_output=True, text=True,
-                   timeout=120).returncode == 0
+        run(["gbrain", "put", slug], input=page, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        pass
+    except OSError:
+        return False
+    try:
+        stored = run(["gbrain", "get", slug], capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return False
+    text = " ".join((stored.stdout or "").split())
+    return stored.returncode == 0 and lines[0] in text and lines[-1] in text
 
 
 # ---------------------------------------------------------------- one job

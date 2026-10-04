@@ -1,3 +1,4 @@
+import * as authRouting from '@jovie/auth-routing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
@@ -39,7 +40,7 @@ async function createSealedAuthState(): Promise<string> {
 }
 
 async function createSealedNativeExchange(
-  overrides: { code?: string; ott?: string | null } = {}
+  overrides: { code?: string; ott?: string | null; nativeAttempt?: string } = {}
 ): Promise<string> {
   const { createStoredNativeExchangeCode } = await modulePromise;
   await createStoredNativeExchangeCode({
@@ -50,6 +51,7 @@ async function createSealedNativeExchange(
     returnTo: '/app',
     codeChallenge: 'challenge',
     ott: overrides.ott ?? null,
+    nativeAttempt: overrides.nativeAttempt,
     now: 1_000,
   });
   return hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
@@ -452,4 +454,150 @@ describe('auth routing state store', () => {
       expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
     });
   });
+  it('round trips correlated state through sealed read and consume', async () => {
+    const {
+      createStoredAuthState,
+      readStoredAuthState,
+      consumeStoredAuthState,
+    } = await modulePromise;
+    const nativeAttempt = 'a'.repeat(43);
+    await createStoredAuthState({
+      client: 'ios',
+      intent: 'sign_in',
+      returnTo: '/app',
+      state: 'state_123',
+      nativeAttempt,
+      now: 1_000,
+    });
+    const value = hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
+    expect(value).not.toContain(nativeAttempt);
+    hoisted.findVerificationValue.mockResolvedValue(verification(value));
+    hoisted.consumeVerificationValue.mockResolvedValue(verification(value));
+    const input = { state: 'state_123', now: 2_000 };
+    expect(await readStoredAuthState(input)).toMatchObject({ nativeAttempt });
+    expect(await consumeStoredAuthState(input)).toMatchObject({
+      nativeAttempt,
+    });
+  });
+
+  it.each([undefined, 'b'.repeat(43)])(
+    'preserves a correlated row after mismatched attempt %s',
+    async nativeAttempt => {
+      const { consumeStoredNativeExchangeCode } = await modulePromise;
+      const storedAttempt = 'a'.repeat(43);
+      const value = await createSealedNativeExchange({
+        nativeAttempt: storedAttempt,
+      });
+      hoisted.findVerificationValue.mockResolvedValue(verification(value));
+      hoisted.consumeVerificationValue.mockResolvedValue(verification(value));
+      const input = {
+        client: 'ios' as const,
+        code: 'code_123',
+        state: 'state_123',
+        codeVerifier: 'verifier',
+        now: 2_000,
+        createCodeChallenge: vi.fn(() => 'challenge'),
+      };
+      expect(
+        await consumeStoredNativeExchangeCode({ ...input, nativeAttempt })
+      ).toEqual({
+        ok: false,
+        reason: 'wrong_attempt',
+        exchangePhase: 'preconsume',
+      });
+      expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
+      expect(input.createCodeChallenge).not.toHaveBeenCalled();
+      expect(
+        await consumeStoredNativeExchangeCode({
+          ...input,
+          nativeAttempt: storedAttempt,
+        })
+      ).toMatchObject({ ok: true });
+      expect(hoisted.consumeVerificationValue).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not mark a postconsume attempt mismatch as preliminary', async () => {
+    const { consumeStoredNativeExchangeCode } = await modulePromise;
+    const nativeAttempt = 'a'.repeat(43);
+    const before = await createSealedNativeExchange({ nativeAttempt });
+    const after = await createSealedNativeExchange({
+      nativeAttempt: 'b'.repeat(43),
+    });
+    hoisted.findVerificationValue.mockResolvedValue(verification(before));
+    hoisted.consumeVerificationValue.mockResolvedValue(verification(after));
+    expect(
+      await consumeStoredNativeExchangeCode({
+        client: 'ios',
+        code: 'code_123',
+        state: 'state_123',
+        nativeAttempt,
+        codeVerifier: 'v',
+        now: 2_000,
+        createCodeChallenge: () => 'challenge',
+      })
+    ).toEqual({ ok: false, reason: 'wrong_attempt' });
+    expect(hoisted.consumeVerificationValue).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, '', 4, 'a'.repeat(42)])(
+    'rejects malformed sealed attempt %s',
+    async nativeAttempt => {
+      const store = await modulePromise;
+      const state = authRouting.createAuthStateRecord({
+        client: 'ios',
+        intent: 'sign_in',
+        returnTo: '/app',
+        state: 'state_123',
+        now: 1_000,
+      });
+      const stateSpy = vi
+        .spyOn(authRouting, 'createAuthStateRecord')
+        .mockReturnValueOnce({
+          ...state,
+          nativeAttempt,
+        } as unknown as authRouting.AuthStateRecord);
+      await store.createStoredAuthState(state);
+      stateSpy.mockRestore();
+      const stateValue =
+        hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
+      hoisted.findVerificationValue.mockResolvedValue(verification(stateValue));
+      expect(
+        await store.readStoredAuthState({ state: 'state_123', now: 2_000 })
+      ).toBeNull();
+      const record = authRouting.buildNativeExchangeCodeRecord({
+        client: 'ios',
+        code: 'code_123',
+        state: 'state_123',
+        userId: 'user',
+        returnTo: '/app',
+        now: 1_000,
+      });
+      const codeSpy = vi
+        .spyOn(authRouting, 'buildNativeExchangeCodeRecord')
+        .mockReturnValueOnce({
+          ...record,
+          nativeAttempt,
+        } as unknown as authRouting.NativeExchangeCodeRecord);
+      await store.createStoredNativeExchangeCode(record);
+      codeSpy.mockRestore();
+      const value =
+        hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
+      hoisted.findVerificationValue.mockResolvedValue(verification(value));
+      expect(
+        await store.consumeStoredNativeExchangeCode({
+          client: 'ios',
+          code: 'code_123',
+          state: 'state_123',
+          now: 2_000,
+          createCodeChallenge: () => 'challenge',
+        })
+      ).toEqual({
+        ok: false,
+        reason: 'missing',
+        exchangePhase: 'preconsume',
+      });
+      expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
+    }
+  );
 });

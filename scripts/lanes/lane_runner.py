@@ -111,6 +111,13 @@ LANE_BRANCH = re.compile(
 )
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
+# JOV-7690: a recovery-handoff run does no work, so the issue backs off exponentially
+# (5 min doubling to 6 h) instead of being re-claimed on the next reexec. Linear hears
+# about the first handoff and once more at HANDOFF_COMMENT_AT, never once per loop.
+HANDOFF_BACKOFF_S = 300
+HANDOFF_BACKOFF_CAP_S = 6 * 3600
+HANDOFF_COMMENT_AT = 3
+PRESERVED_RUN_NAME = re.compile(r"^\d{8}T\d{6}Z-(?P<issue>[A-Z]+-\d+)-")
 # JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
 # new issues and only fixes/adopts what it already opened.
 OPEN_PRS_PER_SLOT = 2
@@ -615,19 +622,22 @@ def admission_order(issue: Issue, now: float) -> tuple:
 
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset(), provider: str | None = None,
-               holds: dict[str, int] | None = None) -> Issue | None:
+               holds: dict[str, int] | None = None,
+               held_back: frozenset[str] = frozenset()) -> Issue | None:
     """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
     sustained stream of newer urgent work from starving older work. Excluded work,
     3x failures, retry backoff, issues with an open lane PR, duplicate candidates and
-    issues aimed at a held hotspot (pool_rejections) remain ineligible.
+    issues aimed at a held hotspot (pool_rejections) remain ineligible, as do issues
+    with preserved work or a recovery-handoff cooldown (held_back, JOV-7690).
     """
     now = time.time() if now is None else now
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
     duplicates = pool_rejections(issues, holds)
     eligible = [issue for issue in issues
                 if issue.identifier not in duplicates
+                and issue.identifier not in held_back
                 and admission_rejection(issue, failures, now, in_flight, provider) is None]
     eligible.sort(key=lambda issue: admission_order(issue, now))
     return eligible[0] if eligible else None
@@ -3016,10 +3026,13 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
     data = load_escalation(host)
     events = data.get("events") or {}
     now = time.time()
+    held_back = held_back_issues(host, now)
     for row in events.values():
         if not isinstance(row, dict):
             continue
         if row.get("status") != "claimed" or row.get("lane") != name or row.get("running"):
+            continue
+        if row.get("identifier") in held_back:
             continue
         if not row.get("issueId"):
             continue
@@ -3453,6 +3466,50 @@ def receipt_worktree_paths(prior, path):
     if any(value is not None and (not isinstance(value, str) or not value) for value in paths):
         raise RecoveryHandoff("preserved-ledger-path-invalid", path)
     return paths
+
+
+def handoff_cooldown_path(host: Host) -> Path:
+    return host.state / "handoff-cooldown.json"
+
+
+def note_recovery_handoff(host: Host, identifier: str, now: float | None = None) -> dict:
+    """Count one recovery-handoff for an issue and start its capped exponential cooldown."""
+    now = time.time() if now is None else now
+    noted: dict = {}
+
+    def bump(data: dict) -> None:
+        row = data.get(identifier) if isinstance(data.get(identifier), dict) else {}
+        count = int(row.get("count") or 0) + 1
+        until = now + min(HANDOFF_BACKOFF_S * 2 ** (count - 1), HANDOFF_BACKOFF_CAP_S)
+        data[identifier] = {"count": count, "until": until}
+        noted.update(count=count, until=until, comment=count in (1, HANDOFF_COMMENT_AT))
+    update_json(handoff_cooldown_path(host), bump)
+    return noted
+
+
+def held_back_issues(host: Host, now: float | None = None) -> frozenset[str]:
+    """Issues no lane may claim: an unexpired handoff cooldown, or a preserved worktree that
+    names the issue (in its marker, or in its canonical run directory name). run_issue would
+    only hand those back, so claiming them burns a slot and a Linear write per loop."""
+    now = time.time() if now is None else now
+    try:
+        cooldowns = json.loads(handoff_cooldown_path(host).read_text())
+    except (OSError, ValueError):
+        cooldowns = {}
+    held = {identifier for identifier, row in (cooldowns if isinstance(cooldowns, dict) else {}).items()
+            if isinstance(row, dict) and isinstance(row.get("until"), (int, float)) and row["until"] > now}
+    for marker_path in (host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}"):
+        try:
+            marker = json.loads(marker_path.read_text())
+        except (OSError, ValueError):
+            marker = None
+        named = marker.get("issue") if isinstance(marker, dict) else None
+        run_name = PRESERVED_RUN_NAME.match(marker_path.parent.name)
+        if isinstance(named, str) and named:
+            held.add(named)
+        elif run_name:
+            held.add(run_name.group("issue"))
+    return frozenset(held)
 
 
 def preserved_run(host: Host, *, pr=None, issue=None):
@@ -4454,10 +4511,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
     claim = Locked(host.state / "claim.lock", blocking=True)
-    # The claim lock serializes the scan, so the shared cache fill happens once. A rate
-    # limit skips the API for every worker until the cooldown file expires.
-    red = adopt = issue = None
-    rate_limited = False
     try:
         ready_candidates = fix_candidates(name) if remediation.escalation_enabled() else []
     finally:
@@ -4492,13 +4545,14 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             pool = linear.lane_issues(spec["label"])
             holds = open_hotspot_holds()
+            held_back = held_back_issues(host)
             overlap_inventory_rows = overlap_inventory(host, linear)
             overlap_unreadable = overlap_inventory_rows is None
             overlap_prs, overlap_tasks = overlap_inventory_rows or ([], [])
             while pool and not overlap_unreadable:
                 issue = design_gate.pick_build_issue(
                     pool, failures, in_flight=in_flight, provider=name,
-                    pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, **kwargs),
+                    pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, held_back=held_back, **kwargs),
                     linear=linear, repo=host.repo)
                 if issue is None:
                     break
@@ -4566,9 +4620,14 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     if verdict == "recovery-handoff":
         linear.move(issue.id, "Backlog")
         handoff = receipt["recovery"]
-        linear.comment(issue.id, f"Preserved work retained at `{handoff['worktree']}`. "
-                                 f"Recovery owner: {handoff['owner']}; reason: {handoff['reason']}. "
-                                 f"{handoff['nextAction']}")
+        noted = note_recovery_handoff(host, issue.identifier)
+        if noted["comment"]:
+            repeat = (f" Handed back {noted['count']} times; claims back off up to "
+                      f"{HANDOFF_BACKOFF_CAP_S // 3600}h and stay silent until reconciled."
+                      if noted["count"] > 1 else "")
+            linear.comment(issue.id, f"Preserved work retained at `{handoff['worktree']}`. "
+                                     f"Recovery owner: {handoff['owner']}; reason: {handoff['reason']}. "
+                                     f"{handoff['nextAction']}{repeat}")
         slot.release()
         return reexec(host, name)
     if verdict == "quarantined":

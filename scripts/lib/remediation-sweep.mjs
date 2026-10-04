@@ -1,3 +1,4 @@
+import { planDomainExpiry } from './domain-expiry.mjs';
 import { HOLD_LABELS } from './merge-group-member-policy.mjs';
 
 export const DRAFT_ROLLUP_MIN = 20;
@@ -25,6 +26,7 @@ export const VERCEL_TOKEN_MISSING_WARNING =
 
 const MODES = new Set([
   'all',
+  'domains',
   'drafts',
   'exhausted',
   'holds',
@@ -336,6 +338,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any[]>} [options.loadPulls]
  * @param {() => Promise<any>} [options.loadHealth]
  * @param {() => Promise<any>} [options.loadDeployments]
+ * @param {() => Promise<any[]>} [options.loadDomains]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -347,6 +350,7 @@ export async function runRemediationSweep({
   loadPulls,
   loadHealth,
   loadDeployments,
+  loadDomains,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -392,6 +396,22 @@ export async function runRemediationSweep({
         const plan = planVercelFailure(project, loaded?.deployment ?? loaded);
         if (plan) plans.push(plan);
       }
+    }
+  }
+  if (includesMode(mode, 'domains')) {
+    const records = await loadDomains();
+    const unobserved = records.filter(record => !record.observed);
+    if (unobserved.length === records.length) {
+      throw new Error(
+        'whois and RDAP read no company domain; the reader is broken'
+      );
+    }
+    for (const record of unobserved) {
+      warnings.push(`No whois or RDAP expiry for ${record.domain}; not judged`);
+    }
+    for (const record of records) {
+      const plan = planDomainExpiry(record, nowMs);
+      if (plan) plans.push(plan);
     }
   }
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });

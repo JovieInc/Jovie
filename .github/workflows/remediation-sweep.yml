@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: A hosted schedule reads pull requests, public Summer health, and an optional read-only Vercel deployment list, then files or reopens Linear issues. It never closes, edits, or labels pull requests.
+# necessary-trust-boundary: A hosted schedule reads pull requests, public Summer health, public whois/RDAP for company domains, and an optional read-only Vercel deployment list, then files or reopens Linear issues. It never closes, edits, or labels pull requests.
 # removal-trigger: Remove when the lanes host files these same fingerprinted remediation issues on the event that makes each condition true.
 name: Remediation Sweep
 
@@ -8,6 +8,7 @@ name: Remediation Sweep
 # JOV-7552: age is the signal. Drafts, exhausted labels, idle holds, and
 # Summer receipts are stale only after a deadline. Vercel production ERROR
 # has no repository event, so the same daily read is the reconciliation.
+# Domain expiry is a calendar deadline too: jov.ie lapsed on 2025-11-23.
 
 on:
   schedule:
@@ -50,6 +51,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
 
+      - name: Install whois
+        run: command -v whois >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq whois)
+
       - name: File returning conditions
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,4 +80,5 @@ jobs:
             run_mode holds
             run_mode summer
             run_mode vercel
+            run_mode domains
           fi

@@ -1676,6 +1676,62 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse(lane.failures_path(self.host).exists())
         self.assertEqual(len(self.execs), 1)
 
+    def test_recovery_handoff_loop_backs_off_and_comments_once_jov_7690(self):
+        # Replays JOV-7658 (2026-10-03): 95 claim -> recovery-handoff -> reexec cycles about
+        # 2 s apart, one Linear move and comment each, until Linear rate-limited the pool.
+        handoff = lane.RecoveryHandoff("preserved-issue-needs-execution-reconciliation", Path("/retained"), "JOV-3")
+        runs = []
+        lane.run_issue = lambda *args: runs.append(args[-1].identifier) or {
+            "verdict": "recovery-handoff", "recovery": handoff.evidence}
+        cooldowns = lane.handoff_cooldown_path(self.host)
+        for _ in range(5):  # the hot loop: every reexec rescans immediately
+            lane.worker(self.host, "devin")
+        self.assertEqual(runs, ["JOV-3"], "a cooling issue is not re-claimed")
+        row = json.loads(cooldowns.read_text())["JOV-3"]
+        self.assertEqual(row["count"], 1)
+        self.assertAlmostEqual(row["until"] - time.time(), lane.HANDOFF_BACKOFF_S, delta=30)
+        spans = []
+        # Freeze the clock: the span is the backoff the note wrote, not worker wall time.
+        with patch("time.time", return_value=1_000_000_000.0):
+            for _ in range(5):  # each cooldown expiry admits exactly one more claim
+                data = json.loads(cooldowns.read_text()); before = data["JOV-3"]["count"]
+                data["JOV-3"]["until"] = 0; cooldowns.write_text(json.dumps(data))
+                start = time.time()
+                lane.worker(self.host, "devin"); lane.worker(self.host, "devin")
+                row = json.loads(cooldowns.read_text())["JOV-3"]
+                self.assertEqual(row["count"], before + 1)
+                spans.append(round(row["until"] - start, -1))
+        self.assertEqual(len(runs), 6)
+        self.assertEqual(spans, [600, 1200, 2400, 4800, 9600])
+        self.assertEqual(lane.HANDOFF_BACKOFF_CAP_S, 21600)
+        handoff_comments = [body for _, body in self.linear.comments if "Preserved work retained" in body]
+        self.assertEqual(len(handoff_comments), 2, "first handoff and the Nth, never one per loop")
+        self.assertIn(f"Handed back {lane.HANDOFF_COMMENT_AT} times", handoff_comments[1])
+        self.assertFalse(lane.failures_path(self.host).exists())
+        self.assertEqual(lane.note_recovery_handoff(self.host, "JOV-9", now=0)["until"], 300)
+        for _ in range(20): capped = lane.note_recovery_handoff(self.host, "JOV-9", now=0)
+        self.assertEqual(capped["until"], lane.HANDOFF_BACKOFF_CAP_S)
+
+    def test_preserved_work_holds_its_issue_out_of_every_claim_path_jov_7690(self):
+        worktrees = self.host.state / "worktrees"
+        named = worktrees / "20261003T163759Z-JOV-7658-devin-0816ea"
+        unnamed = worktrees / "20261003T183421Z-JOV-7632-devin-50b668"  # marker issue: null
+        for path, marker_issue in ((named, "JOV-7658"), (unnamed, None)):
+            path.mkdir(parents=True)
+            (path / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps(
+                {"schema": "jovie-preserved-repair/v1", "runId": path.name, "pr": None, "issue": marker_issue}))
+        (worktrees / "20261003T000000Z-JOV-5-devin-aaaaaa").mkdir()  # no marker: claimable
+        held = lane.held_back_issues(self.host)
+        self.assertEqual(held, frozenset({"JOV-7658", "JOV-7632"}))
+        pool = [issue("JOV-7658", priority=1), issue("JOV-7632", priority=1), issue("JOV-5", priority=3)]
+        self.assertEqual(lane.pick_issue(pool, {}, held_back=held).identifier, "JOV-5")
+        self.assertEqual(lane.pick_issue(pool, {}).identifier, "JOV-7658", "default stays unchanged")
+        lane.save_escalation(self.host, {"events": {"disk-low": {
+            "status": "claimed", "lane": "devin", "running": False, "issueId": "id-JOV-7658",
+            "identifier": "JOV-7658", "title": "t"}}})
+        self.assertIsNone(lane.claim_labeled_event(self.host, "devin", self.linear))
+        self.assertFalse(lane.load_escalation(self.host)["events"]["disk-low"].get("running"))
+
     def test_failures_retry_then_return_to_triage(self):
         lane.run_issue = lambda *a: {"verdict": "held", "reasons": ["code-change-without-test"]}
         for _ in range(3):
@@ -3539,7 +3595,7 @@ class UpdateTest(unittest.TestCase):
 
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
-            tmp = Path(tmp)
+            tmp = Path(tmp).resolve()  # macOS /var -> /private/var must match .resolve() below
             origin, clone = tmp / "origin.git", tmp / "clone"
             self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
             self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
