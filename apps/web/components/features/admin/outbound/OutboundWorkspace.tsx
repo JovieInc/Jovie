@@ -37,12 +37,14 @@ import {
   useOutboundDecisionMutation,
   useOutboundFactReviewMutation,
   useOutboundQueueQuery,
+  useOutboundReadinessQuery,
   useOutboundRefreshEvidenceMutation,
 } from '@/lib/queries/useOutboundQuery';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import { OutboundRail } from './OutboundRail';
+import { OutboundReadinessPanel } from './OutboundReadinessPanel';
 import {
   isTypingTarget,
   resolveOutboundKey,
@@ -209,6 +211,8 @@ export function OutboundWorkspace() {
   // mutateAsync is stable; the mutation result object is not.
   const { mutateAsync: decide } = useOutboundDecisionMutation();
   const [view, setView] = useState<OutboundView>('ready');
+  const [showReadiness, setShowReadiness] = useState(false);
+  const readiness = useOutboundReadinessQuery();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [bulk, setBulk] = useState<ReadonlySet<string>>(new Set());
@@ -552,6 +556,21 @@ export function OutboundWorkspace() {
               >
                 {bulk.size ? `${bulk.size} selected · h hold · r reject` : ''}
               </span>
+              <PageToolbarTabButton
+                active={showReadiness}
+                onClick={() => setShowReadiness(current => !current)}
+                label={
+                  <span
+                    className='whitespace-nowrap tabular-nums'
+                    data-testid='outbound-readiness-toggle'
+                  >
+                    Readiness{' '}
+                    {readiness.data
+                      ? `${readiness.data.ready}/${readiness.data.total}`
+                      : ''}
+                  </span>
+                }
+              />
               <PageToolbarActionButton
                 label='Refresh'
                 ariaLabel='Refresh Outbound'
@@ -562,7 +581,10 @@ export function OutboundWorkspace() {
                 }
                 iconOnly
                 disabled={query.isFetching}
-                onClick={() => void query.refetch()}
+                onClick={() => {
+                  void query.refetch();
+                  void readiness.refetch();
+                }}
                 icon={
                   <RefreshCw
                     className={cn(
@@ -575,6 +597,15 @@ export function OutboundWorkspace() {
             </>
           }
         />
+        {showReadiness ? (
+          <div className='max-h-96 min-h-0 overflow-y-auto border-b border-(--app-shell-frame-seam)'>
+            <OutboundReadinessPanel
+              readiness={readiness.data}
+              isLoading={readiness.isLoading}
+              isError={readiness.isError}
+            />
+          </div>
+        ) : null}
         <AdminTableShell testId='ovie-outbound-table'>
           {() => (
             <AdminDataTable
