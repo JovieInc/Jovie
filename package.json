@@ -131,6 +131,7 @@
     "auth:redirect-uris": "tsx scripts/auth-redirect-uris.ts",
     "check:summer-eve-pin": "tsx scripts/check-summer-eve-pin.ts",
     "factory:truth-sync": "pnpm --filter @jovie/web exec tsx scripts/factory-truth-sync.ts",
+    "factory:calibrate-judges": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/judge-calibration.ts",
     "factory:run": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/run.ts",
     "factory:verify": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/verify.ts",
     "brand:generate": "tsx scripts/generate-brand-assets.ts",

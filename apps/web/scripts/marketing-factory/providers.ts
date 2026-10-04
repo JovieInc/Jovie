@@ -17,6 +17,7 @@ import type {
   ImageGenerationRequest,
 } from '../marketing-media/image-adapter';
 import type { FactoryPageBrief } from './brief';
+import { failedCalibrationJudges } from './judge-calibration';
 import { FACTORY_RUNS_DIR } from './receipts';
 import {
   fixtureCaptures,
@@ -255,7 +256,11 @@ export function liveProviders(
     async reviewVisual(request) {
       return runVisualReview(
         request,
-        await liveVisualJudges(transport, request.producerModel)
+        await liveVisualJudges(
+          transport,
+          request.producerModel,
+          failedCalibrationJudges()
+        )
       );
     },
     async generateAsset() {
