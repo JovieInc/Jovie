@@ -1,12 +1,14 @@
 import 'server-only';
 
 import {
+  type ArtistCandidate,
   type CatalogTrack,
   type InHouseEntityKind,
   type InHouseQuery,
   type InHouseResolution,
   type InHouseSources,
   type ResolutionCandidate,
+  type ResolvedArtistMetadata,
   type ResolvedDspLink,
 } from './in-house-contracts';
 
@@ -84,6 +86,7 @@ function finish(
     readonly isrc: string | null;
     readonly upc: string | null;
     readonly mbid: string | null;
+    readonly artistMetadata?: ResolvedArtistMetadata;
   },
   links: readonly ResolvedDspLink[],
   candidates: readonly ResolutionCandidate[] = []
@@ -103,7 +106,12 @@ function finish(
     0
   );
   return {
-    status: unique.length === 0 && status === 'resolved' ? 'no_match' : status,
+    status:
+      unique.length === 0 &&
+      status === 'resolved' &&
+      !(kind === 'artist' && entity.mbid)
+        ? 'no_match'
+        : status,
     kind,
     title: entity.title,
     artist: entity.artist,
@@ -117,6 +125,7 @@ function finish(
       unique.map(link => [link.provider, link.provenance])
     ),
     candidateCount: Math.max(candidates.length, unique.length),
+    ...(entity.artistMetadata ? { artistMetadata: entity.artistMetadata } : {}),
   };
 }
 
@@ -167,7 +176,7 @@ async function resolveTrack(
     );
   }
   if ('url' in query) {
-    const direct = await sources.trackByUrl(query.url);
+    const direct = await sources.trackByUrl(query.url, query.territory);
     if (!direct) return empty('track', 'no_match');
     const seed: ResolvedDspLink[] = [
       {
@@ -193,7 +202,7 @@ async function resolveTrack(
       links
     );
   }
-  const hits = await sources.searchTracks(query.artist, query.title);
+  const hits = await sources.searchTracks(query.artist, query.title, territory);
   const exact = hits.filter(
     hit =>
       sameCatalogName(hit.artist, query.artist) &&
@@ -267,7 +276,7 @@ async function resolveAlbum(
   sources: InHouseSources
 ): Promise<InHouseResolution> {
   if ('upc' in query) {
-    const album = await sources.albumByUpc(query.upc);
+    const album = await sources.albumByUpc(query.upc, territoryOf(query));
     if (!album) return empty('album', 'no_match');
     return finish(
       'album',
@@ -290,7 +299,7 @@ async function resolveAlbum(
     );
   }
   if ('url' in query) {
-    const album = await sources.albumByUrl(query.url);
+    const album = await sources.albumByUrl(query.url, query.territory);
     if (!album) return empty('album', 'no_match');
     return finish(
       'album',
@@ -312,7 +321,11 @@ async function resolveAlbum(
       ]
     );
   }
-  const hits = await sources.searchAlbums(query.artist, query.title);
+  const hits = await sources.searchAlbums(
+    query.artist,
+    query.title,
+    territoryOf(query)
+  );
   const exact = hits.filter(
     hit =>
       sameCatalogName(hit.artist, query.artist) &&
@@ -385,7 +398,9 @@ async function resolveArtist(
   sources: InHouseSources
 ): Promise<InHouseResolution> {
   if ('url' in query) {
-    const artist = await sources.artistByUrl(query.url);
+    const candidates = await sources.artistByUrl(query.url);
+    if (candidates.length > 1) return artistChoices(candidates, null);
+    const artist = candidates[0];
     if (!artist) return empty('artist', 'no_match');
     return finish(
       'artist',
@@ -396,6 +411,7 @@ async function resolveArtist(
         isrc: null,
         upc: null,
         mbid: artist.mbid,
+        artistMetadata: artist.metadata,
       },
       artist.links
     );
@@ -412,6 +428,7 @@ async function resolveArtist(
         isrc: null,
         upc: null,
         mbid: artist.mbid ?? query.mbid,
+        artistMetadata: artist.metadata,
       },
       artist.links
     );
@@ -421,28 +438,33 @@ async function resolveArtist(
     sameCatalogName(candidate.name, query.name)
   );
   if (exact.length === 0) return empty('artist', 'no_match', candidates.length);
-  const mbids = new Set(
-    exact.flatMap(candidate => (candidate.mbid ? [candidate.mbid] : []))
-  );
-  if (mbids.size > 1) {
-    return finish(
-      'artist',
-      'ambiguous',
-      {
-        title: query.name,
-        artist: query.name,
-        isrc: null,
-        upc: null,
-        mbid: null,
-      },
-      [],
-      exact.map(candidate => ({
-        title: candidate.name,
-        artist: candidate.name,
-        url: candidate.url,
-      }))
-    );
+  const groups = new Map<string, ArtistCandidate[]>();
+  for (const candidate of exact) {
+    const linkedIdentity = candidate.mbid
+      ? null
+      : exact.find(
+          known =>
+            known.mbid &&
+            known.links.some(
+              link =>
+                link.provenance === 'musicbrainz_url_rel' &&
+                artistUrlIdentity(link.url) === artistUrlIdentity(candidate.url)
+            )
+        );
+    const key =
+      candidate.mbid ??
+      linkedIdentity?.mbid ??
+      artistUrlIdentity(candidate.url);
+    const group = groups.get(key) ?? [];
+    group.push(candidate);
+    groups.set(key, group);
   }
+  if (groups.size > 1)
+    return artistChoices(
+      [...groups.values()].map(group => group[0]),
+      query.name
+    );
+  const known = exact.find(candidate => candidate.mbid);
   return finish(
     'artist',
     'resolved',
@@ -451,10 +473,60 @@ async function resolveArtist(
       artist: exact[0]?.name ?? query.name,
       isrc: null,
       upc: null,
-      mbid: [...mbids][0] ?? null,
+      mbid: known?.mbid ?? null,
+      artistMetadata: known?.metadata,
     },
     exact.flatMap(candidate => candidate.links)
   );
+}
+
+function artistChoices(
+  candidates: readonly ArtistCandidate[],
+  name: string | null
+): InHouseResolution {
+  return finish(
+    'artist',
+    'ambiguous',
+    {
+      title: name,
+      artist: name,
+      isrc: null,
+      upc: null,
+      mbid: null,
+    },
+    [],
+    candidates.map(candidate => ({
+      title: candidate.name,
+      artist: candidate.name,
+      url: candidate.url,
+    }))
+  );
+}
+
+/** Only provider artist identifiers prove equivalence; a matching name cannot. */
+function artistUrlIdentity(value: string): string {
+  try {
+    const url = new URL(value);
+    if (['itunes.apple.com', 'music.apple.com'].includes(url.hostname)) {
+      const id = /^\/[a-z]{2}\/artist\/(?:[^/]+\/)?(?:id)?(\d+)\/?$/.exec(
+        url.pathname
+      )?.[1];
+      if (id) return `apple_music:${id}`;
+    }
+    if (url.hostname === 'open.spotify.com') {
+      const id = /^\/(?:intl-[a-z]{2}\/)?artist\/([A-Za-z0-9]{22})\/?$/.exec(
+        url.pathname
+      )?.[1];
+      if (id) return `spotify:${id}`;
+    }
+    if (url.hostname === 'www.deezer.com' || url.hostname === 'deezer.com') {
+      const id = /^\/(?:[a-z]{2}\/)?artist\/(\d+)\/?$/.exec(url.pathname)?.[1];
+      if (id) return `deezer:${id}`;
+    }
+    return `${url.origin}${url.pathname.replace(/\/$/, '')}`;
+  } catch {
+    return value;
+  }
 }
 
 async function loadDefaultSources(): Promise<InHouseSources> {

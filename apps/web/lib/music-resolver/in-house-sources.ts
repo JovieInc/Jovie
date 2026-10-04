@@ -1,6 +1,9 @@
 import 'server-only';
 
-import type { MusicBrainzRelation } from '@/lib/dsp-enrichment/types';
+import type {
+  MusicBrainzArtist,
+  MusicBrainzRelation,
+} from '@/lib/dsp-enrichment/types';
 import { getRegistryEntry, PROVIDER_DOMAINS } from '@/lib/dsp-registry';
 
 import {
@@ -9,6 +12,7 @@ import {
   type CatalogTrack,
   type InHouseSources,
   PROVENANCE_CONFIDENCE,
+  type ResolvedArtistMetadata,
   type ResolvedDspLink,
 } from './in-house-contracts';
 
@@ -63,6 +67,93 @@ function providerForListenUrl(value: string): string | null {
   return null;
 }
 
+function providerForExternalUrl(value: string): string | null {
+  const url = new URL(value);
+  return (
+    Object.entries(PROVIDER_DOMAINS).find(
+      ([provider, domains]) =>
+        (provider !== 'youtube_shorts' ||
+          url.pathname.startsWith('/shorts/')) &&
+        domains.some(
+          domain =>
+            url.hostname === domain || url.hostname.endsWith(`.${domain}`)
+        )
+    )?.[0] ?? null
+  );
+}
+
+function artistFromMusicBrainz(artist: MusicBrainzArtist): ArtistCandidate {
+  const links = linksFromRelations(artist.relations);
+  const externalLinks: ResolvedArtistMetadata['externalLinks'] = (
+    artist.relations ?? []
+  ).flatMap(relation => {
+    const url = relation.ended ? null : httpsUrl(relation.url?.resource);
+    return url
+      ? [
+          {
+            url,
+            provider: providerForExternalUrl(url),
+            relationship: relation.type,
+            provenance: 'musicbrainz_url_rel' as const,
+          },
+        ]
+      : [];
+  });
+  return {
+    name: artist.name,
+    mbid: artist.id,
+    url: links[0]?.url ?? `https://musicbrainz.org/artist/${artist.id}`,
+    links,
+    metadata: {
+      source: 'musicbrainz',
+      sourceUrl: `https://musicbrainz.org/artist/${artist.id}`,
+      disambiguation: artist.disambiguation ?? null,
+      aliases: [
+        ...new Set(
+          (artist.aliases ?? []).map(alias => alias.name).filter(Boolean)
+        ),
+      ],
+      type: artist.type ?? null,
+      country: artist.country ?? null,
+      area: artist.area?.name ?? null,
+      origin: artist['begin-area']?.name ?? null,
+      isnis: artist.isnis ?? [],
+      ipis: artist.ipis ?? [],
+      wikidataIds: externalLinks.flatMap(link => {
+        const url = new URL(link.url);
+        const id =
+          url.hostname === 'www.wikidata.org' || url.hostname === 'wikidata.org'
+            ? /^\/wiki\/(Q\d+)\/?$/.exec(url.pathname)?.[1]
+            : null;
+        return id ? [id] : [];
+      }),
+      externalLinks,
+      releaseGroups: (artist['release-groups'] ?? []).map(group => ({
+        mbid: group.id,
+        title: group.title,
+        primaryType: group['primary-type'] ?? null,
+        firstReleaseDate: group['first-release-date'] ?? null,
+      })),
+      releaseGroupsComplete:
+        artist['release-groups'] !== undefined &&
+        artist['release-groups'].length < 25,
+    },
+  };
+}
+
+function isArtistUrl(href: string, provider: string | null): boolean {
+  const url = new URL(href);
+  if (provider === 'spotify')
+    return /^\/(?:intl-[a-z]{2}\/)?artist\/[A-Za-z0-9]{22}\/?$/.test(
+      url.pathname
+    );
+  if (provider === 'apple_music')
+    return /^\/[a-z]{2}\/artist\/(?:[^/]+\/)?(?:id)?\d+\/?$/.test(url.pathname);
+  if (provider === 'deezer')
+    return /^\/(?:[a-z]{2}\/)?artist\/\d+\/?$/.test(url.pathname);
+  return false;
+}
+
 function linkFromRelation(
   relation: MusicBrainzRelation
 ): ResolvedDspLink | null {
@@ -89,10 +180,15 @@ function linksFromRelations(
   });
 }
 
-async function readJson(url: string): Promise<unknown | null> {
+async function readPublicJson(
+  url: string,
+  signal?: AbortSignal
+): Promise<unknown | null> {
   try {
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: signal
+        ? AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), signal])
+        : AbortSignal.timeout(TIMEOUT_MS),
       headers: { accept: 'application/json' },
     });
     if (!response.ok) return null;
@@ -148,12 +244,22 @@ function rows(payload: unknown): Record<string, unknown>[] {
     : [];
 }
 
-async function appleLookup(params: string): Promise<Record<string, unknown>[]> {
-  const payload = await readJson(`https://itunes.apple.com/lookup?${params}`);
+async function readAppleLookup(
+  params: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>[]> {
+  const payload = await readPublicJson(
+    `https://itunes.apple.com/lookup?${params}`,
+    signal
+  );
   return rows(payload);
 }
 
-export function createDefaultInHouseSources(): InHouseSources {
+export function createDefaultInHouseSources(
+  signal?: AbortSignal
+): InHouseSources {
+  const readJson = (url: string) => readPublicJson(url, signal);
+  const appleLookup = (params: string) => readAppleLookup(params, signal);
   return {
     async trackByIsrc(isrc, territory) {
       const {
@@ -214,7 +320,7 @@ export function createDefaultInHouseSources(): InHouseSources {
       }
       return tracks;
     },
-    async trackByUrl(url) {
+    async trackByUrl(url, territory) {
       const provider = providerForListenUrl(url);
       const href = httpsUrl(url);
       if (!provider || !href) return null;
@@ -225,7 +331,7 @@ export function createDefaultInHouseSources(): InHouseSources {
           parsed.pathname.match(/\/(\d+)\/?$/)?.[1];
         if (!id) return null;
         const [row] = await appleLookup(
-          `id=${encodeURIComponent(id)}&entity=song&country=us`
+          `id=${encodeURIComponent(id)}&entity=song&country=${(territory ?? parsed.pathname.split('/')[1] ?? 'US').toLowerCase()}`
         );
         return row ? appleTrack(row) : null;
       }
@@ -267,7 +373,9 @@ export function createDefaultInHouseSources(): InHouseSources {
               name?: string;
               external_ids?: { isrc?: string };
               artists?: Array<{ name?: string }>;
-            }>(`/tracks/${id}`);
+            }>(
+              `/tracks/${id}${territory ? `?market=${territory.toUpperCase()}` : ''}`
+            );
             const title = text(track.name);
             const artist = text(track.artists?.[0]?.name);
             if (title && artist) {
@@ -308,11 +416,11 @@ export function createDefaultInHouseSources(): InHouseSources {
         confidence: PROVENANCE_CONFIDENCE.input_url,
       };
     },
-    async searchTracks(artist, title) {
+    async searchTracks(artist, title, territory = 'US') {
       const term = `${artist} ${title}`;
       const [applePayload, deezerPayload] = await Promise.all([
         readJson(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=8&country=us`
+          `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=8&country=${territory.toLowerCase()}`
         ),
         readJson(
           `https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=8`
@@ -360,9 +468,11 @@ export function createDefaultInHouseSources(): InHouseSources {
       );
       return [...apple, ...deezer];
     },
-    async albumByUpc(upc) {
+    async albumByUpc(upc, territory = 'US') {
       const [appleRows, musicbrainz] = await Promise.all([
-        appleLookup(`upc=${encodeURIComponent(upc)}&entity=album`),
+        appleLookup(
+          `upc=${encodeURIComponent(upc)}&entity=album&country=${territory.toLowerCase()}`
+        ),
         import('@/lib/dsp-enrichment/providers/musicbrainz').then(module =>
           module.lookupMusicBrainzReleaseByBarcode(upc).catch(() => null)
         ),
@@ -385,7 +495,7 @@ export function createDefaultInHouseSources(): InHouseSources {
         confidence: PROVENANCE_CONFIDENCE.musicbrainz_url_rel,
       };
     },
-    async albumByUrl(url) {
+    async albumByUrl(url, territory) {
       const href = httpsUrl(url);
       const provider = href ? providerForListenUrl(href) : null;
       if (!href || !provider) return null;
@@ -393,7 +503,7 @@ export function createDefaultInHouseSources(): InHouseSources {
         const id = new URL(href).pathname.match(/\/(\d+)\/?$/)?.[1];
         if (!id) return null;
         const [row] = await appleLookup(
-          `id=${encodeURIComponent(id)}&entity=album`
+          `id=${encodeURIComponent(id)}&entity=album&country=${(territory ?? new URL(href).pathname.split('/')[1] ?? 'US').toLowerCase()}`
         );
         const album = row ? appleAlbum(row) : null;
         return album
@@ -414,9 +524,9 @@ export function createDefaultInHouseSources(): InHouseSources {
         confidence: PROVENANCE_CONFIDENCE.input_url,
       };
     },
-    async searchAlbums(artist, title) {
+    async searchAlbums(artist, title, territory = 'US') {
       const payload = await readJson(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=album&limit=8&country=us`
+        `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=album&limit=8&country=${territory.toLowerCase()}`
       );
       return rows(payload).flatMap(row => {
         const album = appleAlbum(row);
@@ -435,28 +545,18 @@ export function createDefaultInHouseSources(): InHouseSources {
       const { matchMusicBrainzArtistByName } = await import(
         '@/lib/dsp-enrichment/providers/musicbrainz'
       );
-      const matched = await matchMusicBrainzArtistByName(name).catch(
-        () => null
-      );
+      const matched = await matchMusicBrainzArtistByName(name, signal);
       if (matched?.status === 'ambiguous') {
-        return Array.from({ length: matched.count }, (_, index) => ({
-          name,
-          url: `https://musicbrainz.org/artist/ambiguous-${index}`,
-          mbid: `ambiguous-${index}`,
+        return matched.artists.map(artist => ({
+          name: artist.name,
+          url: `https://musicbrainz.org/artist/${artist.id}`,
+          mbid: artist.id,
           links: [],
         }));
       }
       const candidates: ArtistCandidate[] = [];
       if (matched?.status === 'found') {
-        const homepage = linksFromRelations(matched.artist.relations)[0];
-        candidates.push({
-          name: matched.artist.name,
-          url:
-            homepage?.url ??
-            `https://musicbrainz.org/artist/${matched.artist.id}`,
-          mbid: matched.artist.id,
-          links: linksFromRelations(matched.artist.relations),
-        });
+        candidates.push(artistFromMusicBrainz(matched.artist));
       }
       const applePayload = await readJson(
         `https://itunes.apple.com/search?term=${encodeURIComponent(name)}&entity=musicArtist&limit=5&country=us`
@@ -483,35 +583,93 @@ export function createDefaultInHouseSources(): InHouseSources {
     },
     async artistByUrl(url) {
       const href = httpsUrl(url);
-      const provider = href ? providerForListenUrl(href) : null;
-      if (!href || !provider) return null;
-      return {
-        name: '',
-        url: href,
-        mbid: null,
-        links: [
+      if (!href) return [];
+      const { getMusicBrainzArtist, lookupMusicBrainzArtistsByUrl } =
+        await import('@/lib/dsp-enrichment/providers/musicbrainz');
+      const parsed = new URL(href);
+      const mbid =
+        parsed.hostname === 'musicbrainz.org'
+          ? /^\/artist\/([0-9a-f-]{36})\/?$/i.exec(parsed.pathname)?.[1]
+          : null;
+      if (parsed.hostname === 'musicbrainz.org') {
+        if (!mbid) return [];
+        const artist = await getMusicBrainzArtist(mbid, {
+          includeReleaseGroups: true,
+          signal,
+        });
+        return artist ? [artistFromMusicBrainz(artist)] : [];
+      }
+      const provider = providerForListenUrl(href);
+      // A track or album on a known DSP must not become an artist identity.
+      if (
+        provider &&
+        ['spotify', 'apple_music', 'deezer'].includes(provider) &&
+        !isArtistUrl(href, provider)
+      )
+        return [];
+      const matches = await lookupMusicBrainzArtistsByUrl(href, signal);
+      if (matches.length > 1)
+        return matches.map(artist => ({
+          name: artist.name,
+          mbid: artist.id,
+          url: `https://musicbrainz.org/artist/${artist.id}`,
+          links: [],
+        }));
+      const only = matches[0];
+      if (only) {
+        const artist = await getMusicBrainzArtist(only.id, {
+          includeReleaseGroups: true,
+          waitForQuota: true,
+          signal,
+        });
+        if (!artist) return [];
+        const candidate = artistFromMusicBrainz(artist);
+        return [
           {
-            provider,
-            url: href,
-            provenance: 'input_url',
-            confidence: PROVENANCE_CONFIDENCE.input_url,
+            ...candidate,
+            links: [
+              ...candidate.links,
+              ...(provider && isArtistUrl(href, provider)
+                ? [
+                    {
+                      provider,
+                      url: href,
+                      provenance: 'input_url',
+                      confidence: PROVENANCE_CONFIDENCE.input_url,
+                    },
+                  ]
+                : []),
+            ],
           },
-        ],
-      };
+        ];
+      }
+      if (!provider || !isArtistUrl(href, provider)) return [];
+      return [
+        {
+          name: '',
+          url: href,
+          mbid: null,
+          links: [
+            {
+              provider,
+              url: href,
+              provenance: 'input_url',
+              confidence: PROVENANCE_CONFIDENCE.input_url,
+            },
+          ],
+        },
+      ];
     },
     async artistByMbid(mbid) {
       const { getMusicBrainzArtist } = await import(
         '@/lib/dsp-enrichment/providers/musicbrainz'
       );
-      const artist = await getMusicBrainzArtist(mbid).catch(() => null);
+      const artist = await getMusicBrainzArtist(mbid, {
+        includeReleaseGroups: true,
+        signal,
+      });
       if (!artist) return null;
-      const links = linksFromRelations(artist.relations);
-      return {
-        name: artist.name,
-        url: links[0]?.url ?? `https://musicbrainz.org/artist/${artist.id}`,
-        mbid: artist.id,
-        links,
-      };
+      return artistFromMusicBrainz(artist);
     },
     async urlRelsForIsrc(isrc) {
       const { lookupMusicBrainzRecordingUrlRels } = await import(
