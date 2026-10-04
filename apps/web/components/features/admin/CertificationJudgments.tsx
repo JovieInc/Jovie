@@ -86,7 +86,7 @@ function JudgmentRow({
 
   return (
     <ShellListRowFrame
-      className='px-3 py-2.5'
+      className='px-3 py-2'
       data-testid={`needs-you-judgment-${item.subject.id}`}
     >
       <div className='flex items-start gap-3'>

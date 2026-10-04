@@ -216,6 +216,7 @@ export const ServerEnvSchema = z.object({
   // Stripe price IDs for Max tier (amounts in lib/config/plan-prices.ts)
   STRIPE_PRICE_MAX_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_MAX_YEARLY: z.string().startsWith('price_').optional(),
+  VISIBILITY_AUDIT_PAYMENT_LINK_URL: z.string().optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
@@ -598,6 +599,7 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_GROWTH_YEARLY',
   'STRIPE_PRICE_MAX_MONTHLY',
   'STRIPE_PRICE_MAX_YEARLY',
+  'VISIBILITY_AUDIT_PAYMENT_LINK_URL',
   'INGESTION_CRON_SECRET',
   'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',

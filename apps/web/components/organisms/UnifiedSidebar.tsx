@@ -32,6 +32,12 @@ import {
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import {
+  SHELL_RAIL_ALLOCATION,
+  SHELL_RAIL_BLOCK_LABEL,
+  SHELL_RAIL_LABEL,
+  SHELL_RAIL_STAGE,
+} from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
@@ -138,7 +144,12 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
     >
       {OPERATOR_NAV_SECTIONS.map(section => (
         <div key={section.label}>
-          <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+          <span
+            className={cn(
+              'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+              SHELL_RAIL_BLOCK_LABEL
+            )}
+          >
             {section.label}
           </span>
           <SettingsNavGroup
@@ -209,13 +220,23 @@ function SettingsNavigation({
       className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
       <div>
-        <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+        <span
+          className={cn(
+            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            SHELL_RAIL_BLOCK_LABEL
+          )}
+        >
           Account
         </span>
         <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+        <span
+          className={cn(
+            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            SHELL_RAIL_BLOCK_LABEL
+          )}
+        >
           Artist
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
@@ -249,7 +270,12 @@ function SidebarHeaderNav({
 
   return (
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
-      <div className='min-w-0 flex-1'>
+      {/* In the 52px icon rail the whole brand/action cluster stages out
+          (max-width → 0, fade, 6px drift) while the collapse toggle — ordered
+          first and centered — stays reachable. Before this, the fixed-width
+          chrome pushed the toggle past the clipped rail edge and the sidebar
+          could not be reopened from the rail itself (JOV-4522). */}
+      <div className={cn('min-w-0 flex-1', SHELL_RAIL_STAGE)}>
         {(() => {
           if (isRouteSidebar) {
             return (
@@ -259,14 +285,14 @@ function SidebarHeaderNav({
                   aria-label={routeBackLabel}
                   className={cn(
                     'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-                    'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                    'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
                   )}
                 >
                   <ArrowLeft
                     className='size-3.5 text-sidebar-item-icon'
                     aria-hidden='true'
                   />
-                  <span className='truncate group-data-[collapsible=icon]:hidden'>
+                  <span className={cn('truncate', SHELL_RAIL_LABEL)}>
                     {routeBackLabel}
                   </span>
                 </Link>
@@ -278,7 +304,7 @@ function SidebarHeaderNav({
               <div
                 className={cn(
                   'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
-                  'group-data-[collapsible=icon]:justify-center'
+                  'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
                 )}
               >
                 <BrandLogo
@@ -287,7 +313,12 @@ function SidebarHeaderNav({
                   rounded={false}
                   className='rounded-sm shrink-0'
                 />
-                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                <span
+                  className={cn(
+                    'truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                    SHELL_RAIL_LABEL
+                  )}
+                >
                   Demo
                 </span>
               </div>
@@ -311,7 +342,7 @@ function SidebarHeaderNav({
             <div
               className={cn(
                 'flex h-7 w-full items-center gap-1.5',
-                'group-data-[collapsible=icon]:justify-center'
+                'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               )}
             >
               {variant === 'ov' ? (
@@ -323,7 +354,9 @@ function SidebarHeaderNav({
                     rounded={false}
                     className='rounded-sm shrink-0'
                   />
-                  <span>{BRAND_WORDMARKS[variant]}</span>
+                  <span className={cn('truncate', SHELL_RAIL_LABEL)}>
+                    {BRAND_WORDMARKS[variant]}
+                  </span>
                 </>
               ) : (
                 <AskJovieMark variant={variant} />
@@ -333,14 +366,17 @@ function SidebarHeaderNav({
         })()}
       </div>
       {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
-        <>
+        <div
+          className={cn('flex items-center', SHELL_RAIL_STAGE)}
+          data-sidebar-header-actions='true'
+        >
           <SidebarInboxLink availability={inboxNavigation} />
           <HeaderSearchSurfaceFromContext compact />
-        </>
+        </div>
       ) : null}
 
       {!isDesktop ? (
-        <SidebarCollapseButton className='ml-auto shrink-0' />
+        <SidebarCollapseButton className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto' />
       ) : null}
     </div>
   );
@@ -358,9 +394,9 @@ function OperatorSessionControls() {
         <SidebarMenuItem>
           <SidebarMenuButton tooltip='Sign Out' onClick={handleSignOut}>
             <LogOut className='size-3.5' aria-hidden='true' />
-            <span className='truncate group-data-[collapsible=icon]:hidden'>
-              Sign Out
-            </span>
+            {/* The menu-button variant stages the last span (max-width +
+                opacity + travel); a local `hidden` would snap it (JOV-4522). */}
+            <span className='truncate'>Sign Out</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
@@ -415,7 +451,7 @@ export function UnifiedSidebar({
         '[--sidebar-width:var(--app-shell-sidebar-width)]',
         // The left rail owns its internal label/icon staging while
         // AppShellFrame owns the adjacent main-plane allocation (#4522).
-        'transition-[flex-basis,width,transform,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',
+        SHELL_RAIL_ALLOCATION,
         // OV brand skin: class-based token override, same mechanism as `.dark`
         // (see design-system.css → OV MODE). Zero layout impact.
         variant === 'ov' && 'ov-mode'
