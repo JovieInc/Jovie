@@ -9,11 +9,37 @@
     "height": 2868
   },
   "pen": {
-    "file": "Jovie Design Studio — canonical.lib.pen",
+    "file": "Jovie Homepage Profiles Claim — review copy 2026-10-01.pen",
     "section": "App Store / iOS screenshots (STAGING)",
-    "status": "requested",
-    "sectionNodeId": null,
-    "frames": {}
+    "status": "bound",
+    "sectionNodeId": "kH5Zr",
+    "frames": {
+      "chat": {
+        "frame": "XC4ox",
+        "headline": "DVed2",
+        "capture": "Ynw5J"
+      },
+      "audience": {
+        "frame": "ckgFv",
+        "headline": "Q6xZD",
+        "capture": "Upx1i"
+      },
+      "calendar": {
+        "frame": "YfiIo",
+        "headline": "j6fQn",
+        "capture": "Ofsbw"
+      },
+      "work": {
+        "frame": "J7yfE9",
+        "headline": "a82Ali",
+        "capture": "eNClk"
+      },
+      "identity": {
+        "frame": "K6oMB",
+        "headline": "tOpc7",
+        "capture": "YBpij"
+      }
+    }
   },
   "layout": {
     "canvas": "canvas",
@@ -34,31 +60,31 @@
     {
       "id": "chat",
       "launchArgument": "-ui-testing-storefront-chat",
-      "headline": "Merch ideas, ready in one chat.",
+      "headline": "Merch ideas,\nready in one chat.",
       "accent": "ion"
     },
     {
       "id": "audience",
       "launchArgument": "-ui-testing-audience",
-      "headline": "Your fans, at a glance.",
+      "headline": "Your fans,\nat a glance.",
       "accent": "ultra"
     },
     {
       "id": "calendar",
       "launchArgument": "-ui-testing-calendar",
-      "headline": "Shows and releases on one calendar.",
+      "headline": "Shows and releases\non one calendar.",
       "accent": "pulse"
     },
     {
       "id": "work",
       "launchArgument": "-ui-testing-library",
-      "headline": "All your work in one place.",
+      "headline": "All your work\nin one place.",
       "accent": "ion"
     },
     {
       "id": "identity",
       "launchArgument": "-ui-testing-venue-mode",
-      "headline": "Share your profile with one scan.",
+      "headline": "Share your profile\nwith one scan.",
       "accent": "ultra"
     }
   ]
