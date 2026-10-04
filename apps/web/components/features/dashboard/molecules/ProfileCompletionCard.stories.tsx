@@ -40,13 +40,13 @@ const mockDashboardData: DashboardData = {
         id: 'avatar',
         label: 'Add a profile photo',
         description: 'A recognizable photo makes your page feel personal.',
-        href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+        href: APP_ROUTES.SETTINGS_PROFILE,
       },
       {
         id: 'music-links',
         label: 'Connect your music links',
         description: 'Link Spotify or Apple Music so fans can listen.',
-        href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+        href: APP_ROUTES.SETTINGS_PROFILE,
       },
       {
         id: 'email',

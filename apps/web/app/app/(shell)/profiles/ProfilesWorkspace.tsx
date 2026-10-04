@@ -759,7 +759,7 @@ function ConnectionRail({
                         ? APP_ROUTES.SETTINGS_BILLING
                         : row.rowType === 'connector'
                           ? APP_ROUTES.SETTINGS_CONNECTORS
-                          : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+                          : APP_ROUTES.SETTINGS_PROFILE
                     }
                   >
                     {primaryAction === 'upgrade'
@@ -1437,7 +1437,7 @@ export function ProfilesWorkspace({
               ? APP_ROUTES.SETTINGS_BILLING
               : connection.rowType === 'connector'
                 ? APP_ROUTES.SETTINGS_CONNECTORS
-                : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+                : APP_ROUTES.SETTINGS_PROFILE
           );
         },
       });
@@ -1662,7 +1662,7 @@ export function ProfilesWorkspace({
           presentation='workspace'
           action={{
             label: 'Set Up Identity',
-            href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+            href: APP_ROUTES.SETTINGS_PROFILE,
           }}
           testId='profiles-workspace-empty-state'
           className='min-h-75'

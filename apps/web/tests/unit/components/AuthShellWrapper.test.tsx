@@ -8,7 +8,7 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
     breadcrumbs: [],
     isTableRoute: false,
     showMobileTabs: false,
-    isArtistProfileSettings: false,
+    isProfileSettings: false,
     isDemoRoute: false,
     isChatRoute: false,
     isLyricsRoute: false,

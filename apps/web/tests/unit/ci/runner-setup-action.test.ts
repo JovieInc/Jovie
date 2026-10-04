@@ -91,7 +91,7 @@ describe('self-hosted runner setup action', () => {
     'github.event.pull_request.head.repo.full_name': 'JovieInc/Jovie',
   };
 
-  it('never saves pnpm stores and installs the pinned pnpm from the lockfile', () => {
+  it('uses the warning-free pinned installer without saving pnpm stores', () => {
     expect(
       actionSteps.filter(step => /^actions\/cache@/.test(step.uses ?? ''))
     ).toEqual([]);
@@ -104,9 +104,10 @@ describe('self-hosted runner setup action', () => {
     );
     const pnpm = actionStep('Setup pnpm');
     expect(pnpm.uses).toBe(
-      'pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320'
+      'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
     );
     expect(pnpm.with?.dest).toBe('${{ runner.temp }}/setup-pnpm');
+    expect(JSON.stringify(pnpm)).not.toContain('--no-deprecation');
   });
 
   it('checks the baked image first and skips setup and fetch when it is warm', () => {

@@ -251,7 +251,7 @@ export async function handleProxyRequest(
         pathname === APP_ROUTES.EARNINGS)
     ) {
       return NextResponse.redirect(
-        new URL(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`, req.url)
+        new URL(`${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`, req.url)
       );
     }
 
