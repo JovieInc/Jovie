@@ -189,6 +189,7 @@
   "lib/notifications/recipient-preferences.test.ts",
   "lib/oauth/",
   "lib/onboarding/",
+  "lib/outbound/",
   "lib/ovie/acceptance.test.ts",
   "lib/ovie/certifications/",
   "lib/ovie/lyb-mrr.server.test.ts",
