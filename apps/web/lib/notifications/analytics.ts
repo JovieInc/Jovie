@@ -1,4 +1,5 @@
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getAccountMetricCohort } from '@/lib/utils/email';
 import type { NotificationChannel } from '@/types/notifications';
@@ -89,7 +90,9 @@ export const trackSubscribeAttempt = async (
     funnel: 'fan_subscribe',
     step: 'contact_submitted',
     cohort: getAccountMetricCohort(
-      typeof payload.email === 'string' ? payload.email : null
+      normalizeSubscriptionEmail(
+        typeof payload.email === 'string' ? payload.email : null
+      )
     ),
   });
 };
