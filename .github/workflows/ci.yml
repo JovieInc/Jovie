@@ -1103,7 +1103,28 @@ jobs:
           policy_contract="$(node "$policy" --print-contract-version)"
           if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v2' \
             || "$policy_contract" == 'jovie-merge-group-live-admission/v1' ]]; then
-            node "$policy"
+            # The trusted policy on main may predate in-script transient
+            # recovery (JOV-7744). Rate-limit, 5xx, and request-timeout exits
+            # are API weather rather than an admission verdict, so retry them
+            # inside the job budget while still failing closed on real
+            # admission defects.
+            attempt=1
+            max_attempts=5
+            log_file="$(mktemp)"
+            while true; do
+              if node "$policy" 2>&1 | tee "$log_file"; then
+                break
+              fi
+              if (( attempt >= max_attempts || SECONDS > 300 )) \
+                || ! grep -Eqi \
+                  'rate limit|API 50[234] |aborted due to timeout|timed out' \
+                  "$log_file"; then
+                exit 1
+              fi
+              attempt=$((attempt + 1))
+              echo "::warning::Merge-group admission hit a transient GitHub API error; retrying (attempt $attempt of $max_attempts)"
+              sleep 45
+            done
             admitted_value="$(sed -n 's/^admitted=//p' "$GITHUB_OUTPUT")"
             if [[ "$admitted_value" != 'true' && "$admitted_value" != 'false' ]]; then
               echo '::error::Live queue admission policy emitted an invalid admitted value'
