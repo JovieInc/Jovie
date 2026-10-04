@@ -465,6 +465,10 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   'Log in': ['SIGNIN'],
   'Find yourself': ['START'],
   'Music Smart Links': ['SMART_LINKS'],
+  // JOV-7580: generic creator labels behind MARKETING_GENERIC_CREATOR_NAV.
+  'Smart Links': ['SMART_LINKS'],
+  'Audience Capture': ['ARTIST_PROFILES'],
+  'Audience Reactivation': ['ARTIST_PROFILES'],
   'Fan Notifications': ['ARTIST_NOTIFICATIONS'],
   Notifications: ['ARTIST_NOTIFICATIONS'],
   'Instant Merch': ['INSTANT_MERCH'],

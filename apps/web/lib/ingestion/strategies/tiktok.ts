@@ -1,10 +1,12 @@
 /**
  * TikTok Profile Ingestion Strategy
  *
- * Lightweight metadata-first extraction using OpenGraph tags.
+ * TikTok renders profiles client-side; public fields live in the
+ * `__UNIVERSAL_DATA_FOR_REHYDRATION__` JSON. OpenGraph tags are a fallback.
  */
 
-import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
+import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 import type { ExtractionResult } from '../types';
 import {
   createExtractionResult,
@@ -12,8 +14,8 @@ import {
   extractLinks,
   extractMetaContent,
   extractOpenGraphProfile,
+  extractScriptJson,
   type FetchOptions,
-  fetchDocument,
   isUrlSafe,
   isValidHandle,
   normalizeHandle,
@@ -68,43 +70,102 @@ export function extractTikTokHandle(url: string): string | null {
 
 export async function fetchTikTokDocument(
   sourceUrl: string,
-  options?: FetchOptions
+  _options?: FetchOptions
 ): Promise<string> {
   const validated = validateTikTokUrl(sourceUrl);
   if (!validated) {
     throw new ExtractionError('Invalid TikTok profile URL', 'INVALID_URL');
   }
 
-  const { html } = await fetchDocument(validated, {
-    ...options,
-    timeoutMs: TIKTOK_CONFIG.defaultTimeoutMs,
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      ...options?.headers,
-    },
-    allowedHosts: TIKTOK_CONFIG.validHosts,
-  });
+  return disabledSocialHtmlDocument();
+}
 
-  return html;
+interface TikTokUserDetail {
+  readonly statusCode?: number;
+  readonly userInfo?: {
+    readonly user?: {
+      readonly nickname?: unknown;
+      readonly signature?: unknown;
+      readonly avatarLarger?: unknown;
+      readonly avatarMedium?: unknown;
+      readonly bioLink?: { readonly link?: unknown };
+    };
+  };
+}
+
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/** The profile slice of TikTok's rehydration payload, if the page has one. */
+function rehydratedUser(html: string) {
+  const data = extractScriptJson<{
+    __DEFAULT_SCOPE__?: Record<string, TikTokUserDetail>;
+  }>(html, '__UNIVERSAL_DATA_FOR_REHYDRATION__');
+  const detail = data?.__DEFAULT_SCOPE__?.['webapp.user-detail'];
+  if (!detail) return null;
+  // 0 is a served profile; anything else is missing, private, or banned.
+  if (detail.statusCode !== undefined && detail.statusCode !== 0) {
+    throw new ExtractionError('TikTok profile not found', 'NOT_FOUND', 404);
+  }
+  return detail.userInfo?.user ?? null;
+}
+
+/** The one external link TikTok shows under the bio. */
+function bioLinkEntry(
+  raw: string | null
+): ExtractionResult['links'][number] | null {
+  if (!raw) return null;
+  try {
+    const detected = detectPlatform(
+      normalizeUrl(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+    );
+    if (!detected.isValid) return null;
+    return {
+      url: detected.normalizedUrl,
+      platformId: detected.platform.id,
+      title: detected.suggestedTitle,
+      sourcePlatform: 'tiktok',
+      evidence: {
+        sources: ['tiktok_profile'],
+        signals: ['tiktok_profile_link'],
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function extractTikTok(html: string): ExtractionResult {
+  const user = rehydratedUser(html);
   const ogProfile = extractOpenGraphProfile(html);
-  const bio = extractMetaContent(html, 'og:description') ?? null;
+  const displayName = text(user?.nickname) ?? ogProfile.displayName;
+  const avatarUrl =
+    text(user?.avatarLarger) ?? text(user?.avatarMedium) ?? ogProfile.avatarUrl;
+  const bio =
+    text(user?.signature) ?? text(extractMetaContent(html, 'og:description'));
 
   const links = extractLinks(html, {
     skipHosts: SKIP_HOSTS,
     sourcePlatform: 'tiktok',
     sourceSignal: 'tiktok_profile_link',
   });
+  const bioLink = bioLinkEntry(text(user?.bioLink?.link));
+  if (bioLink && !links.some(link => link.url === bioLink.url)) {
+    links.push(bioLink);
+  }
+
+  // A 200 with nothing in it is a bot wall, not a creator with no data.
+  if (!displayName && !avatarUrl && !bio && links.length === 0) {
+    throw new ExtractionError(
+      'TikTok served no public profile data',
+      'EMPTY_RESPONSE'
+    );
+  }
 
   return {
-    ...createExtractionResult(
-      links,
-      ogProfile.displayName,
-      ogProfile.avatarUrl
-    ),
+    ...createExtractionResult(links, displayName, avatarUrl),
     sourcePlatform: 'tiktok',
-    bio: bio?.trim() || null,
+    bio,
   };
 }

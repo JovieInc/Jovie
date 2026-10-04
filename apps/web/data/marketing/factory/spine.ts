@@ -31,18 +31,18 @@ import {
 } from './persuasionBrief';
 import { SectionRequestSchema } from './sectionRequest';
 
-export const FACTORY_SPINE_VERSION = '1.0.0';
+export const FACTORY_SPINE_VERSION = '1.1.0';
 
 export const FACTORY_STAGES = [
   'truth',
   'persuasion',
   'outcomes',
   'narrative',
-  'copy',
   'layout',
   'hero-variant',
   'proof',
   'gap-detection',
+  'copy',
   'media-decision',
   'ref-sourcing',
   'asset',
@@ -73,8 +73,8 @@ export const MARKETING_GENERATION_STAGE_TO_FACTORY: Readonly<
 };
 
 /**
- * The grammar fits copy after choosing variants, so this projection is not
- * monotonic on the spine; the spine order (copy before layout) is canonical.
+ * Structural choices precede editorial copy. Legacy generation lists remain
+ * projections; this spine is the executable prerequisite order.
  */
 export const LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY: Readonly<
   Record<LandingPagePipelineStage, FactoryStage>

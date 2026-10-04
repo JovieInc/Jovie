@@ -14,6 +14,7 @@ import {
   createAuthStateRecord,
   isAuthClient,
   isAuthIntent,
+  isValidNativeAttempt,
   type NativeAuthClient,
   type NativeExchangeCodeRecord,
   type NativeExchangeValidationResult,
@@ -159,6 +160,7 @@ function parseStoredAuthState(value: unknown): AuthStateRecord | null {
   if (typeof record.state !== 'string') return null;
   if (typeof record.createdAt !== 'number') return null;
   if (typeof record.expiresAt !== 'number') return null;
+  if (!isValidNativeAttempt(record.client, record.nativeAttempt)) return null;
   if (
     record.codeChallenge !== null &&
     record.codeChallenge !== undefined &&
@@ -173,6 +175,9 @@ function parseStoredAuthState(value: unknown): AuthStateRecord | null {
     returnTo: record.returnTo,
     state: record.state,
     codeChallenge: record.codeChallenge ?? null,
+    ...(record.nativeAttempt !== undefined
+      ? { nativeAttempt: record.nativeAttempt }
+      : {}),
     desktopFlow:
       typeof record.desktopFlow === 'string' ? record.desktopFlow : null,
     desktopReturnCode: record.desktopReturnCode === true,
@@ -210,6 +215,7 @@ function parseStoredNativeExchange(
   if (typeof record.returnTo !== 'string') return null;
   if (typeof record.createdAt !== 'number') return null;
   if (typeof record.expiresAt !== 'number') return null;
+  if (!isValidNativeAttempt(record.client, record.nativeAttempt)) return null;
   if (
     record.codeChallenge !== null &&
     record.codeChallenge !== undefined &&
@@ -232,6 +238,9 @@ function parseStoredNativeExchange(
     userId: record.userId,
     returnTo: record.returnTo,
     codeChallenge: record.codeChallenge ?? null,
+    ...(record.nativeAttempt !== undefined
+      ? { nativeAttempt: record.nativeAttempt }
+      : {}),
     ott: typeof record.ott === 'string' ? record.ott : null,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
@@ -246,6 +255,7 @@ export async function createStoredAuthState(input: {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
   readonly desktopFlow?: string | null;
   readonly desktopReturnCode?: boolean;
   readonly desktopLoopbackPort?: number | null;
@@ -257,6 +267,7 @@ export async function createStoredAuthState(input: {
     returnTo: input.returnTo,
     state: input.state,
     codeChallenge: input.codeChallenge,
+    nativeAttempt: input.nativeAttempt,
     desktopFlow: input.desktopFlow,
     desktopReturnCode: input.desktopReturnCode,
     desktopLoopbackPort: input.desktopLoopbackPort,
@@ -321,6 +332,7 @@ export async function createStoredNativeExchangeCode(input: {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
   readonly ott?: string | null;
   readonly now?: number;
 }): Promise<NativeExchangeCodeRecord> {
@@ -331,6 +343,7 @@ export async function createStoredNativeExchangeCode(input: {
     userId: input.userId,
     returnTo: input.returnTo,
     codeChallenge: input.codeChallenge,
+    nativeAttempt: input.nativeAttempt,
     ott: input.ott,
     now: input.now ?? Date.now(),
   });
@@ -353,6 +366,7 @@ export async function consumeStoredNativeExchangeCode(input: {
   readonly code: string;
   readonly state: string;
   readonly codeVerifier?: string | null;
+  readonly nativeAttempt?: string;
   readonly now?: number;
   readonly createCodeChallenge: (verifier: string) => string;
 }): Promise<StoredNativeExchangeValidationResult> {
@@ -366,6 +380,7 @@ export async function consumeStoredNativeExchangeCode(input: {
     code: input.code,
     state: input.state,
     codeVerifier: input.codeVerifier,
+    nativeAttempt: input.nativeAttempt,
     now,
     createCodeChallenge: input.createCodeChallenge,
   });
@@ -386,6 +401,7 @@ export async function consumeStoredNativeExchangeCode(input: {
     code: input.code,
     state: input.state,
     codeVerifier: input.codeVerifier,
+    nativeAttempt: input.nativeAttempt,
     now,
     createCodeChallenge: input.createCodeChallenge,
   });

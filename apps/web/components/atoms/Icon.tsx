@@ -61,11 +61,7 @@ import {
   Music,
   Newspaper,
   PanelLeft,
-  PanelLeftClose,
-  PanelLeftOpen,
   PanelRight,
-  PanelRightClose,
-  PanelRightOpen,
   Pencil,
   PencilLine,
   Plus,
@@ -95,6 +91,12 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import {
+  RailLeftClosed,
+  RailLeftOpen,
+  RailRightClosed,
+  RailRightOpen,
+} from '@/components/atoms/rail-icons';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -159,11 +161,7 @@ const iconRegistry = {
   Pencil,
   PencilLine,
   PanelLeft,
-  PanelLeftClose,
-  PanelLeftOpen,
   PanelRight,
-  PanelRightClose,
-  PanelRightOpen,
   Plus,
   RefreshCw,
   Rocket,
@@ -190,6 +188,10 @@ const iconRegistry = {
   Waypoints,
   X,
   XCircle,
+  RailLeftClosed,
+  RailLeftOpen,
+  RailRightClosed,
+  RailRightOpen,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof iconRegistry;

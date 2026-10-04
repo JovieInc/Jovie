@@ -727,6 +727,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CHAT_COMPOSER_V2: { nonMarketing: 'UI layout toggle' },
   MEMORY_STUDIO_SESSION_V0: { nonMarketing: 'internal memory loop' },
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
+  MARKETING_GENERIC_CREATOR_NAV: {
+    nonMarketing:
+      'marketing copy presentation; default off; does not change smart-link certification (JOV-7580)',
+  },
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
     nonMarketing: 'OAuth dynamic client registration kill switch',
   },
@@ -741,6 +745,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   AUTH_OFFER_SUMMARY: {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',
+  },
+  SOCIAL_HTML_ISOLATED_PROVIDER: {
+    nonMarketing:
+      'internal ingestion routing kill switch; reserved for future isolated provider rollout',
   },
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:
