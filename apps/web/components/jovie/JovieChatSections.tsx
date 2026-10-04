@@ -2,7 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import type { ReactNode, RefCallback } from 'react';
+import { memo, type ReactNode, type RefCallback } from 'react';
+import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
@@ -29,6 +30,7 @@ import { ChatUploadManifest } from './components/ChatUploadManifest';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
+import { type ComposerDraft, useComposerDraft } from './hooks/useComposerDraft';
 import type { ChatError, MessagePart } from './types';
 
 interface ChatComposerSurfaceProps {
@@ -59,6 +61,39 @@ interface ChatComposerSurfaceProps {
   readonly onRemoveFile: (id: string) => void;
   readonly onCollapseManifest: () => void;
   readonly onExpandManifest: () => void;
+}
+
+interface ChatDraftComposerSurfaceProps
+  extends Omit<ChatComposerSurfaceProps, 'chatInputProps'> {
+  readonly draft: ComposerDraft;
+  readonly chatInputProps: Omit<ChatInputProps, 'value'>;
+}
+
+/** Only this leaf subscribes to characters; the transcript owns the runtime. */
+export const ChatDraftComposerSurface = memo(function ChatDraftComposerSurface({
+  draft,
+  chatInputProps,
+  ...surface
+}: ChatDraftComposerSurfaceProps) {
+  const value = useComposerDraft(draft);
+  return (
+    <ChatComposerSurface
+      {...surface}
+      chatInputProps={{ ...chatInputProps, value }}
+    />
+  );
+});
+
+/** Keep committed draft safety live without rerendering the transcript owner. */
+export function ChatDraftWorkState({
+  draft,
+  ...work
+}: Omit<Parameters<typeof useDesktopChatWorkState>[0], 'input'> & {
+  readonly draft: ComposerDraft;
+}) {
+  const input = useComposerDraft(draft);
+  useDesktopChatWorkState({ ...work, input });
+  return null;
 }
 
 export function ChatComposerSurface({

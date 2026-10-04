@@ -14,8 +14,8 @@ tick="python3 $state/current/lane_runner.py update; python3 $state/current/codex
 # Pin timers to the Node selected by the installing shell.
 node_dir="$(dirname "$(command -v node)")"
 path="$node_dir:$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-source_tree="$(cat "$state/current/.tree")"
-source_commit="$(git -C "$repo" rev-parse origin/main)"
+source_tree="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["objects"]["scripts/lanes"])' "$state/current/.release.json")"
+source_commit="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourceCommit"])' "$state/current/.release.json")"
 LANES_STATE="$state" python3 "$state/current/codex_lane.py" install-receipt \
   --source-commit "$source_commit" --source-tree "$source_tree" --platform "$(uname)" --cadence "$ledger_cadence" >/dev/null
 

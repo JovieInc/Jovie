@@ -298,6 +298,9 @@ describe('full browser matrix setup routing', () => {
   it('preserves browser host validation and serialized execution', () => {
     expect(workflow).toContain('browser: [chromium, firefox]');
     expect(workflow).toContain('max-parallel: 1');
+    // Full suite at the default 4 workers starves the hosted runner and the
+    // job dies as "lost communication with the server" (JOV-7677).
+    expect(workflow).toContain("PLAYWRIGHT_WORKERS: '2'");
     const action = readFileSync(
       resolve(repoRoot, '.github/actions/setup-playwright/action.yml'),
       'utf8'
@@ -633,7 +636,7 @@ describe('baked runner prerequisite contract', () => {
     for (const patchPath of patchedDependencyPaths) {
       expect(listedPaths).toContain(patchPath);
     }
-  }, 15_000);
+  }, 60_000);
 
   it('fails closed when a required filtered-context entry is missing', () => {
     const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));

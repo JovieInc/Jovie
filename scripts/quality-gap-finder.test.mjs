@@ -77,10 +77,21 @@ function escapedDefectEvidence(overrides = {}) {
       gapClass: 'missing-invariant',
       gapAnalysis:
         'Certification covered render success but not the failed interaction outcome.',
+      learningCompiler: {
+        issue: 'JOV-7084',
+        outputRef:
+          'https://linear.app/jovie/issue/JOV-7084#compiled-detector-output',
+      },
       detectorRef: 'scripts/quality-gap-finder.test.mjs',
       coveredClass: 'escaped defects closed without paired detector evidence',
       deliberateRedRef:
         'https://github.com/JovieInc/Jovie/actions/runs/3#deliberate-red',
+      verification: {
+        status: 'live-verified',
+        evidenceRef:
+          'https://github.com/JovieInc/Jovie/actions/runs/3#detector-live',
+        verifiedAt: '2026-09-28T11:00:00Z',
+      },
     },
     remediation: { mode: 'not-automatic' },
     ...overrides,
@@ -393,8 +404,19 @@ describe('quality-gap-finder', () => {
           gapClass: 'missing-invariant',
           gapAnalysis:
             'Certification covered render success but not the failed interaction outcome.',
+          learningCompiler: {
+            issue: 'JOV-7084',
+            outputRef:
+              'https://linear.app/jovie/issue/JOV-7084#compiled-detector-output',
+          },
           detectorRef: 'scripts/quality-gap-finder.test.mjs',
           coveredClass: 'escaped interaction failures across product journeys',
+          verification: {
+            status: 'live-verified',
+            evidenceRef:
+              'https://github.com/JovieInc/Jovie/actions/runs/3#detector-live',
+            verifiedAt: '2026-09-28T11:00:00Z',
+          },
         },
       });
       const result = evaluateEscapedDefectClosure({
@@ -407,6 +429,72 @@ describe('quality-gap-finder', () => {
       assert.ok(
         result.errors.some(error => error.includes('deliberateRedRef'))
       );
+    });
+
+    it('keeps a product repair non-Done until the compiled detector is live-verified', () => {
+      const marker = escapedDefectEvidence({
+        detection: {
+          originatingIssue: 'JOV-9',
+          gapClass: 'missing-invariant',
+          gapAnalysis:
+            'Certification covered render success but not the failed interaction outcome.',
+          learningCompiler: {
+            issue: 'JOV-7084',
+            outputRef:
+              'https://linear.app/jovie/issue/JOV-7084#compiled-detector-output',
+          },
+          detectorRef: 'scripts/quality-gap-finder.test.mjs',
+          coveredClass: 'escaped interaction failures across product journeys',
+          deliberateRedRef:
+            'https://github.com/JovieInc/Jovie/actions/runs/3#deliberate-red',
+          verification: {
+            status: 'source-only',
+            evidenceRef: 'pending live run',
+          },
+        },
+      });
+      const result = evaluateEscapedDefectClosure({
+        identifier: 'JOV-9',
+        description: marker,
+        labels: ['escaped-defect'],
+      });
+
+      assert.equal(result.ok, false);
+      assert.match(result.errors.join('\n'), /status must be live-verified/);
+      assert.match(result.errors.join('\n'), /verifiedAt/);
+    });
+
+    it('requires the detector receipt to come through the existing learning compiler', () => {
+      const marker = escapedDefectEvidence({
+        detection: {
+          originatingIssue: 'JOV-9',
+          gapClass: 'missing-invariant',
+          gapAnalysis:
+            'Certification covered render success but not the failed interaction outcome.',
+          learningCompiler: {
+            issue: 'JOV-9999',
+            outputRef: 'https://example.com/parallel-learning-controller',
+          },
+          detectorRef: 'scripts/quality-gap-finder.test.mjs',
+          coveredClass: 'escaped interaction failures across product journeys',
+          deliberateRedRef:
+            'https://github.com/JovieInc/Jovie/actions/runs/3#deliberate-red',
+          verification: {
+            status: 'live-verified',
+            evidenceRef:
+              'https://github.com/JovieInc/Jovie/actions/runs/3#detector-live',
+            verifiedAt: '2026-09-28T11:00:00Z',
+          },
+        },
+      });
+      const result = evaluateEscapedDefectClosure({
+        identifier: 'JOV-9',
+        description: marker,
+        labels: ['escaped-defect'],
+      });
+
+      assert.equal(result.ok, false);
+      assert.match(result.errors.join('\n'), /JOV-2967, JOV-7084/);
     });
 
     it('requires bounded automatic remediation and an explicit blocked exhaustion state', () => {
@@ -464,6 +552,46 @@ describe('quality-gap-finder', () => {
           originatingIssue: 'JOV-9',
           gapAnalysis:
             'The defect came from an external physical failure with no machine-observable product state.',
+          learningCompiler: {
+            issue: 'JOV-2967',
+            outputRef:
+              'https://linear.app/jovie/issue/JOV-2967#non-applicability-output',
+          },
+          nonApplicability: {
+            justification:
+              'No reusable software detector can observe the external physical-only failure class.',
+            evidenceRef:
+              'https://linear.app/jovie/issue/JOV-9#non-applicability',
+            approvedBy: 'Summer',
+            independentVerification: {
+              verifiedBy: 'Gem',
+              evidenceRef:
+                'https://linear.app/jovie/issue/JOV-9#independent-verification',
+              verifiedAt: '2026-09-28T12:00:00Z',
+            },
+          },
+        },
+      });
+      const result = evaluateEscapedDefectClosure({
+        identifier: 'JOV-9',
+        description: marker,
+        labels: ['escaped-defect'],
+      });
+
+      assert.equal(result.ok, true);
+    });
+
+    it('rejects detector non-applicability without independent verification', () => {
+      const marker = escapedDefectEvidence({
+        detection: {
+          originatingIssue: 'JOV-9',
+          gapAnalysis:
+            'The defect came from an external physical failure with no machine-observable product state.',
+          learningCompiler: {
+            issue: 'JOV-2967',
+            outputRef:
+              'https://linear.app/jovie/issue/JOV-2967#non-applicability-output',
+          },
           nonApplicability: {
             justification:
               'No reusable software detector can observe the external physical-only failure class.',
@@ -479,7 +607,8 @@ describe('quality-gap-finder', () => {
         labels: ['escaped-defect'],
       });
 
-      assert.equal(result.ok, true);
+      assert.equal(result.ok, false);
+      assert.match(result.errors.join('\n'), /independentVerification/);
     });
 
     it('guards the real Done transition and never mutates an incomplete escaped defect', async () => {

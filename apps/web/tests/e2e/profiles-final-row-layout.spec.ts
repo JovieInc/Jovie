@@ -173,7 +173,7 @@ test('keeps the final profile row and destination line visible in a constrained 
     `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`,
     { waitUntil: 'domcontentloaded', timeout: 120_000 }
   );
-  await page.waitForURL(/\/app\/profiles(?:$|\?)/, { timeout: 60_000 });
+  await page.waitForURL(/\/app\/presence(?:$|\?)/, { timeout: 60_000 });
 
   const workspace = page.getByTestId('profiles-workspace');
   await expect(workspace).toBeVisible({ timeout: 30_000 });
@@ -192,7 +192,7 @@ test('keeps the final profile row and destination line visible in a constrained 
     `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`,
     { waitUntil: 'domcontentloaded', timeout: 120_000 }
   );
-  await page.waitForURL(/\/app\/profiles(?:$|\?)/, { timeout: 60_000 });
+  await page.waitForURL(/\/app\/presence(?:$|\?)/, { timeout: 60_000 });
   await expect(workspace).toBeVisible({ timeout: 30_000 });
   await expect(table).toBeVisible({ timeout: 30_000 });
   await expect(table.locator('tbody tr').first()).toBeVisible({
@@ -235,7 +235,7 @@ test('keeps page identity and review status readable at narrow widths', async ({
   await page.goto(
     `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`
   );
-  await page.waitForURL(/\/app\/profiles(?:$|\?)/);
+  await page.waitForURL(/\/app\/presence(?:$|\?)/);
   const response = await suggestionsResponse;
   expect(response.status).toBe(200);
   expect(JSON.parse(response.body)).toMatchObject({

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -79,6 +79,25 @@ describe('WorkspaceSelector', () => {
     expect(trigger.querySelector('[data-brand-mark-size]')).toHaveAttribute(
       'data-brand-mark-size',
       '20'
+    );
+  });
+
+  it('stages the trigger label exit on the shared rail-motion contract', () => {
+    render(
+      <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const label = within(trigger).getByText('OV');
+    // JOV-4522: max-width + opacity + travel keep the label mounted during
+    // the rail collapse instead of popping to display:none at frame one.
+    expect(label.className).toContain(
+      'transition-[max-width,opacity,transform]'
+    );
+    expect(label.className).toContain('duration-cinematic');
+    expect(label.className).toContain('group-data-[collapsible=icon]:max-w-0');
+    expect(label.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
     );
   });
 

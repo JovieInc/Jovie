@@ -95,6 +95,26 @@ describe('CustomerNavMoreMenu', () => {
     expect(label.className).not.toContain('justify-self-start');
   });
 
+  it('stages the More label exit out of the collapsed grid flow (JOV-4522)', () => {
+    render(
+      <ul>
+        <CustomerNavMoreMenu items={moreItems} isItemActive={() => false} />
+      </ul>
+    );
+
+    const label = screen.getByText('More');
+    // Same rail-motion contract as NavMenuItem: absolute in the collapsed
+    // grid, opacity + travel staged — never display:none at frame one.
+    expect(label.className).toContain('group-data-[collapsible=icon]:absolute');
+    expect(label.className).toContain(
+      'group-data-[collapsible=icon]:opacity-0'
+    );
+    expect(label.className).toContain('duration-cinematic');
+    expect(label.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
+    );
+  });
+
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource(
       'components/features/dashboard/dashboard-nav/CustomerNavMoreMenu.tsx'

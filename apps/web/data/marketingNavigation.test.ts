@@ -117,4 +117,13 @@ describe('public marketing navigation', () => {
       )
     ).toBe(false);
   });
+
+  it('links the engineering publication from the footer', () => {
+    const hrefs = MARKETING_FOOTER_COLUMNS.flatMap(column =>
+      column.links.map(link => link.href)
+    );
+
+    expect(hrefs).toContain('/engineering');
+    expect(hrefs).not.toContain('/engineering/preview');
+  });
 });

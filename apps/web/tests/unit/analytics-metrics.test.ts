@@ -25,6 +25,14 @@ describe('CANONICAL_METRICS', () => {
     }
   });
 
+  it('describes subscribers as people who opted in', () => {
+    expect(CANONICAL_METRICS.subscribers.label).toBe('Followers');
+    expect(CANONICAL_METRICS.subscribers.definition).toBe(
+      'People who opted in to notifications.'
+    );
+    expect(CANONICAL_METRICS.unique_users.label).toBe('Unique Visitors');
+  });
+
   it('rate metrics are expressed in percent and document their formula', () => {
     const rateKeys = (
       Object.keys(CANONICAL_METRICS) as CanonicalMetricKey[]

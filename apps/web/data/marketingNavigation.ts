@@ -90,11 +90,6 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
     description: 'Generate merch concepts from an artist identity.',
   },
   {
-    href: APP_ROUTES.YOUTUBE_THUMBNAILS,
-    label: 'YouTube Thumbnails',
-    description: 'Paste your channel and see three thumbnails redone, free.',
-  },
-  {
     href: APP_ROUTES.CLI,
     label: 'CLI',
     description: 'Read public artist data from the command line.',
@@ -158,6 +153,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     links: [
       MARKETING_DEVELOPER_LINK,
       MARKETING_CLI_LINK,
+      { href: APP_ROUTES.ENGINEERING, label: 'Engineering' },
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
       { href: APP_ROUTES.COMPARE, label: 'Compare' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
