@@ -21,6 +21,7 @@ import {
 import {
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
+  persistTerminalAssistantMessageWithReceipt,
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
@@ -40,6 +41,7 @@ import {
 import { getMobileConversationDetail } from '@/lib/mobile/chat/conversations';
 import {
   embedMobileMerchArtifactsInContent,
+  isMobileMerchArtifactEvent,
   mobileMerchToolEventsFromResults,
 } from '@/lib/mobile/chat/tool-artifacts';
 import { handleMobileOvChatTurn } from '@/lib/mobile/chat/turn-handler-ov';
@@ -440,7 +442,7 @@ export async function handleMobileChatTurn(
           });
         }
 
-        await persistTerminalAssistantMessage({
+        const receipt = await persistTerminalAssistantMessageWithReceipt({
           conversationId: reservation.conversationId,
           turnId: reservation.turn.id,
           status:
@@ -454,6 +456,27 @@ export async function handleMobileChatTurn(
               ? null
               : 'WEB_HANDOFF_REQUIRED',
         });
+
+        // Fail-soft persistence or an earlier terminal winner must not advertise
+        // a live design that the browser conversation cannot recover.
+        if (
+          receipt.persisted &&
+          receipt.message.conversationId === reservation.conversationId &&
+          receipt.message.turnId === reservation.turn.id &&
+          receipt.message.content === finalText &&
+          merchToolEvents.some(isMobileMerchArtifactEvent) &&
+          decodeToolEvents(receipt.message.toolCalls).events.some(
+            isMobileMerchArtifactEvent
+          )
+        ) {
+          enqueue({
+            type: 'web.handoff',
+            clientTurnId: parsed.clientTurnId,
+            conversationId: reservation.conversationId,
+            url: buildMobileChatHandoffUrl(reservation.conversationId),
+            summary: finalText,
+          });
+        }
 
         enqueue({
           type: 'assistant.completed',
