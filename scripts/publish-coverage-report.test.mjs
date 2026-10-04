@@ -126,6 +126,10 @@ test('nightly evidence uses the existing exact-source draft publication with pro
   writeFileSync(join(f.cwd, lastRun), '{"status":"fail"}\n');
   const result = publishNightlyReport(f);
   assert.equal(result.status, 'published');
+  assert.equal(
+    f.calls.some(args => args[0] === 'pr' && args[1] === 'list'),
+    true
+  );
   assert.equal(result.branch, 'bot/nightly-evidence-12345-1');
   assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
   assert.equal(f.git('rev-parse', 'origin/main'), f.source);
@@ -338,6 +342,11 @@ test('real publication retires an ancestor report but preserves divergent measur
   };
   const closes = [];
   const gh = args => {
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      assert.deepEqual(args.slice(-2), ['--add-label', 'duplicate']);
+      remotePr.labels = [{ name: 'duplicate' }];
+      return '';
+    }
     if (args[0] === 'pr' && args[1] === 'list')
       return JSON.stringify([
         prior,
@@ -359,4 +368,65 @@ test('real publication retires an ancestor report but preserves divergent measur
     readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8'),
     /Retired reports: 1/
   );
+});
+
+test('actual nightly publisher retires matching nightly evidence while retaining coverage reports', t => {
+  const f = fixture(t, true);
+  writeFileSync(
+    join(f.cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
+    'replacement evidence\n'
+  );
+  const nightly = {
+    number: 1,
+    headRefName: 'bot/nightly-evidence-111-1',
+    isDraft: true,
+    labels: [],
+    body: `Measured source: \`${f.source}\`.`,
+  };
+  const coverage = {
+    ...nightly,
+    number: 2,
+    headRefName: 'bot/coverage-audit-112-1',
+  };
+  const metadata = {
+    state: 'open',
+    draft: true,
+    labels: [],
+    base: { ref: 'main' },
+    title: 'chore(testing): refresh nightly testing evidence',
+    body: nightly.body,
+    head: {
+      ref: nightly.headRefName,
+      sha: 'c'.repeat(40),
+      repo: { full_name: f.env.GITHUB_REPOSITORY },
+    },
+  };
+  const closed = [];
+  const gh = args => {
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      assert.deepEqual(args.slice(-2), ['--add-label', 'duplicate']);
+      metadata.labels = [{ name: 'duplicate' }];
+      return '';
+    }
+    if (args[0] === 'pr' && args[1] === 'list')
+      return JSON.stringify([coverage, nightly]);
+    if (args[0] === 'pr' && args[1] === 'close') {
+      closed.push(Number(args[2]));
+      return '';
+    }
+    if (args[0] === 'api') {
+      assert.ok(
+        !args.some(arg => /pulls\/2(?:\/|$)/.test(arg)),
+        'coverage reports must never reach nightly retirement reads'
+      );
+      if (args.includes('--paginate'))
+        return 'docs/NIGHTLY_TESTING_AGENT_REPORT.md\napps/web/reports/nightly-agent/last-run.json';
+      if (args[1].includes('/git/commits/'))
+        return JSON.stringify({ parents: [{ sha: f.source }] });
+      return JSON.stringify(metadata);
+    }
+    return f.gh(args);
+  };
+  assert.equal(publishNightlyReport({ ...f, gh }).status, 'published');
+  assert.deepEqual(closed, [1]);
 });

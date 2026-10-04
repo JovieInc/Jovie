@@ -4,6 +4,7 @@
  * Document fetching with timeout, retries, and proper error handling.
  */
 
+import { rejectCoreSocialHtmlFetch } from '@/lib/ingestion/social-html-policy';
 import { logger } from '@/lib/utils/logger';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
@@ -102,12 +103,11 @@ async function handleRedirect(
   response: Response,
   currentUrl: string,
   redirects: number,
-  allowedHosts: Set<string>
+  allowedHosts?: Set<string>
 ): Promise<string | null> {
-  const finalHost = new URL(response.url).hostname.toLowerCase();
-  if (!allowedHosts.has(finalHost)) {
-    throw new ExtractionError('Invalid host', 'INVALID_HOST');
-  }
+  const responseUrl = response.url || currentUrl;
+  rejectCoreSocialHtmlFetch(responseUrl);
+  normalizeAndValidateUrl(responseUrl, allowedHosts);
 
   const isRedirect =
     response.status >= 300 &&
@@ -150,6 +150,7 @@ async function fetchWithRedirects(
   let redirects = 0;
 
   while (true) {
+    rejectCoreSocialHtmlFetch(currentUrl);
     const response = await fetch(currentUrl, {
       signal: controller.signal,
       headers: {
@@ -161,21 +162,21 @@ async function fetchWithRedirects(
         Connection: 'keep-alive',
         ...options.headers,
       },
-      redirect: options.allowedHosts ? 'manual' : 'follow',
+      // Inspect every hop before contacting it, including generic reads that
+      // have no platform allowlist. Automatic following bypasses the policy.
+      redirect: 'manual',
     });
 
-    if (options.allowedHosts) {
-      const nextUrl = await handleRedirect(
-        response,
-        currentUrl,
-        redirects,
-        options.allowedHosts
-      );
-      if (nextUrl) {
-        currentUrl = nextUrl;
-        redirects += 1;
-        continue;
-      }
+    const nextUrl = await handleRedirect(
+      response,
+      currentUrl,
+      redirects,
+      options.allowedHosts
+    );
+    if (nextUrl) {
+      currentUrl = nextUrl;
+      redirects += 1;
+      continue;
     }
 
     validateResponseStatus(response);
@@ -197,6 +198,7 @@ function shouldRetryError(error: unknown): boolean {
       'RATE_LIMITED',
       'INVALID_URL',
       'INVALID_HOST',
+      'SOCIAL_HTML_DISABLED',
     ].includes(error.code);
   }
   return true;
@@ -238,6 +240,7 @@ export async function fetchDocument(
   } = options;
 
   const normalizedUrl = normalizeUrl(url);
+  rejectCoreSocialHtmlFetch(normalizedUrl);
   const initialUrl = normalizeAndValidateUrl(normalizedUrl, allowedHosts);
   let lastError: Error | null = null;
 

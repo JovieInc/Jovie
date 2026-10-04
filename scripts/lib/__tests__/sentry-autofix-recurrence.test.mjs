@@ -36,6 +36,8 @@ describe('sentry autofix recurrence', () => {
   it('parses incident identity from the autofix PR body', () => {
     expect(parseAutofixIncident(AUTOFIX_BODY)).toEqual({
       issueId: '1234567890',
+      shortId: null,
+      linearIdentifier: null,
       fingerprint: 'fp-chat-timeout',
       environment: 'vercel-production',
       release: MAIN_SHA,

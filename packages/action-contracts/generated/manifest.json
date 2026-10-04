@@ -165,6 +165,246 @@
         "invocation": "schemas/task.create.invocation.json",
         "result": "schemas/task.create.result.json"
       }
+    },
+    {
+      "id": "fleet.register",
+      "schemaVersion": 1,
+      "titleKey": "actions.fleet.register.title",
+      "descriptionKey": "actions.fleet.register.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "fleet:register"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/fleet.register.input.json",
+        "output": "schemas/fleet.register.output.json",
+        "invocation": "schemas/fleet.register.invocation.json",
+        "result": "schemas/fleet.register.result.json"
+      }
+    },
+    {
+      "id": "fleet.status",
+      "schemaVersion": 1,
+      "titleKey": "actions.fleet.status.title",
+      "descriptionKey": "actions.fleet.status.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "fleet:read"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/fleet.status.input.json",
+        "output": "schemas/fleet.status.output.json",
+        "invocation": "schemas/fleet.status.invocation.json",
+        "result": "schemas/fleet.status.result.json"
+      }
+    },
+    {
+      "id": "work.next",
+      "schemaVersion": 1,
+      "titleKey": "actions.work.next.title",
+      "descriptionKey": "actions.work.next.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "work:next"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/work-next.input.json",
+        "output": "schemas/work-next.output.json",
+        "invocation": "schemas/work-next.invocation.json",
+        "result": "schemas/work-next.result.json"
+      }
+    },
+    {
+      "id": "work.claim",
+      "schemaVersion": 1,
+      "titleKey": "actions.work.claim.title",
+      "descriptionKey": "actions.work.claim.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "work:claim"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/work.claim.input.json",
+        "output": "schemas/work.claim.output.json",
+        "invocation": "schemas/work.claim.invocation.json",
+        "result": "schemas/work.claim.result.json"
+      }
+    },
+    {
+      "id": "work.report",
+      "schemaVersion": 1,
+      "titleKey": "actions.work.report.title",
+      "descriptionKey": "actions.work.report.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "work:report"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/work.report.input.json",
+        "output": "schemas/work.report.output.json",
+        "invocation": "schemas/work.report.invocation.json",
+        "result": "schemas/work.report.result.json"
+      }
+    },
+    {
+      "id": "defect.report",
+      "schemaVersion": 1,
+      "titleKey": "actions.defect.report.title",
+      "descriptionKey": "actions.defect.report.description",
+      "effect": "external_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "defect:report"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/defect.report.input.json",
+        "output": "schemas/defect.report.output.json",
+        "invocation": "schemas/defect.report.invocation.json",
+        "result": "schemas/defect.report.result.json"
+      }
+    },
+    {
+      "id": "fleet.directory",
+      "schemaVersion": 1,
+      "titleKey": "actions.fleet.directory.title",
+      "descriptionKey": "actions.fleet.directory.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "fleet:discover"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/fleet.directory.input.json",
+        "output": "schemas/fleet.directory.output.json",
+        "invocation": "schemas/fleet.directory.invocation.json",
+        "result": "schemas/fleet.directory.result.json"
+      }
+    },
+    {
+      "id": "work.request",
+      "schemaVersion": 1,
+      "titleKey": "actions.work.request.title",
+      "descriptionKey": "actions.work.request.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "cli",
+        "mcp"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "worker_scope",
+          "key": "work:request"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/work.request.input.json",
+        "output": "schemas/work.request.output.json",
+        "invocation": "schemas/work.request.invocation.json",
+        "result": "schemas/work.request.result.json"
+      }
     }
   ]
 }

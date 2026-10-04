@@ -1,4 +1,5 @@
-import { fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/SettingsAdPixelsSection';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -180,8 +181,8 @@ describe('SettingsAdPixelsSection', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders each retargeting platform as a separate setting card with status', () => {
-    const { getByRole, getAllByRole, getByText, getAllByText } = fastRender(
+  it('groups each provider and its status within the shared settings surface', () => {
+    const { getByRole, getByText, getAllByText } = fastRender(
       <SettingsAdPixelsSection isPro />
     );
 
@@ -198,22 +199,61 @@ describe('SettingsAdPixelsSection', () => {
     expect(getAllByText('Configured')).toHaveLength(2);
     expect(getAllByText('Not configured')).toHaveLength(1);
 
-    const facebookHeading = getByRole('heading', {
-      name: 'Facebook Conversions API',
+    for (const name of [
+      'Facebook Conversions API',
+      'Google Analytics 4 (Measurement Protocol)',
+      'TikTok Events API',
+    ]) {
+      const group = getByRole('group', { name });
+      expect(within(group).getByRole('heading', { name })).toBeVisible();
+      expect(
+        within(group).getByRole('link', { name: 'Get credentials' })
+      ).toBeVisible();
+    }
+    const facebook = getByRole('group', { name: 'Facebook Conversions API' });
+    expect(within(facebook).getByLabelText('Pixel ID')).toHaveValue(
+      '1234567890123456'
+    );
+    expect(within(facebook).getByText('Configured')).toBeVisible();
+    expect(
+      within(facebook).getByRole('button', { name: 'Test' })
+    ).toBeEnabled();
+    const tiktok = getByRole('group', { name: 'TikTok Events API' });
+    expect(within(tiktok).getByText('Not configured')).toBeVisible();
+    expect(
+      within(tiktok).queryByRole('button', { name: 'Test' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('names token visibility by provider and preserves input and focus when toggled', async () => {
+    const user = userEvent.setup();
+    const view = fastRender(<SettingsAdPixelsSection isPro />);
+    const facebook = within(
+      view.getByRole('group', { name: 'Facebook Conversions API' })
+    );
+    const token = facebook.getByLabelText('Access Token');
+    await user.clear(token);
+    await user.type(token, 'test-only-token');
+    const show = facebook.getByRole('button', {
+      name: 'Show Facebook Conversions API access token',
     });
-    expect(facebookHeading.parentElement?.parentElement).toHaveClass(
-      'flex-col',
-      'sm:flex-row'
-    );
-    const facebookActions = getAllByRole('button', { name: 'Test' })[0]
-      ?.parentElement?.parentElement;
-    expect(facebookActions).toHaveClass(
-      'w-full',
-      'flex-wrap',
-      'sm:w-auto',
-      'sm:justify-end'
-    );
-    expect(facebookActions).toHaveTextContent('Configured');
+    await user.click(show);
+    expect(token).toHaveAttribute('type', 'text');
+    expect(token).toHaveValue('test-only-token');
+    const hide = facebook.getByRole('button', {
+      name: 'Hide Facebook Conversions API access token',
+    });
+    expect(hide).toHaveFocus();
+    expect(hide).toHaveAttribute('aria-pressed', 'true');
+    await user.keyboard('{Enter}');
+    expect(token).toHaveAttribute('type', 'password');
+    expect(token).toHaveValue('test-only-token');
+    expect(
+      facebook.getByRole('button', {
+        name: 'Show Facebook Conversions API access token',
+      })
+    ).toHaveFocus();
+    expect(savePixels).not.toHaveBeenCalled();
   });
 
   it('calls usePixelSettingsQuery hook on render', () => {

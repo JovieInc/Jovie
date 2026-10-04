@@ -25,8 +25,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import {
   type CanonicalReleaseCredit,
+  creditProviderMismatchWarningKey,
   materializeReleaseCreditPayload,
   parseProviderAlbumArtists,
+  shouldReportCreditProviderMismatch,
 } from '@/lib/discography/release-credits';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
@@ -230,7 +232,16 @@ function attachCanonicalCredits(
     providerArtists: parseProviderAlbumArtists(metadata),
   });
 
-  if (reconciled.mismatch) {
+  if (
+    reconciled.mismatch &&
+    shouldReportCreditProviderMismatch(
+      creditProviderMismatchWarningKey({
+        entityType: context.entityType,
+        entityId: context.entityId,
+        mismatch: reconciled.mismatch,
+      })
+    )
+  ) {
     void captureWarning(
       'Release credit provider mismatch',
       new Error('release_credit_provider_mismatch'),
@@ -414,6 +425,56 @@ export interface CachedContentData {
  */
 const fetchCreatorByUsername = async (usernameNormalized: string) => {
   return await withRetry(async () => {
+    // Columns added after the oldest supported creator_profiles schema.
+    // Gate each on information_schema so environments that predate their
+    // migration don't fail with 42703 ("Failed query: ... does not exist")
+    // (JOV-4394). doesColumnExist is TTL-cached, so the parallel checks are
+    // effectively free after first load.
+    const optionalColumns = [
+      {
+        key: 'settings',
+        name: 'settings',
+        ref: creatorProfiles.settings,
+        fallback: {},
+      },
+      {
+        key: 'spotifyUrl',
+        name: 'spotify_url',
+        ref: creatorProfiles.spotifyUrl,
+        fallback: null,
+      },
+      {
+        key: 'appleMusicUrl',
+        name: 'apple_music_url',
+        ref: creatorProfiles.appleMusicUrl,
+        fallback: null,
+      },
+      {
+        key: 'youtubeUrl',
+        name: 'youtube_url',
+        ref: creatorProfiles.youtubeUrl,
+        fallback: null,
+      },
+      {
+        key: 'musicbrainzId',
+        name: 'musicbrainz_id',
+        ref: creatorProfiles.musicbrainzId,
+        fallback: null,
+      },
+      {
+        key: 'isClaimed',
+        name: 'is_claimed',
+        ref: creatorProfiles.isClaimed,
+        fallback: true,
+      },
+    ] as const;
+
+    const availability = await Promise.all(
+      optionalColumns.map(column =>
+        doesColumnExist('creator_profiles', column.name)
+      )
+    );
+
     const smartLinkCreatorSelect = {
       id: creatorProfiles.id,
       userId: creatorProfiles.userId,
@@ -426,20 +487,15 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       appleMusicUrl: creatorProfiles.appleMusicUrl,
       youtubeUrl: creatorProfiles.youtubeUrl,
       musicbrainzId: creatorProfiles.musicbrainzId,
+      isClaimed: creatorProfiles.isClaimed,
     };
-
-    if (await doesColumnExist('creator_profiles', 'is_claimed')) {
-      const [creator] = await db
-        .select({
-          ...smartLinkCreatorSelect,
-          isClaimed: creatorProfiles.isClaimed,
-        })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-        .limit(1);
-
-      return creator ?? null;
-    }
+    const fallbacks: Record<string, unknown> = {};
+    optionalColumns.forEach((column, index) => {
+      if (!availability[index]) {
+        delete (smartLinkCreatorSelect as Record<string, unknown>)[column.key];
+        fallbacks[column.key] = column.fallback;
+      }
+    });
 
     const [creator] = await db
       .select(smartLinkCreatorSelect)
@@ -448,8 +504,8 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       .limit(1);
 
     // Schema-rollout fallback only: this is not canonical profile state.
-    // Revisit once creator_profiles.is_claimed exists in every environment.
-    return creator ? { ...creator, isClaimed: true } : null;
+    // Revisit once these columns exist in every environment.
+    return creator ? { ...fallbacks, ...creator } : null;
   }, `smartLinkCreator(${usernameNormalized})`);
 };
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -16,15 +16,96 @@ import { dirname, matchesGlob, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { generateVoiceDirective } from '../../.agents/skills/gstack/scripts/resolvers/voice.mjs';
-import { evaluate, references } from './check.mjs';
+import { emitBudgetErrors, evaluate, references } from './check.mjs';
 import { grade } from './grade.mjs';
+import {
+  evaluateMergedBudgets,
+  mergedBudgetExcesses,
+} from './merge-budget.mjs';
 import renderPrompt from './prompt.cjs';
+import { checkRuleScopes, collectRuleScopes } from './rule-scopes.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const cases = JSON.parse(
   readFileSync(new URL('./cases.json', import.meta.url), 'utf8')
 );
 const valid = cases.map(c => ({ id: c.id, decision: c.expected }));
+
+test('rule integrity authoring rejects malformed frontmatter and incomplete records', () => {
+  const file = '.claude/rules/auth.md';
+  const scopes = collectRuleScopes(
+    [file],
+    () => '---\npaths: ["apps/web/**"]\n---\n\nReviewed policy\n'
+  );
+  assert.deepEqual(scopes[0].paths, ['apps/web/**']);
+  assert.equal(
+    scopes[0].bodySha256,
+    createHash('sha256').update('Reviewed policy\n').digest('hex')
+  );
+  checkRuleScopes(scopes, structuredClone(scopes));
+  for (const recorded of [
+    [],
+    [...scopes, scopes[0]],
+    [{ ...scopes[0], bodySha256: 'stale' }],
+  ])
+    assert.throws(
+      () => checkRuleScopes(scopes, recorded),
+      /integrity record is stale/
+    );
+  for (const text of [
+    'missing frontmatter',
+    '---\npaths: []\n---\n\nPolicy',
+    '---\npaths: [null]\n---\n\nPolicy',
+    '---\npaths: [" "]\n---\n\nPolicy',
+    '---\npaths: {}\n---\n\nPolicy',
+    '---\npaths: broken\n---\n\nPolicy',
+  ])
+    assert.throws(() => collectRuleScopes([file], () => text));
+});
+
+test('staged integrity check cannot be masked by an unstaged policy or missing rule', t => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'rule-index-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(resolve(dir, '.claude/rules'), { recursive: true });
+  mkdirSync(resolve(dir, 'scripts/agent-context'), { recursive: true });
+  const file = '.claude/rules/auth.md';
+  const manifest = 'scripts/agent-context/rule-scopes.json';
+  const policy = body => `---\npaths: ["apps/web/**"]\n---\n\n${body}\n`;
+  const old = policy('Original policy');
+  writeFileSync(resolve(dir, file), old);
+  writeFileSync(
+    resolve(dir, manifest),
+    JSON.stringify(collectRuleScopes([file], () => old))
+  );
+  const git = args => {
+    const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+  };
+  git(['init', '-q']);
+  writeFileSync(resolve(dir, file), policy('Reviewed change'));
+  git(['add', '.']);
+  writeFileSync(resolve(dir, file), old);
+  const script = fileURLToPath(new URL('./rule-scopes.mjs', import.meta.url));
+  const run = args =>
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+  assert.equal(run([]).status, 0);
+  assert.equal(run(['--staged']).status, 1);
+  writeFileSync(resolve(dir, file), policy('Reviewed change'));
+  assert.equal(run(['--write']).status, 0);
+  git(['add', '.']);
+  assert.equal(run(['--staged']).status, 0);
+  writeFileSync(resolve(dir, file), policy('Unstaged change'));
+  assert.equal(run([]).status, 1);
+  assert.equal(run(['--staged']).status, 0);
+  assert.equal(run(['--staged', '--write']).status, 1);
+  assert.equal(run(['--unknown']).status, 1);
+  git(['rm', '-f', '-q', file]);
+  assert.equal(run(['--staged']).status, 1);
+});
+
 function fixture(t) {
   const dir = mkdtempSync(resolve(tmpdir(), 'context-eval-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -300,4 +381,156 @@ test('shared voice preserves the full original guidance without repeated generat
   assert.ok(
     !landing.includes('**Core belief:** there is no one at the wheel.')
   );
+});
+
+test('budget failures are emitted as workflow errors', () => {
+  const lines = [];
+  emitBudgetErrors(['CLAUDE.md: 6081 bytes exceeds 6000'], line =>
+    lines.push(line)
+  );
+  assert.deepEqual(lines, ['::error::CLAUDE.md: 6081 bytes exceeds 6000']);
+});
+
+function budgetRepo(t) {
+  const dir = mkdtempSync(resolve(tmpdir(), 'merge-budget-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const run = args =>
+    execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+  run(['init', '-b', 'main']);
+  run(['config', 'user.email', 'budget@example.com']);
+  run(['config', 'user.name', 'budget']);
+  mkdirSync(resolve(dir, 'docs/agent-context'), { recursive: true });
+  writeFileSync(resolve(dir, 'CLAUDE.md'), `${'a'.repeat(100)}\n`);
+  writeFileSync(resolve(dir, 'DESIGN.md'), '# design\n');
+  writeFileSync(resolve(dir, 'docs/agent-context/README.md'), '# context\n');
+  run(['add', '.']);
+  run(['commit', '-m', 'base']);
+  return { dir, run };
+}
+
+test('post-merge budget check skips PRs that do not touch capped files', t => {
+  const { dir, run } = budgetRepo(t);
+  writeFileSync(resolve(dir, 'CLAUDE.md'), 'x'.repeat(6001));
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'base already over']);
+  run(['checkout', '-b', 'feature', 'HEAD~1']);
+  writeFileSync(resolve(dir, 'notes.txt'), 'unrelated\n');
+  run(['add', 'notes.txt']);
+  run(['commit', '-m', 'feature']);
+  const result = evaluateMergedBudgets({
+    cwd: dir,
+    base: 'main',
+    head: 'HEAD',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+});
+
+test('post-merge budget check rejects a head that fits only before merging main', t => {
+  const { dir, run } = budgetRepo(t);
+  const root = run(['rev-parse', 'HEAD']).trim();
+  const body = `${'a'.repeat(5900)}\n`;
+  writeFileSync(resolve(dir, 'CLAUDE.md'), body);
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'shared body']);
+  const shared = run(['rev-parse', 'HEAD']).trim();
+  writeFileSync(resolve(dir, 'CLAUDE.md'), `${'s'.repeat(80)}\n${body}`);
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'main grew']);
+  run(['checkout', '-b', 'feature', shared]);
+  writeFileSync(resolve(dir, 'CLAUDE.md'), `${body}${'r'.repeat(40)}\n`);
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'add route']);
+  assert.ok(root);
+  const merged = evaluateMergedBudgets({
+    cwd: dir,
+    base: 'main',
+    head: 'HEAD',
+  });
+  assert.equal(merged.skipped, false);
+  assert.equal(merged.ok, false);
+  assert.match(merged.errors.join('\n'), /CLAUDE\.md: \d+ bytes exceeds 6000/);
+  assert.ok(merged.sizes['CLAUDE.md'] <= 6000 + 80 + 41);
+});
+
+test('merged budget excess names a missing file and an oversized file', () => {
+  const errors = mergedBudgetExcesses({
+    'CLAUDE.md': 6001,
+    'DESIGN.md': 1,
+  });
+  assert.match(errors.join('\n'), /CLAUDE\.md: 6001 bytes exceeds 6000/);
+  assert.match(
+    errors.join('\n'),
+    /missing merged docs\/agent-context\/README\.md/
+  );
+});
+
+test('post-merge budget check fails closed without a tree or blob', () => {
+  const missingTree = evaluateMergedBudgets({
+    base: 'base',
+    head: 'head',
+    run: (_cwd, args) => (args[0] === 'diff' ? 'CLAUDE.md\n' : 'not-a-sha\n'),
+  });
+  assert.match(missingTree.errors[0], /did not produce a tree/);
+  const tree = 'a'.repeat(40);
+  const missingBlob = evaluateMergedBudgets({
+    base: 'base',
+    head: 'head',
+    run: (_cwd, args) => {
+      if (args[0] === 'diff') return 'DESIGN.md\n';
+      if (args[0] === 'merge-tree') return `${tree}\n`;
+      if (String(args[2]).endsWith('DESIGN.md')) return '12\n';
+      throw new Error('missing blob');
+    },
+  });
+  assert.equal(missingBlob.ok, false);
+  assert.match(missingBlob.errors.join('\n'), /missing merged CLAUDE\.md/);
+});
+
+test('merge-budget CLI exits with the post-merge result', t => {
+  const { dir, run } = budgetRepo(t);
+  const script = resolve(root, 'scripts/agent-context/merge-budget.mjs');
+  const invoke = args =>
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+  const missing = invoke([]);
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /base and head are required/);
+  const skipped = invoke(['--base', 'main', '--head', 'HEAD']);
+  assert.equal(skipped.status, 0);
+  assert.match(skipped.stdout, /post-merge size check skipped/);
+  run(['checkout', '-b', 'feature']);
+  writeFileSync(resolve(dir, 'CLAUDE.md'), `${'a'.repeat(100)}\nok\n`);
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'still under']);
+  const under = invoke(['--base', 'main', '--head', 'HEAD']);
+  assert.equal(under.status, 0);
+  assert.match(under.stdout, /"ok":true/);
+  writeFileSync(resolve(dir, 'CLAUDE.md'), `${'x'.repeat(6001)}\n`);
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'over']);
+  const over = invoke(['--base', 'main', '--head', 'HEAD']);
+  assert.equal(over.status, 1);
+  assert.match(over.stderr, /::error::CLAUDE\.md: \d+ bytes exceeds 6000/);
+});
+
+test('post-merge budget check fails closed when the capped file conflicts', t => {
+  const { dir, run } = budgetRepo(t);
+  const root = run(['rev-parse', 'HEAD']).trim();
+  writeFileSync(resolve(dir, 'CLAUDE.md'), 'main side\n');
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'main']);
+  run(['checkout', '-b', 'feature', root]);
+  writeFileSync(resolve(dir, 'CLAUDE.md'), 'feature side\n');
+  run(['add', 'CLAUDE.md']);
+  run(['commit', '-m', 'feature']);
+  const result = evaluateMergedBudgets({
+    cwd: dir,
+    base: 'main',
+    head: 'HEAD',
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.errors[0], /conflicts/);
 });

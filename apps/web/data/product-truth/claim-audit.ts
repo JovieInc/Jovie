@@ -103,6 +103,30 @@ export interface BaselineComparison {
   readonly stale: readonly string[];
 }
 
+/**
+ * Public marketing copy must not claim web research. That job lives on
+ * `profile-monitoring`, which is internal-only and has no public marketing
+ * block (JOV-7581).
+ */
+export const UNCERTIFIED_WEB_RESEARCH_CLAIM = 'what the web says about you';
+
+export function findUncertifiedWebResearchClaims(
+  modules: Readonly<Record<string, unknown>>,
+  phrase: string = UNCERTIFIED_WEB_RESEARCH_CLAIM
+): CopyClaimFinding[] {
+  const needle = normalizeClaimText(phrase);
+  const findings = new Map<string, CopyClaimFinding>();
+  for (const [file, moduleExports] of Object.entries(modules)) {
+    for (const text of collectStrings(moduleExports)) {
+      const normalized = normalizeClaimText(text);
+      if (!normalized.includes(needle)) continue;
+      const key = `${file}#${hashText(normalized)}`;
+      if (!findings.has(key)) findings.set(key, { key, file, text });
+    }
+  }
+  return [...findings.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
 export function compareToBaseline(
   findings: readonly CopyClaimFinding[],
   baselineKeys: readonly string[]

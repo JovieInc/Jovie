@@ -51,5 +51,35 @@ describe('SettingsSmsAccessSection', () => {
     expect(
       screen.getByRole('button', { name: 'Request SMS Access' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No SMS subscribers yet. People can sign up on your profile page.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Let your audience opt in to text alerts when you publish.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('counts subscribers without calling them fans', () => {
+    mockUseSmsAccessRequestMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isSuccess: false,
+      isError: false,
+      error: null,
+    });
+
+    render(
+      <SettingsSmsAccessSection
+        smsSubscriberCount={2}
+        alreadyRequested={false}
+      />
+    );
+
+    expect(screen.getByText(/subscribers have/)).toBeInTheDocument();
+    expect(screen.queryByText(/fans have/)).not.toBeInTheDocument();
   });
 });

@@ -1,0 +1,1964 @@
+{
+  "title": "fleet.status result v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "completed"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "entityRef": {
+          "type": "object",
+          "properties": {
+            "entityType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "entityId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "entityType",
+            "entityId"
+          ],
+          "additionalProperties": false
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "worker": {
+              "type": "object",
+              "properties": {
+                "workerId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                },
+                "runtimeClass": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "capabilities": {
+                  "maxItems": 32,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "tools": {
+                  "maxItems": 32,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "connectors": {
+                  "maxItems": 32,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "availability": {
+                  "type": "string",
+                  "enum": [
+                    "available",
+                    "busy",
+                    "offline"
+                  ]
+                },
+                "specialization": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "fleet:register",
+                      "fleet:read",
+                      "work:next",
+                      "work:claim",
+                      "work:report",
+                      "defect:report",
+                      "fleet:discover",
+                      "work:request"
+                    ]
+                  }
+                },
+                "registeredAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "revoked": {
+                  "type": "boolean"
+                },
+                "authority": {
+                  "type": "object",
+                  "properties": {
+                    "identity": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "accountRef": {
+                          "type": "string",
+                          "pattern": "^urn:[a-z0-9][a-z0-9:._-]{2,180}$"
+                        },
+                        "runtimeRef": {
+                          "type": "string",
+                          "pattern": "^urn:[a-z0-9][a-z0-9:._-]{2,180}$"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "operator",
+                            "customer"
+                          ]
+                        },
+                        "attestationRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "accountRef",
+                        "runtimeRef",
+                        "displayName",
+                        "role",
+                        "attestationRef"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "operators",
+                        "fleet"
+                      ]
+                    },
+                    "allowedCommands": {
+                      "minItems": 1,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "artist.get",
+                          "artist.llms",
+                          "api.openapi",
+                          "docs.llms"
+                        ]
+                      }
+                    },
+                    "allowedTools": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      }
+                    },
+                    "allowedConnectors": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      }
+                    },
+                    "maxDurationSeconds": {
+                      "type": "integer",
+                      "minimum": 30,
+                      "maximum": 3600
+                    },
+                    "maxConcurrentLeases": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "spendUsd": {
+                      "type": "number",
+                      "const": 0
+                    }
+                  },
+                  "required": [
+                    "identity",
+                    "visibility",
+                    "allowedCommands",
+                    "allowedTools",
+                    "allowedConnectors",
+                    "maxDurationSeconds",
+                    "maxConcurrentLeases",
+                    "spendUsd"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "workerId",
+                "runtimeClass",
+                "capabilities",
+                "tools",
+                "connectors",
+                "availability",
+                "scopes",
+                "registeredAt",
+                "updatedAt",
+                "revoked"
+              ],
+              "additionalProperties": false
+            },
+            "lease": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "leaseId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "workerId": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                    },
+                    "mission": {
+                      "type": "object",
+                      "properties": {
+                        "missionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "issueId": {
+                          "type": "string",
+                          "pattern": "^JOV-[1-9][0-9]*$"
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "acceptanceCriteria": {
+                          "minItems": 1,
+                          "maxItems": 10,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "owner": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "existingWorkRefs": {
+                          "maxItems": 10,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "command": {
+                          "type": "string",
+                          "enum": [
+                            "artist.get",
+                            "artist.llms",
+                            "api.openapi",
+                            "docs.llms"
+                          ]
+                        },
+                        "argument": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "requiredTools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          }
+                        },
+                        "requiredConnectors": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          }
+                        },
+                        "targetWorkerId": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                        },
+                        "maxDurationSeconds": {
+                          "type": "integer",
+                          "minimum": 30,
+                          "maximum": 3600
+                        },
+                        "notAfter": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "founderIntentRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "required": [
+                        "missionId",
+                        "issueId",
+                        "title",
+                        "acceptanceCriteria",
+                        "owner",
+                        "existingWorkRefs",
+                        "command",
+                        "requiredTools",
+                        "requiredConnectors",
+                        "maxDurationSeconds",
+                        "notAfter",
+                        "founderIntentRef"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "offered",
+                        "claimed",
+                        "reported"
+                      ]
+                    },
+                    "offeredAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "claimedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "leaseId",
+                    "workerId",
+                    "mission",
+                    "state",
+                    "offeredAt",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "receipts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "leaseId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "completed",
+                      "failed",
+                      "blocked"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "evidence": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "receiptId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "workerId": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                  },
+                  "missionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reportedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "durationMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "leaseId",
+                  "outcome",
+                  "summary",
+                  "evidence",
+                  "receiptId",
+                  "workerId",
+                  "missionId",
+                  "reportedAt",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "requests": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "help",
+                      "dogfood",
+                      "research"
+                    ]
+                  },
+                  "proposal": {
+                    "type": "object",
+                    "properties": {
+                      "issueId": {
+                        "type": "string",
+                        "pattern": "^JOV-[1-9][0-9]*$"
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "acceptanceCriteria": {
+                        "minItems": 1,
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "existingWorkRefs": {
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "command": {
+                        "type": "string",
+                        "enum": [
+                          "artist.get",
+                          "artist.llms",
+                          "api.openapi",
+                          "docs.llms"
+                        ]
+                      },
+                      "argument": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "requiredTools": {
+                        "maxItems": 32,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "requiredConnectors": {
+                        "maxItems": 32,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "targetWorkerId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                      },
+                      "maxDurationSeconds": {
+                        "type": "integer",
+                        "minimum": 30,
+                        "maximum": 3600
+                      },
+                      "notAfter": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      }
+                    },
+                    "required": [
+                      "issueId",
+                      "title",
+                      "acceptanceCriteria",
+                      "existingWorkRefs",
+                      "command",
+                      "requiredTools",
+                      "requiredConnectors",
+                      "maxDurationSeconds",
+                      "notAfter"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "requesterWorkerId": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "accepted",
+                      "rejected",
+                      "expired",
+                      "completed",
+                      "failed",
+                      "blocked",
+                      "unavailable"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "capacity",
+                      "scope",
+                      "identity",
+                      "duplicate",
+                      "unavailable",
+                      "declined"
+                    ]
+                  },
+                  "receipt": {
+                    "type": "object",
+                    "properties": {
+                      "leaseId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "completed",
+                          "failed",
+                          "blocked"
+                        ]
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "evidence": {
+                        "minItems": 1,
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "summary": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1000
+                            }
+                          },
+                          "required": [
+                            "ref",
+                            "summary"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "receiptId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "workerId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                      },
+                      "missionId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "reportedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      },
+                      "durationMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "leaseId",
+                      "outcome",
+                      "summary",
+                      "evidence",
+                      "receiptId",
+                      "workerId",
+                      "missionId",
+                      "reportedAt",
+                      "durationMs"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "requestId",
+                  "kind",
+                  "proposal",
+                  "requesterWorkerId",
+                  "createdAt",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "requestsNextCursor": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "history": {
+              "type": "object",
+              "properties": {
+                "entries": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "sequence": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "kind": {
+                            "type": "string",
+                            "const": "receipt"
+                          },
+                          "receipt": {
+                            "type": "object",
+                            "properties": {
+                              "leaseId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "completed",
+                                  "failed",
+                                  "blocked"
+                                ]
+                              },
+                              "summary": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2000
+                              },
+                              "evidence": {
+                                "minItems": 1,
+                                "maxItems": 10,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "ref": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    },
+                                    "summary": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 1000
+                                    }
+                                  },
+                                  "required": [
+                                    "ref",
+                                    "summary"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "receiptId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "workerId": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                              },
+                              "missionId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "reportedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "durationMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "leaseId",
+                              "outcome",
+                              "summary",
+                              "evidence",
+                              "receiptId",
+                              "workerId",
+                              "missionId",
+                              "reportedAt",
+                              "durationMs"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "sequence",
+                          "kind",
+                          "receipt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "sequence": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "kind": {
+                            "type": "string",
+                            "const": "request"
+                          },
+                          "request": {
+                            "type": "object",
+                            "properties": {
+                              "requestId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "help",
+                                  "dogfood",
+                                  "research"
+                                ]
+                              },
+                              "proposal": {
+                                "type": "object",
+                                "properties": {
+                                  "issueId": {
+                                    "type": "string",
+                                    "pattern": "^JOV-[1-9][0-9]*$"
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "acceptanceCriteria": {
+                                    "minItems": 1,
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    }
+                                  },
+                                  "existingWorkRefs": {
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    }
+                                  },
+                                  "command": {
+                                    "type": "string",
+                                    "enum": [
+                                      "artist.get",
+                                      "artist.llms",
+                                      "api.openapi",
+                                      "docs.llms"
+                                    ]
+                                  },
+                                  "argument": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100
+                                  },
+                                  "requiredTools": {
+                                    "maxItems": 32,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 100
+                                    }
+                                  },
+                                  "requiredConnectors": {
+                                    "maxItems": 32,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 100
+                                    }
+                                  },
+                                  "targetWorkerId": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                                  },
+                                  "maxDurationSeconds": {
+                                    "type": "integer",
+                                    "minimum": 30,
+                                    "maximum": 3600
+                                  },
+                                  "notAfter": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                  }
+                                },
+                                "required": [
+                                  "issueId",
+                                  "title",
+                                  "acceptanceCriteria",
+                                  "existingWorkRefs",
+                                  "command",
+                                  "requiredTools",
+                                  "requiredConnectors",
+                                  "maxDurationSeconds",
+                                  "notAfter"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "requesterWorkerId": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "accepted",
+                                  "rejected",
+                                  "expired",
+                                  "completed",
+                                  "failed",
+                                  "blocked",
+                                  "unavailable"
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": [
+                                  "capacity",
+                                  "scope",
+                                  "identity",
+                                  "duplicate",
+                                  "unavailable",
+                                  "declined"
+                                ]
+                              },
+                              "receipt": {
+                                "type": "object",
+                                "properties": {
+                                  "leaseId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "completed",
+                                      "failed",
+                                      "blocked"
+                                    ]
+                                  },
+                                  "summary": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  },
+                                  "evidence": {
+                                    "minItems": 1,
+                                    "maxItems": 10,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "ref": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 500
+                                        },
+                                        "summary": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 1000
+                                        }
+                                      },
+                                      "required": [
+                                        "ref",
+                                        "summary"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "receiptId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "workerId": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                                  },
+                                  "missionId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "reportedAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                  },
+                                  "durationMs": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "leaseId",
+                                  "outcome",
+                                  "summary",
+                                  "evidence",
+                                  "receiptId",
+                                  "workerId",
+                                  "missionId",
+                                  "reportedAt",
+                                  "durationMs"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "requestId",
+                              "kind",
+                              "proposal",
+                              "requesterWorkerId",
+                              "createdAt",
+                              "state"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "sequence",
+                          "kind",
+                          "request"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "nextCursor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "pending": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "entries",
+                "nextCursor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "worker",
+            "lease",
+            "receipts"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "handoff"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "handoff": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "string",
+              "minLength": 1
+            },
+            "labelKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "target"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "handoff"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "requires_input"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "missingFields": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "missingFields"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "in_progress"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "status",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "unavailable"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "AUTH_REQUIRED",
+                "PROFILE_REQUIRED",
+                "FORBIDDEN",
+                "ENTITLEMENT_REQUIRED",
+                "ENTITLEMENT_UNVERIFIED",
+                "QUOTA_EXHAUSTED",
+                "FEATURE_DISABLED",
+                "PROVIDER_UNAVAILABLE",
+                "CLIENT_UPGRADE_REQUIRED",
+                "VALIDATION_FAILED",
+                "REQUIRES_INPUT",
+                "CONFIRMATION_REQUIRED",
+                "CONFLICT",
+                "IN_PROGRESS",
+                "RATE_LIMITED",
+                "TEMPORARILY_UNAVAILABLE",
+                "INTERNAL"
+              ]
+            },
+            "messageKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "fieldIssues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "messageKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path",
+                  "messageKey"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "upgrade": {
+              "type": "object",
+              "properties": {
+                "eligible": {
+                  "type": "boolean"
+                },
+                "routeRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "eligible"
+              ],
+              "additionalProperties": false
+            },
+            "handoff": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "labelKey": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "code",
+            "messageKey",
+            "retryable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "failed"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "AUTH_REQUIRED",
+                "PROFILE_REQUIRED",
+                "FORBIDDEN",
+                "ENTITLEMENT_REQUIRED",
+                "ENTITLEMENT_UNVERIFIED",
+                "QUOTA_EXHAUSTED",
+                "FEATURE_DISABLED",
+                "PROVIDER_UNAVAILABLE",
+                "CLIENT_UPGRADE_REQUIRED",
+                "VALIDATION_FAILED",
+                "REQUIRES_INPUT",
+                "CONFIRMATION_REQUIRED",
+                "CONFLICT",
+                "IN_PROGRESS",
+                "RATE_LIMITED",
+                "TEMPORARILY_UNAVAILABLE",
+                "INTERNAL"
+              ]
+            },
+            "messageKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "fieldIssues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "messageKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path",
+                  "messageKey"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "upgrade": {
+              "type": "object",
+              "properties": {
+                "eligible": {
+                  "type": "boolean"
+                },
+                "routeRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "eligible"
+              ],
+              "additionalProperties": false
+            },
+            "handoff": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "labelKey": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "code",
+            "messageKey",
+            "retryable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -56,10 +56,10 @@ describe('CLI landing page', () => {
     expect(pageText).toContain('No API key');
     expect(pageText).toContain('MCP server');
     expect(pageText).toContain('JSON output');
-    expect(pageText).toContain('Give an artist a profile');
+    expect(pageText).toContain('Give a creator a profile');
     expect(pageText).toContain('Plug Jovie into an agent');
-    expect(pageText).toContain('Get an artist');
-    expect(pageText).toContain('Give an artist to an agent');
+    expect(pageText).toContain('Get a profile');
+    expect(pageText).toContain('Give a profile to an agent');
     expect(pageText).toContain('Build against Jovie');
     expect(pageText).toContain('Give Jovie to an agent');
 

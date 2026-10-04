@@ -10,11 +10,13 @@ Internal work uses `<!-- customer-changelog/v1 {"releaseWorthy":false} -->`.
 Source Validation requires an explicit decision for customer-code PRs created from 2026-10-03 UTC; older PRs retain their admission contract. Metadata-only repairs require rerunning Source Validation.
 
 ```html
-<!-- customer-changelog/v1 {"issueId":"JOV-7447","outcomeKey":"profile-link-claim","audience":"public","visibility":"public","releaseWorthy":true,"section":"Added","text":"Choose your profile link: Start with a name on the homepage.","evidence":[{"url":"https://jov.ie/","contains":"Claim"}]} -->
+<!-- customer-changelog/v1 {"issueId":"JOV-7447","outcomeKey":"profile-link-claim","audience":"public","visibility":"public","releaseWorthy":true,"section":"Added","text":"Choose your profile link: Start with a name on the homepage.","availability":{"status":"ga","prerequisites":[]},"evidence":[{"url":"https://jov.ie/","contains":"Claim"}]} -->
 ```
 
 Sections: Added, Changed, Fixed, Removed. Public copy is at most 400 characters, without internal tooling or issue IDs.
 Evidence uses bounded read-only checks on jov.ie or docs.jov.ie. Approve only claims the path actually proves; authenticated actions, payments and entitlements need their actual customer-path receipt, not marketing headlines.
+Optional `details` (up to 3 claim-mapped bullets, each at most 240 customer-safe characters) explain what changed and why it matters beyond the one-line outcome.
+Optional `action` (`{"label":"…","href":"…"}`, label at most 80 characters) gives the entry one next step. The destination must be an internal path or `https` on jov.ie/docs.jov.ie — a working example, setup, or help route a signed-out visitor can actually open. Unsafe or unverifiable destinations fail validation; omit `action` rather than linking a placeholder or the generic homepage.
 
 ## Release path
 
@@ -37,3 +39,9 @@ Scripts CI runs evaluator/publication tests with per-file floors: 85% lines, 75%
 Recovery scans at most 5,000 first-parent commits; PR reads batch 50/request; public sources have at most three checks. Normal collection starts at the last published deployment head. No model, service, database, cron or automatic email.
 Adopt-first decision, 2026-10-02: extend the existing evaluator, parsers, verified artifact and release transport.
 A separate service/store adds an authority without fixing the missing publisher. Ship now: approved copy and verified outcomes. Re-evaluate when PR writers cannot maintain metadata; then assess the existing governed factual-writing model route with measured evaluation proof.
+
+## Customer archive and rollout evidence
+
+The customer index, feeds, and What's New project only exact copy approved by a bound daily publication receipt. Historical engineering records keep their original source, dates, and permanent version pages, linked from the collapsed engineering-history index. Unreviewed technical bullets are not customer cards.
+
+New public source metadata declares `availability: {status: "ga" | "preview" | "limited", prerequisites: string[]}`. Limited rollout requires explicit prerequisites. The publisher retains this declaration and its verified customer-path evidence; it does not infer GA from eligibility. Older receipts without a declaration remain explicitly `unverified`, with no GA claim. Public/internal and scope admission for new customer-code PRs begins October 3 UTC; existing PRs keep their admission rules.

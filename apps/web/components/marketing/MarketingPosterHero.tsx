@@ -2,6 +2,7 @@
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
 import { MarketingHero } from './MarketingHero';
 
@@ -83,7 +84,10 @@ export function MarketingPosterHero({
           >
             <LinkComponent
               href={primaryCta.href}
-              prefetch={primaryCta.prefetch}
+              prefetch={resolveMarketingAuthPrefetch(
+                primaryCta.href,
+                primaryCta.prefetch
+              )}
               {...analyticsPropsFor(primaryCta)}
               data-testid='homepage-primary-cta'
               data-cta-sign-up={primaryCta.signUp ? 'true' : undefined}
@@ -103,7 +107,10 @@ export function MarketingPosterHero({
             >
               <LinkComponent
                 href={secondaryCta.href}
-                prefetch={secondaryCta.prefetch}
+                prefetch={resolveMarketingAuthPrefetch(
+                  secondaryCta.href,
+                  secondaryCta.prefetch
+                )}
                 {...analyticsPropsFor(secondaryCta)}
                 data-testid='homepage-secondary-cta'
               >

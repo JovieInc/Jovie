@@ -5,7 +5,16 @@ struct CachedMeSnapshot: Codable, Equatable, Sendable {
   let cachedAt: Date
 }
 
-actor MeCache {
+protocol MeCaching: Sendable {
+  func load(for userID: String) async -> CachedMeSnapshot?
+  func store(_ response: MobileMeResponse, for userID: String) async
+  func store(_ response: MobileMeResponse, for userID: String,
+             ifOwnedBy ownership: NativeSessionOwnership) async -> Bool
+  func remove(for userID: String) async
+  func remove(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) async
+}
+
+actor MeCache: MeCaching {
   private var memory: [String: CachedMeSnapshot] = [:]
   private let defaults: UserDefaults
   private let encoder = JSONEncoder()
@@ -42,6 +51,16 @@ actor MeCache {
   func remove(for userID: String) {
     memory[userID] = nil
     defaults.removeObject(forKey: cacheKey(for: userID))
+  }
+
+  func store(
+    _ response: MobileMeResponse, for userID: String, ifOwnedBy ownership: NativeSessionOwnership
+  ) -> Bool {
+    NativeSessionTokenStore.performIfCurrent(ownership) { store(response, for: userID) }
+  }
+
+  func remove(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) {
+    NativeSessionTokenStore.performIfCurrent(ownership) { remove(for: userID) }
   }
 
   private func cacheKey(for userID: String) -> String {
