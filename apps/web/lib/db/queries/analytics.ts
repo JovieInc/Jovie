@@ -36,8 +36,10 @@ import {
   dailyProfileViews,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
+import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -47,6 +49,11 @@ import type {
 
 type JsonArray<T> = T[] | string | null;
 type AggregateValue = string | number | null;
+
+export interface CanonicalPublicProfileObservation {
+  readonly count: number;
+  readonly latest: string | null;
+}
 
 const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
   if (!value) return [];
@@ -619,6 +626,91 @@ export async function getCanonicalProfileViews(input: {
     .where(and(...conditions));
 
   return Number(row?.views ?? 0);
+}
+
+/**
+ * Canonical `profile_views` observation across public, claimed customer
+ * profiles. The metric formula remains CANONICAL_METRICS.profile_views; this
+ * query only fixes the population used by the admin capability evidence view.
+ * A null result means a required source table is unavailable.
+ */
+export async function getCanonicalPublicProfileViewObservation(input: {
+  readonly windowDays: number;
+}): Promise<CanonicalPublicProfileObservation | null> {
+  if (
+    !(await doesTableExist(TABLE_NAMES.creatorProfiles)) ||
+    !(await doesTableExist(TABLE_NAMES.dailyProfileViews))
+  ) {
+    return null;
+  }
+
+  const [row] = await db
+    .select({
+      count: drizzleSql<number>`coalesce(sum(${dailyProfileViews.viewCount}), 0)::int`,
+      latest: drizzleSql<string | null>`max(${dailyProfileViews.viewDate})`,
+    })
+    .from(dailyProfileViews)
+    .innerJoin(
+      creatorProfiles,
+      eq(creatorProfiles.id, dailyProfileViews.creatorProfileId)
+    )
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(
+      and(
+        drizzleSql`${dailyProfileViews.viewDate} >= (current_date - ${input.windowDays})::text::date`,
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isClaimed, true),
+        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+      )
+    );
+
+  return {
+    count: Number(row?.count ?? 0),
+    latest: row?.latest ?? null,
+  };
+}
+
+/**
+ * Canonical `total_clicks` observation across public, claimed customer
+ * profiles. A null result means a required source table is unavailable.
+ */
+export async function getCanonicalPublicProfileClickObservation(input: {
+  readonly windowDays: number;
+}): Promise<CanonicalPublicProfileObservation | null> {
+  if (
+    !(await doesTableExist(TABLE_NAMES.creatorProfiles)) ||
+    !(await doesTableExist('click_events'))
+  ) {
+    return null;
+  }
+
+  const [row] = await db
+    .select({
+      count: drizzleSql<number>`count(*)::int`,
+      latest: drizzleSql<
+        string | null
+      >`max(${clickEvents.createdAt}::date)::text`,
+    })
+    .from(clickEvents)
+    .innerJoin(
+      creatorProfiles,
+      eq(creatorProfiles.id, clickEvents.creatorProfileId)
+    )
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(
+      and(
+        drizzleSql`${clickEvents.createdAt} >= now() - make_interval(days => ${input.windowDays})`,
+        eq(clickEvents.isBot, false),
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isClaimed, true),
+        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+      )
+    );
+
+  return {
+    count: Number(row?.count ?? 0),
+    latest: row?.latest ?? null,
+  };
 }
 
 /**
