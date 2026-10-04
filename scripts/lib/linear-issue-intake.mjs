@@ -1,53 +1,46 @@
-const LINEAR_API = 'https://api.linear.app/graphql';
-const LINEAR_REQUEST_TIMEOUT_MS = 15_000;
-export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+import { linearRequest } from './linear-cooldown.mjs';
 
-async function readResponse(response) {
-  const text = await response.text();
-  if (!text) return { json: null, text: '' };
-  try {
-    return { json: JSON.parse(text), text };
-  } catch {
-    return { json: null, text };
-  }
-}
+export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
 async function linearGraphql(
   { query, variables, apiKey, fetchImpl = fetch },
   caller
 ) {
-  try {
-    const response = await fetchImpl(LINEAR_API, {
-      method: 'POST',
-      headers: {
-        Authorization: apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(LINEAR_REQUEST_TIMEOUT_MS),
-    });
-    const parsed = await readResponse(response);
-    if (!response.ok) {
-      return {
-        ok: false,
-        reason: `${caller}_${response.status}`,
-        body: parsed.json ?? parsed.text,
-      };
-    }
-    if (Array.isArray(parsed.json?.errors) && parsed.json.errors.length > 0)
-      return {
-        ok: false,
-        reason: `${caller}_graphql_error`,
-        body: parsed.json.errors,
-      };
-    return { ok: true, data: parsed.json?.data ?? null, raw: parsed.json };
-  } catch (error) {
+  const result = await linearRequest({
+    key: apiKey,
+    query,
+    variables,
+    fetchImpl,
+  });
+  if (result.rateLimited) {
     return {
       ok: false,
-      reason: `${caller}_transport`,
-      body: error instanceof Error ? error.message : String(error),
+      reason: 'linear_rate_limited',
+      resetAt: result.resetAt,
+      body: result.data,
     };
   }
+  if (result.reason === 'missing_linear_api_key') {
+    return { ok: false, reason: 'missing_linear_api_key' };
+  }
+  if (result.reason === 'transport') {
+    return { ok: false, reason: `${caller}_transport`, body: result.error };
+  }
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason: `${caller}_${result.status}`,
+      body: result.data ?? result.text,
+    };
+  }
+  if (Array.isArray(result.data?.errors) && result.data.errors.length > 0) {
+    return {
+      ok: false,
+      reason: `${caller}_graphql_error`,
+      body: result.data.errors,
+    };
+  }
+  return { ok: true, data: result.data?.data ?? null, raw: result.data };
 }
 
 /** Post a comment on a Linear issue. */

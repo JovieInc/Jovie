@@ -681,6 +681,15 @@ jobs:
       concurrency-key: release-${{ needs.authorize-release.outputs.release_sha }}
       full-regression: true
 
+  # Store graphics for every release generation. Advisory: never gates beta.
+  app-store-graphics:
+    name: iOS App Store graphics
+    needs: [authorize-release]
+    if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
+    uses: ./.github/workflows/ios-app-store-graphics.yml
+    with:
+      checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}
+
   beta:
     name: Upload Internal TestFlight
     needs: [authorize-release, full-regression]

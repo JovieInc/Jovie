@@ -98,6 +98,7 @@ export {
   healthLimiter,
   inspectPressSourceHourlyLimiter,
   inspectPressSourceLimiter,
+  investorPortalTokenLimiter,
   isrcRescanLimiter,
   libraryAssetShareAccessLimiter,
   merchCheckoutLimiter,

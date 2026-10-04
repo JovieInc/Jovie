@@ -512,6 +512,22 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   /**
+   * Investor-portal token validation: 30 attempts per minute per IP.
+   * Each attempt is a DB-backed token lookup, so the dedicated bucket bounds
+   * brute-force token guessing whether the token arrives via ?t= or cookie.
+   */
+  investorPortalToken: {
+    name: 'Investor Portal Token',
+    limit: 30,
+    window: '1 m',
+    prefix: 'public:investor-portal-token',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /**
    * Private library share link reads: 30 requests per minute per IP.
    * This token-bearing RSC surface performs database reads for both metadata
    * and page content, so it needs a dedicated bucket before either lookup.
