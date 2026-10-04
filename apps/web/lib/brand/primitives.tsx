@@ -1,10 +1,6 @@
+import { JOVIE_BRAND_GEOMETRY } from '@jovie/ui/brand/geometry.gen';
 import type { CSSProperties } from 'react';
-import { JOVIE_PATH, JOVIE_VIEWBOX, WORDMARK_TRACK } from '@/lib/brand/tokens';
-import {
-  LETTER_PAIRS,
-  LETTER_PATHS,
-  LETTER_SEQUENCE,
-} from '@/lib/brand/wordmark-letters';
+import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
 
 /**
  * Server-renderable SVG primitives for the Jovie brand. No state, no hooks,
@@ -66,10 +62,29 @@ export function Mark({
   );
 }
 
+type WordmarkMaster = keyof typeof JOVIE_BRAND_GEOMETRY.wordmark;
+
+/**
+ * The "Jovie" wordmark as static outlines from the construction
+ * (packages/brand). Its o is the mark itself. Below 24 px the Text master
+ * (open seam, looser spacing) is used. For the animated wordmark that folds
+ * into the O, render <JovieWordmark> from @jovie/ui/brand.
+ */
+export function wordmarkGeometry(height: number) {
+  const master: WordmarkMaster = height < 24 ? 'text' : 'display';
+  const w = JOVIE_BRAND_GEOMETRY.wordmark[master];
+  const [, , width, boxHeight] = w.viewBox;
+  return {
+    master,
+    viewBox: `0 0 ${width} ${boxHeight}`,
+    aspect: width / boxHeight,
+    glyphs: w.glyphs.map(g => ({ char: g.char, d: g.d })),
+  };
+}
+
 interface WordmarkProps {
   readonly height?: number;
   readonly color?: string;
-  readonly markAsO?: boolean;
   readonly className?: string;
   readonly title?: string;
   readonly style?: CSSProperties;
@@ -78,94 +93,29 @@ interface WordmarkProps {
 export function Wordmark({
   height = 40,
   color = 'currentColor',
-  markAsO = false,
   className,
   title,
   style,
 }: WordmarkProps) {
-  const placed = LETTER_SEQUENCE.reduce<
-    Array<{
-      letter: (typeof LETTER_SEQUENCE)[number];
-      x: number;
-      w: number;
-      d: string;
-      rule?: 'evenodd';
-    }>
-  >((acc, letter, i) => {
-    const prev = acc[i - 1];
-    const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
-    let prevAdvance = 0;
-    if (prev) {
-      const pairTrack = prevPair ? WORDMARK_TRACK[prevPair] : 0;
-      prevAdvance = prev.w + pairTrack;
-    }
-    const x = (prev?.x ?? 0) + prevAdvance;
-    const p = LETTER_PATHS[letter];
-    acc.push({ letter, x, w: p.w, d: p.d, rule: p.rule });
-    return acc;
-  }, []);
-  const lastIndex = placed.length - 1;
-  const last = placed[lastIndex];
-  const lastPair = LETTER_PAIRS[lastIndex];
-  const totalW = last.x + last.w + (lastPair ? WORDMARK_TRACK[lastPair] : 0);
-  const width = (totalW / 100) * height;
-  const viewBox = `0 0 ${totalW} 100`;
+  const g = wordmarkGeometry(height);
   const mergedStyle = { display: 'block', color, ...style };
-  const glyphs = placed.map((p, i) => {
-    if (p.letter === 'O' && markAsO) {
-      // Drop the mark into the O slot. Mark outer R is 177 in its 360
-      // viewBox, centered at (180,180). Scale 100/354 ≈ 0.2825 to fit the
-      // O's 100×100 box with the ring landing where the O's ring would.
-      const s = 100 / 354;
-      const tx = p.x + (100 - 360 * s) / 2;
-      const ty = (100 - 360 * s) / 2;
-      return (
-        <g
-          key={`${p.letter}-${String(i)}`}
-          transform={`translate(${tx} ${ty}) scale(${s})`}
-        >
-          <path fill='currentColor' d={JOVIE_PATH} />
-        </g>
-      );
-    }
-    return (
-      <path
-        key={`${p.letter}-${String(i)}`}
-        fill='currentColor'
-        fillRule={p.rule ?? 'nonzero'}
-        transform={`translate(${p.x} 0)`}
-        d={p.d}
-      />
-    );
-  });
-  if (title) {
-    return (
-      <svg
-        width={width}
-        height={height}
-        viewBox={viewBox}
-        xmlns='http://www.w3.org/2000/svg'
-        className={className}
-        style={mergedStyle}
-        role='img'
-        aria-label={title}
-      >
-        <title>{title}</title>
-        {glyphs}
-      </svg>
-    );
-  }
   return (
     <svg
-      width={width}
+      width={height * g.aspect}
       height={height}
-      viewBox={viewBox}
+      viewBox={g.viewBox}
       xmlns='http://www.w3.org/2000/svg'
       className={className}
       style={mergedStyle}
-      aria-hidden='true'
+      fill='currentColor'
+      role={title ? 'img' : undefined}
+      aria-label={title}
+      aria-hidden={title ? undefined : 'true'}
     >
-      {glyphs}
+      {title ? <title>{title}</title> : null}
+      {g.glyphs.map(glyph => (
+        <path key={glyph.char} d={glyph.d} />
+      ))}
     </svg>
   );
 }
@@ -232,32 +182,14 @@ export function Lockup({
       </div>
     );
   }
+  // The o in the wordmark is the mark, so the horizontal lockup is the
+  // wordmark alone; a mark beside it would show the O twice.
   return (
-    <div
-      className={className}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: g,
-        color,
-      }}
-      role='img'
-      aria-label={title}
-    >
-      <Mark size={height} color='currentColor' />
+    <div className={className} style={{ color }} role='img' aria-label={title}>
       <Wordmark height={height * 0.74} color='currentColor' />
     </div>
   );
 }
 
-/**
- * Computed total wordmark width in cap-height units (100u). Exposed for tests
- * and asset generation that needs to know the canonical width.
- */
-export const WORDMARK_TOTAL_WIDTH_U = LETTER_SEQUENCE.reduce(
-  (acc, letter, i) => {
-    const pair = LETTER_PAIRS[i];
-    return acc + LETTER_PATHS[letter].w + (pair ? WORDMARK_TRACK[pair] : 0);
-  },
-  0
-);
+/** Wordmark width in units of its own height (display master). */
+export const WORDMARK_ASPECT = wordmarkGeometry(40).aspect;

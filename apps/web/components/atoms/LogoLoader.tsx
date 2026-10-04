@@ -1,5 +1,5 @@
-import { BrandLogo } from '@/components/atoms/BrandLogo';
-import type { BrandMarkSize } from '@/lib/brand/tokens';
+import { JovieO } from '@jovie/ui/brand';
+import { type BrandMarkSize, resolveBrandMarkSize } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 interface LogoLoaderProps {
@@ -8,6 +8,11 @@ interface LogoLoaderProps {
   readonly 'aria-label'?: string;
 }
 
+/**
+ * Page and panel loader: the living O in its loading state (JOV-7760).
+ * The live region carries the accessible state; the O itself is decorative,
+ * and under reduced motion it holds still.
+ */
 export function LogoLoader({
   size = 'splash',
   className,
@@ -18,20 +23,11 @@ export function LogoLoader({
       aria-live='polite'
       aria-label={ariaLabel}
       className={cn(
-        'inline-flex items-center justify-center rounded-full bg-muted/50 p-2 shadow-sm ring-1 ring-border/60 dark:ring-border/40',
+        'inline-flex items-center justify-center text-secondary-token',
         className
       )}
     >
-      <BrandLogo
-        size={size}
-        tone='muted'
-        alt='Jovie logo loading'
-        aria-hidden
-        className={cn(
-          'animate-pulse',
-          'motion-reduce:animate-none motion-reduce:transition-none'
-        )}
-      />
+      <JovieO size={resolveBrandMarkSize(size)} state='loading' />
     </output>
   );
 }

@@ -1,3 +1,4 @@
+import { JOVIE_BRAND_GEOMETRY } from '@jovie/ui/brand/geometry.gen';
 import { describe, expect, it } from 'vitest';
 import { generateFooterHTML } from '@/lib/footer';
 import type { Artist } from '@/types/db';
@@ -61,7 +62,8 @@ describe('generateFooterHTML', () => {
     const html = await generateFooterHTML({ artist: mockArtist });
 
     expect(html).toContain('<svg');
-    expect(html).toContain('viewBox="0 0 136 39"');
+    const [, , w, h] = JOVIE_BRAND_GEOMETRY.wordmark.display.viewBox;
+    expect(html).toContain(`viewBox="0 0 ${w} ${h}"`);
   });
 
   it('has proper accessibility attributes', async () => {

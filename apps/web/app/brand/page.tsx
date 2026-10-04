@@ -355,17 +355,15 @@ function LockupsSection() {
           a creator&apos;s phone.
         </p>
         <p className={prose}>
-          The horizontal lockup is the default. The stacked lockup is for square
-          surfaces. The mark alone is for product chrome, app icons, and places
-          where the system has already earned recognition.
+          The o in the wordmark is the mark, so the wordmark is the lockup. The
+          mark alone is for product chrome, app icons, and places where the
+          system has already earned recognition.
         </p>
         <p className={proseStrong}>
-          The integrated lockup is reserved for moments where the wordmark can
-          carry the full brand by itself.
+          When the word has to leave, it folds into the O. The O stays.
         </p>
         <div className='system-b-brand-lockups'>
           <Wordmark height={54} title='Jovie wordmark lockup' />
-          <Wordmark height={54} markAsO title='Jovie integrated lockup' />
           <Mark size={88} title='Jovie mark-only lockup' />
         </div>
       </div>

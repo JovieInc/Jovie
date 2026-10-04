@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { BRAND_PATHS, JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
+import { jovieMarkAtSize } from '@/lib/brand/tokens';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 describe('BrandLogo', () => {
@@ -111,14 +111,19 @@ describe('BrandLogo', () => {
     expect(svg).toHaveAttribute('fill', 'currentColor');
   });
 
-  it('renders the canonical brand mark path and viewBox', () => {
-    const { container } = render(<BrandLogo />);
-    const svg = container.querySelector('svg');
-    const path = container.querySelector('path');
-    expect(svg?.getAttribute('viewBox')).toBe(
-      `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`
-    );
-    expect(path?.getAttribute('d')).toBe(JOVIE_PATH);
+  it('renders the pixel-master mark path and viewBox for its size', () => {
+    for (const [size, box] of [
+      [20, 16],
+      [24, 24],
+      [32, 32],
+    ] as const) {
+      const { container, unmount } = render(<BrandLogo size={size} />);
+      const svg = container.querySelector('svg');
+      const path = container.querySelector('path');
+      expect(svg?.getAttribute('viewBox')).toBe(`0 0 ${box} ${box}`);
+      expect(path?.getAttribute('d')).toBe(jovieMarkAtSize(size).d);
+      unmount();
+    }
   });
 
   it('wraps svg in span to isolate from parent [&>svg] selectors', () => {
@@ -133,12 +138,12 @@ describe('BrandLogo', () => {
     expect(wrapper).toHaveAttribute('data-brand-variant', 'jovie');
   });
 
-  it('renders the ov variant with the OV mark path and data attribute', () => {
+  it('renders the ov variant as the same O in a square slot', () => {
     const { container } = render(<BrandLogo variant='ov' />);
     const wrapper = container.querySelector('span');
     const path = container.querySelector('path');
     expect(wrapper).toHaveAttribute('data-brand-variant', 'ov');
-    expect(path?.getAttribute('d')).toBe(BRAND_PATHS.ov);
+    expect(path?.getAttribute('d')).toBe(jovieMarkAtSize(20).d);
   });
 
   it('defaults aria-label to "OV" for the ov variant', () => {
