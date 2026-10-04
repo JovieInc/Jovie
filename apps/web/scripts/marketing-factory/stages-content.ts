@@ -10,6 +10,7 @@ import {
   HERO_CODE_BINDING_BY_VARIANT,
   selectHeroDecision,
 } from '../../data/marketing/factory/heroDecision';
+import { solutionsFactoryVariantIssue } from '../../data/marketing/factory/pageRecord';
 import {
   buildPersuasionPlan,
   persuasionJobToken,
@@ -391,6 +392,17 @@ async function layoutStage(ctx: StageContext): Promise<StageResult> {
     !composition.shadowRequired,
     'an essential story job has no certified section; resolve its section request before copy'
   );
+  for (const section of composition.sections) {
+    const issue =
+      ctx.brief.family === 'solutions'
+        ? solutionsFactoryVariantIssue(section.sectionId, section.variantId)
+        : `factory has no renderer contract for family ${ctx.brief.family}`;
+    checks.check(
+      `family-renderer:${section.sectionInstanceId}`,
+      issue === null,
+      issue ?? 'selected variant has a concrete family renderer'
+    );
+  }
   return result(checks, composition, {
     notes: { shadowRequired: composition.shadowRequired ?? false },
   });
