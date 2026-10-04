@@ -443,10 +443,12 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     // Click the Releases nav row.
     const releasesNav = screen
       .getAllByRole('option')
-      .find(el => el.textContent?.includes('Open your work catalog'));
+      .find(el =>
+        el.textContent?.includes('Manage your release catalog and smart links.')
+      );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
-    expect(pushMock).toHaveBeenCalledWith('/app/library?view=releases');
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
   });
 
   it('does not duplicate Audience as a separate command', () => {
