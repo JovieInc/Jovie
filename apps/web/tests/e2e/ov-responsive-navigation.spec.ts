@@ -228,7 +228,7 @@ test.describe('OV responsive navigation exclusivity', () => {
             customerBefore.styleInvariants
           );
           await expect(
-            customerNavigation.getByRole('link', { name: 'Inbox', exact: true })
+            customerNavigation.locator('[data-navigation-item-id="home"]')
           ).toHaveAttribute('aria-current', 'page');
         }
       }

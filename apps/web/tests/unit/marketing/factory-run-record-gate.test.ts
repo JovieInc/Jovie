@@ -54,16 +54,19 @@ describe('factory page records vs the /solutions build gate', () => {
         renderer: 'factory-hero',
         instanceId: 'hero-1',
         sectionId: 'hero',
+        variantId: 'split-screenshot-right',
       },
       {
         renderer: 'factory-feature-split',
         instanceId: 'capture-1',
         sectionId: 'feature-split',
+        variantId: 'phone-right',
       },
       {
         renderer: 'factory-cta',
         instanceId: 'cta-1',
         sectionId: 'cta',
+        variantId: 'final-single-claim',
       },
     ]);
     expect(() => assertRenderableSolutionsRecord(record)).not.toThrow();

@@ -60,7 +60,6 @@ const APP_SHELL_SCAN_DIRS = [
   '../components/features/opportunity-inbox',
   '../components/features/pay',
   '../components/features/releases',
-  '../components/features/settings',
   '../components/features/tracking',
   '../components/features/ui',
   '../components/jovie',

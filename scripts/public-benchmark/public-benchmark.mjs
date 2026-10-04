@@ -401,9 +401,67 @@ export function evaluateClaim(claim, receipt) {
   return { id: claim.id, subject, comparisons, verdict };
 }
 
+// Proof registry claim id format (apps/web/data/product-truth).
+const PROOF_CLAIM_ID = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+
+/**
+ * Founder rule (2026-10-04): competitors are named publicly only when the
+ * data is solid, on a marketing page where the claim drives conversion, and
+ * backed by a certified proof-registry claim plus a benchmark receipt.
+ * Naming therefore requires state "certified" and a complete publication
+ * record; only a founder decision sets "certified".
+ * @param {{ claims: any[] }} claimsDoc
+ * @returns {string[]} errors
+ */
+export function validatePublication(claimsDoc) {
+  /** @type {string[]} */
+  const errors = [];
+  for (const claim of claimsDoc.claims) {
+    const pub = claim.publication;
+    if (pub?.namesCompetitors && claim.state !== 'certified') {
+      errors.push(`${claim.id}: naming competitors requires state "certified"`);
+    }
+    if (claim.state !== 'certified') continue;
+    if (!pub) {
+      errors.push(`${claim.id}: certified claims need a publication record`);
+      continue;
+    }
+    if (typeof pub.surface !== 'string' || !pub.surface.startsWith('/')) {
+      errors.push(
+        `${claim.id}: publication.surface must be a marketing page path`
+      );
+    }
+    if (typeof pub.conversionGoal !== 'string' || !pub.conversionGoal.trim()) {
+      errors.push(
+        `${claim.id}: publication.conversionGoal must say what the claim buys`
+      );
+    }
+    if (!PROOF_CLAIM_ID.test(String(pub.proofClaimId ?? ''))) {
+      errors.push(
+        `${claim.id}: publication.proofClaimId must be a proof registry claim id`
+      );
+    }
+    if (typeof pub.receipt !== 'string' || !pub.receipt.trim()) {
+      errors.push(
+        `${claim.id}: publication.receipt must point at a benchmark receipt`
+      );
+    }
+    if (
+      pub.certifiedBy !== 'founder' ||
+      !Number.isFinite(Date.parse(pub.certifiedAt))
+    ) {
+      errors.push(
+        `${claim.id}: publication needs certifiedBy "founder" and certifiedAt`
+      );
+    }
+  }
+  return errors;
+}
+
 /**
  * Enforced claims (state "holding" or "certified") must keep passing; an
  * unknown verdict is a failure because missing evidence is not a win.
+ * Certified claims also need a receipt from the hosted runner, not a laptop.
  * @param {{ claims: any[] }} claimsDoc @param {any} receipt
  */
 export function runGate(claimsDoc, receipt) {
@@ -416,7 +474,19 @@ export function runGate(claimsDoc, receipt) {
       (r.state === 'holding' || r.state === 'certified') &&
       r.verdict !== 'passes'
   );
-  return { ok: violations.length === 0, results, violations };
+  const publicationErrors = validatePublication(claimsDoc);
+  if (
+    results.some(r => r.state === 'certified') &&
+    receipt.harness?.runner !== 'github-actions'
+  ) {
+    publicationErrors.push('certified claims need a hosted-runner receipt');
+  }
+  return {
+    ok: violations.length === 0 && publicationErrors.length === 0,
+    results,
+    violations,
+    publicationErrors,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -957,6 +1027,7 @@ async function main(argv) {
 function summarizeGate(gate) {
   return {
     ok: gate.ok,
+    publicationErrors: gate.publicationErrors,
     claims: gate.results.map(r => ({
       id: r.id,
       state: r.state,

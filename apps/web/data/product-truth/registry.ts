@@ -691,6 +691,14 @@ export type FlagCapabilityBinding =
   | { readonly nonMarketing: string };
 
 export const PRODUCT_FLAG_CAPABILITIES = {
+  YOUTUBE_WORKSPACE_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
+  JOVIE_WORK_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
   BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
   SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },
@@ -713,7 +721,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   PROFILE_SEARCH_MONITORING: { capabilityId: 'profile-monitoring' },
   ONBOARDING_WOW_TASK_QUEUE: { nonMarketing: 'onboarding orchestration' },
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
-  MERCH_QA_GATE: { capabilityId: 'instant-merch' },
   AGENT_PROFILE_CREATE: { capabilityId: 'cli' },
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
