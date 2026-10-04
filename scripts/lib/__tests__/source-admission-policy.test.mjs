@@ -18,6 +18,81 @@ import {
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
+test('trusted source-read guards reject a deleted test on an old head and execute in the source checkout', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const step = workflow.jobs.deterministic.steps.find(
+    step =>
+      step.name === 'Validate disk-read source contracts from trusted base'
+  );
+  assert.ok(step, 'disk-read guards must run before queue admission');
+  const script = step.run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-read-bootstrap-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const runner = join(root, 'runner');
+  for (const dir of [repo, bin, runner]) mkdirSync(dir, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    const archive = execFileSync(
+      '/usr/bin/git',
+      ['archive', 'HEAD', 'scripts'],
+      { maxBuffer: 20 * 1024 * 1024 }
+    );
+    execFileSync('tar', ['-x', '-C', repo], { input: archive });
+    const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
+    mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
+    mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
+    const manifest = join(repo, 'apps/web/tests/node-environment-files.json');
+    writeFileSync(manifest, '["lib/merch/qa-gate.test.ts"]\n');
+    writeFileSync(retired, 'test fixture\n');
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
+      { mode: 0o755 }
+    );
+    git('init', '--quiet', '--initial-branch=source-head');
+    git('config', 'user.name', 'Source guard test');
+    git('config', 'user.email', 'source-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'trusted source-read guards');
+    git('branch', 'main');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    rmSync(join(repo, 'scripts'), { recursive: true });
+    rmSync(retired);
+    git('add', '--all');
+    git('commit', '--quiet', '-m', 'older head deletes a manifest-listed test');
+    const invoke = () =>
+      spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_BASE_REF: 'main',
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          RUNNER_TEMP: runner,
+          SOURCE_CHECKOUT: repo,
+        },
+      });
+    const rejected = invoke();
+    assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
+    assert.match(rejected.stdout, /node-environment-files: exit 1/);
+    writeFileSync(manifest, '[]\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'remove the retired manifest entry');
+    const accepted = invoke();
+    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+    assert.match(accepted.stdout, /node-environment-files: exit 0/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('source and size checks wake when the PR base or contract text is edited', () => {
   for (const file of ['source-validation.yml', 'pr-size-guard.yml']) {
     const workflow = load(readFileSync(`.github/workflows/${file}`, 'utf8'));

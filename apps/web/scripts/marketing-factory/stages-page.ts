@@ -353,6 +353,14 @@ async function seoStage(ctx: StageContext): Promise<StageResult> {
 }
 
 /**
+ * The stage a visual rejection reworks. Layout, hero, media and refs are
+ * deterministic resolvers of the brief, so rerunning them renders the same
+ * page; copy is the generative stage the screenshots show, and it takes the
+ * judge's findings as feedback.
+ */
+export const VISUAL_REWORK_STAGE: FactoryStage = 'copy';
+
+/**
  * Visual taste admission: cross-family vision review of the render stage's
  * screenshots, bound to the candidate record's digest, then the visual
  * gates of auditMarketingTasteAdmission.
@@ -377,7 +385,12 @@ async function visualAdmission(
     producerModel,
   });
   if (review.status !== 'reviewed') {
-    return { evaluators: [], receipts, unavailable: review.reason };
+    return {
+      evaluators: [],
+      receipts,
+      unavailable: review.reason,
+      rejection: null,
+    };
   }
   const admission = auditVisualAdmission({
     candidateDigest,
@@ -400,7 +413,17 @@ async function visualAdmission(
       rubricVersion: 'factory-visual-review/1',
     },
   ];
-  return { evaluators, receipts, unavailable: null };
+  // A judge that rejected the page itself, not a seating problem a rework
+  // cannot change.
+  const rejected =
+    review.verdict === 'fail' &&
+    !review.findings.some(finding => finding.startsWith('same-family-judge:'));
+  return {
+    evaluators,
+    receipts,
+    unavailable: null,
+    rejection: rejected ? review.findings : null,
+  };
 }
 
 async function trustStage(ctx: StageContext): Promise<StageResult> {
@@ -462,6 +485,9 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
         [verdict.unavailable, visual.unavailable].filter(Boolean).join('; ') ||
         null,
       notes: { tasteReceipts: visual.receipts },
+      rework: visual.rejection
+        ? { stage: VISUAL_REWORK_STAGE, findings: visual.rejection }
+        : null,
     }
   );
 }

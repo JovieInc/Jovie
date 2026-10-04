@@ -61,6 +61,32 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      - name: Validate disk-read source contracts from trusted base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/source-read-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
+          export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
+          node --input-type=module -e '
+            import { spawnSync } from "node:child_process";
+            const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
+            const guards = selectSourceGuards(process.env.GITHUB_EVENT_NAME, listAllChangedFiles(process.cwd()));
+            let exitCode = 0;
+            for (const guard of guards) {
+              const result = spawnSync(guard.command, { shell: true, cwd: process.cwd(), stdio: "inherit" });
+              const code = result.status ?? 1;
+              console.log(`[source-guards] ${guard.id}: exit ${code}`);
+              if (code !== 0 && exitCode === 0) exitCode = code;
+            }
+            process.exitCode = exitCode;
+          '
       - name: Check agent-context size after merge onto base
         shell: bash
         env:
@@ -100,12 +126,27 @@ jobs:
         run: |
           set -euo pipefail
           base_sha="$(git merge-base 'origin/${{ github.base_ref }}' HEAD)"
-          changed_cli="$(git diff --name-only "$base_sha" HEAD -- packages/jovie-cli .github/workflows/npm-publish.yml .github/workflows/source-validation.yml)"
+          # The CLI and every public API route it calls (JOV-7714): a route
+          # change can break the CLI's error contract as surely as a CLI edit.
+          changed_cli="$(git diff --name-only "$base_sha" HEAD -- \
+            packages/jovie-cli \
+            .github/workflows/npm-publish.yml \
+            .github/workflows/cli-chaos-nightly.yml \
+            .github/workflows/source-validation.yml \
+            ':(literal)apps/web/app/api/v1/[username]' \
+            apps/web/app/api/v1/openapi.json \
+            apps/web/app/api/v1/actions \
+            apps/web/app/api/agents \
+            apps/web/app/llms.txt \
+            apps/web/app/llms-full.txt \
+            ':(literal)apps/web/app/[username]/llms.txt' \
+            apps/web/lib/api/v1)"
           if [ -n "$changed_cli" ]; then
             pnpm --filter @jovie/cli run test:coverage
             pnpm --filter @jovie/cli run typecheck
             pnpm --filter @jovie/cli run build
             pnpm --filter @jovie/cli run pack:dry
+            pnpm --filter @jovie/cli run chaos:gate
           fi
   security:
     name: Security Evidence

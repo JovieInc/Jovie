@@ -7,6 +7,10 @@
  * attempt's failed invariants and judge critique. Only this harness sets
  * `passed`, through applyStagePassedBit. An unreachable model, render or
  * media provider stops the run as `credentials-unavailable`, never a pass.
+ * A stage that reports a `rework` (a visual rejection) is not retried on the
+ * same screenshots: the run rewinds to the owning stage, re-renders and
+ * re-judges, up to FACTORY_MAX_REWORKS times, and each rewind is recorded in
+ * run.json `reworks`. A rework that renders the same page again fails.
  * Receipts land in runs/factory/<pageId>/ (gitignored); publish is always
  * `shadow` until the ramp ships.
  */
@@ -59,6 +63,9 @@ import type { StageContext, StageResult, StageRunner } from './stage-kit';
 import { FACTORY_STAGE_RUNNERS } from './stages';
 
 const MODEL_JUDGED = new Set(['llm', 'vision']);
+
+/** Rewinds per run after a rejection, on top of the per-stage attempts. */
+export const FACTORY_MAX_REWORKS = 2;
 
 export interface RunFactoryOptions {
   readonly family: string;
@@ -284,7 +291,13 @@ export async function runFactory(
     return manifest;
   };
 
-  for (const stage of FACTORY_STAGES.slice(manifest.chain.length)) {
+  const reworkFeedback = new Map<FactoryStage, readonly string[]>();
+  const renderDigest = () =>
+    manifest.chain.find(link => link.stage === 'render')?.outputDigest ?? null;
+
+  stages: while (manifest.chain.length < FACTORY_STAGES.length) {
+    const stage = FACTORY_STAGES[manifest.chain.length] as FactoryStage;
+    const rework = manifest.reworks?.length ?? 0;
     const runner = runners[stage];
     if (!runner) {
       return finish({
@@ -298,7 +311,8 @@ export async function runFactory(
       manifest.chain.map(link => link.outputDigest),
       factoryStageSourceDigest(stage, brief)
     );
-    let feedback: readonly string[] = [];
+    let feedback: readonly string[] = reworkFeedback.get(stage) ?? [];
+    reworkFeedback.delete(stage);
     let passed = false;
     const maxAttempts = paidBudget ? 1 : FACTORY_STAGE_MAX_ATTEMPTS;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -338,7 +352,7 @@ export async function runFactory(
         },
         { certifier: FACTORY_CERTIFIER_HARNESS }
       );
-      const file = attemptFileName(stage, attempt);
+      const file = attemptFileName(stage, attempt, rework);
       const record: StageAttemptRecord = {
         receipt,
         artifact: result.artifact,
@@ -361,6 +375,20 @@ export async function runFactory(
           status: 'credentials-unavailable',
           stoppedAt: stage,
           reason: result.unavailable,
+        });
+      }
+      if (
+        receipt.passed &&
+        stage === 'render' &&
+        manifest.reworks?.some(
+          entry => entry.rejectedRenderDigest === receipt.outputDigest
+        )
+      ) {
+        return finish({
+          status: 'failed',
+          stoppedAt: stage,
+          reason:
+            'rework produced no new render: the rejected screenshots would be re-judged',
         });
       }
       if (receipt.passed) {
@@ -388,6 +416,43 @@ export async function runFactory(
           ? ['judges: at least one evaluator did not pass']
           : []),
       ];
+      if (result.rework) {
+        const from = FACTORY_STAGES.indexOf(result.rework.stage);
+        if (from < 0 || from >= FACTORY_STAGES.indexOf(stage)) {
+          return finish({
+            status: 'failed',
+            stoppedAt: stage,
+            reason: `rework target ${result.rework.stage} is not upstream of ${stage}`,
+          });
+        }
+        if (rework >= FACTORY_MAX_REWORKS) {
+          return finish({
+            status: 'failed',
+            stoppedAt: stage,
+            reason: `still rejected after ${rework} rework(s): ${result.rework.findings.join('; ')}`,
+          });
+        }
+        const entry = {
+          iteration: rework + 1,
+          rejectedAt: stage,
+          reworkFrom: result.rework.stage,
+          rejectedRenderDigest: renderDigest(),
+          findings: [...result.rework.findings],
+        };
+        for (const later of FACTORY_STAGES.slice(from)) {
+          delete artifacts[later];
+          delete receipts[later];
+        }
+        reworkFeedback.set(result.rework.stage, [
+          `rework ${entry.iteration} after ${stage} rejected the render:`,
+          ...entry.findings,
+        ]);
+        finish({
+          chain: manifest.chain.slice(0, from),
+          reworks: [...(manifest.reworks ?? []), entry],
+        });
+        continue stages;
+      }
     }
     if (!passed) {
       return finish({
