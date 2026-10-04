@@ -25,7 +25,7 @@ automated install. A repository build is not proof that npm has the package.
 
 | Command | Request |
 | --- | --- |
-| `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels, Instagram profiles, TikTok profiles, and Linktree |
+| `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels; Instagram, TikTok, and Linktree return `SOURCE_UNSUPPORTED` |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
@@ -58,7 +58,8 @@ resets, 502 without an error code, 503, 504, and 429 with `Retry-After` of 5 sec
 or less). A longer `Retry-After` is reported, not slept through. Writes never retry
 automatically: a timeout may have occurred after the server committed. Report tools
 therefore do not advertise idempotency. Every attempt, backoff, and body read share
-one 30-second deadline, so no command waits longer. Bodies are capped at 1 MiB.
+one 30-second deadline, so no command waits longer; set `JOVIE_TIMEOUT_MS`
+(1000-120000) to change it. Bodies are capped at 1 MiB.
 
 Errors are one line on stderr that says what to do next (for example
 `Could not resolve jov.ie. Check your internet connection or --base-url.`). Add
@@ -204,6 +205,27 @@ CLI or merging this source. Live commissioning remains tracked in
 [JOV-7393](https://linear.app/jovie/issue/JOV-7393).
 
 Docs: [Jovie CLI](https://jov.ie/cli), [developer resources](https://jov.ie/developers).
+
+## Chaos gate
+
+Every change ships through the same black-box chaos gate. The gate runs the
+real `jovie` binary against a hostile local server and requires one actionable
+line, the right exit code, no stack trace, no secret, and no hang.
+
+| When | What runs | Where |
+| --- | --- | --- |
+| Every PR touching this package or an API route it calls | `src/chaos.test.ts`, then `chaos:gate` (black-box against `dist`, plus the deliberate-red proof) | Source Validation, which is required via PR Ready |
+| Every npm release | The packed tarball is installed into a clean directory and gated on macOS, Linux, and Windows with Node 22.13, 24.21, and 26 using heavier fuzzing. Publish refuses bytes that differ from the tested tarball | `npm-publish.yml` |
+| Nightly | `@jovie/cli@latest` from npm on all three OSes, plus read-only production probes. A red run files a remediation issue; the next green run resolves it | `cli-chaos-nightly.yml` |
+
+`scripts/chaos-mutation-proof.mjs` puts a stack trace, a hang, and a secret
+leak back into a copy of the build. It fails unless the gate catches each one,
+so the gate cannot quietly stop working. Run the gate locally:
+
+```sh
+pnpm --filter @jovie/cli run build
+pnpm --filter @jovie/cli run chaos:gate
+```
 
 ## Release boundary
 

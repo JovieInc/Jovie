@@ -74,6 +74,8 @@ Do not spend design effort on:
 
 `../DESIGN.md` is the operational design-system reference. This file defines why and when design work matters; `../DESIGN.md` defines how to execute it correctly.
 
+UI judge calibration set: [`docs/screenshots/ui-escape-holdout/holdout.json`](../docs/screenshots/ui-escape-holdout/holdout.json) (HumanHoldoutSet v1). Its `fail` items render the escape classes in the UI escape corpus (`uiEscapeCorpus` in `scripts/invariants/assurance-matrix.json`), and its `pass` items are certified screens. Vision and coherence judges must be calibrated against it before they can block.
+
 ---
 
 ## Changelog

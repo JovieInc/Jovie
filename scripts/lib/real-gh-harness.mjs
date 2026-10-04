@@ -1,6 +1,8 @@
 import { execFileSync, spawn } from 'node:child_process';
 import {
+  accessSync,
   closeSync,
+  constants,
   mkdirSync,
   mkdtempSync,
   openSync,
@@ -9,7 +11,7 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -24,46 +26,50 @@ import { crc32 } from 'node:zlib';
 export const GH_FAKE_HOST = 'github.localhost';
 
 /**
- * A `gh` on PATH can be a host shim (jovie-lanes wraps gh to mint an app token
- * per call). The wrapper needs the host's real HOME for the app key and reaches
- * the network this harness removes, so it must not shadow the real binary.
+ * A `#!` wrapper is not the real CLI. Hosts may prepend a shim that injects
+ * state the harness deliberately isolates (e.g. lane_runner's `gh` shim mints
+ * a GitHub App token from `~/.config/jovie-lanes/jovie-bot.pem`, which does
+ * not exist under the harness HOME and makes every `gh` call fail).
  */
-function isGhShim(path) {
+function isScriptWrapper(path) {
+  let fd;
   try {
-    const fd = openSync(path, 'r');
-    try {
-      const head = Buffer.alloc(8192);
-      return readSync(fd, head, 0, head.length, 0) > 0
-        ? head.toString('utf8').includes('gh_app_token')
-        : false;
-    } finally {
-      closeSync(fd);
-    }
+    fd = openSync(path, 'r');
+    const head = Buffer.alloc(2);
+    return readSync(fd, head, 0, 2, 0) === 2 && head.toString() === '#!';
   } catch {
     return false;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
-}
-
-/** PATH minus any directory whose `gh` is a token-minting shim. */
-export function realGhPath(path = process.env.PATH ?? '') {
-  return path
-    .split(delimiter)
-    .filter(dir => !isGhShim(join(dir, 'gh')))
-    .join(delimiter);
 }
 
 /** Absolute path of the real gh binary, or null when it is not installed. */
 export function resolveRealGh() {
-  try {
-    return (
-      execFileSync('sh', ['-c', 'command -v gh'], {
-        encoding: 'utf8',
-        env: { PATH: realGhPath() },
-      }).trim() || null
-    );
-  } catch {
-    return null;
+  const names = process.platform === 'win32' ? ['gh.exe', 'gh'] : ['gh'];
+  const candidates = [];
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    for (const name of names) {
+      const candidate = join(dir, name);
+      try {
+        accessSync(candidate, constants.X_OK);
+      } catch {
+        continue;
+      }
+      if (!candidates.includes(candidate)) candidates.push(candidate);
+    }
   }
+  if (!candidates.length)
+    try {
+      const found = execFileSync('sh', ['-c', 'command -v gh'], {
+        encoding: 'utf8',
+      }).trim();
+      if (found) candidates.push(found);
+    } catch {
+      return null;
+    }
+  return candidates.find(path => !isScriptWrapper(path)) ?? candidates[0];
 }
 
 /** First line of `gh --version`, recorded as the exercised boundary version. */
@@ -153,7 +159,7 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: realGhPath(),
+          PATH: `${dirname(binary)}${delimiter}${process.env.PATH ?? ''}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,

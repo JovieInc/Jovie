@@ -225,6 +225,25 @@ describe('settings shell normalization', () => {
     expect(layoutSource).toContain('{children}');
   });
 
+  it('keeps dashboard-nav/config.ts as the only settings navigation source', () => {
+    // JOV-7627: the orphaned settings-sidebar-config module defined a second,
+    // divergent settings IA (Referral/Appearance/Delete Account) that the live
+    // rail never rendered. It must not come back; userSettingsNavigation and
+    // artistSettingsNavigation in dashboard-nav/config.ts are the source of
+    // truth consumed by UnifiedSidebar and DashboardNav.
+    const deadConfig = findSourceFile(
+      resolve(
+        process.cwd(),
+        'components/features/settings/settings-sidebar-config.ts'
+      ),
+      resolve(
+        process.cwd(),
+        'apps/web/components/features/settings/settings-sidebar-config.ts'
+      )
+    );
+    expect(deadConfig).toBeUndefined();
+  });
+
   it('keeps SettingsPolished content-only so it cannot restore duplicate navigation', () => {
     expect(SETTINGS_POLISHED).toBeDefined();
 
