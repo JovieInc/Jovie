@@ -339,7 +339,7 @@ class AdmissionTest(unittest.TestCase):
         picked = design_gate.pick_build_issue(
             [build, held], {}, pick=self.lane.pick_issue, linear=linear, provider="devin", now=NOW)
         self.assertEqual(picked.identifier, "JOV-1")
-        self.assertTrue(design_gate.wants_brief(linear.refresh(held)))
+        self.assertTrue(design_gate.wants_brief(linear.refresh(held), now=NOW))
         self.assertIn(design_gate.NEEDS_BRIEF_LABEL, held.labels)
         self.assertEqual(design_gate.held_at(held.description), NOW)
         self.assertIn("brief-auto", linear.comments[0][1])
@@ -371,7 +371,7 @@ class AdmissionTest(unittest.TestCase):
                 [linear.refresh(held)], {}, pick=self.lane.pick_issue, linear=linear,
                 provider="devin", now=now)
             self.assertIsNotNone(picked, "a held issue was skipped with no brief run")
-            if not design_gate.wants_brief(picked):
+            if not design_gate.wants_brief(picked, now=now):
                 break
             # Each brief run leaves step 9 open: no Pen or ImageGen artifact.
             runs.append(design_gate.publish_brief(linear, picked, app_brief(pen=""),
@@ -397,7 +397,7 @@ class AdmissionTest(unittest.TestCase):
         picked = design_gate.pick_build_issue([held], {}, pick=self.lane.pick_issue, linear=linear,
                                               provider="devin", now=NOW + design_gate.HOLD_LIMIT_S)
         self.assertEqual(picked.identifier, "JOV-1")
-        self.assertFalse(design_gate.wants_brief(picked))
+        self.assertFalse(design_gate.wants_brief(picked, now=NOW + design_gate.HOLD_LIMIT_S))
         self.assertIn("held 24h", linear.comments[-1][1])
         # The founder order is filed once even if the label read is stale.
         self.assertFalse(design_gate.ensure_brief_auto(
