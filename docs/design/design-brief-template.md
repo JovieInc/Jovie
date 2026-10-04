@@ -3,6 +3,8 @@
 UI and landing work is IA-first. A build lane admits the issue only when steps
 1–9 are filled in, either in the issue description or in a linked brief.
 Step 10 is the build checklist, not an admission input.
+App-surface issues (not marketing or landing) use
+[`app-ui-brief-template.md`](app-ui-brief-template.md) instead.
 
 Copy this file to `docs/design/briefs/<slug>.md` and point at it from the issue
 or the PR with a single `Design brief:` line whose value is the repo path (or a

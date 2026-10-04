@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { AlertTriangle, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
@@ -219,7 +219,10 @@ function JudgmentRow({
 export function CertificationJudgments() {
   const query = useOvieCertificationsQuery();
   const mutation = useOvieCertificationDecisionMutation();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const inFlight = useRef(new Set<string>());
+  const [pendingKinds, setPendingKinds] = useState<
+    ReadonlyMap<string, OvieCertificationDecisionKind>
+  >(new Map());
 
   const inventory =
     query.data?.contract === OVIE_CERTIFICATION_INVENTORY_CONTRACT
@@ -245,8 +248,9 @@ export function CertificationJudgments() {
     ) => {
       const evidenceDigest =
         row.decision.evidenceDigest ?? item.decisionEvidenceDigest;
-      if (!evidenceDigest) return false;
-      setPendingKey(`${row.id}:${kind}`);
+      if (!evidenceDigest || inFlight.current.has(row.id)) return false;
+      inFlight.current.add(row.id);
+      setPendingKinds(previous => new Map(previous).set(row.id, kind));
       try {
         await mutation.mutateAsync({
           rowId: row.id,
@@ -262,7 +266,12 @@ export function CertificationJudgments() {
         void query.refetch();
         return false;
       } finally {
-        setPendingKey(null);
+        inFlight.current.delete(row.id);
+        setPendingKinds(previous => {
+          const next = new Map(previous);
+          next.delete(row.id);
+          return next;
+        });
       }
     },
     [mutation, query]
@@ -318,12 +327,7 @@ export function CertificationJudgments() {
     <div className='grid gap-2' data-testid='needs-you-judgments'>
       {judgments.map(item => {
         const row = rowBySubject.get(`${item.domain}:${item.subject.id}`);
-        const pendingKind =
-          row && pendingKey?.startsWith(`${row.id}:`)
-            ? (pendingKey.slice(
-                row.id.length + 1
-              ) as OvieCertificationDecisionKind)
-            : null;
+        const pendingKind = row ? (pendingKinds.get(row.id) ?? null) : null;
         return (
           <JudgmentRow
             key={`${item.domain}:${item.subject.id}`}

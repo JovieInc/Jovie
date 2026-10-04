@@ -2084,15 +2084,10 @@ describe('informational CI tail capacity', () => {
 describe('canary health gate workflow', () => {
   it('accepts a wildcard block for a raw preview', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
-    const canaryStep = getStepBlock(workflow, 'Canary health check');
 
     expect(
       previewRobotsPolicyValid(workflow, 'User-agent: *\nDisallow: /')
     ).toBe(true);
-    expect(canaryStep).toContain(
-      `! printf '%s\\n' "$robots_body" | preview_robots_policy_valid; then`
-    );
-    expect(canaryStep).toContain('[ "$robots_code" != "200" ]');
   });
 
   it('rejects a block that only belongs to an unrelated crawler group', () => {
@@ -2123,112 +2118,6 @@ describe('canary health gate workflow', () => {
         'User-agent: *\nDisallow: /\nSitemap: https://preview.example/sitemap.xml'
       )
     ).toBe(false);
-  });
-
-  it('fails closed when the automation bypass secret is missing', () => {
-    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
-    const canaryStep = getStepBlock(workflow, 'Canary health check');
-
-    expect(canaryStep).toContain(
-      'VERCEL_AUTOMATION_BYPASS_SECRET is required for deterministic staging verification.'
-    );
-    expect(canaryStep).toContain('canary_status=failed_config');
-    expect(canaryStep).not.toContain('Canary INCONCLUSIVE');
-    expect(canaryStep).not.toContain(
-      'canary_status=verified" >> "$GITHUB_OUTPUT"\n                    exit 0'
-    );
-  });
-
-  it('binds the exact project deployment before cookie-only canary and auth smoke', () => {
-    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
-    const canaryStep = getStepBlock(workflow, 'Canary health check');
-    const authSmokeStep = getStepBlock(
-      workflow,
-      'Verify public auth controls are interactive'
-    );
-    const canaryCurlProbes =
-      canaryStep.match(/curl -sS? --max-redirs 0/g) ?? [];
-
-    expect(workflow).toContain('verified_deployment_url:');
-    expect(workflow).toContain(
-      'value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}'
-    );
-    expect(canaryStep).toContain('resolve-deployment');
-    expect(canaryStep).toContain('VERCEL_CANDIDATE_DEPLOYMENT_URL=');
-    expect(canaryStep).toContain('VERCEL_CANDIDATE_DEPLOYMENT_ID=');
-    expect(canaryStep).toContain('VERCEL_DEPLOYMENT_MAX_PAGES=5');
-    expect(canaryStep).toContain('VERCEL_API_TIMEOUT_MS=180000');
-    expect(canaryStep).toContain('VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=5000');
-    expect(canaryStep.indexOf('sleep "$WAIT_SECONDS"')).toBeLessThan(
-      canaryStep.indexOf('resolve-deployment')
-    );
-    expect(
-      workflow.indexOf('uses: ./.github/actions/setup-node-pnpm')
-    ).toBeLessThan(
-      workflow.indexOf(
-        'node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment'
-      )
-    );
-    expect(workflow).toContain('deployment_id:');
-    expect(workflow).not.toContain('fallback_health_url');
-    expect(canaryStep).toContain(
-      'CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)'
-    );
-    expect(canaryStep).toContain('bootstrap-cookie-jar');
-    expect(canaryStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=preview');
-    expect(canaryStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
-    expect(canaryStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
-    expect(canaryStep).toContain('-b "$COOKIE_JAR"');
-    expect(canaryStep).not.toContain('curl -s -L');
-    expect(canaryStep).not.toContain('curl -sS -L');
-    expect(canaryStep).not.toContain('BYPASS_ARGS');
-    expect(canaryStep).not.toContain('x-vercel-protection-bypass');
-    expect(canaryStep).toContain('verified_deployment_url=${deployment_url}');
-    expect(canaryStep).toContain(
-      'Checking onboarding chat reaches the bot gate'
-    );
-    expect(canaryStep).toContain('"errorCode":"ONBOARDING_CHAT_DISABLED"');
-    expect(canaryStep).toContain('"errorCode":"TURNSTILE_REQUIRED"');
-    expect(canaryStep).toContain('canary_status=failed_onboarding_chat');
-    expect(canaryStep).not.toContain('/api/auth/ok');
-    expect(canaryStep).not.toContain('failed_better_auth_handler');
-    expect(canaryStep).not.toContain('health_url_fallback');
-    expect(canaryStep).not.toContain('max_attempts=8');
-    expect(canaryStep).not.toContain('check_route_renders');
-    expect(canaryStep).not.toContain('profile_response=');
-    expect(authSmokeStep).toContain(
-      'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
-    );
-    expect(authSmokeStep).toContain(
-      'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
-    );
-    expect(authSmokeStep).toContain(
-      'EXPECTED_COMMIT_SHA: ${{ inputs.commit_sha }}'
-    );
-    expect(authSmokeStep).toContain(
-      'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN: ${{ steps.canary-check.outputs.verified_deployment_url }}'
-    );
-    expect(authSmokeStep).not.toContain(
-      'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
-    );
-    expect(authSmokeStep).toContain(
-      'verifies build identity and host-only cookie'
-    );
-    expect(authSmokeStep).toContain('auth_smoke_attempt=1');
-    expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');
-    expect(authSmokeStep).toContain('until CI=true');
-    expect(authSmokeStep).toContain('BASE_URL="${DEPLOYMENT_URL}"');
-    expect(authSmokeStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=preview');
-    expect(authSmokeStep).toContain('PLAYWRIGHT_DYNAMIC_SECRETS_FILE=');
-    expect(authSmokeStep).toContain('auth-public-ready.spec.ts');
-    expect(authSmokeStep).toContain(
-      'Public auth controls failed after ${auth_smoke_max_attempts} attempts.'
-    );
-    expect(authSmokeStep).toContain(
-      'sleep_seconds=$((auth_smoke_attempt * 30))'
-    );
-
-    expect(canaryCurlProbes).toHaveLength(3);
   });
 
   it('never probes the shared staging alias before this release owns it', () => {

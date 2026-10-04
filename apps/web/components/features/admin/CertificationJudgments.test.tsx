@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
 import type { OvieCertificationInventory } from '@/lib/ovie/certifications/types';
@@ -113,6 +119,55 @@ describe('CertificationJudgments', () => {
       });
     });
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Certified');
+  });
+
+  it('keeps each judgment disabled until its own concurrent submission finishes', async () => {
+    const inventory = fixtureInventory();
+    const flow = inventory.rows.find(
+      row => row.id === 'flows:signup-golden-path'
+    );
+    const judgment = inventory.queue.needsYou.find(
+      item => item.domain === 'flows'
+    );
+    if (!flow || !judgment) throw new Error('Expected the flow fixture');
+    const second = {
+      ...flow,
+      id: 'flows:second',
+      subject: { ...flow.subject, id: 'second', title: 'Second flow' },
+    };
+    mockQuery({
+      data: {
+        ...inventory,
+        rows: [flow, second],
+        queue: {
+          ...inventory.queue,
+          needsYou: [judgment, { ...judgment, subject: second.subject }],
+        },
+      },
+    });
+    const firstRequest = Promise.withResolvers<void>();
+    const secondRequest = Promise.withResolvers<void>();
+    mocks.mutateAsync
+      .mockReturnValueOnce(firstRequest.promise)
+      .mockReturnValueOnce(secondRequest.promise);
+    render(<CertificationJudgments />);
+    const first = screen.getByRole('button', {
+      name: 'Certify "Flow signup-golden-path"',
+    });
+    const other = screen.getByRole('button', { name: 'Certify "Second flow"' });
+    fireEvent.click(first);
+    fireEvent.click(other);
+    expect(first).toBeDisabled();
+    expect(other).toBeDisabled();
+    fireEvent.click(first);
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(2);
+    await act(async () => firstRequest.resolve());
+    expect(first).toBeEnabled();
+    expect(other).toBeDisabled();
+    fireEvent.click(other);
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(2);
+    await act(async () => secondRequest.resolve());
+    expect(other).toBeEnabled();
   });
 
   it('requires a note before requesting changes', async () => {
