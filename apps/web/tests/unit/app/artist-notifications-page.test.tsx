@@ -148,7 +148,7 @@ describe('ArtistNotificationsPage', () => {
       )
     ).toBeInTheDocument();
     expect(
-      faqSection.getByText('Why use Jovie instead of writing email campaigns?')
+      faqSection.getByText('Why use Jovie instead of writing newsletters?')
     ).toBeInTheDocument();
     expect(
       faqSection.getByText('Where do fans land after they click?')

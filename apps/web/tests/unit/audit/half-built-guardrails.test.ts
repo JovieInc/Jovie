@@ -1,9 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_TOOLS_FLYOUT_LINKS } from '@/data/marketingNavigation';
 import { PRODUCT_CAPABILITIES } from '@/data/product-truth/registry';
+import {
+  ENTITLEMENT_REGISTRY,
+  PRICING_COMPARISON,
+} from '@/lib/entitlements/registry';
 import { CODE_FLAGS } from '@/lib/flags/code-flags';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
@@ -14,13 +18,39 @@ function source(relativePath: string): string {
 }
 
 const DARK_CAPABILITIES = [
-  'fan-subscriptions',
-  'email-campaigns',
+  'ab-testing',
   'developer-api',
+  'email-campaigns',
+  'fan-subscriptions',
   'team-management',
   'white-label',
-  'ab-testing',
 ] as const;
+
+const DARK_CAPABILITY_PUBLIC_TERMS: Record<
+  (typeof DARK_CAPABILITIES)[number],
+  readonly RegExp[]
+> = {
+  'ab-testing': [/\ba\/b (?:optimization|testing)\b/iu],
+  'developer-api': [
+    /\bapi access\b/iu,
+    /\bdeveloper api\b/iu,
+    /\bwebhooks?\b/iu,
+  ],
+  'email-campaigns': [/\bemail campaigns?\b/iu],
+  'fan-subscriptions': [/\bfan subscriptions?\b/iu],
+  'team-management': [/\bteam management\b/iu],
+  'white-label': [
+    /\bremove jovie branding\b/iu,
+    /\bwhite[- ]label(?:ed|ing)?\b/iu,
+  ],
+};
+
+function mdxSources(relativeDirectory: string): string[] {
+  const directory = resolve(webRoot, relativeDirectory);
+  return readdirSync(directory, { recursive: true })
+    .filter(path => path.endsWith('.mdx'))
+    .map(path => readFileSync(resolve(directory, path), 'utf8'));
+}
 
 describe('half-built product surfaces stay dark', () => {
   it('keeps YouTube thumbnail generation off and out of navigation until certified', () => {
@@ -51,6 +81,29 @@ describe('half-built product surfaces stay dark', () => {
         publication: 'internal_only',
         access: 'unavailable',
       });
+    }
+  });
+
+  it('keeps proposed capabilities out of public availability copy', () => {
+    const publicAvailabilityCopy = [
+      ...Object.values(ENTITLEMENT_REGISTRY).flatMap(
+        plan => plan.marketing.features
+      ),
+      ...PRICING_COMPARISON.flatMap(category =>
+        category.features.map(feature => feature.name)
+      ),
+      ...mdxSources('../docs/app'),
+      source('components/features/home/NewFeaturesSection.tsx'),
+      source('content/pages/solutions/artists.ts'),
+      source('data/artistNotificationsCopy.ts'),
+    ].join('\n');
+
+    for (const id of DARK_CAPABILITIES) {
+      for (const pattern of DARK_CAPABILITY_PUBLIC_TERMS[id]) {
+        expect(publicAvailabilityCopy, `${id} matched ${pattern}`).not.toMatch(
+          pattern
+        );
+      }
     }
   });
 });
