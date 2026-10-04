@@ -36,6 +36,7 @@ import {
   useOutboundDecisionMutation,
   useOutboundFactReviewMutation,
   useOutboundQueueQuery,
+  useOutboundRefreshEvidenceMutation,
 } from '@/lib/queries/useOutboundQuery';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
@@ -200,6 +201,7 @@ export function OutboundWorkspace() {
   const certificationQuery = useOutboundCertificationQuery(selectedId);
   const certification = certificationQuery.data?.certification ?? null;
   const { mutateAsync: reviewFact } = useOutboundFactReviewMutation();
+  const { mutateAsync: refreshEvidence } = useOutboundRefreshEvidenceMutation();
   const facts = certification?.items ?? [];
   const activeFact = facts[Math.min(factIndex, facts.length - 1)] ?? null;
 
@@ -256,6 +258,15 @@ export function OutboundWorkspace() {
     },
     [reviewFact, run, selected]
   );
+
+  const onRefreshEvidence = useCallback(() => {
+    if (!selected) return;
+    void run(
+      'refresh_evidence',
+      () => refreshEvidence(selected.leadId),
+      'Evidence refresh started. Facts fill in as enrichment finishes.'
+    );
+  }, [refreshEvidence, run, selected]);
 
   const onCertify = useCallback(() => {
     if (!selected?.dedupeKey || !certification) return;
@@ -413,6 +424,7 @@ export function OutboundWorkspace() {
         onClose={() => setSelectedId(null)}
         onFact={onFact}
         onCertify={onCertify}
+        onRefreshEvidence={onRefreshEvidence}
         onApprove={onApprove}
         onSaveCopy={onSaveCopy}
         onHold={onHold}
@@ -427,6 +439,7 @@ export function OutboundWorkspace() {
       onApprove,
       onCertify,
       onFact,
+      onRefreshEvidence,
       onHold,
       onReject,
       onSaveCopy,
