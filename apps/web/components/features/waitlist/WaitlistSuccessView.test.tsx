@@ -1,13 +1,28 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/queries', () => ({
+  useCheckoutMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+  }),
+}));
+
 import { WaitlistSuccessView } from './WaitlistSuccessView';
 import storyMeta, {
   Web214AuthenticatedPending,
 } from './WaitlistSuccessView.stories';
 
 describe('WaitlistSuccessView', () => {
+  it('forwards the Pro price so a waiting visitor can buy now (JOV-7701)', () => {
+    render(<WaitlistSuccessView proCheckoutPriceId='price_pro_monthly' />);
+
+    expect(screen.getByTestId('waitlist-start-pro-checkout')).toBeVisible();
+  });
+
   it('does not show a saved-request confirmation for an orphaned pending account', () => {
     render(<WaitlistSuccessView outcome='receipt_unavailable' />);
 
@@ -118,8 +133,9 @@ describe('WaitlistSuccessView', () => {
       "import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';"
     );
     expect(routeSource).toContain('<WaitlistRouteWithContract>');
+    expect(routeSource).toContain('email={authResult.context.email}');
     expect(routeSource).toContain(
-      '<WaitlistSuccessView email={authResult.context.email} />'
+      'proCheckoutPriceId = PRICING.pro.monthly.priceId'
     );
     expect(routeSource).toContain('getWaitlistRouteRedirect');
     expect(routeSource).not.toContain('notFound()');
@@ -149,8 +165,9 @@ describe('WaitlistSuccessView', () => {
     expect(outcomeSource).not.toContain('PRIMARY_CTA_CLASS');
     expect(outcomeSource).not.toContain('SECONDARY_BTN_CLASS');
     expect(outcomeSource).toContain(
-      "<Button asChild variant='primary' size='lg'>"
+      "<Button asChild variant={variant} size='lg'>"
     );
+    expect(outcomeSource).toContain("variant='primary'");
     expect(outcomeSource).toContain("variant='secondary'");
     expect(outcomeSource).toContain("size='lg'");
   });

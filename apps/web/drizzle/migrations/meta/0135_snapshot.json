@@ -5775,7 +5775,7 @@
           "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "event_type": {
           "name": "event_type",
@@ -38634,7 +38634,7 @@
           "name": "full_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "email": {
           "name": "email",
@@ -38658,19 +38658,19 @@
           "name": "primary_social_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "primary_social_platform": {
           "name": "primary_social_platform",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "primary_social_url_normalized": {
           "name": "primary_social_url_normalized",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "spotify_url": {
           "name": "spotify_url",

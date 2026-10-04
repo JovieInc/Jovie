@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const MIGRATION_PATH =
-  'drizzle/migrations/0134_reconcile_feature_flag_overrides.sql';
+  'drizzle/migrations/0135_reconcile_feature_flag_overrides.sql';
 
 const OVERRIDE_KEYS_TO_REMOVE = [
   'code:DESIGN_V1',

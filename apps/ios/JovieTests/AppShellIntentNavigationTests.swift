@@ -283,6 +283,56 @@ struct AppShellIntentNavigationTests {
     #expect(MobileSignedInLinkRoute.chatHome.intent == .openChat)
   }
 
+  // JOV-7632: web-only workspaces (YouTube, Insights, Jovie Work, release
+  // plan, merch checkout) must never resolve to an in-app route until a
+  // native surface exists. The AASA excludes their paths; this boundary is
+  // the in-app backstop that hands stragglers back to Safari.
+  @Test func webOnlyWorkspaceURLsNeverRouteInApp() {
+    let webOnly = [
+      "https://jov.ie/app/youtube",
+      "https://jov.ie/app/youtube/experiments",
+      "https://jov.ie/app/insights",
+      "https://jov.ie/app/insights/",
+      "https://jov.ie/app/jovie-work",
+      "https://jov.ie/app/dashboard/release-plan",
+      "https://jov.ie/app/dashboard/insights",
+      "ie.jov.jovie://app/youtube",
+    ]
+
+    for raw in webOnly {
+      let url = URL(string: raw)!
+      #expect(
+        MobileSignedInLinkRoute.resolve(url) == nil,
+        "\(raw) must not resolve to an iOS surface"
+      )
+      #expect(
+        MobileWebOnlyRouteBoundary.isWebOnly(url),
+        "\(raw) must hit the web-only boundary"
+      )
+    }
+
+    // Lookalike prefixes are not web-only: /app/youtube-foo stays unmatched.
+    let lookalike = URL(string: "https://jov.ie/app/youtube-foo")!
+    #expect(MobileWebOnlyRouteBoundary.isWebOnly(lookalike) == false)
+
+    // Shipped routes still route in-app.
+    let settings = URL(string: "https://jov.ie/app/settings")!
+    #expect(MobileWebOnlyRouteBoundary.isWebOnly(settings) == false)
+    #expect(MobileSignedInLinkRoute.resolve(settings) == .settings)
+  }
+
+  @Test func webOnlyFallbackRebasesOntoWebHost() {
+    let webBaseURL = URL(string: "https://jov.ie")!
+    let url = URL(string: "ie.jov.jovie://app/jovie-work?tab=queue")!
+    let fallback = MobileWebOnlyRouteBoundary.webFallbackURL(
+      for: url, webBaseURL: webBaseURL
+    )
+    #expect(fallback.scheme == "https")
+    #expect(fallback.host == "jov.ie")
+    #expect(fallback.path == "/app/jovie-work")
+    #expect(fallback.query == "tab=queue")
+  }
+
   @Test func consumedRequestDoesNotApplyTwice() {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,
