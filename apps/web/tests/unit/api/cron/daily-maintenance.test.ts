@@ -195,29 +195,6 @@ describe('GET /api/cron/daily-maintenance', () => {
     vi.unstubAllEnvs();
   });
 
-  it('reports a stranded or stale pending user as a failed sub-job', async () => {
-    mockReconcileWaitlistAdmission.mockResolvedValue({
-      healedMissingEntries: 2,
-      stalePending: 1,
-    });
-    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
-    const response = await GET(
-      new Request('http://localhost/api/cron/daily-maintenance', {
-        headers: { Authorization: 'Bearer test-secret' },
-      })
-    );
-    const data = await response.json();
-
-    expect(response.status).toBe(207);
-    expect(data.results.waitlistAdmission.success).toBe(false);
-    expect(data.results.waitlistAdmission.error).toContain(
-      '2 waitlist_pending user(s) had no waitlist entry'
-    );
-    expect(data.results.waitlistAdmission.error).toContain(
-      '1 external user(s) pending longer than 3 days'
-    );
-  });
-
   it('returns 401 for invalid cron auth', async () => {
     const { GET } = await import('@/app/api/cron/daily-maintenance/route');
     const response = await GET(
@@ -400,5 +377,28 @@ describe('GET /api/cron/daily-maintenance', () => {
       error: '1 founder-review upload lease quarantined for manual cleanup',
     });
     expect(data.results.dataRetention).toMatchObject({ success: true });
+  });
+
+  it('reports a stranded or stale pending user as a failed sub-job', async () => {
+    mockReconcileWaitlistAdmission.mockResolvedValue({
+      healedMissingEntries: 2,
+      stalePending: 1,
+    });
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.results.waitlistAdmission.success).toBe(false);
+    expect(data.results.waitlistAdmission.error).toContain(
+      '2 waitlist_pending user(s) had no waitlist entry'
+    );
+    expect(data.results.waitlistAdmission.error).toContain(
+      '1 external user(s) pending longer than 3 days'
+    );
   });
 });
