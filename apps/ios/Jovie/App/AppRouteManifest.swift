@@ -846,7 +846,7 @@ enum AppRouteManifest {
     }
 
     for prefix in MobileWebOnlyRouteBoundary.pathPrefixes {
-      if !entries.contains({ $0.classification == .webOnly && $0.stateOwner.contains(prefix) }) {
+      if !entries.contains(where: { $0.classification == .webOnly && $0.stateOwner.contains(prefix) }) {
         issues.append("web-only path \(prefix) lacks a webOnly manifest entry")
       }
     }
