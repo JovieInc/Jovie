@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { buildIosAuthCompleteUrl, sanitizeReturnTo } from '@jovie/auth-routing';
+import {
+  buildIosAuthCompleteUrl,
+  isValidNativeAttempt,
+  sanitizeReturnTo,
+} from '@jovie/auth-routing';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   ensureLiveDevTestAuthActor,
@@ -130,6 +134,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const attempts = request.nextUrl.searchParams.getAll('native_attempt');
+  const nativeAttempt = attempts[0];
+  if (attempts.length > 1 || !isValidNativeAttempt('ios', nativeAttempt)) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid native_attempt' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
   let userId = await resolveConfiguredNativeTestBetterAuthUserId();
   if (!userId) {
     const actor = await ensureLiveDevTestAuthActor(persona);
@@ -145,9 +158,13 @@ export async function GET(request: NextRequest) {
     userId,
     returnTo,
     codeChallenge,
+    ...(nativeAttempt !== undefined ? { nativeAttempt } : {}),
   });
 
-  return NextResponse.redirect(buildIosAuthCompleteUrl({ code, state }), {
-    headers: NO_STORE_HEADERS,
-  });
+  return NextResponse.redirect(
+    buildIosAuthCompleteUrl({ code, state, nativeAttempt }),
+    {
+      headers: NO_STORE_HEADERS,
+    }
+  );
 }

@@ -198,6 +198,16 @@ describe('remediation sweep selection', () => {
         'jovie-docs': { readyState: 'ERROR', uid: 'dpl_docs' },
         'jovie-web': { readyState: 'READY' },
       }),
+      loadDomains: async () => [
+        {
+          domain: 'jov.ie',
+          observed: true,
+          registered: true,
+          expiresAt: ago(-90 * DAY_MS),
+          statuses: ['ok'],
+          nameservers: ['ns1.vercel-dns.com'],
+        },
+      ],
       vercelTokenPresent: true,
       upsert,
     });
