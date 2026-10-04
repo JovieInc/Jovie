@@ -442,7 +442,9 @@ class RelayTest(unittest.TestCase):
         self.assertTrue(events.in_scope(pr(branch="claude/jov-9-20260926t0100", draft=True), "orphan", disabled))
         self.assertFalse(events.in_scope(pr(draft=True), "orphan", disabled))
         self.assertEqual(events.disabled_lanes(PROVIDERS), {"claude", "hyperagent"})
-        self.assertIn("claude", events.disabled_lanes())
+        # JOV-7706: claude repairs locally; remote-only Hyperagent's drafts stay orphan-maintained.
+        self.assertNotIn("claude", events.disabled_lanes())
+        self.assertIn("hyperagent", events.disabled_lanes())
 
     def test_relay_labels_only_the_current_head_once(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h1",
@@ -459,6 +461,13 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(labeled.made("gh", "api"), [], "an already queued PR is not relabeled")
         missing = Shell({("gh", "pr", "view"): (1, "")})
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, missing, set()), [])
+
+        exhausted = Shell({("gh", "pr", "view"): {
+            **view, "labels": [{"name": "lane-fix-exhausted"}],
+        }})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, exhausted, set()), [])
+        self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
+                         "a terminal head never gets another repair signal")
 
     def test_a_second_failed_ejection_in_a_day_marks_the_pr_queue_poison(self):
         now = time.time()
@@ -546,15 +555,33 @@ class RelayTest(unittest.TestCase):
 
     def test_a_push_to_main_labels_newly_conflicting_prs_after_mergeability_settles(self):
         reads = iter([
-            [{"number": 5, "headRefName": "tim/fix", "isDraft": False, "mergeable": "UNKNOWN", "labels": []}],
-            [{"number": 5, "headRefName": "tim/fix", "isDraft": False, "mergeable": "CONFLICTING", "labels": []},
-             {"number": 6, "headRefName": "tim/other", "isDraft": False, "mergeable": "CONFLICTING",
-              "labels": [{"name": "lane-fix-conflict"}]}],
+            [{"number": 5, "headRefName": "tim/fix", "headRefOid": "h5", "isDraft": False,
+              "mergeable": "UNKNOWN", "labels": []}],
+            [{"number": 5, "headRefName": "tim/fix", "headRefOid": "h5", "isDraft": False,
+              "mergeable": "CONFLICTING", "labels": []},
+             {"number": 6, "headRefName": "tim/other", "headRefOid": "h6", "isDraft": False,
+              "mergeable": "CONFLICTING", "labels": [{"name": "lane-fix-conflict"}]}],
         ])
         shell = Shell({("gh", "pr", "list"): lambda args: next(reads)})
         added = events.label_backlog(shell, set(), kinds=("conflict",), settle_s=0.01)
         self.assertEqual(added, [(5, "conflict")])
         self.assertEqual(len(shell.made("gh", "pr", "list")), 2)
+
+    def test_conflict_detector_skips_terminal_and_claimed_heads(self):
+        claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        terminal = pr(number=5, branch="tim/terminal", mergeable="CONFLICTING",
+                      labels=["lane-fix-exhausted"])
+        claimed = pr(number=6, branch="tim/claimed", sha="claimed-head", mergeable="CONFLICTING")
+        claim_url = (f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc")
+        shell = Shell({
+            ("gh", "pr", "list"): [terminal, claimed],
+            ("gh", "api", claim_url):
+                f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
+        })
+        with patch.object(events.time, "time", return_value=NOW):
+            added = events.label_backlog(shell, set(), kinds=("conflict",), settle_s=0)
+        self.assertEqual(added, [])
+        self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
 
     def test_backfill_labels_green_lane_drafts_and_orphans(self):
         prs = [
@@ -629,7 +656,7 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual(search, "label:lane-fix-red,lane-fix-conflict,lane-fix-dequeued,lane-fix-review,lane-fix-stale")
         self.assertEqual(events.queued_prs(fake_lane(Shell({("gh", "pr", "list"): (1, "")})), events.FIX_KINDS), [])
 
-    def test_an_event_pr_is_claimed_first_recorded_and_its_label_consumed(self):
+    def test_an_event_pr_is_claimed_first_recorded_and_retains_its_label(self):
         shell = Shell()
         lane = fake_lane(shell)
         runner.record_held(self.host, 5, "h1", ["check-failed:x", "boom"])
@@ -637,8 +664,8 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual((claimed["number"], claimed["gateEvidence"][1]), (5, "boom"))
         self.assertEqual(self.attempts()["5"], {"sha": "h1", "count": 1, "lane": "devin", "at": NOW})
         self.assertEqual(lane.posted, [5])
-        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
-                         [["gh", "api", "-X", "DELETE", f"repos/{runner.REPO_SLUG}/issues/5/labels/lane-fix-red"]])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
+                         "the repair signal remains until the worker publishes a new head")
 
     def test_an_unfixable_hold_retains_the_label_without_an_attempt(self):
         shell = Shell()
@@ -1085,6 +1112,19 @@ class GapTest(unittest.TestCase):
         no_linear = Shell({("gh", "api", "graphql"): page})
         events.reconcile(self.host, fake_lane(no_linear), lambda: (_ for _ in ()).throw(OSError("x")), NOW, force=True)
         self.assertEqual(len(no_linear.made("gh", "pr", "close")), 0, "terminal work is preserved even with Linear unavailable")
+
+    def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
+        target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
+        claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        claim_url = f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc"
+        shell = Shell({
+            ("gh", "api", claim_url):
+                f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
+        })
+        with patch.object(events, "open_prs_state", return_value=[target]):
+            record = events.reconcile(self.host, fake_lane(shell), lambda: None, NOW, force=True)
+        self.assertEqual(record["labeled"], [])
+        self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
 
     def hold_ctx(self, events_list, notes=(), committed="2033-05-18T00:00:00Z", oid="h"):
         """A canned hold_context GraphQL reply: labeled events, comments, last commit."""
@@ -1718,6 +1758,8 @@ class TerminalPreservationTest(unittest.TestCase):
                 return super(ReceiptShell,inner).__call__(args,**kwargs)
         shell=ReceiptShell();lane=fake_lane(shell)
         self.assertEqual(events.claim_event_pr(self.host,lane,'devin',[target],NOW)['number'],5)
+        self.assertFalse(any(call[-1].endswith('/lane-fix-conflict') for call in shell.calls),
+                         'the repair signal remains until the worker publishes a new head')
         saved=json.loads((self.host.state/'fix-attempts.json').read_text())
         receipt=saved['5']['reentry']
         saved['5'].update(endedAt=NOW+1,pushedHead='h2',pushed=True)

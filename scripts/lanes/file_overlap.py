@@ -220,17 +220,36 @@ def classify_pair(left: dict, right: dict, *, existing_first: bool = False) -> d
     }
 
 
+def queue_owned(pr: dict | None) -> bool:
+    """A PR the native merge queue already sequences: queued or armed for auto-merge.  The queue
+    tests combined trees and ejects real conflicts. Ordinary ordering must not hold a member
+    (2026-10-04: holds on queued #20469/#20447 ejected the whole queue); semantic blocks remain."""
+    return bool(pr) and (pr.get("isInMergeQueue") is True or bool(pr.get("autoMergeRequest")))
+
+
 def open_pr_decisions(prs: list[dict], mode: str | None = None) -> list[dict]:
     mode = guard_mode(mode)
     if mode == "off":
         return []
     eligible = [pr for pr in prs if not pr.get("isDraft")]
+    by_number = {_number(pr): pr for pr in eligible}
     decisions = []
     for index, left in enumerate(eligible):
         for right in eligible[index + 1:]:
             decision = classify_pair(left, right)
             if decision:
-                decision["actionTaken"] = "flag" if mode == "flag" else decision["policyAction"]
+                owned = queue_owned(by_number.get(decision["laterPr"]))
+                # Sequencing waits for the first PR to land; one that is not queued or armed may
+                # never land (#20148 held queued #20469 on 2026-10-04), so it only flags.
+                idle = decision["policyAction"] == "sequence" \
+                    and not queue_owned(by_number.get(decision["firstPr"]))
+                queue_ordering = owned and decision["policyAction"] != "block"
+                decision["actionTaken"] = "flag" if mode == "flag" or queue_ordering or idle \
+                    else decision["policyAction"]
+                if owned:
+                    decision["queueOwned"] = True
+                if idle:
+                    decision["firstIdle"] = True
                 decisions.append(decision)
     return decisions
 
@@ -399,15 +418,38 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
     desired = {_key(row): row for row in decisions}
     if mode == "enforce":
         # Retargeting a legacy child to main removes the base-branch evidence.  Preserve the
-        # dependency until its recorded parent actually leaves the open inventory.
+        # dependency until its recorded parent leaves the open inventory or the native
+        # queue owns ordering. Never restore an old hold over that current decision.
         for key, row in previous_pr.items():
             if row.get("policyAction") == "stack" and row.get("firstPr") in by_number \
-                    and row.get("laterPr") in by_number:
+                    and row.get("laterPr") in by_number \
+                    and not queue_owned(by_number[row["laterPr"]]):
                 for current_key, current in list(desired.items()):
                     if current.get("firstPr") == row.get("firstPr") and current.get("laterPr") == row.get("laterPr"):
                         del desired[current_key]
                 desired[key] = row
     created, released = [], []
+    enforced = {"sequence", "stack", "block"}
+    remaining_later = {row.get("laterPr") for row in desired.values()
+                       if row.get("actionTaken") in enforced}
+    owned_holds = {row.get("laterPr") for row in previous_pr.values()
+                   if row.get("holdApplied")}
+    rebase_later = {row.get("laterPr") for key, row in previous_pr.items()
+                    if key not in desired and mode == "enforce"
+                    and row.get("actionTaken") in enforced
+                    and row.get("firstPr") not in by_number}
+    released_later = set()
+
+    def release_once(later, record):
+        number = later["number"]
+        # A hold is shared by every enforced pair targeting this PR. Release it
+        # only after the final owner leaves, even when several pairs change.
+        if number in remaining_later or number in released_later:
+            return False
+        _release(lane, later, {**record, "holdApplied": number in owned_holds},
+                 rebase=number in rebase_later)
+        released_later.add(number)
+        return True
 
     for key, decision in desired.items():
         old = previous_pr.get(key)
@@ -416,8 +458,9 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
             is_enforced = decision.get("actionTaken") in {"sequence", "stack", "block"}
             later = by_number.get(decision.get("laterPr"))
             if later and was_enforced and not is_enforced:
-                _release(lane, later, old, rebase=False)
-                released.append({**old, "actionTaken": "released", "releasedAt": now_iso()})
+                did_release = release_once(later, old)
+                action = "rebase-queued" if did_release and later["number"] in rebase_later else "released"
+                released.append({**old, "actionTaken": action, "releasedAt": now_iso()})
             elif later and is_enforced and not was_enforced:
                 _retarget_main(lane, later)
                 decision["holdApplied"] = "hold" not in {label.lower() for label in _pr_labels(later)}
@@ -436,20 +479,20 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
             _hold(lane, later["number"], add_label=decision["holdApplied"])
         created.append(decision)
 
-    remaining_later = {row.get("laterPr") for row in desired.values()
-                       if row.get("actionTaken") in {"sequence", "stack", "block"}}
+    # Transfer ownership after per-pair metadata is copied, so an older false
+    # holdApplied value cannot overwrite the surviving owner's inherited lease.
+    for number in remaining_later & owned_holds:
+        owners = [row for row in desired.values() if row.get("laterPr") == number
+                  and row.get("actionTaken") in enforced]
+        if not any(row.get("holdApplied") for row in owners):
+            owners[0]["holdApplied"] = True
     for key, record in previous_pr.items():
         if key in desired:
             continue
         later = by_number.get(record.get("laterPr"))
-        if later and record.get("laterPr") in remaining_later and record.get("holdApplied"):
-            inheritor = next(row for row in desired.values() if row.get("laterPr") == record.get("laterPr")
-                             and row.get("actionTaken") in {"sequence", "stack", "block"})
-            inheritor["holdApplied"] = True
-        elif later:
-            rebase = (mode == "enforce" and record.get("actionTaken") in {"sequence", "stack", "block"}
-                      and record.get("firstPr") not in by_number)
-            _release(lane, later, record, rebase=rebase)
+        if later and record.get("laterPr") not in remaining_later:
+            did_release = release_once(later, record)
+            rebase = did_release and later["number"] in rebase_later
             released.append({**record, "actionTaken": "rebase-queued" if rebase else "released",
                              "releasedAt": now_iso()})
 
