@@ -266,6 +266,7 @@ web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx
 web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
+web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
 web.admin-wiki|web|admin-wiki|apps/web/app/app/(shell)/admin/wiki/|desktop,mobile
 web.hud-isolated|web|ovie-ops-isolated|apps/web/app/hud/page.tsx,apps/web/app/hud/layout.tsx|desktop,mobile
 web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile

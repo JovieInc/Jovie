@@ -164,6 +164,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
     }
   });
+  it('registers the admin share studio for both viewports', () => {
+    const entry = classifyScreenPath(
+      'apps/web/app/app/(shell)/admin/share-studio/page.tsx'
+    ).entry;
+
+    assert.equal(entry?.id, 'web.admin-share-studio');
+    assert.equal(entry?.owner, 'admin-share-studio');
+    assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+  });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
     const platforms = [...new Set(gated().map(e => e.platform))].sort();
