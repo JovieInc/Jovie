@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   releaseInvestorViewDedup: vi.fn(),
   shouldRecordInvestorView: vi.fn(),
-  apiLimiterLimit: vi.fn(),
+  investorPortalTokenLimit: vi.fn(),
   getSessionCookie: vi.fn(),
   isTestAuthBypassEnabled: vi.fn(() => false),
   resolveTestBypassUserId: vi.fn(() => null),
@@ -65,8 +65,8 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
-  apiLimiter: {
-    limit: mocks.apiLimiterLimit,
+  investorPortalTokenLimiter: {
+    limit: mocks.investorPortalTokenLimit,
   },
 }));
 
@@ -103,10 +103,10 @@ describe('investor portal proxy helper', () => {
     mocks.getSessionCookie.mockReturnValue(null);
     mocks.isTestAuthBypassEnabled.mockReturnValue(false);
     mocks.shouldRecordInvestorView.mockResolvedValue(true);
-    mocks.apiLimiterLimit.mockResolvedValue({
+    mocks.investorPortalTokenLimit.mockResolvedValue({
       success: true,
-      limit: 20,
-      remaining: 19,
+      limit: 30,
+      remaining: 29,
       reset: new Date(Date.now() + 60_000),
     });
   });
@@ -162,17 +162,17 @@ describe('investor portal proxy helper', () => {
     );
     await handleInvestorRequest(req);
 
-    expect(mocks.apiLimiterLimit).toHaveBeenCalledTimes(1);
-    expect(mocks.apiLimiterLimit).toHaveBeenCalledWith(
+    expect(mocks.investorPortalTokenLimit).toHaveBeenCalledTimes(1);
+    expect(mocks.investorPortalTokenLimit).toHaveBeenCalledWith(
       'investor-portal:token:203.0.113.7'
     );
   });
 
   it('returns 429 with a numeric Retry-After header when the rate limiter rejects the request, without touching the database', async () => {
     const resetInMs = 12_000;
-    mocks.apiLimiterLimit.mockResolvedValue({
+    mocks.investorPortalTokenLimit.mockResolvedValue({
       success: false,
-      limit: 20,
+      limit: 30,
       remaining: 0,
       reset: new Date(Date.now() + resetInMs),
     });
@@ -197,9 +197,9 @@ describe('investor portal proxy helper', () => {
   });
 
   it('floors Retry-After at 1 second even when the reset window has already elapsed', async () => {
-    mocks.apiLimiterLimit.mockResolvedValue({
+    mocks.investorPortalTokenLimit.mockResolvedValue({
       success: false,
-      limit: 20,
+      limit: 30,
       remaining: 0,
       reset: new Date(Date.now() - 5_000), // already in the past
     });
@@ -213,10 +213,10 @@ describe('investor portal proxy helper', () => {
   });
 
   it('still validates the token normally once the rate limiter allows the request (limiter pass -> normal flow)', async () => {
-    mocks.apiLimiterLimit.mockResolvedValue({
+    mocks.investorPortalTokenLimit.mockResolvedValue({
       success: true,
-      limit: 20,
-      remaining: 19,
+      limit: 30,
+      remaining: 29,
       reset: new Date(Date.now() + 60_000),
     });
     mockSelectRows([LIVE_LINK]);
@@ -225,15 +225,18 @@ describe('investor portal proxy helper', () => {
       createInvestorRequest(`/investor-portal?t=${CLAIM_TOKEN}&utm=x`)
     );
 
-    expect(mocks.apiLimiterLimit).toHaveBeenCalledTimes(1);
+    expect(mocks.investorPortalTokenLimit).toHaveBeenCalledTimes(1);
     expect(res?.status).toBe(307);
     expect(res?.cookies.get('__investor_token')?.value).toBe(CLAIM_TOKEN);
     expect(mocks.select).toHaveBeenCalledTimes(1);
   });
 
-  it('does not rate-limit cookie-based revisits (no ?t= param)', async () => {
+  it('rate-limits cookie-based token validation on the same per-IP bucket', async () => {
     const req = new NextRequest('https://jov.ie/investor-portal', {
-      headers: { Cookie: `__investor_token=${CLAIM_TOKEN}` },
+      headers: {
+        Cookie: `__investor_token=${CLAIM_TOKEN}`,
+        'x-forwarded-for': '203.0.113.9',
+      },
     });
 
     mockSelectRows([LIVE_LINK]);
@@ -241,7 +244,39 @@ describe('investor portal proxy helper', () => {
 
     await handleInvestorRequest(req);
 
-    expect(mocks.apiLimiterLimit).not.toHaveBeenCalled();
+    expect(mocks.investorPortalTokenLimit).toHaveBeenCalledWith(
+      'investor-portal:token:203.0.113.9'
+    );
+  });
+
+  it('returns 429 for cookie-based attempts when the limiter rejects, without touching the database', async () => {
+    mocks.investorPortalTokenLimit.mockResolvedValue({
+      success: false,
+      limit: 30,
+      remaining: 0,
+      reset: new Date(Date.now() + 30_000),
+    });
+
+    const req = new NextRequest('https://jov.ie/investor-portal', {
+      headers: { Cookie: `__investor_token=${CLAIM_TOKEN}` },
+    });
+
+    const res = await handleInvestorRequest(req);
+
+    expect(res?.status).toBe(429);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('does not rate-limit malformed cookie tokens (shape check short-circuits first)', async () => {
+    const req = new NextRequest('https://jov.ie/investor-portal', {
+      headers: { Cookie: '__investor_token=short' },
+    });
+
+    const res = await handleInvestorRequest(req);
+
+    expect(res?.status).toBe(404);
+    expect(mocks.investorPortalTokenLimit).not.toHaveBeenCalled();
+    expect(mocks.select).not.toHaveBeenCalled();
   });
 
   function expectPrivateNotFound(res: Response | null | undefined) {

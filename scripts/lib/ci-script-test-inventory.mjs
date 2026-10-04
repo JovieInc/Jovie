@@ -66,8 +66,6 @@ export const KNOWN_RED_ORPHANS = Object.freeze({
     'red on main: canonical queue-hold list no longer contains every expected hold.',
   'scripts/lib/__tests__/scripts-hermes-path-death.test.mjs':
     'red on main: 8 live package-path citations to the removed hermes path remain.',
-  'scripts/lib/__tests__/typecheck-singleflight.test.mjs':
-    'red on main: live-owner heartbeat case emits no "phase=wait" line.',
 });
 
 /**
