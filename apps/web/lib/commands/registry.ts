@@ -15,6 +15,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
+import type { AppFlagName } from '@/lib/flags/contracts';
 import { isDiscoverabilityFlagEnabled } from '@/lib/flags/discoverability-flags';
 
 /**
@@ -159,6 +160,8 @@ export interface NavCommand {
   readonly href: string;
   /** Optional shortcut hint rendered on the cmd+k row. */
   readonly shortcutLabel?: string;
+  /** Hide this row unless the flag is on. A missing value stays hidden. */
+  readonly requiredFlag?: AppFlagName;
 }
 
 export type Command = SkillCommand | NavCommand;
@@ -201,7 +204,8 @@ function nav(
   label: string,
   description: string,
   iconName: string,
-  href: string
+  href: string,
+  requiredFlag?: AppFlagName
 ): NavCommand {
   return {
     kind: 'nav',
@@ -211,12 +215,21 @@ function nav(
     iconName,
     surfaces: CMDK_ONLY,
     href,
+    ...(requiredFlag ? { requiredFlag } : {}),
   };
 }
 
 export interface CommandDiscoverability {
   readonly youtubeWorkspaceNav?: boolean;
   readonly jovieWorkNav?: boolean;
+}
+/** Skills stay visible. Nav rows with a required flag render only when it is on. */
+export function isCommandVisible(
+  command: Command,
+  flags: Partial<Record<AppFlagName, boolean>>
+): boolean {
+  if (command.kind !== 'nav' || !command.requiredFlag) return true;
+  return flags[command.requiredFlag] === true;
 }
 
 export function buildCommands(
@@ -284,7 +297,8 @@ export function buildCommands(
       PRODUCT_ONTOLOGY.identity.label,
       PRODUCT_ONTOLOGY.identity.definition,
       'Waypoints',
-      APP_ROUTES.PRESENCE
+      APP_ROUTES.PRESENCE,
+      'PROFILES_WORKSPACE'
     ),
     nav(
       'go-work',

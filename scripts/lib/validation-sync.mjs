@@ -17,7 +17,9 @@ import {
   parseValidationReceipts,
 } from './validation-lifecycle.mjs';
 
-const MAX_LINKED_PULLS = 10;
+// Long-running issues collect many linked pull requests (JOV-7707 had more
+// than 10 on its first live run). The cap only bounds GitHub reads.
+const MAX_LINKED_PULLS = 60;
 const MAX_FILE_PAGES = 30;
 const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
 

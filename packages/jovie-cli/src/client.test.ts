@@ -215,7 +215,7 @@ describe('Jovie public resource client', () => {
       code: 'REQUEST_FAILED',
       message: 'GET https://jov.ie/llms.txt failed: socket unavailable',
     });
-    expect(attempts).toBe(2);
+    expect(attempts).toBe(3);
 
     const nonErrorFetch: FetchImplementation = async () => {
       throw 'connection closed';
@@ -324,7 +324,8 @@ describe('Jovie public resource client', () => {
     await expect(
       createProfile('https://open.spotify.com/artist/abc', { fetchImpl })
     ).rejects.toMatchObject({
-      message: 'POST https://jov.ie/api/agents/profiles returned HTTP 429',
+      message:
+        'Rate limited by jov.ie. Retry in 120s. (POST https://jov.ie/api/agents/profiles returned HTTP 429)',
       apiCode: 'RATE_LIMITED',
       status: 429,
       retryAfterSeconds: 120,

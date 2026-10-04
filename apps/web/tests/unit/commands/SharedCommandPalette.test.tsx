@@ -452,7 +452,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
-    expect(pushMock).toHaveBeenCalledWith('/app/releases');
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
   });
 
   it('does not duplicate Audience as a separate command', () => {

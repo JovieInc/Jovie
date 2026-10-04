@@ -7,6 +7,8 @@ import {
   CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
 } from '@/components/jovie/chat-composer-copy';
 import type { PickerActionItem } from '@/components/jovie/components/picker-rows';
+import { APP_ROUTES } from '@/constants/routes';
+import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
@@ -138,6 +140,40 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('keeps Identity gated when workspace discoverability flags are hydrated', () => {
+    pushMock.mockClear();
+    const view = (enabled: boolean) => (
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, PROFILES_WORKSPACE: enabled }}
+      >
+        <MainPlaneHarness />
+      </AppFlagProvider>
+    );
+    const { rerender } = render(view(false));
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'Identity' } });
+    expect(
+      screen.queryByRole('option', { name: /^Identity/ })
+    ).not.toBeInTheDocument();
+    rerender(view(true));
+    expect(
+      screen.getByRole('option', { name: /^Identity/ })
+    ).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
+    fireEvent.change(input, { target: { value: 'YouTube' } });
+    expect(
+      screen.queryByRole('option', { name: /YouTube/ })
+    ).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'Identity' } });
+    rerender(view(false));
+    expect(
+      screen.queryByRole('option', { name: /^Identity/ })
+    ).not.toBeInTheDocument();
+  });
+
   it('updates workspace doors from the hydrated flag provider', () => {
     pushMock.mockClear();
     const view = (enabled: boolean) => (
@@ -255,8 +291,8 @@ describe('CmdKPalette', () => {
     expect(
       screen.getByRole('option', {
         name: segmentedAccessibleName(
-          'Identity',
-          'Who you are and how you are represented.',
+          PRODUCT_ONTOLOGY.work.label,
+          PRODUCT_ONTOLOGY.work.definition,
           '⌘2'
         ),
       })

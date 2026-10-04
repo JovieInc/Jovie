@@ -71,4 +71,20 @@ describe('UnifiedTableSkeleton', () => {
     // when isLoading is true. This keeps the skeleton accessible.
     expect(screen.getByText('Loading table data')).toBeInTheDocument();
   });
+
+  it('applies the loaded table row mode so two-line rows reserve their height', () => {
+    const { container } = render(
+      <UnifiedTableSkeleton
+        columns={COLUMNS}
+        skeletonRows={1}
+        rowMode='two-line'
+      />
+    );
+
+    const table = container.querySelector('table');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table?.style.getPropertyValue('--table-cell-content-height')).toBe(
+      '48px'
+    );
+  });
 });

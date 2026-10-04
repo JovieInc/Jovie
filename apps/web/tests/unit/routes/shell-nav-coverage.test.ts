@@ -74,13 +74,13 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
   '/app/insights':
-    'Needs a product decision before nav: Audience may have replaced this workspace. Expires 2026-12-31',
+    'Contextual Audience workspace reached from the Audience route control and chat insight cards',
   '/app/jovie-work':
-    'Cmd-K row is gated by JOVIE_WORK_NAV (default off) until 2026-12-31',
+    'Contextual autonomous work history reached from Home/Inbox',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
   '/app/youtube':
-    'Cmd-K row is gated by YOUTUBE_WORKSPACE_NAV (default off) until 2026-12-31',
+    'YouTube ledger workspace reached from the contextual Work toolbar action',
 };
 
 interface ShellPage {

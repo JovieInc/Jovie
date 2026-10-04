@@ -132,6 +132,12 @@ const producerStageRequired = [
 ];
 // Image and Markdown evidence widen what an artifact may carry; each job
 // that opts in is reviewed here.
+// An expression-valued flag can evaluate true, so anything but an explicit
+// false counts as an allowance.
+const allowanceEnabled = (value: unknown) =>
+  value !== undefined &&
+  value !== false &&
+  !['', 'false'].includes(String(value));
 const imageAllowedJobs = new Set([
   'agent-tick.yml:synthetic-monitoring',
   'ci.yml:ci-fast-remaining',
@@ -139,6 +145,8 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
+  // Manual public-profile CTA identity captures only (dispatch-gated flag).
+  'e2e-full-matrix.yml:e2e-full-matrix',
   'screenshots.yml:generate',
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
@@ -1205,16 +1213,16 @@ ${fixtureCheckout}
         String(env.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE) !== 'true'
           ? [`${key}:missing-producer-stage`]
           : []),
-        ...(String(env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES) === 'true' &&
+        ...(allowanceEnabled(env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES) &&
         !imageAllowedJobs.has(key)
           ? [`${key}:unreviewed-job-image-allowance`]
           : []),
         ...uploads.flatMap(step => [
-          ...(String(step.with?.['allow-images']) === 'true' &&
+          ...(allowanceEnabled(step.with?.['allow-images']) &&
           !imageAllowedJobs.has(key)
             ? [`${key}:${step.with?.name}:unreviewed-image-upload`]
             : []),
-          ...(String(step.with?.['allow-markdown']) === 'true' &&
+          ...(allowanceEnabled(step.with?.['allow-markdown']) &&
           !markdownAllowedJobs.has(key)
             ? [`${key}:${step.with?.name}:unreviewed-markdown-upload`]
             : []),
@@ -1222,6 +1230,12 @@ ${fixtureCheckout}
       ];
     });
     expect(violations).toEqual([]);
+    expect(
+      allowanceEnabled("${{ github.event_name == 'workflow_dispatch' }}")
+    ).toBe(true);
+    expect(allowanceEnabled(true)).toBe(true);
+    for (const disabled of [undefined, false, 'false', ''])
+      expect(allowanceEnabled(disabled)).toBe(false);
     for (const key of producerStageRequired) {
       const [file, id] = key.split(':');
       const job = workflowJobs().find(

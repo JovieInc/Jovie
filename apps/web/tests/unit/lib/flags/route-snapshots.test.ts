@@ -33,6 +33,7 @@ describe('route flag snapshots', () => {
           'INBOX_HOME',
           'YOUTUBE_WORKSPACE_NAV',
           'JOVIE_WORK_NAV',
+          'PROFILES_WORKSPACE',
         ])
       );
     }
