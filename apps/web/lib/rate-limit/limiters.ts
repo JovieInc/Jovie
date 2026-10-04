@@ -377,6 +377,18 @@ export const claimTokenAccessLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for investor-portal token validation (`/investor-portal`).
+ * Limit: 30 attempts per minute per IP; fail-closed without Redis so a limiter
+ * outage cannot reopen the DB-backed token-guessing oracle.
+ */
+export const investorPortalTokenLimiter = createRateLimiter(
+  RATE_LIMITERS.investorPortalToken,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for private library asset share pages (`/p/[token]`).
  * A dedicated bucket prevents share traffic from consuming the claim-link or
  * public-profile budgets.
@@ -1306,6 +1318,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     agentProfileCreate: agentProfileCreateLimiter,
     agentCreatorLookup: agentCreatorLookupLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
+    investorPortalToken: investorPortalTokenLimiter,
     libraryAssetShareAccess: libraryAssetShareAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,

@@ -45,7 +45,7 @@ describe('HomeV1Design', () => {
     ).toContainElement(requestHeading);
   });
 
-  it('keeps the request-access links and trust strip in raw server HTML', () => {
+  it('keeps the request-access links in raw server HTML, with no unpermissioned logos', () => {
     const rawDocument = new DOMParser().parseFromString(
       renderToStaticMarkup(<HomeV1Design />),
       'text/html'
@@ -66,6 +66,8 @@ describe('HomeV1Design', () => {
     expect(rawDocument.body.textContent).toContain(
       'Built for artists and teams replacing scattered release work'
     );
+    // No brand has granted permission for `/` (JOV-7795), so no logos.
+    expect(rawDocument.querySelectorAll('[data-logo-asset]')).toHaveLength(0);
     expect(
       rawDocument
         .querySelector('[data-brand-mark-size]')

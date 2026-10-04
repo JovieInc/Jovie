@@ -470,11 +470,6 @@ export const sendNotification = async (
       continue;
     }
 
-    if (channel === 'in_app') {
-      results.push(buildSkippedResult(channel, 'Channel not implemented yet'));
-      continue;
-    }
-
     const isChannelEnabled = preferences.channels[channel] ?? false;
 
     if (!isChannelEnabled) {
@@ -497,11 +492,7 @@ export const sendNotification = async (
     if (channel === 'sms') {
       const smsResult = await handleSmsChannel(message, target);
       results.push(smsResult);
-      continue;
     }
-
-    // Placeholder for in-app transport
-    results.push(buildSkippedResult(channel, 'Channel not implemented yet'));
   }
 
   return {
