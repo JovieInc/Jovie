@@ -1,5 +1,17 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  accessSync,
+  chmodSync,
+  closeSync,
+  constants,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,8 +28,47 @@ import { crc32 } from 'node:zlib';
 
 export const GH_FAKE_HOST = 'github.localhost';
 
-/** Absolute path of the real gh binary, or null when it is not installed. */
+/** True when the file starts with a binary executable magic (ELF, Mach-O, MZ). */
+function isBinaryExecutable(path) {
+  try {
+    const fd = openSync(path, 'r');
+    const head = Buffer.alloc(4);
+    const count = readSync(fd, head, 0, 4, 0);
+    closeSync(fd);
+    if (count < 2) return false;
+    if (head.readUInt32BE(0) === 0x7f454c46) return true; // ELF
+    if (
+      head.readUInt32BE(0) === 0xfeedface ||
+      head.readUInt32BE(0) === 0xfeedfacf ||
+      head.readUInt32BE(0) === 0xcefaedfe ||
+      head.readUInt32BE(0) === 0xcffaedfe ||
+      head.readUInt32BE(0) === 0xcafebabe ||
+      head.readUInt32BE(0) === 0xbebafeca
+    )
+      return true; // Mach-O / fat Mach-O
+    return head[0] === 0x4d && head[1] === 0x5a; // MZ (Windows PE)
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Absolute path of the real gh binary, or null when it is not installed.
+ * PATH may lead with shell shims that wrap gh (e.g. the jovie-lanes token
+ * shim); those are scripts, so the first actual binary executable wins and
+ * `command -v` is only a fallback.
+ */
 export function resolveRealGh() {
+  for (const dir of (process.env.PATH ?? '').split(':')) {
+    if (!dir) continue;
+    const candidate = `${dir}/gh`;
+    try {
+      accessSync(candidate, constants.X_OK);
+    } catch {
+      continue;
+    }
+    if (isBinaryExecutable(candidate)) return candidate;
+  }
   try {
     return (
       execFileSync('sh', ['-c', 'command -v gh'], {
@@ -112,11 +163,23 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
+  // Script PATH may lead with shims that wrap gh (e.g. the jovie-lanes token
+  // shim). A dedicated bin dir pinned to the resolved real binary keeps the
+  // exercised grammar the real CLI's.
+  const bin = join(home, 'bin');
+  mkdirSync(bin);
+  const harnessGh = join(bin, 'gh');
+  try {
+    symlinkSync(binary, harnessGh);
+  } catch {
+    copyFileSync(binary, harnessGh);
+    chmodSync(harnessGh, 0o755);
+  }
   try {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
+          PATH: `${bin}:${process.env.PATH}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
