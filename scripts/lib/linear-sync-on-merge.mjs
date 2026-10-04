@@ -535,6 +535,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
 const MAX_COMMENT_PAGES = 10;
 const MAX_SWEEP_PAGES = 10;
 const CI_HARNESS_MANIFEST = '.github/ci-harness/manifest.json';
+const ASSURANCE_MATRIX = 'scripts/invariants/assurance-matrix.json';
 
 /**
  * Read the issue with every comment in server order. The escaped-defect
@@ -625,6 +626,7 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
  *   readonly facts: ReturnType<typeof createProductionFacts>,
  *   readonly openPulls: { pulls: readonly object[], complete: boolean },
  *   readonly harnessManifest: unknown,
+ *   readonly assuranceMatrix: unknown,
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly eventPull?: { number: number },
  *   readonly dryRun?: boolean,
@@ -664,6 +666,7 @@ export async function reconcileIssueLifecycle(ctx) {
     repository: ctx.repository,
     facts: ctx.facts,
     harnessManifest: ctx.harnessManifest,
+    assuranceMatrix: ctx.assuranceMatrix,
     eventPull: ctx.eventPull,
     dryRun: ctx.dryRun,
     log: ctx.log,
@@ -698,13 +701,12 @@ export async function reconcileIssueLifecycle(ctx) {
 
 /**
  * @param {string} root
+ * @param {string} path
  * @returns {unknown}
  */
-function loadHarnessManifest(root) {
+function loadJson(root, path) {
   try {
-    return JSON.parse(
-      readFileSync(resolvePath(root, CI_HARNESS_MANIFEST), 'utf8')
-    );
+    return JSON.parse(readFileSync(resolvePath(root, path), 'utf8'));
   } catch {
     return null;
   }
@@ -721,6 +723,7 @@ function loadHarnessManifest(root) {
  *   readonly log?: (message: string) => void,
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly harnessManifest?: unknown,
+ *   readonly assuranceMatrix?: unknown,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
@@ -761,9 +764,11 @@ export async function syncLinearIssueOnMerge(options = {}) {
     repository,
     versionUrl: env.PRODUCTION_VERSION_URL,
   });
+  const root = env.GITHUB_WORKSPACE ?? process.cwd();
   const harnessManifest =
-    options.harnessManifest ??
-    loadHarnessManifest(env.GITHUB_WORKSPACE ?? process.cwd());
+    options.harnessManifest ?? loadJson(root, CI_HARNESS_MANIFEST);
+  const assuranceMatrix =
+    options.assuranceMatrix ?? loadJson(root, ASSURANCE_MATRIX);
   let openPulls = { pulls: /** @type {object[]} */ ([]), complete: true };
   try {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
@@ -810,6 +815,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
           facts,
           openPulls,
           harnessManifest,
+          assuranceMatrix,
           allowlist: options.allowlist,
           eventPull,
           dryRun: env.LIFECYCLE_DRY_RUN === '1',
@@ -842,7 +848,8 @@ export async function syncLinearIssueOnMerge(options = {}) {
 
 /**
  * Record an owner receipt: `receipt --issue JOV-1 --kind outcome --status pass
- * --sha <full sha> --evidence <url>`.
+ * --sha <full sha> --evidence <url> [--note <text>]`. A founder-taste
+ * rejection carries the founder's note into Rework.
  *
  * @param {readonly string[]} args
  * @param {{ fetchImpl?: HttpFetch, env?: NodeJS.ProcessEnv }} [options]
@@ -858,6 +865,7 @@ export async function recordValidationReceipt(args, options = {}) {
     status: /** @type {'pass' | 'fail'} */ (value('--status')),
     sha: value('--sha'),
     evidence: value('--evidence'),
+    note: value('--note'),
   });
   const env = options.env ?? process.env;
   const apiKey = env.LINEAR_API_KEY ?? '';

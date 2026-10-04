@@ -16,6 +16,19 @@ export const HARNESS_MANIFEST = JSON.parse(
     'utf8'
   )
 );
+/** A matrix with no UI rows: changes owe no founder taste receipt. */
+export const NO_UI_MATRIX = Object.freeze({ rows: [] });
+/** One JOV-7713 UI row that `apps/web/components/` changes invalidate. */
+export const UI_MATRIX = Object.freeze({
+  rows: [
+    {
+      id: 'AM-020',
+      failureClass: 'ui-interaction-state-machine',
+      invalidatesOn: ['apps/web/components/'],
+      ui: { requiredEvidence: ['web-chromium', 'macos-electron'] },
+    },
+  ],
+});
 export const REPO = 'JovieInc/Jovie';
 const sha = (/** @type {string} */ seed) => seed.repeat(40).slice(0, 40);
 /** Main history, oldest first. Every later commit contains the earlier ones. */

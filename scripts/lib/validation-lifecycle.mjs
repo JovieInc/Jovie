@@ -29,11 +29,17 @@ export const COMPUTED_RECEIPT_KINDS = Object.freeze([
   'deployment',
   'escaped-defect-dual-closure',
 ]);
-/** Kinds an owner records with a receipt comment. */
+/**
+ * Kinds an owner records with a receipt comment. `founder-taste` is the
+ * founder's decision on the exact production build of a UI change (JOV-7759);
+ * the Ovie taste card (JOV-7739) records it, and a rejection carries a note.
+ */
 export const RECORDED_RECEIPT_KINDS = Object.freeze([
   'outcome',
   'human-certification',
+  'founder-taste',
 ]);
+const MAX_NOTE_LENGTH = 2000;
 
 const RECEIPT_MARKER = /<!--\s*validation-receipt:v1\s*\n?([\s\S]*?)\n?\s*-->/g;
 const STATUS_MARKER = /<!--\s*validation-lifecycle:v1\s+([0-9a-f]{16})\s*-->/;
@@ -140,6 +146,11 @@ export function outcomeAcceptanceReasons(issue, parentReason = '') {
  * }} RiskSummary
  * @typedef {{ kind: string, reason: string }} RequiredReceipt
  * @typedef {{
+ *   row: string,
+ *   failureClass: string,
+ *   targets: readonly string[],
+ * }} UiEvidence
+ * @typedef {{
  *   schema: string,
  *   issue: string,
  *   bindingSha: string,
@@ -147,6 +158,7 @@ export function outcomeAcceptanceReasons(issue, parentReason = '') {
  *   mergedPulls: string[],
  *   riskLevel: string,
  *   required: RequiredReceipt[],
+ *   uiEvidence?: UiEvidence[],
  * }} ValidationManifest
  */
 
@@ -187,6 +199,7 @@ export function selectBindingPull(pulls) {
  *   readonly risk: RiskSummary | null,
  *   readonly parentReason?: string,
  *   readonly escapedDefect?: boolean,
+ *   readonly uiEvidence?: readonly UiEvidence[] | null,
  * }} input
  * @returns {ValidationManifest | null}
  */
@@ -232,6 +245,33 @@ export function deriveValidationManifest(input) {
       reason: 'the issue declares validation-required: human-certification',
     });
   }
+  // JOV-7713 names the UI rows a change invalidates. Each one owes the
+  // founder's taste decision on the exact production build. `null` means the
+  // merged files or the matrix could not be read, which is never "no UI".
+  const uiEvidence = input.uiEvidence === undefined ? [] : input.uiEvidence;
+  if (uiEvidence === null) {
+    required.push({
+      kind: 'founder-taste',
+      reason:
+        'UI evidence is unknown (merged files or the assurance matrix were unreadable); a founder taste receipt is required',
+    });
+  } else if (uiEvidence.length > 0) {
+    required.push({
+      kind: 'founder-taste',
+      reason: `UI change invalidates ${uiEvidence.map(entry => `${entry.row} ${entry.failureClass}`).join(', ')}; the founder accepts the exact production build on ${[...new Set(uiEvidence.flatMap(entry => entry.targets))].join(', ')} (Ovie taste card, JOV-7739)`,
+    });
+  }
+  if (
+    !required.some(entry => entry.kind === 'founder-taste') &&
+    declaredRequirements(input.issue.description ?? '').includes(
+      'founder-taste'
+    )
+  ) {
+    required.push({
+      kind: 'founder-taste',
+      reason: 'the issue declares validation-required: founder-taste',
+    });
+  }
   return {
     schema: VALIDATION_MANIFEST_SCHEMA,
     issue: input.issue.identifier.toUpperCase(),
@@ -242,6 +282,15 @@ export function deriveValidationManifest(input) {
       .map(pull => pull.url),
     riskLevel,
     required,
+    ...(uiEvidence && uiEvidence.length > 0
+      ? {
+          uiEvidence: uiEvidence.map(entry => ({
+            row: entry.row,
+            failureClass: entry.failureClass,
+            targets: [...entry.targets],
+          })),
+        }
+      : {}),
   };
 }
 
@@ -251,6 +300,7 @@ export function deriveValidationManifest(input) {
  *   status: 'pass' | 'fail',
  *   sha: string,
  *   evidence: string,
+ *   note?: string,
  *   recordedAt: string,
  * }} ValidationReceipt
  */
@@ -293,11 +343,16 @@ export function parseValidationReceipts(comments, identifier) {
       ) {
         continue;
       }
+      const note =
+        typeof parsed.note === 'string'
+          ? parsed.note.trim().slice(0, MAX_NOTE_LENGTH)
+          : '';
       receipts.push({
         kind,
         status,
         sha,
         evidence: parsed.evidence.trim(),
+        ...(note ? { note } : {}),
         recordedAt,
       });
     }
@@ -315,6 +370,7 @@ export function parseValidationReceipts(comments, identifier) {
  *   status: 'pass' | 'fail',
  *   sha: string,
  *   evidence: string,
+ *   note?: string,
  * }} receipt
  * @returns {string}
  */
@@ -336,6 +392,12 @@ export function formatValidationReceipt(receipt) {
   if (String(receipt.evidence ?? '').trim().length < 8) {
     throw new Error('receipt evidence must reference the proof');
   }
+  const note = String(receipt.note ?? '').trim();
+  if (note.length > MAX_NOTE_LENGTH) {
+    throw new Error(
+      `receipt note must be at most ${MAX_NOTE_LENGTH} characters`
+    );
+  }
   const payload = {
     schema: VALIDATION_RECEIPT_SCHEMA,
     issue: receipt.issue.toUpperCase(),
@@ -343,9 +405,11 @@ export function formatValidationReceipt(receipt) {
     status: receipt.status,
     sha: receipt.sha.toLowerCase(),
     evidence: receipt.evidence.trim(),
+    ...(note ? { note } : {}),
   };
   return [
     `Validation receipt: ${payload.kind} ${payload.status} for ${payload.sha.slice(0, 12)}. Evidence: ${payload.evidence}`,
+    ...(note ? [`Note: ${note}`] : []),
     '',
     `<!-- validation-receipt:v1\n${JSON.stringify(payload)}\n-->`,
   ].join('\n');
@@ -437,7 +501,7 @@ export function decideValidationTransition(input) {
       failing,
       explanation: failing.map(
         receipt =>
-          `Required ${receipt.kind} failed at ${receipt.sha.slice(0, 12)}: ${receipt.evidence}`
+          `Required ${receipt.kind} failed at ${receipt.sha.slice(0, 12)}: ${receipt.evidence}${receipt.note ? `. Note: ${receipt.note}` : ''}`
       ),
     };
   }

@@ -17,6 +17,7 @@ import {
   intercept,
   json,
   MAIN,
+  NO_UI_MATRIX,
   REPO,
   receiptComment,
 } from './fixtures/validation-world.mjs';
@@ -97,6 +98,7 @@ function mergeEvent(fetchImpl, number, identifier = 'JOV-1', env = {}) {
     },
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
+    assuranceMatrix: NO_UI_MATRIX,
     log: () => {},
   });
 }
@@ -106,6 +108,7 @@ function sweep(fetchImpl) {
     env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
+    assuranceMatrix: NO_UI_MATRIX,
     log: () => {},
   });
 }
@@ -370,12 +373,27 @@ describe('linear sync on merge', () => {
     );
   });
 
-  it('loads the harness manifest from the workspace; a missing one is unknown risk', async () => {
-    for (const [workspace, expected] of [
-      [resolve(import.meta.dirname, '../../..'), 'Done'],
-      ['/nonexistent-workspace', 'Validating'],
-    ]) {
+  it('loads the harness manifest and assurance matrix from the workspace; missing ones are unknown', async () => {
+    const repoRoot = resolve(import.meta.dirname, '../../..');
+    /** @type {[string, string[], string, string][]} */
+    const cases = [
+      [repoRoot, ['docs/README.md'], 'Done', ''],
+      [
+        repoRoot,
+        ['apps/web/components/atoms/RailToggleButton.tsx'],
+        'Validating',
+        'founder-taste',
+      ],
+      [
+        '/nonexistent-workspace',
+        ['docs/README.md'],
+        'Validating',
+        'human-certification',
+      ],
+    ];
+    for (const [workspace, files, expected, missing] of cases) {
       const { world, fetchImpl } = createWorld();
+      world.pulls[101].files = files;
       await syncLinearIssueOnMerge({
         env: {
           ...BASE_ENV,
@@ -388,6 +406,11 @@ describe('linear sync on merge', () => {
         log: () => {},
       });
       expect(world.issues['JOV-1'].state).toBe(expected);
+      if (missing) {
+        expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+          `Next missing receipt: ${missing}.`
+        );
+      }
     }
   });
 

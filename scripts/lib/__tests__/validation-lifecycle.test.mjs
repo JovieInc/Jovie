@@ -157,6 +157,52 @@ describe('validation manifest', () => {
     ]);
     expect(declaredRequirements('validation-required: deployment')).toEqual([]);
   });
+
+  it('owes one founder taste receipt for the UI rows a change invalidates (JOV-7759)', () => {
+    const uiEvidence = [
+      {
+        row: 'AM-020',
+        failureClass: 'ui-interaction-state-machine',
+        targets: ['web-chromium', 'macos-electron'],
+      },
+      {
+        row: 'AM-021',
+        failureClass: 'ui-layout-stability',
+        targets: ['web-chromium'],
+      },
+    ];
+    const ui = manifestFor({}, { uiEvidence });
+    expect(ui.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'founder-taste',
+    ]);
+    expect(ui.required[1].reason).toContain(
+      'AM-020 ui-interaction-state-machine, AM-021 ui-layout-stability'
+    );
+    expect(ui.required[1].reason).toContain('web-chromium, macos-electron');
+    expect(ui.uiEvidence).toEqual(uiEvidence);
+    expect(manifestFor({}, { uiEvidence: [] })).not.toHaveProperty(
+      'uiEvidence'
+    );
+    expect(manifestFor({}).required.map(entry => entry.kind)).toEqual([
+      'deployment',
+    ]);
+    expect(
+      manifestFor({}, { uiEvidence: null }).required.at(-1)?.reason
+    ).toContain('UI evidence is unknown');
+    const declared = manifestFor(
+      { description: 'validation-required: founder-taste' },
+      { uiEvidence }
+    );
+    expect(
+      declared.required.filter(entry => entry.kind === 'founder-taste')
+    ).toHaveLength(1);
+    expect(
+      manifestFor({
+        description: 'validation-required: founder-taste',
+      }).required.at(-1)?.reason
+    ).toBe('the issue declares validation-required: founder-taste');
+  });
 });
 
 describe('validation receipts', () => {
@@ -182,6 +228,60 @@ describe('validation receipts', () => {
         recordedAt: '2026-10-03T12:00:00.000Z',
       },
     ]);
+  });
+
+  it('carries a founder note on a rejection and bounds it', () => {
+    const rejection = formatValidationReceipt({
+      issue: 'JOV-1',
+      kind: 'founder-taste',
+      status: 'fail',
+      sha: SHA_B,
+      evidence: 'https://example.test/ovie/taste/7',
+      note: ' Too much chrome around the player. ',
+    });
+    expect(rejection).toContain('Note: Too much chrome around the player.');
+    expect(
+      parseValidationReceipts(
+        [{ body: rejection, createdAt: '2026-10-03T12:00:00Z' }],
+        'JOV-1'
+      )[0]
+    ).toMatchObject({
+      kind: 'founder-taste',
+      status: 'fail',
+      note: 'Too much chrome around the player.',
+    });
+    expect(() =>
+      formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'founder-taste',
+        status: 'fail',
+        sha: SHA_B,
+        evidence: 'https://example.test/ovie/taste/7',
+        note: 'x'.repeat(2001),
+      })
+    ).toThrow(/at most 2000/);
+    const decision = decideValidationTransition({
+      state: { name: 'Validating', type: 'started' },
+      manifest: manifestFor(
+        {},
+        {
+          uiEvidence: [{ row: 'AM-020', failureClass: 'x', targets: [] }],
+        }
+      ),
+      holds: [],
+      deployment: { status: 'verified', sha: SHA_B },
+      receipts: [
+        receipt({
+          kind: 'founder-taste',
+          status: 'fail',
+          note: 'Too much chrome around the player.',
+        }),
+      ],
+    });
+    expect(decision.target).toBe('Rework');
+    expect(decision.explanation[0]).toContain(
+      '. Note: Too much chrome around the player.'
+    );
   });
 
   it('ignores receipts for another issue, computed kinds, and malformed bodies', () => {

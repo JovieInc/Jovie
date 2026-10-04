@@ -3,7 +3,9 @@ import {
   classifyMergedRisk,
   createProductionFacts,
   githubClient,
+  listMergedFiles,
   listMergedLinkedPulls,
+  mergedUiEvidence,
   reconcileValidation,
 } from '../validation-sync.mjs';
 import {
@@ -12,10 +14,12 @@ import {
   intercept,
   json,
   MAIN,
+  NO_UI_MATRIX,
   portFor,
   REPO,
   receiptComment,
   snapshotFor,
+  UI_MATRIX,
   validClosure,
 } from './fixtures/validation-world.mjs';
 
@@ -33,6 +37,8 @@ function evaluate(world, fetchImpl, options = {}) {
     repository: REPO,
     facts: createProductionFacts({ fetchImpl, github, repository: REPO }),
     harnessManifest: options.harnessManifest ?? HARNESS_MANIFEST,
+    assuranceMatrix:
+      'assuranceMatrix' in options ? options.assuranceMatrix : NO_UI_MATRIX,
     linear: portFor(world),
     eventPull: options.eventPull,
     dryRun: options.dryRun,
@@ -261,6 +267,78 @@ describe('validation sync: receipts', () => {
   });
 });
 
+describe('validation sync: founder taste (JOV-7759)', () => {
+  const taste = (overrides, createdAt) =>
+    receiptComment(
+      'JOV-1',
+      {
+        kind: 'founder-taste',
+        evidence: 'https://example.test/ovie/taste/1',
+        ...overrides,
+      },
+      createdAt
+    );
+
+  it('holds a UI change in Validating until the founder accepts the exact production build', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    const held = world.issues['JOV-1'].comments.at(-1).body;
+    expect(held).toContain('Next missing receipt: founder-taste.');
+    expect(held).toContain('AM-020 ui-interaction-state-machine');
+    expect(held).toContain('web-chromium, macos-electron');
+    expect(held).toContain('"uiEvidence":[{"row":"AM-020"');
+
+    world.issues['JOV-1'].comments.push(taste({}, '2026-10-03T13:00:00Z'));
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('routes a founder rejection to Rework with the note, and needs a fresh decision after the fix', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX });
+    world.issues['JOV-1'].comments.push(
+      taste(
+        { status: 'fail', note: 'The rail toggle still jumps 2px on open.' },
+        '2026-10-03T13:00:00Z'
+      )
+    );
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Rework');
+    expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+      'Note: The rail toggle still jumps 2px on open.'
+    );
+
+    addMerge(world, 103, MAIN[3], '2026-10-03T14:00:00Z');
+    world.served = MAIN[4].slice(0, 7);
+    await merge(world, fetchImpl, 103, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    world.issues['JOV-1'].comments.push(
+      taste({ sha: MAIN[4] }, '2026-10-03T15:00:00Z')
+    );
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('treats an unreadable matrix as unknown UI evidence, never as no UI change', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: null });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+      'Next missing receipt: founder-taste.'
+    );
+    expect(mergedUiEvidence(null, UI_MATRIX)).toBeNull();
+    expect(mergedUiEvidence(['docs/README.md'], UI_MATRIX)).toEqual([]);
+  });
+
+  it('does not ask for taste when the change touches no UI row', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.pulls[101].files = ['scripts/lib/thing.mjs'];
+    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+});
+
 describe('validation sync: writes', () => {
   it('does not write when another writer moved the issue mid-evaluation', async () => {
     const { world, fetchImpl } = createWorld();
@@ -326,6 +404,7 @@ describe('validation sync: writes', () => {
           repository: REPO,
         }),
         harnessManifest: HARNESS_MANIFEST,
+        assuranceMatrix: NO_UI_MATRIX,
         linear: portFor(stateless.world),
         eventPull: { number: 101 },
         log: () => {},
@@ -376,13 +455,15 @@ describe('validation sync: facts', () => {
         body: [{ filename, previous_filename: 'apps/web/lib/old.ts' }],
         link,
       });
-    const classify = (github, harnessManifest = HARNESS_MANIFEST) =>
-      classifyMergedRisk({
-        github,
-        repository: REPO,
-        pulls: [{ number: 1 }],
-        harnessManifest,
-      });
+    const classify = async (github, harnessManifest = HARNESS_MANIFEST) =>
+      classifyMergedRisk(
+        await listMergedFiles({
+          github,
+          repository: REPO,
+          pulls: [{ number: 1 }],
+        }),
+        harnessManifest
+      );
     const risk = await classify(page('apps/web/lib/billing/new.ts'));
     expect(risk?.riskLevel).toBe('high');
     expect(risk?.matchedRules).toContain('billing-money');

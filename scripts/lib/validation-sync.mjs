@@ -6,6 +6,7 @@
  * files. Linear writes go through a port the merge-sync writer supplies.
  */
 
+import { uiEvidenceRequirements } from '../invariants/assurance-matrix.mjs';
 import { classifyCiRisk } from './ci-harness.mjs';
 import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
 import {
@@ -279,19 +280,17 @@ export async function listMergedLinkedPulls(input) {
 }
 
 /**
- * The JOV-5937 risk receipt for the merged change: the existing deterministic
- * CI classifier over the merged files. Any unread page is unknown risk.
+ * Every file the merged pull requests changed, renames included. Any unread
+ * page makes the whole list unknown (`null`).
  *
  * @param {{
  *   readonly github: GithubGet,
  *   readonly repository: string,
  *   readonly pulls: readonly { number: number }[],
- *   readonly harnessManifest: unknown,
  * }} input
- * @returns {Promise<RiskSummary | null>}
+ * @returns {Promise<string[] | null>}
  */
-export async function classifyMergedRisk(input) {
-  if (!input.harnessManifest) return null;
+export async function listMergedFiles(input) {
   const files = new Set();
   try {
     for (const pull of input.pulls) {
@@ -317,7 +316,20 @@ export async function classifyMergedRisk(input) {
   } catch {
     return null;
   }
-  const classification = classifyCiRisk([...files], input.harnessManifest);
+  return [...files];
+}
+
+/**
+ * The JOV-5937 risk receipt for the merged change: the existing deterministic
+ * CI classifier over the merged files. Unknown files are unknown risk.
+ *
+ * @param {readonly string[] | null} files
+ * @param {unknown} harnessManifest
+ * @returns {RiskSummary | null}
+ */
+export function classifyMergedRisk(files, harnessManifest) {
+  if (!harnessManifest || !files) return null;
+  const classification = classifyCiRisk([...files], harnessManifest);
   if (classification.errors.length > 0) return null;
   return {
     riskLevel: classification.riskLevel,
@@ -326,6 +338,25 @@ export async function classifyMergedRisk(input) {
       /** @param {{ id: string }} rule */ rule => rule.id
     ),
   };
+}
+
+/**
+ * The exact-build UI evidence the JOV-7713 assurance matrix says these files
+ * owe. Unknown files or an unreadable matrix are unknown (`null`), never "no
+ * UI change".
+ *
+ * @param {readonly string[] | null} files
+ * @param {unknown} assuranceMatrix
+ */
+export function mergedUiEvidence(files, assuranceMatrix) {
+  if (!files || !assuranceMatrix || typeof assuranceMatrix !== 'object') {
+    return null;
+  }
+  return uiEvidenceRequirements(assuranceMatrix, [...files]).map(entry => ({
+    row: String(entry.row),
+    failureClass: String(entry.failureClass),
+    targets: entry.targets.map(String),
+  }));
 }
 
 /**
@@ -369,6 +400,7 @@ export function selectStateId(name, states) {
  *   readonly repository: string,
  *   readonly facts: ReturnType<typeof createProductionFacts>,
  *   readonly harnessManifest: unknown,
+ *   readonly assuranceMatrix: unknown,
  *   readonly linear: LinearPort,
  *   readonly eventPull?: { number: number },
  *   readonly dryRun?: boolean,
@@ -387,18 +419,18 @@ export async function reconcileValidation(ctx) {
     ...issue,
     comments: issue.commentRecords,
   });
-  const risk = await classifyMergedRisk({
+  const files = await listMergedFiles({
     github: ctx.github,
     repository: ctx.repository,
     pulls: merged,
-    harnessManifest: ctx.harnessManifest,
   });
   const manifest = deriveValidationManifest({
     issue,
     mergedPulls: merged,
-    risk,
+    risk: classifyMergedRisk(files, ctx.harnessManifest),
     parentReason: ctx.parentReason,
     escapedDefect: escapedDefect.applicable,
+    uiEvidence: mergedUiEvidence(files, ctx.assuranceMatrix),
   });
   if (!manifest) {
     ctx.log(
