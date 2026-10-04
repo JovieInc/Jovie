@@ -302,6 +302,15 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'clipped-heading');
   });
 
+  test('rejects a clamped heading whose block size is also capped (/launch hero)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1 style="width:520px;font-size:80px;line-height:0.94;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-block-size:calc(2 * 1lh);overflow:hidden">Your entire music career. One intelligent link.</h1></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'clipped-heading');
+  });
+
   test('rejects an unstyled terminal CTA stack (/product footer CTA)', async ({
     page,
   }) => {

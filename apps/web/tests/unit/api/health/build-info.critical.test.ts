@@ -34,7 +34,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('NODE_ENV', 'production');
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
+    const response = await GET();
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.buildId).toBe('unknown');
@@ -49,7 +49,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'b'.repeat(40));
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
+    const response = await GET();
     expect(response.status).toBe(200);
 
     const body = await response.json();
@@ -61,7 +61,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('VERCEL_DEPLOYMENT_ID', 'dpl_exactStaging123');
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const body = await GET().json();
+    const body = await (await GET()).json();
 
     expect(body.deploymentId).toBe('dpl_exactStaging123');
   });
@@ -72,7 +72,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const body = await GET().json();
+    const body = await (await GET()).json();
 
     expect(body.commitSha).toBeUndefined();
   });
@@ -84,7 +84,7 @@ describe('@critical GET /api/health/build-info', () => {
     const { BUILD_INFO_CACHE_HEADERS, GET } = await import(
       '@/app/api/health/build-info/route'
     );
-    const response = GET();
+    const response = await GET();
 
     expect(response.headers.get('cache-control')).toBe(
       BUILD_INFO_CACHE_HEADERS['cache-control']
@@ -102,7 +102,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('NODE_ENV', 'development');
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
+    const response = await GET();
     expect(response.status).toBe(200);
     expect(mockConsoleWarn).not.toHaveBeenCalled();
 
@@ -115,7 +115,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.6.61');
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
+    const response = await GET();
     const body = await response.json();
 
     expect(body.version).toBe('26.6.61');
@@ -127,7 +127,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '');
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
+    const response = await GET();
     const body = await response.json();
 
     expect(body.version).not.toBe('0.0.0');
@@ -139,7 +139,7 @@ describe('@critical GET /api/health/build-info', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '0.0.0');
 
     const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
+    const response = await GET();
     const body = await response.json();
 
     expect(body.version).not.toBe('0.0.0');

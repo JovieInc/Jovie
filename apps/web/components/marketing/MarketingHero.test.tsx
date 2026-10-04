@@ -91,7 +91,8 @@ describe('MarketingHero source-backed default story', () => {
       'href',
       '/pricing'
     );
-    expect(screen.getByTestId('home-trust-section')).toBeInTheDocument();
+    // No default logo bar: logos need a page permission (JOV-7795).
+    expect(screen.queryByTestId('home-trust-section')).not.toBeInTheDocument();
   });
 
   it('supports the three-line Jovie Card headline without changing the default clamp', () => {
