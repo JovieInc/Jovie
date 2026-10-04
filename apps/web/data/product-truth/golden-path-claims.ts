@@ -100,6 +100,8 @@ export interface GoldenPathClaim {
 }
 
 const HOMEPAGE_COPY = 'apps/web/data/homepageIdentityCopy.ts';
+const CHECKOUT_CLIENT =
+  'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx';
 const PRESENCE_STEPS = 'apps/web/lib/onboarding/presence-build/execute-step.ts';
 
 export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
@@ -177,19 +179,13 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     capabilityIds: ['public-profile', 'artist-notifications'],
   },
   {
-    id: 'start.metadata.one-conversation',
+    id: 'start.metadata.description',
     step: 'start',
     route: '/start',
     source: 'apps/web/app/(dynamic)/start/page.tsx',
-    copy: 'Start your artist profile in one conversation.',
-    nature: 'outcome',
-    capabilityIds: ['artist-profiles'],
-    evidence: {
-      class: 'none',
-      kind: 'metric',
-      generator: 'dogfood',
-      need: 'Median onboarding turns from first /start message to a live profile, measured from prod chat sessions.',
-    },
+    copy: 'Claim your name and start your Jovie profile.',
+    nature: 'capability',
+    capabilityIds: ['public-profile'],
   },
   {
     id: 'preview.research.verified-signals',
@@ -235,9 +231,28 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'upgrade',
     route: APP_ROUTES.SETTINGS_BILLING,
     source: 'apps/web/lib/entitlements/registry.ts',
-    copy: 'Continuous visibility monitoring, prioritized opportunities, and agentic fixes.',
+    copy: 'Take payments, launch releases and sell merch from your Jovie profile.',
     nature: 'capability',
-    capabilityIds: ['profile-monitoring'],
+    capabilityIds: ['pay', 'release-launch', 'instant-merch'],
+  },
+  {
+    id: 'upgrade.checkout.claim-time-proof',
+    step: 'upgrade',
+    route: APP_ROUTES.ONBOARDING_CHECKOUT,
+    source: CHECKOUT_CLIENT,
+    copy: 'Found From Your Profile',
+    nature: 'outcome',
+    capabilityIds: ['public-profile'],
+    evidence: { class: 'computed', slot: 'assembled-profile' },
+  },
+  {
+    id: 'upgrade.checkout.payments',
+    step: 'upgrade',
+    route: APP_ROUTES.ONBOARDING_CHECKOUT,
+    source: CHECKOUT_CLIENT,
+    copy: 'Take tips and payments on your profile',
+    nature: 'capability',
+    capabilityIds: ['pay'],
   },
   {
     id: 'pricing.pro.note',

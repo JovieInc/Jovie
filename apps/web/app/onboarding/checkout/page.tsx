@@ -23,6 +23,7 @@ import {
   hasOnboardingUpgradeOfferState,
   recordOnboardingUpgradeOfferEvent,
 } from '@/lib/onboarding/upgrade-offer';
+import { loadClaimTimeProof } from '@/lib/proof/claim-time-proof.server';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -187,6 +188,11 @@ export default async function OnboardingCheckoutPage({
     await recordOnboardingUpgradeOfferEvent(profileData.id, 'seen', planIntent);
   }
 
+  // JOV-7794: the paywall carries the visitor's own computed proof.
+  const proofFindings = profileData.id
+    ? await loadClaimTimeProof(profileData.id)
+    : [];
+
   return (
     <OnboardingCheckoutClient
       plan={planIntent}
@@ -200,6 +206,7 @@ export default async function OnboardingCheckoutPage({
       avatarUrl={profileData.avatarUrl}
       spotifyFollowers={profileData.spotifyFollowers}
       isDefaultUpsell={isDefaultUpsell}
+      proofFindings={proofFindings}
     />
   );
 }
