@@ -46,6 +46,8 @@ vi.mock('@/lib/db/schema/content', () => ({
   discogRecordings: { id: 'recordingId' },
   discogReleaseTracks: { releaseId: 'releaseId' },
   discogTracks: { id: 'trackId' },
+  recordingArtists: { recordingId: 'recordingId' },
+  releaseArtists: { releaseId: 'releaseId' },
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
