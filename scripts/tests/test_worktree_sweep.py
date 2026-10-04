@@ -261,12 +261,14 @@ class HostWiringTest(unittest.TestCase):
         self.assertFalse(sweeper.busy(Path("/w/wt-b"), live))
         self.assertIsNone(sweeper.live_paths(lambda *a, **k: (_ for _ in ()).throw(OSError("no lsof"))))
 
-    def test_lsof_resolves_outside_launchd_path(self):
-        with patch.object(sweeper.shutil, "which", return_value=None), \
-                patch.object(Path, "exists", return_value=True):
-            self.assertEqual(sweeper.lsof_command(), "/usr/sbin/lsof")
-        with patch.object(sweeper.shutil, "which", return_value="/usr/bin/lsof"):
-            self.assertEqual(sweeper.lsof_command(), "lsof")
+    def test_launchd_path_gains_sbin_for_lsof_once(self):
+        env = {"PATH": "/usr/bin:/bin"}
+        sweeper.ensure_sbin_on_path(env)
+        sweeper.ensure_sbin_on_path(env)
+        self.assertEqual(env["PATH"], "/usr/bin:/bin:/usr/sbin")
+        empty = {}
+        sweeper.ensure_sbin_on_path(empty)
+        self.assertEqual(empty["PATH"], "/usr/sbin")
 
     def test_defaults_cover_agent_roots_and_skip_shared_caches(self):
         with tempfile.TemporaryDirectory() as tmp:

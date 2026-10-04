@@ -1350,6 +1350,17 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_blocked_last_overlap_candidate_never_runs_or_claims_the_issue(self):
+        self.linear.issues[0].description = "Edit `scripts/lanes/lane_runner.py`."
+        existing = {"number": 1, "files": ["scripts/lanes/lane_runner.py"], "isDraft": False}
+        with patch.object(lane, "overlap_inventory", return_value=([existing], [])), \
+                patch.object(lane, "open_hotspot_holds", return_value={}), \
+                patch.object(lane, "run_issue") as run, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            lane.worker(self.host, "devin")
+        run.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+
     def test_event_cleanup_waits_until_all_productive_selections_decline(self):
         for chosen in ("event", "poll", "adopt", "issue", "idle"):
             with self.subTest(chosen=chosen):
