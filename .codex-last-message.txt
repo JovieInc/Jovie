@@ -1,0 +1,9 @@
+Implemented and published draft PR [#19853](https://github.com/JovieInc/Jovie/pull/19853) at `1cf9d9dfc4a242fe7d650c65111009a29d824792`.
+
+- Root cause: JOV-7113 hid the card whenever normal starter actions rendered.
+- Fix: [JovieChat.tsx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T165309Z-JOV-5350-codex-ac5d1a/apps/web/components/jovie/JovieChat.tsx:889) now places the existing source-bound card in the scrollable region, outside the fixed composer dock.
+- Regression coverage proves visibility, source ID, and non-overlap.
+- Passed: Biome, 39 focused tests, 17 typecheck tasks, component ship gate, and diff checks.
+- JOV-5350 is In Review with a detailed root-cause comment.
+
+Production remains unproven: hosted PR checks are running, and the PR is intentionally draft—not ready or merged. Production currently serves SHA `80fc859b…`; closure still requires authenticated browser PASS against the eventual deployed SHA. The current verified public feed’s newest eligible item is `26.8.2`; no newer history was fabricated.
