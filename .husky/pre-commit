@@ -11,6 +11,11 @@ pnpm run skill-governance:check -- --staged
 pnpm run next:proxy-guard
 pnpm exec lint-staged --no-stash
 
+# Bind the final staged rule bodies to their reviewed integrity record.
+if git diff --cached --name-only --diff-filter=ACMD | grep -qE '^\.claude/rules/.*\.md$|^scripts/agent-context/rule-scopes\.(json|mjs)$'; then
+  node scripts/agent-context/rule-scopes.mjs --staged
+fi
+
 # iOS adapter: when Swift sources are staged, run the portable best-practices lint.
 if git diff --cached --name-only --diff-filter=ACM | grep -qE '^apps/ios/.*\.swift$'; then
   echo "[gate-ladder] ios format-lint rung (staged Swift)"

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  classifyReviewRisk,
   parseCompare,
   parsePull,
   readRiskRuleIds,
@@ -16,12 +17,14 @@ import {
   assertRoutes,
   costUsd,
   createGatewayTransport,
-  loadModelPrices,
-  REVIEW_MODEL_OVERRIDES,
-  REVIEW_ROUTES,
-  resolveRoutes,
+  rankReviewModels,
+  selectRoutes,
 } from '../../pr-review/models.mjs';
-import { scoreReplay } from '../../pr-review/replay.mjs';
+import {
+  outcomesFromCases,
+  recordOutcomes,
+  scoreReplay,
+} from '../../pr-review/replay.mjs';
 import {
   normalizeCandidate,
   parseJsonObject,
@@ -31,6 +34,10 @@ import {
 const BASE = 'a'.repeat(40);
 const HEAD = 'b'.repeat(40);
 const PATH = 'apps/web/app/api/stripe/webhook/route.ts';
+const REVIEW_ROUTES = Object.freeze({
+  discovery: 'deepseek/deepseek-v4-flash',
+  verification: 'z-ai/glm-5.3',
+});
 const PRICES = {
   [REVIEW_ROUTES.discovery]: {
     family: 'deepseek',
@@ -100,6 +107,7 @@ const baseRun = extra => ({
   baseSha: BASE,
   headSha: HEAD,
   prices: PRICES,
+  routes: REVIEW_ROUTES,
   readLiveHead: async () => HEAD,
   now: () => '2026-09-25T00:00:00.000Z',
   ...extra,
@@ -421,91 +429,254 @@ describe('collectContext', () => {
   });
 });
 
+const rankRow = (id, model, family, quality, cost) => ({
+  id,
+  model,
+  family,
+  quality,
+  provider: 'vercel-ai-gateway',
+  priceIn: 0.1,
+  priceOut: 0.4,
+  expectedCostPerSuccess: cost,
+  pSuccess: quality / 100,
+  priceBasis: 'list',
+});
+const RANKINGS = {
+  discovery: {
+    ranked: [
+      rankRow('g-flash', 'z-ai/glm-5.3-flash', 'glm', 68, 0.02),
+      rankRow('d-flash', 'deepseek/deepseek-v4-flash', 'deepseek', 65, 0.03),
+      rankRow('d-41', 'deepseek/deepseek-v4.1-flash', 'deepseek', 65, 0.06),
+    ],
+  },
+  verification: {
+    ranked: [rankRow('g-full', 'z-ai/glm-5.3', 'glm', 82, 0.003)],
+  },
+};
+
 describe('models', () => {
-  it('prices the configured routes from the registry with different families', () => {
-    const prices = loadModelPrices();
-    expect(() => assertRoutes(prices)).not.toThrow();
+  it('retains priced, different-family route validation', () => {
+    expect(() => assertRoutes({}, REVIEW_ROUTES)).toThrow(/not in registry/);
+    expect(() =>
+      assertRoutes(
+        {
+          [REVIEW_ROUTES.discovery]: {
+            ...PRICES[REVIEW_ROUTES.discovery],
+            family: 'x',
+          },
+          [REVIEW_ROUTES.verification]: {
+            ...PRICES[REVIEW_ROUTES.verification],
+            family: 'x',
+          },
+        },
+        REVIEW_ROUTES
+      )
+    ).toThrow(/different families/);
+    expect(() =>
+      assertRoutes(
+        {
+          ...PRICES,
+          [REVIEW_ROUTES.discovery]: {
+            ...PRICES[REVIEW_ROUTES.discovery],
+            inPerMillion: -1,
+          },
+        },
+        REVIEW_ROUTES
+      )
+    ).toThrow(/not in registry/);
+  });
+
+  it('prices usage and treats unknown models as free of budget', () => {
+    const prices = {
+      'a/b': { family: 'f', inPerMillion: 2, outPerMillion: 4 },
+    };
     expect(
-      costUsd(prices, REVIEW_ROUTES.discovery, {
-        inputTokens: 1e6,
-        outputTokens: 0,
-      })
-    ).toBe(prices[REVIEW_ROUTES.discovery].inPerMillion);
+      costUsd(prices, 'a/b', { inputTokens: 1e6, outputTokens: 1e6 })
+    ).toBe(6);
     expect(costUsd(prices, 'unknown/model', { inputTokens: 5 })).toBe(0);
   });
 
-  it('rejects unknown models and same-family routes', () => {
-    expect(() => assertRoutes({})).toThrow(/not in registry/);
+  it('picks the cheapest pair whose verifier is another family and at least as strong', () => {
+    const { routes, prices, routing } = selectRoutes(RANKINGS);
+    // glm-flash is the cheapest discoverer, but the only verifier above the
+    // floor is also glm, so deepseek discovers and glm-5.3 verifies.
+    expect(routes).toEqual({
+      discovery: 'deepseek/deepseek-v4-flash',
+      verification: 'z-ai/glm-5.3',
+    });
+    expect(Object.keys(prices).sort()).toEqual(
+      ['deepseek/deepseek-v4-flash', 'z-ai/glm-5.3'].sort()
+    );
+    expect(routing.discovery).toMatchObject({
+      registryId: 'd-flash',
+      priceBasis: 'list',
+    });
+  });
+
+  it('honors pins only for ranked models', () => {
+    expect(
+      selectRoutes(RANKINGS, {
+        PR_REVIEW_DISCOVERY_MODEL: 'deepseek/deepseek-v4.1-flash',
+      }).routes.discovery
+    ).toBe('deepseek/deepseek-v4.1-flash');
     expect(() =>
-      assertRoutes({
-        [REVIEW_ROUTES.discovery]: {
-          ...PRICES[REVIEW_ROUTES.discovery],
-          family: 'x',
-        },
-        [REVIEW_ROUTES.verification]: {
-          ...PRICES[REVIEW_ROUTES.verification],
-          family: 'x',
-        },
+      selectRoutes(RANKINGS, {
+        PR_REVIEW_VERIFICATION_MODEL: 'z-ai/glm-5.3-flash',
       })
-    ).toThrow(/different families/);
+    ).toThrow(/not a ranked review model/);
+  });
+
+  it('refuses when no valid pair exists', () => {
+    expect(() =>
+      selectRoutes({
+        discovery: { ranked: [RANKINGS.discovery.ranked[0]] },
+        verification: RANKINGS.verification,
+      })
+    ).toThrow(/no different-family review pair/);
+  });
+
+  it('picks V4.1 Flash to discover and GLM 5.3 to verify from the real registry priors', () => {
+    // Locks the benchmark-prior outcome (DeepSWE v1.1 + Gateway prices +
+    // $5 failure cost). Replay outcomes are expected to move it later.
+    const { routes, routing } = selectRoutes(
+      rankReviewModels({ outcomes: {} })
+    );
+    expect(routes).toEqual({
+      discovery: 'deepseek/deepseek-v4.1-flash',
+      verification: 'zai/glm-5.3',
+    });
+    expect(routing.verification.pSuccess).toBeGreaterThanOrEqual(0.65);
+  });
+
+  it('lets a weaker verifier check a stronger discoverer of another family', () => {
+    const { routes } = selectRoutes({
+      discovery: {
+        ranked: [
+          rankRow('d-41', 'deepseek/deepseek-v4.1-flash', 'deepseek', 74, 1.3),
+        ],
+      },
+      verification: {
+        ranked: [rankRow('g-full', 'zai/glm-5.3', 'glm', 67, 1.66)],
+      },
+    });
+    expect(routes.verification).toBe('zai/glm-5.3');
   });
 
   it('refuses to build a transport without a key', () => {
     expect(() => createGatewayTransport({ apiKey: ' ' })).toThrow(/credential/);
   });
+});
 
-  it('reads prices from an injected registry', () => {
-    expect(
-      loadModelPrices({
-        models: [
-          { model: 'a/b', family: 'f', list_price_in: 1, list_price_out: 2 },
-          { model: 'a/b', family: 'g', list_price_in: 9, list_price_out: 9 },
-          { model: 'c/d' },
-        ],
-      })
-    ).toEqual({
-      ...REVIEW_MODEL_OVERRIDES,
-      'a/b': { family: 'f', inPerMillion: 1, outPerMillion: 2 },
+describe('replay outcomes', () => {
+  const receipt = (findings, status = 'complete') => ({
+    status,
+    findings,
+    routing: {
+      discovery: { registryId: 'd-flash', model: 'deepseek/deepseek-v4-flash' },
+      verification: { registryId: 'g-full', model: 'z-ai/glm-5.3' },
+    },
+    stats: {
+      minutes: 2,
+      usage: {
+        'deepseek/deepseek-v4-flash': { inputTokens: 100, outputTokens: 10 },
+      },
+    },
+  });
+  const hit = { state: 'verified', location: { path: 'a.ts', line: 10 } };
+
+  it('records one outcome per model and skips incomplete receipts', () => {
+    const outcomes = outcomesFromCases([
+      { receipt: receipt([hit]), expected: [{ path: 'a.ts', line: 12 }] },
+      { receipt: receipt([hit]), clean: true },
+      { receipt: receipt([], 'incomplete'), expected: [{ path: 'a.ts' }] },
+      { receipt: { ...receipt([]), routing: undefined }, clean: true },
+    ]);
+    expect(outcomes).toHaveLength(4);
+    expect(outcomes[0]).toMatchObject({
+      modelId: 'd-flash',
+      success: true,
+      tokensIn: 100,
+      tokensOut: 10,
+      minutes: 1,
     });
+    expect(outcomes[1]).toMatchObject({
+      modelId: 'g-full',
+      capability: 'review-verify',
+      tokensIn: 0,
+    });
+    expect(outcomes[2].success).toBe(false);
   });
 
-  it('lets the registry price win over a local override', () => {
-    const [model] = Object.keys(REVIEW_MODEL_OVERRIDES);
-    const prices = loadModelPrices({
-      models: [
-        { model, family: 'deepseek', list_price_in: 0.2, list_price_out: 0.8 },
-      ],
+  it('merges outcomes into the ledger keyed by case', () => {
+    const cases = [
+      {
+        id: 'c1',
+        headSha: HEAD,
+        receipt: receipt([hit]),
+        expected: [{ path: 'a.ts', line: 10 }],
+      },
+      { id: 'c2', receipt: receipt([], 'incomplete'), clean: true },
+    ];
+    const once = recordOutcomes(null, cases, 'T1');
+    expect(Object.keys(once.cases)).toEqual(['c1']);
+    expect(once.outcomes['d-flash'].review).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      tokens_in: 100,
     });
-    expect(prices[model]).toEqual({
-      family: 'deepseek',
-      inPerMillion: 0.2,
-      outPerMillion: 0.8,
-    });
-  });
-
-  it('resolves routes from env within the allowlist only', () => {
-    expect(resolveRoutes({})).toEqual(REVIEW_ROUTES);
-    expect(
-      resolveRoutes({ PR_REVIEW_VERIFICATION_MODEL: 'z-ai/glm-5.3-flash' })
-        .verification
-    ).toBe('z-ai/glm-5.3-flash');
-    expect(() =>
-      resolveRoutes({ PR_REVIEW_DISCOVERY_MODEL: 'openai/gpt-6-astra' })
-    ).toThrow(/not allowed/);
-    expect(() =>
-      resolveRoutes({ PR_REVIEW_VERIFICATION_MODEL: 'x/y' })
-    ).toThrow(/not allowed/);
-    const prices = loadModelPrices();
-    expect(() =>
-      assertRoutes(
-        prices,
-        resolveRoutes({ PR_REVIEW_DISCOVERY_MODEL: 'z-ai/glm-5.3-flash' })
-      )
-    ).toThrow(/different families/);
+    const twice = recordOutcomes(once, cases, 'T2');
+    expect(twice.outcomes['d-flash'].review.attempts).toBe(1);
+    expect(twice.updatedAt).toBe('T2');
   });
 });
 
 describe('readRiskRuleIds', () => {
+  it('classifies exact source paths with canonical policy beyond prompt-context limits', async () => {
+    const paths = [
+      ...Array.from({ length: 45 }, (_, i) => `lib/example-${i}.ts`),
+      PATH,
+    ];
+    const git = async args => {
+      expect(args).toEqual(['diff', '--name-only', BASE, HEAD]);
+      return paths.join('\n');
+    };
+    expect(
+      await classifyReviewRisk({ baseSha: BASE, headSha: HEAD, git })
+    ).toContain('billing-money');
+  });
+
+  it('keeps package and lockfile risk when trusted checkout differs from PR head', async () => {
+    expect(
+      await classifyReviewRisk({
+        baseSha: BASE,
+        headSha: HEAD,
+        git: async () => 'apps/web/package.json\npnpm-lock.yaml\n',
+      })
+    ).toContain('env-config');
+  });
+
+  it('keeps unavailable classification unknown and distinguishes a genuine empty diff', async () => {
+    expect(
+      await classifyReviewRisk({
+        baseSha: BASE,
+        headSha: HEAD,
+        git: async () => '',
+      })
+    ).toEqual([]);
+    expect(
+      await classifyReviewRisk({
+        baseSha: BASE,
+        headSha: HEAD,
+        git: async () => {
+          throw new Error('missing source');
+        },
+      })
+    ).toBeNull();
+    expect(
+      await classifyReviewRisk({ baseSha: 'invalid', headSha: HEAD })
+    ).toBeNull();
+  });
+
   it('reads rule ids and distinguishes missing from empty', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pr-review-'));
     const good = join(dir, 'risk.json');

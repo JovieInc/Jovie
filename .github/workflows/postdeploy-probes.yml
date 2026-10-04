@@ -12,7 +12,8 @@ name: Post-Deploy Probes
 #
 # Hard boundaries (do not relax):
 # - Read-only evidence. No production mutation, no marker writes, no rollback.
-#   Slack on probe failure is allowed and is not a production mutation.
+#   Slack and the deduped Linear remediation intake on probe results are
+#   allowed and are not production mutations.
 #   It must never join the `production-mutation` FIFO lease.
 # - It changes nothing about release authorization: the controller's exact
 #   CI-attempt + Main Release Ready contract is untouched.
@@ -562,6 +563,31 @@ jobs:
       - name: Remove Lighthouse sensitive probe state
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/lighthouse-sensitive-values"
+
+  remediation:
+    name: File post-deploy probe remediation
+    needs: [resolve-target, smoke, auth-smoke, lighthouse]
+    if: ${{ always() && needs.resolve-target.outputs.should_probe == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve production-monitor-postdeploy-probes
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-postdeploy-probes
+          REMEDIATION_SOURCE: postdeploy-probes.yml
+          REMEDIATION_CONCLUSION: ${{ (needs.smoke.result == 'failure' || needs.auth-smoke.result == 'failure' || needs.lighthouse.result == 'failure') && 'failure' || 'success' }}
+          REMEDIATION_DETAIL: smoke=${{ needs.smoke.result }} auth-smoke=${{ needs.auth-smoke.result }} lighthouse=${{ needs.lighthouse.result }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
 
   notify-failure:
     name: Alert on post-deploy probe failure

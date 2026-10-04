@@ -38,6 +38,7 @@ def _load(name: str):
 
 lane = _load("lane_runner")
 codex = _load("codex_lane")
+merge_evidence = _load("merge_evidence")
 
 RUN_ID = re.compile(r"^(?P<stamp>\d{8}T\d{6}Z)-(?P<target>PR\d+|JOV-\d+)-(?P<provider>[a-z0-9]+)(?:-(?P<kind>adopt|fix))?-[0-9a-f]{6}$")
 PHASES = [
@@ -211,7 +212,10 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
     numbers = sorted({int(target.split("-")[1]) for target in in_flight if target.startswith("JOV-")})
     try:
         client = lane.Linear(env_file)
-        data = client.gql(
+        token = lane._cache_token("-".join(str(number) for number in numbers) or "idle")
+
+        def fetch():
+            return client.gql(
             'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
             'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier priority labels{nodes{name}}}}'
@@ -219,6 +223,8 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
                '{nodes{identifier title state{name}}}' if numbers else '')
             + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
+
+        data = lane.shared(f"claim-hud-linear-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
     pool = Counter()
@@ -263,10 +269,10 @@ def github_model() -> dict:
     except Exception as error:
         model["errors"]["open"] = f"{type(error).__name__}: {error}"[:100]
     try:
-        since = (utcnow() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        merged = gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "merged", "--limit", "100",
-                          "--search", f"merged:>={since}", "--json",
-                          "number,title,headRefName,createdAt,mergedAt"])
+        until = utcnow().timestamp()
+        evidence = merge_evidence.collect(lane.REPO_SLUG, until - 86400, until)
+        model["mergedWindow"] = {k: v for k, v in evidence.items() if k != "prs"}
+        merged = merge_evidence.require_complete(evidence)
         model["merged24h"] = [{"number": m["number"], "title": m["title"], "mergedAt": m["mergedAt"],
                                "createdAt": m["createdAt"], "headRefName": m["headRefName"],
                                "lane": (lambda found: found.group("lane") if found else None)(lane.LANE_BRANCH.match(m["headRefName"]))}
@@ -319,6 +325,7 @@ def promotion_line(metrics: dict) -> str:
     back = metrics["reenqueueMinutes"]
     intake = metrics["intake"]
     occupancy = metrics["occupancy"]
+    queue_per_merge = metrics.get("queueEntriesPerMerge")
     rate_color = GREEN if first is not None and first >= 0.9 else ORANGE
     return (rgb(FG, "PROMOTION 8h  ", bold=True)
             + rgb(rate_color, f"first-pass {'n/a' if first is None else f'{round(first * 100)}%'}")
@@ -326,7 +333,24 @@ def promotion_line(metrics: dict) -> str:
                        f" · open→enqueue p75 {metrics['openToFirstEnqueueMinutes']['p75']}m"
                        f" · opens/h {intake['opensPerHour']} vs merges/h {intake['mergesPerHour']}"
                        f" · CLEAN not queued {occupancy['cleanNotQueued']}"
-                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"))
+                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"
+                       f" · queue entries/merge {queue_per_merge if queue_per_merge is not None else 'n/a'}"))
+
+
+def file_overlap_line(summary: dict) -> str:
+    summary = summary or {}
+    pairs = summary.get("pairs") or []
+    metrics = summary.get("metrics") or {}
+    text = (rgb(FG, "FILE OVERLAP  ", bold=True)
+            + rgb(DIM, f"{summary.get('mode', 'enforce')} · active {len(pairs)}"
+                       f" · prevented {metrics.get('conflicts_prevented', 0)}"
+                       f" · flags {metrics.get('overlap_flags', 0)}"
+                       f" · rebases {metrics.get('rebases_caused_by_overlap', 0)}"))
+    if pairs:
+        pair = pairs[0]
+        files = ", ".join(pair.get("files") or [])
+        text += rgb(ORANGE, f" · {pair.get('first')} → {pair.get('later')} {pair.get('actionTaken')} {files}"[:100])
+    return text
 
 
 def system_model() -> dict:
@@ -588,21 +612,29 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         lines.append(rgb(DIM, f" … {len(open_prs) - pipeline_budget} more"))
 
     # recently merged
-    merged = github.get("merged24h", [])
+    merge_error = github.get("errors", {}).get("merged")
+    if not merge_error and "merged24h" not in github:
+        merge_error = "merged-pr-evidence:not-read-yet"
+    if not merge_error and (github.get("mergedWindow") or {}).get("complete") is False:
+        merge_error = "merged-pr-evidence:" + str(github["mergedWindow"].get("reason") or "incomplete")
+    merged = [] if merge_error else github.get("merged24h", [])
     attribution_receipts = local.get("attributionReceipts") or []
     attributions = {m["number"]: lane.pr_attribution(m, attribution_receipts) for m in merged}
     autonomous = sum(value.get("origin") == lane.AUTONOMOUS_ORIGIN for value in attributions.values())
     manual_codex = sum(value.get("originCategory") == "manual-codex-app-created" for value in attributions.values())
     old_codex = sum(value.get("originCategory") == "old-codex-branch-landed-later" for value in attributions.values())
-    lines.append(rgb(FG, f"RECENTLY MERGED · autonomous {autonomous} · manual Codex app {manual_codex} · "
-                     f"old codex/* {old_codex} · total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True)
-                 + ("" if "merged" not in github.get("errors", {}) else "  " + rgb(RED, github["errors"]["merged"])))
+    if merge_error:
+        lines.append(rgb(FG, "RECENTLY MERGED · unknown · ", bold=True) + rgb(RED, merge_error))
+    else:
+        lines.append(rgb(FG, f"RECENTLY MERGED · autonomous {autonomous} · manual Codex app {manual_codex} · "
+                         f"old codex/* {old_codex} · total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True))
     for m in merged[:3]:
         label = attribution_label(attributions[m["number"]])
         lines.append(pad(f" {rgb(GREEN, '✓')} #{m['number']} {clip(m['title'], 90)} "
                          f"{rgb(DIM, label + ' · ' + age(m['mergedAt'], now))}", width))
 
     lines.append(promotion_line(github.get("promotion")))
+    lines.append(file_overlap_line(local.get("doctor", {}).get("fileOverlap") or {}))
 
     # needs attention
     ledger = local["ledger24h"]
@@ -617,6 +649,11 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         attention.append(rgb(RED, f"failed runs 24h {ledger['failed']}"))
     if ledger.get("gate-timeout"):
         attention.append(rgb(ORANGE, f"gate timeouts 24h {ledger['gate-timeout']}"))
+    escalation = local.get("doctor", {}).get("escalation") or {}
+    if escalation.get("escalating") or escalation.get("ladder_exhausted") or escalation.get("surfaced"):
+        attention.append(rgb(ORANGE, f"escalation {escalation.get('escalating', 0)} "
+                                     f"exhausted {escalation.get('ladder_exhausted', 0)} "
+                                     f"surfaced {len(escalation.get('surfaced') or [])}"))
     if not attention:
         attention.append(rgb(GREEN, "✓ nothing needs a human"))
     lines.append(rgb(FG, "NEEDS ATTENTION  ", bold=True) + rgb(DIM, f"held {len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))
@@ -625,10 +662,11 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     provider_parts = []
     for provider, metric in throughput["providers"].items():
         first_pass = metric["firstPassGreenRate"]
+        landed = "unknown" if merge_error else str(metric["landedOutput"])
         provider_parts.append(f"{provider} offer {metric['eligibleWorkOffered']} start {metric['workerStarts']} "
                               f"productive {metric['productiveRuns']} PR {metric['prsCreated']} "
                               f"first-pass {'n/a' if first_pass is None else f'{round(first_pass * 100)}%'} "
-                              f"repair {metric['remediationRuns']} landed {metric['landedOutput']}")
+                              f"repair {metric['remediationRuns']} landed {landed}")
     counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items(), key=lambda item: str(item[0]))) or "no runs"
     lines.append(rgb(DIM, f"  24h verdicts: {counts}"))
     lines.append(rgb(DIM, "  THROUGHPUT 24h · " + " | ".join(provider_parts)))

@@ -1,4 +1,6 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import { UnifiedTable } from './UnifiedTable';
@@ -70,6 +72,52 @@ function installObserver() {
 }
 
 describe('UnifiedTable column priority', () => {
+  it('preserves server-rendered cells and focus when hydration enables motion', async () => {
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      matches: false,
+      media,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const table = (
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(table);
+    document.body.append(container);
+    const header = container.querySelector('th');
+    const cell = container.querySelector('td');
+    const button = container.querySelector('button');
+    expect(header).not.toBeNull();
+    expect(cell).not.toBeNull();
+    expect(button).not.toBeNull();
+    button?.focus();
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, table);
+      });
+      await waitFor(() =>
+        expect(
+          container.querySelector('[data-column-snap="on"]')
+        ).not.toBeNull()
+      );
+      expect(container.querySelector('th')).toBe(header);
+      expect(container.querySelector('td')).toBe(cell);
+      expect(container.querySelector('button')).toBe(button);
+      expect(document.activeElement).toBe(button);
+    } finally {
+      await act(async () => root?.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
   it('folds hidden columns into the primary cell and stretches the rest back', () => {
     const resize = installObserver();
     render(
@@ -117,6 +165,91 @@ describe('UnifiedTable column priority', () => {
       'SMS'
     );
 
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps a caller from forcing a column back on when it does not fit', () => {
+    const resize = installObserver();
+    render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        columnVisibility={{ alerts: true }}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+
+    resize(500);
+    expect(
+      screen.queryByRole('columnheader', { name: 'Alerts' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('table-column-compacts')).toHaveTextContent(
+      'SMS'
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it('snaps painted cells, and stays still when snap is off or motion is reduced', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const { unmount } = render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+    await waitFor(() => {
+      expect(document.querySelector('[data-column-snap="on"]')).not.toBeNull();
+    });
+    expect(
+      document.querySelector('[data-column-snap-order="0"]')
+    ).not.toBeNull();
+    unmount();
+
+    render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        columnSnap={false}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-column-snap="on"]')).toBeNull();
+
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const reduced = render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        minWidth='0'
+      />
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-column-snap="on"]')).toBeNull();
+    reduced.unmount();
     vi.unstubAllGlobals();
   });
 });

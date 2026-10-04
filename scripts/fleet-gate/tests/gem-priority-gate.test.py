@@ -546,6 +546,26 @@ class ProductionHealthTests(unittest.TestCase):
         self.assertEqual(observed["reportedStatus"], "ok")
         self.assertEqual(observed["deployedSha"], "a" * 40)
 
+    def test_anonymous_liveness_healthy_is_green(self):
+        url = "https://jov.ie/api/health/deploy"
+        router = urlopen_router(
+            {
+                "/api/health/deploy": {
+                    "healthy": True,
+                    "timestamp": "2026-10-02T00:00:00.000Z",
+                },
+                "/api/health/build-info": {"commitSha": "b" * 40},
+            }
+        )
+
+        with mock.patch.object(MODULE.urllib.request, "urlopen", side_effect=router):
+            observed = MODULE.observe_production(url)
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reportedStatus"], "healthy")
+        self.assertEqual(observed["dependencies"]["database"]["status"], "unknown")
+        self.assertEqual(observed["deployedSha"], "b" * 40)
+
     def test_green_health_without_build_info_is_green_but_unbound(self):
         url = "https://jov.ie/api/health/deploy"
         router = urlopen_router(
@@ -4139,6 +4159,171 @@ class ScheduledFreshnessTests(unittest.TestCase):
             )
 
 
+def _gh_completed(command: list[str], stdout: str = "", stderr: str = "", code: int = 0):
+    return subprocess.CompletedProcess(command, code, stdout, stderr)
+
+
+class GitHubConditionalGetTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cache = pathlib.Path(self.tmp.name)
+        self.env = mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": str(self.cache)})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def test_revalidates_with_if_none_match_and_returns_the_cached_body(self):
+        included = 'HTTP/2.0 200 OK\r\nEtag: W/"aa"\r\n\r\n{"sha":"abc"}\n'
+        calls = []
+
+        def run(command, **_kwargs):
+            calls.append(command)
+            if len(calls) == 1:
+                return _gh_completed(command, included)
+            return _gh_completed(command, 'HTTP/2.0 304 Not Modified\nEtag: "aa"\n\n', "gh: HTTP 304\n", 1)
+
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=run):
+            first = MODULE.gh_json("JovieInc/Jovie", "branches/main")
+            second = MODULE.gh_json("JovieInc/Jovie", "branches/main")
+
+        self.assertEqual(first, {"sha": "abc"})
+        self.assertEqual(second, {"sha": "abc"})
+        self.assertNotIn("-H", calls[0])
+        self.assertIn('If-None-Match: W/"aa"', calls[1])
+
+    def test_unsolicited_304_refetches_without_a_validator(self):
+        calls = []
+
+        def run(command, **_kwargs):
+            calls.append(list(command))
+            if len(calls) == 1:
+                return _gh_completed(command, "HTTP/2.0 304 Not Modified\n\n", "gh: HTTP 304\n", 1)
+            return _gh_completed(command, 'HTTP/2.0 200 OK\nEtag: "bb"\n\n{"ok":true}\n')
+
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=run):
+            value = MODULE.gh_json("JovieInc/Jovie", "commits/abc/status")
+
+        self.assertEqual(value, {"ok": True})
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("-H", calls[1])
+
+    def test_http_error_and_non_object_keep_the_old_failure_modes(self):
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=_gh_completed(
+                ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                "HTTP/2.0 500\n\n",
+                "gh: HTTP 500\n",
+                1,
+            ),
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=_gh_completed(
+                ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                "HTTP/2.0 200 OK\nEtag: W/\"cc\"\n\n[]\n",
+            ),
+        ):
+            with self.assertRaises(ValueError):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+
+    def test_old_gh_without_include_falls_back_to_a_plain_read(self):
+        calls = []
+
+        def run(command, **_kwargs):
+            calls.append(list(command))
+            if "--include" in command:
+                return _gh_completed(command, "", "unknown flag: --include\n", 1)
+            return _gh_completed(command, '{"sha":"plain"}\n')
+
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=run):
+            self.assertEqual(
+                MODULE.gh_json("JovieInc/Jovie", "branches/main"), {"sha": "plain"}
+            )
+        self.assertEqual(calls[1][:2], ["gh", "api"])
+        self.assertNotIn("--include", calls[1])
+
+    def test_cache_off_and_unwritable_cache_still_return_the_body(self):
+        included = 'HTTP/2.0 200 OK\nEtag: W/"dd"\n\n{"sha":"live"}\n'
+        with mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}):
+            with mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(["gh"], included),
+            ):
+                self.assertEqual(MODULE.gh_json("JovieInc/Jovie", "branches/main"), {"sha": "live"})
+        self.assertEqual(list(self.cache.iterdir()), [])
+
+        with mock.patch.object(MODULE, "_write_github_cache", side_effect=OSError("full")):
+            with mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(["gh"], included),
+            ):
+                self.assertEqual(MODULE.gh_json("JovieInc/Jovie", "branches/main"), {"sha": "live"})
+
+    def test_default_cache_dir_follows_the_gem_workspace(self):
+        with mock.patch.dict(os.environ, {"GEM_WORKSPACE": "/tmp/gem"}, clear=False):
+            os.environ.pop("FLEET_GATE_HTTP_CACHE", None)
+            directory = MODULE._github_http_cache_dir()
+        self.assertEqual(
+            directory,
+            pathlib.Path("/tmp/gem/state/gem-priority-gate/github-http-cache"),
+        )
+
+    def test_rejects_a_malformed_validator(self):
+        MODULE._write_github_cache(self.cache / "body", "*", '{"sha":"nope"}')
+        self.assertFalse((self.cache / "body").exists())
+
+    def test_ignores_a_corrupt_cache_and_a_plain_json_body(self):
+        corrupt = MODULE._github_cache_path("JovieInc/Jovie", "branches/main")
+        assert corrupt is not None
+        corrupt.parent.mkdir(parents=True, exist_ok=True)
+        corrupt.write_text('{"sha":"stale"}', encoding="utf-8")
+        corrupt.with_name(corrupt.name + ".etag").write_text("not-an-etag\n", encoding="utf-8")
+        calls = []
+
+        def run(command, **_kwargs):
+            calls.append(list(command))
+            if len(calls) == 1:
+                return _gh_completed(command, '{"sha":"fresh"}\n')
+            if len(calls) == 2:
+                return _gh_completed(command, "HTTP/2.0 OK\n\n{}", "bad status\n", 1)
+            return _gh_completed(
+                command,
+                'HTTP/2.0 200 OK\nNotAHeader\nEtag: W/"ee"\n\n{"sha":"fresh"}\n',
+            )
+
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=run):
+            self.assertEqual(MODULE.gh_json("JovieInc/Jovie", "branches/main"), {"sha": "fresh"})
+            with self.assertRaises(subprocess.CalledProcessError):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+            self.assertEqual(MODULE.gh_json("JovieInc/Jovie", "rate_limit"), {"sha": "fresh"})
+        self.assertNotIn("-H", calls[0])
+
+    def test_repeated_304_and_plain_fallback_array_fail_closed(self):
+        def always_304(command, **_kwargs):
+            return _gh_completed(command, "HTTP/2.0 304 Not Modified\n\n", "gh: HTTP 304\n", 1)
+
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=always_304):
+            with self.assertRaises(subprocess.CalledProcessError):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+
+        def fallback_array(command, **_kwargs):
+            if "--include" in command:
+                return _gh_completed(command, "", "unknown flag: --include\n", 1)
+            return _gh_completed(command, "[]\n")
+
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=fallback_array):
+            with self.assertRaises(ValueError):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+
+
 class WorkflowContractTests(unittest.TestCase):
     WORKFLOWS = ROOT / ".github" / "workflows"
 
@@ -4160,9 +4345,17 @@ class WorkflowContractTests(unittest.TestCase):
         content = (self.WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         self.assertIn("consumer: deployment", content)
+        # Staging completion binds this to the source CI push run's head_sha,
+        # the same commit the controller used to read from workflow_run.
         self.assertIn(
-            "expected-sha: ${{ github.event.workflow_run.head_sha }}", content
+            "expected-sha: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}",
+            content,
         )
+        source = (ROOT / ".github/scripts/staging-release-source.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("exactRun(ci, repository, CI_PATH, 'push')", source)
+        self.assertIn("ci.head_sha === completion.sha", source)
         self.assertIn("dry-run: 'false'", content)
         self.assertNotIn("python3 scripts/fleet-gate/gem-priority-gate.py", content)
         wrapper = (ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
@@ -4171,9 +4364,12 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_refresh_is_event_driven_without_homemade_symphony_admission(self):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-        self.assertNotIn("schedule:", content)
-        self.assertNotIn("cron:", content)
-        self.assertIn("pull_request_target:", content)
+        self.assertIn("schedule:", content)
+        self.assertIn("cron: '*/5 * * * *'", content)
+        self.assertIn("# clock-class: production-liveness", content)
+        self.assertNotIn("pull_request_target:", content)
+        self.assertNotIn("check_run:", content)
+        self.assertNotIn("check_suite:", content)
         self.assertNotIn("workflow_run:", content)
         self.assertNotIn("Production Marker Recovery]", content)
         self.assertIn("push:", content)
@@ -4182,14 +4378,16 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("node-version: '24'", content)
         self.assertNotIn("node-version: '22'", content)
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
-        # pull_request_target Refresh must be a dry run (no live latest.json
-        # write while the main gate is unfenced); every other event persists.
+        # A future pull_request_target wake must stay a dry run (no live
+        # latest.json write while the main gate is unfenced).
         self.assertIn(
             "dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}",
             content,
         )
         self.assertIn("jovie-fixed", content)
-        self.assertIn("cancel-in-progress: false", content)
+        self.assertIn("cancel-in-progress: true", content)
+        self.assertIn("fleet-gate-receipt", content)
+        self.assertIn("0 <= age < 120", content)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text(
             encoding="utf-8"
@@ -4204,10 +4402,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("live_persist_override_nonzero", wrapper)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST=1", wrapper)
         self.assertNotIn('FLEET_GATE_ALLOW_LIVE_PERSIST="1"', wrapper)
-        self.assertIn("github.event.pull_request.merged != true", content)
-        self.assertIn("github.event.label.name == 'hold'", content)
-        self.assertIn("github.event.label.name == 'gated'", content)
-        self.assertIn("github.event.label.name == 'queue-deferred'", content)
+        self.assertNotIn("github.event.pull_request.merged != true", content)
+        self.assertNotIn("github.event.label.name == 'hold'", content)
+        self.assertNotIn("github.event.label.name == 'gated'", content)
+        self.assertNotIn("github.event.label.name == 'queue-deferred'", content)
         self.assertNotIn("github.event.label.name == 'needs-human'", content)
         self.assertNotIn("github.event.label.name == 'needs-human-taste'", content)
         self.assertNotIn("github.event.label.name == 'no-auto'", content)

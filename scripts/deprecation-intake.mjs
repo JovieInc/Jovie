@@ -5,6 +5,7 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { linearRequest } from './lib/linear-cooldown.mjs';
 import {
   JOVIE_TEAM_ID,
   upsertLinearIssueByTitleFingerprint,
@@ -40,18 +41,17 @@ export function extractDeprecations(log) {
   return [...seen].map(([fingerprint, text]) => ({ fingerprint, text }));
 }
 
-async function resolveLabelId(name, apiKey) {
-  const response = await fetch('https://api.linear.app/graphql', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: apiKey },
-    body: JSON.stringify({
-      query: `query($teamId: String!, $name: String!) { team(id: $teamId) { labels(filter: { name: { eq: $name } }) { nodes { id } } } }`,
-      variables: { teamId: JOVIE_TEAM_ID, name },
-    }),
+export async function resolveLabelId(name, apiKey, fetchImpl = fetch) {
+  const result = await linearRequest({
+    key: apiKey,
+    query: `query($teamId: String!, $name: String!) { team(id: $teamId) { labels(filter: { name: { eq: $name } }) { nodes { id } } } }`,
+    variables: { teamId: JOVIE_TEAM_ID, name },
+    fetchImpl,
   });
-  /** @type {{ data?: { team?: { labels?: { nodes?: Array<{ id: string }> } } } }} */
-  const body = await response.json();
-  return body?.data?.team?.labels?.nodes?.[0]?.id ?? null;
+  if (result.rateLimited) throw new Error('linear rate limited');
+  if (!result.ok)
+    throw new Error(result.reason || 'linear label lookup failed');
+  return result.data?.data?.team?.labels?.nodes?.[0]?.id ?? null;
 }
 
 async function main() {
@@ -85,6 +85,7 @@ async function main() {
       ].join('\n'),
       priority: 4,
       createStateName: 'Todo',
+      reopenTerminal: true,
       createLabelIds: [devinLabel],
       apiKey,
     });

@@ -1,94 +1,6 @@
 import Foundation
 import JovieKit
-
-enum MobileChatTimelineRole: String, Equatable, Sendable {
-  case user
-  case assistant
-  case system
-}
-
-enum MobileChatTimelineStatus: Equatable, Sendable {
-  case idle
-  case sending
-  case queued
-  case running
-  case retrying
-  case streaming
-  case failed
-  case canceled
-  case completed
-
-  var isInFlight: Bool {
-    switch self {
-    case .sending, .queued, .running, .retrying, .streaming:
-      return true
-    case .idle, .failed, .canceled, .completed:
-      return false
-    }
-  }
-}
-
-struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
-  let id: String
-  let role: MobileChatTimelineRole
-  var content: String
-  var status: MobileChatTimelineStatus
-  let clientTurnId: String?
-  var requiresWebHandoff: Bool
-  var handoffURL: URL?
-  var turnId: String? = nil
-  var eveWorkId: String? = nil
-  /// Server timestamp (ISO-8601) for fetched messages, stamped once at append
-  /// for local turns. Persisted through the cache round-trip in `persistCache`
-  /// so the load-earlier cursor still points at older history after an app
-  /// restart; `nil` only for locally composed rows with no server row yet
-  /// (JOV-6210).
-  var createdAt: String? = nil
-}
-
-struct CachedChatSnapshot: Codable, Equatable, Sendable {
-  let conversations: [MobileConversationSummary]
-  let messagesByConversationID: [String: [MobileConversationMessage]]
-  let cachedAt: Date
-  var activeConversationID: String? = nil
-  /// Optional so snapshots written before this field existed still decode.
-  /// Without it, a restarted session could never offer load-earlier for a
-  /// cached window at or under the fetch limit (JOV-6210).
-  var hasMoreOlderByConversationID: [String: Bool]? = nil
-}
-
-/// Newest-first transcript window. Numbers match `CHAT_TRANSCRIPT_WINDOW`
-/// in `apps/web/lib/chat/transcript-window.ts` (JOV-5874 / JOV-5044).
-enum ChatTranscriptWindow {
-  static let virtualizeAfterMessageCount = 8
-  static let overscanRowCount = 5
-  static let initialMessageLimit = 40
-
-  /// Hard cap on messages persisted per conversation (JOV-5144). The
-  /// persisted snapshot is re-encoded whole on every turn and loaded into
-  /// memory at launch, so an unbounded history grows resident RAM without
-  /// limit and can trip the Jetsam watchdog. Older rows stay available via
-  /// load-earlier (`before` cursor) and never need to live in the cache.
-  static let maxPersistedMessagesPerConversation = 200
-
-  static func visibleTail<T>(_ items: [T]) -> [T] {
-    Array(items.suffix(initialMessageLimit))
-  }
-
-  /// Bound persisted history to the newest `maxPersistedMessagesPerConversation`
-  /// rows so the cached snapshot stays a fixed size (JOV-5144).
-  static func persistedTail<T>(_ items: [T]) -> [T] {
-    Array(items.suffix(maxPersistedMessagesPerConversation))
-  }
-
-  static func hasOlderHistory(cachedCount: Int, fetchedHasMore: Bool) -> Bool {
-    fetchedHasMore || cachedCount > initialMessageLimit
-  }
-
-  static func shouldOfferLoadEarlier(hasMoreOlder: Bool) -> Bool {
-    hasMoreOlder
-  }
-}
+import UIKit
 
 /// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
 /// (JOV-3608). Exercises entity mentions (all four kinds), a skill
@@ -279,18 +191,63 @@ enum MobileChatAllComponentsFixture {
   ]
 }
 
-struct EyesFreeCaptureAPIRequest: Encodable, Sendable {
-  let destination: String
-  let transcript: String
-  let clientTurnId: String
-  let clientMessageId: String
-}
+/// Deterministic fixture for `.uiTestingStorefrontChat`, the App Store chat
+/// shot (JOV-4481). One finished exchange whose reply delivers merch option
+/// cards, so the graphic shows what its headline claims. Fictional designs
+/// only: no real artist, venue, or event names.
+enum MobileChatStorefrontFixture {
+  static let conversationID = "conv_ui_testing_storefront"
 
-struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
-  let destination: String
-  let status: String
-  let conversationId: String?
-  let turnId: String?
-  let readback: String
-  let errorCode: String?
+  static let userProse = "Make merch for my summer tour."
+
+  /// Bundled mockups (Assets.xcassets) keyed by the fixture URLs below.
+  /// Generated artwork for fictional designs, not real merch.
+  static let mockupAssets: [(url: String, asset: String)] = [
+    ("https://fixtures.jov.ie/storefront/night-drive-tee.jpg", "StorefrontMerchNightDriveTee"),
+    ("https://fixtures.jov.ie/storefront/summer-run-hoodie.jpg", "StorefrontMerchSummerRunHoodie"),
+    ("https://fixtures.jov.ie/storefront/afterglow-cap.jpg", "StorefrontMerchAfterglowCap"),
+  ]
+
+  static let merchOptionsJSON =
+    #"{"success":true,"generationId":"gen-storefront","options":[{"id":"opt-1","option_number":1,"design_name":"Night Drive Tee","product_type":"Tee","concept":"Chrome road lines under a night sky.","mockup_urls":["https://fixtures.jov.ie/storefront/night-drive-tee.jpg"],"price_recommendation":{"sale_price":"$38.00"}},{"id":"opt-2","option_number":2,"design_name":"Summer Run Hoodie","product_type":"Hoodie","concept":"Sunset arc with sleeve marks.","mockup_urls":["https://fixtures.jov.ie/storefront/summer-run-hoodie.jpg"],"price_recommendation":{"sale_price":"$68.00"}},{"id":"opt-3","option_number":3,"design_name":"Afterglow Cap","product_type":"Cap","concept":"Embroidered sunset mark.","mockup_urls":["https://fixtures.jov.ie/storefront/afterglow-cap.jpg"],"price_recommendation":{"sale_price":"$32.00"}}]}"#
+
+  /// Seeds the image cache so the merch cards paint the bundled mockups on
+  /// their first frame with no network. UI-testing launch mode only.
+  static func primeMockupImages() {
+    for mockup in mockupAssets {
+      guard let url = URL(string: mockup.url), let image = UIImage(named: mockup.asset) else {
+        continue
+      }
+      AvatarImageCache.store(image, for: url)
+    }
+  }
+
+  static var assistantReply: String {
+    """
+    Here are three designs from your tour artwork. Pick one to save it to Work.
+    <tool_call><name>createMerch</name><parameters></parameters></tool_call>
+    <tool_result><name>createMerch</name><state>success</state><json>\(merchOptionsJSON)</json></tool_result>
+    """
+  }
+
+  static let `default`: [MobileChatTimelineItem] = [
+    MobileChatTimelineItem(
+      id: "msg_storefront_user",
+      role: .user,
+      content: userProse,
+      status: .completed,
+      clientTurnId: "turn_storefront",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+    MobileChatTimelineItem(
+      id: "msg_storefront_merch",
+      role: .assistant,
+      content: assistantReply,
+      status: .completed,
+      clientTurnId: "turn_storefront",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+  ]
 }

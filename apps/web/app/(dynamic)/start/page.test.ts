@@ -7,6 +7,11 @@ const mocks = vi.hoisted(() => ({
   }),
   getWaitlistAccess: vi.fn(),
   isWaitlistGateEnabled: vi.fn(),
+  resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
+  resolveStartEntryProfile: mocks.resolveStartEntryProfile,
 }));
 
 // OnboardingShell is a UI component we don't need to render in this test.
@@ -92,6 +97,34 @@ describe('StartPage', () => {
         starterHandoff: null,
       },
     });
+  });
+
+  it('passes the real page behind a handle-only entry into the shell', async () => {
+    const entry = { status: 'available', handle: 'megaran' } as const;
+    mocks.resolveStartEntryProfile.mockResolvedValueOnce(entry);
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({ handle: 'megaran' }),
+    });
+
+    expect(mocks.resolveStartEntryProfile).toHaveBeenCalledWith({
+      handle: 'megaran',
+    });
+    expect(result.props.entryProfile).toEqual(entry);
+  });
+
+  it('skips the handle lookup when an explicit starter prompt drives the chat', async () => {
+    mocks.resolveStartEntryProfile.mockClear();
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({
+        handle: 'megaran',
+        starter_prompt: 'I want to claim jov.ie/megaran.',
+      }),
+    });
+
+    expect(mocks.resolveStartEntryProfile).not.toHaveBeenCalled();
+    expect(result.props.entryProfile).toBeNull();
   });
 
   it('redirects a pending account to the canonical receipt when the waitlist read fails', async () => {

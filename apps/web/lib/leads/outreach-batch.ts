@@ -15,11 +15,21 @@ import {
 } from 'drizzle-orm';
 import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
+import { contactEvidenceReviews } from '@/lib/db/schema/contacts';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
+import {
+  evaluateOutboundSend,
+  outboundCopyEvidenceKey,
+} from '@/lib/outbound/approval';
+import {
+  outboundTargetFromLead,
+  readOutboundLedger,
+} from '@/lib/outbound/ledger.server';
 
 export const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
 
@@ -54,6 +64,9 @@ function getPendingEmailWhereClause(now = new Date()) {
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),
+    // Prefilter: only leads Tim has approved copy for. The exact-revision
+    // check runs per lead in processOutreachBatch before anything is pushed.
+    drizzleSql`exists (select 1 from ${contactEvidenceReviews} where ${contactEvidenceReviews.evidenceKey} = (${outboundCopyEvidenceKey('')} || ${leads.id}::text) and ${contactEvidenceReviews.decision} = 'yes')`,
     or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
   );
 }
@@ -106,6 +119,8 @@ export interface OutreachBatchResult {
   queued: number;
   failed: number;
   dismissed: number;
+  /** Claimed leads refused because Tim's approval is missing or stale. */
+  unapproved: number;
   remainingPending: number;
 }
 
@@ -131,6 +146,8 @@ interface ClaimedLead {
   linktreeHandle: string;
   displayName: string | null;
   contactEmail: string | null;
+  instagramHandle: string | null;
+  creatorProfileId: string | null;
   claimToken: string | null;
   priorityScore: number | null;
   claimedAt: Date;
@@ -220,6 +237,8 @@ async function claimOutreachLeads(
         linktreeHandle: leads.linktreeHandle,
         displayName: leads.displayName,
         contactEmail: leads.contactEmail,
+        instagramHandle: leads.instagramHandle,
+        creatorProfileId: leads.creatorProfileId,
         claimToken: leads.claimToken,
         priorityScore: leads.priorityScore,
       })
@@ -279,6 +298,17 @@ export async function processOutreachBatch(
   limit: number,
   options: ProcessOutreachBatchOptions = {}
 ): Promise<OutreachBatchResult> {
+  if (!isInstantlyOutboundEnabled()) {
+    return {
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      dismissed: 0,
+      unapproved: 0,
+      remainingPending: 0,
+    };
+  }
+
   const now = new Date();
   const pendingEmailWhereClause = getPendingEmailWhereClause(now);
 
@@ -288,6 +318,8 @@ export async function processOutreachBatch(
   let queued = 0;
   let failed = 0;
   let dismissed = 0;
+  let unapproved = 0;
+  const ledger = await readOutboundLedger(claimedLeads.map(lead => lead.id));
 
   for (const lead of claimedLeads) {
     // Fix #3: Re-check kill switch between each send so an admin flip takes
@@ -298,6 +330,18 @@ export async function processOutreachBatch(
         await releaseClaim(lead.id);
         continue;
       }
+    }
+
+    // Never auto-send: Tim approves every target and every copy revision.
+    const permission = evaluateOutboundSend({
+      target: outboundTargetFromLead(lead),
+      channel: 'email',
+      rows: ledger.get(lead.id) ?? [],
+    });
+    if (!permission.allowed) {
+      unapproved++;
+      await releaseClaim(lead.id);
+      continue;
     }
 
     attempted++;
@@ -360,6 +404,7 @@ export async function processOutreachBatch(
         claimLink: getAppUrl(`/claim/${lead.claimToken}`),
         artistName: lead.displayName ?? lead.linktreeHandle,
         priorityScore: lead.priorityScore ?? 0,
+        approvedCopy: permission.copy,
       });
 
       await db
@@ -383,7 +428,11 @@ export async function processOutreachBatch(
             channel: 'email',
             provider: 'instantly',
             campaignKey: 'claim_invite',
-            metadata: { instantlyLeadId, claimToken: lead.claimToken },
+            metadata: {
+              instantlyLeadId,
+              claimToken: lead.claimToken,
+              approvedCopyRevision: permission.copy.revision,
+            },
           },
           { idempotent: true }
         );
@@ -421,6 +470,7 @@ export async function processOutreachBatch(
     queued,
     failed,
     dismissed,
+    unapproved,
     remainingPending: Number(remainingPending?.total ?? 0),
   };
 }

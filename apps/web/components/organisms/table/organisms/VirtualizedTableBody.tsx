@@ -153,6 +153,12 @@ export interface VirtualizedTableBodyProps<TData extends RowData> {
    * Number of columns (for expanded content spanning)
    */
   readonly columnCount: number;
+
+  /**
+   * Layout-snap painted rows when columns appear or disappear.
+   * @default false
+   */
+  readonly columnSnap?: boolean;
 }
 
 /**
@@ -204,6 +210,7 @@ export function VirtualizedTableBody<TData extends RowData>({
   renderExpandedContent,
   getExpandableRowId,
   columnCount,
+  columnSnap = false,
 }: VirtualizedTableBodyProps<TData>) {
   'use no memo';
   // Row identity is stable across visibility changes; read fresh visible cells.
@@ -274,6 +281,8 @@ export function VirtualizedTableBody<TData extends RowData>({
             getRowTestId={getRowTestId}
             measureElement={rowVirtualizer?.measureElement}
             onRowShiftClick={onRowShiftClick}
+            columnSnap={columnSnap}
+            columnSnapOrder={listIndex}
           />
         );
 

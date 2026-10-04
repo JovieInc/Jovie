@@ -2,14 +2,18 @@ import Observation
 import SwiftUI
 
 
+private struct ChatRepositoryContext: Equatable {
+  let identity: NativeChatIdentity?
+  let showsWorkspaceSwitch: Bool
+}
+
 private struct AppContentView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
   let isSignInUnavailable: Bool
   let authErrorMessage: String?
+  let authCoordinator: MobileAuthCoordinator
   let onLogout: @MainActor () async -> Void
-  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
-  let onAuthError: @MainActor (String?) -> Void
   @State private var chatRepository: ChatRepository?
   @State private var chatDraft = ""
   @State private var homeData: MobileHomeDataStore
@@ -28,17 +32,15 @@ private struct AppContentView: View {
     isAuthAvailable: Bool,
     isSignInUnavailable: Bool,
     authErrorMessage: String?,
-    onLogout: @escaping @MainActor () async -> Void,
-    onAuthReturn: @escaping @MainActor (MobileAuthReturn) -> Void,
-    onAuthError: @escaping @MainActor (String?) -> Void
+    authCoordinator: MobileAuthCoordinator,
+    onLogout: @escaping @MainActor () async -> Void
   ) {
     self.appState = appState
     self.isAuthAvailable = isAuthAvailable
     self.isSignInUnavailable = isSignInUnavailable
     self.authErrorMessage = authErrorMessage
     self.onLogout = onLogout
-    self.onAuthReturn = onAuthReturn
-    self.onAuthError = onAuthError
+    self.authCoordinator = authCoordinator
     let homeData = MobileHomeDataStore()
     homeData.showFixture(
       audience: Self.previewAudienceHighlightsState(for: appState.launchMode),
@@ -70,6 +72,7 @@ private struct AppContentView: View {
          .uiTestingChat,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
+         .uiTestingStorefrontChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingLibrary,
@@ -98,10 +101,8 @@ private struct AppContentView: View {
         AuthScreen(
           isMock: !isAuthAvailable,
           isSignInUnavailable: isSignInUnavailable,
-          webBaseURL: appState.configuration.webBaseURL,
           errorMessage: authErrorMessage,
-          onAuthReturn: onAuthReturn,
-          onAuthError: onAuthError
+          authCoordinator: authCoordinator
         )
         .transition(.opacity)
       case .needsOnboarding:
@@ -133,7 +134,7 @@ private struct AppContentView: View {
           NeedsOnboardingView(
             initialDisplayName: appState.loadedDashboardResponse?.displayName ?? "",
             initialUsername: appState.loadedDashboardResponse?.username ?? "",
-            onComplete: { displayName, username in
+            onComplete: { [userID = appState.activeUserID, owner = appState.activeSessionOwnership] displayName, username in
               if appState.launchMode == .uiTestingNeedsOnboardingUnauthorized {
                 await appState.handleExpiredSession()
                 return nil
@@ -143,26 +144,15 @@ private struct AppContentView: View {
                 return "Profile completion is temporarily unavailable. Try again."
               }
 
-              do {
-                try await APIClient(
-                  baseURL: appState.configuration.apiBaseURL,
-                  tokenProvider: NativeSessionTokenProvider()
-                ).completeProfile(displayName: displayName, username: username)
-                await appState.retry()
-                guard appState.route == .ready else {
-                  return "Your profile was saved, but the app couldn't refresh it. Try again."
-                }
-                return nil
-              } catch APIClientError.missingToken,
-                      APIClientError.requestFailed(statusCode: 401)
-              {
-                await appState.handleExpiredSession()
-                return nil
-              } catch {
-                return error.localizedDescription
-              }
+              guard let userID, let owner else { return nil }
+              return await appState.completeProfile(
+                displayName: displayName, username: username, for: userID, ifOwnedBy: owner,
+                using: APIClient(baseURL: appState.configuration.apiBaseURL,
+                                 tokenProvider: NativeSessionTokenProvider())
+              )
             }
           )
+          .id(appState.activeSessionOwnership)
         } audienceContent: { _ in
           EmptyView()
         } libraryContent: { _, _ in
@@ -310,7 +300,7 @@ private struct AppContentView: View {
       }
       await reloadHomeData(for: appState.activeUserID)
     }
-    .task(id: "\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)-\(showsWorkspaceSwitch)") {
+    .task(id: ChatRepositoryContext(identity: chatIdentity, showsWorkspaceSwitch: showsWorkspaceSwitch)) {
       // Ovie never persists across launches: the artist app cold-starts in
       // Jovie mode and admins opt in per session via Settings (JOV-5358).
       let resolved = MobileWorkspaceStore.load(isAdmin: showsWorkspaceSwitch)
@@ -331,16 +321,19 @@ private struct AppContentView: View {
         return
       }
 
-      if appState.launchMode.needsChatRepository,
-         chatRepository == nil || chatRepository?.workspace != workspaceMode
-      {
-        let repository = makeChatRepository(userID: activeUserID)
+      let identity = NativeChatIdentity(userID: activeUserID, ownership: appState.activeSessionOwnership,
+                                        workspace: workspaceMode)
+      if appState.launchMode.needsChatRepository, chatRepository?.identity != identity {
+        let repository = ChatRepository.resolve(chatRepository, for: identity, create: makeChatRepository)
         chatRepository = repository
 
         if let fixtureTimeline = appState.launchMode.chatEntityFixture {
           // Deterministic UI-testing fixture: bypasses the network
           // client/cache entirely so parse→render can be asserted without a
           // mocked backend.
+          if appState.launchMode == .uiTestingStorefrontChat {
+            MobileChatStorefrontFixture.primeMockupImages()
+          }
           repository.seedTimelineForUITesting(
             fixtureTimeline,
             activeConversationID: appState.launchMode.chatFixtureConversationID
@@ -364,7 +357,7 @@ private struct AppContentView: View {
 #endif
     }
     .task(id: chatRepository?.sessionExpired) {
-      guard chatRepository?.sessionExpired == true else { return }
+      guard chatRepository?.identity.ownership == nil, chatRepository?.sessionExpired == true else { return }
       await appState.handleExpiredSession()
     }
   }
@@ -431,17 +424,19 @@ private struct AppContentView: View {
     homeData.setContext(userID: appState.activeUserID, workspace: mode)
   }
 
-  private func makeChatRepository(userID: String) -> ChatRepository {
-    ChatRepository(
-      client: MobileChatClient(
-        baseURL: appState.configuration.apiBaseURL,
-        tokenProvider: NativeSessionTokenProvider(),
-        workspace: workspaceMode
-      ),
-      cache: ChatCache(),
-      userID: userID,
+  private var chatIdentity: NativeChatIdentity? {
+    appState.activeUserID.map {
+      NativeChatIdentity(userID: $0, ownership: appState.activeSessionOwnership, workspace: workspaceMode)
+    }
+  }
+
+  private func makeChatRepository(identity: NativeChatIdentity) -> ChatRepository {
+    NativeChatRepositoryFactory.make(
+      identity: identity,
+      apiBaseURL: appState.configuration.apiBaseURL,
       webBaseURL: appState.configuration.webBaseURL,
-      workspace: workspaceMode
+      cache: ChatCache(),
+      onSessionExpired: { [appState] receipt in await appState.handleExpiredSession(receipt) }
     )
   }
 
@@ -457,6 +452,7 @@ private struct AppContentView: View {
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
+         .uiTestingStorefrontChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingAuthCallback,
@@ -611,9 +607,8 @@ struct RootView: View {
   let isSignInUnavailable: Bool
   let authenticatedUserID: String?
   let authErrorMessage: String?
+  let authCoordinator: MobileAuthCoordinator
   let onLogout: @MainActor () async -> Void
-  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
-  let onAuthError: @MainActor (String?) -> Void
 
   var body: some View {
     ZStack {
@@ -622,9 +617,8 @@ struct RootView: View {
         isAuthAvailable: isAuthAvailable,
         isSignInUnavailable: isSignInUnavailable,
         authErrorMessage: authErrorMessage,
-        onLogout: onLogout,
-        onAuthReturn: onAuthReturn,
-        onAuthError: onAuthError
+        authCoordinator: authCoordinator,
+        onLogout: onLogout
       )
 
 #if DEBUG

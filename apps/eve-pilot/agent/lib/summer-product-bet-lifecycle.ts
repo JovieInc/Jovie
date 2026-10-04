@@ -146,6 +146,24 @@ export const productBetEventSchema = z.discriminatedUnion('kind', [
   z
     .object({
       ...eventBase,
+      kind: z.literal('cohort-measurement'),
+      /**
+       * Aggregate arm-level measurement from an experiment writeback
+       * (JOV-6468): real sources report counts, not member identities.
+       * usefulResults must not exceed assigned.
+       */
+      arm: z.string().trim().min(1).max(64),
+      assigned: z.number().int().nonnegative(),
+      usefulResults: z.number().int().nonnegative(),
+      sourceRef: ref,
+    })
+    .strict()
+    .refine(m => m.usefulResults <= m.assigned, {
+      message: 'useful-results-cannot-exceed-assigned',
+    }),
+  z
+    .object({
+      ...eventBase,
       kind: z.literal('telemetry-failure'),
       instrumentationRef: ref,
     })
@@ -316,7 +334,11 @@ export function projectProductBet(
   let delivered: BetProjection['delivered'] = null;
   const usefulMembers = new Set<string>();
   const observedMembers = new Set<string>();
+  let measuredAssigned = 0;
+  let measuredUseful = 0;
   let businessOutcomeObserved = false;
+  let businessMetric: string | null = null;
+  let businessValue: number | null = null;
   let attributionOpen = false;
   let telemetryFailed = false;
   let guardrailTripped = false;
@@ -336,8 +358,16 @@ export function projectProductBet(
         observedMembers.add(event.cohortMemberId);
         if (event.usefulResult) usefulMembers.add(event.cohortMemberId);
         break;
+      case 'cohort-measurement':
+        measuredAssigned += event.assigned;
+        measuredUseful += event.usefulResults;
+        break;
       case 'business-outcome':
         businessOutcomeObserved = true;
+        if (event.metric === contract.prediction.metric) {
+          businessMetric = event.metric;
+          businessValue = event.observedValue;
+        }
         if (!event.attributionWindowClosed) attributionOpen = true;
         break;
       case 'telemetry-failure':
@@ -349,10 +379,14 @@ export function projectProductBet(
       case 'observation-restarted':
         horizon = Date.parse(event.newHorizon);
         businessOutcomeObserved = false;
+        businessMetric = null;
+        businessValue = null;
         attributionOpen = false;
         telemetryFailed = false;
         observedMembers.clear();
         usefulMembers.clear();
+        measuredAssigned = 0;
+        measuredUseful = 0;
         break;
     }
   }
@@ -362,9 +396,11 @@ export function projectProductBet(
     : Date.parse(contract.decidedAt);
   const staleApproval = now > Date.parse(contract.approvalValidUntil);
   const horizonReached = now >= horizon;
-  const cohortTooSmall = observedMembers.size < contract.cohort.minUsefulSize;
+  const observedTotal = observedMembers.size + measuredAssigned;
+  const usefulTotal = usefulMembers.size + measuredUseful;
+  const cohortTooSmall = observedTotal < contract.cohort.minUsefulSize;
 
-  const hasObservation = observedMembers.size > 0 || businessOutcomeObserved;
+  const hasObservation = observedTotal > 0 || businessOutcomeObserved;
 
   let evaluation: BetEvaluation;
   if (delivered && !hasObservation && !telemetryFailed && !guardrailTripped) {
@@ -381,11 +417,20 @@ export function projectProductBet(
     evaluation = 'inconclusive';
   } else if (attributionOpen) {
     evaluation = 'awaiting-maturity';
-  } else if (businessOutcomeObserved && observedMembers.size > 0) {
+  } else if (businessOutcomeObserved && observedTotal > 0) {
+    // When the observed metric is the declared prediction metric, judge
+    // against the pre-action expected value; otherwise fall back to the
+    // cohort useful-result majority.
     evaluation =
-      usefulMembers.size * 2 >= observedMembers.size
-        ? 'supported'
-        : 'contradicted';
+      businessMetric === contract.prediction.metric &&
+      contract.prediction.expectedValue !== null &&
+      businessValue !== null
+        ? businessValue >= contract.prediction.expectedValue
+          ? 'supported'
+          : 'contradicted'
+        : usefulTotal * 2 >= observedTotal
+          ? 'supported'
+          : 'contradicted';
   } else if (businessOutcomeObserved) {
     // Lucky outcome with poor evidence: cannot attribute causally.
     evaluation = 'inconclusive';
@@ -398,8 +443,8 @@ export function projectProductBet(
   if (delivered && guardrailTripped) route = 'repair';
   else if (
     delivered &&
-    observedMembers.size > 0 &&
-    usefulMembers.size === 0 &&
+    observedTotal > 0 &&
+    usefulTotal === 0 &&
     !cohortTooSmall
   )
     route = 'customer-problem-offer-review';
@@ -415,9 +460,9 @@ export function projectProductBet(
     schema: PRODUCT_BET_PROJECTION_SCHEMA,
     betId: contract.betId,
     delivered,
-    customerOutcomeReached: observedMembers.size > 0,
-    usefulResultCount: usefulMembers.size,
-    observedCohortSize: observedMembers.size,
+    customerOutcomeReached: observedTotal > 0,
+    usefulResultCount: usefulTotal,
+    observedCohortSize: observedTotal,
     businessOutcomeObserved,
     evaluation,
     route,

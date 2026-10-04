@@ -47,13 +47,12 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Sub-tool reached from Investors workspace actions',
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
-  '/app/ov/interviews': 'Internal admin review workspace (manual entry)',
+  '/app/ov/chat-playground':
+    'Internal chat visual QA workspace reached by direct product and design review links',
   '/app/ov/wiki':
     'Internal admin wiki index reached from the /hud/wiki rewrite into the OV app shell',
   '/app/ov/wiki/[...slug]':
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
-  '/app/ov/playlists': 'Internal admin workflow (manual entry)',
-  '/app/ov/presence': 'Internal admin workspace pending Ovie IA placement',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
   '/app/ov/system':
@@ -69,23 +68,19 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/releases':
     'Legacy releases workspace retained for old bookmarks',
   '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
-  '/app/settings/retargeting-ads':
-    'Legacy settings route redirected to Audience',
   '/app/settings/connectors':
     'Settings Connections page loads shared shell route context directly (data-backed since JOV-4799)',
   '/app/settings/admin': 'Legacy admin settings route redirected to Ops',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
   '/app/insights':
-    'AI insights workspace is reachable from dashboard widgets and direct app links until nav placement is finalised',
+    'Contextual Audience workspace reached from the Audience route control and chat insight cards',
   '/app/jovie-work':
-    'Unified autonomous work feed is reachable from direct app links until nav placement is finalised',
+    'Contextual autonomous work history reached from Home/Inbox',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
-  '/app/settings/referral':
-    'Referral code page reached from share/referral flows; Settings IA nav placement lands with the Settings sidebar consolidation (#13134)',
   '/app/youtube':
-    'YouTube revival queue workspace (GH-10921); reachable from direct app links until nav placement is finalised',
+    'YouTube ledger workspace reached from the contextual Work toolbar action',
 };
 
 interface ShellPage {

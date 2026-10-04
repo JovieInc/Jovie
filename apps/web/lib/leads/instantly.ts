@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type { OutboundCopy } from '@/lib/outbound/approval';
+import { isInstantlyOutboundEnabled } from './outbound-gates';
 import { pipelineError, pipelineLog } from './pipeline-logger';
 
 const INSTANTLY_API_BASE = 'https://api.instantly.ai/api/v2';
@@ -10,6 +12,11 @@ interface PushLeadParams {
   claimLink: string;
   artistName: string;
   priorityScore: number;
+  /**
+   * The exact copy Tim approved. The campaign template renders these
+   * variables, so what sends is the revision he approved.
+   */
+  approvedCopy: OutboundCopy & { readonly revision: string };
 }
 
 function isRateLimitRetry(status: number, attempt: number): boolean {
@@ -73,6 +80,10 @@ async function attemptLeadPush(
 export async function pushLeadToInstantly(
   params: PushLeadParams
 ): Promise<string> {
+  if (!isInstantlyOutboundEnabled()) {
+    throw new Error('Instantly outbound is disabled');
+  }
+
   const apiKey = process.env.INSTANTLY_API_KEY;
   const campaignId = process.env.INSTANTLY_CAMPAIGN_ID;
 
@@ -105,6 +116,9 @@ export async function pushLeadToInstantly(
       claim_link: params.claimLink,
       artist_name: params.artistName,
       priority_score: String(params.priorityScore),
+      approved_subject: params.approvedCopy.subject ?? '',
+      approved_body: params.approvedCopy.body,
+      approved_copy_revision: params.approvedCopy.revision,
     },
   };
 

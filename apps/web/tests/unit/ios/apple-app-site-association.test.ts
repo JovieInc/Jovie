@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GET as getWellKnown } from '@/app/.well-known/apple-app-site-association/route';
 import { GET as getLegacy } from '@/app/apple-app-site-association/route';
 import {
+  IOS_WEB_ONLY_APP_PATH_PREFIXES,
   JOVIE_APPLE_APP_SITE_ASSOCIATION,
   JOVIE_APPLE_TEAM_ID,
   JOVIE_IOS_BUNDLE_ID,
@@ -20,6 +21,10 @@ describe('apple-app-site-association routes', () => {
       {
         appID: `${JOVIE_APPLE_TEAM_ID}.${JOVIE_IOS_BUNDLE_ID}`,
         paths: [
+          ...IOS_WEB_ONLY_APP_PATH_PREFIXES.flatMap(prefix => [
+            `NOT ${prefix}`,
+            `NOT ${prefix}/*`,
+          ]),
           '/app/*',
           '/auth/ios/complete',
           '/auth/ios/complete?*',
@@ -31,6 +36,32 @@ describe('apple-app-site-association routes', () => {
     expect(JSON.stringify(JOVIE_APPLE_APP_SITE_ASSOCIATION)).not.toContain(
       '/auth/*'
     );
+  });
+
+  // JOV-7632: web-only workspaces (YouTube, Insights, Jovie Work, release
+  // plan) must stay out of iOS navigation until a native surface exists.
+  // Merch checkout (`/<handle>/merch/<cardId>`) is outside `/app/*` and is
+  // never claimed by the AASA.
+  it('excludes web-only /app/* destinations from universal links', () => {
+    const paths =
+      JOVIE_APPLE_APP_SITE_ASSOCIATION.applinks.details[0]?.paths ?? [];
+
+    for (const prefix of IOS_WEB_ONLY_APP_PATH_PREFIXES) {
+      expect(paths.indexOf(`NOT ${prefix}`)).toBeLessThan(
+        paths.indexOf('/app/*')
+      );
+      expect(paths.indexOf(`NOT ${prefix}/*`)).toBeLessThan(
+        paths.indexOf('/app/*')
+      );
+    }
+
+    expect(IOS_WEB_ONLY_APP_PATH_PREFIXES).toEqual([
+      '/app/youtube',
+      '/app/insights',
+      '/app/jovie-work',
+      '/app/dashboard/release-plan',
+      '/app/dashboard/insights',
+    ]);
   });
 
   it.each([

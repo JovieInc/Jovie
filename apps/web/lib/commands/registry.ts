@@ -14,6 +14,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
+import type { AppFlagName } from '@/lib/flags/contracts';
 
 /**
  * Backend chat tools that are deliberately NOT exposed as user-visible
@@ -157,6 +158,8 @@ export interface NavCommand {
   readonly href: string;
   /** Optional shortcut hint rendered on the cmd+k row. */
   readonly shortcutLabel?: string;
+  /** Hide this row unless the flag is on. A missing value stays hidden. */
+  readonly requiredFlag?: AppFlagName;
 }
 
 export type Command = SkillCommand | NavCommand;
@@ -199,7 +202,8 @@ function nav(
   label: string,
   description: string,
   iconName: string,
-  href: string
+  href: string,
+  requiredFlag?: AppFlagName
 ): NavCommand {
   return {
     kind: 'nav',
@@ -209,7 +213,17 @@ function nav(
     iconName,
     surfaces: CMDK_ONLY,
     href,
+    ...(requiredFlag ? { requiredFlag } : {}),
   };
+}
+
+/** Skills stay visible. Nav rows with a required flag render only when it is on. */
+export function isCommandVisible(
+  command: Command,
+  flags: Partial<Record<AppFlagName, boolean>>
+): boolean {
+  if (command.kind !== 'nav' || !command.requiredFlag) return true;
+  return flags[command.requiredFlag] === true;
 }
 
 // Nav entries mirror the primary dashboard sidebar (`dashboard-nav/config.ts`)
@@ -227,7 +241,7 @@ export const COMMANDS: readonly Command[] = [
     'generateReleasePitch',
     'Generate pitch',
     'Draft a destination-aware release pitch in chat.',
-    'Music',
+    'Megaphone',
     [{ kind: 'release', required: true }]
   ),
   skill(
@@ -239,13 +253,13 @@ export const COMMANDS: readonly Command[] = [
   skill(
     'proposeSocialLink',
     'Add social link',
-    'Add a social profile URL to your artist profile.',
+    'Add a social profile URL to your profile.',
     'Link'
   ),
   skill(
     'proposeSocialLinkRemoval',
     'Remove social link',
-    'Remove a social link from your artist profile.',
+    'Remove a social link from your profile.',
     'Link2Off'
   ),
   skill(
@@ -263,10 +277,11 @@ export const COMMANDS: readonly Command[] = [
   ),
   nav(
     'go-presence',
-    'Presence',
-    'Monitor artist profiles, public pages, and search visibility.',
-    'Waypoints',
-    APP_ROUTES.PRESENCE
+    'Identity',
+    'Monitor your identity, public pages, and search presence.',
+    'User',
+    APP_ROUTES.PRESENCE,
+    'PROFILES_WORKSPACE'
   ),
   nav(
     'go-connections',
@@ -286,8 +301,36 @@ export const COMMANDS: readonly Command[] = [
     'go-releases',
     'Releases',
     'Manage your release catalog and smart links.',
-    'Music',
+    'Layers',
     APP_ROUTES.RELEASES
+  ),
+  nav(
+    'go-youtube',
+    'YouTube',
+    'Open the YouTube workspace.',
+    'Youtube',
+    APP_ROUTES.YOUTUBE_REVIVAL
+  ),
+  nav(
+    'go-insights',
+    'Insights',
+    'Open the insights workspace.',
+    'LineChart',
+    APP_ROUTES.INSIGHTS
+  ),
+  nav(
+    'go-jovie-work',
+    'Jovie work',
+    'Open autonomous work for this identity.',
+    'ListTodo',
+    APP_ROUTES.JOVIE_WORK
+  ),
+  nav(
+    'go-tour-dates',
+    'Tour dates',
+    'Open scheduled dates.',
+    'CalendarDays',
+    APP_ROUTES.TOUR_DATES
   ),
   nav(
     'go-calendar',
@@ -306,7 +349,7 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-settings',
     'Settings',
-    'Account, billing, and artist settings.',
+    'Account, billing, and profile settings.',
     'Settings',
     APP_ROUTES.SETTINGS
   ),

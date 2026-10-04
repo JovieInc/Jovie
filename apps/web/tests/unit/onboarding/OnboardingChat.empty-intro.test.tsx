@@ -140,9 +140,26 @@ describe('OnboardingChat empty intro', () => {
       />
     );
 
-    expect(screen.getByText('Getting This Ready')).toBeTruthy();
+    expect(screen.getByText('Getting this ready')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+  });
+
+  it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {
+    render(
+      <OnboardingChat
+        entryProfile={{ status: 'available', handle: 'newartist' }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Claim jov.ie/newartist')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
+    expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('falls back to blank entry when a stored intent is missing', async () => {
@@ -179,6 +196,12 @@ describe('OnboardingChat empty intro', () => {
       );
       expect(scrollRegion).not.toBeNull();
       expect(scrollRegion).toHaveClass(expected);
+      // Content scrolled under the floating sign-in fades rather than
+      // hard-clipping into a cut-off bubble; at rest, content below the 4rem
+      // clearance stays fully opaque.
+      expect(
+        scrollRegion?.className.includes('system-b-chat-thread-top-fade')
+      ).toBe(headerOverlay === true);
     }
   );
 

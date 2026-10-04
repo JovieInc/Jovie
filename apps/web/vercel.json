@@ -55,6 +55,10 @@
     {
       "path": "/api/cron/voice-pipeline",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/artist-daily-snapshots",
+      "schedule": "15 9 * * *"
     }
   ],
   "functions": {

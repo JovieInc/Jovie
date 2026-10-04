@@ -203,11 +203,18 @@ class AutoscaleTest(unittest.TestCase):
             self.assertIn("devin", collected["cooling"]); self.assertGreater(NOW - collected["cooldownAt"]["devin"], A.MULTIPLICATIVE_WINDOW_S)
             (root / "doctor.json").write_text("{")
             self.assertFalse(A.collect(root, {}, NOW)["doctorFresh"]); env_file = root / "linear.env"; env_file.write_text("LINEAR_API_KEY=test\n"); client = lane.Linear(env_file); client.state = root / "state"; headers = {"X-RateLimit-Requests-Remaining": "1800", "X-RateLimit-Requests-Limit": "2500", "X-RateLimit-Requests-Reset": "99"}
+            # The shared cooldown dir and api-budget.json live under LANES_STATE; a unit test
+            # must not read the host's real cooldown or overwrite its budget snapshot.
+            for guard in (patch.dict(os.environ, {"LINEAR_COOLDOWN_STATE_DIR": str(root / "linear-cooldown")}),
+                          patch.object(lane, "linear_cooldown_until", return_value=None),
+                          patch.object(lane, "record_linear_budget"),
+                          patch.object(lane, "publish_linear_cooldown", return_value=NOW + 60)):
+                guard.start(); self.addCleanup(guard.stop)
             with patch.object(lane.urllib.request, "urlopen", return_value=_Body(b'{"data": {"ok": 1}}', headers)):
                 self.assertEqual(client.gql("q", {}), {"ok": 1})
             saved = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((saved["schema"], saved["remaining"], saved["limit"], saved["reset"], saved["rateLimitedAt"]), (1, 1800, 2500, 99, None)); self.assertRegex(saved["observedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"); self.assertNotIn("linearRemaining", saved); body = json.dumps({"errors": [{"message": "limited", "extensions": {"code": "RATELIMITED"}}]}).encode(); error = urllib.error.HTTPError("https://api.linear.app/graphql", 400, "bad", None, io.BytesIO(body))
             with patch.object(lane.urllib.request, "urlopen", side_effect=error):
-                with self.assertRaises(urllib.error.HTTPError):
+                with self.assertRaises(lane.LinearRateLimited):
                     client.gql("q", {})
             limited_budget = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((limited_budget["remaining"], limited_budget["limit"]), (1800, 2500)); self.assertRegex(limited_budget["rateLimitedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"); self.assertNotIn("linearRateLimitedAt", limited_budget); parsed_limit = A.collect(client.state, {}, time.time()); self.assertAlmostEqual(parsed_limit["linearRateLimitedAt"], time.time(), delta=5)
             A.record_linear_budget(client.state, {"X-RateLimit-Requests-Remaining": "1000"}, 200, b""); partial = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((partial["schema"], partial["remaining"], partial["limit"], partial["reset"]), (1, 1000, 2500, 99)); self.assertRegex(partial["rateLimitedAt"], r"Z$")
@@ -219,7 +226,7 @@ class AutoscaleTest(unittest.TestCase):
                                               io.BytesIO(b'{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'))
             with patch.object(lane.autoscale, "record_linear_budget", side_effect=RuntimeError("disk")), \
                     patch.object(lane.urllib.request, "urlopen", side_effect=limited):
-                with self.assertRaises(urllib.error.HTTPError):
+                with self.assertRaises(lane.LinearRateLimited):
                     client.gql("q", {})
     def test_dispatch_worker_doctor_and_hud(self):
         spawned = []
@@ -235,7 +242,10 @@ class AutoscaleTest(unittest.TestCase):
                     patch.object(lane.doctor, "run", return_value={}), \
                     patch.object(lane.urllib.request, "urlopen", side_effect=AssertionError("network")):
                 self.assertEqual(lane.dispatch(host), 0)
-            tick = json.loads((host.state / "tick.json").read_text()); self.assertIn("boom", tick["autoscaleError"]); self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex"]); self.assertEqual(spawned, tick["spawned"])
+            tick = json.loads((host.state / "tick.json").read_text()); self.assertIn("boom", tick["autoscaleError"])
+            expected = [name for name, spec in lane.load_providers().items() if spec.get("enabled", True)
+                        for _ in range(spec.get("slots", 1))]
+            self.assertEqual(tick["spawned"], expected); self.assertEqual(spawned, tick["spawned"])
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp)
             (root / "doctor.json").write_text(json.dumps({"observed": {"now": time.time(), "capacityByProvider": {"devin": {"running": 4}},

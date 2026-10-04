@@ -144,6 +144,26 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('registers the money route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/money/page.tsx',
+      'apps/web/app/app/money/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.money');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
+  it('registers the admin chat playground route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
+      'apps/web/app/app/(shell)/admin/chat-playground/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.admin-chat-playground');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
     const platforms = [...new Set(gated().map(e => e.platform))].sort();
@@ -193,6 +213,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
     assert.equal(
       kindOf('apps/web/app/app/(shell)/library/page.tsx'),
+      'registered'
+    );
+    assert.equal(
+      kindOf('apps/web/app/(dynamic)/playlists/page.tsx'),
       'registered'
     );
   });
@@ -432,6 +456,27 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(result.receipt.schema, SCREEN_CERT_SCHEMA);
     const rows = result.receipt.changedScreens.map(i => [i.id, i.verdict]);
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
+    for (const name of ['costs', 'features']) {
+      const changedFiles = [`apps/web/app/app/(shell)/admin/${name}/page.tsx`];
+      const registered = runScreenCertification({
+        headSha: HEAD,
+        changedFiles,
+        registrationOnly: true,
+      });
+      assert.equal(registered.ok, true, registered.receipt.issues.join('\n'));
+      assert.equal(registered.receipt.certified, false);
+      assert.deepEqual(
+        registered.receipt.changedScreens.map(item => [item.id, item.verdict]),
+        [[`web.admin-${name}`, 'evidence-required']]
+      );
+      // Registration cannot stand in for authenticated, exact-head browser proof.
+      const certification = runScreenCertification({
+        headSha: HEAD,
+        changedFiles,
+      });
+      assert.equal(certification.ok, false);
+      assert.equal(certification.receipt.certified, false);
+    }
   });
 
   it('rejects caller-authored proof that did not pass through the trusted resolver', () => {
@@ -3498,7 +3543,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     const paths = [
       'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
-      'apps/web/app/not-found.tsx',
+      'apps/web/app/billing/success/not-found.tsx',
       'apps/desktop/src/renderer/App.tsx',
       'apps/ios/Jovie/Features/New/NewScreen.swift',
       'apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift',

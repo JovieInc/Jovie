@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
+const mockRequireAdmin = vi.hoisted(() => vi.fn());
+const mockVerifyCronRequest = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -38,6 +40,40 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
 
+vi.mock('@/lib/admin', () => ({
+  requireAdmin: mockRequireAdmin,
+}));
+
+vi.mock('@/lib/cron/auth', () => ({
+  extractBearerToken: (authHeader: string | null) => {
+    if (!authHeader) return undefined;
+    const spaceIndex = authHeader.indexOf(' ');
+    if (spaceIndex === -1) return undefined;
+    const scheme = authHeader.slice(0, spaceIndex);
+    if (scheme.toLowerCase() !== 'bearer') return undefined;
+    const token = authHeader.slice(spaceIndex + 1);
+    if (token.length === 0 || /\s/.test(token)) return undefined;
+    return token;
+  },
+  verifyCronRequest: mockVerifyCronRequest,
+}));
+
+function anonymousRequest() {
+  return new Request('https://jov.ie/api/billing/health');
+}
+
+function cronRequest() {
+  return new Request('https://jov.ie/api/billing/health', {
+    headers: { Authorization: 'Bearer test-cron-secret' },
+  });
+}
+
+function adminSessionRequest() {
+  return new Request('https://jov.ie/api/billing/health', {
+    headers: { cookie: 'better-auth.session_token=signed-session' },
+  });
+}
+
 function mockHealthQueries(queryResults: unknown[]) {
   let queryIndex = 0;
 
@@ -68,6 +104,10 @@ describe('GET /api/billing/health', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockVerifyCronRequest.mockReturnValue(null);
+    mockRequireAdmin.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    );
   });
 
   it('returns healthy status when all checks pass', async () => {
@@ -87,7 +127,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(cronRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -101,6 +141,31 @@ describe('GET /api/billing/health', () => {
     expect(data.metrics.lastBillingEventAt).toBe(
       lastBillingEventAt.toISOString()
     );
+  });
+
+  it('reports a fresh failed reconciliation instead of healthy sync', async () => {
+    const createdAt = new Date().toISOString();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt, metadata: { success: false } }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: createdAt }],
+    ]);
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(cronRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.healthy).toBe(false);
+    expect(data.checks.recentReconciliation.status).toBe('critical');
+    expect(data.metrics.lastReconciliationSuccess).toBe(false);
+    expect(data.metrics.lastReconciliationAt).toBe(createdAt);
   });
 
   it('serializes neon-http string timestamps without throwing', async () => {
@@ -120,7 +185,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(cronRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -150,7 +215,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(cronRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -176,7 +241,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(cronRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -201,7 +266,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(cronRequest());
     const data = await response.json();
 
     expect(response.status).toBe(503);
@@ -223,7 +288,7 @@ describe('GET /api/billing/health', () => {
     });
 
     const { GET } = await import('@/app/api/billing/health/route');
-    const response = await GET();
+    const response = await GET(cronRequest());
     const data = await response.json();
 
     expect(response.status).toBe(503);
@@ -237,5 +302,100 @@ describe('GET /api/billing/health', () => {
         route: '/api/billing/health',
       })
     );
+  });
+
+  it('returns only liveness for anonymous callers and skips Stripe and the database', async () => {
+    mockDbSelect.mockImplementation(() => {
+      throw new Error('Database connection failed');
+    });
+    mockStripeSubscriptionsList.mockRejectedValue(new Error('stripe down'));
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(anonymousRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      healthy: true,
+      timestamp: expect.any(String),
+    });
+    expect(Object.keys(data).toSorted()).toEqual(['healthy', 'timestamp']);
+    expect(data.checks).toBeUndefined();
+    expect(data.metrics).toBeUndefined();
+    expect(data.error).toBeUndefined();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockStripeSubscriptionsList).not.toHaveBeenCalled();
+    expect(mockRequireAdmin).not.toHaveBeenCalled();
+    expect(mockVerifyCronRequest).not.toHaveBeenCalled();
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
+    expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('does not reveal billing detail for a rejected cron bearer', async () => {
+    mockVerifyCronRequest.mockReturnValue(
+      new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    );
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(cronRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      healthy: true,
+      timestamp: expect.any(String),
+    });
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockStripeSubscriptionsList).not.toHaveBeenCalled();
+    expect(mockRequireAdmin).not.toHaveBeenCalled();
+    expect(mockVerifyCronRequest).toHaveBeenCalledWith(expect.any(Request), {
+      route: '/api/billing/health',
+    });
+  });
+
+  it('returns the full body for an admin session without a cron bearer', async () => {
+    mockVerifyCronRequest.mockReturnValue(
+      new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    );
+    mockRequireAdmin.mockResolvedValue(null);
+    const lastReconciliationAt = new Date();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: lastReconciliationAt }],
+      [{ count: 2 }],
+      [{ lastBillingEventAt: lastReconciliationAt }],
+    ]);
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(adminSessionRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.metrics.proUsersInDb).toBe(2);
+    expect(data.metrics.activeSubscriptionsInStripe).toBe(2);
+    expect(data.checks).toBeDefined();
+    expect(mockVerifyCronRequest).not.toHaveBeenCalled();
+    expect(mockRequireAdmin).toHaveBeenCalledOnce();
+    expect(mockStripeSubscriptionsList).toHaveBeenCalled();
+  });
+
+  it('does not run billing queries for a signed-in non-admin', async () => {
+    mockRequireAdmin.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    );
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(adminSessionRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(Object.keys(data).toSorted()).toEqual(['healthy', 'timestamp']);
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockStripeSubscriptionsList).not.toHaveBeenCalled();
   });
 });

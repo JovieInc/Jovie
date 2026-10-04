@@ -1447,7 +1447,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'design-governance-enforcement':
         'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
-      'ios-fast': 'pnpm run ios:lint',
+      'ios-fast': 'pnpm run ios:lint && pnpm run ios:app-store:test',
       'merge-group-guards':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
       'profile-admission':
@@ -1654,7 +1654,8 @@ describe('ci-fast bounded parallel workflow', () => {
         process.env.GITHUB_EVENT_NAME = previousEvent;
       }
     }
-  }, 30000);
+    // Runs three nested Vitest suites synchronously; a loaded Mac needs >30s.
+  }, 120_000);
 
   it('fails closed onto structural UI gates for every web UI source and guard', () => {
     const remaining = jobBlock(
