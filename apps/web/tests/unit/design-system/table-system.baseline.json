@@ -9,7 +9,6 @@
     "app/app/(shell)/admin/shipping/ShippingMatrix.tsx": 1,
     "app/app/(shell)/admin/shipping/ShippingStatistics.tsx": 1,
     "components/features/admin/ShippingVelocityCanvas.tsx": 1,
-    "components/features/admin/contacts-table/AdminContactsTable.tsx": 1,
     "components/features/admin/hud/FounderFunnelDrilldown.tsx": 1,
     "components/features/dev/NoirIonSpecimen.tsx": 1,
     "components/features/home/demo/DashboardAudienceDemo.tsx": 1,
