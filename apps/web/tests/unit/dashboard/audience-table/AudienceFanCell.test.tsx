@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { AudienceFanCell } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells';
+import { AudienceFanCell } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceFanCell';
 import type { AudienceMember } from '@/types';
 
 const baseMember: AudienceMember = {

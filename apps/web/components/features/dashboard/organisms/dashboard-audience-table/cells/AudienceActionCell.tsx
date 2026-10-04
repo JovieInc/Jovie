@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/audience-table/AudienceActionCell.test.tsx
+
 import { memo, useCallback } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableIconButton } from '@/components/organisms/table/atoms/TableIconButton';

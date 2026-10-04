@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/audience-table/AudienceFanCell.test.tsx
+
 import { memo } from 'react';
 import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import type { AudienceMember } from '@/types';

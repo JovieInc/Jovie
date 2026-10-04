@@ -1,9 +1,8 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AudienceTableStableProvider } from '@/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
-import { AudienceActionCell } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells';
+import { AudienceActionCell } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceActionCell';
 import type { AudienceMember } from '@/types';
 
 const baseMember: AudienceMember = {
@@ -52,9 +51,7 @@ function makeStableContext(
 }
 
 // The action is a canonical TableIconButton with a tooltip, as in the app shell.
-function render(ui: ReactElement) {
-  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
-}
+const withTooltips = { wrapper: TooltipProvider };
 
 describe('AudienceActionCell', () => {
   it('calls onSendNotification when clicked and reachable', () => {
@@ -63,7 +60,8 @@ describe('AudienceActionCell', () => {
     render(
       <AudienceTableStableProvider value={ctx}>
         <AudienceActionCell member={baseMember} />
-      </AudienceTableStableProvider>
+      </AudienceTableStableProvider>,
+      withTooltips
     );
     fireEvent.click(screen.getByRole('button'));
     expect(onSendNotification).toHaveBeenCalledWith(baseMember);
@@ -79,7 +77,8 @@ describe('AudienceActionCell', () => {
         <AudienceTableStableProvider value={ctx}>
           <AudienceActionCell member={baseMember} />
         </AudienceTableStableProvider>
-      </form>
+      </form>,
+      withTooltips
     );
     fireEvent.click(screen.getByRole('button', { name: /message/i }));
     expect(rowClick).not.toHaveBeenCalled();
@@ -92,7 +91,8 @@ describe('AudienceActionCell', () => {
         <AudienceActionCell
           member={{ ...baseMember, email: null, phone: null }}
         />
-      </AudienceTableStableProvider>
+      </AudienceTableStableProvider>,
+      withTooltips
     );
     expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
   });
@@ -110,7 +110,8 @@ describe('AudienceActionCell', () => {
             phone: null,
           }}
         />
-      </AudienceTableStableProvider>
+      </AudienceTableStableProvider>,
+      withTooltips
     );
     expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
   });
@@ -120,7 +121,8 @@ describe('AudienceActionCell', () => {
     render(
       <AudienceTableStableProvider value={ctx}>
         <AudienceActionCell member={baseMember} />
-      </AudienceTableStableProvider>
+      </AudienceTableStableProvider>,
+      withTooltips
     );
     expect(
       screen.getByRole('button', { name: 'Message Tim' }).className
