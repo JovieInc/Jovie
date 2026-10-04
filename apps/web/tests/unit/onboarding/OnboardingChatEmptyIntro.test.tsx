@@ -35,4 +35,61 @@ describe('OnboardingChatEmptyIntro', () => {
 
     expect(screen.getByTestId('onboarding-start-ambient-mark')).toBeTruthy();
   });
+
+  it('shows the real page behind a prebuilt handle instead of a blank prompt', () => {
+    render(
+      <OnboardingChatEmptyIntro
+        mode='handle_entry'
+        entryProfile={{
+          status: 'claimable',
+          handle: 'megaran',
+          displayName: 'Mega Ran',
+          avatarUrl: null,
+          spotifyId: null,
+          spotifyUrl: null,
+          genres: [],
+          socialLinks: ['https://instagram.com/megaran'],
+          linkPlatforms: ['instagram', 'twitch'],
+          linkCount: 8,
+        }}
+      />
+    );
+
+    expect(screen.getByText('Your Page Is Ready')).toBeTruthy();
+    expect(screen.getByText('Mega Ran')).toBeTruthy();
+    expect(screen.getByText('jov.ie/megaran')).toBeTruthy();
+    expect(screen.getByText('8 links')).toBeTruthy();
+    expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
+  });
+
+  it('tells the visitor a claimed handle is taken', () => {
+    render(
+      <OnboardingChatEmptyIntro
+        mode='handle_entry'
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+      />
+    );
+
+    expect(screen.getByText('This Page Is Taken')).toBeTruthy();
+    expect(
+      screen.getByTestId('onboarding-entry-profile').dataset.entryStatus
+    ).toBe('claimed');
+  });
+
+  it('invites an open handle without a profile card', () => {
+    render(
+      <OnboardingChatEmptyIntro
+        mode='handle_entry'
+        entryProfile={{ status: 'available', handle: 'newartist' }}
+      />
+    );
+
+    expect(screen.getByText('Claim jov.ie/newartist')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-entry-profile')).toBeNull();
+  });
 });
