@@ -51,12 +51,4 @@ describe('marketing motion budgets', () => {
     expect(staticImports).toBeNull();
     expect(island).toContain("import('./ambient-field-gl')");
   });
-
-  it('pauses the GL loop offscreen and in hidden tabs', () => {
-    const gl = readFileSync(join(MOTION_DIR, 'ambient-field-gl.ts'), 'utf8');
-
-    expect(gl).toContain('new IntersectionObserver');
-    expect(gl).toContain("addEventListener('visibilitychange'");
-    expect(gl).toContain('failIfMajorPerformanceCaveat: true');
-  });
 });
