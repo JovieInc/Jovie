@@ -159,7 +159,10 @@ export function createWorld(overrides = {}) {
           issues: {
             nodes: Object.values(world.issues)
               .filter(issue => variables.states.includes(issue.state))
-              .map(issue => ({ identifier: issue.identifier })),
+              .map(issue => ({
+                identifier: issue.identifier,
+                updatedAt: issue.updatedAt ?? '2026-10-03T12:00:00Z',
+              })),
             pageInfo: { hasNextPage: false, endCursor: null },
           },
         },

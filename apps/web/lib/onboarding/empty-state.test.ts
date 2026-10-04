@@ -7,7 +7,7 @@ import {
 
 describe('onboarding empty state copy', () => {
   it('keeps the blank entry concise and artist-specific', () => {
-    expect(ONBOARDING_ENTRY_TITLE).toBe('What Are You Working On?');
+    expect(ONBOARDING_ENTRY_TITLE).toBe('What are you working on?');
     expect(ONBOARDING_ENTRY_SUPPORT).toMatch(
       /artist name, Spotify link, or next release/i
     );
