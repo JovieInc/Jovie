@@ -227,7 +227,7 @@ export const COMMANDS: readonly Command[] = [
     'generateReleasePitch',
     'Generate pitch',
     'Draft a destination-aware release pitch in chat.',
-    'Music',
+    'Megaphone',
     [{ kind: 'release', required: true }]
   ),
   skill(
@@ -239,13 +239,13 @@ export const COMMANDS: readonly Command[] = [
   skill(
     'proposeSocialLink',
     'Add social link',
-    'Add a social profile URL to your artist profile.',
+    'Add a social profile URL to your profile.',
     'Link'
   ),
   skill(
     'proposeSocialLinkRemoval',
     'Remove social link',
-    'Remove a social link from your artist profile.',
+    'Remove a social link from your profile.',
     'Link2Off'
   ),
   skill(
@@ -263,9 +263,9 @@ export const COMMANDS: readonly Command[] = [
   ),
   nav(
     'go-presence',
-    'Presence',
-    'Monitor artist profiles, public pages, and search visibility.',
-    'Waypoints',
+    'Identity',
+    'Monitor your identity, public pages, and search presence.',
+    'User',
     APP_ROUTES.PRESENCE
   ),
   nav(
@@ -286,7 +286,7 @@ export const COMMANDS: readonly Command[] = [
     'go-releases',
     'Releases',
     'Manage your release catalog and smart links.',
-    'Music',
+    'Layers',
     APP_ROUTES.RELEASES
   ),
   nav(
@@ -306,7 +306,7 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-settings',
     'Settings',
-    'Account, billing, and artist settings.',
+    'Account, billing, and profile settings.',
     'Settings',
     APP_ROUTES.SETTINGS
   ),

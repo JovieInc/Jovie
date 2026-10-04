@@ -128,18 +128,28 @@ test('nightly launch agents are registered for prod and staging only', () => {
 test('closed nightly launches install immediately; visible windows wait', () => {
   expect(
     shouldInstallDownloadedUpdateNow({
+      workStateSafe: false,
+      nightlyLaunch: true,
+      hasVisibleWindow: false,
+    })
+  ).toBe(false);
+  expect(
+    shouldInstallDownloadedUpdateNow({
+      workStateSafe: true,
       nightlyLaunch: true,
       hasVisibleWindow: false,
     })
   ).toBe(true);
   expect(
     shouldInstallDownloadedUpdateNow({
+      workStateSafe: true,
       nightlyLaunch: true,
       hasVisibleWindow: true,
     })
   ).toBe(false);
   expect(
     shouldInstallDownloadedUpdateNow({
+      workStateSafe: true,
       nightlyLaunch: false,
       hasVisibleWindow: false,
     })
@@ -188,6 +198,7 @@ const idleOvernight = {
   systemIdleSeconds: IDLE_UPDATE_INSTALL_SECONDS,
   audible: false,
   hasUnsentInput: false,
+  workStateSafe: true,
 };
 
 test('a running app restarts into a downloaded update only overnight and idle', () => {
@@ -215,6 +226,7 @@ test('an idle restart never interrupts audio, drafts, or a missing download', ()
   for (const guard of [
     { audible: true },
     { hasUnsentInput: true },
+    { workStateSafe: false },
     { updateReadyToInstall: false },
   ]) {
     expect(

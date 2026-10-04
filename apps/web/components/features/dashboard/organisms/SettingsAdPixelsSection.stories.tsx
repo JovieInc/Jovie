@@ -50,6 +50,33 @@ const healthyStatus: PixelHealthData = {
   },
 };
 
+const inactiveStatus: PixelHealthData = {
+  platforms: {
+    facebook: {
+      status: 'inactive',
+      totalSent: 0,
+      totalFailed: 0,
+      lastSuccessAt: null,
+    },
+    google: {
+      status: 'inactive',
+      totalSent: 0,
+      totalFailed: 0,
+      lastSuccessAt: null,
+    },
+    tiktok: {
+      status: 'inactive',
+      totalSent: 0,
+      totalFailed: 0,
+      lastSuccessAt: null,
+    },
+  },
+  aggregate: {
+    totalEventsThisWeek: 0,
+    overallSuccessRate: 0,
+  },
+};
+
 function PixelsStoryShell({
   settings,
   health,
@@ -144,7 +171,7 @@ export const Empty: Story = {
           },
           hasTokens: { facebook: false, google: false, tiktok: false },
         }}
-        health={null}
+        health={inactiveStatus}
       >
         <Story />
       </PixelsStoryShell>
@@ -163,4 +190,14 @@ export const FreePlanGated: Story = {
       </PixelsStoryShell>
     ),
   ],
+};
+
+export const EmptyLight: Story = {
+  ...Empty,
+  parameters: { themes: { themeOverride: 'light' } },
+};
+
+export const ConfiguredLight: Story = {
+  ...Configured,
+  parameters: { themes: { themeOverride: 'light' } },
 };

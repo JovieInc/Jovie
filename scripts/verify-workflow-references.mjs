@@ -14,6 +14,44 @@ const FILTER_PATTERN = /--filter(?:=|\s+)([^\s;&|]+)/g;
 const IOS_SCRIPT_PATH_PATTERN =
   /(?:apps\/ios\/scripts|\.github\/scripts)\/[A-Za-z0-9._/-]+\.(?:mjs|js|ts|sh|cjs|rb)\b/g;
 
+const GH_COMMAND_PATTERN = /(?<![-\w./])gh\s+[a-z]/g;
+
+/**
+ * gh's --jq takes exactly one expression and has no --arg/--argjson; the real
+ * CLI rejects that form at runtime (#20164, JOV-7698). Scan each
+ * backslash-joined command from `gh` to the first unquoted pipe or separator.
+ */
+export function findGhJqArgMisuse(source) {
+  const lines = source.split(/\r?\n/);
+  const hits = [];
+  for (let start = 0; start < lines.length; start++) {
+    let end = start;
+    while (end < lines.length - 1 && /\\\s*$/.test(lines[end])) end++;
+    const command = lines.slice(start, end + 1).join(' ');
+    for (const match of command.matchAll(GH_COMMAND_PATTERN)) {
+      let quote = '';
+      let span = '';
+      for (const char of command.slice(match.index)) {
+        if (quote) {
+          if (char === quote) quote = '';
+        } else if (char === "'" || char === '"') quote = char;
+        else if ('|;&)'.includes(char)) break;
+        span += char;
+      }
+      const words = span.split(/\s+/);
+      if (
+        words.some(word => word === '--jq' || word.startsWith('--jq=')) &&
+        words.some(word => /^--arg(?:json)?$/.test(word))
+      ) {
+        hits.push(start + 1);
+        break;
+      }
+    }
+    start = end;
+  }
+  return hits;
+}
+
 function walkFiles(directory, predicate) {
   const result = [];
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -74,6 +112,12 @@ export function validateWorkflowReferences(root = process.cwd()) {
     const relativeWorkflow = path.relative(root, workflowFile);
     const source = fs.readFileSync(workflowFile, 'utf8');
     const lines = source.split(/\r?\n/);
+
+    for (const line of findGhJqArgMisuse(source)) {
+      errors.push(
+        `${relativeWorkflow}:${line}: gh --jq cannot take --arg/--argjson; filter server-side or pipe to jq`
+      );
+    }
 
     for (const [index, line] of lines.entries()) {
       const localAction = line.match(/\buses:\s*(['"]?)(\.\/[^\s#'"}]+)\1/);

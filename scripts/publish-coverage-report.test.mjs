@@ -71,7 +71,8 @@ function fixture(t, nightly = false) {
   const calls = [];
   const gh = args => {
     calls.push(args);
-    if (args[0] === 'pr') {
+    if (args[0] === 'pr' && args[1] === 'list') return '[]';
+    if (args[0] === 'pr' && args[1] === 'create') {
       const body = readFileSync(args[args.indexOf('--body-file') + 1], 'utf8');
       assert.ok(body.includes(source));
       assert.ok(body.includes('/actions/runs/12345/attempts/1'));
@@ -125,6 +126,10 @@ test('nightly evidence uses the existing exact-source draft publication with pro
   writeFileSync(join(f.cwd, lastRun), '{"status":"fail"}\n');
   const result = publishNightlyReport(f);
   assert.equal(result.status, 'published');
+  assert.equal(
+    f.calls.some(args => args[0] === 'pr' && args[1] === 'list'),
+    true
+  );
   assert.equal(result.branch, 'bot/nightly-evidence-12345-1');
   assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
   assert.equal(f.git('rev-parse', 'origin/main'), f.source);
@@ -162,15 +167,20 @@ test('the actual nightly publication step succeeds with main protected', t => {
     'Nightly failed; evidence retained\n'
   );
   mkdirSync(join(f.cwd, 'scripts/lib'), { recursive: true });
-  writeFileSync(
-    join(f.cwd, 'scripts/lib/publish-coverage-report.mjs'),
-    readFileSync(new URL('./lib/publish-coverage-report.mjs', import.meta.url))
-  );
+  for (const lib of [
+    'publish-coverage-report.mjs',
+    'retire-coverage-reports.mjs',
+  ]) {
+    writeFileSync(
+      join(f.cwd, `scripts/lib/${lib}`),
+      readFileSync(new URL(`./lib/${lib}`, import.meta.url))
+    );
+  }
   const bin = join(f.root, 'bin');
   mkdirSync(bin);
   writeFileSync(
     join(bin, 'gh'),
-    `#!/bin/sh\nif [ "$1" = pr ]; then echo '${url}'; fi\n`,
+    `#!/bin/sh\nif [ "$2" = create ]; then echo '${url}'; elif [ "$2" = list ]; then echo '[]'; fi\n`,
     { mode: 0o755 }
   );
   const workflow =
@@ -292,10 +302,131 @@ test('uses the real gh command adapter and supports runners without a summary fi
   mkdirSync(bin);
   writeFileSync(
     join(bin, 'gh'),
-    `#!/bin/sh\nif [ "$1" = pr ]; then echo '${url}'; fi\n`,
+    `#!/bin/sh\nif [ "$2" = create ]; then echo '${url}'; elif [ "$2" = list ]; then echo '[]'; fi\n`,
     { mode: 0o755 }
   );
   const env = { ...f.env, PATH: `${bin}:${process.env.PATH}` };
   delete env.GITHUB_STEP_SUMMARY;
   assert.equal(publishCoverageReport({ cwd: f.cwd, env }).url, url);
+});
+
+test('real publication retires an ancestor report but preserves divergent measured source', t => {
+  const f = fixture(t);
+  f.change();
+  const divergent = f.git(
+    'commit-tree',
+    f.git('rev-parse', 'HEAD^{tree}'),
+    '-m',
+    'other source'
+  );
+  const body = `Measured source: \`${f.source}\`.`;
+  const prior = {
+    number: 1,
+    isDraft: true,
+    labels: [],
+    headRefName: 'bot/coverage-audit-1-1',
+    body,
+  };
+  const remotePr = {
+    state: 'open',
+    draft: true,
+    labels: [],
+    base: { ref: 'main' },
+    body,
+    title: 'chore(testing): refresh changed-evidence heatmap',
+    head: {
+      ref: prior.headRefName,
+      sha: 'c'.repeat(40),
+      repo: { full_name: f.env.GITHUB_REPOSITORY },
+    },
+  };
+  const closes = [];
+  const gh = args => {
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      assert.deepEqual(args.slice(-2), ['--add-label', 'duplicate']);
+      remotePr.labels = [{ name: 'duplicate' }];
+      return '';
+    }
+    if (args[0] === 'pr' && args[1] === 'list')
+      return JSON.stringify([
+        prior,
+        { ...prior, number: 2, body: `Measured source: \`${divergent}\`.` },
+      ]);
+    if (args[0] === 'pr' && args[1] === 'close') {
+      closes.push(args[2]);
+      return '';
+    }
+    if (args.includes('--paginate')) return `${heatmap}\n${snapshot}`;
+    if (args[0] === 'api' && args[1].includes('/git/commits/'))
+      return JSON.stringify({ parents: [{ sha: f.source }] });
+    if (args[0] === 'api') return JSON.stringify(remotePr);
+    return f.gh(args);
+  };
+  assert.equal(publishCoverageReport({ ...f, gh }).url, url);
+  assert.deepEqual(closes, ['1']);
+  assert.match(
+    readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8'),
+    /Retired reports: 1/
+  );
+});
+
+test('actual nightly publisher retires matching nightly evidence while retaining coverage reports', t => {
+  const f = fixture(t, true);
+  writeFileSync(
+    join(f.cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
+    'replacement evidence\n'
+  );
+  const nightly = {
+    number: 1,
+    headRefName: 'bot/nightly-evidence-111-1',
+    isDraft: true,
+    labels: [],
+    body: `Measured source: \`${f.source}\`.`,
+  };
+  const coverage = {
+    ...nightly,
+    number: 2,
+    headRefName: 'bot/coverage-audit-112-1',
+  };
+  const metadata = {
+    state: 'open',
+    draft: true,
+    labels: [],
+    base: { ref: 'main' },
+    title: 'chore(testing): refresh nightly testing evidence',
+    body: nightly.body,
+    head: {
+      ref: nightly.headRefName,
+      sha: 'c'.repeat(40),
+      repo: { full_name: f.env.GITHUB_REPOSITORY },
+    },
+  };
+  const closed = [];
+  const gh = args => {
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      assert.deepEqual(args.slice(-2), ['--add-label', 'duplicate']);
+      metadata.labels = [{ name: 'duplicate' }];
+      return '';
+    }
+    if (args[0] === 'pr' && args[1] === 'list')
+      return JSON.stringify([coverage, nightly]);
+    if (args[0] === 'pr' && args[1] === 'close') {
+      closed.push(Number(args[2]));
+      return '';
+    }
+    if (args[0] === 'api') {
+      assert.ok(
+        !args.some(arg => /pulls\/2(?:\/|$)/.test(arg)),
+        'coverage reports must never reach nightly retirement reads'
+      );
+      if (args.includes('--paginate'))
+        return 'docs/NIGHTLY_TESTING_AGENT_REPORT.md\napps/web/reports/nightly-agent/last-run.json';
+      if (args[1].includes('/git/commits/'))
+        return JSON.stringify({ parents: [{ sha: f.source }] });
+      return JSON.stringify(metadata);
+    }
+    return f.gh(args);
+  };
+  assert.equal(publishNightlyReport({ ...f, gh }).status, 'published');
+  assert.deepEqual(closed, [1]);
 });

@@ -485,18 +485,6 @@
   background: var(--system-b-app-content-surface);
 }
 
-:where(.system-b-chat-profile-preview-phone-notch) {
-  width: var(--space-10);
-  height: var(--space-1-5);
-  margin: var(--space-2) auto 0;
-  border-radius: var(--radius-full);
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 28%,
-    transparent
-  );
-}
-
 :where(.system-b-chat-profile-preview-phone-card) {
   overflow: hidden;
   margin: var(--space-5) var(--space-3) 0;
@@ -671,6 +659,16 @@
   /* Skeleton / loading — reserved geometry; color only */
   --color-skeleton-base: #1b1d22;
   --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
+}
+
+/* A selected row mode owns the same geometry during loading and after data arrives. */
+[data-table-row-mode] tbody > .system-b-table-row-height {
+  height: var(--table-row-height);
+}
+
+[data-table-row-mode] [data-table-cell-content="stable"] {
+  height: var(--table-cell-content-height);
+  max-height: var(--table-cell-content-height);
 }
 
 :where(.system-b-table-row-height) {

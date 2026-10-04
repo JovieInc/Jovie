@@ -33,6 +33,9 @@ export {
   INSPECTOR_TAB_OPTIONS,
   type InspectorTabId,
   LIBRARY_INSPECTOR_TABS,
+  WORK_INSPECTOR_TAB_IDS,
+  WORK_INSPECTOR_TABS,
+  type WorkInspectorTabId,
 } from './inspector-tabs';
 export {
   OverflowMenu,

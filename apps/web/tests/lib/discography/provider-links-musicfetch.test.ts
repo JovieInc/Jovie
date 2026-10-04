@@ -35,6 +35,7 @@ import {
   resolveProviderLinks,
   type TrackDescriptor,
 } from '@/lib/discography/provider-links';
+import { resetMusicfetchDormantForTests } from '@/lib/music-resolver/musicfetch-gate';
 
 const baseTrack: TrackDescriptor = {
   title: 'Blinding Lights',
@@ -46,6 +47,8 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
+    resetMusicfetchDormantForTests();
+    delete process.env.FEATURE_IN_HOUSE_RESOLVER;
     vi.clearAllMocks();
     fetchMock.mockReset();
     mockIsMusicfetchAvailable.mockReturnValue(true);

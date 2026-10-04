@@ -322,16 +322,13 @@ export function dogfoodReceiptFromPlaywrightReport(
   timing?: { readonly startedAt?: string; readonly completedAt?: string }
 ): DogfoodReceipt {
   const stats = report.stats ?? {};
-  const attempted =
-    (stats.expected ?? 0) +
-    (stats.unexpected ?? 0) +
-    (stats.flaky ?? 0) +
-    (stats.skipped ?? 0);
+  const executed =
+    (stats.expected ?? 0) + (stats.unexpected ?? 0) + (stats.flaky ?? 0);
   const unexpected = stats.unexpected ?? 0;
 
   let outcome: DogfoodOutcome;
   let blocker: string | null = null;
-  if (attempted === 0) {
+  if (executed === 0) {
     outcome = 'blocked';
     blocker = 'playwright mission ran no tests';
   } else if (unexpected > 0) {

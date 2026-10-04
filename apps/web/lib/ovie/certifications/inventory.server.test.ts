@@ -30,6 +30,9 @@ import type { CertificationPacketFile } from './packet-files.server';
 vi.mock('@/lib/agent-os/certification-runtime-store', () => ({
   getMarketingCertificationStore: vi.fn(),
 }));
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  getAcquisitionEligibility: vi.fn(),
+}));
 vi.mock('@/lib/ovie/mcp/postgres-backend', () => ({
   postgresRecordBackend: vi.fn(),
 }));
@@ -425,8 +428,12 @@ function customerStoreHarness() {
 }
 
 function customerDeps(
-  harness: ReturnType<typeof customerStoreHarness>
-): Pick<OvieCertificationInventoryDeps, 'customers'> {
+  harness: ReturnType<typeof customerStoreHarness>,
+  eligible = true
+): Pick<
+  OvieCertificationInventoryDeps,
+  'customers' | 'acquisitionEligibility'
+> {
   const candidate: CustomerCertificationCandidateRef = {
     subjectId: CUSTOMER_SUBJECT,
     revision: 'domain-revision-1',
@@ -437,6 +444,22 @@ function customerDeps(
     updatedAt: '2026-09-12T21:30:00.000Z',
   };
   return {
+    acquisitionEligibility: async () =>
+      eligible
+        ? { eligible: true, verdict: 'ELIGIBLE', firstBlocker: null }
+        : {
+            eligible: false,
+            verdict: 'BLOCKED',
+            firstBlocker: {
+              id: 'payment_entitlement',
+              label: 'Verified payment',
+              status: 'red',
+              owner: 'billing',
+              nextAction: 'Fix the Golden Path lane.',
+              explanation: 'red',
+              evidence: [],
+            },
+          },
     customers: {
       list: async () => [candidate],
       store: () => harness.store,
@@ -481,6 +504,28 @@ describe('customers certification domain', () => {
     );
     expect(card?.subject.id).toBe(CUSTOMER_SUBJECT);
     expect(card?.decisionEvidenceDigest).toBe(row?.decision.evidenceDigest);
+  });
+
+  it('holds prospects out of the founder queue while ACQUISITION_ELIGIBLE is false', async () => {
+    const h = customerStoreHarness();
+    const d = deps([packetFile('signup')]);
+    const inventory = await readOvieCertificationInventory(
+      { ...d, ...customerDeps(h, false) },
+      FIXTURE_NOW
+    );
+    expect(
+      inventory.queue.needsYou.some(item => item.domain === 'customers')
+    ).toBe(false);
+    const held = inventory.queue.blocked.find(
+      item => item.domain === 'customers'
+    );
+    expect(held?.heldForMachineEvidence).toBe(true);
+    expect(held?.blockers.map(blocker => blocker.code)).toContain(
+      'machine_evidence_failed'
+    );
+    expect(held?.blockers.at(-1)?.summary).toContain(
+      'first blocker payment_entitlement is red'
+    );
   });
 
   it('lands the same store receipt whether approved via card or table path', async () => {

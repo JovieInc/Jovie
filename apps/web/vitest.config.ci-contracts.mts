@@ -18,5 +18,9 @@ export default {
     // Scope the config so browser-dependent suites cannot run under it.
     include: ['tests/unit/ci/**/*.test.ts'],
     projects: undefined,
+    // Contract tests spawn git/tar/node; on a loaded, disk-bound Mac a single
+    // archive pass took 10s (JOV-7707), so the 5s unit budget timed out green
+    // contracts in the pre-push structural lane.
+    testTimeout: 30_000,
   },
 };

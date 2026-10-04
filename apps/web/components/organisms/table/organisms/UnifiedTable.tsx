@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.sorting.test.tsx
+// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.column-priority.test.tsx
 
 import { Spinner as LoadingSpinner } from '@jovie/ui';
 import React, {
@@ -27,13 +27,27 @@ import {
   type VisibilityState,
 } from '@/lib/tanstack-table';
 import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
+import { ColumnSnapMotion } from '../ColumnSnapMotion';
+import { columnPrioritySpecsFromDefs, readColumnId } from '../column-priority';
+import {
+  type ColumnCompactItem,
+  ColumnCompactProvider,
+} from '../column-priority-context';
+import { useColumnPriorityLayout } from '../hooks/useColumnPriorityLayout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
 import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '../molecules/TableContextMenu';
-import { cn, iconColors, zIndex } from '../table.styles';
+import {
+  cn,
+  iconColors,
+  TABLE_ROW_MODES,
+  type TableRowMode,
+  tableRowModeStyle,
+  zIndex,
+} from '../table.styles';
 import { useTableGrouping } from '../utils/useTableGrouping';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 import { useTableKeyboardNav } from './useTableKeyboardNav';
@@ -93,6 +107,8 @@ export interface UnifiedTableProps<TData extends RowData> {
    * @default 40
    */
   readonly rowHeight?: number;
+  /** Fixed geometry for content, loading rows, and virtualization. */
+  readonly rowMode?: TableRowMode;
 
   /**
    * Number of rows to render above/below viewport
@@ -264,6 +280,14 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
   /**
+   * Layout-snap columns when they appear or disappear.
+   * Short, interruptible, and skipped when the user prefers reduced motion.
+   * Dense admin tables pass false.
+   * @default true
+   */
+  readonly columnSnap?: boolean;
+
+  /**
    * Whether there are more pages to load (infinite scroll)
    */
   readonly hasNextPage?: boolean;
@@ -396,7 +420,7 @@ function HiddenHeaderSortStatus({
  * />
  * ```
  */
-export function UnifiedTable<TData extends RowData>({
+function UnifiedTableContent<TData extends RowData>({
   data,
   columns,
   isLoading = false,
@@ -407,6 +431,7 @@ export function UnifiedTable<TData extends RowData>({
   onSortingChange,
   enableVirtualization,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowMode,
   overscan = 5,
   renderRow,
   getRowId,
@@ -437,6 +462,7 @@ export function UnifiedTable<TData extends RowData>({
   enablePinning = false,
   columnVisibility,
   onColumnVisibilityChange,
+  columnSnap = true,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -446,6 +472,12 @@ export function UnifiedTable<TData extends RowData>({
   renderExpandedContent,
   getExpandableRowId,
 }: UnifiedTableProps<TData>) {
+  // Cell identity follows the table option. The provider disables layout
+  // animation for reduced motion without remounting cells after hydration.
+  const snapColumns = columnSnap;
+  const resolvedRowHeight = rowMode
+    ? TABLE_ROW_MODES[rowMode].rowHeight
+    : rowHeight;
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [rowRefs] = useState(() => new Map<number, HTMLTableRowElement>());
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
@@ -457,6 +489,56 @@ export function UnifiedTable<TData extends RowData>({
     },
     [setScrollRoot]
   );
+
+  // Columns that declare a priority lay themselves out from this container.
+  // A caller can hide more columns. Priority only hides; it does not force a
+  // column back on. Audience still passes its shell measurement so the
+  // historical floors stay put before this container is measured.
+  const prioritySpecs = useMemo(
+    () => columnPrioritySpecsFromDefs(columns),
+    [columns]
+  );
+  const hasColumnPriority = prioritySpecs.some(
+    column => column.priority != null
+  );
+  const autoLayout = useColumnPriorityLayout(
+    prioritySpecs,
+    hasColumnPriority ? scrollRoot : null
+  );
+  const effectiveColumnVisibility = useMemo(() => {
+    if (!hasColumnPriority) return columnVisibility;
+    if (columnVisibility == null && autoLayout.hiddenIds.length === 0) {
+      return autoLayout.visibility;
+    }
+    const merged: VisibilityState = { ...(columnVisibility ?? {}) };
+    for (const id of autoLayout.hiddenIds) merged[id] = false;
+    return merged;
+  }, [
+    autoLayout.hiddenIds,
+    autoLayout.visibility,
+    columnVisibility,
+    hasColumnPriority,
+  ]);
+  const columnCompacts = useMemo(() => {
+    const primaryColumn = columns.find(column => column.meta?.primary === true);
+    const primaryId = primaryColumn
+      ? readColumnId(primaryColumn as { id?: string; accessorKey?: unknown })
+      : null;
+    const items: ColumnCompactItem[] = [];
+    if (!primaryId) return { primaryId, items };
+    for (const column of columns) {
+      const id = readColumnId(column as { id?: string; accessorKey?: unknown });
+      const compact = column.meta?.compact;
+      if (!id || !compact || effectiveColumnVisibility?.[id] !== false) {
+        continue;
+      }
+      items.push({
+        id,
+        render: compact as ColumnCompactItem['render'],
+      });
+    }
+    return { primaryId, items };
+  }, [columns, effectiveColumnVisibility]);
 
   // Internal focused row state (uncontrolled mode)
   // Roving tabindex needs a deterministic first stop. Focus-visible styling
@@ -503,10 +585,17 @@ export function UnifiedTable<TData extends RowData>({
     if (sorting !== undefined) state.sorting = sorting;
     if (globalFilter !== undefined) state.globalFilter = globalFilter;
     if (columnPinning !== undefined) state.columnPinning = columnPinning;
-    if (columnVisibility !== undefined)
-      state.columnVisibility = columnVisibility;
+    if (effectiveColumnVisibility !== undefined) {
+      state.columnVisibility = effectiveColumnVisibility;
+    }
     return state;
-  }, [rowSelection, sorting, globalFilter, columnPinning, columnVisibility]);
+  }, [
+    rowSelection,
+    sorting,
+    globalFilter,
+    columnPinning,
+    effectiveColumnVisibility,
+  ]);
 
   const table = useReactTable({
     data,
@@ -563,7 +652,7 @@ export function UnifiedTable<TData extends RowData>({
   } = useTableVirtualization({
     rowCount: rows.length,
     scrollElementRef: tableContainerRef,
-    estimatedRowHeight: rowHeight,
+    estimatedRowHeight: resolvedRowHeight,
     overscan,
     enabled: shouldVirtualize,
   });
@@ -616,6 +705,8 @@ export function UnifiedTable<TData extends RowData>({
           getRowClassName={getRowClassName}
           getRowTestId={getRowTestId}
           onRowShiftClick={onRowShiftClick}
+          columnSnap={snapColumns}
+          columnSnapOrder={index}
         />
       );
 
@@ -682,6 +773,7 @@ export function UnifiedTable<TData extends RowData>({
       contextMenuSearchPlaceholder,
       contextMenuSearchMode,
       rowRefs,
+      snapColumns,
     ]
   );
 
@@ -735,7 +827,7 @@ export function UnifiedTable<TData extends RowData>({
     // → populated transitions do not shift layout (JOV-4869).
     const loadingRowCount = Math.max(
       skeletonRows,
-      Math.ceil(TABLE_EMPTY_STATE_MIN_HEIGHT_PX / rowHeight)
+      Math.ceil(TABLE_EMPTY_STATE_MIN_HEIGHT_PX / resolvedRowHeight)
     );
     return (
       <div
@@ -743,18 +835,25 @@ export function UnifiedTable<TData extends RowData>({
         className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
-        <table className={tableClassName} style={{ minWidth }}>
+        <table
+          className={tableClassName}
+          data-table-row-mode={rowMode}
+          style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+        >
           <caption className='sr-only'>
             {caption ?? 'Loading table data'}
           </caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <LoadingTableBody
             rows={loadingRowCount}
             columns={columnCount}
             columnConfig={skeletonColumnConfig}
-            rowHeight={`${rowHeight}px`}
+            rowHeight={`${resolvedRowHeight}px`}
           />
         </table>
       </div>
@@ -769,10 +868,17 @@ export function UnifiedTable<TData extends RowData>({
         className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
-        <table className={tableClassName} style={{ minWidth }}>
+        <table
+          className={tableClassName}
+          data-table-row-mode={rowMode}
+          style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+        >
           <caption className='sr-only'>{caption ?? 'Empty table'}</caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <tbody>
             <tr>
@@ -789,98 +895,127 @@ export function UnifiedTable<TData extends RowData>({
   // Render grouped table if grouping is enabled
   if (groupingConfig && groupedData.length > 0) {
     return (
-      <div
-        ref={setTableContainerRef}
-        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
-      >
-        {sortStatusNode}
-        <table className={tableClassName} style={{ minWidth }}>
-          <caption className='sr-only'>
-            {caption ?? 'Grouped table data'}
-          </caption>
-          {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
-          )}
-          <GroupedTableBody
-            groupedData={groupedData}
-            observeGroupHeader={observeGroupHeader}
-            visibleGroupIndex={visibleGroupIndex}
-            columns={columns.length}
-            renderRow={renderGroupedRow}
-          />
-        </table>
-      </div>
+      <ColumnCompactProvider value={columnCompacts}>
+        <div
+          ref={setTableContainerRef}
+          className={cn('w-full min-w-0 overflow-auto', containerClassName)}
+        >
+          {sortStatusNode}
+          <table
+            className={tableClassName}
+            data-table-row-mode={rowMode}
+            style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+          >
+            <caption className='sr-only'>
+              {caption ?? 'Grouped table data'}
+            </caption>
+            {!hideHeader && (
+              <UnifiedTableHeader
+                headerGroups={table.getHeaderGroups()}
+                columnSnap={snapColumns}
+              />
+            )}
+            <GroupedTableBody
+              groupedData={groupedData}
+              observeGroupHeader={observeGroupHeader}
+              visibleGroupIndex={visibleGroupIndex}
+              columns={columns.length}
+              renderRow={renderGroupedRow}
+            />
+          </table>
+        </div>
+      </ColumnCompactProvider>
     );
   }
 
   // Render table with data
   return (
-    <div
-      ref={setTableContainerRef}
-      className={cn('w-full min-w-0 overflow-auto', containerClassName)}
-    >
-      {sortStatusNode}
-      <table className={tableClassName} style={{ minWidth }}>
-        <caption className='sr-only'>{caption ?? 'Data table'}</caption>
-        {!hideHeader && (
-          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
-        )}
-        <VirtualizedTableBody
-          rows={rows}
-          columnVisibility={resolvedColumnVisibility}
-          shouldVirtualize={shouldVirtualize}
-          virtualRows={virtualRows}
-          paddingTop={paddingTop}
-          paddingBottom={paddingBottom}
-          rowVirtualizer={rowVirtualizer}
-          rowRefsMap={rowRefs}
-          shouldEnableKeyboardNav={shouldEnableKeyboardNav}
-          focusedIndex={focusedIndex}
-          onFocusChange={setFocusedIndex}
-          onRowClick={onRowClick}
-          onRowContextMenu={onRowContextMenu}
-          onKeyDown={handleKeyDown}
-          getContextMenuItems={getContextMenuItems}
-          contextMenuSearchable={contextMenuSearchable}
-          contextMenuSearchPlaceholder={contextMenuSearchPlaceholder}
-          contextMenuSearchMode={contextMenuSearchMode}
-          onRowShiftClick={onRowShiftClick}
-          getRowClassName={getRowClassName}
-          isRowSelected={isRowSelected}
-          getRowTestId={getRowTestId}
-          renderRow={renderRow}
-          getRowId={getRowId}
-          expandedRowIds={expandedRowIds}
-          renderExpandedContent={renderExpandedContent}
-          getExpandableRowId={getExpandableRowId}
-          columnCount={columnCount}
-        />
-        {/* Infinite scroll sentinel + loading indicator */}
-        {onLoadMore && (
-          <tbody>
-            <tr ref={sentinelRef}>
-              <td style={{ height: 1, padding: 0, border: 'none' }} />
-            </tr>
-            {isFetchingNextPage && (
-              <tr>
-                <td
-                  colSpan={columnCount}
-                  className='py-1.5 text-center text-2xs text-tertiary-token'
-                >
-                  <span className='inline-flex items-center gap-1.5'>
-                    <LoadingSpinner
-                      size='sm'
-                      tone='muted'
-                      label='Loading More'
-                    />
-                    {' Loading more...'}
-                  </span>
-                </td>
+    <ColumnCompactProvider value={columnCompacts}>
+      <div
+        ref={setTableContainerRef}
+        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
+      >
+        {sortStatusNode}
+        <table
+          className={tableClassName}
+          data-table-row-mode={rowMode}
+          style={{ minWidth, ...tableRowModeStyle(rowMode) }}
+        >
+          <caption className='sr-only'>{caption ?? 'Data table'}</caption>
+          {!hideHeader && (
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
+          )}
+          <VirtualizedTableBody
+            rows={rows}
+            columnVisibility={resolvedColumnVisibility}
+            shouldVirtualize={shouldVirtualize}
+            virtualRows={virtualRows}
+            paddingTop={paddingTop}
+            paddingBottom={paddingBottom}
+            rowVirtualizer={rowVirtualizer}
+            rowRefsMap={rowRefs}
+            shouldEnableKeyboardNav={shouldEnableKeyboardNav}
+            focusedIndex={focusedIndex}
+            onFocusChange={setFocusedIndex}
+            onRowClick={onRowClick}
+            onRowContextMenu={onRowContextMenu}
+            onKeyDown={handleKeyDown}
+            getContextMenuItems={getContextMenuItems}
+            contextMenuSearchable={contextMenuSearchable}
+            contextMenuSearchPlaceholder={contextMenuSearchPlaceholder}
+            contextMenuSearchMode={contextMenuSearchMode}
+            onRowShiftClick={onRowShiftClick}
+            getRowClassName={getRowClassName}
+            isRowSelected={isRowSelected}
+            getRowTestId={getRowTestId}
+            renderRow={renderRow}
+            getRowId={getRowId}
+            expandedRowIds={expandedRowIds}
+            renderExpandedContent={renderExpandedContent}
+            getExpandableRowId={getExpandableRowId}
+            columnCount={columnCount}
+            columnSnap={snapColumns}
+          />
+          {/* Infinite scroll sentinel + loading indicator */}
+          {onLoadMore && (
+            <tbody>
+              <tr ref={sentinelRef}>
+                <td style={{ height: 1, padding: 0, border: 'none' }} />
               </tr>
-            )}
-          </tbody>
-        )}
-      </table>
-    </div>
+              {isFetchingNextPage && (
+                <tr>
+                  <td
+                    colSpan={columnCount}
+                    className='py-1.5 text-center text-2xs text-tertiary-token'
+                  >
+                    <span className='inline-flex items-center gap-1.5'>
+                      <LoadingSpinner
+                        size='sm'
+                        tone='muted'
+                        label='Loading More'
+                      />
+                      {' Loading more...'}
+                    </span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          )}
+        </table>
+      </div>
+    </ColumnCompactProvider>
+  );
+}
+
+export function UnifiedTable<TData extends RowData>(
+  props: UnifiedTableProps<TData>
+) {
+  return (
+    <ColumnSnapMotion enabled={props.columnSnap ?? true}>
+      <UnifiedTableContent {...props} />
+    </ColumnSnapMotion>
   );
 }

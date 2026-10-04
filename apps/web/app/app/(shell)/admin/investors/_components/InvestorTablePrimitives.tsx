@@ -20,7 +20,10 @@ export function InvestorTable({
 }>) {
   return (
     <div className='w-full min-w-0 overflow-x-auto'>
-      <TableRoot className={cn('w-full border-collapse text-app', minWidth)}>
+      <TableRoot
+        rowMode='two-line'
+        className={cn('w-full border-collapse text-app', minWidth)}
+      >
         {children}
       </TableRoot>
     </div>
@@ -89,14 +92,17 @@ export function InvestorTableCell({
   children,
   align = 'left',
   className,
+  multiline = false,
 }: Readonly<{
   children: ReactNode;
   align?: 'left' | 'right';
   className?: string;
+  multiline?: boolean;
 }>) {
   return (
     <TableCell
       align={align}
+      multiline={multiline}
       className={cn('px-3 py-1 align-middle', className)}
     >
       {children}

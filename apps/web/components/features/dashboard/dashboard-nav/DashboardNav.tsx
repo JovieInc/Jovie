@@ -15,6 +15,7 @@ import {
   useSidebar,
 } from '@/components/organisms/sidebar';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
+import { SHELL_RAIL_BLOCK_LABEL } from '@/components/shell/rail-motion';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -68,7 +69,10 @@ interface PendingNavigationRecord {
 const PENDING_NAVIGATION_MIN_VISIBLE_MS = 400;
 const PENDING_NAVIGATION_RECOVERY_MS = NAVIGATION_DROP_OFF_MS;
 
-export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
+export function DashboardNav({
+  children: searchSurface,
+  headerOwnsInbox = false,
+}: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const runtimeUpdate = useRuntimeUpdate();
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
@@ -106,6 +110,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     [isElectron, isMobile]
   );
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
+
   const threadsVisible =
     !isDemo &&
     !isInSettings &&
@@ -187,6 +192,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     },
     []
   );
+
+  // Connectivity loss can retain the source URL. Clear its acknowledgment
+  // immediately; the existing per-navigation recovery timer remains bounded.
+  useEffect(() => {
+    if (!pendingNavigation) return;
+    const clearAcknowledgment = () => setPendingNavigation(null);
+    globalThis.addEventListener('offline', clearAcknowledgment);
+    return () => globalThis.removeEventListener('offline', clearAcknowledgment);
+  }, [pendingNavigation]);
 
   useEffect(() => {
     if (
@@ -432,56 +446,70 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           <SidebarGroup className='p-0'>
             <div
               data-sidebar-search-slot='true'
-              className='mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5 group-data-[collapsible=icon]:hidden'
+              className={cn(
+                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5',
+                // Rail-motion staged exit (JOV-4522): the pill collapses
+                // vertically with a fade instead of snapping to display:none.
+                SHELL_RAIL_BLOCK_LABEL,
+                'max-h-9'
+              )}
             >
               {searchSurface}
-              <span aria-hidden='true' className='h-4 w-px bg-subtle' />
-              <Link
-                href={APP_ROUTES.DASHBOARD}
-                onClick={event => handleCommandClick(event, inboxNavItem)}
-                prefetch={!isDemo}
-                aria-busy={
-                  pendingNavigation?.itemId === inboxNavItem.id || undefined
-                }
-                aria-label={
-                  hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
-                }
-                data-inbox-attention={
-                  hasRuntimeUpdate
-                    ? 'available'
-                    : (inboxNavigation?.state ?? 'unknown')
-                }
-                data-navigation-item-id={inboxNavItem.id}
-                data-navigation-pending={
-                  pendingNavigation?.itemId === inboxNavItem.id || undefined
-                }
-                className={cn(
-                  'relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden',
-                  pendingNavigation?.itemId === inboxNavItem.id &&
-                    'bg-sidebar-accent-active text-primary-token'
-                )}
-              >
-                <Bell
-                  className='size-(--app-shell-sidebar-icon-size)'
+              {searchSurface ? (
+                <span
                   aria-hidden='true'
+                  data-sidebar-search-divider
+                  className='h-4 w-px bg-subtle'
                 />
-                {inboxNavigation?.state === 'available' &&
-                (inboxNavigation.pendingCount ?? 0) > 0 ? (
-                  <span
-                    role='status'
-                    aria-label={`${inboxNavigation.pendingCount} pending items`}
-                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
-                  >
-                    {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
-                  </span>
-                ) : hasRuntimeUpdate ? (
-                  <span
+              ) : null}
+              {headerOwnsInbox ? null : (
+                <Link
+                  href={APP_ROUTES.DASHBOARD}
+                  onClick={event => handleCommandClick(event, inboxNavItem)}
+                  prefetch={!isDemo}
+                  aria-busy={
+                    pendingNavigation?.itemId === inboxNavItem.id || undefined
+                  }
+                  aria-label={
+                    hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
+                  }
+                  data-inbox-attention={
+                    hasRuntimeUpdate
+                      ? 'available'
+                      : (inboxNavigation?.state ?? 'unknown')
+                  }
+                  data-navigation-item-id={inboxNavItem.id}
+                  data-navigation-pending={
+                    pendingNavigation?.itemId === inboxNavItem.id || undefined
+                  }
+                  className={cn(
+                    'relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden',
+                    pendingNavigation?.itemId === inboxNavItem.id &&
+                      'bg-sidebar-accent-active text-primary-token'
+                  )}
+                >
+                  <Bell
+                    className='size-(--app-shell-sidebar-icon-size)'
                     aria-hidden='true'
-                    data-inbox-runtime-update
-                    className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
                   />
-                ) : null}
-              </Link>
+                  {inboxNavigation?.state === 'available' &&
+                  (inboxNavigation.pendingCount ?? 0) > 0 ? (
+                    <span
+                      role='status'
+                      aria-label={`${inboxNavigation.pendingCount} pending items`}
+                      className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
+                    >
+                      {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
+                    </span>
+                  ) : hasRuntimeUpdate ? (
+                    <span
+                      aria-hidden='true'
+                      data-inbox-runtime-update
+                      className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
+                    />
+                  ) : null}
+                </Link>
+              )}
               <Link
                 href={APP_ROUTES.CHAT}
                 onClick={event => handleCommandClick(event, chatNavItem)}

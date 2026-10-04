@@ -56,10 +56,10 @@ describe('CLI landing page', () => {
     expect(pageText).toContain('No API key');
     expect(pageText).toContain('MCP server');
     expect(pageText).toContain('JSON output');
-    expect(pageText).toContain('Give an artist a profile');
+    expect(pageText).toContain('Give a creator a profile');
     expect(pageText).toContain('Plug Jovie into an agent');
-    expect(pageText).toContain('Get an artist');
-    expect(pageText).toContain('Give an artist to an agent');
+    expect(pageText).toContain('Get a profile');
+    expect(pageText).toContain('Give a profile to an agent');
     expect(pageText).toContain('Build against Jovie');
     expect(pageText).toContain('Give Jovie to an agent');
 
@@ -181,9 +181,9 @@ describe('CLI landing page', () => {
       item => item.question === 'Which Node.js version does it need?'
     );
 
-    expect(packageJson.engines?.node).toBe('>=24.21.0 <25');
+    expect(packageJson.engines?.node).toBe('>=24.21.0');
     expect(nodeFaq?.answer).toContain('Node.js 24.21.0');
-    expect(nodeFaq?.answer).toContain('below Node 25');
+    expect(nodeFaq?.answer).toContain('including Node 26');
     expect(nodeFaq?.answer).toContain('published package engines field');
   });
 

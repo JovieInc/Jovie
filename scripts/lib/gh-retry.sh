@@ -22,15 +22,19 @@ gh_retry() {
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
   local max_delay="${GH_RETRY_MAX_DELAY:-30}"
   local attempt=1
-  local err_file
+  local err_file out_file
   err_file="$(mktemp)"
+  out_file="$(mktemp)"
   # shellcheck disable=SC2064
-  trap "rm -f '$err_file'" RETURN
+  trap "rm -f '$err_file' '$out_file'" RETURN
 
   while [[ "$attempt" -le "$attempts" ]]; do
     # gh colorizes JSON when stdout is a pipe; that breaks downstream jq.
-    if NO_COLOR=1 GH_FORCE_TTY=false gh "$@" 2>"$err_file"; then
-      rm -f "$err_file"
+    # gh writes HTTP error bodies to stdout too. Publish only a successful
+    # attempt, so a recovered JSON read never includes prior error payloads.
+    if NO_COLOR=1 GH_FORCE_TTY=false gh "$@" >"$out_file" 2>"$err_file"; then
+      cat "$out_file"
+      rm -f "$err_file" "$out_file"
       return 0
     fi
 
@@ -39,7 +43,7 @@ gh_retry() {
     if [[ "$attempt" -eq "$attempts" ]] \
       || ! gh_retry_is_transient_error "$err"; then
       echo "$err" >&2
-      rm -f "$err_file"
+      rm -f "$err_file" "$out_file"
       return 1
     fi
 
@@ -50,6 +54,6 @@ gh_retry() {
     attempt=$((attempt + 1))
   done
 
-  rm -f "$err_file"
+  rm -f "$err_file" "$out_file"
   return 1
 }

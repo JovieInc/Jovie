@@ -11,6 +11,7 @@ const { mockUseAdminReleasesInfiniteQuery } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME: 'whitespace-normal',
   createMultiFieldFilterFn: () => () => true,
   PAGE_TOOLBAR_END_GROUP_CLASS: '',
   PAGE_TOOLBAR_META_TEXT_CLASS: '',
@@ -35,6 +36,7 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
     getRowId,
   }: {
     readonly columns: Array<{
+      readonly meta?: { readonly cellContentClassName?: string };
       readonly cell?: (context: {
         readonly row: { readonly original: AdminReleaseRow };
       }) => ReactNode;
@@ -45,7 +47,15 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
   }) => {
     const artistColumn = columns.find(column => column.id === 'artist');
     return (
-      <div data-testid='admin-data-table'>
+      <div
+        data-testid='admin-data-table'
+        data-multiline-columns={columns
+          .filter(column =>
+            column.meta?.cellContentClassName?.includes('whitespace-normal')
+          )
+          .map(column => column.id)
+          .join(',')}
+      >
         {data.map(row => (
           <div key={getRowId(row)}>
             {artistColumn?.cell?.({ row: { original: row } })}
@@ -139,6 +149,10 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     // Avatar contract ratchet, so the caller passes the size prop instead.
     const avatarRoot = container.querySelector("span[data-shape='person']");
     expect(avatarRoot).not.toBeNull();
+    expect(screen.getByTestId('admin-data-table')).toHaveAttribute(
+      'data-multiline-columns',
+      'release,issues,artist'
+    );
     expect(avatarRoot).toHaveAttribute('data-size', 'md');
     expect(avatarRoot).toHaveAttribute('data-shape', 'person');
     expect(avatarRoot).toHaveStyle({ width: '24px', height: '24px' });
@@ -205,6 +219,6 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     );
 
     expect(source).not.toMatch(/\bred-\d/);
-    expect(source).toContain('text-error');
+    expect(source).toContain('TableIssueSummary');
   });
 });

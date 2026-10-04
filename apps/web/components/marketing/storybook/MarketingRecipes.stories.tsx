@@ -283,7 +283,12 @@ export const comparison: Story = {
                 >
                   Feature Matrix
                 </h2>
-                <div className='mt-8 overflow-x-auto'>
+                <section
+                  className='mt-8 overflow-x-auto'
+                  aria-label={`Jovie vs ${data.competitor} feature matrix`}
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region needs a keyboard entry point for native scrolling (axe scrollable-region-focusable)
+                  tabIndex={0}
+                >
                   <table className='w-full min-w-160 border-collapse text-left text-sm'>
                     <thead>
                       <tr className='border-b border-subtle'>
@@ -342,7 +347,7 @@ export const comparison: Story = {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </section>
               </MarketingContainer>
             </section>
 

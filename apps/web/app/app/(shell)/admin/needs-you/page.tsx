@@ -15,7 +15,7 @@ export default async function NeedsYouPage() {
       description='Only founder judgments whose highest-value next action cannot be automated safely.'
       testId='founder-needs-you-page'
     >
-      <TimActionRequiredSection />
+      <TimActionRequiredSection presentation='page' />
     </AdminPage>
   );
 }

@@ -23,6 +23,7 @@ vi.mock('@/lib/queries', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME: 'whitespace-normal',
   PAGE_TOOLBAR_END_GROUP_CLASS: '',
   PAGE_TOOLBAR_META_TEXT_CLASS: '',
   TableEmptyState: ({ heading }: { readonly heading: string }) => (
@@ -43,6 +44,7 @@ vi.mock('@/components/organisms/table', () => ({
 }));
 
 interface TestColumn {
+  readonly meta?: { readonly cellContentClassName?: string };
   readonly id?: string;
   readonly cell?: (context: {
     readonly row: { readonly original: AdminAssetRow };
@@ -66,7 +68,15 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
       readonly onClick: () => void;
     }[];
   }) => (
-    <div data-testid='admin-data-table'>
+    <div
+      data-testid='admin-data-table'
+      data-multiline-columns={columns
+        .filter(column =>
+          column.meta?.cellContentClassName?.includes('whitespace-normal')
+        )
+        .map(column => column.id)
+        .join(',')}
+    >
       {data.length === 0
         ? emptyState
         : data.map(row => (
@@ -200,6 +210,10 @@ describe('AdminAssetsTable', () => {
     expect(screen.getAllByText('@alpha').length).toBeGreaterThan(0);
     expect(screen.getAllByText('No owner').length).toBeGreaterThan(0);
     expect(screen.getByText('2 assets')).toBeInTheDocument();
+    expect(screen.getByTestId('admin-data-table')).toHaveAttribute(
+      'data-multiline-columns',
+      'asset,issues,owner'
+    );
     screen.getAllByText('Open Asset')[0]?.click();
     expect(openSpy).toHaveBeenCalledWith(
       'https://jovie.local/r/first-light',
@@ -259,6 +273,6 @@ describe('AdminAssetsTable', () => {
     );
 
     expect(source).not.toMatch(/\bred-\d/);
-    expect(source).toContain('text-error');
+    expect(source).toContain('TableIssueSummary');
   });
 });
