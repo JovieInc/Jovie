@@ -535,6 +535,12 @@ class GateTest(unittest.TestCase):
     def test_code_changes_run_the_one_canonical_gate(self):
         self.assertEqual(lane.check_commands(["apps/web/lib/a.ts", "docs/readme.md"]), [lane.CANONICAL_GATE])
         self.assertEqual(lane.check_commands(["docs/readme.md"]), [])
+        pr = {"number": 7, "headRefOid": "a" * 40, "headRefName": "feat/x"}
+        self.assertEqual(lane.check_commands(["apps/web/app/claim/page.tsx"], pr),
+                         [lane.CANONICAL_GATE,
+                          ["node", "scripts/funnel-judge/preview-gate.mjs", "--pr", "7",
+                           "--sha", "a" * 40, "--ref", "feat/x"]])
+        self.assertEqual(lane.check_commands(["docs/readme.md"], pr), [])
 
     @unittest.skipUnless((ROOT / "scripts/automation-verify.sh").exists(), "release copy has no repo gates")
     def test_canonical_gate_carries_the_ci_component_contract(self):
@@ -692,10 +698,14 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
         self.assertEqual(providers["codex"]["reasoningEffort"], "xhigh")
         self.assertIn("xhigh", providers["codex"]["cmd"])
-        # Tim 2026-09-26: Devin and Codex are the shipping lanes; every other lane stays off.
+        # Tim 2026-10-03 (JOV-7706): Claude Code and Hyperagent join Devin and Codex as regular lanes.
         enabled = {name for name, spec in providers.items() if spec.get("enabled", True)}
-        self.assertTrue(enabled <= {"devin", "codex"}, enabled)
-        self.assertIn("devin", enabled)
+        self.assertEqual(enabled, {"devin", "codex", "claude", "hyperagent"})
+        # Claude rides the subscription wrapper with a routed model; never a bare `claude` with API env.
+        claude = providers["claude"]
+        self.assertIn("{here}/claude_lane.py", claude["cmd"])
+        self.assertEqual(claude["cmd"][claude["cmd"].index("--model") + 1], "{model}")
+        self.assertEqual({route["model"] for route in claude["routes"]}, {"claude-opus-5-5", "claude-sonnet-5-5"})
         # Every lane run is a fresh worktree; Devin refuses untrusted dirs unless told not to.
         cmd = providers["devin"]["cmd"]
         self.assertEqual(cmd[cmd.index("--respect-workspace-trust") + 1], "false")
@@ -1309,12 +1319,16 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
 
     def test_hyperagent_without_actual_dispatch_proof_holds_before_any_provider_process(self):
-        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
-                                 FakeLinear([]), issue("JOV-6871"))
-        self.assertEqual(receipt["verdict"], "remote-held")
-        self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
-        self.assertNotIn("agentExit", receipt)
-        self.assertFalse((self.host.state / "worktrees").exists())
+        for api in ({"__name__": "hyperagent"}, {"mcp_call": None}, ["invalid-api"]):
+            with self.subTest(api=api), patch("runpy.run_path", return_value=api), \
+                    patch.object(lane.shutil, "which", return_value="/fake/hyperagent"):
+                receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
+                                         FakeLinear([]), issue("JOV-6871"))
+                self.assertEqual(receipt["verdict"], "remote-held")
+                self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
+                self.assertNotIn("agentExit", receipt)
+                self.assertFalse((self.host.state / "worktrees").exists())
+                self.assertEqual(self.ledger()[-1]["verdict"], "remote-held")
 
     def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
@@ -3143,7 +3157,10 @@ class FixRedTest(unittest.TestCase):
                 attempts = host.state / "fix-attempts.json"
                 attempts.write_text(json.dumps({"5": {"sha": "h1", "count": 2, "at": time.time() - 1}}))
                 with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)):
-                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {**self.pr(), "isDraft": False})
+                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {
+                        **self.pr(), "isDraft": False,
+                        "labels": [{"name": "lane-fix-conflict"}, {"name": "lane-fix-red"}],
+                    })
                 self.assertEqual(receipt["verdict"], "fix-pushed")
                 self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "h9"})
                 record = json.loads(attempts.read_text())["5"]
@@ -3153,6 +3170,9 @@ class FixRedTest(unittest.TestCase):
             finally:
                 lane.sh, lane.failure_excerpt = real, real_excerpt
         self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in calls))
+        deleted = {call[-1] for call in calls if call[:3] == ["gh", "api", "-X"] and "DELETE" in call}
+        self.assertIn(f"repos/{lane.REPO_SLUG}/issues/5/labels/lane-fix-conflict", deleted)
+        self.assertIn(f"repos/{lane.REPO_SLUG}/issues/5/labels/lane-fix-red", deleted)
 
     def test_a_pr_merged_before_its_fix_run_installs_nothing_and_records_cancellation(self):
         real_sh, real_agent = lane.sh, lane.run_agent
@@ -3946,7 +3966,9 @@ class GateSingleflightTest(unittest.TestCase):
             result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
         self.assertEqual(result["verdict"], "gate-deferred")
         self.assertEqual(self.fake.calls.count(lane.CANONICAL_GATE), 1)
-        self.assertEqual(result["stage"], "after-gate")
+        # The moved head is caught before the next gate command (the funnel gate) runs.
+        self.assertEqual(result["stage"], "before-gate-command")
+        self.assertFalse(any("scripts/funnel-judge/preview-gate.mjs" in c for c in self.fake.calls))
         self.assertIn("gateWaitS", result)
         self.assertFalse((self.host.state / "verified.json").exists())
         self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in self.fake.calls))
