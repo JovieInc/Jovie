@@ -1,8 +1,16 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  closeSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -16,17 +24,44 @@ import { crc32 } from 'node:zlib';
 
 export const GH_FAKE_HOST = 'github.localhost';
 
-/** Absolute path of the real gh binary, or null when it is not installed. */
-export function resolveRealGh() {
+/** A `#!` candidate is a wrapper (e.g. a token-minting shim), not the CLI. */
+function isScript(path) {
   try {
-    return (
-      execFileSync('sh', ['-c', 'command -v gh'], {
-        encoding: 'utf8',
-      }).trim() || null
-    );
+    const fd = openSync(path, 'r');
+    try {
+      const head = Buffer.alloc(2);
+      const read = readSync(fd, head, 0, 2, 0);
+      return read === 2 && head[0] === 0x23 && head[1] === 0x21;
+    } finally {
+      closeSync(fd);
+    }
   } catch {
-    return null;
+    return false;
   }
+}
+
+/**
+ * Absolute path of the real gh binary, or null when it is not installed.
+ * Enumerates every `gh` on PATH and prefers binaries over executable
+ * wrapper scripts, so shims cannot replace the exercised boundary.
+ */
+export function resolveRealGh() {
+  let script = null;
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    const candidate = join(dir, 'gh');
+    try {
+      execFileSync('test', ['-x', candidate]);
+    } catch {
+      continue;
+    }
+    if (isScript(candidate)) {
+      script ??= candidate;
+      continue;
+    }
+    return candidate;
+  }
+  return script;
 }
 
 /** First line of `gh --version`, recorded as the exercised boundary version. */
@@ -112,11 +147,16 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
+  // The exercised script resolves bare `gh` through PATH; shadow it with
+  // the resolved binary so wrapper shims cannot interpose on the fixture.
+  const bin = join(home, 'bin');
+  mkdirSync(bin);
+  symlinkSync(binary, join(bin, 'gh'));
   try {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
+          PATH: `${bin}${delimiter}${process.env.PATH}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
