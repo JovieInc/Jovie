@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { load as yamlLoad } from 'js-yaml';
 import {
   auditScreens,
   changedScreenManifest,
@@ -73,10 +82,105 @@ const passingViewport = {
 };
 
 describe('screen audit', () => {
+  it('rejects missing CLI values before writing or filing', () => {
+    const script = fileURLToPath(
+      new URL('./screen-audit.mjs', import.meta.url)
+    );
+    const root = mkdtempSync(join(tmpdir(), 'screen-audit-values-'));
+    try {
+      for (const [flag, args] of [
+        ['--artifacts', ['--artifacts', '--out', 'ledger.json']],
+        ['--changed', ['--changed', '--file', '--dry-run']],
+        ['--judge', ['--artifacts', root, '--judge', '--out', 'ledger.json']],
+        ['--out', ['--artifacts', root, '--out', '--file', '--dry-run']],
+      ]) {
+        const result = spawnSync(process.execPath, [script, ...args], {
+          cwd: root,
+          encoding: 'utf8',
+        });
+        assert.notEqual(result.status, 0);
+        assert.match(result.stderr, new RegExp(`${flag} requires a value`));
+      }
+      assert.equal(existsSync(join(root, 'ledger.json')), false);
+      assert.equal(existsSync(join(root, '--file')), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails an empty nightly run lookup before download and accepts a real run', () => {
+    const workflow =
+      /** @type {{jobs: {sweep: {steps: Array<{name: string, run: string}>}}}} */ (
+        yamlLoad(
+          readFileSync(
+            new URL(
+              '../../.github/workflows/remediation-sweep.yml',
+              import.meta.url
+            ),
+            'utf8'
+          )
+        )
+      );
+    const command = workflow.jobs.sweep.steps.find(
+      step => step.name === 'Download latest screen evidence'
+    ).run;
+    const root = mkdtempSync(join(tmpdir(), 'screen-audit-runs-'));
+    try {
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/bin/bash
+set -euo pipefail
+if [ "$1 $2" = 'run list' ]; then
+  while [ "$1" != '--jq' ]; do shift; done
+  printf '%s' "$SCREEN_AUDIT_TEST_RUNS" | jq -r "$2"
+else
+  printf '%s' "$3" > "$SCREEN_AUDIT_TEST_DOWNLOAD"
+fi
+`
+      );
+      chmodSync(gh, 0o755);
+      const download = join(root, 'download.txt');
+      const run = runs =>
+        spawnSync('bash', ['-c', command], {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${root}:${process.env.PATH}`,
+            RUNNER_TEMP: root,
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            GITHUB_OUTPUT: join(root, 'output.txt'),
+            SCREEN_AUDIT_TEST_RUNS: JSON.stringify(runs),
+            SCREEN_AUDIT_TEST_DOWNLOAD: download,
+          },
+        });
+      const empty = run([]);
+      assert.notEqual(empty.status, 0);
+      assert.match(empty.stdout, /No completed Product Screenshots run/);
+      assert.equal(existsSync(download), false);
+      const populated = run([{ databaseId: 123 }]);
+      assert.equal(populated.status, 0, populated.stderr);
+      assert.equal(readFileSync(download, 'utf8'), '123');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
   it('maps producers from the certification route tables', () => {
     assert.equal(screenProducer('web.homepage').kind, 'marketing-route');
     assert.equal(screenProducer('web.tasks').kind, 'proof-route');
     assert.equal(screenProducer('ios.chat').kind, 'none');
+    assert.deepEqual(screenProducer('web.public-profile'), {
+      kind: 'proof-route',
+      route: '/unfazed',
+    });
+    const profile = auditScreens({
+      registry: registry.filter(screen => screen.id === 'web.public-profile'),
+      routeDom: new Map([
+        ['/unfazed', [{ viewport: 'desktop', findings: [] }]],
+      ]),
+    });
+    assert.equal(profile.screens[0].verdict, 'green');
   });
 
   it('never counts missing evidence or a missing producer as green', () => {

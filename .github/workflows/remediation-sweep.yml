@@ -111,7 +111,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          run_id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow screenshots.yml --branch main --event push --status completed --limit 1 --json databaseId --jq '.[0].databaseId')"
+          run_id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow screenshots.yml --branch main --event push --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
           if [ -z "$run_id" ]; then
             echo "::error::No completed Product Screenshots run on main; the screen audit has no evidence."
             exit 1
