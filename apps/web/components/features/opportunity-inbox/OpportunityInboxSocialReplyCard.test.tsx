@@ -131,6 +131,45 @@ describe('OpportunityInboxSocialReplyCard', () => {
     );
   });
 
+  it('renders video title and like count when present on the reply', () => {
+    renderCard({
+      card: {
+        ...CARD,
+        socialReply: {
+          ...CARD.socialReply!,
+          platform: 'YouTube',
+          videoTitle: 'Midnight Run (Official Video)',
+          likeCount: 42,
+        },
+      },
+    });
+
+    expect(screen.getByTestId('social-reply-video-reply-1')).toHaveTextContent(
+      'Midnight Run (Official Video)'
+    );
+    expect(screen.getByText('42 likes')).toBeInTheDocument();
+  });
+
+  it('uses the singular like label for a single like', () => {
+    renderCard({
+      card: {
+        ...CARD,
+        socialReply: { ...CARD.socialReply!, likeCount: 1 },
+      },
+    });
+
+    expect(screen.getByText('1 like')).toBeInTheDocument();
+  });
+
+  it('omits video and like metadata when absent', () => {
+    renderCard();
+
+    expect(
+      screen.queryByTestId('social-reply-video-reply-1')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/likes?$/)).not.toBeInTheDocument();
+  });
+
   it('renders nothing when the card lacks social reply data', () => {
     const { container } = renderCard({
       card: { ...CARD, socialReply: undefined },

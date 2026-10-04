@@ -537,7 +537,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
     expect(
       screen.getByRole('link', { name: 'Set Up Identity' })
-    ).toHaveAttribute('href', '/app/settings/artist-profile');
+    ).toHaveAttribute('href', '/app/settings/profile');
   });
 
   it('uses attributable profile photos instead of platform icons as primary identity', async () => {

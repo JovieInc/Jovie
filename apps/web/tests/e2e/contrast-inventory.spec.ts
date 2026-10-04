@@ -77,7 +77,7 @@ const AUTH_ROUTES = [
   [APP_ROUTES.LEGACY_DASHBOARD, 'app-dashboard'],
   [APP_ROUTES.CHAT, 'app-chat'],
   [APP_ROUTES.RELEASES, 'app-releases'],
-  [APP_ROUTES.SETTINGS_ARTIST_PROFILE, 'settings-artist-profile'],
+  [APP_ROUTES.SETTINGS_PROFILE, 'settings-artist-profile'],
   [APP_ROUTES.SETTINGS_BILLING, 'settings-billing'],
   [APP_ROUTES.SETTINGS_ACCOUNT, 'settings-account'],
   [APP_ROUTES.ONBOARDING, 'onboarding-start'],
