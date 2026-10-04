@@ -43,6 +43,11 @@ const BLOCKED: ReadinessInputs = {
     pendingRouted: 6,
     dailySendCap: 5,
   },
+  production: {
+    sha: 'c16157e0000000000000000000000000000000000',
+    deployedAt: '2026-10-04T03:33:00Z',
+    behindMain: 41,
+  },
   issues: new Map([
     [
       'JOV-7192',
@@ -81,7 +86,11 @@ describe('onboarding readiness', () => {
   it('shows today’s wait item by item', () => {
     const readiness = buildOutboundReadiness(BLOCKED);
     expect(readiness.ready).toBe(0);
-    expect(readiness.total).toBe(6);
+    expect(readiness.total).toBe(7);
+    expect(byId(readiness, 'production')).toMatchObject({
+      status: 'red',
+      detail: 'c16157e · deployed 8h ago · 41 commits behind main',
+    });
     expect(byId(readiness, 'cone')).toMatchObject({
       status: 'red',
       detail: '1 of 2 receipts not green',
@@ -120,6 +129,7 @@ describe('onboarding readiness', () => {
       queue: null,
       evidence: null,
       sendPath: null,
+      production: null,
       issues: null,
       openGrowthLoopChildren: null,
     });
@@ -129,6 +139,7 @@ describe('onboarding readiness', () => {
         .filter(item => item.status !== 'info')
         .map(item => item.status)
     ).toEqual([
+      'unknown',
       'unknown',
       'unknown',
       'unknown',
@@ -151,9 +162,14 @@ describe('onboarding readiness', () => {
         instantlyEnabled: true,
         instantlyConfigured: true,
       },
+      production: {
+        sha: 'abc1234',
+        deployedAt: NOW.toISOString(),
+        behindMain: 3,
+      },
       openGrowthLoopChildren: 0,
     });
-    expect(readiness.ready).toBe(6);
+    expect(readiness.ready).toBe(7);
   });
 
   it('states the transactional versus cold boundary', () => {

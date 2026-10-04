@@ -8,6 +8,7 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { resolveAppPath, resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
 import { linearGraphql } from '@/lib/ovie/linear-coordination-live';
+import { readConfiguredLiveBuild } from '@/lib/ovie/shipping-state/configured.server';
 import { getOutboundQueue } from './queue.server';
 import {
   buildOutboundReadiness,
@@ -89,6 +90,17 @@ async function readLinear(): Promise<{
   return { issues, openChildren: data.loop.children.nodes.length };
 }
 
+async function readProduction() {
+  const read = await readConfiguredLiveBuild();
+  const production = read.status === 'ok' ? read.delivery?.production : null;
+  if (!production) return null;
+  return {
+    sha: production.sha,
+    deployedAt: production.deployedAt,
+    behindMain: production.behindMain.value,
+  };
+}
+
 async function readEvidence() {
   const [row] = await db
     .select({
@@ -137,14 +149,16 @@ export async function getOutboundReadiness(
       value => value,
       () => null
     );
-  const [cone, queue, evidence, sendPath, linear, funnel] = await Promise.all([
-    settle(getAcquisitionEligibility()),
-    settle(getOutboundQueue(now)),
-    settle(readEvidence()),
-    settle(readSendPath()),
-    settle(readLinear()),
-    readFunnelTrend(),
-  ]);
+  const [cone, queue, evidence, sendPath, linear, funnel, production] =
+    await Promise.all([
+      settle(getAcquisitionEligibility()),
+      settle(getOutboundQueue(now)),
+      settle(readEvidence()),
+      settle(readSendPath()),
+      settle(readLinear()),
+      readFunnelTrend(),
+      settle(readProduction()),
+    ]);
   return buildOutboundReadiness({
     now,
     cone,
@@ -161,6 +175,7 @@ export async function getOutboundReadiness(
       : null,
     evidence,
     sendPath,
+    production,
     issues: linear?.issues ?? null,
     openGrowthLoopChildren: linear?.openChildren ?? null,
   });
