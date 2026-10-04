@@ -66,12 +66,14 @@ describe('ArtistProfileContent', () => {
   it('keeps the canonical settings header and panel anatomy while loading', () => {
     render(<ArtistProfileContent />);
 
-    expect(screen.getByRole('heading', { name: 'Artist' })).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Profile' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('status', { name: 'Loading Artist Profile Settings' })
+      screen.getByRole('heading', { name: 'Identity' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Loading Profile Settings' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Payments' })
@@ -84,7 +86,7 @@ describe('ArtistProfileContent', () => {
     expect(
       screen
         .getByRole('status', {
-          name: 'Loading Artist Profile Settings',
+          name: 'Loading Profile Settings',
         })
         .querySelectorAll('[data-state="shimmer"]')
     ).toHaveLength(16);

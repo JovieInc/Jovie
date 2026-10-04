@@ -60,16 +60,16 @@ export function ArtistProfileContent({
       <>
         <SettingsSection
           id='artist-profile'
-          title='Artist'
-          description='Photo, name, username, and brand details fans see.'
+          title='Profile'
+          description='Photo, name, username, and brand details shown on your public profile.'
         >
           <div
             className='space-y-4'
             role='status'
-            aria-label='Loading Artist Profile Settings'
+            aria-label='Loading Profile Settings'
           >
             <SettingsPanel
-              title='Profile'
+              title='Identity'
               description='Display name, username, image, and place details fans see.'
               bodyClassName='space-y-4 px-4 py-4 sm:px-5'
             >
@@ -104,8 +104,8 @@ export function ArtistProfileContent({
     <>
       <SettingsSection
         id='artist-profile'
-        title='Artist'
-        description='Photo, name, username, and brand details fans see.'
+        title='Profile'
+        description='Photo, name, username, and brand details shown on your public profile.'
         headerAction={
           artist.handle ? (
             <Button asChild variant='secondary' size='sm'>

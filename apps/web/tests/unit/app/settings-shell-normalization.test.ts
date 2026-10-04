@@ -19,6 +19,7 @@ const REQUIRED_SHARED_SETTINGS_ROUTES = [
   'payments',
   'data-privacy',
   'artist-profile',
+  'profile',
   'contacts',
   'touring',
   'analytics',
@@ -51,13 +52,16 @@ const SETTINGS_ALIAS_ROUTES = [
     ),
   },
   {
-    route: 'settings profile',
-    expectedDestination: 'APP_ROUTES.SETTINGS_ARTIST_PROFILE',
+    route: 'settings artist-profile',
+    expectedDestination: 'APP_ROUTES.SETTINGS_PROFILE',
     filePath: findSourceFile(
-      resolve(process.cwd(), 'app/app/(shell)/settings/profile/page.tsx'),
       resolve(
         process.cwd(),
-        'apps/web/app/app/(shell)/settings/profile/page.tsx'
+        'app/app/(shell)/settings/artist-profile/page.tsx'
+      ),
+      resolve(
+        process.cwd(),
+        'apps/web/app/app/(shell)/settings/artist-profile/page.tsx'
       )
     ),
   },
@@ -98,11 +102,8 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
     resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/touring/page.tsx')
   ),
   findSourceFile(
-    resolve(process.cwd(), 'app/app/(shell)/settings/artist-profile/page.tsx'),
-    resolve(
-      process.cwd(),
-      'apps/web/app/app/(shell)/settings/artist-profile/page.tsx'
-    )
+    resolve(process.cwd(), 'app/app/(shell)/settings/profile/page.tsx'),
+    resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/profile/page.tsx')
   ),
   findSourceFile(
     resolve(process.cwd(), 'app/app/(shell)/settings/admin/page.tsx'),
@@ -127,7 +128,7 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
 const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
   resolve(process.cwd(), 'app/app/(shell)/settings/contacts/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/touring/page.tsx'),
-  resolve(process.cwd(), 'app/app/(shell)/settings/artist-profile/page.tsx'),
+  resolve(process.cwd(), 'app/app/(shell)/settings/profile/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/admin/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/payments/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
@@ -149,7 +150,7 @@ const GATED_SETTINGS_ROUTE_FILES = [
       resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/admin/page.tsx')
     ),
     expectedGate: 'routeContext.dashboardData.isAdmin',
-    expectedDestination: 'APP_ROUTES.SETTINGS_ARTIST_PROFILE',
+    expectedDestination: 'APP_ROUTES.SETTINGS_PROFILE',
   },
   {
     route: 'settings payments',

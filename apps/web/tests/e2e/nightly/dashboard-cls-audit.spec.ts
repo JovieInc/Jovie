@@ -185,7 +185,7 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
       return;
     }
 
-    await gotoAppRoute(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    await gotoAppRoute(page, APP_ROUTES.SETTINGS_PROFILE);
     const careerHighlightsField = await expectCareerHighlightsField(page);
 
     const testValue = `CLS audit ${Date.now()}`;
@@ -208,7 +208,7 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
     await attachClsResult(testInfo, 'cls-settings-save', {
       cls,
       budget: CLS_INTERACTION_BUDGET,
-      route: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      route: APP_ROUTES.SETTINGS_PROFILE,
       interaction: 'career-highlights-save',
     });
 
