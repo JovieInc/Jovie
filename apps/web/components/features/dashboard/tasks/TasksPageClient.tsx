@@ -88,6 +88,7 @@ import {
   useCreateTaskMutation,
   useDeleteTaskMutation,
   useMoveTaskMutation,
+  useStartPlaybookMutation,
   useUpdateTaskMutation,
 } from '@/lib/queries/useTaskMutations';
 import {
@@ -105,6 +106,11 @@ import {
   isPitchRelatedText,
 } from '@/lib/services/pitch/targets';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
+import {
+  PLAYBOOK_PICKER_COPY,
+  playbookStartedToast,
+} from '@/lib/tasks/playbooks/copy';
+import { getPlaybookTemplate } from '@/lib/tasks/playbooks/registry';
 import {
   compareTasksByBoardOrder,
   getVisibleTaskBoardStatuses,
@@ -124,6 +130,10 @@ import type {
 } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
+import {
+  PlaybookPickerDialog,
+  type PlaybookPickerSubmit,
+} from './PlaybookPickerDialog';
 import { TaskBoard } from './TaskBoard';
 import {
   type TaskSubviewId,
@@ -968,12 +978,12 @@ function TaskEmptyState({
   hasFilters,
   onClearFilters,
   onOpenComposer,
-  onOpenReleases,
+  onOpenPlaybooks,
 }: Readonly<{
   hasFilters: boolean;
   onClearFilters: () => void;
   onOpenComposer: () => void;
-  onOpenReleases: () => void;
+  onOpenPlaybooks: () => void;
 }>) {
   return (
     <TableEmptyState
@@ -983,7 +993,7 @@ function TaskEmptyState({
       description={
         hasFilters
           ? 'Try widening the filters or search query.'
-          : 'Create your first task, or tasks will appear automatically when you set up a release.'
+          : 'Create your first task, or start from a playbook for a release, video, episode or book.'
       }
       className='min-h-90'
       action={
@@ -998,7 +1008,7 @@ function TaskEmptyState({
       secondaryAction={
         hasFilters
           ? undefined
-          : { label: 'Set Up Release', onClick: onOpenReleases }
+          : { label: PLAYBOOK_PICKER_COPY.trigger, onClick: onOpenPlaybooks }
       }
     />
   );
@@ -1397,6 +1407,8 @@ export function TasksPageClient() {
   }, []);
 
   const createTaskMutation = useCreateTaskMutation();
+  const startPlaybookMutation = useStartPlaybookMutation();
+  const [isPlaybookPickerOpen, setIsPlaybookPickerOpen] = useState(false);
   const deleteTaskMutation = useDeleteTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
   const moveTaskMutation = useMoveTaskMutation();
@@ -1579,6 +1591,26 @@ export function TasksPageClient() {
   const openReleases = useCallback(() => {
     router.push(APP_ROUTES.RELEASES);
   }, [router]);
+  const openPlaybookPicker = useCallback(() => {
+    setIsPlaybookPickerOpen(true);
+  }, []);
+  const handleStartPlaybook = useCallback(
+    async (input: PlaybookPickerSubmit) => {
+      try {
+        const result = await startPlaybookMutation.mutateAsync(input);
+        setIsPlaybookPickerOpen(false);
+        toast.success(
+          playbookStartedToast(
+            result.stepCount,
+            getPlaybookTemplate(input.playbookId).name
+          )
+        );
+      } catch {
+        toast.error(PLAYBOOK_PICKER_COPY.error);
+      }
+    },
+    [startPlaybookMutation]
+  );
   const showTaskWorkbenchEmptyState =
     !isBoardMode && !isActiveListLoading && tasks.length === 0;
   const selectedTaskIndex = effectiveSelectedTaskId
@@ -2243,7 +2275,7 @@ export function TasksPageClient() {
             hasFilters={hasFilters}
             onClearFilters={clearFilters}
             onOpenComposer={() => setHeaderMode('create')}
-            onOpenReleases={openReleases}
+            onOpenPlaybooks={openPlaybookPicker}
           />
         </div>
       </div>
@@ -2279,7 +2311,7 @@ export function TasksPageClient() {
             hasFilters={hasFilters}
             onClearFilters={clearFilters}
             onOpenComposer={() => setHeaderMode('create')}
-            onOpenReleases={openReleases}
+            onOpenPlaybooks={openPlaybookPicker}
           />
         }
       />
@@ -2298,7 +2330,7 @@ export function TasksPageClient() {
           hasFilters={hasFilters || mobileScope !== 'all'}
           onClearFilters={clearFilters}
           onOpenComposer={() => setHeaderMode('create')}
-          onOpenReleases={openReleases}
+          onOpenPlaybooks={openPlaybookPicker}
         />
       </div>
     );
@@ -2376,6 +2408,7 @@ export function TasksPageClient() {
             filterCategories={taskFilterCategories}
             onClearFilters={clearFilters}
             onCreateTask={() => setHeaderMode('create')}
+            onStartPlaybook={openPlaybookPicker}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             showCancelledColumn={showCancelledColumn}
@@ -2553,6 +2586,17 @@ export function TasksPageClient() {
         </section>
       </WorkspacePage>
 
+      <PlaybookPickerDialog
+        open={isPlaybookPickerOpen}
+        creatorType={selectedProfile?.creatorType ?? null}
+        pending={startPlaybookMutation.isPending}
+        onClose={() => setIsPlaybookPickerOpen(false)}
+        onSubmit={handleStartPlaybook}
+        onOpenReleases={() => {
+          setIsPlaybookPickerOpen(false);
+          openReleases();
+        }}
+      />
       <ConfirmDialog
         open={taskPendingDelete !== null}
         onOpenChange={open => {

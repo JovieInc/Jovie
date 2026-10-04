@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { ArrowDown, ArrowUp, Plus, Settings2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ListChecks, Plus, Settings2 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import {
   TableFilterDropdown,
@@ -16,6 +16,7 @@ import {
   DisplayMenuDropdown,
   type ViewMode,
 } from '@/components/organisms/table/molecules/DisplayMenuDropdown';
+import { PLAYBOOK_PICKER_COPY } from '@/lib/tasks/playbooks/copy';
 import { cn } from '@/lib/utils';
 
 const TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME =
@@ -60,6 +61,7 @@ export interface TaskWorkspaceHeaderBarProps {
   readonly filterCategories: ReadonlyArray<TableFilterDropdownCategory>;
   readonly onClearFilters: () => void;
   readonly onCreateTask: () => void;
+  readonly onStartPlaybook?: () => void;
   readonly viewMode: ViewMode;
   readonly onViewModeChange: (viewMode: ViewMode) => void;
   readonly showCancelledColumn: boolean;
@@ -82,6 +84,7 @@ export function TaskWorkspaceHeaderBar({
   filterCategories,
   onClearFilters,
   onCreateTask,
+  onStartPlaybook,
   viewMode,
   onViewModeChange,
   showCancelledColumn,
@@ -162,6 +165,17 @@ export function TaskWorkspaceHeaderBar({
           shortcutHint='S'
           buttonClassName={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}
         />
+        {onStartPlaybook ? (
+          <PageToolbarActionButton
+            ariaLabel={PLAYBOOK_PICKER_COPY.trigger}
+            label={PLAYBOOK_PICKER_COPY.trigger}
+            tooltipLabel={PLAYBOOK_PICKER_COPY.trigger}
+            onClick={onStartPlaybook}
+            iconOnly
+            icon={<ListChecks className='h-3.5 w-3.5' />}
+            className={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}
+          />
+        ) : null}
         {primaryAction}
         <DisplayMenuDropdown
           viewMode={viewMode}

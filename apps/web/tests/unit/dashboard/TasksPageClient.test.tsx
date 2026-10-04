@@ -315,6 +315,7 @@ const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
 const mockUpdateTaskAsync = vi.fn();
 const mockMoveTask = vi.fn();
+const mockStartPlaybook = vi.fn();
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
 let mockTasksData: TaskView[] = [mockTask, mockTaskTwo];
@@ -502,6 +503,10 @@ vi.mock('@/lib/queries/useTaskMutations', () => ({
   }),
   useMoveTaskMutation: () => ({
     mutate: mockMoveTask,
+    isPending: false,
+  }),
+  useStartPlaybookMutation: () => ({
+    mutateAsync: mockStartPlaybook,
     isPending: false,
   }),
 }));
@@ -913,15 +918,22 @@ describe('TasksPageClient', () => {
     expect(screen.queryByText('All Assignees')).not.toBeInTheDocument();
   }, 10000);
 
-  it('routes the empty-state release setup CTA through the app router', () => {
+  it('opens the playbook picker from the empty state and routes music releases to Releases', () => {
     mockTasksData = [];
     mockListQueryData = [];
 
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set Up Release' }));
+    const [emptyStateTrigger] = screen.getAllByRole('button', {
+      name: 'Start From a Playbook',
+    });
+    fireEvent.click(emptyStateTrigger);
+
+    expect(screen.getByTestId('playbook-picker-list')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Releases' }));
 
     expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
+    expect(mockStartPlaybook).not.toHaveBeenCalled();
   });
 
   it('keeps release detail loading disabled until a release context is opened', () => {

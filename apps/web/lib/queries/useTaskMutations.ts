@@ -2,6 +2,10 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  type StartPlaybookInput,
+  startPlaybook,
+} from '@/app/app/(shell)/dashboard/tasks/playbook-actions';
+import {
   bulkUpdateTasks,
   createTask,
   deleteTask,
@@ -322,6 +326,17 @@ export function useCreateTaskMutation() {
     mutationFn: (data: CreateTaskInput) => createTask(data),
     onSuccess: async () => {
       await invalidateTaskQueries(queryClient);
+    },
+  });
+}
+
+export function useStartPlaybookMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: StartPlaybookInput) => startPlaybook(data),
+    onSuccess: async () => {
+      await invalidateTaskQueries(queryClient, { includeStats: true });
     },
   });
 }
