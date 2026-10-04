@@ -535,6 +535,12 @@ class GateTest(unittest.TestCase):
     def test_code_changes_run_the_one_canonical_gate(self):
         self.assertEqual(lane.check_commands(["apps/web/lib/a.ts", "docs/readme.md"]), [lane.CANONICAL_GATE])
         self.assertEqual(lane.check_commands(["docs/readme.md"]), [])
+        pr = {"number": 7, "headRefOid": "a" * 40, "headRefName": "feat/x"}
+        self.assertEqual(lane.check_commands(["apps/web/app/claim/page.tsx"], pr),
+                         [lane.CANONICAL_GATE,
+                          ["node", "scripts/funnel-judge/preview-gate.mjs", "--pr", "7",
+                           "--sha", "a" * 40, "--ref", "feat/x"]])
+        self.assertEqual(lane.check_commands(["docs/readme.md"], pr), [])
 
     @unittest.skipUnless((ROOT / "scripts/automation-verify.sh").exists(), "release copy has no repo gates")
     def test_canonical_gate_carries_the_ci_component_contract(self):
@@ -692,10 +698,14 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
         self.assertEqual(providers["codex"]["reasoningEffort"], "xhigh")
         self.assertIn("xhigh", providers["codex"]["cmd"])
-        # Tim 2026-09-26: Devin and Codex are the shipping lanes; every other lane stays off.
+        # Tim 2026-10-03 (JOV-7706): Claude Code and Hyperagent join Devin and Codex as regular lanes.
         enabled = {name for name, spec in providers.items() if spec.get("enabled", True)}
-        self.assertTrue(enabled <= {"devin", "codex"}, enabled)
-        self.assertIn("devin", enabled)
+        self.assertEqual(enabled, {"devin", "codex", "claude", "hyperagent"})
+        # Claude rides the subscription wrapper with a routed model; never a bare `claude` with API env.
+        claude = providers["claude"]
+        self.assertIn("{here}/claude_lane.py", claude["cmd"])
+        self.assertEqual(claude["cmd"][claude["cmd"].index("--model") + 1], "{model}")
+        self.assertEqual({route["model"] for route in claude["routes"]}, {"claude-opus-5-5", "claude-sonnet-5-5"})
         # Every lane run is a fresh worktree; Devin refuses untrusted dirs unless told not to.
         cmd = providers["devin"]["cmd"]
         self.assertEqual(cmd[cmd.index("--respect-workspace-trust") + 1], "false")
@@ -1309,12 +1319,16 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
 
     def test_hyperagent_without_actual_dispatch_proof_holds_before_any_provider_process(self):
-        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
-                                 FakeLinear([]), issue("JOV-6871"))
-        self.assertEqual(receipt["verdict"], "remote-held")
-        self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
-        self.assertNotIn("agentExit", receipt)
-        self.assertFalse((self.host.state / "worktrees").exists())
+        for api in ({"__name__": "hyperagent"}, {"mcp_call": None}, ["invalid-api"]):
+            with self.subTest(api=api), patch("runpy.run_path", return_value=api), \
+                    patch.object(lane.shutil, "which", return_value="/fake/hyperagent"):
+                receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
+                                         FakeLinear([]), issue("JOV-6871"))
+                self.assertEqual(receipt["verdict"], "remote-held")
+                self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
+                self.assertNotIn("agentExit", receipt)
+                self.assertFalse((self.host.state / "worktrees").exists())
+                self.assertEqual(self.ledger()[-1]["verdict"], "remote-held")
 
     def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
@@ -3187,8 +3201,8 @@ class FixRedTest(unittest.TestCase):
                          "a merged target performs zero checkout, install, or push work")
 
     def test_a_lockfile_only_conflict_skips_the_agent_and_records_gate_intent(self):
-        real, real_resolve, real_agent = lane.sh, lane.resolve_lockfile_conflict, lane.run_agent
-        lane.resolve_lockfile_conflict = lambda worktree, branch, log, **kwargs: True
+        real, real_resolve, real_agent = lane.sh, lane.resolve_generated_conflict, lane.run_agent
+        lane.resolve_generated_conflict = lambda worktree, branch, log, **kwargs: True
         lane.run_agent = lambda *a, **k: self.fail("a lockfile-only conflict needs no model")
         calls = []
 
@@ -3209,8 +3223,8 @@ class FixRedTest(unittest.TestCase):
                                           {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
                 pending = json.loads((host.state / "requeue.json").read_text())
             finally:
-                lane.sh, lane.resolve_lockfile_conflict, lane.run_agent = real, real_resolve, real_agent
-        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "lockfile-regenerated"))
+                lane.sh, lane.resolve_generated_conflict, lane.run_agent = real, real_resolve, real_agent
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "generated-regenerated"))
         self.assertNotIn(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], calls)
         self.assertEqual(pending, {"5": "h9"})
         self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in calls))
@@ -3588,7 +3602,7 @@ class FixRedTest(unittest.TestCase):
                           second["verdict"], second["execution"]["attempt"]), (None, "retry", "fix-no-change", 2))
 
     def test_non_lockfile_conflict_preserves_the_second_agent_attempt(self):
-        real_sh, real_excerpt, real_resolve = lane.sh, lane.failure_excerpt, lane.resolve_lockfile_conflict
+        real_sh, real_excerpt, real_resolve = lane.sh, lane.failure_excerpt, lane.resolve_generated_conflict
 
         def fake(args, cwd=None, timeout=600, env=None, log=None):
             if args[:2] == ["git", "ls-remote"]:
@@ -3602,10 +3616,10 @@ class FixRedTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stderr="", stdout="")
 
         lane.sh, lane.failure_excerpt = fake, lambda pr: "err"
-        lane.resolve_lockfile_conflict = lambda worktree, branch, log: False
+        lane.resolve_generated_conflict = lambda worktree, branch, log: False
         self.addCleanup(lambda: (setattr(lane, "sh", real_sh),
                                  setattr(lane, "failure_excerpt", real_excerpt),
-                                 setattr(lane, "resolve_lockfile_conflict", real_resolve)))
+                                 setattr(lane, "resolve_generated_conflict", real_resolve)))
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             dirty = {**self.pr(), "mergeStateStatus": "DIRTY"}
@@ -3946,7 +3960,9 @@ class GateSingleflightTest(unittest.TestCase):
             result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
         self.assertEqual(result["verdict"], "gate-deferred")
         self.assertEqual(self.fake.calls.count(lane.CANONICAL_GATE), 1)
-        self.assertEqual(result["stage"], "after-gate")
+        # The moved head is caught before the next gate command (the funnel gate) runs.
+        self.assertEqual(result["stage"], "before-gate-command")
+        self.assertFalse(any("scripts/funnel-judge/preview-gate.mjs" in c for c in self.fake.calls))
         self.assertIn("gateWaitS", result)
         self.assertFalse((self.host.state / "verified.json").exists())
         self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in self.fake.calls))
@@ -4714,7 +4730,7 @@ class OnePrPerIssueTest(unittest.TestCase):
 
 
 class LockfileConflictTest(unittest.TestCase):
-    """JOV-6837: a lockfile-only conflict is resolved without a model; anything else is not."""
+    """JOV-6837/JOV-7594: a generated-file-only conflict is resolved without a model; anything else is not."""
 
     def test_rechecks_target_immediately_before_runner_owned_install_and_push(self):
         for conflict in (True, False):
@@ -4726,14 +4742,14 @@ class LockfileConflictTest(unittest.TestCase):
             guard = Mock(side_effect=[None, lane.RepairStopped("target-pr-merged", {"state": "MERGED"}, "command")])
             with self.subTest(conflict=conflict), patch.object(lane, "sh", side_effect=shell):
                 with self.assertRaises(lane.RepairStopped):
-                    lane.resolve_lockfile_conflict(Path("/not-used"), "branch", None, guard=guard)
+                    lane.resolve_generated_conflict(Path("/not-used"), "branch", None, guard=guard)
             self.assertFalse(any(cmd[:2] == ["pnpm", "install"] or cmd[:2] == ["git", "push"] for cmd in calls))
 
     def git(self, *args, cwd):
         return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
                               check=True, capture_output=True, text=True).stdout.strip()
 
-    def repo(self, tmp: Path, pr_changes: dict):
+    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None):
         origin, work = tmp / "origin.git", tmp / "work"
         self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
         self.git("clone", "-q", str(origin), str(work), cwd=tmp)
@@ -4744,13 +4760,17 @@ class LockfileConflictTest(unittest.TestCase):
         self.git("push", "-q", "origin", "HEAD:main", cwd=work)
         self.git("checkout", "-q", "-b", "devin/jov-1-20260927", cwd=work)
         for name, text in pr_changes.items():
+            (work / name).parent.mkdir(parents=True, exist_ok=True)
             (work / name).write_text(text)
-        self.git("commit", "-qam", "pr", cwd=work)
+        self.git("add", "-A", cwd=work)
+        self.git("commit", "-qm", "pr", cwd=work)
         self.git("push", "-q", "origin", "HEAD:devin/jov-1-20260927", cwd=work)
         self.git("checkout", "-q", "main", cwd=work)
-        (work / "pnpm-lock.yaml").write_text("main\n")
-        (work / "a.ts").write_text("main\n")
-        self.git("commit", "-qam", "main moves", cwd=work)
+        for name, text in (main_changes or {"pnpm-lock.yaml": "main\n", "a.ts": "main\n"}).items():
+            (work / name).parent.mkdir(parents=True, exist_ok=True)
+            (work / name).write_text(text)
+        self.git("add", "-A", cwd=work)
+        self.git("commit", "-qm", "main moves", cwd=work)
         self.git("push", "-q", "origin", "HEAD:main", cwd=work)
         self.git("checkout", "-q", "devin/jov-1-20260927", cwd=work)
         self.git("fetch", "-q", "origin", cwd=work)
@@ -4764,6 +4784,11 @@ class LockfileConflictTest(unittest.TestCase):
             if args[:2] == ["pnpm", "install"]:
                 (Path(cwd) / "pnpm-lock.yaml").write_text("regenerated\n")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if args == ["pnpm", "ci:topology:write"]:
+                target = Path(cwd) / ".github/workflow-topology.gen.yml"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("regenerated\n")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
             return real(args, cwd=cwd, timeout=timeout, env=env)
         lane.sh = sh
         try:
@@ -4773,7 +4798,7 @@ class LockfileConflictTest(unittest.TestCase):
                 saved = dict(os.environ)
                 os.environ.update(env)
                 try:
-                    return lane.resolve_lockfile_conflict(work, "devin/jov-1-20260927", log), calls
+                    return lane.resolve_generated_conflict(work, "devin/jov-1-20260927", log), calls
                 finally:
                     os.environ.clear()
                     os.environ.update(saved)
@@ -4789,6 +4814,29 @@ class LockfileConflictTest(unittest.TestCase):
             pushed = self.git("show", "devin/jov-1-20260927:pnpm-lock.yaml", cwd=origin)
             self.assertEqual(pushed, "regenerated")
             self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
+
+    def test_generated_topology_conflict_is_regenerated_and_pushed(self):
+        """JOV-7594: a generated-file conflict regenerates instead of hand-merging."""
+        path = ".github/workflow-topology.gen.yml"
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: "pr\n"},
+                                     main_changes={path: "main\n", "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertIn(["pnpm", "ci:topology:write"], calls)
+            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
+            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
+
+    def test_mixed_generated_conflicts_run_each_resolver_once(self):
+        topology = ".github/workflow-topology.gen.yml"
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", topology: "pr\n"},
+                                     main_changes={"pnpm-lock.yaml": "main\n", topology: "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertEqual(calls.count(["pnpm", "install", "--lockfile-only", "--ignore-scripts"]), 1)
+            self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
 
     def test_a_source_conflict_is_left_to_the_agent_untouched(self):
         with tempfile.TemporaryDirectory() as tmp:

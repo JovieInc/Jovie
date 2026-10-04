@@ -182,7 +182,8 @@ def relay_targets(event: str, payload: dict) -> list[tuple[int, str, str | None]
 def disabled_lanes(providers: dict | None = None) -> set[str]:
     if providers is None:
         providers = json.loads((HERE / "providers.json").read_text())
-    return {name for name, spec in providers.items() if not spec.get("enabled", True)}
+    # Same set as `providers - cost_order`: remote-only lanes' drafts are maintained locally.
+    return set(providers) - set(cost_order(providers))
 
 
 def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
@@ -756,8 +757,11 @@ def iso_ts(stamp: str | None) -> float | None:
 
 
 def cost_order(providers: dict) -> list[str]:
-    """Enabled lanes, cheapest first: providers.json lists them in cost order."""
-    return [name for name, spec in providers.items() if spec.get("enabled", True)]
+    """Enabled lanes that repair locally, cheapest first: providers.json lists them in cost order.
+    A remote-only lane (`repairs: false`) is left out, so its drafts are maintained like a
+    disabled lane's."""
+    return [name for name, spec in providers.items()
+            if spec.get("enabled", True) and spec.get("repairs") is not False]
 
 
 def may_take(name: str, pr: dict, record: dict, order: list[str], now: float) -> bool:
@@ -1325,7 +1329,8 @@ def ledger(host, receipt: dict) -> None:
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
 pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
-baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt
+baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
+isCrossRepository createdAt updatedAt
 labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 

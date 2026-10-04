@@ -44,7 +44,7 @@ struct MobileActionLoopCalendarResponse: Codable, Equatable, Sendable {
       MobileActionLoopCalendarEventItem(
         id: "event-1",
         title: "Brooklyn show",
-        subtitle: "Brooklyn, NY · Bandsintown",
+        subtitle: "Brooklyn, NY · Imported",
         eventDate: "2026-07-10T20:00:00.000Z",
         eventType: "tour",
         confirmationStatus: "pending",
