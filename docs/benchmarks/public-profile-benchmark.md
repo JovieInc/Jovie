@@ -178,6 +178,28 @@ that anyone with the targets file can check.
   by this harness. For speed, the planned answer is public field data from the
   Chrome UX Report, which requires no page loads.
 
+## First hosted run (2026-10-04)
+
+Receipt: `scripts/public-benchmark/receipts/2026-10-04-hosted.json`
+(methodology `2026-10-03.3`, GitHub `ubuntu-latest`, 5 runs per profile,
+run 37203734926).
+
+| Median | Jovie | Platform A | Platform B | Platform C |
+| --- | ---: | ---: | ---: | ---: |
+| LCP (simulated mobile) | 6.03 s | not measured | 12.41 s | 7.50 s |
+| TBT | 342 ms | not measured | 609 ms | 617 ms |
+| CLS | 0 | not measured | 0.017 | 0.001 |
+| TTFB (unthrottled) | 20 ms | not measured | not measured | 406 ms |
+| Total bytes | 1.26 MB | not measured | 4.27 MB | 1.28 MB |
+| Agent readiness | 90 | not measured | 30 | 38.3 |
+
+Every comparative claim stays *unknown* while Platform A is unmeasured.
+Against B and C, Jovie leads on LCP, TBT, CLS, TTFB and agent readiness, but
+is only 1% lighter than C on bytes, inside the 10% margin, so the bytes claim
+fails. A 6 s simulated-mobile LCP on the hosted runner is also slow in
+absolute terms. The hosted runner's CPU is slower than the laptop's, which
+Lighthouse's simulation amplifies.
+
 ## First dry run (2026-10-04, not publishable)
 
 Receipt: `scripts/public-benchmark/receipts/2026-10-04-local-dry-run.json`
