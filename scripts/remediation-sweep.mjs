@@ -12,6 +12,7 @@ import {
   EXHAUSTED_LABEL,
   readVercelReadonlyToken,
   runRemediationSweep,
+  SUMMER_CONFIG_REPO,
   SUMMER_HEALTH_URL,
   VERCEL_PROJECTS,
   VERCEL_TEAM_ID,
@@ -87,6 +88,27 @@ export async function loadOpenPullRequests(
         .at(-1) ?? null;
   }
   return pulls;
+}
+
+export async function loadSummerConfigPullRequests(repo = SUMMER_CONFIG_REPO) {
+  const nodes = JSON.parse(
+    await gh([
+      'pr',
+      'list',
+      '--repo',
+      repo,
+      '--state',
+      'open',
+      '--limit',
+      '500',
+      '--json',
+      'number,isDraft,url,headRefOid,autoMergeRequest,statusCheckRollup',
+    ])
+  );
+  if (nodes.length >= 500) {
+    throw new Error(`${repo} open pull request list hit the 500 cap`);
+  }
+  return nodes;
 }
 
 export async function loadSummerHealth(fetchImpl = fetch) {
@@ -192,6 +214,7 @@ async function main() {
     loadPulls: () =>
       loadOpenPullRequests(process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie'),
     loadHealth: () => loadSummerHealth(),
+    loadSummerPulls: () => loadSummerConfigPullRequests(),
     loadDeployments: () => loadVercelDeployments({ token: token?.token }),
     loadDomains: () => loadDomainRecords(),
     vercelTokenPresent: Boolean(token),
