@@ -42,6 +42,8 @@ function buildBooleanFlag(flagName: AppFlagName): Flag<boolean> {
 }
 
 export const APP_FLAG_REGISTRY = {
+  YOUTUBE_WORKSPACE_NAV: buildBooleanFlag('YOUTUBE_WORKSPACE_NAV'),
+  JOVIE_WORK_NAV: buildBooleanFlag('JOVIE_WORK_NAV'),
   BILLING_UPGRADE_DIRECT: buildBooleanFlag('BILLING_UPGRADE_DIRECT'),
   SMARTLINK_PRE_SAVE: buildBooleanFlag('SMARTLINK_PRE_SAVE'),
   IOS_APPLE_MUSIC_PRIORITY: buildBooleanFlag('IOS_APPLE_MUSIC_PRIORITY'),
