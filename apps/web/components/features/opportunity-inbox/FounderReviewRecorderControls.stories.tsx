@@ -1,11 +1,44 @@
+import { useState } from 'react';
+import '@/app/globals.css';
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { FounderReviewReceipt } from '@/lib/founder-review/contract';
 import { FounderReviewRecorderControls } from './FounderReviewRecorderControls';
+
+function RecorderPreview(
+  args: Parameters<typeof FounderReviewRecorderControls>[0]
+) {
+  const [typedText, setTypedText] = useState(args.typedText);
+  const [keepAudio, setKeepAudio] = useState(args.keepAudio);
+  const [allowContentUse, setAllowContentUse] = useState(args.allowContentUse);
+  const [sessionActive, setSessionActive] = useState(args.sessionActive);
+  return (
+    <div className='min-h-screen bg-(--app-shell-content-surface) p-4 sm:p-6'>
+      <div className='w-full max-w-2xl'>
+        <FounderReviewRecorderControls
+          {...args}
+          typedText={typedText}
+          keepAudio={keepAudio}
+          allowContentUse={allowContentUse}
+          sessionActive={sessionActive}
+          onTypedTextChange={setTypedText}
+          onKeepAudioChange={setKeepAudio}
+          onAllowContentUseChange={setAllowContentUse}
+          onStart={() => setSessionActive(true)}
+          onStop={() => setSessionActive(false)}
+        />
+      </div>
+    </div>
+  );
+}
 
 const meta = {
   title: 'Dashboard/Opportunity Inbox/Founder Review Recorder Controls',
   component: FounderReviewRecorderControls,
   parameters: { layout: 'fullscreen' },
+  render: args => (
+    <RecorderPreview key={JSON.stringify(args.target)} {...args} />
+  ),
 } satisfies Meta<typeof FounderReviewRecorderControls>;
 
 export default meta;
@@ -121,4 +154,32 @@ export const ErrorState: Story = {
     ...Idle.args,
     error: 'Microphone permission was denied. Typed notes still work.',
   },
+};
+
+export const RetainedAudio: Story = {
+  args: {
+    ...Idle.args,
+    latestReceipt: {
+      ...receipt,
+      recording: { ...receipt.recording, mediaAvailable: true },
+    },
+  },
+};
+
+export const BrainDump: Story = {
+  args: {
+    ...Idle.args,
+    target: {
+      type: 'founder-note',
+      id: 'founder-brain-dump',
+      title: 'Inbox Brain Dump',
+      sourceKind: 'founder.brain_dump',
+      category: 'note',
+    },
+  },
+};
+
+export const Light: Story = {
+  ...BrainDump,
+  parameters: { themes: { themeOverride: 'light' } },
 };

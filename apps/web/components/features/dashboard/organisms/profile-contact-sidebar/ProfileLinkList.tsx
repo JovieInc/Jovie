@@ -252,7 +252,7 @@ export function ProfileLinkList({
         return (
           <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
             <p className='py-1 text-xs text-tertiary-token'>
-              No music links yet. Click + to add one.
+              No music links yet.{onAddLink ? ' Click + to add one.' : ''}
             </p>
           </div>
         );
@@ -275,8 +275,8 @@ export function ProfileLinkList({
       return (
         <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
           <p className='py-1 text-xs text-tertiary-token'>
-            No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click
-            + to add one.
+            No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet.
+            {onAddLink ? ' Click + to add one.' : ''}
           </p>
         </div>
       );

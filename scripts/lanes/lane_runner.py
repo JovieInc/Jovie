@@ -4852,8 +4852,12 @@ def remove_worktree(host: Host, worktree: Path) -> None:
         record_worktree_disposition(host, worktree, "preserved", "unpublished-work")
         preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-unpublished-work"]})
         return
-    record_worktree_disposition(host, worktree, "removed")
-    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+    # Proven clean and published: hand it to the next run installed, instead of spending
+    # minutes deleting ~230k node_modules files (JOV-7723).
+    slot = worktree_pool.recycle(host.repo, worktree)
+    record_worktree_disposition(host, worktree, "recycled" if slot else "removed", slot)
+    if not slot:
+        sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
 
 
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
