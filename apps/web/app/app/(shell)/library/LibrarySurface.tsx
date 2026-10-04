@@ -119,6 +119,7 @@ import {
   type TableRowMode,
 } from '@/components/organisms/table/table.styles';
 import {
+  isFormElement,
   isInteractiveOverlayTarget,
   resolveTableNavAction,
 } from '@/components/organisms/table/utils/tableKeyMap';
@@ -1659,6 +1660,74 @@ const AssetCard = memo(function AssetCard({
   );
 });
 
+export type LibraryReviewStep =
+  | { readonly kind: 'move'; readonly delta: number }
+  | { readonly kind: 'edge'; readonly to: 'first' | 'last' }
+  | { readonly kind: 'play' }
+  | { readonly kind: 'open' };
+
+/**
+ * Keyboard review across grid, list and table: J/K and arrows move, Space
+ * plays, Enter inspects. In the grid, up and down jump a row of tiles.
+ * Focused controls keep their native keys, except the tile itself, where
+ * Space plays instead of opening.
+ */
+export function resolveLibraryReviewStep(
+  key: string,
+  target: EventTarget | null,
+  gridColumns: number | null
+): LibraryReviewStep | null {
+  if (target instanceof Element && target.closest('[role="slider"]')) {
+    return null;
+  }
+  const nativeControl =
+    target instanceof Element &&
+    Boolean(target.closest('button, a[href]')) &&
+    !target.closest('[data-library-item-focus]');
+  const isGrid = gridColumns !== null;
+  if (isGrid && (key === 'ArrowRight' || key === 'ArrowLeft')) {
+    return isFormElement(target)
+      ? null
+      : { kind: 'move', delta: key === 'ArrowRight' ? 1 : -1 };
+  }
+  const rowStep = isGrid ? Math.max(1, gridColumns) : 1;
+  switch (resolveTableNavAction(key, target)) {
+    case 'next':
+      return { kind: 'move', delta: key === 'ArrowDown' ? rowStep : 1 };
+    case 'prev':
+      return { kind: 'move', delta: key === 'ArrowUp' ? -rowStep : -1 };
+    case 'first':
+      return { kind: 'edge', to: 'first' };
+    case 'last':
+      return { kind: 'edge', to: 'last' };
+    case 'toggle':
+      return nativeControl ? null : { kind: 'play' };
+    case 'activate':
+      // Buttons and tiles activate natively; only the page itself needs help.
+      return target instanceof Element && target.closest('button, a[href]')
+        ? null
+        : { kind: 'open' };
+    default:
+      return null;
+  }
+}
+
+/** The tile button or table row that carries keyboard focus for an item. */
+function findLibraryItemFocusTarget(
+  region: HTMLElement,
+  id: string
+): HTMLElement | null {
+  const tile = Array.from(
+    region.querySelectorAll<HTMLElement>('[data-library-item-id]')
+  ).find(element => element.dataset.libraryItemId === id);
+  if (tile) return tile.querySelector<HTMLElement>('[data-library-item-focus]');
+  return (
+    Array.from(region.querySelectorAll<HTMLElement>('tr[data-testid]')).find(
+      row => row.dataset.testid?.endsWith(`-row-${id}`)
+    ) ?? null
+  );
+}
+
 function AssetGrid({
   assets,
   selectedId,
@@ -1682,6 +1751,7 @@ function AssetGrid({
 }) {
   return (
     <div
+      data-library-grid
       className={cn(
         LIBRARY_GRID_DENSITY_LAYOUT[gridDensity],
         LIBRARY_CONTENT_INSET_CLASS
@@ -1734,6 +1804,8 @@ function LibraryReleaseTable({
   rowMode,
   playingPreviewId,
   onSelect,
+  onCursor,
+  onRowToggle,
   onTogglePreview,
   getContextMenuItems,
 }: {
@@ -1745,6 +1817,10 @@ function LibraryReleaseTable({
   readonly rowMode: TableRowMode;
   readonly playingPreviewId?: string | null;
   readonly onSelect: (id: string) => void;
+  /** Keyboard focus moved to a row; selection (and an open inspector) follows. */
+  readonly onCursor: (id: string) => void;
+  /** Space on a row. */
+  readonly onRowToggle: (asset: LibraryReleaseAsset) => void;
   readonly onTogglePreview?: LibraryPreviewToggle;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
 }) {
@@ -1768,6 +1844,11 @@ function LibraryReleaseTable({
       data={tableData}
       columns={columns}
       onRowClick={asset => onSelect(asset.id)}
+      onRowToggle={onRowToggle}
+      onFocusedRowChange={index => {
+        const asset = tableData[index];
+        if (asset) onCursor(asset.id);
+      }}
       getRowId={getRowId}
       getRowTestId={getRowTestId}
       rowSelection={rowSelection}
@@ -2926,6 +3007,74 @@ export function LibrarySurface({
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [drawerOpen]);
 
+  // Keyboard review (J/K/arrows move, Space plays, Enter inspects) for the
+  // grid, and for every view while focus rests on the page. Focused table
+  // rows handle their own keys and report moves through onCursor.
+  const catalogRegionRef = useRef<HTMLDivElement | null>(null);
+  const reviewKeyDownRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  function handleReviewKeyDown(event: KeyboardEvent) {
+    if (event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const region = catalogRegionRef.current;
+    const target = event.target;
+    if (!region || isInteractiveOverlayTarget(target)) return;
+    const onPage =
+      target === null ||
+      target === document.body ||
+      target === document.documentElement;
+    if (!onPage && !(target instanceof Node && region.contains(target))) {
+      return;
+    }
+    const grid = region.querySelector<HTMLElement>('[data-library-grid]');
+    const gridColumns =
+      view === 'grid' && grid
+        ? getComputedStyle(grid)
+            .getPropertyValue('grid-template-columns')
+            .split(' ')
+            .filter(Boolean).length || 1
+        : null;
+    const step = resolveLibraryReviewStep(event.key, target, gridColumns);
+    if (!step || visibleAssets.length === 0) return;
+
+    const index = visibleAssets.findIndex(asset => asset.id === selectedId);
+    const cursor = index === -1 ? null : visibleAssets[index];
+    if (step.kind === 'play' || step.kind === 'open') {
+      if (!cursor) return;
+      event.preventDefault();
+      if (step.kind === 'play') handleTogglePreview(cursor);
+      else openAsset(cursor.id);
+      return;
+    }
+
+    event.preventDefault();
+    const last = visibleAssets.length - 1;
+    const nextIndex =
+      step.kind === 'edge'
+        ? step.to === 'first'
+          ? 0
+          : last
+        : index === -1
+          ? step.delta > 0
+            ? 0
+            : last
+          : Math.min(last, Math.max(0, index + step.delta));
+    const next = visibleAssets[nextIndex];
+    if (!next) return;
+    setSelectedId(next.id);
+    const focusTarget = findLibraryItemFocusTarget(region, next.id);
+    focusTarget?.focus({ preventScroll: true });
+    focusTarget?.scrollIntoView?.({ block: 'nearest' });
+  }
+  useEffect(() => {
+    reviewKeyDownRef.current = handleReviewKeyDown;
+  });
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) =>
+      reviewKeyDownRef.current(event);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleApprovalStatusChange = useCallback(
     async (
       asset: LibraryReleaseAsset,
@@ -3409,7 +3558,10 @@ export function LibrarySurface({
         className='flex h-full min-h-0 flex-1 overflow-hidden'
       >
         <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
-          <div className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'>
+          <div
+            ref={catalogRegionRef}
+            className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'
+          >
             {visibleAssets.length === 0 ? (
               <NoResults onReset={resetView} />
             ) : view === 'grid' ? (
@@ -3432,6 +3584,8 @@ export function LibrarySurface({
                 rowTestIdPrefix='library-catalog-row'
                 rowMode='compact'
                 onSelect={openAsset}
+                onCursor={setSelectedId}
+                onRowToggle={handleTogglePreview}
                 getContextMenuItems={getContextMenuItems}
               />
             ) : (
@@ -3444,6 +3598,8 @@ export function LibrarySurface({
                 rowMode={LIBRARY_LIST_ROW_MODE}
                 playingPreviewId={playingPreviewId}
                 onSelect={openAsset}
+                onCursor={setSelectedId}
+                onRowToggle={handleTogglePreview}
                 onTogglePreview={handleTogglePreview}
                 getContextMenuItems={getContextMenuItems}
               />

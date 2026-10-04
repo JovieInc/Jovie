@@ -10,6 +10,8 @@ export interface TableKeyboardNavConfig<TData> {
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly setFocusedIndex: (index: number) => void;
   readonly onRowClick?: (row: TData) => void;
+  /** Space; falls back to `onRowClick` when omitted. */
+  readonly onRowToggle?: (row: TData) => void;
 }
 
 export interface TableKeyboardNavResult<TData> {
@@ -33,6 +35,7 @@ export function useTableKeyboardNav<TData>({
   rowRefsMap,
   setFocusedIndex,
   onRowClick,
+  onRowToggle,
 }: TableKeyboardNavConfig<TData>): TableKeyboardNavResult<TData> {
   const moveFocus = useCallback(
     (nextIndex: number) => {
@@ -71,13 +74,17 @@ export function useTableKeyboardNav<TData>({
           break;
 
         case 'activate':
-        case 'toggle':
           event.preventDefault();
           onRowClick?.(rowData);
           break;
+
+        case 'toggle':
+          event.preventDefault();
+          (onRowToggle ?? onRowClick)?.(rowData);
+          break;
       }
     },
-    [enabled, rowCount, moveFocus, onRowClick]
+    [enabled, rowCount, moveFocus, onRowClick, onRowToggle]
   );
 
   // Scroll focused row into view when it changes

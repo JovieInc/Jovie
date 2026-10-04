@@ -11,7 +11,10 @@ import {
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
+import {
+  LibrarySurface,
+  resolveLibraryReviewStep,
+} from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { LIBRARY_VIEW_MODE_STORAGE_KEY } from '@/app/app/(shell)/library/library-grid-preferences';
 import { LIBRARY_SAVED_VIEW_STORAGE_KEY } from '@/app/app/(shell)/library/library-saved-views';
@@ -1652,6 +1655,89 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('reviews tiles from the keyboard: J/K move, Space plays, Enter inspects, Esc closes', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Song' }),
+      buildAsset({ id: 'release-3', title: 'Third Song' }),
+    ]);
+    clickGridView();
+    const tile = (title: string) =>
+      screen.getByRole('button', { name: `View ${title}` });
+
+    fireEvent.keyDown(document.body, { key: 'j' });
+    expect(tile('Take Me Over')).toHaveFocus();
+    fireEvent.keyDown(tile('Take Me Over'), { key: 'j' });
+    expect(tile('Second Song')).toHaveFocus();
+    fireEvent.keyDown(tile('Second Song'), { key: 'ArrowRight' });
+    expect(tile('Third Song')).toHaveFocus();
+    fireEvent.keyDown(tile('Third Song'), { key: 'k' });
+    expect(tile('Second Song')).toHaveFocus();
+
+    const space = fireEvent.keyDown(tile('Second Song'), { key: ' ' });
+    expect(space).toBe(false);
+    expect(audioMock.toggleTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'release-2', title: 'Second Song' })
+    );
+    expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+
+    // Enter on the page inspects the cursor; the inspector then follows J/K.
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    const drawer = screen.getByTestId('library-asset-drawer');
+    expect(drawer).toHaveAttribute('aria-hidden', 'false');
+    expect(
+      within(drawer).getByTestId('library-asset-entity-header')
+    ).toHaveTextContent('Second Song');
+    fireEvent.keyDown(tile('Second Song'), { key: 'j' });
+    expect(
+      within(drawer).getByTestId('library-asset-entity-header')
+    ).toHaveTextContent('Third Song');
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('lets list rows play on Space and carries selection with the arrow keys', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Song' }),
+    ]);
+
+    const first = screen.getByTestId('library-release-row-release-1');
+    const second = screen.getByTestId('library-release-row-release-2');
+    fireEvent.click(first);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(second, { key: ' ' });
+    expect(audioMock.toggleTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'release-2' })
+    );
+    expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
+
+  it('leaves typing, menus and sliders alone', () => {
+    renderLibrary([buildAsset()]);
+    clickGridView();
+    const input = document.createElement('input');
+    document.body.append(input);
+
+    fireEvent.keyDown(input, { key: 'j' });
+    expect(
+      screen.getByRole('button', { name: 'View Take Me Over' })
+    ).not.toHaveFocus();
+    input.remove();
+  });
+
   it('does not render route filtering as a second shell search surface', () => {
     renderLibraryWithHeader([
       buildAsset(),
@@ -2151,5 +2237,62 @@ describe('LibrarySurface', () => {
     });
     expect(trigger).toHaveFocus();
     expect(globalThis.scrollY).toBe(320);
+  });
+});
+
+describe('resolveLibraryReviewStep', () => {
+  const page = document.body;
+
+  it('moves one item on J/K and one row of tiles on up/down in the grid', () => {
+    expect(resolveLibraryReviewStep('j', page, 5)).toEqual({
+      kind: 'move',
+      delta: 1,
+    });
+    expect(resolveLibraryReviewStep('k', page, 5)).toEqual({
+      kind: 'move',
+      delta: -1,
+    });
+    expect(resolveLibraryReviewStep('ArrowDown', page, 5)).toEqual({
+      kind: 'move',
+      delta: 5,
+    });
+    expect(resolveLibraryReviewStep('ArrowUp', page, 5)).toEqual({
+      kind: 'move',
+      delta: -5,
+    });
+    expect(resolveLibraryReviewStep('ArrowLeft', page, 5)).toEqual({
+      kind: 'move',
+      delta: -1,
+    });
+    // Lists and tables move one row and leave left/right to scrolling.
+    expect(resolveLibraryReviewStep('ArrowDown', page, null)).toEqual({
+      kind: 'move',
+      delta: 1,
+    });
+    expect(resolveLibraryReviewStep('ArrowRight', page, null)).toBeNull();
+    expect(resolveLibraryReviewStep('End', page, null)).toEqual({
+      kind: 'edge',
+      to: 'last',
+    });
+  });
+
+  it('plays on Space and inspects on Enter without stealing native controls', () => {
+    const tile = document.createElement('button');
+    tile.dataset.libraryItemFocus = '';
+    const control = document.createElement('button');
+    const slider = document.createElement('div');
+    slider.setAttribute('role', 'slider');
+    const input = document.createElement('input');
+
+    expect(resolveLibraryReviewStep(' ', page, 4)).toEqual({ kind: 'play' });
+    expect(resolveLibraryReviewStep(' ', tile, 4)).toEqual({ kind: 'play' });
+    expect(resolveLibraryReviewStep(' ', control, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('Enter', page, 4)).toEqual({
+      kind: 'open',
+    });
+    expect(resolveLibraryReviewStep('Enter', tile, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('j', slider, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('j', input, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('ArrowLeft', input, 4)).toBeNull();
   });
 });
