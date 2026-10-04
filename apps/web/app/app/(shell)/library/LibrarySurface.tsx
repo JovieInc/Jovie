@@ -94,6 +94,7 @@ import {
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -1502,6 +1503,7 @@ function LibraryToolbar({
       }
       end={
         <>
+          <YouTubeLedgerLink />
           <LibraryImportMenu
             canSyncSpotify={canSyncSpotify}
             isSyncingSpotify={isSyncingSpotify}
@@ -1892,6 +1894,19 @@ function LibraryFirstAction({
   );
 }
 
+function YouTubeLedgerLink() {
+  return (
+    <Button
+      asChild
+      variant='ghost'
+      size='sm'
+      className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+    >
+      <Link href={APP_ROUTES.YOUTUBE_REVIVAL}>YouTube Ledger</Link>
+    </Button>
+  );
+}
+
 function EmptyCatalog({
   canSyncSpotify,
   isSyncing,
@@ -1912,12 +1927,15 @@ function EmptyCatalog({
         <PageToolbar
           start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
           end={
-            <LibraryFirstAction
-              canSyncSpotify={canSyncSpotify}
-              isSyncing={isSyncing}
-              onSyncSpotify={onSyncSpotify}
-              testId='library-sync-spotify-toolbar'
-            />
+            <>
+              <YouTubeLedgerLink />
+              <LibraryFirstAction
+                canSyncSpotify={canSyncSpotify}
+                isSyncing={isSyncing}
+                onSyncSpotify={onSyncSpotify}
+                testId='library-sync-spotify-toolbar'
+              />
+            </>
           }
         />
       }
