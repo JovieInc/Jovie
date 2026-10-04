@@ -139,4 +139,15 @@ describe('OutboundWorkspace', () => {
     }>;
     expect(rail.props.row?.leadId).toBe(BEA.leadId);
   });
+
+  it('shows the next action as a button that opens the person', () => {
+    mockQueue(outboundFixtureQueue([ADA, BEA]));
+    renderWorkspace();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Review Facts' })[1]);
+    const rail = mocks.panels.at(-1) as ReactElement<{
+      row: { leadId: string } | null;
+    }>;
+    expect(rail.props.row?.leadId).toBe(BEA.leadId);
+    expect(screen.getAllByText('Not scored').length).toBeGreaterThan(0);
+  });
 });

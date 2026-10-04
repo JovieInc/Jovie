@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AlertTriangle, RefreshCw, Send } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -59,7 +60,7 @@ const BAND_LABELS: Record<OutboundBand, string> = {
   high: 'High',
   medium: 'Med',
   low: 'Low',
-  unknown: '—',
+  unknown: 'Not scored',
 };
 
 const BAND_TITLES = {
@@ -95,9 +96,19 @@ function bandColumn(id: keyof typeof BAND_TITLES, header: string) {
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
 type OutboundColumn = ColumnDef<OutboundRow, any>;
 
+/** Actions Tim takes himself; the rest are waits shown as plain text. */
+const ACTIONABLE = new Set([
+  'build_profile',
+  'review_facts',
+  'approve_message',
+  'send',
+]);
+
 function buildColumns(
   selected: ReadonlySet<string>,
-  toggle: (leadId: string) => void
+  toggle: (leadId: string) => void,
+  activeId: string | null,
+  open: (row: OutboundRow) => void
 ): OutboundColumn[] {
   return [
     columnHelper.display({
@@ -167,12 +178,28 @@ function buildColumns(
     }),
     columnHelper.accessor('nextAction', {
       header: 'Next',
-      cell: ({ row }) => (
-        <span className='truncate text-xs text-secondary-token'>
-          {OUTBOUND_NEXT_ACTION_LABELS[row.original.nextAction]}
-        </span>
-      ),
-      size: 120,
+      cell: ({ row }) => {
+        const label = OUTBOUND_NEXT_ACTION_LABELS[row.original.nextAction];
+        if (!ACTIONABLE.has(row.original.nextAction))
+          return (
+            <span className='truncate text-xs text-tertiary-token'>
+              {label}
+            </span>
+          );
+        return (
+          <Button
+            size='sm'
+            variant={row.original.leadId === activeId ? 'secondary' : 'ghost'}
+            onClick={event => {
+              event.stopPropagation();
+              open(row.original);
+            }}
+          >
+            {label.replace(/\b\w/g, letter => letter.toUpperCase())}
+          </Button>
+        );
+      },
+      size: 132,
     }),
   ];
 }
@@ -400,8 +427,12 @@ export function OutboundWorkspace() {
   ]);
 
   const columns = useMemo<OutboundColumn[]>(
-    () => buildColumns(bulk, toggleBulk),
-    [bulk, toggleBulk]
+    () =>
+      buildColumns(bulk, toggleBulk, selectedId, row => {
+        setSelectedId(row.leadId);
+        setFocusedIndex(rows.indexOf(row));
+      }),
+    [bulk, rows, selectedId, toggleBulk]
   );
 
   const getRowClassName = useCallback(
