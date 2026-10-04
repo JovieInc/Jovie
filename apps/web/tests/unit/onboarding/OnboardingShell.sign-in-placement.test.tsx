@@ -95,3 +95,42 @@ describe('onboarding sign-in placement', () => {
     }
   );
 });
+
+describe('buildEntryProfileBuilderState (JOV-7753)', () => {
+  it('previews a prebuilt page in the rail before the chat knows anything', async () => {
+    const { buildEntryProfileBuilderState } = await import(
+      '@/components/features/onboarding/OnboardingShell'
+    );
+
+    expect(
+      buildEntryProfileBuilderState({
+        status: 'claimable',
+        handle: 'megaran',
+        displayName: 'Mega Ran',
+        avatarUrl: 'https://blob.example.com/a.png',
+        spotifyId: null,
+        spotifyUrl: null,
+        genres: ['hip hop'],
+        socialLinks: ['https://instagram.com/megaran'],
+        linkPlatforms: ['instagram'],
+        linkCount: 1,
+      })
+    ).toEqual({
+      artist: {
+        id: 'handle-megaran',
+        name: 'Mega Ran',
+        url: '',
+        imageUrl: 'https://blob.example.com/a.png',
+        genres: ['hip hop'],
+      },
+      artistConfirmed: false,
+      handle: 'megaran',
+      socialLinks: ['https://instagram.com/megaran'],
+    });
+    expect(
+      buildEntryProfileBuilderState({ status: 'available', handle: 'x-y-z' })
+        .artist
+    ).toBeNull();
+    expect(buildEntryProfileBuilderState(null).artist).toBeNull();
+  });
+});
