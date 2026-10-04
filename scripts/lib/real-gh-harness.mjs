@@ -1,8 +1,17 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  accessSync,
+  closeSync,
+  constants,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -16,17 +25,48 @@ import { crc32 } from 'node:zlib';
 
 export const GH_FAKE_HOST = 'github.localhost';
 
+/**
+ * True when `path` is a script shim (`#!` shebang) rather than the compiled
+ * gh binary. Lane tooling installs a POSIX `gh` wrapper that mints a GH_TOKEN
+ * from a machine-local app key before exec'ing the real CLI; that wrapper
+ * would overwrite the harness credentials (and fail under the harness HOME),
+ * so it does not qualify as the real gh boundary.
+ */
+function isScriptShim(path) {
+  try {
+    const fd = openSync(path, 'r');
+    const head = Buffer.alloc(2);
+    const read = readSync(fd, head, 0, 2, 0);
+    closeSync(fd);
+    return read === 2 && head.toString('latin1') === '#!';
+  } catch {
+    return false;
+  }
+}
+
 /** Absolute path of the real gh binary, or null when it is not installed. */
 export function resolveRealGh() {
+  const candidates = [];
   try {
-    return (
-      execFileSync('sh', ['-c', 'command -v gh'], {
-        encoding: 'utf8',
-      }).trim() || null
-    );
+    const first = execFileSync('sh', ['-c', 'command -v gh'], {
+      encoding: 'utf8',
+    }).trim();
+    if (first) candidates.push(first);
   } catch {
-    return null;
+    // keep scanning PATH below
   }
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    const candidate = join(dir, 'gh');
+    if (candidates.includes(candidate)) continue;
+    try {
+      accessSync(candidate, constants.X_OK);
+      candidates.push(candidate);
+    } catch {
+      // not executable here
+    }
+  }
+  return candidates.find(candidate => !isScriptShim(candidate)) ?? null;
 }
 
 /** First line of `gh --version`, recorded as the exercised boundary version. */
@@ -116,7 +156,9 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
+          // The resolved real binary's directory leads PATH so lane `gh`
+          // shim wrappers earlier on PATH cannot shadow it.
+          PATH: `${dirname(binary)}${delimiter}${process.env.PATH}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
