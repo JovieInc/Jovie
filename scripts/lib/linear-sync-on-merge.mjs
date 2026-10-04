@@ -16,7 +16,10 @@ import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GREEN_MARKER } from './remediation-signal.mjs';
-import { LIFECYCLE_STATES } from './validation-lifecycle.mjs';
+import {
+  formatValidationReceipt,
+  LIFECYCLE_STATES,
+} from './validation-lifecycle.mjs';
 import {
   createProductionFacts,
   fetchWithRetry,
@@ -427,7 +430,26 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
     body: JSON.stringify({ query, variables }),
   });
   if (!response.ok) {
-    throw new Error(`Linear HTTP ${response.status}`);
+    // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
+    // lifecycle key is shared with Summer and agents, so name it plainly.
+    /** @type {any} */
+    const body = await response.json().catch(() => null);
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+    const limited = errors.some(
+      (/** @type {any} */ error) => error?.extensions?.code === 'RATELIMITED'
+    );
+    const detail = errors
+      .map((/** @type {any} */ error) => String(error?.message ?? ''))
+      .filter(Boolean)
+      .join('; ');
+    throw Object.assign(
+      new Error(
+        limited
+          ? `Linear rate limited (HTTP ${response.status})`
+          : `Linear HTTP ${response.status}${detail ? `: ${detail}` : ''}`
+      ),
+      { rateLimited: limited }
+    );
   }
   const payload =
     /** @type {{ errors?: unknown, data?: Record<string, any> }} */ (
@@ -524,7 +546,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier }
+    nodes { identifier updatedAt }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -772,6 +794,8 @@ export async function syncLinearIssueOnMerge(options = {}) {
 
   const lookups = [];
   if (sweep) {
+    /** @type {{ identifier: string, updatedAt: string }[]} */
+    const found = [];
     let after = null;
     for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
       const data = await linearGraphql(fetchImpl, apiKey, SWEEP_QUERY, {
@@ -783,11 +807,23 @@ export async function syncLinearIssueOnMerge(options = {}) {
         after,
       });
       for (const node of data.issues?.nodes ?? []) {
-        if (typeof node?.identifier === 'string') lookups.push(node.identifier);
+        if (typeof node?.identifier === 'string') {
+          found.push({
+            identifier: node.identifier,
+            updatedAt: String(node.updatedAt ?? ''),
+          });
+        }
       }
       if (data.issues?.pageInfo?.hasNextPage !== true) break;
       after = data.issues.pageInfo.endCursor;
     }
+    // Least recently touched first: when a budget runs out mid-sweep, the
+    // next sweep starts where this one could not reach.
+    found.sort(
+      (left, right) =>
+        (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0)
+    );
+    lookups.push(...found.map(entry => entry.identifier));
   } else {
     lookups.push(ref.issueId || ref.identifier);
   }
@@ -795,7 +831,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
   const results = [];
   const failures = [];
-  for (const lookupId of lookups) {
+  for (const [index, lookupId] of lookups.entries()) {
     try {
       results.push(
         await reconcileIssueLifecycle({
@@ -817,6 +853,15 @@ export async function syncLinearIssueOnMerge(options = {}) {
       const message = error instanceof Error ? error.message : String(error);
       failures.push(`${lookupId}: ${message}`);
       log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
+      if (/** @type {{ rateLimited?: boolean }} */ (error)?.rateLimited) {
+        const deferred = lookups.length - index - 1;
+        if (deferred > 0) {
+          failures.push(
+            `${deferred} issue(s) deferred to the next sweep by the Linear rate limit`
+          );
+        }
+        break;
+      }
     }
   }
   const reasons = [...failures];
@@ -837,11 +882,60 @@ export async function syncLinearIssueOnMerge(options = {}) {
   };
 }
 
+/**
+ * Record an owner receipt: `receipt --issue JOV-1 --kind outcome --status pass
+ * --sha <full sha> --evidence <url>`.
+ *
+ * @param {readonly string[]} args
+ * @param {{ fetchImpl?: HttpFetch, env?: NodeJS.ProcessEnv }} [options]
+ */
+export async function recordValidationReceipt(args, options = {}) {
+  const value = (/** @type {string} */ name) => {
+    const index = args.indexOf(name);
+    return index === -1 ? '' : String(args[index + 1] ?? '');
+  };
+  const body = formatValidationReceipt({
+    issue: value('--issue').toUpperCase(),
+    kind: value('--kind'),
+    status: /** @type {'pass' | 'fail'} */ (value('--status')),
+    sha: value('--sha'),
+    evidence: value('--evidence'),
+  });
+  const env = options.env ?? process.env;
+  const apiKey = env.LINEAR_API_KEY ?? '';
+  if (!apiKey)
+    throw new Error('LINEAR_API_KEY is required to record a receipt');
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const data = await linearGraphql(fetchImpl, apiKey, ISSUE_STATE_QUERY, {
+    issueId: value('--issue').toUpperCase(),
+  });
+  if (typeof data.issue?.id !== 'string') {
+    throw new Error(`Could not resolve ${value('--issue')}`);
+  }
+  const created = await linearGraphql(
+    fetchImpl,
+    apiKey,
+    `mutation AddValidationReceipt($issueId: String!, $body: String!) {
+      commentCreate(input: { issueId: $issueId, body: $body }) { success }
+    }`,
+    { issueId: data.issue.id, body }
+  );
+  if (created.commentCreate?.success !== true) {
+    throw new Error('Linear refused the validation receipt');
+  }
+  return body;
+}
+
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isDirectRun) {
-  syncLinearIssueOnMerge().catch(error => {
+  const [command, ...rest] = process.argv.slice(2);
+  const run =
+    command === 'receipt'
+      ? recordValidationReceipt(rest).then(body => console.log(body))
+      : syncLinearIssueOnMerge();
+  run.catch(error => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
     process.exitCode = 1;

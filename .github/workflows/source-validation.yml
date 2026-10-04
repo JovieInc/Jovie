@@ -1,4 +1,8 @@
 name: Source Validation
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: GitHub re-runs pull_request workflows on PR body/title edits and offers no native reuse of the same head's checks; one read-only run lookup per job reuses the exact-head proof.
+# removal-trigger: Remove the lookup when body-dependent decisions leave Source Validation or GitHub stops re-running pull_request workflows on metadata-only edits.
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
@@ -18,17 +22,49 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
+      actions: read
       contents: read
       pull-requests: read
     steps:
-      - &source-checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A PR body/title edit re-runs this workflow at an unchanged head and
+      # base. 262 of 303 same-head reruns on 2026-10-03 were body edits. When
+      # the newest completed earlier run for this exact head and branch
+      # succeeded, its proof still holds: only body-dependent decisions (the
+      # customer changelog guard) are re-proven. A base retarget, a failed or
+      # cancelled predecessor, or an unreadable run list runs everything.
+      - &proof-reuse
+        name: Reuse exact-head proof for a metadata-only edit
+        id: reuse
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          reuse=false proof=''
+          if [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+            runs="$(gh api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=100")"; then
+            proof="$(jq -r --arg sha "$HEAD_SHA" --arg ref "$HEAD_REF" --argjson run "$RUN_ID" '
+              [.workflow_runs[]
+                | select(.id < $run and .head_sha == $sha and .head_branch == $ref
+                  and .path == ".github/workflows/source-validation.yml")]
+              | sort_by(.id) | last
+              | select(.conclusion == "success") | .id' <<<"$runs" 2>/dev/null || true)"
+          fi
+          if [[ "$proof" =~ ^[1-9][0-9]*$ ]]; then
+            reuse=true
+            echo "::notice::Metadata-only edit at $HEAD_SHA reuses Source Validation run $proof."
+          fi
+          printf 'reuse=%s\nproof_run=%s\n' "$reuse" "$proof" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - &source-setup
-        uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-node-pnpm
       - name: Validate performance policy source bindings
         run: node scripts/invariants/performance-factory.mjs
       - name: Measure actual installed source dependency graph
@@ -46,6 +82,7 @@ jobs:
       # diff touches in-scope UI components; without browsers the gate fails
       # closed before any story is measured.
       - name: Setup Playwright (Chromium)
+        if: steps.reuse.outputs.reuse != 'true'
         uses: ./.github/actions/setup-playwright
       - name: Validate customer changelog decision from trusted base
         shell: bash
@@ -74,7 +111,22 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts/agent-context | tar -x -C "$guard_root"
           node "$guard_root/scripts/agent-context/merge-budget.mjs" --base "$trusted_ref" --head "$EXPECTED_HEAD"
+      - name: Validate UI interaction source from trusted base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "$BASE_BRANCH"
+          trusted_ref="$(git rev-parse --verify "refs/remotes/origin/$BASE_BRANCH^{commit}")"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/ui-interaction-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/design-frontend-skill-check.mjs | tar -x -C "$guard_root"
+          node "$guard_root/scripts/design-frontend-skill-check.mjs" --diff-base "$trusted_ref"
       - name: Run deterministic source contract
+        if: steps.reuse.outputs.reuse != 'true'
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           TURBO_SCM_BASE: origin/${{ github.base_ref }}
@@ -92,27 +144,58 @@ jobs:
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate
+          pnpm screen-registration-gate
+          pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts
           pnpm ci:control:test
       - name: Verify changed CLI publication behavior
+        if: steps.reuse.outputs.reuse != 'true'
         shell: bash
         run: |
           set -euo pipefail
           base_sha="$(git merge-base 'origin/${{ github.base_ref }}' HEAD)"
-          changed_cli="$(git diff --name-only "$base_sha" HEAD -- packages/jovie-cli .github/workflows/npm-publish.yml .github/workflows/source-validation.yml)"
+          # The CLI and every public API route it calls (JOV-7714): a route
+          # change can break the CLI's error contract as surely as a CLI edit.
+          changed_cli="$(git diff --name-only "$base_sha" HEAD -- \
+            packages/jovie-cli \
+            .github/workflows/npm-publish.yml \
+            .github/workflows/cli-chaos-nightly.yml \
+            .github/workflows/source-validation.yml \
+            ':(literal)apps/web/app/api/v1/[username]' \
+            apps/web/app/api/v1/openapi.json \
+            apps/web/app/api/v1/actions \
+            apps/web/app/api/agents \
+            apps/web/app/llms.txt \
+            apps/web/app/llms-full.txt \
+            ':(literal)apps/web/app/[username]/llms.txt' \
+            apps/web/lib/api/v1)"
           if [ -n "$changed_cli" ]; then
             pnpm --filter @jovie/cli run test:coverage
             pnpm --filter @jovie/cli run typecheck
             pnpm --filter @jovie/cli run build
             pnpm --filter @jovie/cli run pack:dry
+            pnpm --filter @jovie/cli run chaos:gate
           fi
   security:
     name: Security Evidence
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
     steps:
-      - *source-checkout
-      - *source-setup
+      - *proof-reuse
+      - &reused-checkout
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - &reused-setup
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: ./.github/actions/setup-node-pnpm
       - name: Scan the exact source diff
+        if: steps.reuse.outputs.reuse != 'true'
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
@@ -123,10 +206,15 @@ jobs:
     name: Migration Guard
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
     steps:
-      - *source-checkout
-      - *source-setup
+      - *proof-reuse
+      - *reused-checkout
+      - *reused-setup
       - name: Validate changed migration surfaces
+        if: steps.reuse.outputs.reuse != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
@@ -147,10 +235,15 @@ jobs:
     name: Exact-head Coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
     steps:
-      - *source-checkout
-      - *source-setup
+      - *proof-reuse
+      - *reused-checkout
+      - *reused-setup
       - name: Run changed-behavior coverage ratchet
+        if: steps.reuse.outputs.reuse != 'true'
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
