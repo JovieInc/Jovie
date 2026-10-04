@@ -38,15 +38,20 @@ describe('marketing composition registry gate', () => {
       validateMarketingComposition(
         composition([
           section('hero', 'centered-none'),
-          section('faq', 'objection-handler', 1),
+          section('feature-split', 'editorial', 1),
+          section('faq', 'objection-handler', 2),
+          section('cta', 'final-single-claim', 3),
         ])
       )
     ).toEqual({ valid: true, issues: [] });
-    expect(
-      assertMarketingComposition(
-        composition([section('hero', 'centered-none')])
-      )
-    ).toBeDefined();
+  });
+
+  it('rejects a hero-only story even when every surviving variant is registered', () => {
+    const incomplete = composition([section('hero', 'centered-none')]);
+    expect(codes(incomplete)).toContain('incomplete-story');
+    expect(() => assertMarketingComposition(incomplete)).toThrow(
+      'incomplete-story'
+    );
   });
 
   it('rejects missing, repeated, or misplaced heroes', () => {

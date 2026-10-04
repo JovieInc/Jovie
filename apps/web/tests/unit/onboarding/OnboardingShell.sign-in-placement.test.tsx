@@ -52,6 +52,25 @@ describe('onboarding sign-in placement', () => {
     );
   });
 
+  it('keeps sign-in reachable when a taken handle tells the owner to sign in (JOV-7753)', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SIGNIN
+    );
+  });
+
   it('hides sign-in after the server resolves an authenticated session', () => {
     render(<OnboardingShell sessionLabel='pending' isSignedIn />);
 
