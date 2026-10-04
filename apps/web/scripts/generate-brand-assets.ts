@@ -26,12 +26,8 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { JOVIE_PATH, JOVIE_VIEWBOX, WORDMARK_TRACK } from '../lib/brand/tokens';
-import {
-  LETTER_PAIRS,
-  LETTER_PATHS,
-  LETTER_SEQUENCE,
-} from '../lib/brand/wordmark-letters';
+import { wordmarkGeometry } from '../lib/brand/primitives';
+import { JOVIE_PATH, JOVIE_VIEWBOX } from '../lib/brand/tokens';
 import { DESIGN_TOKENS } from '../lib/design/generated/design-tokens';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -87,86 +83,18 @@ function markSvg(color: string): string {
 }
 
 function wordmarkSvg(color: string): string {
-  // Same layout math as <Wordmark> in lib/brand/primitives.tsx — kept in lock
-  // step so the static SVG matches the React render byte-for-byte.
-  type Placed = {
-    letter: (typeof LETTER_SEQUENCE)[number];
-    x: number;
-    w: number;
-    d: string;
-    rule?: 'evenodd';
-  };
-  const placed: Placed[] = LETTER_SEQUENCE.reduce<Placed[]>(
-    (acc, letter, i) => {
-      const prev = acc[i - 1];
-      const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
-      const prevAdvance = prev
-        ? prev.w + (prevPair ? WORDMARK_TRACK[prevPair] : 0)
-        : 0;
-      const x = (prev?.x ?? 0) + prevAdvance;
-      const p = LETTER_PATHS[letter];
-      acc.push({ letter, x, w: p.w, d: p.d, rule: p.rule });
-      return acc;
-    },
-    []
-  );
-  const last = placed[placed.length - 1];
-  const lastPair = LETTER_PAIRS[placed.length - 1];
-  const totalW = last.x + last.w + (lastPair ? WORDMARK_TRACK[lastPair] : 0);
-  const glyphs = placed
-    .map(
-      p =>
-        `<path fill="${color}" fill-rule="${p.rule ?? 'nonzero'}" transform="translate(${p.x} 0)" d="${p.d}"/>`
-    )
+  // Same outlines as <Wordmark> in lib/brand/primitives.tsx (display master).
+  const g = wordmarkGeometry(100);
+  const glyphs = g.glyphs
+    .map(glyph => `<path fill="${color}" d="${glyph.d}"/>`)
     .join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} 100">${glyphs}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.viewBox}">${glyphs}</svg>`;
 }
 
 function lockupSvg(color: string): string {
-  // Horizontal lockup: mark at left, wordmark to the right with a gap of
-  // 0.34 × mark height. Mark sized 100, wordmark height 74 → gap 34.
-  // Mark sits on a 360×360 viewBox; scale to 100 → factor 100/360 = 0.2778.
-  // Wordmark total width is 374u, scaled to height 74 → width 74 * 374/100 = 276.76.
-  const markH = 100;
-  const wordmarkH = 74;
-  const gap = 34;
-  const wordmarkW = (wordmarkH * 374) / 100;
-  const totalW = markH + gap + wordmarkW;
-  const totalH = markH;
-  const yOffsetWordmark = (markH - wordmarkH) / 2;
-  // Inline both via group transforms to avoid <use> + defs complexity.
-  const markGroup = `<g transform="scale(${markH / 360})"><path fill="${color}" d="${JOVIE_PATH}"/></g>`;
-  // Inline wordmark glyphs at the wordmark's intrinsic 374×100 viewBox, then
-  // scale into the lockup coordinate space.
-  type Placed = {
-    x: number;
-    w: number;
-    d: string;
-    rule?: 'evenodd';
-  };
-  const placed: Placed[] = LETTER_SEQUENCE.reduce<Placed[]>(
-    (acc, letter, i) => {
-      const prev = acc[i - 1];
-      const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
-      const prevAdvance = prev
-        ? prev.w + (prevPair ? WORDMARK_TRACK[prevPair] : 0)
-        : 0;
-      const x = (prev?.x ?? 0) + prevAdvance;
-      const p = LETTER_PATHS[letter];
-      acc.push({ x, w: p.w, d: p.d, rule: p.rule });
-      return acc;
-    },
-    []
-  );
-  const wordmarkInner = placed
-    .map(
-      p =>
-        `<path fill="${color}" fill-rule="${p.rule ?? 'nonzero'}" transform="translate(${p.x} 0)" d="${p.d}"/>`
-    )
-    .join('');
-  const wordmarkScale = wordmarkH / 100;
-  const wordmarkGroup = `<g transform="translate(${markH + gap} ${yOffsetWordmark}) scale(${wordmarkScale})">${wordmarkInner}</g>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}">${markGroup}${wordmarkGroup}</svg>`;
+  // The o in the wordmark is the mark (JOV-7760), so the horizontal lockup is
+  // the wordmark itself; a separate mark beside it would show the O twice.
+  return wordmarkSvg(color);
 }
 
 async function writeSvg(file: string, content: string): Promise<void> {
