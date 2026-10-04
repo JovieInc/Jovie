@@ -2967,7 +2967,10 @@ class FixRedTest(unittest.TestCase):
                 attempts = host.state / "fix-attempts.json"
                 attempts.write_text(json.dumps({"5": {"sha": "h1", "count": 2, "at": time.time() - 1}}))
                 with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)):
-                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {**self.pr(), "isDraft": False})
+                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {
+                        **self.pr(), "isDraft": False,
+                        "labels": [{"name": "lane-fix-conflict"}, {"name": "lane-fix-red"}],
+                    })
                 self.assertEqual(receipt["verdict"], "fix-pushed")
                 self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "h9"})
                 record = json.loads(attempts.read_text())["5"]
@@ -2977,6 +2980,9 @@ class FixRedTest(unittest.TestCase):
             finally:
                 lane.sh, lane.failure_excerpt = real, real_excerpt
         self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in calls))
+        deleted = {call[-1] for call in calls if call[:3] == ["gh", "api", "-X"] and "DELETE" in call}
+        self.assertIn(f"repos/{lane.REPO_SLUG}/issues/5/labels/lane-fix-conflict", deleted)
+        self.assertIn(f"repos/{lane.REPO_SLUG}/issues/5/labels/lane-fix-red", deleted)
 
     def test_a_pr_merged_before_its_fix_run_installs_nothing_and_records_cancellation(self):
         real_sh, real_agent = lane.sh, lane.run_agent

@@ -83,7 +83,7 @@ SENSITIVE_RED_LINES = re.compile(
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
 MAX_GATE_TIMEOUTS = 3
-CLAIM_TTL_S = 2 * 3600
+CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
@@ -2428,20 +2428,7 @@ def requeue_verified(host: Host, prs: list[dict] | None, *, defer=None) -> dict 
 def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None, *, timeout: float = 600) -> bool:
     """True when another host recorded a live claim for this exact head and kind on the PR.
     Local state files are per host; the PR's comments are the truth every host can see."""
-    now = time.time() if now is None else now
-    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
-                 "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
-    if listed.returncode != 0:
-        return True  # fail closed: an unreadable claim list is not permission to take the head
-    for line in (listed.stdout or "").splitlines():
-        fields = dict(part.split("=", 1) for part in line.split()[3:] if "=" in part)
-        try:
-            age = now - datetime.fromisoformat(fields.get("at", "").replace("Z", "+00:00")).timestamp()
-        except ValueError:
-            continue
-        if fields.get("sha") == sha and fields.get("kind") == kind and fields.get("host") != HOST and age < CLAIM_TTL_S:
-            return True
-    return False
+    return pr_events.claim_active(number, sha, sh, now, kind=kind, exclude_host=HOST, timeout=timeout)
 
 
 def post_claim(number: int, sha: str, kind: str) -> None:
@@ -3660,6 +3647,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed:
                 verify_target({**pr, "headRefOid": after}, "before-push-effects")
+                labels = {label.lower() for label in pr_events.label_names(pr)}
+                resolved = [kind for kind in pr_events.FIX_KINDS if pr_events.PREFIX + kind in labels]
+                if resolved:
+                    pr_events.consume(THIS, pr, resolved)
                 # A new fix head earns another queue try; a repeat failure re-marks it. The PR
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
