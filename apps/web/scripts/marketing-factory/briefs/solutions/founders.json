@@ -10,6 +10,9 @@
     "trafficSource": "search",
     "intent": "feature"
   },
+  "sectionVariants": {
+    "capture-1": "phone-right"
+  },
   "icp": "Founders who want one public page that grows an audience they own",
   "jobsToBeDone": [
     "Claim a public profile page",
@@ -100,7 +103,10 @@
     ],
     "differentiator": "The profile itself captures subscribers the founder can notify again, so the page is the audience, not a list of links."
   },
-  "hero": { "useCase": "claim-conversion", "conversion": "claim-profile" },
+  "hero": {
+    "useCase": "aha-capture",
+    "captureId": "public-profile-desktop"
+  },
   "proof": [
     {
       "sectionInstanceId": "capture-1",
@@ -231,6 +237,12 @@
           "sectionInstanceId": "hero-1",
           "slot": "subhead",
           "text": "Jovie gives founders one public page that turns visitors into subscribers you can reach again.",
+          "claimIds": ["capability.artist-profiles.audience-capture"]
+        },
+        {
+          "sectionInstanceId": "capture-1",
+          "slot": "headline",
+          "text": "Let visitors subscribe from your profile.",
           "claimIds": ["capability.artist-profiles.audience-capture"]
         },
         {

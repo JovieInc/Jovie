@@ -152,6 +152,11 @@ function loadPriorChain(
       `--from-stage ${fromStage}: earlier stages have not passed`
     );
   }
+  if (chain.some((link, index) => link.stage !== FACTORY_STAGES[index])) {
+    throw new Error(
+      '--from-stage: prior stage identities do not match the current spine order; rerun from truth'
+    );
+  }
   const issues = verifyFactoryRun(runDir).filter(issue =>
     chain.some(link => issue.startsWith(`${link.stage}#`))
   );
