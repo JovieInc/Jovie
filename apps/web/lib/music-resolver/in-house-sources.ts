@@ -143,10 +143,10 @@ function artistFromMusicBrainz(artist: MusicBrainzArtist): ArtistCandidate {
 
 function isArtistUrl(href: string, provider: string | null): boolean {
   const url = new URL(href);
-  if (provider === 'spotify')
-    return /^\/(?:intl-[a-z]{2}\/)?artist\/[A-Za-z0-9]{22}\/?$/.test(
-      url.pathname
-    );
+  if (provider === 'spotify') {
+    const artistPath = url.pathname.replace(/^\/intl-([a-z]{2})\//, '/');
+    return /^\/artist\/[A-Za-z0-9]{22}\/?$/.test(artistPath);
+  }
   if (provider === 'apple_music')
     return /^\/[a-z]{2}\/artist\/(?:[^/]+\/)?(?:id)?\d+\/?$/.test(url.pathname);
   if (provider === 'deezer')
