@@ -1,0 +1,11 @@
+No code change or PR was created. The required current recurrence proof is absent; only the August 17 historical report exists. Current source already bounds, caches, deduplicates, and fails soft on Mercury timeouts.
+
+Verification:
+
+- Mercury metrics and server-fetch tests: 20/20 passed
+- Worktree remains clean
+- No commit, push, or PR
+- Revalidation evidence recorded on Linear JOV-5178
+- GBrain unavailable as declared
+
+NOT-SHIPPABLE: current production recurrence proof with an exact release, route, and stack is missing, so the issue’s dispatch gate remains unmet.
