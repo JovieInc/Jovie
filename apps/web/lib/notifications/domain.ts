@@ -68,6 +68,7 @@ import {
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
 import { fireSubscribeCAPIEvent } from '@/lib/tracking/fire-subscribe-event';
+import { getAccountMetricCohort } from '@/lib/utils/email';
 import {
   statusSchema,
   subscribeSchema,
@@ -824,7 +825,11 @@ export const subscribeToNotificationsDomain = async (
     });
     // Email OTP subscribers reach `subscribed` in verifyEmailOtpDomain().
     if (!shouldVerifyEmail) {
-      await recordFunnelStep({ funnel: 'fan_subscribe', step: 'subscribed' });
+      await recordFunnelStep({
+        funnel: 'fan_subscribe',
+        step: 'subscribed',
+        cohort: getAccountMetricCohort(normalizedEmail),
+      });
     }
 
     // Fire CAPI Subscribe event for immediately-confirmed subscriptions (SMS, or
@@ -952,7 +957,11 @@ export const verifyEmailOtpDomain = async (
     email: normalizedEmail,
   });
 
-  await recordFunnelStep({ funnel: 'fan_subscribe', step: 'subscribed' });
+  await recordFunnelStep({
+    funnel: 'fan_subscribe',
+    step: 'subscribed',
+    cohort: getAccountMetricCohort(normalizedEmail),
+  });
 
   // Fire CAPI Subscribe event now that the email subscriber is confirmed
   void fireSubscribeCAPIEvent({

@@ -60,7 +60,7 @@ import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
-import { LibraryInspectorAssetSlots } from '@/components/features/library/LibraryInspectorAssetSlots';
+import { LibraryFilesPanel } from '@/components/features/library/LibraryFilesPanel';
 import {
   formatLibraryItemType,
   formatLibraryStatus,
@@ -74,7 +74,6 @@ import { WorkInspectorActions } from '@/components/features/library/WorkInspecto
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
-import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
 import { EntityHeader } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -95,6 +94,7 @@ import {
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -1503,6 +1503,7 @@ function LibraryToolbar({
       }
       end={
         <>
+          <YouTubeLedgerLink />
           <LibraryImportMenu
             canSyncSpotify={canSyncSpotify}
             isSyncingSpotify={isSyncingSpotify}
@@ -1893,6 +1894,19 @@ function LibraryFirstAction({
   );
 }
 
+function YouTubeLedgerLink() {
+  return (
+    <Button
+      asChild
+      variant='ghost'
+      size='sm'
+      className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+    >
+      <Link href={APP_ROUTES.YOUTUBE_REVIVAL}>YouTube Ledger</Link>
+    </Button>
+  );
+}
+
 function EmptyCatalog({
   canSyncSpotify,
   isSyncing,
@@ -1913,12 +1927,15 @@ function EmptyCatalog({
         <PageToolbar
           start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
           end={
-            <LibraryFirstAction
-              canSyncSpotify={canSyncSpotify}
-              isSyncing={isSyncing}
-              onSyncSpotify={onSyncSpotify}
-              testId='library-sync-spotify-toolbar'
-            />
+            <>
+              <YouTubeLedgerLink />
+              <LibraryFirstAction
+                canSyncSpotify={canSyncSpotify}
+                isSyncing={isSyncing}
+                onSyncSpotify={onSyncSpotify}
+                testId='library-sync-spotify-toolbar'
+              />
+            </>
           }
         />
       }
@@ -2033,55 +2050,6 @@ function PreviewActionButton({
       )}
       {compact ? <span className='sr-only'>{label}</span> : label}
     </Button>
-  );
-}
-
-function LibraryAudioPanel({
-  asset,
-  isPreviewPlaying,
-  onTogglePreview,
-  onUploaded,
-  disabledTabIndex,
-  embedded = false,
-}: {
-  readonly asset: LibraryReleaseAsset;
-  readonly isPreviewPlaying: boolean;
-  readonly onTogglePreview: LibraryPreviewToggle;
-  readonly onUploaded: (assetId: string, previewUrl: string) => void;
-  readonly disabledTabIndex?: number;
-  readonly embedded?: boolean;
-}) {
-  return (
-    <div className={embedded ? undefined : 'mt-4 border-t border-subtle pt-3'}>
-      {embedded ? null : (
-        <div className='mb-2 flex h-7 items-center justify-between gap-2'>
-          <div className='flex min-w-0 items-center gap-2'>
-            <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-            <h3 className='system-b-library-audio-heading truncate font-semibold text-primary-token'>
-              Audio
-            </h3>
-          </div>
-          {hasVerifiedLibraryAudioPreview(asset) ? (
-            <PreviewActionButton
-              asset={asset}
-              isPreviewPlaying={isPreviewPlaying}
-              onTogglePreview={onTogglePreview}
-              compact
-              disabledTabIndex={disabledTabIndex}
-            />
-          ) : null}
-        </div>
-      )}
-      <ReleaseAudioAssetPanel
-        releaseId={asset.id}
-        releaseTitle={asset.title}
-        previewUrl={asset.previewUrl}
-        durationMs={asset.totalDurationMs}
-        disabledTabIndex={disabledTabIndex}
-        testIdPrefix='library'
-        onUploaded={previewUrl => onUploaded(asset.id, previewUrl)}
-      />
-    </div>
   );
 }
 
@@ -2523,9 +2491,13 @@ function AssetDrawer({
               <InspectorEmpty message='No files for this merch item.' />
             ) : (
               <>
-                <InspectorSection title='Audio'>
-                  {hasVerifiedLibraryAudioPreview(current) ? (
-                    <div className='mb-2 flex justify-end'>
+                <LibraryFilesPanel
+                  asset={current}
+                  downloads={inspectorBundle.downloads}
+                  disabled={!open}
+                  disabledTabIndex={closedTabIndex}
+                  audioPreviewAction={
+                    hasVerifiedLibraryAudioPreview(current) ? (
                       <PreviewActionButton
                         asset={current}
                         isPreviewPlaying={isPreviewPlaying}
@@ -2533,22 +2505,9 @@ function AssetDrawer({
                         compact
                         disabledTabIndex={closedTabIndex}
                       />
-                    </div>
-                  ) : null}
-                  <LibraryAudioPanel
-                    asset={current}
-                    isPreviewPlaying={isPreviewPlaying}
-                    onTogglePreview={onTogglePreview}
-                    onUploaded={onAudioUploaded}
-                    disabledTabIndex={closedTabIndex}
-                    embedded
-                  />
-                </InspectorSection>
-
-                <LibraryInspectorAssetSlots
-                  asset={current}
-                  downloads={inspectorBundle.downloads}
-                  disabled={!open}
+                    ) : null
+                  }
+                  onAudioUploaded={onAudioUploaded}
                   onArtworkUploaded={onArtworkUploaded}
                 />
 

@@ -1,0 +1,82 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: Comparative profile claims (JOV-7152) need dated, reproducible evidence from a neutral hosted runner; PR CI cannot measure third-party pages and local runs depend on one laptop's network.
+# removal-trigger: Remove when the claim registry's evidence producer runs this harness itself, or when no claim in scripts/public-benchmark/claims.json is holding or certified for 90 days.
+# Public Profile Benchmark (JOV-7152)
+#
+# PURPOSE: Weekly, reproducible speed + agent-readiness comparison of public
+# artist profiles across link-in-bio platforms. Feeds the claim registry as
+# "computed/public benchmark" evidence and keeps comparative claims true.
+# Methodology: docs/benchmarks/public-profile-benchmark.md.
+#
+# GATE: claims in scripts/public-benchmark/claims.json with state "holding" or
+# "certified" must keep passing. A regression, or missing comparator evidence,
+# fails this workflow. "candidate" claims are reported only.
+#
+# PRIVACY: competitor URLs come from the PUBLIC_BENCHMARK_TARGETS secret and
+# never reach the repository or the uploaded artifact. Only the anonymized
+# receipt and gate summary are uploaded. Without the secret the run measures
+# Jovie alone and every comparative verdict is "unknown".
+#
+# POLITENESS: robots.txt is honored for every fetch; loads are round-robin
+# across hosts with a pause between runs (5 runs per profile per week).
+
+name: Public Profile Benchmark
+# clock-class: temporal-resource
+
+on:
+  schedule:
+    - cron: '0 15 * * 2'
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: 'Runs per profile (3-9)'
+        required: false
+        default: '5'
+        type: string
+
+concurrency:
+  group: public-benchmark
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Measure and gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RUNS: ${{ github.event.inputs.runs || '5' }}
+      PUBLIC_BENCHMARK_TARGETS: ${{ secrets.PUBLIC_BENCHMARK_TARGETS }}
+      PUBLIC_BENCHMARK_REGION: github-ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-playwright
+      - name: Run benchmark
+        run: |
+          set -euo pipefail
+          [[ "$RUNS" =~ ^[3-9]$ ]] || { echo "::error::runs must be 3-9"; exit 1; }
+          set +e
+          node scripts/public-benchmark/public-benchmark.mjs run \
+            --runs "$RUNS" --out "$RUNNER_TEMP/public-benchmark" \
+            > "$RUNNER_TEMP/public-benchmark-gate.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/public-benchmark-gate.json"
+          mkdir -p public-benchmark-receipt
+          cp "$RUNNER_TEMP"/public-benchmark/receipt-*[0-9].json public-benchmark-receipt/
+          jq '.gate' "$RUNNER_TEMP/public-benchmark-gate.json" > public-benchmark-receipt/gate.json
+          exit "$status"
+      - name: Upload anonymized receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-benchmark-receipt-${{ github.run_id }}
+          path: public-benchmark-receipt/
+          retention-days: 90
+          if-no-files-found: warn

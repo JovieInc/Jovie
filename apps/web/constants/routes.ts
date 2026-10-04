@@ -37,6 +37,8 @@ export const APP_ROUTES = {
   DASHBOARD_CONTACTS: '/app/dashboard/contacts',
   DASHBOARD_TOUR_DATES: '/app/dashboard/tour-dates',
   DASHBOARD_RELEASE_PLAN: '/app/dashboard/release-plan',
+  /** Legacy dashboard insights path. Keep as a redirect source only; use INSIGHTS. */
+  LEGACY_DASHBOARD_INSIGHTS: '/app/dashboard/insights',
   /** @deprecated Profile is now a drawer on the chat route. Use CHAT instead. */
   PROFILE: '/app/chat',
   CONTACTS: '/app/contacts',

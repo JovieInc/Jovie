@@ -1,8 +1,15 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { LibraryInspectorAssetSlots } from './LibraryInspectorAssetSlots';
+import { LibraryFilesPanel } from './LibraryFilesPanel';
 import { StatefulAssetSlot } from './StatefulAssetSlot';
+
+vi.mock('@/lib/audio/decode-waveform-peaks', () => ({
+  decodeWaveformPeaks: vi
+    .fn()
+    .mockResolvedValue({ peaks: [0.4, 0.8], durationMs: 120_000 }),
+  isAudioPreviewError: () => false,
+}));
 
 const baseSlot = {
   cardinality: 'single' as const,
@@ -69,7 +76,7 @@ describe('StatefulAssetSlot', () => {
   });
 });
 
-describe('LibraryInspectorAssetSlots', () => {
+describe('LibraryFilesPanel', () => {
   const asset = (overrides: Partial<LibraryReleaseAsset> = {}) =>
     ({
       id: 'release-1',
@@ -79,37 +86,10 @@ describe('LibraryInspectorAssetSlots', () => {
       ...overrides,
     }) as LibraryReleaseAsset;
 
-  it('uses object UI for populated artwork and acquisition links for empty kinds', () => {
-    render(<LibraryInspectorAssetSlots asset={asset()} downloads={[]} />);
-    expect(screen.getByTestId('library-artwork-object')).toBeInTheDocument();
-    expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
-    expect(screen.getByTestId('library-video-acquisition')).toBeInTheDocument();
-  });
-
-  it('collapses empty media sections into Add File links', () => {
-    render(<LibraryInspectorAssetSlots asset={asset()} downloads={[]} />);
-    expect(screen.queryByText('Video')).toBeNull();
-    expect(screen.queryByText('Documents')).toBeNull();
-    expect(screen.queryByText('Stems')).toBeNull();
-    expect(screen.getByText('Add File')).toBeInTheDocument();
-    expect(screen.getByTestId('library-video-acquisition')).toHaveAttribute(
-      'href',
-      '/app/library?view=videos'
-    );
-    expect(screen.getByTestId('library-docs-acquisition')).toHaveAttribute(
-      'href',
-      '/app/library?view=documents'
-    );
-    expect(screen.getByTestId('library-stems-acquisition')).toHaveAttribute(
-      'href',
-      '/app/releases/release-1/downloads'
-    );
-  });
-
-  it('keeps a populated stems section with its add link', () => {
+  it('renders a flat list of real files and never empty media sections', () => {
     render(
-      <LibraryInspectorAssetSlots
-        asset={asset()}
+      <LibraryFilesPanel
+        asset={asset({ previewUrl: 'https://cdn.example.com/master.mp3' })}
         downloads={[
           {
             id: 'download-1',
@@ -120,21 +100,128 @@ describe('LibraryInspectorAssetSlots', () => {
         ]}
       />
     );
-    expect(screen.getByText('Stems')).toBeInTheDocument();
-    expect(screen.getByTestId('library-stems-add')).toHaveAttribute(
-      'href',
-      '/app/releases/release-1/downloads'
-    );
-    expect(screen.queryByTestId('library-stems-acquisition')).toBeNull();
+
+    const list = screen.getByTestId('library-files-list');
+    expect(list).toHaveTextContent('master.mp3');
+    expect(list).toHaveTextContent('Private recording');
+    expect(list).toHaveTextContent('artwork.jpg');
+    expect(list).toHaveTextContent('Published artwork');
+    expect(list).toHaveTextContent('stems.zip');
+    expect(list).toHaveTextContent('Restricted');
+    expect(screen.queryByTestId('library-add-download-acquisition')).toBeNull();
+    expect(screen.queryByText('Video')).toBeNull();
+    expect(screen.queryByText('Documents')).toBeNull();
+    expect(screen.queryByText('Stems')).toBeNull();
   });
 
-  it('shows an artwork drop zone only when empty', () => {
+  it('collects acquisition behind one Add File section', () => {
+    render(<LibraryFilesPanel asset={asset()} downloads={[]} />);
+
+    expect(screen.getByText('Add File')).toBeInTheDocument();
+    expect(screen.getByTestId('library-add-audio-acquisition')).toBeDefined();
+    expect(screen.getByTestId('library-add-video-acquisition')).toHaveAttribute(
+      'href',
+      '/app/library?view=videos'
+    );
+    expect(
+      screen.getByTestId('library-add-document-acquisition')
+    ).toHaveAttribute('href', '/app/library?view=documents');
+    expect(
+      screen.getByTestId('library-add-download-acquisition')
+    ).toHaveAttribute('href', '/app/releases/release-1/downloads');
+  });
+
+  it('opens focused file detail with a Back path', async () => {
     render(
-      <LibraryInspectorAssetSlots
-        asset={asset({ artworkUrl: null, hasArtwork: false })}
+      <LibraryFilesPanel
+        asset={asset({ previewUrl: 'https://cdn.example.com/master.mp3' })}
         downloads={[]}
       />
     );
-    expect(screen.getByTestId('library-artwork-dropzone')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-file-audio:release-1'));
+    expect(screen.getByTestId('library-file-detail')).toBeInTheDocument();
+    expect(screen.getByTestId('library-audio-ready')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-file-back'));
+    expect(screen.getByTestId('library-files-list')).toBeInTheDocument();
   });
+
+  it('keeps the audio upload dropzone behind the Add audio action', async () => {
+    render(<LibraryFilesPanel asset={asset()} downloads={[]} />);
+    expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
+    expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    'keeps uploads bound to their work when switching during upload: %s',
+    async switchWork => {
+      const artworkUrl = 'https://cdn.example.com/uploaded.jpg';
+      const emptyAsset = asset({ artworkUrl: null, hasArtwork: false });
+      const response = Promise.withResolvers<Response>();
+      const onArtworkUploaded = vi.fn();
+      const upload = vi
+        .spyOn(globalThis, 'fetch')
+        .mockReturnValue(response.promise);
+      try {
+        const { rerender } = render(
+          <LibraryFilesPanel
+            asset={emptyAsset}
+            downloads={[]}
+            onArtworkUploaded={onArtworkUploaded}
+          />
+        );
+        expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
+        fireEvent.click(screen.getByTestId('library-add-artwork-acquisition'));
+        expect(
+          screen.getByTestId('library-artwork-dropzone')
+        ).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Drop artwork'), {
+          target: {
+            files: [new File(['art'], 'uploaded.jpg', { type: 'image/jpeg' })],
+          },
+        });
+        if (switchWork)
+          rerender(
+            <LibraryFilesPanel
+              asset={{ ...emptyAsset, id: 'release-2' }}
+              downloads={[]}
+            />
+          );
+        response.resolve(Response.json({ artworkUrl }));
+        await waitFor(() =>
+          expect(onArtworkUploaded.mock.calls).toEqual([
+            ['release-1', artworkUrl],
+          ])
+        );
+        if (switchWork) {
+          expect(screen.queryByText('uploaded.jpg')).toBeNull();
+          expect(
+            screen.queryByTestId('library-file-artwork:release-2')
+          ).toBeNull();
+          return;
+        }
+        await screen.findByTestId('library-artwork-object');
+        expect(upload).toHaveBeenCalledWith(
+          '/api/images/artwork/upload?releaseId=release-1',
+          expect.objectContaining({ method: 'POST' })
+        );
+        fireEvent.click(screen.getByTestId('library-file-back'));
+        const row = screen.getByTestId('library-file-artwork:release-1');
+        expect(row).toHaveTextContent('uploaded.jpg');
+        expect(
+          screen.queryByTestId('library-add-artwork-acquisition')
+        ).toBeNull();
+        fireEvent.click(row);
+        expect(screen.getByAltText('Artwork for Take Me Over')).toHaveAttribute(
+          'src',
+          artworkUrl
+        );
+      } finally {
+        upload.mockRestore();
+      }
+    }
+  );
 });
