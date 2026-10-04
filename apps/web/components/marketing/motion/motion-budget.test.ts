@@ -65,4 +65,19 @@ describe('marketing motion budgets', () => {
       /prefers-reduced-motion: reduce\)\s*\{\s*\.hero-stagger > \* \{\s*animation: none;/
     );
   });
+
+  it('steps every block stagger on the one --stagger-block token', () => {
+    const css = readFileSync(
+      join(MOTION_DIR, '../../../app/globals.css'),
+      'utf8'
+    );
+    const rawStaggerDelays = [
+      ...css.matchAll(
+        /\.(?:hero-stagger|chat-stagger|reveal-on-scroll)[^{]*\{[^}]*?(?:animation|transition)-delay:\s*\d+m?s/gu
+      ),
+    ].map(match => match[0].split('{')[0].trim());
+
+    expect(rawStaggerDelays).toEqual([]);
+    expect(css.match(/var\(--stagger-block\)/gu)?.length).toBe(11);
+  });
 });
