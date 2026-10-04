@@ -2,6 +2,7 @@ import type { VirtualItem } from '@tanstack/react-virtual';
 import { render, renderHook, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { COLUMN_SNAP_STAGGER_CAP } from '@/components/organisms/table/column-snap';
 import { VirtualizedTableBody } from '@/components/organisms/table/organisms/VirtualizedTableBody';
 import { getCoreRowModel, type Row, useReactTable } from '@/lib/tanstack-table';
 
@@ -12,12 +13,15 @@ vi.mock('@/components/organisms/table/organisms/VirtualizedTableRow', () => ({
     row,
     columnSnap,
     columnSnapOrder,
+    isFocused,
   }: {
     row: { id: string };
     columnSnap?: boolean;
     columnSnapOrder?: number;
+    isFocused?: boolean;
   }) => (
     <tr
+      data-focused={isFocused ? 'true' : 'false'}
       data-column-snap={columnSnap ? 'on' : 'off'}
       data-column-snap-order={
         columnSnapOrder == null ? '' : String(columnSnapOrder)
@@ -181,5 +185,45 @@ describe('VirtualizedTableBody', () => {
     const row = screen.getByTestId('table-row-2');
     expect(row).toHaveAttribute('data-column-snap', 'on');
     expect(row).toHaveAttribute('data-column-snap-order', '0');
+  });
+
+  it('hands each row a focus boolean so j/k re-renders only two rows', () => {
+    const rows = [createRow('1', 'One'), createRow('2', 'Two')];
+
+    render(
+      <table>
+        <VirtualizedTableBody {...baseProps} rows={rows} focusedIndex={1} />
+      </table>
+    );
+
+    expect(screen.getByTestId('table-row-1')).toHaveAttribute(
+      'data-focused',
+      'false'
+    );
+    expect(screen.getByTestId('table-row-2')).toHaveAttribute(
+      'data-focused',
+      'true'
+    );
+  });
+
+  it('caps the stagger order so rows past the cap keep stable props', () => {
+    const rows = Array.from({ length: 10 }, (_, index) =>
+      createRow(String(index), `Row ${index}`)
+    );
+
+    render(
+      <table>
+        <VirtualizedTableBody {...baseProps} rows={rows} columnSnap />
+      </table>
+    );
+
+    expect(screen.getByTestId('table-row-3')).toHaveAttribute(
+      'data-column-snap-order',
+      '3'
+    );
+    expect(screen.getByTestId('table-row-9')).toHaveAttribute(
+      'data-column-snap-order',
+      String(COLUMN_SNAP_STAGGER_CAP)
+    );
   });
 });
