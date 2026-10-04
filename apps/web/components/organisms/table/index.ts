@@ -83,6 +83,7 @@ export { AudienceVisitsCell } from './atoms/AudienceVisitsCell';
 export { AvatarCell } from './atoms/AvatarCell';
 export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
+export { PersonCell, type PersonCellProps } from './atoms/PersonCell';
 export type {
   ShellListRowButtonProps,
   ShellListRowChrome,
