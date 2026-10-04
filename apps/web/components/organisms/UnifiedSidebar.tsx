@@ -59,6 +59,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
+import { OperatorListsNav } from './OperatorListsNav';
 import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_SECTIONS,
@@ -140,7 +141,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
     <nav
       aria-label='OV Navigation'
-      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
+      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       {OPERATOR_NAV_SECTIONS.map(section => (
         <div key={section.label}>
@@ -161,6 +162,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
           />
         </div>
       ))}
+      <OperatorListsNav pathname={pathname} />
     </nav>
   );
 }

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   updateList: vi.fn(),
   deleteList: vi.fn(),
   search: vi.fn(),
+  getSmartViewDetail: vi.fn(),
 }));
 
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
@@ -20,6 +21,7 @@ vi.mock('@/lib/ovie/lists/service.server', () => ({
   getSidebarLists: mocks.getSidebarLists,
   getListDetail: mocks.getListDetail,
   suggestForList: mocks.suggestForList,
+  getSmartViewDetail: mocks.getSmartViewDetail,
 }));
 vi.mock('@/lib/ovie/lists/list-store.server', () => ({
   insertList: mocks.insertList,
@@ -34,6 +36,7 @@ import * as ListRoute from '@/app/api/admin/ov-lists/[id]/route';
 import * as SuggestRoute from '@/app/api/admin/ov-lists/[id]/suggest/route';
 import * as CreatorsRoute from '@/app/api/admin/ov-lists/creators/route';
 import * as ListsRoute from '@/app/api/admin/ov-lists/route';
+import * as ViewRoute from '@/app/api/admin/ov-lists/views/[viewId]/route';
 import { ListModelError } from '@/lib/ovie/lists/model';
 
 const CREATOR = '6f1c2b0e-7a4d-4c55-9a62-1f4f7d9b2c11';
@@ -64,6 +67,9 @@ describe('ovie lists API', () => {
       ListRoute.DELETE(req('/api/admin/ov-lists/list-1', 'DELETE'), ctx),
       SuggestRoute.POST(req('/api/admin/ov-lists/list-1/suggest', 'POST'), ctx),
       CreatorsRoute.GET(req('/api/admin/ov-lists/creators?q=a')),
+      ViewRoute.GET(req('/api/admin/ov-lists/views/favorites'), {
+        params: Promise.resolve({ viewId: 'favorites' }),
+      }),
     ]);
     expect(responses.every(r => r === denial)).toBe(true);
     for (const fn of [
@@ -74,6 +80,7 @@ describe('ovie lists API', () => {
       mocks.updateList,
       mocks.deleteList,
       mocks.search,
+      mocks.getSmartViewDetail,
     ]) {
       expect(fn).not.toHaveBeenCalled();
     }
@@ -143,5 +150,14 @@ describe('ovie lists API', () => {
     );
     expect(response.status).toBe(404);
     expect(mocks.suggestForList).toHaveBeenCalledWith('list-1');
+  });
+
+  it('404s unknown smart views', async () => {
+    mocks.getSmartViewDetail.mockResolvedValue(null);
+    const response = await ViewRoute.GET(
+      req('/api/admin/ov-lists/views/nope'),
+      { params: Promise.resolve({ viewId: 'nope' }) }
+    );
+    expect(response.status).toBe(404);
   });
 });

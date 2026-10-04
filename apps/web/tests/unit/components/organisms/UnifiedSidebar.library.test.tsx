@@ -568,5 +568,21 @@ describe('UnifiedSidebar library route', () => {
       screen.queryByRole('navigation', { name: 'OV Navigation' })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('user-button')).toBeInTheDocument();
+    // Lists and smart views are Ovie-only (JOV-7802); the Jovie creator
+    // sidebar lock stays intact.
+    expect(screen.queryByTestId('operator-lists-nav')).not.toBeInTheDocument();
+  });
+
+  it('renders founder lists only inside the Ovie operator navigation', () => {
+    renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_OPS, section: 'ov' });
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    expect(
+      within(operatorNavigation).getByTestId('operator-lists-nav')
+    ).toBeInTheDocument();
+
+    renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });
+    expect(screen.getAllByTestId('operator-lists-nav')).toHaveLength(1);
   });
 });
