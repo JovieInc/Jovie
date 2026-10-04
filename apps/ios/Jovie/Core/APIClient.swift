@@ -39,7 +39,14 @@ extension APIClientProtocol {
   }
 }
 
-struct APIClient: APIClientProtocol, Sendable {
+protocol ProfileCompleting: Sendable {
+  func completeProfile(
+    displayName: String, username: String, for userID: String,
+    ifOwnedBy ownership: NativeSessionOwnership
+  ) async throws
+}
+
+struct APIClient: APIClientProtocol, ProfileCompleting, Sendable {
   private struct ProfileCompletionRequest: Encodable {
     let displayName: String
     let username: String
@@ -346,15 +353,41 @@ struct APIClient: APIClientProtocol, Sendable {
     )
   }
 
+  func completeProfile(
+    displayName: String, username: String, for userID: String,
+    ifOwnedBy ownership: NativeSessionOwnership
+  ) async throws {
+    try await sendProfileCompletionRequest(
+      displayName: displayName, username: username, forceRefresh: false,
+      ownership: ownership, userID: userID
+    )
+  }
+
   private func sendProfileCompletionRequest(
     displayName: String,
     username: String,
     forceRefresh: Bool,
-    tokenOverride: String? = nil
+    tokenOverride: String? = nil,
+    ownership: NativeSessionOwnership? = nil,
+    userID: String? = nil,
+    authorizationOverride: NativeRequestAuthorization? = nil
   ) async throws {
-    let authorization = try await resolveAuthorization(
-      forceRefresh: forceRefresh, tokenOverride: tokenOverride
-    )
+    let authorization: NativeRequestAuthorization
+    if let authorizationOverride {
+      authorization = authorizationOverride
+    } else if let ownership, let userID {
+      try Task.checkCancellation()
+      authorization = try await tokenProvider.ownedRequestAuthorization(for: userID, ifOwnedBy: ownership)
+    } else {
+      authorization = try await resolveAuthorization(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    }
+    func validateOwner() throws {
+      guard let ownership else { return }
+      guard authorization.ownership == ownership, let userID else {
+        throw NativeSessionRequestError.superseded
+      }
+      _ = try NativeSessionTokenStore.ownedRequestAuthorization(ifOwnedBy: ownership, for: userID)
+    }
     let token = authorization.bearerToken
     var request = URLRequest(
       url: baseURL.appending(path: "/api/mobile/v1/profile/complete")
@@ -370,17 +403,37 @@ struct APIClient: APIClientProtocol, Sendable {
 
     let data: Data
     let response: URLResponse
+    try validateOwner()
+    if ownership != nil { try Task.checkCancellation() }
     do {
       (data, response) = try await session.data(for: request)
     } catch let error as URLError {
+      if ownership != nil, error.code == .cancelled { throw CancellationError() }
+      try validateOwner()
       throw APIClientError.transportFailed(code: error.code.rawValue)
     } catch {
+      if ownership != nil, error is CancellationError { throw error }
+      try validateOwner()
       throw APIClientError.invalidResponse
     }
 
     guard let httpResponse = response as? HTTPURLResponse else {
+      try validateOwner()
+      if ownership != nil { try Task.checkCancellation() }
       throw APIClientError.invalidResponse
     }
+    if httpResponse.statusCode == 401, let ownership {
+      // Rejection belongs to the bearer sent. A later login cannot supply a retry.
+      let retry = try NativeSessionTokenStore.resolveUnauthorized(
+        authorizedBy: authorization, allowRetry: !forceRefresh
+      )
+      return try await sendProfileCompletionRequest(
+        displayName: displayName, username: username, forceRefresh: true,
+        ownership: ownership, userID: userID, authorizationOverride: retry
+      )
+    }
+    try validateOwner()
+    if ownership != nil { try Task.checkCancellation() }
     if httpResponse.statusCode == 401, !forceRefresh {
       let refreshed = try await retryTokenOrTerminal(after: token)
       return try await sendProfileCompletionRequest(

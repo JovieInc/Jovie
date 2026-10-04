@@ -144,6 +144,16 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('registers the money route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/money/page.tsx',
+      'apps/web/app/app/money/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.money');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers the admin chat playground route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
@@ -3512,7 +3522,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     const paths = [
       'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
-      'apps/web/app/not-found.tsx',
+      'apps/web/app/billing/success/not-found.tsx',
       'apps/desktop/src/renderer/App.tsx',
       'apps/ios/Jovie/Features/New/NewScreen.swift',
       'apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift',

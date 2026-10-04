@@ -3,6 +3,7 @@ import CoreText
 import JovieKit
 import SwiftUI
 import XCTest
+import Security
 @testable import JovieMac
 
 @MainActor
@@ -567,3 +568,102 @@ private actor MacHeldChatClient: MobileChatClientProtocol {
     return []
   }
 }
+
+#if DEBUG
+private final class MacSecurityScript: @unchecked Sendable {
+  private let lock = NSLock()
+  private var bytes: Data?
+  private var scopes: [(String?, String?, Bool)] = []
+  private var statuses: [OSStatus] = []
+  private var deletion = errSecSuccess
+  private var addition = errSecSuccess
+  var queries: [(String?, String?, Bool)] { lock.withLock { scopes } }
+  func configure(delete: OSStatus = errSecSuccess, add: OSStatus = errSecSuccess, reads: [OSStatus] = []) {
+    lock.withLock { deletion = delete; addition = add; statuses = reads; scopes = [] }
+  }
+  var operations: NativeSessionSecurityOperations {
+    NativeSessionSecurityOperations(delete: { self.run("delete", $0).0 },
+      add: { self.run("add", $0).0 }, copy: { self.run("copy", $0) })
+  }
+  private func run(_ operation: String, _ query: CFDictionary) -> (OSStatus, Data?) {
+    lock.withLock {
+      let query = query as NSDictionary
+      scopes.append((query[kSecAttrService] as? String, query[kSecAttrAccount] as? String,
+        query[kSecUseDataProtectionKeychain] as? Bool == true))
+      if operation == "copy" {
+        let status = statuses.isEmpty ? (bytes == nil ? errSecItemNotFound : errSecSuccess) : statuses.removeFirst()
+        return (status, status == errSecSuccess ? bytes : nil)
+      }
+      if operation == "delete" {
+        if deletion == errSecSuccess || deletion == errSecItemNotFound { bytes = nil }
+        return (deletion, nil)
+      }
+      if addition == errSecSuccess { bytes = query[kSecValueData] as? Data }
+      return (addition, nil)
+    }
+  }
+}
+
+@MainActor
+private final class MacStorageFixture {
+  let domain = "JovieMacStorageTests.\(UUID().uuidString)"
+  let defaults: UserDefaults
+  let security = MacSecurityScript()
+  private let priorDefaults: UserDefaults?
+  private let priorSecurity: NativeSessionSecurityOperations
+
+  init() {
+    defaults = UserDefaults(suiteName: domain)!
+    priorDefaults = NativeSessionTokenStore.replaceDefaultsForTesting(defaults)
+    priorSecurity = NativeSessionTokenStore.replaceSecurityOperationsForTesting(security.operations)
+    NativeSessionTokenStore.clear()
+  }
+
+  func seed(_ userID: String = "a") {
+    NativeSessionTokenStore.save(token: userID, userID: userID, expiresAt: .distantFuture)
+  }
+
+  func finish() {
+    NativeSessionTokenStore.clear()
+    _ = NativeSessionTokenStore.replaceSecurityOperationsForTesting(priorSecurity)
+    _ = NativeSessionTokenStore.replaceDefaultsForTesting(priorDefaults)
+    defaults.removePersistentDomain(forName: domain)
+  }
+}
+
+@MainActor
+private func withMacStorageFixture(_ body: (MacStorageFixture) throws -> Void) rethrows {
+  let fixture = MacStorageFixture()
+  defer { fixture.finish() }
+  try body(fixture)
+}
+
+extension MacDevelopmentBoundaryTests {
+  func testMacRawStoreKeepsCanonicalPersistenceOutcomesAndNamespace() throws {
+    for mode in ["persisted", "preserved", "consumed", "unknown", "denied", "nil-data"] {
+      try withMacStorageFixture { f in
+        if mode != "nil-data" { f.seed() }
+        f.security.configure(delete: mode == "preserved" ? errSecInteractionNotAllowed : errSecSuccess,
+          add: ["preserved", "consumed"].contains(mode) ? errSecMissingEntitlement : errSecSuccess,
+          reads: mode == "unknown" ? [errSecSuccess, errSecInteractionNotAllowed]
+            : (mode == "denied" ? [errSecMissingEntitlement] : (mode == "nil-data" ? [errSecSuccess] : [])))
+        let result = try XCTUnwrap(NativeSessionTokenStore.commit(NativeSessionTokenStore.beginAuthAttempt(),
+          session: NativeStoredSession(userID: "b", token: "b", expiresAt: .distantFuture)))
+        let expected: NativeAuthResolution.Outcome = mode == "persisted" ? .persisted
+          : (mode == "preserved" ? .preserved : (mode == "consumed" ? .consumed : .unknown))
+        XCTAssertEqual(result.outcome, expected, mode)
+        if mode == "persisted" {
+          XCTAssertEqual(f.defaults.string(forKey: NativeAuthPlatform.storagePrefix + ".nativeSession.userID"), "b")
+        }
+        XCTAssertNil(f.defaults.object(forKey: "ie.jov.Jovie.nativeSession.userID"))
+        XCTAssertFalse(f.security.queries.isEmpty)
+        XCTAssertTrue(f.security.queries.allSatisfy {
+          $0.0 == "ie.jov.JovieMac.Development.production.session" && $0.1 == "nativeSessionToken" && $0.2
+        })
+        XCTAssertNil(f.defaults.object(forKey: "ie.jov.JovieMac.Development.production.nativeSession.token"))
+      }
+    }
+  }
+
+}
+#endif

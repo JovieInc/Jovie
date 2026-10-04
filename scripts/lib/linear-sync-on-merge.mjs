@@ -1,17 +1,28 @@
 #!/usr/bin/env node
 /**
- * Move a Linear issue to Done after a PR merges, unless linked work is still
- * open or the issue is a commissioning parent.
+ * Project merged pull requests onto the Linear validation lifecycle
+ * (JOV-7694): Merging until a verified production generation contains the
+ * merge, Validating while required receipts are missing, Rework on a required
+ * failure, and Done only when every required receipt passes. Merge alone
+ * never marks an issue Done.
  *
  * Linked means a linear-issue-id / linear-issue-identifier marker in the PR
- * body, a jov-NNNN branch reference, or the identifier in the title.
- * Commissioning parents are detected by label, sub-issues, or the allowlist.
- * Invariant consumer: JOV-INV-041.
+ * body, a jov-NNNN branch reference, the identifier in the title, or a native
+ * Linear attachment. Commissioning and parent issues enter the lifecycle but
+ * need an outcome receipt (JOV-7300). Invariant consumer: JOV-INV-041.
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
-
-import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
+import { GREEN_MARKER } from './remediation-signal.mjs';
+import { LIFECYCLE_STATES } from './validation-lifecycle.mjs';
+import {
+  createProductionFacts,
+  fetchWithRetry,
+  githubClient,
+  reconcileValidation,
+} from './validation-sync.mjs';
 
 export const LINEAR_API = 'https://api.linear.app/graphql';
 export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
@@ -326,19 +337,6 @@ function formatBlockingPulls(pulls) {
 }
 
 /**
- * @param {{ id?: string, name?: string, type?: string }[]} states
- * @returns {string}
- */
-export function selectDoneStateId(states) {
-  const match = (states ?? []).find(state => {
-    const type = String(state?.type ?? '');
-    const name = String(state?.name ?? '');
-    return type === 'completed' || /done|completed/i.test(name);
-  });
-  return typeof match?.id === 'string' ? match.id : '';
-}
-
-/**
  * @param {string | null | undefined} header
  * @returns {string}
  */
@@ -352,28 +350,28 @@ export function nextLink(header) {
 }
 
 /**
+ * Reasons the lifecycle must not move the issue at all. Commissioning and
+ * parent acceptance no longer hold here: they enter the lifecycle and stay
+ * out of Done until an outcome receipt passes.
+ *
  * @param {{
  *   readonly issue: {
  *     readonly id?: string,
  *     readonly identifier?: string,
- *     readonly title?: string,
- *     readonly description?: string,
  *     readonly labels?: readonly string[],
- *     readonly comments?: readonly string[],
- *     readonly children?: readonly string[],
- *     readonly hasChildren?: boolean,
+ *     readonly openChildren?: readonly string[],
+ *     readonly acceptanceMetadataVerified?: boolean,
  *   },
  *   readonly pullRequests: readonly object[],
- *   readonly mergingPull: { readonly number: number, readonly url: string, readonly sha: string },
- *   readonly allowlist?: ReadonlySet<string>,
+ *   readonly mergingNumber?: number,
  *   readonly scanComplete?: boolean,
  *   readonly checkGreen?: boolean,
  * }} input
- * @returns {{ action: 'close' | 'skip', comment: string, blockingNumbers: number[] }}
+ * @returns {{ holds: string[], blockingNumbers: number[] }}
  */
-export function decideLinearCloseOnMerge(input) {
+export function lifecycleHolds(input) {
   const identifier = String(input.issue.identifier ?? '').toUpperCase();
-  const mergingNumber = Number(input.mergingPull.number);
+  const mergingNumber = Number(input.mergingNumber ?? 0);
   const blocking = input.pullRequests
     .map(normalizePullRequest)
     .filter(pull => pull.number > 0 && pull.number !== mergingNumber)
@@ -385,47 +383,31 @@ export function decideLinearCloseOnMerge(input) {
       })
     )
     .sort((left, right) => left.number - right.number);
-  const reasons = [];
-  const parent = parentHoldReason(input.issue, input.allowlist);
-  if (parent) reasons.push(parent);
-  const escapedDefect = evaluateEscapedDefectClosure(input.issue);
-  if (escapedDefect.applicable) {
-    reasons.push(
-      'Escaped defects stay open at merge: closure requires product repair and detector evidence from the exact deployed build.'
-    );
-    if (!escapedDefect.ok) {
-      reasons.push(
-        `Closure evidence is incomplete: ${escapedDefect.errors.join('; ')}.`
-      );
-    }
+  const holds = [];
+  if (input.issue.acceptanceMetadataVerified === false) {
+    holds.push('Canonical acceptance metadata is unverified.');
   }
-  if (blocking.length > 0) reasons.push(formatBlockingPulls(blocking));
+  if (blocking.length > 0) holds.push(formatBlockingPulls(blocking));
   if (input.scanComplete === false) {
-    reasons.push(
-      'The open pull request scan stopped before the last page, so the issue was left open.'
+    holds.push(
+      'The open pull request scan stopped before the last page, so the issue was left in place.'
+    );
+  }
+  const openChildren = input.issue.openChildren ?? [];
+  if (openChildren.length > 0) {
+    holds.push(
+      `Sub-issues are still open: ${openChildren.slice(0, 10).join(', ')}.`
     );
   }
   const remediationLabeled = (input.issue.labels ?? []).some(label =>
     String(label).startsWith('remediation:')
   );
   if (remediationLabeled && input.checkGreen !== true) {
-    reasons.push(
+    holds.push(
       'Fingerprinted remediation issues stay open while the check is red.'
     );
   }
-  const lead = `Did not mark ${identifier} Done after ${input.mergingPull.url} merged (merge SHA: ${input.mergingPull.sha}).`;
-  if (reasons.length > 0) {
-    return {
-      action: 'skip',
-      comment: [lead, ...reasons].join('\n'),
-      blockingNumbers: blocking.map(pull => pull.number),
-    };
-  }
-  return {
-    action: 'close',
-    comment: `PR merged for ${identifier}: ${input.mergingPull.url} (merge SHA: ${input.mergingPull.sha})`,
-    blockingNumbers: [],
-  };
+  return { holds, blockingNumbers: blocking.map(pull => pull.number) };
 }
 
 /**
@@ -436,7 +418,7 @@ export function decideLinearCloseOnMerge(input) {
  * @returns {Promise<Record<string, any>>}
  */
 async function linearGraphql(fetchImpl, apiKey, query, variables) {
-  const response = await fetchImpl(LINEAR_API, {
+  const response = await fetchWithRetry(fetchImpl, LINEAR_API, {
     method: 'POST',
     headers: {
       Authorization: apiKey,
@@ -502,27 +484,240 @@ export async function listOpenPullRequests(input) {
   return { pulls, complete: false };
 }
 
-const ISSUE_QUERY = `query IssueDoneState($issueId: String!) {
-  issue(id: $issueId) {
+const ISSUE_FIELDS = `
     id
     identifier
-
-
     title
     description
+    state { id name type }
     labels(first: 50) { nodes { name } }
-    comments(first: 50) { nodes { body } }
-    children(first: 50) { nodes { identifier } }
-    team { states { nodes { id name type } } }
+    comments(first: 100) {
+      nodes { body createdAt }
+      pageInfo { hasNextPage endCursor }
+    }
+    children(first: 50) { nodes { identifier state { type } } }
+    attachments(first: 50) { nodes { url } }
+    history(first: 100) { nodes { fromState { type } toState { type } } }
+    team { states { nodes { id name type } } }`;
+
+const ISSUE_QUERY = `query IssueLifecycle($issueId: String!) {
+  issue(id: $issueId) {${ISSUE_FIELDS}
   }
 }`;
 
+const COMMENTS_PAGE_QUERY = `query IssueLifecycleComments($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    comments(first: 100, after: $after) {
+      nodes { body createdAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
+
+const ISSUE_STATE_QUERY = `query IssueLifecycleState($issueId: String!) {
+  issue(id: $issueId) { id state { id name } }
+}`;
+
+const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
+  issues(
+    first: 50
+    after: $after
+    filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
+  ) {
+    nodes { identifier }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
+
+const MAX_COMMENT_PAGES = 10;
+const MAX_SWEEP_PAGES = 10;
+const CI_HARNESS_MANIFEST = '.github/ci-harness/manifest.json';
+
 /**
+ * Read the issue with every comment in server order. The escaped-defect
+ * parser and receipt reader take the latest marker, so order matters.
+ *
+ * @param {HttpFetch} fetchImpl
+ * @param {string} apiKey
+ * @param {string} lookupId
+ */
+async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
+  const data = await linearGraphql(fetchImpl, apiKey, ISSUE_QUERY, {
+    issueId: lookupId,
+  });
+  const raw = data.issue;
+  if (!raw || typeof raw !== 'object') return null;
+  const comments = [...(raw.comments?.nodes ?? [])];
+  let pageInfo = raw.comments?.pageInfo;
+  for (
+    let page = 0;
+    pageInfo?.hasNextPage === true && page < MAX_COMMENT_PAGES;
+    page += 1
+  ) {
+    const more = await linearGraphql(fetchImpl, apiKey, COMMENTS_PAGE_QUERY, {
+      issueId: raw.id,
+      after: pageInfo.endCursor,
+    });
+    comments.push(...(more.issue?.comments?.nodes ?? []));
+    pageInfo = more.issue?.comments?.pageInfo;
+  }
+  if (pageInfo?.hasNextPage === true) {
+    throw new Error(
+      `Comment history for ${raw.identifier} exceeds the read bound`
+    );
+  }
+  comments.sort(
+    (left, right) =>
+      Date.parse(String(left?.createdAt ?? '')) -
+      Date.parse(String(right?.createdAt ?? ''))
+  );
+  const snapshot = readIssueSnapshot({
+    ...raw,
+    comments: { nodes: comments },
+  });
+  const childNodes = Array.isArray(raw.children?.nodes)
+    ? raw.children.nodes
+    : [];
+  return {
+    ...snapshot,
+    state: {
+      id: String(raw.state?.id ?? ''),
+      name: String(raw.state?.name ?? ''),
+      type: String(raw.state?.type ?? ''),
+    },
+    commentRecords: comments.map(comment => ({
+      body: String(comment?.body ?? ''),
+      createdAt: String(comment?.createdAt ?? ''),
+    })),
+    openChildren: childNodes
+      .filter(
+        child =>
+          !['completed', 'canceled'].includes(String(child?.state?.type ?? ''))
+      )
+      .map(child => String(child?.identifier ?? '').toUpperCase())
+      .filter(Boolean),
+    reopenedAfterDone: (raw.history?.nodes ?? []).some(
+      /** @param {any} entry */
+      entry =>
+        entry?.fromState?.type === 'completed' &&
+        typeof entry?.toState?.type === 'string' &&
+        entry.toState.type !== 'completed'
+    ),
+    attachmentUrls: (raw.attachments?.nodes ?? [])
+      .map(node => String(node?.url ?? ''))
+      .filter(Boolean),
+  };
+}
+
+/**
+ * The Linear side of one lifecycle evaluation: read the issue, compute the
+ * merge-sync holds, and hand the writes to a port that re-reads state first.
+ *
+ * @param {{
+ *   readonly lookupId: string,
+ *   readonly fetchImpl: HttpFetch,
+ *   readonly apiKey: string,
+ *   readonly github: import('./validation-sync.mjs').GithubGet,
+ *   readonly repository: string,
+ *   readonly facts: ReturnType<typeof createProductionFacts>,
+ *   readonly openPulls: { pulls: readonly object[], complete: boolean },
+ *   readonly harnessManifest: unknown,
+ *   readonly allowlist?: ReadonlySet<string>,
+ *   readonly eventPull?: { number: number },
+ *   readonly dryRun?: boolean,
+ *   readonly log: (message: string) => void,
+ * }} ctx
+ */
+export async function reconcileIssueLifecycle(ctx) {
+  const issue = await readLifecycleIssue(
+    ctx.fetchImpl,
+    ctx.apiKey,
+    ctx.lookupId
+  );
+  if (!issue?.id || !issue.identifier) {
+    ctx.log(
+      `Could not resolve Linear issue for lookup '${ctx.lookupId}'; skipping`
+    );
+    return { action: 'skip', identifier: '', target: null, comment: '' };
+  }
+  const checkGreen = (issue.commentRecords ?? []).some(comment =>
+    String(comment?.body ?? '').includes(GREEN_MARKER)
+  );
+  const { holds } = lifecycleHolds({
+    issue,
+    pullRequests: ctx.openPulls.pulls,
+    mergingNumber: ctx.eventPull?.number,
+    scanComplete: ctx.openPulls.complete,
+    checkGreen,
+  });
+  /** @param {string} query @param {Record<string, unknown>} variables */
+  const linear = (query, variables) =>
+    linearGraphql(ctx.fetchImpl, ctx.apiKey, query, variables);
+  return reconcileValidation({
+    issue,
+    holds,
+    parentReason: parentHoldReason(issue, ctx.allowlist),
+    github: ctx.github,
+    repository: ctx.repository,
+    facts: ctx.facts,
+    harnessManifest: ctx.harnessManifest,
+    eventPull: ctx.eventPull,
+    dryRun: ctx.dryRun,
+    log: ctx.log,
+    linear: {
+      readStateId: async issueId =>
+        String(
+          (await linear(ISSUE_STATE_QUERY, { issueId })).issue?.state?.id ?? ''
+        ),
+      setState: async (issueId, stateId) =>
+        String(
+          (
+            await linear(
+              `mutation SetLifecycleState($issueId: String!, $stateId: String!) {
+        issueUpdate(id: $issueId, input: { stateId: $stateId }) { success issue { state { name } } }
+      }`,
+              { issueId, stateId }
+            )
+          ).issueUpdate?.issue?.state?.name ?? ''
+        ),
+      addComment: async (issueId, body) =>
+        (
+          await linear(
+            `mutation AddLifecycleComment($issueId: String!, $body: String!) {
+        commentCreate(input: { issueId: $issueId, body: $body }) { success }
+      }`,
+            { issueId, body }
+          )
+        ).commentCreate?.success === true,
+    },
+  });
+}
+
+/**
+ * @param {string} root
+ * @returns {unknown}
+ */
+function loadHarnessManifest(root) {
+  try {
+    return JSON.parse(
+      readFileSync(resolvePath(root, CI_HARNESS_MANIFEST), 'utf8')
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merge event: evaluate the linked issue. Sweep (production generation
+ * completed, schedule, manual replay): evaluate every issue in the lifecycle
+ * states. Both run the same evaluation, so order and replay do not matter.
+ *
  * @param {{
  *   readonly fetchImpl?: HttpFetch,
  *   readonly env?: NodeJS.ProcessEnv,
  *   readonly log?: (message: string) => void,
  *   readonly allowlist?: ReadonlySet<string>,
+ *   readonly harnessManifest?: unknown,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
@@ -530,112 +725,115 @@ export async function syncLinearIssueOnMerge(options = {}) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const env = options.env ?? process.env;
   const log = options.log ?? (message => console.log(message));
+  const sweep = env.LIFECYCLE_MODE === 'sweep';
   const ref = extractMergeIssueRef({
     body: env.PR_BODY,
     headRef: env.HEAD_REF,
   });
-  if (!ref.identifier && !ref.issueId) {
+  if (!sweep && !ref.identifier && !ref.issueId) {
     log('No linear issue marker or branch identifier found; skipping');
-    return { action: 'skip', comment: '', identifier: '' };
+    return { action: 'skip', comment: '', identifier: '', results: [] };
   }
   const apiKey = env.LINEAR_API_KEY ?? '';
   if (!apiKey) {
     log('LINEAR_API_KEY not set; skipping');
-    return { action: 'skip', comment: '', identifier: ref.identifier };
-  }
-  const lookupId = ref.issueId || ref.identifier;
-  const data = await linearGraphql(fetchImpl, apiKey, ISSUE_QUERY, {
-    issueId: lookupId,
-  });
-  const issue = readIssueSnapshot(data.issue);
-  if (!issue.id || !issue.identifier) {
-    log(`Could not resolve Linear issue for lookup '${lookupId}'; skipping`);
-    return { action: 'skip', comment: '', identifier: ref.identifier };
-  }
-  if (!issue.acceptanceMetadataVerified) {
     return {
       action: 'skip',
-      comment: 'Canonical acceptance metadata is unverified; issue stays open.',
-      identifier: issue.identifier,
+      comment: '',
+      identifier: ref.identifier,
+      results: [],
     };
   }
   const repository = env.GITHUB_REPOSITORY ?? '';
   const token = env.GITHUB_TOKEN ?? '';
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) || !token) {
     throw new Error(
-      'GITHUB_REPOSITORY and GITHUB_TOKEN are required before closing a Linear issue'
+      'GITHUB_REPOSITORY and GITHUB_TOKEN are required before moving a Linear issue'
     );
   }
-  let scanFailed = false;
-  let openPulls = { pulls: [], complete: true };
+  const github = githubClient(fetchImpl, token);
+  const facts = createProductionFacts({
+    fetchImpl,
+    github,
+    repository,
+    versionUrl: env.PRODUCTION_VERSION_URL,
+  });
+  const harnessManifest =
+    options.harnessManifest ??
+    loadHarnessManifest(env.GITHUB_WORKSPACE ?? process.cwd());
+  let openPulls = { pulls: /** @type {object[]} */ ([]), complete: true };
   try {
-    openPulls = await listOpenPullRequests({
-      fetchImpl,
-      token,
-      repository,
-    });
+    openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
   } catch (error) {
-    scanFailed = true;
-    openPulls = { pulls: [], complete: false };
     const message = error instanceof Error ? error.message : String(error);
     log(`Open pull request scan failed: ${message}`);
+    openPulls = { pulls: [], complete: false };
   }
-  const mergingPull = {
-    number: Number(env.PR_NUMBER),
-    url: String(env.PR_URL ?? ''),
-    sha: String(env.MERGE_SHA ?? ''),
-  };
-  const decision = decideLinearCloseOnMerge({
-    issue,
-    pullRequests: openPulls.pulls,
-    mergingPull,
-    allowlist: options.allowlist,
-    scanComplete: openPulls.complete,
-  });
-  if (decision.action === 'close') {
-    const stateId = selectDoneStateId(issue.states);
-    if (!stateId) {
-      throw new Error(
-        `No completed Linear state for ${issue.identifier}; left the issue open`
+
+  const lookups = [];
+  if (sweep) {
+    let after = null;
+    for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
+      const data = await linearGraphql(fetchImpl, apiKey, SWEEP_QUERY, {
+        states: [
+          LIFECYCLE_STATES.merging,
+          LIFECYCLE_STATES.validating,
+          LIFECYCLE_STATES.rework,
+        ],
+        after,
+      });
+      for (const node of data.issues?.nodes ?? []) {
+        if (typeof node?.identifier === 'string') lookups.push(node.identifier);
+      }
+      if (data.issues?.pageInfo?.hasNextPage !== true) break;
+      after = data.issues.pageInfo.endCursor;
+    }
+  } else {
+    lookups.push(ref.issueId || ref.identifier);
+  }
+
+  const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
+  const results = [];
+  const failures = [];
+  for (const lookupId of lookups) {
+    try {
+      results.push(
+        await reconcileIssueLifecycle({
+          lookupId,
+          fetchImpl,
+          apiKey,
+          github,
+          repository,
+          facts,
+          openPulls,
+          harnessManifest,
+          allowlist: options.allowlist,
+          eventPull,
+          dryRun: env.LIFECYCLE_DRY_RUN === '1',
+          log,
+        })
       );
-    }
-    const updated = await linearGraphql(
-      fetchImpl,
-      apiKey,
-      `mutation SetIssueDone($issueId: String!, $stateId: String!) {
-        issueUpdate(id: $issueId, input: { stateId: $stateId }) { success }
-      }`,
-      { issueId: issue.id, stateId }
-    );
-    if (updated.issueUpdate?.success !== true) {
-      throw new Error(`Linear refused to mark ${issue.identifier} Done`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`${lookupId}: ${message}`);
+      log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
     }
   }
-  const commented = await linearGraphql(
-    fetchImpl,
-    apiKey,
-    `mutation AddDoneComment($issueId: String!, $body: String!) {
-      commentCreate(input: { issueId: $issueId, body: $body }) { success }
-    }`,
-    { issueId: issue.id, body: decision.comment }
-  );
-  if (commented.commentCreate?.success !== true) {
-    throw new Error(`Linear refused the merge comment on ${issue.identifier}`);
-  }
-  if (scanFailed) {
-    throw new Error(
-      `Left ${issue.identifier} open because the open pull request scan failed`
+  const reasons = [...failures];
+  if (!openPulls.complete) {
+    reasons.unshift(
+      'the open pull request scan failed, so issues were left in place'
     );
   }
-  log(
-    decision.action === 'close'
-      ? `Marked ${issue.identifier} Done`
-      : `Left ${issue.identifier} open`
-  );
+  if (reasons.length > 0) {
+    throw new Error(`Lifecycle evaluation failed: ${reasons.join('; ')}`);
+  }
+  const first = results[0];
   return {
-    action: decision.action,
-    comment: decision.comment,
-    identifier: issue.identifier,
+    action: first?.action ?? 'skip',
+    comment: first?.comment ?? '',
+    identifier: first?.identifier ?? ref.identifier,
+    results,
   };
 }
 

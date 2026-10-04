@@ -1,19 +1,6 @@
 import SwiftUI
 import UIKit
 
-// Keep chat-model mapping beside its consumers so the shared theme compiles
-// independently on both iOS and macOS.
-extension JovieColor.EntityAccent {
-  static func color(for kind: MobileChatEntityKind) -> Color {
-    switch kind {
-    case .release: return release
-    case .artist: return artist
-    case .track: return track
-    case .event: return event
-    }
-  }
-}
-
 struct MobileChatMessageRow: View {
   let item: MobileChatTimelineItem
   let webBaseURL: URL

@@ -1,0 +1,28 @@
+{
+  "schema": "jovie.app-ui-primitives/v1",
+  "rule": "DESIGN_SYSTEM_COMPONENT_IDS plus the AppScreenComponentId union",
+  "sources": [
+    "apps/web/data/designSystem/componentRegistry.ts",
+    "apps/web/data/appScreens/registry.ts"
+  ],
+  "ids": [
+    "atom.brand-logo",
+    "atom.button",
+    "atom.icon-button",
+    "atom.input",
+    "atom.kbd",
+    "atom.link",
+    "atom.logo",
+    "atom.logo-link",
+    "atom.separator",
+    "atom.sheet",
+    "atom.switch",
+    "component.app-shell-content-panel",
+    "component.app-shell-frame",
+    "component.empty-state",
+    "component.entity-sidebar",
+    "component.error-fallback",
+    "component.settings-panel",
+    "component.unified-table"
+  ]
+}
