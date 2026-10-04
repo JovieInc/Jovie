@@ -1,0 +1,6 @@
+- [P1, confidence 10/10] [computer-use-decision.mjs](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T071850Z-JOV-7340-codex-f4f941/scripts/capability-benchmark/computer-use-decision.mjs:22) omits `retries-recovery` and `product-specific-behavior` from protected controls. Both can be changed to `jovieOwned:false` plus `ADOPT` while validation returns no errors, contradicting the PR’s retained-control contract.
+- [P1, confidence 10/10] [computer-use-decision.mjs](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T071850Z-JOV-7340-codex-f4f941/scripts/capability-benchmark/computer-use-decision.mjs:111) does not enforce material source, mapping, replay, or promotion fields. Placeholder sources, bogus capability mappings, attacker-controlled/empty origins, an empty oracle, and empty promotion requirements all validate successfully. Corresponding negative tests are missing.
+
+No migrations or runtime auth, billing, or infrastructure code changed. The 21 focused tests pass, but adversarial validation demonstrates the blockers above.
+
+LLM-REVIEW: FAIL — required Jovie-owned controls can be delegated, and replay/source/promotion safety fields fail open
