@@ -717,9 +717,8 @@ export const LIBRARY_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 1,
       minWidth: 220,
-      compact: asset => (
-        <LibraryAssetShareUrlCell asset={asset} share={asset.share} />
-      ),
+      // No compact form: a folded URL crowds the title out on narrow rows;
+      // sharing lives in the row menu and the inspector.
     },
   }),
   createLibraryActionColumn('w-10 pl-1 pr-2'),

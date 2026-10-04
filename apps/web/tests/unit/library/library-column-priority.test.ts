@@ -73,4 +73,13 @@ describe('library column priority', () => {
       compactFor('length')?.({ ...empty, totalDurationMs: 1000 })
     ).not.toBeNull();
   });
+
+  it('never folds the share URL beside a list title', () => {
+    const shareColumn = LIBRARY_TABLE_COLUMNS.find(
+      column => column.id === 'shareUrl'
+    );
+    expect(
+      (shareColumn?.meta as { compact?: unknown } | undefined)?.compact
+    ).toBeUndefined();
+  });
 });
