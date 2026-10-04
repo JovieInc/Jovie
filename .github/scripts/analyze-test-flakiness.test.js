@@ -478,6 +478,72 @@ test('a failed artifact read is never cached and still downloads that run', asyn
   }
 });
 
+for (const failure of ['mkdir', 'write']) {
+  test(`a ${failure} cache failure retains fetched report evidence and retries next wake`, async t => {
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const path = require('node:path');
+    const flakiness = require('./analyze-test-flakiness');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flaky-cache-failure-'));
+    const dir = path.join(root, 'evidence');
+    if (failure === 'mkdir') {
+      fs.writeFileSync(dir, 'not a directory');
+    } else {
+      fs.mkdirSync(dir);
+      for (const kind of ['jobs', 'artifacts']) {
+        fs.mkdirSync(path.join(dir, `${kind}-27-1.json`));
+      }
+    }
+    const warn = t.mock.method(console, 'warn', () => {});
+    flakiness.setRunEvidenceCacheDir(dir);
+    const run = { id: 27, run_attempt: 1, conclusion: 'failure' };
+    const routes = p =>
+      p.includes('/actions/workflows/ci.yml/runs?')
+        ? { body: { workflow_runs: [run] } }
+        : p.endsWith('/jobs')
+          ? {
+              body: {
+                jobs: [
+                  {
+                    name: 'Unit Tests',
+                    steps: [{ name: 'Run unit tests', conclusion: 'failure' }],
+                  },
+                ],
+              },
+            }
+          : { body: { artifacts: [] } };
+    try {
+      for (let wake = 0; wake < 2; wake++) {
+        const paths = await withFakeGitHub(routes, async calls => {
+          const report = await flakiness.analyzeFlakiness(
+            't',
+            'JovieInc',
+            'Jovie'
+          );
+          assert.equal(report.totalRuns, 1);
+          assert.equal(report.runsWithFailures, 1);
+          assert.equal(
+            report.testStats.get('Unit Tests › Run unit tests').failures,
+            1
+          );
+          return calls;
+        });
+        assert.equal(paths.length, 3);
+        assert.ok(paths.includes('/repos/JovieInc/Jovie/actions/runs/27/jobs'));
+        assert.ok(
+          paths.includes(
+            '/repos/JovieInc/Jovie/actions/runs/27/artifacts?per_page=100'
+          )
+        );
+      }
+      assert.equal(warn.mock.callCount(), 4);
+    } finally {
+      flakiness.setRunEvidenceCacheDir('');
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
 test('the evidence cache keeps the newest runs and keys on content', () => {
   const fs = require('node:fs');
   const os = require('node:os');

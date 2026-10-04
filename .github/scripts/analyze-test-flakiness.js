@@ -148,8 +148,18 @@ function createRunEvidenceCache(dir) {
       return JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch {}
     const value = await load();
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(value));
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(file, JSON.stringify(value));
+    } catch (error) {
+      // Persistence is optional; preserve successful API evidence and retry
+      // the cache on the next wake. API load failures still propagate above.
+      const code =
+        typeof error?.code === 'string' && /^[A-Z0-9_]+$/.test(error.code)
+          ? error.code
+          : 'UNKNOWN';
+      console.warn(`Run evidence cache persistence failed (${code}).`);
+    }
     return value;
   };
 }

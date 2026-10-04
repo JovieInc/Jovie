@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { Fragment, type ReactNode } from 'react';
+import { HomepageEditorialFeatureSection } from '@/components/homepage/HomepageCertifiedSections';
 import { ArtistProfileCaptureSection } from '@/components/marketing/artist-profile/ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from '@/components/marketing/artist-profile/ArtistProfileFaq';
 import { ArtistProfileFinalCta } from '@/components/marketing/artist-profile/ArtistProfileFinalCta';
@@ -28,6 +29,7 @@ import {
   type PageCompositionSection,
   type PageRecord,
   resolvePageCopy,
+  solutionsFactoryVariantIssue,
 } from '@/data/marketing/factory/pageRecord';
 import { derivePageRecordContract } from '@/data/marketing/factory/pageRecordContract';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
@@ -39,6 +41,7 @@ import { listProductTruthClaims } from '@/data/product-truth/claims';
 import type { Claim } from '@/data/product-truth/registry';
 import { buildFaqSchema, buildSoftwareSchema } from '@/lib/constants/schemas';
 import { ARTIST_PROFILE_FLAGS } from '@/lib/featureFlags';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import '@/components/marketing/artist-profile/ArtistProfileLandingPage.css';
 
 export interface SolutionsSectionRenderer {
@@ -66,7 +69,7 @@ const REQUIRED_FACTORY_COPY_SLOTS: Partial<
   Record<MarketingSectionId, readonly string[]>
 > = {
   hero: ['headline', 'subhead'],
-  'feature-split': ['body'],
+  'feature-split': ['headline', 'body'],
   cta: ['headline'],
 };
 
@@ -182,73 +185,6 @@ function FactorySectionMedia({
   );
 }
 
-function FactoryCopyLines({
-  entries,
-  omit = [],
-}: Readonly<{
-  entries: readonly FactoryCopyEntry[];
-  omit?: readonly string[];
-}>) {
-  return entries
-    .filter(entry => !omit.includes(entry.slot))
-    .map(entry => (
-      <p
-        key={entry.slot}
-        data-copy-slot={entry.slot}
-        className='text-base leading-relaxed text-secondary-token'
-      >
-        {entry.text}
-      </p>
-    ));
-}
-
-function FactoryGenericSection({
-  context,
-}: Readonly<{ context: SolutionsSectionRenderContext }>) {
-  const { section, copy: entries, media } = context;
-  const headline = slotText(entries, 'headline', 'title');
-  const omitted = headline
-    ? entries.filter(entry => entry.text === headline).map(entry => entry.slot)
-    : [];
-  const headingId = `${section.instanceId}-heading`;
-
-  return (
-    <section
-      aria-labelledby={headline ? headingId : undefined}
-      data-testid={`marketing-section-${section.sectionId}`}
-      data-marketing-section={section.sectionId}
-      data-marketing-owner='apps/web/app/(marketing)/solutions/[audience]/sections.tsx'
-      data-marketing-variant='factory-record'
-      className='section-spacing-linear'
-    >
-      <MarketingContainer width='page'>
-        <div
-          className={
-            media
-              ? 'grid items-center gap-10 lg:grid-cols-2 lg:gap-16'
-              : 'mx-auto flex max-w-prose-canonical flex-col gap-4'
-          }
-        >
-          <div className='flex min-w-0 flex-col gap-4'>
-            {headline ? (
-              <h2
-                id={headingId}
-                data-wrap='editorial-title'
-                data-copy-slot={omitted[0]}
-                className='text-balance text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl'
-              >
-                {headline}
-              </h2>
-            ) : null}
-            <FactoryCopyLines entries={entries} omit={omitted} />
-          </div>
-          <FactorySectionMedia media={media} />
-        </div>
-      </MarketingContainer>
-    </section>
-  );
-}
-
 interface CopyPair {
   readonly title: string;
   readonly description: string;
@@ -288,15 +224,25 @@ function FactoryFeatureGrid({
   context,
 }: Readonly<{ context: SolutionsSectionRenderContext }>) {
   const items = pairedCopy(context.copy, 'title', 'description');
-  if (items.length === 0) return <FactoryGenericSection context={context} />;
+  if (items.length === 0) {
+    throw new Error(
+      `Page record ${context.record.id} feature-grid ${context.section.instanceId} needs at least one title/description pair`
+    );
+  }
 
   const heading = slotText(context.copy, 'headline', 'title');
+  const variantId = context.section.variantId;
+  if (!variantId) {
+    throw new Error(
+      `Page record ${context.record.id} feature-grid ${context.section.instanceId} has no selected variantId`
+    );
+  }
   return (
     <section
       data-testid='marketing-section-feature-grid'
       data-marketing-section='feature-grid'
       data-marketing-owner='apps/web/app/(marketing)/solutions/[audience]/sections.tsx'
-      data-marketing-variant='two-column-text'
+      data-marketing-variant={variantId}
       className='section-spacing-linear'
     >
       <MarketingContainer width='page'>
@@ -322,11 +268,21 @@ function FactoryFaq({
     question: item.title,
     answer: item.description,
   }));
-  if (items.length === 0) return <FactoryGenericSection context={context} />;
+  if (items.length === 0) {
+    throw new Error(
+      `Page record ${context.record.id} FAQ ${context.section.instanceId} needs at least one question/answer pair`
+    );
+  }
+  const variantId = context.section.variantId;
+  if (!variantId) {
+    throw new Error(
+      `Page record ${context.record.id} FAQ ${context.section.instanceId} has no selected variantId`
+    );
+  }
 
   return (
     <FaqSection
-      sectionVariant='objection-handler' /* copy-lint-allow: objection -- canonical registry variant id */
+      sectionVariant={variantId}
       heading={slotText(context.copy, 'headline', 'title')}
       items={items}
     />
@@ -337,7 +293,22 @@ function FactoryHero({
   context,
 }: Readonly<{ context: SolutionsSectionRenderContext }>) {
   const binding = HERO_CODE_BINDING_BY_VARIANT[context.record.heroVariant];
-  if (!binding.sectionVariantId) return null;
+  const variantId = context.section.variantId;
+  if (!binding.sectionVariantId || !variantId) {
+    throw new Error(
+      `Page record ${context.record.id} hero variant ${context.record.heroVariant} has no selected MarketingHero binding`
+    );
+  }
+  if (binding.sectionVariantId !== variantId) {
+    throw new Error(
+      `Page record ${context.record.id} hero section variant ${variantId} does not match ${context.record.heroVariant} binding ${binding.sectionVariantId}`
+    );
+  }
+  if (variantId === 'left-none' && context.media) {
+    throw new Error(
+      `Page record ${context.record.id} hero ${context.section.instanceId} variant left-none cannot render media; choose a split hero variant`
+    );
+  }
   const contract = derivePageRecordContract(context.record);
 
   return (
@@ -351,13 +322,17 @@ function FactoryHero({
         href: contract.primaryCta.href,
       }}
       media={
-        context.media ? (
+        variantId === 'split-screenshot-right' && context.media ? (
           <FactorySectionMedia media={context.media} />
         ) : undefined
       }
       logos={false}
-      align={binding.sectionVariantId === 'left-none' ? 'left' : 'center'}
-      sectionVariant={binding.sectionVariantId}
+      align={
+        variantId === 'left-none' || variantId === 'split-screenshot-right'
+          ? 'left'
+          : 'center'
+      }
+      sectionVariant={variantId}
       sectionOwner='apps/web/app/(marketing)/solutions/[audience]/sections.tsx'
       testId='marketing-section-hero'
     />
@@ -368,12 +343,9 @@ function FactoryCta({
   context,
 }: Readonly<{ context: SolutionsSectionRenderContext }>) {
   const contract = derivePageRecordContract(context.record);
-  const copyScope = contract.copyScope;
   return (
     <MarketingTerminalCta
-      sectionVariant={
-        copyScope === 'music' ? 'final-single-claim' : 'final-dual-path'
-      }
+      sectionVariant={context.section.variantId}
       title={slotText(context.copy, 'headline', 'title') ?? ''}
       body={slotText(context.copy, 'subhead', 'body')}
       ctaLabel={
@@ -392,6 +364,46 @@ function FactoryCta({
   );
 }
 
+function FactoryFeatureSplit({
+  context,
+}: Readonly<{ context: SolutionsSectionRenderContext }>) {
+  const { section, media } = context;
+  const headline = slotText(context.copy, 'headline');
+  const body = slotText(context.copy, 'body');
+  if (!section.instanceId || !headline || !body) {
+    throw new Error(
+      `Page record ${context.record.id} feature-split ${section.instanceId ?? '(missing instance)'} requires headline and body copy`
+    );
+  }
+  if (!media || media.kind !== 'screenshot-registry') {
+    throw new Error(
+      `Page record ${context.record.id} feature-split ${section.instanceId} requires a screenshot-registry capture`
+    );
+  }
+  const preview = getMarketingExportImage(media.id);
+
+  if (section.variantId === 'editorial') {
+    return (
+      <HomepageEditorialFeatureSection
+        section={{ id: section.instanceId, headline, body }}
+        previews={[{ image: preview }]}
+      />
+    );
+  }
+  if (section.variantId === 'phone-right') {
+    return (
+      <ArtistProfileOpinionatedSection
+        opinionated={{ headline, body }}
+        preview={preview}
+        sectionOccurrence={section.instanceId}
+      />
+    );
+  }
+  throw new Error(
+    `Page record ${context.record.id} has no certified feature-split renderer for variant ${section.variantId ?? '(missing)'}`
+  );
+}
+
 function FactoryCanonicalSection({
   context,
 }: Readonly<{ context: SolutionsSectionRenderContext }>) {
@@ -400,12 +412,16 @@ function FactoryCanonicalSection({
       return <FactoryHero context={context} />;
     case 'feature-grid':
       return <FactoryFeatureGrid context={context} />;
+    case 'feature-split':
+      return <FactoryFeatureSplit context={context} />;
     case 'faq':
       return <FactoryFaq context={context} />;
     case 'cta':
       return <FactoryCta context={context} />;
     default:
-      return <FactoryGenericSection context={context} />;
+      throw new Error(
+        `Page record ${context.record.id} has no certified solutions renderer for ${context.section.sectionId}/${context.section.variantId ?? '(missing variant)'}`
+      );
   }
 }
 
@@ -415,6 +431,18 @@ function validateFactorySection(context: SolutionsSectionRenderContext) {
     throw new Error(
       `Page record ${record.id} factory section ${section.renderer} has no instanceId`
     );
+  }
+  if (!section.variantId) {
+    throw new Error(
+      `Page record ${record.id} factory section ${section.renderer} has no persisted variantId`
+    );
+  }
+  const variantIssue = solutionsFactoryVariantIssue(
+    section.sectionId,
+    section.variantId
+  );
+  if (variantIssue) {
+    throw new Error(`Page record ${record.id}: ${variantIssue}`);
   }
   if (entries.length === 0) {
     throw new Error(
@@ -430,13 +458,49 @@ function validateFactorySection(context: SolutionsSectionRenderContext) {
       );
     }
   }
-  if (
-    section.sectionId === 'hero' &&
-    HERO_CODE_BINDING_BY_VARIANT[record.heroVariant].sectionVariantId === null
-  ) {
-    throw new Error(
-      `Page record ${record.id} hero variant ${record.heroVariant} has no code binding`
-    );
+  if (section.sectionId === 'hero') {
+    const expectedVariant =
+      HERO_CODE_BINDING_BY_VARIANT[record.heroVariant].sectionVariantId;
+    if (!expectedVariant || expectedVariant !== section.variantId) {
+      throw new Error(
+        `Page record ${record.id} hero section variant ${section.variantId} does not match ${record.heroVariant} code binding ${expectedVariant ?? '(unbound)'}`
+      );
+    }
+    if (section.variantId === 'left-none' && context.media) {
+      throw new Error(
+        `Page record ${record.id} hero ${section.instanceId} variant left-none cannot render media; choose a split hero variant`
+      );
+    }
+    if (section.variantId === 'split-screenshot-right') {
+      if (!context.media || context.media.kind !== 'screenshot-registry') {
+        throw new Error(
+          `Page record ${record.id} hero ${section.instanceId} requires a screenshot-registry capture for split-screenshot-right`
+        );
+      }
+      getMarketingExportImage(context.media.id);
+    }
+  }
+  if (section.sectionId === 'feature-split') {
+    if (!context.media || context.media.kind !== 'screenshot-registry') {
+      throw new Error(
+        `Page record ${record.id} feature-split ${section.instanceId} requires a screenshot-registry capture`
+      );
+    }
+    getMarketingExportImage(context.media.id);
+  }
+  if (section.sectionId === 'feature-grid') {
+    if (pairedCopy(entries, 'title', 'description').length === 0) {
+      throw new Error(
+        `Page record ${record.id} feature-grid ${section.instanceId} needs at least one title/description pair`
+      );
+    }
+  }
+  if (section.sectionId === 'faq') {
+    if (pairedCopy(entries, 'question', 'answer').length === 0) {
+      throw new Error(
+        `Page record ${record.id} FAQ ${section.instanceId} needs at least one question/answer pair`
+      );
+    }
   }
 }
 
