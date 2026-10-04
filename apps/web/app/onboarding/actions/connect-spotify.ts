@@ -31,6 +31,7 @@ import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { createOnboardingReceiptPendingError } from '@/lib/errors/onboarding';
 import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
+import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import {
   assertSpotifyProfileIdentityAvailable,
@@ -515,28 +516,26 @@ export async function connectOnboardingSpotifyArtist(
       );
     }
 
-    if (params.skipMusicFetchEnrichment) {
-      return;
-    }
-
-    try {
-      await processMusicFetchEnrichmentJob(db, {
-        creatorProfileId: profile.id,
-        spotifyUrl: spotifyUrlForEnrichment,
-        dedupKey: buildInlineMusicFetchDedupKey(
-          profile.id,
-          params.spotifyArtistId
-        ),
-      });
-    } catch (error) {
-      void captureError(
-        'MusicFetch enrichment inline processing failed on connect',
-        error,
-        {
-          action: 'connectOnboardingSpotifyArtist',
+    if (!params.skipMusicFetchEnrichment && musicfetchNetworkAllowed()) {
+      try {
+        await processMusicFetchEnrichmentJob(db, {
           creatorProfileId: profile.id,
-        }
-      );
+          spotifyUrl: spotifyUrlForEnrichment,
+          dedupKey: buildInlineMusicFetchDedupKey(
+            profile.id,
+            params.spotifyArtistId
+          ),
+        });
+      } catch (error) {
+        void captureError(
+          'MusicFetch enrichment inline processing failed on connect',
+          error,
+          {
+            action: 'connectOnboardingSpotifyArtist',
+            creatorProfileId: profile.id,
+          }
+        );
+      }
     }
 
     void refreshFeaturedPlaylistFallbackCandidate({
