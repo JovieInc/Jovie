@@ -81,7 +81,7 @@ export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
   /**
    * Proof element rendered below the hero copy. Omitted by default: a logo
    * bar needs a permission for the page (JOV-7795), so callers pass
-   * `<HomeTrustSection placement={...} />` explicitly. `false` also omits.
+   * a `HomeTrustSection` with a placement explicitly. `false` also omits.
    *
    * Intentionally NO stats props: numeric social-proof claims must not
    * render here (decision, 2026-07-03 — unverifiable stats never ship;
