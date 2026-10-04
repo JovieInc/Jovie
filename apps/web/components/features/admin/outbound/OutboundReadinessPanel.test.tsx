@@ -15,7 +15,7 @@ describe('OutboundReadinessPanel', () => {
           items: [
             {
               id: 'cone',
-              label: 'Revenue cone (ACQUISITION_ELIGIBLE)',
+              label: 'Revenue cone: acquisition eligible',
               status: 'red',
               detail: '1 of 8 receipts not green',
               owner: 'revenue',

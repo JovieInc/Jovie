@@ -93,7 +93,7 @@ export function OutboundReadinessPanel({
     );
   }
   return (
-    <ul aria-label='Onboarding Readiness' data-testid='outbound-readiness'>
+    <ul aria-label='Readiness' data-testid='outbound-readiness'>
       {readiness.items.map(item => (
         <li key={item.id} className='list-none'>
           <ul>

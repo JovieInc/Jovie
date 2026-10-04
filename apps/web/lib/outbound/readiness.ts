@@ -141,7 +141,7 @@ export function buildOutboundReadiness(
 
   items.push({
     id: 'cone',
-    label: 'Revenue cone (ACQUISITION_ELIGIBLE)',
+    label: 'Revenue cone: acquisition eligible',
     status: !input.cone ? 'unknown' : input.cone.eligible ? 'green' : 'red',
     detail: !input.cone
       ? 'Eligibility could not be read; outbound stays held.'
