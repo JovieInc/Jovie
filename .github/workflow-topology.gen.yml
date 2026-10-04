@@ -250,7 +250,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 61
+    jobCount: 62
   - name: Claude Review (gbrain-aware)
     path: .github/workflows/claude-review.yml
     active: true
@@ -604,6 +604,20 @@ nodes:
       - pull_request_target
     terminalReceipt: job:review
     jobCount: 1
+  - name: iOS App Store Graphics
+    path: .github/workflows/ios-app-store-graphics.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_call
+      - workflow_dispatch
+    terminalReceipt: job:graphics
+    jobCount: 1
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -635,11 +649,12 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - iOS CI
+      - iOS App Store Graphics
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-upload
-    jobCount: 4
+    jobCount: 5
   - name: Jovie artist agent Eve release and rollback
     path: .github/workflows/jovie-agent-release.yml
     active: true
@@ -762,7 +777,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
-    jobCount: 3
+    jobCount: 4
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -1480,6 +1495,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
     jobCount: 2
+  - name: VOC Mine
+    path: .github/workflows/voc-mine.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:mine
+    jobCount: 1
 edges:
   - from: CI
     to: iOS CI
@@ -1495,6 +1522,9 @@ edges:
     type: workflow_run
   - from: iOS TestFlight
     to: iOS CI
+    type: workflow_call
+  - from: iOS TestFlight
+    to: iOS App Store Graphics
     type: workflow_call
   - from: Source Validation
     to: Lane Fix Relay

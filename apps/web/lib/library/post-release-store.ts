@@ -111,6 +111,8 @@ export async function listLibraryPostReleaseBundle(
       domain: item.domain,
       evidenceClass: item.evidenceClass,
       source: item.source,
+      sourceWorkId: item.sourceWorkId,
+      sourceUrl: item.sourceUrl,
       shareBps: item.shareBps,
     })),
     stats: [

@@ -72,6 +72,7 @@ private struct AppContentView: View {
          .uiTestingChat,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
+         .uiTestingStorefrontChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingLibrary,
@@ -330,6 +331,9 @@ private struct AppContentView: View {
           // Deterministic UI-testing fixture: bypasses the network
           // client/cache entirely so parse→render can be asserted without a
           // mocked backend.
+          if appState.launchMode == .uiTestingStorefrontChat {
+            MobileChatStorefrontFixture.primeMockupImages()
+          }
           repository.seedTimelineForUITesting(
             fixtureTimeline,
             activeConversationID: appState.launchMode.chatFixtureConversationID
@@ -448,6 +452,7 @@ private struct AppContentView: View {
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
+         .uiTestingStorefrontChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingAuthCallback,
