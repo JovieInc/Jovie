@@ -103,6 +103,62 @@ describe('TimActionRequiredSection observation states', () => {
     }
   );
 
+  it('waits for both observations before showing the aggregate decision count', async () => {
+    certificationOverrides.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        issues: [
+          {
+            id: 'task-1',
+            identifier: 'JOV-12',
+            title: 'Review task',
+            priority: 2,
+            daysOld: 0,
+            url: 'https://linear.app/jovie/issue/JOV-12',
+          },
+        ],
+        fetchedAt: new Date().toISOString(),
+        available: true,
+        observation: 'fresh',
+        errorMessage: null,
+      })
+    );
+    let view: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(<TimActionRequiredSection />);
+    });
+    expect(screen.getByText('Review task')).toBeInTheDocument();
+    expect(screen.queryByText('1', { exact: true })).toBeNull();
+    certificationOverrides.mockReturnValue({
+      data: fixtureInventory(),
+      isLoading: false,
+    });
+    view!.rerender(<TimActionRequiredSection />);
+    expect(screen.getByText('2', { exact: true })).toBeInTheDocument();
+  });
+
+  it('reports both unavailable sources and retains their separate recovery controls', async () => {
+    certificationOverrides.mockReturnValue({ data: undefined, isError: true });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('linear down', { status: 503 })
+    );
+    await act(async () => {
+      render(<TimActionRequiredSection />);
+    });
+    expect(
+      screen.getByTestId('needs-you-judgments-observation')
+    ).toHaveAttribute('data-state', 'unavailable');
+    expect(screen.getByTestId('tim-action-observation')).toHaveAttribute(
+      'data-state',
+      'unavailable'
+    );
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(2);
+    expect(screen.queryByText('Nothing needs you.')).toBeNull();
+  });
+
   it('shows empty after a successful observation with no issues', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(

@@ -43,6 +43,10 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
+  // Social-network HTML must not be fetched from Jovie server IPs. Default
+  // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
+  // isolated provider and still fails closed until that provider exists.
+  SOCIAL_HTML_ISOLATED_PROVIDER: false,
   // JOV-5862: paste-channel thumbnail redo generation (model spend). Ships
   // OFF per cert-sla-v1 — the lander + channel lookup work without it; the
   // flag flips on only when Tim certifies the redo output. Env override:

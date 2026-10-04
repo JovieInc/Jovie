@@ -28,6 +28,7 @@ import {
   retrySpentDescription,
   revisionFailureDisposition,
   sourceHeadForRun,
+  supersededByLiveEntry,
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -359,7 +360,7 @@ if (args[1] === 'graphql') {
   const pr = query.includes('timelineItems')
     ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
     : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
-        isInMergeQueue: true, mergeQueueEntry: { id: 'MQE_42' }, autoMergeRequest: null };
+        isInMergeQueue: true, mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: fixture.run.head_sha } }, autoMergeRequest: null };
   process.stdout.write(JSON.stringify({ data: { repository: { pullRequest: pr } } }));
 } else if (args.includes('POST')) {
   process.stdout.write('{}');
@@ -750,7 +751,7 @@ describe('terminal failure hold application', () => {
       state: 'OPEN',
       headRefOid: SOURCE,
       isInMergeQueue: true,
-      mergeQueueEntry: { id: 'MQE_42' },
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
       autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
     };
     const order = [];
@@ -844,6 +845,71 @@ describe('terminal failure hold application', () => {
     expect(disableAutoMerge).not.toHaveBeenCalled();
   });
 
+  it('ignores a superseded group failure while the exact source is still queued', async () => {
+    const LIVE_GROUP = 'f'.repeat(40);
+    for (const mergeQueueEntry of [
+      { id: 'MQE_42', headCommit: { oid: LIVE_GROUP } },
+      { id: 'MQE_42', headCommit: null },
+    ]) {
+      const writeStatus = vi.fn();
+      const dequeuePullRequest = vi.fn();
+      const disableAutoMerge = vi.fn();
+      const result = await applyMergeGroupFailure(failureInput, {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: true,
+          mergeQueueEntry,
+          autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+        })),
+        dequeuePullRequest,
+        disableAutoMerge,
+      });
+      expect(result).toMatchObject({
+        superseded: true,
+        mergeGroupHeadSha: GROUP,
+        liveMergeGroupHeadSha: mergeQueueEntry.headCommit?.oid ?? null,
+        statusWritten: false,
+        dequeued: false,
+        autoMergeDisabled: false,
+      });
+      // No retry is spent and the live entry keeps its place in the queue.
+      expect(writeStatus).not.toHaveBeenCalled();
+      expect(dequeuePullRequest).not.toHaveBeenCalled();
+      expect(disableAutoMerge).not.toHaveBeenCalled();
+    }
+  });
+
+  it('only treats a live queued exact source as superseded', () => {
+    const queued = {
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+    };
+    expect(supersededByLiveEntry(queued, SOURCE, GROUP)).toBe(false);
+    expect(supersededByLiveEntry(queued, SOURCE, 'f'.repeat(40))).toBe(true);
+    expect(
+      supersededByLiveEntry(
+        { ...queued, isInMergeQueue: false, mergeQueueEntry: null },
+        SOURCE,
+        'f'.repeat(40)
+      )
+    ).toBe(false);
+    expect(supersededByLiveEntry(queued, NEW_SOURCE, 'f'.repeat(40))).toBe(
+      false
+    );
+    expect(
+      supersededByLiveEntry(
+        { ...queued, state: 'CLOSED' },
+        SOURCE,
+        'f'.repeat(40)
+      )
+    ).toBe(false);
+  });
+
   it('classifies only the integration denial and an already-removed queue', () => {
     const denied = Object.assign(new Error('Command failed: gh api graphql'), {
       stderr: 'gh: Resource not accessible by integration\n',
@@ -867,7 +933,7 @@ describe('terminal failure hold application', () => {
       state: 'OPEN',
       headRefOid: SOURCE,
       isInMergeQueue: true,
-      mergeQueueEntry: { id: 'MQE_42' },
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
       autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
     };
     const order = [];
@@ -906,13 +972,15 @@ describe('terminal failure hold application', () => {
       writeStatus: vi.fn(),
       readPullRequest: vi.fn(async () => {
         reads += 1;
-        const queued = reads < 3;
+        const queued = reads < 4;
         return {
           id: 'PR_42',
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: queued,
-          mergeQueueEntry: queued ? { id: 'MQE_42' } : null,
+          mergeQueueEntry: queued
+            ? { id: 'MQE_42', headCommit: { oid: GROUP } }
+            : null,
           autoMergeRequest: null,
         };
       }),
@@ -939,7 +1007,7 @@ describe('terminal failure hold application', () => {
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: true,
-          mergeQueueEntry: { id: 'MQE_42' },
+          mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
           autoMergeRequest: null,
         })),
         dequeuePullRequest: vi.fn(async () => {
@@ -960,7 +1028,7 @@ describe('terminal failure hold application', () => {
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: true,
-          mergeQueueEntry: { id: 'MQE_42' },
+          mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
           autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
         })),
         dequeuePullRequest: vi.fn(async () => {

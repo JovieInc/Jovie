@@ -236,13 +236,13 @@ export function TimActionRequiredSection({
             <p className='text-xs font-caption text-tertiary-token'>
               Needs You
             </p>
-            {!isLoading && pendingCount > 0 ? (
+            {!isLoading && !certificationQuery.isLoading && pendingCount > 0 ? (
               <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
                 {pendingCount}
               </span>
             ) : null}
           </div>
-        ) : !isLoading && pendingCount > 0 ? (
+        ) : !isLoading && !certificationQuery.isLoading && pendingCount > 0 ? (
           <p className='px-3 text-xs tabular-nums text-tertiary-token'>
             {pendingCount} {pendingCount === 1 ? 'decision' : 'decisions'}
           </p>
@@ -276,7 +276,9 @@ export function TimActionRequiredSection({
               ))}
             </div>
           </div>
-        ) : pendingCount === 0 && certificationObserved ? (
+        ) : observation === 'unavailable' ||
+          observation === 'not_configured' ||
+          (pendingCount === 0 && certificationObserved) ? (
           <HudObservationStatus
             state={observation}
             message={timActionsMessage(observation, data, locked)}
