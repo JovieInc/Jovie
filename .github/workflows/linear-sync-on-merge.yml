@@ -61,9 +61,12 @@ jobs:
             scripts/lib/validation-lifecycle.mjs
             scripts/lib/validation-sync.mjs
             scripts/lib/escaped-defect-closure.mjs
+            scripts/lib/founder-taste-order.mjs
             scripts/lib/ci-harness.mjs
             scripts/lib/remediation-signal.mjs
             scripts/lib/linear-issue-intake.mjs
+            scripts/invariants/assurance-matrix.mjs
+            scripts/invariants/assurance-matrix.json
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
