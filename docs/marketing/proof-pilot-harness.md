@@ -2,6 +2,10 @@
 
 Status: spec only. Recruiting has not started. Refs JOV-7750, epic JOV-7244.
 
+Gate (Tim, 2026-10-04): recruiting waits until the funnel passes the persona
+scorer (`scripts/funnel-judge`, JOV-7753 pass bar). Keep the harness ready;
+do not recruit before then. Tracked in JOV-7793.
+
 The proof system has three admissible evidence classes for an outcome claim:
 computed, dogfood and pilot (`apps/web/data/product-truth/evidence.ts`).
 Computed and dogfood proof ship first. This document specifies the pilot

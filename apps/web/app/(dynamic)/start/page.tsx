@@ -34,7 +34,8 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Start with Jovie',
-  description: 'Start your artist profile in one conversation.',
+  // JOV-7794: no unmeasured speed claim, no single-ICP wording.
+  description: 'Claim your name and start your Jovie profile.',
   robots: { index: false, follow: false },
 };
 

@@ -239,8 +239,10 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     limits: { ...PRO_LIMITS },
     marketing: {
       displayName: 'Pro',
+      // JOV-7794: certified capabilities only (pay, release-launch,
+      // instant-merch). profile-monitoring is internal-only.
       tagline:
-        'Continuous visibility monitoring, prioritized opportunities, and agentic fixes.',
+        'Take payments, launch releases and sell merch from your Jovie profile.',
       features: PRO_FEATURES,
       price: {
         monthly: PLAN_PRICES.pro.monthly,
