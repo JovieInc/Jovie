@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Retry wrapper for `gh` on transient GitHub API failures (429/502/503/504).
+# Retry wrapper for `gh` on transient GitHub API failures (429/500/502/503/504).
 # Usage: source scripts/lib/gh-retry.sh, then gh_retry pr list ...
 
 gh_retry_is_transient_error() {
@@ -7,11 +7,12 @@ gh_retry_is_transient_error() {
   # An installation whose quota is already exhausted cannot recover inside a
   # short retry loop. Retrying only monopolizes the repo-wide queue writer
   # until GitHub's hourly reset, so fail fast and let the next event retry with
-  # a fresh quota window.
-  if grep -qiE "API rate limit already exceeded for installation ID" <<<"$err"; then
+  # a fresh quota window. Actions' GITHUB_TOKEN reports the same exhaustion
+  # as "for site ID installation" (JOV-7744 storm, 2026-10-03).
+  if grep -qiE "API rate limit already exceeded for (installation ID|site ID installation)" <<<"$err"; then
     return 1
   fi
-  grep -qiE "HTTP (429|502|503|504)|rate limit|timed out|timeout|couldn't respond|stream error|stream ID [0-9]+; CANCEL|unexpected end of JSON input|unexpected EOF|connection reset" <<<"$err"
+  grep -qiE "HTTP (429|500|502|503|504)|rate limit|timed out|timeout|couldn't respond|stream error|stream ID [0-9]+; CANCEL|unexpected end of JSON input|unexpected EOF|connection reset" <<<"$err"
 }
 
 gh_retry() {

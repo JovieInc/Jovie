@@ -1128,6 +1128,71 @@ jobs:
             echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'
           } >> "$GITHUB_OUTPUT"
 
+  # A rebuilt group gets a new queue ref for the same PR, but CI keys
+  # merge_group concurrency by head SHA, so the superseded run kept every lane
+  # busy: 2,312 of 3,468 group runs on 2026-10-03 were still running after
+  # their PR had a newer group (~11.5k wall-min). This watchdog lists the PR's
+  # queue refs over git (no REST quota) and cancels this run only after two
+  # consecutive reads show its own ref gone AND a successor ref for the same
+  # PR present. A merged or failed-and-removed group leaves no successor, so
+  # its run keeps its real conclusion; an unreadable listing is not evidence.
+  ci-merge-group-watchdog:
+    name: Merge Group Supersession Watchdog
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    # Outlives check_response_timeout_minutes (60); exits as soon as the
+    # group leaves the queue.
+    timeout-minutes: 70
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel this run once a newer group supersedes it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUEUE_REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          POLL_SECONDS: '30'
+          MAX_SECONDS: '3900'
+        run: |
+          set -uo pipefail
+          if [[ ! "$QUEUE_REF" =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}$ ]]; then
+            echo "::notice::$QUEUE_REF is not a main queue ref; watchdog idle."
+            exit 0
+          fi
+          prefix="refs/heads/gh-readonly-queue/main/pr-${BASH_REMATCH[1]}-"
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          list_refs() {
+            GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+            GIT_CONFIG_VALUE_0="$auth" \
+            GIT_TERMINAL_PROMPT=0 \
+              git ls-remote "https://github.com/$REPOSITORY" "${prefix}*"
+          }
+          misses=0
+          while (( SECONDS < MAX_SECONDS )); do
+            if refs="$(list_refs)"; then
+              names="$(awk '{print $2}' <<<"$refs")"
+              if grep -qxF "$QUEUE_REF" <<<"$names"; then
+                misses=0
+              elif grep -q . <<<"$names"; then
+                misses=$((misses + 1))
+                if (( misses >= 2 )); then
+                  echo "::notice::$QUEUE_REF was superseded by $(head -n1 <<<"$names"); cancelling run $RUN_ID."
+                  gh run cancel "$RUN_ID" --repo "$REPOSITORY" || echo "::warning::cancel request failed"
+                  exit 0
+                fi
+              else
+                echo "::notice::$QUEUE_REF left the queue without a successor; keeping this run's conclusion."
+                exit 0
+              fi
+            else
+              misses=0
+            fi
+            sleep "$POLL_SECONDS"
+          done
+          echo "::notice::watchdog budget elapsed with $QUEUE_REF still queued."
+
   ci-risk-classifier:
     # Dependency-free so fork PRs classify without waiting on a trusted job or
     # secret. On main, only an unproven exact SHA executes the fallback lane.
