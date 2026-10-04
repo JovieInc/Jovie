@@ -8,13 +8,13 @@ import {
   getRegistryEntryByService,
 } from '@/lib/dsp-registry';
 import { env } from '@/lib/env-server';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import {
   type InHouseQuery,
   type InHouseResolution,
   resolveInHouse,
 } from '@/lib/music-resolver/in-house';
 import {
+  isMusicResolverFamilyEnabled,
   musicfetchNetworkAllowed,
   noteMusicfetchHttpStatus,
 } from '@/lib/music-resolver/musicfetch-gate';
@@ -486,7 +486,7 @@ export async function resolveAgentRelease(
     }
     let inHouseAttempted = false;
     if (input.release_url || input.upc) {
-      if (isCodeFlagEnabled('IN_HOUSE_RESOLVER')) {
+      if (isMusicResolverFamilyEnabled('release_facts')) {
         inHouseAttempted = true;
         const house = await resolveAgentReleaseInHouse(input);
         if (house.facts) {
