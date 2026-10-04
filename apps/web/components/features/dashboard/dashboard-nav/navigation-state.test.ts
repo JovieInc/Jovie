@@ -71,6 +71,7 @@ describe('isNavigationItemActive', () => {
       APP_ROUTES.LEGACY_DASHBOARD_LIBRARY,
       APP_ROUTES.RELEASES,
       APP_ROUTES.DASHBOARD_RELEASES,
+      APP_ROUTES.YOUTUBE_REVIVAL,
     ]) {
       expect(
         isNavigationItemActive(
