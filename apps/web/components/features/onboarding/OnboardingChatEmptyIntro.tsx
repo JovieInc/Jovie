@@ -67,7 +67,7 @@ function EntryProfileCard({
 
   return (
     <div
-      className='mb-6 flex w-full max-w-[22rem] items-center gap-3 rounded-2xl border border-subtle bg-surface-1 p-3 text-left lg:hidden'
+      className='mb-6 flex w-full max-w-88 items-center gap-3 rounded-2xl border border-subtle bg-surface-1 p-3 text-left lg:hidden'
       data-testid='onboarding-entry-profile'
       data-entry-status={entry.status}
     >
@@ -155,7 +155,7 @@ export function OnboardingChatEmptyIntro({
           <h1 className='text-2xl font-semibold text-primary-token'>
             {copy.title}
           </h1>
-          <p className='mx-auto mt-2 max-w-[28rem] text-sm leading-6 text-secondary-token'>
+          <p className='mx-auto mt-2 max-w-112 text-sm leading-6 text-secondary-token'>
             {copy.support}
           </p>
         </div>
