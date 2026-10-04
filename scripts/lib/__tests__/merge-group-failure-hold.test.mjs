@@ -17,6 +17,8 @@ import {
   references,
 } from '../../agent-context/check.mjs';
 import {
+  ADMISSION_RECOVERY_SCHEMA,
+  admissionRecoveryReceiptStatus,
   applyMergeGroupFailure,
   autoMergeWasNotArmed,
   classifyDequeueDenial,
@@ -25,6 +27,7 @@ import {
   FAILURE_HOLD_CONTEXT,
   failureReceiptStatus,
   parseMergeQueueBranch,
+  reenrollmentDisposition,
   retryReleasedDescription,
   retrySpentDescription,
   revisionFailureDisposition,
@@ -42,6 +45,188 @@ const classify = (conclusion, failedSteps = []) =>
   classifyMergeGroupFailure({ conclusion, failedSteps });
 const disposition = statuses =>
   revisionFailureDisposition({ repository: REPOSITORY, statuses });
+it('scopes admission recovery receipts to the exact repository, PR and source revision', () => {
+  const receipt = {
+    schema: ADMISSION_RECOVERY_SCHEMA,
+    repository: REPOSITORY,
+    prNumber: 42,
+    sourceHeadSha: SOURCE,
+    mergeGroupHeadSha: GROUP,
+    workflowRunId: 123,
+    workflowRunAttempt: 1,
+    completedAt: Date.parse('2026-09-30T10:10:00Z'),
+  };
+  const scope = { repository: REPOSITORY, prNumber: 42, headSha: SOURCE };
+  const convert = value =>
+    admissionRecoveryReceiptStatus(JSON.stringify(value), scope);
+  expect(convert(receipt).target_url).toBe(RUN_URL);
+  expect(convert({ ...receipt, prNumber: 43 })).toBeNull();
+  expect(convert({ ...receipt, sourceHeadSha: NEW_SOURCE })).toBeNull();
+  expect(admissionRecoveryReceiptStatus('', scope)).toBeNull();
+  expect(admissionRecoveryReceiptStatus(undefined, scope)).toBeNull();
+  for (const invalid of [
+    null,
+    {},
+    { ...receipt, schema: 'spoof' },
+    { ...receipt, repository: 'other/repo' },
+    { ...receipt, sourceHeadSha: 'bad' },
+    { ...receipt, mergeGroupHeadSha: 'bad' },
+    { ...receipt, prNumber: 0 },
+    { ...receipt, workflowRunId: 0 },
+    { ...receipt, workflowRunAttempt: 0 },
+    { ...receipt, completedAt: 0 },
+  ])
+    expect(() => convert(invalid)).toThrow();
+  expect(() => admissionRecoveryReceiptStatus(null, scope)).toThrow();
+  expect(() => admissionRecoveryReceiptStatus('{', scope)).toThrow();
+});
+
+it('admission recovery preserves revision holds, source leases, intent and retry reservations', () => {
+  const ended = Date.parse('2026-09-30T10:10:00Z');
+  const recovery = {
+    context: 'jovie-queue-admission-recovery/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: `pr=42;run=123;try=1;at=${ended}`,
+    target_url: RUN_URL,
+  };
+  const input = {
+    failure: { action: 'allow', reason: 'no-revision-failure', failures: [] },
+    statuses: [recovery],
+    repository: REPOSITORY,
+    prNumber: 42,
+    lastRemoval: '2026-09-30T10:09:59Z',
+    headCommittedAt: '2026-09-30T09:00:00Z',
+    autoMergeEnabled: true,
+  };
+  expect(reenrollmentDisposition(input)).toMatchObject({
+    action: 'retry-once',
+    latest: { runId: 123, runAttempt: 1 },
+  });
+  for (const change of [
+    { prNumber: 43 },
+    { autoMergeEnabled: false },
+    { lastRemoval: 'bad' },
+    { lastRemoval: '2026-09-30T10:11:00Z' },
+    { statuses: [] },
+    { statuses: [{ ...recovery, state: 'pending' }] },
+    {
+      statuses: [
+        { ...recovery, creator: { type: 'User', login: 'jovie-bot[bot]' } },
+      ],
+    },
+    { statuses: [{ ...recovery, description: 'bad' }] },
+    {
+      statuses: [
+        {
+          ...recovery,
+          target_url: 'https://github.com/other/repo/actions/runs/123',
+        },
+      ],
+    },
+    {
+      statuses: [
+        {
+          ...recovery,
+          description: `pr=42;run=123;try=1;at=${Number.MAX_SAFE_INTEGER + 1}`,
+        },
+      ],
+    },
+  ])
+    expect(reenrollmentDisposition({ ...input, ...change }).action).toBe(
+      'block'
+    );
+  for (const failure of [
+    { action: 'block', reason: 'source-failure' },
+    { action: 'retry-once', reason: 'existing-recovery' },
+  ])
+    expect(reenrollmentDisposition({ ...input, failure })).toBe(failure);
+  expect(reenrollmentDisposition({ ...input, lastRemoval: undefined })).toBe(
+    input.failure
+  );
+  expect(
+    reenrollmentDisposition({
+      ...input,
+      headCommittedAt: '2026-09-30T10:12:00Z',
+    })
+  ).toBe(input.failure);
+  const spent = {
+    ...recovery,
+    context: 'jovie-queue-failure-retry/v1',
+    description: 'spent:run=123;try=1',
+  };
+  expect(
+    reenrollmentDisposition({ ...input, statuses: [spent, recovery] }).action
+  ).toBe('block');
+  expect(
+    reenrollmentDisposition({
+      ...input,
+      statuses: [
+        { ...spent, description: 'released:run=123;try=1' },
+        spent,
+        recovery,
+      ],
+    }).action
+  ).toBe('retry-once');
+});
+
+it('records admission recovery only for a current source and an attested completed run', async () => {
+  const writeStatus = vi.fn();
+  const readPullRequest = vi.fn(async () => ({
+    state: 'OPEN',
+    headRefOid: SOURCE,
+    isInMergeQueue: false,
+  }));
+  const io = {
+    writeStatus,
+    readPullRequest,
+    dequeuePullRequest: vi.fn(),
+    disableAutoMerge: vi.fn(),
+  };
+  const input = {
+    repository: REPOSITORY,
+    run: { ...run, updated_at: '2026-09-30T10:10:00Z' },
+    timeline,
+    failedSteps: [
+      'Require live queue membership and external admission checks',
+    ],
+    admissionText:
+      'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.',
+    statuses: [],
+  };
+  const result = await applyMergeGroupFailure(input, io);
+  expect(result.statusWritten).toBe(false);
+  expect(result.admissionRecoveryReceipt).toMatchObject({
+    schema: ADMISSION_RECOVERY_SCHEMA,
+    sourceHeadSha: SOURCE,
+    prNumber: 42,
+  });
+  expect(writeStatus).toHaveBeenCalledWith(
+    expect.objectContaining({
+      context: 'jovie-queue-admission-recovery/v1',
+      sha: SOURCE,
+    })
+  );
+  expect(io.dequeuePullRequest).not.toHaveBeenCalled();
+  expect(io.disableAutoMerge).not.toHaveBeenCalled();
+  for (const current of [
+    { state: 'CLOSED', headRefOid: SOURCE, isInMergeQueue: false },
+    { state: 'OPEN', headRefOid: NEW_SOURCE, isInMergeQueue: false },
+    {
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { headCommit: { oid: NEW_SOURCE } },
+    },
+  ]) {
+    writeStatus.mockClear();
+    readPullRequest.mockResolvedValue(current);
+    expect(
+      (await applyMergeGroupFailure(input, io)).admissionRecoveryReceipt
+    ).toBeUndefined();
+    expect(writeStatus).not.toHaveBeenCalled();
+  }
+});
 it('validates trusted failure receipts and never applies them to a different revision', () => {
   const receipt = {
     schema: 'jovie-merge-group-failure-hold/v1',
