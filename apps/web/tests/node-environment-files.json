@@ -110,6 +110,7 @@
   "lib/chat/tools/",
   "lib/claim/finalize.test.ts",
   "lib/commands/entities.test.ts",
+  "lib/commands/registry.presence.test.ts",
   "lib/connectors/__tests__/no-gmail-send.test.ts",
   "lib/connectors/brand-deal-opportunity-emitter.test.ts",
   "lib/connectors/brand-deal-opportunity.test.ts",
