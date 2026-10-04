@@ -54,6 +54,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
@@ -114,7 +115,14 @@ import {
   convertToCommonDropdownItems,
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
-import { alignment } from '@/components/organisms/table/table.styles';
+import {
+  alignment,
+  type TableRowMode,
+} from '@/components/organisms/table/table.styles';
+import {
+  isInteractiveOverlayTarget,
+  resolveTableNavAction,
+} from '@/components/organisms/table/utils/tableKeyMap';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
@@ -164,8 +172,8 @@ import {
 } from '../dashboard/releases/actions';
 import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import {
+  LIBRARY_LIST_ROW_MODE,
   LIBRARY_TABLE_MIN_WIDTH,
-  LIBRARY_TABLE_ROW_HEIGHT,
   LIBRARY_TABLE_SKELETON_CONFIG,
 } from './LibraryLoadingState';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
@@ -1350,7 +1358,11 @@ function GridDensityToggle({
 }) {
   return (
     <fieldset
-      className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5 border-0 p-0')}
+      // Every density is one column below sm, so the control would be inert.
+      className={cn(
+        PAGE_TOOLBAR_END_GROUP_CLASS,
+        'ml-0 hidden gap-0.5 border-0 p-0 sm:flex'
+      )}
       data-testid='library-grid-density-toggle'
       aria-label='Card Size'
     >
@@ -1478,8 +1490,12 @@ function LibraryToolbar({
 }) {
   return (
     <PageToolbar
+      // Below sm the stage row takes the full width and actions wrap beneath
+      // it, so tabs scroll instead of clipping beside the action group.
+      className='flex-wrap sm:flex-nowrap'
+      startClassName='basis-full sm:basis-auto'
       start={
-        <div className='flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2'>
+        <div className='flex min-w-0 items-center gap-2'>
           <LibraryStageTabs stage={stage} onStage={onStage} />
           <div className='group/toolbar-filters flex min-w-0 shrink-0 items-center gap-1'>
             <LibraryFiltersControl
@@ -1495,7 +1511,9 @@ function LibraryToolbar({
               hidden={filtersOpen}
             />
           </div>
-          <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+          <span
+            className={cn(PAGE_TOOLBAR_META_TEXT_CLASS, 'whitespace-nowrap')}
+          >
             {visibleCount}
             {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
           </span>
@@ -1662,8 +1680,13 @@ const AssetCard = memo(function AssetCard({
               <span>{formatLibraryItemType(asset)}</span>
               {getLibraryItemKind(asset) === 'release' ? (
                 <>
-                  <span className='opacity-50'>.</span>
-                  <span>{asset.trackCount} Tracks</span>
+                  <span aria-hidden='true' className='opacity-50'>
+                    ·
+                  </span>
+                  <span>
+                    {asset.trackCount}{' '}
+                    {asset.trackCount === 1 ? 'Track' : 'Tracks'}
+                  </span>
                 </>
               ) : null}
             </div>
@@ -1784,6 +1807,7 @@ function LibraryReleaseTable({
   columns,
   hideHeader,
   rowTestIdPrefix,
+  rowMode,
   playingPreviewId,
   onSelect,
   onTogglePreview,
@@ -1794,6 +1818,7 @@ function LibraryReleaseTable({
   readonly columns: ColumnDef<LibraryReleaseAsset, unknown>[];
   readonly hideHeader?: boolean;
   readonly rowTestIdPrefix: 'library-release-row' | 'library-catalog-row';
+  readonly rowMode: TableRowMode;
   readonly playingPreviewId?: string | null;
   readonly onSelect: (id: string) => void;
   readonly onTogglePreview?: LibraryPreviewToggle;
@@ -1828,7 +1853,7 @@ function LibraryReleaseTable({
       contextMenuSearchPlaceholder='Search actions'
       contextMenuSearchMode='recursive'
       enableVirtualization={assets.length >= 20}
-      rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
+      rowMode={rowMode}
       minWidth={LIBRARY_TABLE_MIN_WIDTH}
       hideHeader={hideHeader}
       className='system-b-library-table'
@@ -2696,6 +2721,8 @@ export function LibrarySurface({
   const { view, setView } = useLibraryViewMode();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // The element that opened the inspector, so Escape can hand focus back.
+  const inspectorOpenerRef = useRef<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const { density: gridDensity, setDensity: setGridDensity } =
@@ -2947,9 +2974,31 @@ export function LibrarySurface({
       );
       return;
     }
+    const opener = document.activeElement;
+    inspectorOpenerRef.current =
+      opener instanceof HTMLElement && opener !== document.body ? opener : null;
     setSelectedId(id);
     setDrawerOpen(true);
   }
+
+  // Escape closes the inspector from anywhere on the surface, not only when
+  // focus is inside it, and returns focus to the item that opened it. Menus,
+  // dialogs and popovers keep their own Escape; the inspector's handler marks
+  // the event handled so it never closes twice.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
+      if (resolveTableNavAction(event.key, event.target) !== 'close') return;
+      if (isInteractiveOverlayTarget(event.target)) return;
+      event.preventDefault();
+      setDrawerOpen(false);
+      const opener = inspectorOpenerRef.current;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    }
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+  }, [drawerOpen]);
 
   const handleApprovalStatusChange = useCallback(
     async (
@@ -3454,6 +3503,7 @@ export function LibrarySurface({
                 selectedId={selectedId}
                 columns={LIBRARY_CATALOG_COLUMNS}
                 rowTestIdPrefix='library-catalog-row'
+                rowMode='compact'
                 onSelect={openAsset}
                 getContextMenuItems={getContextMenuItems}
               />
@@ -3464,6 +3514,7 @@ export function LibrarySurface({
                 columns={LIBRARY_TABLE_COLUMNS}
                 hideHeader
                 rowTestIdPrefix='library-release-row'
+                rowMode={LIBRARY_LIST_ROW_MODE}
                 playingPreviewId={playingPreviewId}
                 onSelect={openAsset}
                 onTogglePreview={handleTogglePreview}
