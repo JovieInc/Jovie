@@ -4,7 +4,7 @@
 
 import { Skeleton } from '@jovie/ui';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
@@ -12,6 +12,7 @@ import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
 import {
   getBrowserTurnstileHostname,
   resolveTurnstileSiteKey,
@@ -45,6 +46,29 @@ interface OnboardingShellProps {
   readonly intentId?: string;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+  /** The real page behind `?handle=`, shown before the visitor types. */
+  readonly entryProfile?: StartEntryProfile | null;
+}
+
+/** Preview state for a prebuilt, unclaimed page so the rail shows it on first paint. */
+export function buildEntryProfileBuilderState(
+  entryProfile: StartEntryProfile | null | undefined
+): OnboardingProfileBuilderState {
+  if (entryProfile?.status !== 'claimable') {
+    return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
+  }
+  return {
+    artist: {
+      id: entryProfile.spotifyId ?? `handle-${entryProfile.handle}`,
+      name: entryProfile.displayName,
+      url: entryProfile.spotifyUrl ?? '',
+      imageUrl: entryProfile.avatarUrl,
+      genres: entryProfile.genres,
+    },
+    artistConfirmed: false,
+    handle: entryProfile.handle,
+    socialLinks: entryProfile.socialLinks,
+  };
 }
 
 export function OnboardingShell({
@@ -52,6 +76,7 @@ export function OnboardingShell({
   intentId,
   sessionLabel,
   starterHandoff,
+  entryProfile,
 }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
@@ -162,8 +187,17 @@ export function OnboardingShell({
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
-  const sideProfileRail = resolvePreviewArtist(profileBuilderState) ? (
-    <OnboardingProfileRail state={profileBuilderState} />
+  const entryBuilderState = useMemo(
+    () => buildEntryProfileBuilderState(entryProfile),
+    [entryProfile]
+  );
+  // The chat's own state wins once it knows anything; until then the rail
+  // previews the prebuilt page from `?handle=`.
+  const railState = resolvePreviewArtist(profileBuilderState)
+    ? profileBuilderState
+    : entryBuilderState;
+  const sideProfileRail = resolvePreviewArtist(railState) ? (
+    <OnboardingProfileRail state={railState} />
   ) : null;
 
   return (
@@ -196,6 +230,7 @@ export function OnboardingShell({
               onConversationActivity={handleConversationActivity}
               onProfileBuilderChange={setProfileBuilderState}
               starterHandoff={starterHandoff}
+              entryProfile={entryProfile}
               turnstileToken={turnstileToken}
               turnstileStatus={turnstileState.status}
               turnstilePanel={turnstilePanel}
