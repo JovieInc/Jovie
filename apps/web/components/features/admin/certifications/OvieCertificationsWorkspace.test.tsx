@@ -6,8 +6,11 @@ import {
   screen,
   within,
 } from '@testing-library/react';
+import * as navigation from 'next/navigation';
 import type { ReactElement, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   FIXTURE_NOW,
   fixtureInventory,
@@ -74,7 +77,14 @@ function latestRailProps() {
 }
 
 describe('OvieCertificationsWorkspace', () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
+    vi.spyOn(navigation, 'useSearchParams').mockImplementation(
+      () =>
+        new URLSearchParams(
+          typeof window === 'undefined' ? '' : window.location.search
+        ) as ReturnType<typeof navigation.useSearchParams>
+    );
     vi.clearAllMocks();
     mocks.panels.length = 0;
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -192,12 +202,65 @@ describe('OvieCertificationsWorkspace', () => {
   });
 
   it('deep-links to the evidence rail when ?row= is present', () => {
-    mockQuery({ data: fixtureInventory() });
+    const inventory = fixtureInventory();
+    mockQuery({ data: inventory });
     window.history.pushState({}, '', '?row=flows%3Asignup-golden-path');
     try {
-      render(<OvieCertificationsWorkspace />);
+      const { rerender } = render(<OvieCertificationsWorkspace />);
+      expect(latestRailProps().row?.id).toBe('flows:signup-golden-path');
+      window.history.pushState(
+        {},
+        '',
+        `?row=${encodeURIComponent(inventory.rows[1]!.id)}`
+      );
+      rerender(
+        <TooltipProvider>
+          <OvieCertificationsWorkspace />
+        </TooltipProvider>
+      );
+      expect(latestRailProps().row?.id).toBe(inventory.rows[1]?.id);
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
+
+  it('hydrates a row deep link without changing the server-rendered selection', async () => {
+    mockQuery({ data: fixtureInventory() });
+    window.history.pushState({}, '', '?row=flows%3Asignup-golden-path');
+    const browserWindow = window;
+    const container = document.createElement('div');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const recoverable = vi.fn();
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      vi.stubGlobal('window', undefined);
+      const html = renderToString(
+        <TooltipProvider>
+          <OvieCertificationsWorkspace />
+        </TooltipProvider>
+      );
+      vi.stubGlobal('window', browserWindow);
+      container.innerHTML = html;
+      document.body.append(container);
+      await act(async () => {
+        root = hydrateRoot(
+          container,
+          <TooltipProvider>
+            <OvieCertificationsWorkspace />
+          </TooltipProvider>,
+          { onRecoverableError: recoverable }
+        );
+      });
+      expect(recoverable).not.toHaveBeenCalled();
+      expect(errors.mock.calls.flat().join(' ')).not.toMatch(
+        /hydration|hydrated|didn't match/i
+      );
       expect(latestRailProps().row?.id).toBe('flows:signup-golden-path');
     } finally {
+      vi.unstubAllGlobals();
+      await act(async () => root?.unmount());
+      container.remove();
+      errors.mockRestore();
       window.history.pushState({}, '', '/');
     }
   });

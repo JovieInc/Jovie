@@ -598,3 +598,48 @@ describe('controller run trust', () => {
     );
   });
 });
+
+describe('controller run trust replay: run 37144574062 (#20386)', () => {
+  // Exact production evidence from 2026-10-03; compare bodies are the recorded
+  // GitHub `compare/{deployed}...{head}` fields the publisher reads.
+  const deployed = 'ddd83d2278061a9cece22a21e23e47fe09d2c6cb';
+  const marker = { sha: deployed };
+  const controller = head => ({
+    path: '.github/workflows/production-controller.yml',
+    head_branch: 'main',
+    event: 'workflow_run',
+    head_sha: head,
+  });
+
+  it('accepts the workflow_run head c75c559 that descends from deployed ddd83d2', () => {
+    expect(
+      isTrustedControllerRun(
+        controller('c75c559a06e94a26a7afb258f85dc951775332bd'),
+        marker,
+        {
+          status: 'ahead',
+          ahead_by: 3,
+          behind_by: 0,
+          merge_base_commit: { sha: deployed },
+        }
+      )
+    ).toBe(true);
+  });
+
+  it('rejects the pre-freeze head 4777fd7, which is not a descendant', () => {
+    expect(
+      isTrustedControllerRun(
+        controller('4777fd7d6887596d22de3c3edae5c7c16bf1b0bd'),
+        marker,
+        {
+          status: 'behind',
+          ahead_by: 0,
+          behind_by: 194,
+          merge_base_commit: {
+            sha: '4777fd7d6887596d22de3c3edae5c7c16bf1b0bd',
+          },
+        }
+      )
+    ).toBe(false);
+  });
+});
