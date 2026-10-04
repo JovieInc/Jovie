@@ -66,7 +66,8 @@ describe('ArtistNotificationsPage', () => {
     ).toHaveAttribute('href', '/signup?plan=pro');
     expect(heroSection.queryByText('Capture once')).not.toBeInTheDocument();
 
-    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
+    // No brand has granted permission for this page (JOV-7795).
+    expect(screen.queryByTestId('homepage-trust')).not.toBeInTheDocument();
     expect(
       screen.queryByText('Trusted by artists and teams releasing on')
     ).not.toBeInTheDocument();

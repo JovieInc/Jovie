@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { LOGO_PERMISSION_FIXTURES } from '@/data/product-truth/logo-permissions.fixture';
 import { HomeTrustSection } from './HomeTrustSection';
 
 const meta = {
@@ -10,9 +11,13 @@ const meta = {
     docs: {
       description: {
         component:
-          'Canonical trust-logo owner across the homepage and artist-profile presentations. Route wrappers retain their own placement and copy.',
+          'Canonical trust-logo owner. Renders only logos with an active permission for its placement (JOV-7795); these stories use example grants, not real permissions.',
       },
     },
+  },
+  args: {
+    placement: { page: '/' },
+    fixturePermissions: LOGO_PERMISSION_FIXTURES,
   },
 } satisfies Meta<typeof HomeTrustSection>;
 
@@ -27,4 +32,9 @@ export const InlineStrip: Story = {
 
 export const ArtistProfile: Story = {
   args: { presentation: 'artist-profile' },
+};
+
+/** No grant covers the placement, so nothing renders. */
+export const NoPermission: Story = {
+  args: { fixturePermissions: [] },
 };
