@@ -2769,6 +2769,19 @@
      see .claude/rules/motion.md for the easing decision tree) */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
+  /* Living O (JOV-7760): brand-only loops and one-shots for <JovieO>,
+     <JovieWordmark> and Ovie's OV eyes. Mirrored by name in
+     packages/ui/brand/jovie-o-motion.ts; a parity test pins the two. Land,
+     settle and the wordmark fold reuse --duration-cinematic / -slower. */
+  --duration-o-turn: 1250ms;
+  --duration-o-wind: 1700ms;
+  --duration-o-orbit: 2600ms;
+  --duration-o-shake: 460ms;
+  --duration-ov-blink-close: 90ms;
+  --duration-ov-blink-hold: 40ms;
+  --duration-ov-blink-open: 170ms;
+  --stagger-glyph: 28ms;
+
   /* Blur — header backdrop (migrated from linear blur token, JOV-5465) */
   --blur-header: 20px;
 
@@ -2807,6 +2820,14 @@
     --duration-slowest: 0ms;
     --duration-subtle: 0ms;
     --duration-cinematic: 0ms;
+    --duration-o-turn: 0ms;
+    --duration-o-wind: 0ms;
+    --duration-o-orbit: 0ms;
+    --duration-o-shake: 0ms;
+    --duration-ov-blink-close: 0ms;
+    --duration-ov-blink-hold: 0ms;
+    --duration-ov-blink-open: 0ms;
+    --stagger-glyph: 0ms;
   }
 }
 
