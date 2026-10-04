@@ -51,6 +51,13 @@ const ACCEPTANCE_CUE = /acceptance|done means|done when|gate verifies/i;
 const RUNTIME_CHECK = /golden[\s-]?path|e2e[\s-]smoke|nightly|cron monitor/i;
 const UNCHECKED_BOX = /^\s*[-*] \[ \]\s+\S/m;
 const COMMISSIONING_HEADING = /^#{1,6}\s.*commission/im;
+// A section that defines done. JOV-7510, JOV-7506, JOV-7494 and JOV-7492
+// closed on deployment alone at 02:32Z on 2026-10-04 despite "Acceptance
+// evidence", "Acceptance checks" and "Evaluation / completion" sections.
+const ACCEPTANCE_SECTION =
+  /^\s*(?:#{1,6}\s+|\*\*)\s*(?:acceptance|completion|evaluation|success criteria|exit criteria|definition of done|done (?:when|means)|verification|proof)\b/i;
+const ANY_HEADING = /^\s*#{1,6}\s/;
+const CHECKED_BOX = /^\s*[-*] \[[xX]\]/;
 const DECLARED_REQUIREMENT =
   /validation-required:\s*([a-z-]+(?:\s*,\s*[a-z-]+)*)/gi;
 
@@ -123,7 +130,37 @@ export function outcomeAcceptanceReasons(issue, parentReason = '') {
   if (COMMISSIONING_HEADING.test(description)) {
     reasons.push('commissioning proof section');
   }
+  if (hasOpenAcceptanceSection(description)) {
+    reasons.push('acceptance section names evidence a deploy cannot prove');
+  }
   return reasons;
+}
+
+/**
+ * An acceptance, completion, evaluation or verification section with any
+ * item that is not a checked box. A section whose every item is checked off
+ * has already been accepted.
+ *
+ * @param {string} description
+ * @returns {boolean}
+ */
+function hasOpenAcceptanceSection(description) {
+  const lines = description.split('\n');
+  for (const [index, line] of lines.entries()) {
+    if (!ACCEPTANCE_SECTION.test(line)) continue;
+    // `**Acceptance:** text` carries its criteria on the same line.
+    const inline = line
+      .replace(ACCEPTANCE_SECTION, '')
+      .replace(/^[^*]*\*\*\s*:?/, '')
+      .replace(/^\s*:/, '')
+      .trim();
+    if (!/^#/.test(line.trim()) && inline.length > 0) return true;
+    for (const next of lines.slice(index + 1)) {
+      if (ANY_HEADING.test(next)) break;
+      if (next.trim() && !CHECKED_BOX.test(next)) return true;
+    }
+  }
+  return false;
 }
 
 /**

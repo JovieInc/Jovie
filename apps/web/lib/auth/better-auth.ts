@@ -36,6 +36,7 @@ import {
 import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
+import { getAccountMetricCohort } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
@@ -431,6 +432,7 @@ export const auth = betterAuth({
             await recordFunnelStep({
               funnel: 'artist_signup',
               step: 'auth_success',
+              cohort: getAccountMetricCohort(user.email),
             });
           } catch (error) {
             // provisionAppUser never throws by contract; this is

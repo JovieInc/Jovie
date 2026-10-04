@@ -49,7 +49,8 @@ export type ExtractionErrorCode =
   | 'NOT_FOUND'
   | 'PARSE_ERROR'
   | 'EMPTY_RESPONSE'
-  | 'SOCIAL_HTML_DISABLED';
+  | 'SOCIAL_HTML_DISABLED'
+  | 'LOGIN_REQUIRED';
 
 export class ExtractionError extends Error {
   constructor(

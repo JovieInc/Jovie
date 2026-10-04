@@ -53,6 +53,15 @@ describe('isNavigationItemActive', () => {
         new URLSearchParams('tab=contacts')
       )
     ).toBe(false);
+
+    for (const route of [
+      APP_ROUTES.INSIGHTS,
+      `${APP_ROUTES.INSIGHTS}/priority/high`,
+    ]) {
+      expect(
+        isNavigationItemActive(audienceNavItem, route, new URLSearchParams())
+      ).toBe(true);
+    }
   });
 
   it('matches Presence throughout its workspace', () => {
