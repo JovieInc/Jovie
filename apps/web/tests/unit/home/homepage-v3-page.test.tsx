@@ -48,7 +48,7 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     vi.resetModules();
   });
 
-  it('mounts the v3 hero, presence, structure, and close with the flag on', async () => {
+  it('mounts the v3 hero, presence, structure, FAQ, and close with the flag on', async () => {
     flags.HOMEPAGE_V3_ENABLED = true;
     const { container } = await renderHomePage();
 
@@ -59,6 +59,7 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
       'homepage-hero-shell',
       'homepage-section-presence',
       'homepage-section-structure',
+      'homepage-faq',
       'homepage-close',
     ]);
     expect(
