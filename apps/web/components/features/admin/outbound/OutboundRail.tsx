@@ -71,6 +71,8 @@ export interface OutboundRailProps {
     correction?: string
   ) => Promise<void>;
   readonly onCertify: () => void;
+  /** Re-collect public evidence for a built profile; sends nothing. */
+  readonly onRefreshEvidence: () => void;
   readonly onApprove: (copy: OutboundCopy) => void;
   readonly onSaveCopy: (copy: OutboundCopy) => void;
   readonly onHold: () => void;
@@ -213,6 +215,7 @@ export function OutboundRail({
   onClose,
   onFact,
   onCertify,
+  onRefreshEvidence,
   onApprove,
   onSaveCopy,
   onHold,
@@ -380,6 +383,19 @@ export function OutboundRail({
                     {certification.coverage.missingSourceClasses.join(', ')}.
                     Certification waits for the resolver to find it.
                   </p>
+                ) : null}
+                {row.profilePath &&
+                certification.coverage.missingSourceClasses.length ? (
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    className='w-full'
+                    disabled={pending !== null}
+                    loading={pending === 'refresh_evidence'}
+                    onClick={onRefreshEvidence}
+                  >
+                    Refresh Evidence
+                  </Button>
                 ) : null}
                 <Button
                   size='sm'
