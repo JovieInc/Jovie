@@ -607,6 +607,7 @@ interface OnboardingMessageRegionProps {
   readonly shouldDockComposer: boolean;
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
+  readonly onTryAnotherName: () => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -615,6 +616,7 @@ function OnboardingMessageRegion({
   displayMessages,
   entryMode,
   entryProfile,
+  onTryAnotherName,
   hasConversationStarted,
   isBusy,
   isStreaming,
@@ -656,6 +658,7 @@ function OnboardingMessageRegion({
             <OnboardingChatEmptyIntro
               mode={entryMode}
               entryProfile={entryProfile}
+              onTryAnotherName={onTryAnotherName}
             />
           </div>
         }
@@ -756,6 +759,10 @@ export function OnboardingChat({
   const setComposerInput = useCallback((nextInput: string) => {
     latestInputRef.current = nextInput;
     setInput(nextInput);
+  }, []);
+
+  const focusComposer = useCallback(() => {
+    composerInputRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -1156,7 +1163,9 @@ export function OnboardingChat({
         onScroll={onScroll}
         className={cn(
           'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
-          headerOverlay ? 'pt-16' : 'pt-5'
+          // Under the floating sign-in row, scrolled-away messages fade out
+          // instead of hard-clipping at the panel edge (JOV-7192).
+          headerOverlay ? 'pt-16 system-b-chat-thread-top-fade' : 'pt-5'
         )}
         aria-live='polite'
       >
@@ -1176,6 +1185,7 @@ export function OnboardingChat({
             displayMessages={displayMessages}
             entryMode={entryMode}
             entryProfile={entryProfile}
+            onTryAnotherName={focusComposer}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}

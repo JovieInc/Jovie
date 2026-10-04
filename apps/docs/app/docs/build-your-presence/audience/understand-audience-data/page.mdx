@@ -9,23 +9,23 @@ featureId: click-visit-tracking
 additionalFeatureIds:
   - audience-intelligence-device-location-intent
 productRoute: /app/contacts?tab=audience
-status: certified
-lastVerifiedAt: 2026-09-27
-verifiedBy: human
+status: stale
+searchable: false
+lastVerifiedAt: null
+verifiedBy: unverified
 keywords:
   - analytics
   - who visited
   - where are my fans
   - audience data
 redirectAliases: []
-visualProofRefs:
-  - proof/understand-audience-data.png
+visualProofRefs: []
 uiLabels:
   - Audience
   - Audience funnel
   - Profile Views
-  - Fans
-  - Subscribed Fans
+  - Unique Visitors
+  - Subscribers
   - Link Clicks
   - Listen Clicks
   - Cities
@@ -60,11 +60,11 @@ Select **7D** or **30D** before comparing values. Keep the same range selected w
 
 <HelpStep title="Read the funnel and click metrics">
 - **Profile Views**: all profile visits, including repeat visits.
-- **Fans**: the sidebar label for unique visitors, counted once per visitor in the selected range.
-- **Subscribed Fans**: visitors who opted in to notifications. This is the canonical **Followers** metric.
+- **Unique Visitors**: individual visitors, counted once per person in the selected range.
+- **Subscribers**: people who opted in to notifications. This is the canonical **Followers** metric.
 - **Link Clicks**: all profile-link clicks. **Listen Clicks** are the streaming-link subset. **Tip Link Visits** appears only when its count is above zero.
 
-A percentage beside **Fans** or **Subscribed Fans** compares that stage with Profile Views. Jovie hides the percentage when there are fewer than 30 Profile Views, because a small base is easy to misread.
+A percentage beside **Unique Visitors** or **Subscribers** compares that stage with Profile Views. Jovie hides the percentage when there are fewer than 30 Profile Views, because a small base is easy to misread.
 </HelpStep>
 
 <HelpStep title="Use breakdowns as coarse context">
@@ -93,7 +93,7 @@ Small samples can omit percentages, and fresh events may not appear immediately.
 
 ### Two values contradict each other
 
-Unique visitors should not exceed Profile Views, Subscribed Fans should not exceed Fans, and Listen Clicks should not exceed Link Clicks for the same range. Refresh without changing the range, then [report the mismatch](/docs/manage-jovie/contact-support/contact-support-or-report-incorrect-data) with a screenshot if it remains.
+Unique Visitors should not exceed Profile Views, Subscribers should not exceed Unique Visitors, and Listen Clicks should not exceed Link Clicks for the same range. Refresh without changing the range, then [report the mismatch](/docs/manage-jovie/contact-support/contact-support-or-report-incorrect-data) with a screenshot if it remains.
 
 </HelpTroubleshooting>
 

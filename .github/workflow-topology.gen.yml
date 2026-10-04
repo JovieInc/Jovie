@@ -273,6 +273,18 @@ nodes:
       - issue_comment
     terminalReceipt: job:claude
     jobCount: 1
+  - name: CLI Chaos Nightly
+    path: .github/workflows/cli-chaos-nightly.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:remediation
+    jobCount: 2
   - name: CODEOWNERS Path Drift
     path: .github/workflows/codeowners-drift.yml
     active: true
@@ -592,6 +604,20 @@ nodes:
       - pull_request_target
     terminalReceipt: job:review
     jobCount: 1
+  - name: iOS App Store Graphics
+    path: .github/workflows/ios-app-store-graphics.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_call
+      - workflow_dispatch
+    terminalReceipt: job:graphics
+    jobCount: 1
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -623,11 +649,12 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - iOS CI
+      - iOS App Store Graphics
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-upload
-    jobCount: 4
+    jobCount: 5
   - name: Jovie artist agent Eve release and rollback
     path: .github/workflows/jovie-agent-release.yml
     active: true
@@ -750,7 +777,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
-    jobCount: 3
+    jobCount: 4
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -859,7 +886,7 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 1
+    jobCount: 3
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -1020,8 +1047,8 @@ nodes:
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:remediation-customer-changelog
-    jobCount: 13
+    terminalReceipt: job:heal-interrupted-marker
+    jobCount: 14
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1045,6 +1072,18 @@ nodes:
       - workflow_call
     terminalReceipt: job:release-result
     jobCount: 16
+  - name: Public Profile Benchmark
+    path: .github/workflows/public-benchmark.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:benchmark
+    jobCount: 1
   - name: Quality Gap Finder
     path: .github/workflows/quality-gap-finder.yml
     active: true
@@ -1471,6 +1510,9 @@ edges:
     type: workflow_run
   - from: iOS TestFlight
     to: iOS CI
+    type: workflow_call
+  - from: iOS TestFlight
+    to: iOS App Store Graphics
     type: workflow_call
   - from: Source Validation
     to: Lane Fix Relay
