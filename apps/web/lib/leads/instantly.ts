@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { OutboundCopy } from '@/lib/outbound/approval';
+import type { OutboundCopy } from '@/lib/outbound/types';
 import { denyAudienceEffect } from '@/lib/outbound/audience-effect-policy';
 
 interface PushLeadParams {

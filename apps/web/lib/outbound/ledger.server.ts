@@ -6,16 +6,18 @@ import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
 import { contactEvidenceReviews, contacts } from '@/lib/db/schema/contacts';
 import {
-  type OutboundCopy,
-  type OutboundDecision,
   type OutboundLedgerRow,
-  type OutboundRejectReason,
   type OutboundTarget,
   outboundCopyEvidenceKey,
   outboundCopyRevision,
   outboundTargetEvidenceKey,
   outboundTargetRevision,
 } from './approval';
+import type {
+  OutboundCopy,
+  OutboundDecision,
+  OutboundRejectReason,
+} from './types';
 
 /** The lead columns a target revision binds. */
 export interface OutboundLeadIdentity {
