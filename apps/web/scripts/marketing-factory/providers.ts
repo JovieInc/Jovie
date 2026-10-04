@@ -8,6 +8,7 @@
 import { join } from 'node:path';
 import { type CopyTier, type JudgeTransport, selectJudges } from '@jovie/copy';
 import { pickRoleModel, visionAvailability } from '../design-ci-judge-dispatch';
+import { liveRefGuard } from '../design-refs-store';
 import type {
   ImageGenerationOutcome,
   ImageGenerationRequest,
@@ -240,7 +241,8 @@ export function liveProviders(
     async reviewVisual(request) {
       return runVisualReview(
         request,
-        await liveVisualJudges(transport, request.producerModel)
+        await liveVisualJudges(transport, request.producerModel),
+        liveRefGuard()
       );
     },
     async generateAsset() {

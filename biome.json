@@ -27,6 +27,8 @@
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
       "!docs/design-system/drift-ledger.json",
+      "!canon/design-refs/corpus.json",
+      "!canon/design-refs/scout-seeds.json",
       "!packages/action-contracts/generated/**",
       "!**/*.a11y-red.tsx",
       "!scripts/invariants/fixtures/done-sprint-invariants/**"
