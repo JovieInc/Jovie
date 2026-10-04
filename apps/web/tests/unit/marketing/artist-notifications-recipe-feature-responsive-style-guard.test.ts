@@ -50,14 +50,17 @@ describe('recipe.feature artist notifications responsive title contract', () => 
     );
 
     expect(desktopMediaStart).toBeGreaterThan(tabletMediaStart);
-    expect(desktopRule).toContain('font-size: clamp(3.6rem, 6.25vw, 7.2rem);');
+    // JOV-7772: rendered at 1024px the old 6.25vw slope needed three lines and
+    // the two-line H1 clamp hid "Automatically."; 5.5vw capped at 5rem keeps
+    // two lines from 1024 to 1440 (route DOM clipped-heading).
+    expect(desktopRule).toContain('font-size: clamp(3.5rem, 5.5vw, 5rem);');
   });
 
   it('preserves the compact 390px wrapping and no-overflow fallback', () => {
     const compactRule = extractRule(stylesheet, heroTitleSelector);
     const titleLineRule = extractRule(stylesheet, heroTitleLineSelector);
 
-    expect(compactRule).toContain('font-size: clamp(3rem, 15vw, 3.6rem);');
+    expect(compactRule).toContain('font-size: var(--text-5xl);');
     expect(titleLineRule).toContain('max-width: 100%;');
     expect(titleLineRule).toContain('overflow-wrap: break-word;');
     expect(titleLineRule).not.toContain('white-space: nowrap;');

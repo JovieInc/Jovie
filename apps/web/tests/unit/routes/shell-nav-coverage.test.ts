@@ -30,7 +30,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/library': 'Canonical Work surface with stable library route ownership',
   '/app/links':
-    'Contextual smart-link workspace reached from the G then K shortcut and the legacy /app/dashboard/links redirect. Desktop rail placement stays founder-locked',
+    'Contextual smart-link workspace reached from Cmd-K and the G then K shortcut, plus the legacy /app/dashboard/links redirect. Desktop rail placement stays founder-locked',
   '/app/calendar':
     'Contextual moments workspace reached from event and release links',
   '/app/tasks':
@@ -38,7 +38,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/audience':
     'Retained customer workspace reachable by direct links and shortcuts after primary navigation consolidation',
   '/app/tour-dates':
-    'Retained customer workspace reachable by direct links and Settings after primary navigation consolidation',
+    'Retained show-date workspace. Cmd-K go-tour-dates and shortcut G then O. Kept off the primary rail after JOV-7305',
   '/app/threads': 'Legacy all threads route redirects to chats',
   '/app/ov/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/ov/investors/settings':
@@ -68,7 +68,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/releases/[releaseId]/downloads':
     'Internal release workflow (manual entry)',
   '/app/dashboard/releases':
-    'Legacy releases workspace retained for old bookmarks',
+    'Intentional legacy matrix owner. The customer door is /app/releases, which redirects to the library releases view',
   '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
   '/app/settings/connectors':
     'Settings Connections page loads shared shell route context directly (data-backed since JOV-4799)',
@@ -78,11 +78,11 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/insights':
     'Contextual Audience workspace reached from the Audience route control and chat insight cards',
   '/app/jovie-work':
-    'Unified autonomous work feed is reachable from direct app links until nav placement is finalised',
+    'Contextual autonomous work history reached from Home/Inbox',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
   '/app/youtube':
-    'YouTube revival queue workspace (GH-10921); reachable from direct app links until nav placement is finalised',
+    'YouTube ledger workspace reached from the contextual Work toolbar action',
 };
 
 interface ShellPage {
@@ -250,6 +250,19 @@ describe('shell route coverage', () => {
       .sort();
 
     expect(staleAllowlistEntries).toEqual([]);
+  });
+
+  it('rejects expired nav-placement reasons', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const expired = Object.entries(INTENTIONAL_INTERNAL_ROUTES).flatMap(
+      ([route, reason]) => {
+        const match = reason.match(/\b(?:until|Expires) (\d{4}-\d{2}-\d{2})\b/);
+        if (!match || !match[1] || match[1] >= today) return [];
+        return [`${route} expired ${match[1]}`];
+      }
+    );
+
+    expect(expired).toEqual([]);
   });
 
   it('keeps release task implementation owned by the canonical shell route', () => {

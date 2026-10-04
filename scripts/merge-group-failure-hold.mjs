@@ -457,6 +457,13 @@ export function classifyDequeueDenial(error) {
   return null;
 }
 
+/** GitHub's answer to disablePullRequestAutoMerge when nothing is armed. */
+export function autoMergeWasNotArmed(error) {
+  return /can't disable auto-merge for this pull request/i.test(
+    errorText(error)
+  );
+}
+
 /** Only an explicit mutation rejection may release a reserved retry. */
 export function enqueueWasRejected(error) {
   if (!error || typeof error !== 'object') return false;
@@ -649,11 +656,20 @@ export async function applyMergeGroupFailure(
       current = await readPullRequest(front.prNumber);
     }
   }
-  if (currentMatches() && current.autoMergeRequest) {
+  // A queued PR can read autoMergeRequest null, during and just after the
+  // dequeue, while its armed auto-merge re-enqueues the same head seconds
+  // later. On 2026-10-03 #20354 re-entered the queue 13 times and failed 8
+  // holds on one unchanged head (JOV-7708). Disable on every exact-head hold;
+  // "nothing to disable" is the only tolerated answer.
+  if (currentMatches()) {
     current = await readPullRequest(front.prNumber);
-    if (currentMatches() && current.autoMergeRequest) {
-      await disableAutoMerge(current.id);
-      autoMergeDisabled = true;
+    if (currentMatches()) {
+      try {
+        await disableAutoMerge(current.id);
+        autoMergeDisabled = true;
+      } catch (error) {
+        if (!autoMergeWasNotArmed(error)) throw error;
+      }
       current = await readPullRequest(front.prNumber);
     }
   }
