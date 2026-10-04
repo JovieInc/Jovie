@@ -518,6 +518,21 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('exposes the YouTube ledger directly from every Work state', () => {
+    const emptyLibrary = renderLibrary([]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
+
+    emptyLibrary.unmount();
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
+  });
+
   it('uses the canonical Spotify sync owner for an empty connected library', () => {
     renderLibrary([], {
       profileId: 'profile-1',
