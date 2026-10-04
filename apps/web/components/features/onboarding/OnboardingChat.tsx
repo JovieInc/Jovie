@@ -45,6 +45,10 @@ import { useAppFlag } from '@/lib/flags/client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import {
+  buildStartEntryDraft,
+  type StartEntryProfile,
+} from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
@@ -117,6 +121,8 @@ interface OnboardingChatProps {
   ) => void;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+  /** The real page behind `?handle=`; drafts (never sends) the claim message. */
+  readonly entryProfile?: StartEntryProfile | null;
   /**
    * Reserves extra top clearance inside the scroll region while a floating
    * header control (the anonymous "Sign in" link) overlays the top-right
@@ -600,6 +606,8 @@ interface OnboardingMessageRegionProps {
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
   readonly entryMode: OnboardingEntryMode;
+  readonly entryProfile: StartEntryProfile | null;
+  readonly onTryAnotherName: () => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -607,6 +615,8 @@ function OnboardingMessageRegion({
   composerPickerOpen,
   displayMessages,
   entryMode,
+  entryProfile,
+  onTryAnotherName,
   hasConversationStarted,
   isBusy,
   isStreaming,
@@ -645,7 +655,11 @@ function OnboardingMessageRegion({
       <ChatEmptyStateComposerRegion
         above={
           <div className='flex min-h-full items-center justify-center'>
-            <OnboardingChatEmptyIntro mode={entryMode} />
+            <OnboardingChatEmptyIntro
+              mode={entryMode}
+              entryProfile={entryProfile}
+              onTryAnotherName={onTryAnotherName}
+            />
           </div>
         }
         hideWelcomeHeader
@@ -696,6 +710,7 @@ export function OnboardingChat({
   onTurnstileRejected,
   onTurnstileRequired,
   starterHandoff,
+  entryProfile = null,
   turnstilePanel,
   turnstilePanelVisible = false,
   turnstileStatus,
@@ -703,14 +718,18 @@ export function OnboardingChat({
 }: OnboardingChatProps) {
   const initialStarterPrompt = starterHandoff?.prompt ?? '';
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
-  const [input, setInput] = useState(initialStarterPrompt);
+  const initialDraft = hasInitialStarterPrompt
+    ? initialStarterPrompt
+    : (buildStartEntryDraft(entryProfile) ?? '');
+  const [input, setInput] = useState(initialDraft);
   const [entryMode, setEntryMode] = useState<OnboardingEntryMode>(() => {
     if (starterHandoff?.kind === 'spotify_artist') return 'spotify_handoff';
     if (starterHandoff) return 'prompt_handoff';
     if (intentId) return 'restoring_intent';
+    if (entryProfile) return 'handle_entry';
     return 'blank';
   });
-  const latestInputRef = useRef(initialStarterPrompt);
+  const latestInputRef = useRef(initialDraft);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [verificationRequested, setVerificationRequested] = useState(false);
@@ -740,6 +759,10 @@ export function OnboardingChat({
   const setComposerInput = useCallback((nextInput: string) => {
     latestInputRef.current = nextInput;
     setInput(nextInput);
+  }, []);
+
+  const focusComposer = useCallback(() => {
+    composerInputRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -959,9 +982,9 @@ export function OnboardingChat({
       hasInjectedStarterPromptRef.current = true;
       setEntryMode('prompt_handoff');
     } else {
-      setEntryMode('blank');
+      setEntryMode(entryProfile ? 'handle_entry' : 'blank');
     }
-  }, [intentId, setComposerInput]);
+  }, [entryProfile, intentId, setComposerInput]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
@@ -1140,7 +1163,9 @@ export function OnboardingChat({
         onScroll={onScroll}
         className={cn(
           'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
-          headerOverlay ? 'pt-16' : 'pt-5'
+          // Under the floating sign-in row, scrolled-away messages fade out
+          // instead of hard-clipping at the panel edge (JOV-7192).
+          headerOverlay ? 'pt-16 system-b-chat-thread-top-fade' : 'pt-5'
         )}
         aria-live='polite'
       >
@@ -1159,6 +1184,8 @@ export function OnboardingChat({
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
             entryMode={entryMode}
+            entryProfile={entryProfile}
+            onTryAnotherName={focusComposer}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}

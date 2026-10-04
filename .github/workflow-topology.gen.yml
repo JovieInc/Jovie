@@ -273,6 +273,18 @@ nodes:
       - issue_comment
     terminalReceipt: job:claude
     jobCount: 1
+  - name: CLI Chaos Nightly
+    path: .github/workflows/cli-chaos-nightly.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:remediation
+    jobCount: 2
   - name: CODEOWNERS Path Drift
     path: .github/workflows/codeowners-drift.yml
     active: true
@@ -681,6 +693,9 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
+      - schedule
+      - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:sync_done
     jobCount: 1
   - name: M2 Revenue-Path Canary
@@ -856,7 +871,7 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 1
+    jobCount: 3
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -1013,11 +1028,12 @@ nodes:
       - desktop-release
       - iOS TestFlight
       - Lane Fix Relay
+      - Linear Sync on Merge
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:publish-customer-changelog
-    jobCount: 12
+    terminalReceipt: job:heal-interrupted-marker
+    jobCount: 14
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1041,6 +1057,18 @@ nodes:
       - workflow_call
     terminalReceipt: job:release-result
     jobCount: 16
+  - name: Public Profile Benchmark
+    path: .github/workflows/public-benchmark.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:benchmark
+    jobCount: 1
   - name: Quality Gap Finder
     path: .github/workflows/quality-gap-finder.yml
     active: true
@@ -1491,6 +1519,9 @@ edges:
     type: workflow_run
   - from: Changed-Evidence Test Suites
     to: Lane Fix Relay
+    type: workflow_run
+  - from: Production Controller
+    to: Linear Sync on Merge
     type: workflow_run
   - from: Source Validation
     to: Merge Queue Green Enroll

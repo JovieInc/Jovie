@@ -33,7 +33,6 @@
   "app/r/[slug]/page.test.ts",
   "components/features/dashboard/",
   "components/features/profile/",
-  "components/features/settings/settings-sidebar-config.test.ts",
   "components/jovie/components/entity-mappers.test.ts",
   "components/jovie/components/slash-trigger.test.ts",
   "components/jovie/feature-intro-changelog.test.ts",

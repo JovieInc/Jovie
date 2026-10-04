@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
@@ -182,6 +183,22 @@ describe('OpportunityInboxPageClient', () => {
     mutateAsyncMock.mockResolvedValue({ ok: true });
     tourDateMutateMock.mockReset();
     refreshMock.mockReset();
+  });
+
+  it('links the Inbox to the autonomous work history', () => {
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          availability: HEALTHY_AVAILABILITY,
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Jovie Did This' })
+    ).toHaveAttribute('href', APP_ROUTES.JOVIE_WORK);
   });
 
   it('does not claim a clear inbox when availability metadata is missing', () => {

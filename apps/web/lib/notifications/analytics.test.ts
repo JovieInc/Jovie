@@ -32,6 +32,33 @@ describe('notification server analytics privacy boundary', () => {
     );
   });
 
+  it.each([
+    ['not-an-email', 'unattributed'],
+    ['@band.com', 'unattributed'],
+    ['fan name@band.com', 'unattributed'],
+    [undefined, 'unattributed'],
+    ['  Fan@Band.com  ', 'customer'],
+    ['auth-surface-qa@test.jovie.com', 'synthetic'],
+  ])(
+    'attributes the raw subscribe attempt for %s without logging contact data',
+    async (email, cohort) => {
+      await trackSubscribeAttempt({ email });
+
+      expect(trackServerEvent).toHaveBeenCalledWith('funnel_step', {
+        funnel_id: 'fan_subscribe',
+        step: 'contact_submitted',
+        outcome: 'reached',
+        surface: 'server',
+        cohort,
+        reason: undefined,
+      });
+      for (const [, properties] of trackServerEvent.mock.calls) {
+        expect(properties).not.toHaveProperty('email');
+        expect(properties).not.toHaveProperty('phone');
+      }
+    }
+  );
+
   it('omits raw identifiers and methods before unsubscribe validation', async () => {
     await trackUnsubscribeAttempt({
       artist_id: '11111111-1111-4111-8111-111111111111',

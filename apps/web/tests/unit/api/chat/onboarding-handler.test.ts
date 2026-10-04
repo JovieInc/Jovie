@@ -8,6 +8,7 @@ const hoisted = vi.hoisted(() => ({
   getBetterAuthSessionMock: vi.fn(),
   isTurnstileConfiguredMock: vi.fn(),
   verifyTurnstileTokenMock: vi.fn(),
+  verifyTurnstileTestModeTokenMock: vi.fn(),
   encodeSessionCookieMock: vi.fn(),
   captureExceptionMock: vi.fn(),
   captureMessageMock: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock('@/lib/auth/better-auth', () => ({
 vi.mock('@/lib/turnstile/verify', () => ({
   isTurnstileConfigured: hoisted.isTurnstileConfiguredMock,
   verifyTurnstileToken: hoisted.verifyTurnstileTokenMock,
+  verifyTurnstileTestModeToken: hoisted.verifyTurnstileTestModeTokenMock,
 }));
 
 vi.mock('@/lib/onboarding/session', () => ({
@@ -932,6 +934,128 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(body.errorCode).toBe('TURNSTILE_NOT_CONFIGURED');
     expect(hoisted.isTurnstileConfiguredMock).toHaveBeenCalledTimes(1);
     expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+  });
+
+  describe('synthetic principal passage (JOV-7697)', () => {
+    const DUMMY_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX';
+
+    function arrangeProduction({ passageGate = true } = {}) {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+      vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'canary@mail.example');
+      hoisted.checkGateForUserMock.mockImplementation(
+        async (_userId: string | null, gate: string) =>
+          gate === 'synthetic_principal_passage' ? passageGate : false
+      );
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      // The real production key rejects Cloudflare's dummy token.
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+        success: false,
+        reason: 'siteverify_failed',
+      });
+      hoisted.verifyTurnstileTestModeTokenMock.mockResolvedValue({
+        success: true,
+      });
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: ({
+            headers,
+          }: {
+            headers: Record<string, string>;
+          }) => new Response('synthetic reply', { status: 200, headers }),
+        },
+        selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+        systemPrompt: '',
+        toolNames: [],
+        modelMessages: [],
+      });
+    }
+
+    function signIn(email: string) {
+      hoisted.getBetterAuthSessionMock.mockResolvedValue({
+        user: { id: 'ba-synthetic', email, emailVerified: true },
+      });
+    }
+
+    async function firstTurn(requestId: string) {
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      return tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          turnstileToken: DUMMY_TOKEN,
+          messages: [userMessage('hi')],
+        }),
+        requestId
+      );
+    }
+
+    it('verifies an approved principal in Turnstile test mode and keeps rate limits', async () => {
+      arrangeProduction();
+      signIn('canary+synthetic-grokbot-run1@mail.example');
+
+      const result = await firstTurn('req-synthetic');
+
+      expect(result?.status).toBe(200);
+      expect(hoisted.verifyTurnstileTestModeTokenMock).toHaveBeenCalledWith(
+        DUMMY_TOKEN,
+        '203.0.113.5'
+      );
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(
+        hoisted.checkAuthenticatedOnboardingChatRateLimitMock
+      ).toHaveBeenCalledWith('ba-synthetic', expect.any(String));
+      expect(hoisted.setTagMock).toHaveBeenCalledWith(
+        'synthetic_principal',
+        'grokbot'
+      );
+    });
+
+    it('still challenges an anonymous visitor who sends the dummy token', async () => {
+      arrangeProduction();
+
+      const result = await firstTurn('req-anon-dummy');
+
+      expect(result?.status).toBe(403);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_REQUIRED',
+      });
+      expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
+      expect(hoisted.verifyTurnstileTestModeTokenMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a real customer', 'artist@band.com'],
+      [
+        'a synthetic tag on a mailbox Jovie does not control',
+        'me+synthetic-grokbot@gmail.com',
+      ],
+      [
+        'an unknown actor on the controlled mailbox',
+        'canary+synthetic-evilbot@mail.example',
+      ],
+    ])('still challenges %s', async (_label, email) => {
+      arrangeProduction();
+      signIn(email);
+
+      const result = await firstTurn('req-signed-in-dummy');
+
+      expect(result?.status).toBe(403);
+      expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
+      expect(hoisted.verifyTurnstileTestModeTokenMock).not.toHaveBeenCalled();
+    });
+
+    it('still challenges an approved principal while the kill switch is off', async () => {
+      arrangeProduction({ passageGate: false });
+      signIn('canary+synthetic-grokbot@mail.example');
+
+      const result = await firstTurn('req-gate-off');
+
+      expect(result?.status).toBe(403);
+      expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
+      expect(hoisted.verifyTurnstileTestModeTokenMock).not.toHaveBeenCalled();
+    });
   });
 
   it('dispatches executeChatTurn with mode=onboarding and the 7 onboarding tools', async () => {
