@@ -5265,7 +5265,7 @@ describe('in-band interrupted marker heal (JOV-7773)', () => {
     return parsed.jobs['heal-interrupted-marker'];
   }
 
-  function runHeal(env: Record<string, string>) {
+  function runHeal(env: Record<string, string | undefined>) {
     const script = healStep().steps[0]?.run;
     expect(script).toBeTruthy();
     const root = mkdtempSync(resolve(tmpdir(), 'marker-heal-'));
