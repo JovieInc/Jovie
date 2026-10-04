@@ -456,6 +456,27 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(result.receipt.schema, SCREEN_CERT_SCHEMA);
     const rows = result.receipt.changedScreens.map(i => [i.id, i.verdict]);
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
+    for (const name of ['costs', 'features']) {
+      const changedFiles = [`apps/web/app/app/(shell)/admin/${name}/page.tsx`];
+      const registered = runScreenCertification({
+        headSha: HEAD,
+        changedFiles,
+        registrationOnly: true,
+      });
+      assert.equal(registered.ok, true, registered.receipt.issues.join('\n'));
+      assert.equal(registered.receipt.certified, false);
+      assert.deepEqual(
+        registered.receipt.changedScreens.map(item => [item.id, item.verdict]),
+        [[`web.admin-${name}`, 'evidence-required']]
+      );
+      // Registration cannot stand in for authenticated, exact-head browser proof.
+      const certification = runScreenCertification({
+        headSha: HEAD,
+        changedFiles,
+      });
+      assert.equal(certification.ok, false);
+      assert.equal(certification.receipt.certified, false);
+    }
   });
 
   it('rejects caller-authored proof that did not pass through the trusted resolver', () => {
