@@ -19,7 +19,7 @@ export interface AuthRouteConfig {
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
-  isArtistProfileSettings: boolean;
+  isProfileSettings: boolean;
   isChatRoute: boolean;
   isDemoRoute: boolean;
   isLyricsRoute: boolean;
@@ -167,11 +167,11 @@ export function useAuthRouteConfig(
     [isDemoRoute, pathname]
   );
 
-  // Artist profile settings page gets the preview panel sidebar
-  const isArtistProfileSettings = useMemo(
+  // Profile settings page gets the preview panel sidebar
+  const isProfileSettings = useMemo(
     () =>
-      pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
-      pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`),
+      pathname === APP_ROUTES.SETTINGS_PROFILE ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_PROFILE}/`),
     [pathname]
   );
 
@@ -194,7 +194,7 @@ export function useAuthRouteConfig(
     breadcrumbs,
     showMobileTabs,
     isTableRoute,
-    isArtistProfileSettings,
+    isProfileSettings,
     isChatRoute,
     isDemoRoute,
     isLyricsRoute,

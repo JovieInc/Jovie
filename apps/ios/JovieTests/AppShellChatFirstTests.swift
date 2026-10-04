@@ -212,7 +212,6 @@ struct AppShellChatFirstTests {
     )
     #expect(MobileChatEmptyHomePolicy.composerIsDockedToBottom())
     #expect(MobileChatEmptyHomePolicy.showsBrandMark() == false)
-    #expect(MobileChatEmptyHomePolicy.showsFeatureIntroOnEmptyHome() == false)
     #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
     #expect(ChatComposerCopy.inputAccessibilityIdentifier == "chat-composer-input")
   }

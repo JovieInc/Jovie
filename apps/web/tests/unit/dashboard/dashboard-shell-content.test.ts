@@ -117,9 +117,9 @@ describe('@critical DashboardShellContent behavior contracts', () => {
     });
 
     it('artist profile settings routes use essential shell data', () => {
-      expect(
-        shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
-      ).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_PROFILE)).toBe(
+        true
+      );
     });
 
     it('null pathname uses full dashboard data', () => {
@@ -179,9 +179,9 @@ describe('@critical DashboardShellContent behavior contracts', () => {
     });
 
     it('artist profile settings route uses essential data + stable hydration root', () => {
-      expect(
-        shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
-      ).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_PROFILE)).toBe(
+        true
+      );
     });
   });
 });

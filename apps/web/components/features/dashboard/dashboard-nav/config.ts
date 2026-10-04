@@ -279,7 +279,7 @@ export const paymentsNavItem: SettingsNavItem = {
 export const artistSettingsNavigation: SettingsNavItem[] = [
   {
     name: 'Profile',
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    href: APP_ROUTES.SETTINGS_PROFILE,
     id: 'artist-profile',
     admission: {
       userJob: 'Edit artist identity and public profile details',

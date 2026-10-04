@@ -156,6 +156,37 @@ describe('DSP Utils', () => {
       expect(result[0].url).toBe('https://tidal.com/browse/track/123');
       expect(result[0].name).toBe('Tidal');
     });
+
+    it('keeps release URLs on platforms outside the registry as generic links', () => {
+      // S-05/M-04: the link model is generic platform links (URL + label);
+      // a platform that is not a known provider still renders.
+      const artistWithNoUrls: Artist = {
+        ...mockArtist,
+        spotify_url: undefined,
+        apple_music_url: undefined,
+        youtube_url: undefined,
+        spotify_id: '',
+      };
+
+      const releases = [
+        {
+          id: '1',
+          creator_id: '1',
+          dsp: 'some_niche_service',
+          title: 'Latest Song',
+          url: 'https://niche.example.com/track/123',
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+      ];
+
+      const result = getAvailableDSPs(artistWithNoUrls, releases);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Some Niche Service');
+      expect(result[0].url).toBe('https://niche.example.com/track/123');
+      expect(result[0].platformKey).toBeNull();
+    });
   });
 
   describe('sortDSPsForDevice', () => {

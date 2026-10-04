@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { cn, layoutStability, presets } from '../table.styles';
+import { PersonCellSkeleton } from './PersonCell';
 import { SkeletonCell } from './SkeletonCell';
 
 interface SkeletonRowProps {
@@ -21,7 +22,8 @@ interface SkeletonRowProps {
       | 'badge'
       | 'button'
       | 'release'
-      | 'meta';
+      | 'meta'
+      | 'person';
   }>;
 
   /**
@@ -63,10 +65,14 @@ export function SkeletonRow({
         const config = columnConfig?.[index];
         return (
           <td key={key} className={presets.tableCell}>
-            <SkeletonCell
-              width={config?.width}
-              variant={config?.variant || 'text'}
-            />
+            {config?.variant === 'person' ? (
+              <PersonCellSkeleton width={config.width} />
+            ) : (
+              <SkeletonCell
+                width={config?.width}
+                variant={config?.variant || 'text'}
+              />
+            )}
           </td>
         );
       })}
