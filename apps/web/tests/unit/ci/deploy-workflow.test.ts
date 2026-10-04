@@ -5401,4 +5401,113 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     );
     expect(markerState).toContain('unsafe_or_contradictory_rollback');
   });
+
+  describe('admission binds a descendant controller head (JOV-7724)', () => {
+    const deployed = 'd'.repeat(40);
+    const head = 'c'.repeat(40);
+
+    function runAdmission(compareStatus: string) {
+      const parsed = parseYaml(
+        readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8')
+      ) as {
+        jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>;
+      };
+      const script = parsed.jobs['recover-marker'].steps.find(
+        step => step.name === 'Validate bounded recovery request'
+      )?.run;
+      expect(script).toBeTruthy();
+      const root = mkdtempSync(resolve(tmpdir(), 'marker-admission-'));
+      try {
+        const bin = resolve(root, 'bin');
+        mkdirSync(bin);
+        const jobs = [
+          ['Production Release / Promote to Production', 'success'],
+          ['Production Release / Sentry Error Gate (production)', 'success'],
+          ['Production Release / Centralized production rollback', 'skipped'],
+          ['Production Verified', 'success'],
+          ['Publish verified customer changelog', 'failure'],
+        ].map(([name, conclusion], index) => ({
+          id: index + 1,
+          name,
+          head_sha: head,
+          head_branch: 'main',
+          status: 'completed',
+          conclusion,
+        }));
+        writeFileSync(
+          resolve(root, 'run.json'),
+          JSON.stringify({
+            id: 37144574062,
+            run_attempt: 1,
+            path: '.github/workflows/production-controller.yml',
+            event: 'workflow_run',
+            head_sha: head,
+            head_branch: 'main',
+            head_repository: { full_name: 'JovieInc/Jovie' },
+            status: 'completed',
+            conclusion: 'failure',
+          })
+        );
+        writeFileSync(
+          resolve(root, 'jobs.json'),
+          JSON.stringify({ total_count: jobs.length, jobs })
+        );
+        writeFileSync(
+          resolve(root, 'compare.json'),
+          JSON.stringify({ status: compareStatus, behind_by: 0 })
+        );
+        writeFileSync(
+          resolve(bin, 'gh'),
+          `#!/usr/bin/env bash
+set -euo pipefail
+case "$2" in
+  */compare/*) cat "$FIXTURES/compare.json" ;;
+  */jobs\?*) cat "$FIXTURES/jobs.json" ;;
+  */attempts/*) cat "$FIXTURES/run.json" ;;
+  */artifacts\?name=*) case "$*" in *length*) echo 0 ;; esac ;;
+  *) echo "unexpected gh $*" >&2; exit 2 ;;
+esac
+`
+        );
+        chmodSync(resolve(bin, 'gh'), 0o700);
+        const output = resolve(root, 'output');
+        writeFileSync(output, '');
+        const result = spawnSync('bash', ['-c', script!], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            FIXTURES: root,
+            GITHUB_OUTPUT: output,
+            EXPECTED_SHA: deployed,
+            EXPECTED_DEPLOYMENT_ID: 'dpl_recovery123',
+            SOURCE_CONTROLLER_RUN: '37144574062',
+            SOURCE_CONTROLLER_ATTEMPT: '1',
+            REPO: 'JovieInc/Jovie',
+            REQUEST_MODE: 'workflow_dispatch',
+          },
+        });
+        return { ...result, output: readFileSync(output, 'utf8') };
+      } finally {
+        rmSync(root, { force: true, recursive: true });
+      }
+    }
+
+    it('admits the run 37144574062 shape whose head descends from the deployed SHA', () => {
+      const result = runAdmission('ahead');
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.output).toContain('recovery_required=true');
+    });
+
+    it('refuses a controller head that does not descend from the deployed SHA', () => {
+      for (const status of ['diverged', 'behind', 'identical']) {
+        const result = runAdmission(status);
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(
+          'is not an exact completed Production Controller attempt'
+        );
+        expect(result.output).not.toContain('recovery_required=true');
+      }
+    });
+  });
 });
