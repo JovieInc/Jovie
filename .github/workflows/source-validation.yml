@@ -92,6 +92,8 @@ jobs:
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate
+          pnpm screen-registration-gate
+          pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts
           pnpm ci:control:test
       - name: Verify changed CLI publication behavior
         shell: bash
