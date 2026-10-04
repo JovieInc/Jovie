@@ -291,9 +291,21 @@ describe('CmdKPalette', () => {
     expect(
       screen.getByRole('option', {
         name: segmentedAccessibleName(
+          PRODUCT_ONTOLOGY.identity.label,
+          PRODUCT_ONTOLOGY.identity.definition,
+          '⌘2'
+        ),
+      })
+    ).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    expect(
+      screen.getByRole('option', {
+        name: segmentedAccessibleName(
           PRODUCT_ONTOLOGY.work.label,
           PRODUCT_ONTOLOGY.work.definition,
-          '⌘2'
+          '⌘3'
         ),
       })
     ).toHaveAttribute('aria-selected', 'true');
