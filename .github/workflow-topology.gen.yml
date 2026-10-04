@@ -517,12 +517,11 @@ nodes:
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
-      - merge_group
       - pull_request
       - pull_request_review
       - pull_request_target
     terminalReceipt: job:fork-gate
-    jobCount: 3
+    jobCount: 2
   - name: GitHub AI Dispatcher
     path: .github/workflows/github-ai-dispatcher.yml
     active: false
@@ -967,7 +966,7 @@ nodes:
       - merge_group
       - pull_request
     terminalReceipt: job:size
-    jobCount: 2
+    jobCount: 3
   - name: PR targets main
     path: .github/workflows/pr-targets-main.yml
     active: true
@@ -976,7 +975,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - merge_group
       - pull_request
     terminalReceipt: job:pr-targets-main
     jobCount: 1

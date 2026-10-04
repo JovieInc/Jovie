@@ -363,9 +363,8 @@ describe('merge_group workflow contract', () => {
     expect(SIZE_GUARD_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
     );
-    expect(FORK_GATE_WORKFLOW).toMatch(
-      /merge_group:\n\s+types: \[checks_requested\]/
-    );
+    // One combined-head producer owns both member policies (JOV-7744).
+    expect(FORK_GATE_WORKFLOW).not.toMatch(/^\s*merge_group:\s*$/m);
   });
 
   it('reserves ready_for_review for auto-merge enable only', () => {
@@ -486,7 +485,7 @@ describe('merge_group workflow contract', () => {
     // Each producer must still conclude before admission stops polling.
     for (const [producerName, producer] of [
       ['PR Size Guard', sizeGuard],
-      ['Fork PR Gate', getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')],
+      ['Fork PR Gate', getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork')],
     ]) {
       const producerTimeoutMinutes = Number(
         producer.match(/timeout-minutes:\s*(\d+)/)?.[1]
@@ -497,8 +496,8 @@ describe('merge_group workflow contract', () => {
       );
     }
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
-    expect(sizeGuard).toContain('--policy=size');
-    expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
+    expect(sizeGuard).toContain('--policy=size --also=fork');
+    expect(FORK_GATE_WORKFLOW).not.toContain('merge-group-member-policy');
     expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
     // A still-running required check must be able to finish: the helper
     // polls for minutes, and the job timeout leaves >=90s for setup so the
@@ -2678,10 +2677,7 @@ ${selectedGateScript}`,
     expect(enableScript).toContain('exit 0');
   });
 
-  it.each([
-    ['fork', FORK_GATE_WORKFLOW, 'merge-group-gate'],
-    ['size', SIZE_GUARD_WORKFLOW, 'merge-group-size'],
-  ])(
+  it.each([['size', SIZE_GUARD_WORKFLOW, 'merge-group-size']])(
     'loads the complete %s policy import closure from its sparse checkout',
     (_policy, workflow, job) => {
       const block = getJobBlock(workflow, job);
@@ -2722,30 +2718,47 @@ ${selectedGateScript}`,
     }
   );
 
+  it.each([
+    ['pass', 0],
+    ['fail', 1],
+    ['', 1],
+    ['PASS', 1],
+  ])(
+    'Fork PR Gate merge-group producer exits %j -> %i from the size-job verdict alone',
+    (verdict, status) => {
+      const job =
+        /** @type {{ jobs: Record<string, { steps: { run: string }[] }> }} */ (
+          load(SIZE_GUARD_WORKFLOW)
+        ).jobs['merge-group-fork'];
+      expect(job.steps).toHaveLength(1);
+      const result = spawnSync('bash', ['-c', job.steps[0].run], {
+        encoding: 'utf8',
+        // No gh/node on PATH: the producer must decide without any API call.
+        env: { PATH: '/usr/bin:/bin', FORK_VERDICT: verdict },
+      });
+      expect(result.status, result.stdout + result.stderr).toBe(status);
+      if (status)
+        expect(result.stdout).toContain('::error::Fork policy verdict');
+    }
+  );
+
   it('revalidates mutable member policy on the exact combined head', () => {
-    expect(FORK_GATE_WORKFLOW).toMatch(
-      /merge_group:\n\s+types: \[checks_requested\]/
-    );
-    const forkGate = getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate');
+    expect(FORK_GATE_WORKFLOW).not.toMatch(/^\s*merge_group:\s*$/m);
+    const forkGate = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork');
     expect(forkGate).toContain(
       "github.event_name == 'merge_group' && 'Fork PR Gate'"
     );
-    expect(forkGate).toContain("github.event_name == 'merge_group'");
-    expect(forkGate).toContain('ref: main');
-    expect(forkGate).not.toContain(
-      'ref: ${{ github.event.merge_group.base_sha }}'
-    );
-    expect(forkGate).toContain('persist-credentials: false');
-    expect(forkGate).toContain('contents: read');
-    expect(forkGate).toContain('pull-requests: read');
-    expect(forkGate).toContain('GH_TOKEN: ${{ github.token }}');
-    expect(forkGate).not.toContain('actions/create-github-app-token');
-    expect(forkGate).not.toContain('secrets.');
-    expect(forkGate).not.toContain('private-key:');
     expect(forkGate).toContain(
-      'node scripts/lib/merge-group-member-policy.mjs --policy=fork'
+      "if: always() && github.event_name == 'merge_group'"
     );
-    expect(forkGate).not.toContain('inherits the source PR fork-policy');
+    expect(forkGate).toContain('needs: [merge-group-size]');
+    expect(forkGate).toContain(
+      'FORK_VERDICT: ${{ needs.merge-group-size.outputs.fork_verdict }}'
+    );
+    expect(forkGate).toContain('permissions: {}');
+    expect(forkGate).not.toContain('uses:');
+    expect(forkGate).not.toContain('secrets.');
+    expect(forkGate).not.toContain('GH_TOKEN');
 
     expect(SIZE_GUARD_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
@@ -2787,7 +2800,10 @@ ${selectedGateScript}`,
     expect(sizeGuard).not.toContain('secrets.');
     expect(sizeGuard).not.toContain('private-key:');
     expect(sizeGuard).toContain(
-      'node scripts/lib/merge-group-member-policy.mjs --policy=size'
+      'node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork'
+    );
+    expect(sizeGuard).toContain(
+      'fork_verdict: ${{ steps.bootstrap-policy.outputs.fork_verdict || steps.member-policy.outputs.fork_verdict }}'
     );
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
@@ -2926,20 +2942,12 @@ ${selectedGateScript}`,
         )
       )
       .sort();
-    expect(mergeGroupWorkflows).toEqual([
-      'ci.yml',
-      'fork-pr-gate.yml',
-      'pr-size-guard.yml',
-      'pr-targets-main.yml',
-    ]);
-    expect(getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')).not.toContain(
+    expect(mergeGroupWorkflows).toEqual(['ci.yml', 'pr-size-guard.yml']);
+    expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork')).not.toContain(
       'secrets.'
     );
     expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size')).not.toContain(
       'secrets.'
-    );
-    expect(FORK_GATE_WORKFLOW).toContain(
-      'Active native-queue required-context producer'
     );
     expect(SIZE_GUARD_WORKFLOW).toContain(
       'Active native-queue required-context producer'
@@ -3065,7 +3073,7 @@ ${selectedGateScript}`,
     expect(sourceSize).toContain("'PR Size Guard (source inactive)'");
     expect(SIZE_GUARD_WORKFLOW).not.toMatch(/^ {4}name: PR Size Guard\s*$/m);
 
-    const mergeFork = getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate');
+    const mergeFork = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork');
     expect(mergeFork).toContain("'Fork PR Gate (merge-group inactive)'");
     expect(getJobBlock(FORK_GATE_WORKFLOW, 'dependabot-gate')).toContain(
       'name: Fork PR Gate Dependabot Controller'
@@ -3264,11 +3272,11 @@ describe('PR targets main (no stacked bases)', () => {
     'utf8'
   );
 
-  it('fails closed on any pull_request base other than main and passes merge_group', () => {
+  it('fails closed on any pull_request base other than main and leaves merge groups to the member policy', () => {
     expect(workflow).toContain('name: PR targets main');
     expect(workflow).toMatch(/^on:\n  pull_request:\n    types:/m);
     expect(workflow).not.toMatch(/branches:\s*\[main/);
-    expect(workflow).toContain('merge_group:');
+    expect(workflow).not.toMatch(/^\s*merge_group:\s*$/m);
     expect(workflow).toContain("live.base.ref !== 'main'");
     expect(workflow).toContain('PRs must target main');
     expect(workflow).toContain('Retarget the pull request base to main');

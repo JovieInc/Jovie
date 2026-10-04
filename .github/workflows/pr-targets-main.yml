@@ -10,18 +10,20 @@ name: PR targets main
 # branch after the PR has been retargeted to main. Bind that read to this event's
 # exact source head so an older run cannot validate a newer revision.
 
+# Merge groups are not re-checked here: the required `PR Size Guard` and
+# `Fork PR Gate` producers already fail closed unless merge_group.base_ref is
+# refs/heads/main (validateMergeGroupEvent), so a runner per group re-proving
+# the same payload fact only spent queue capacity (JOV-7744).
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
-  merge_group:
-    types: [checks_requested]
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: pr-targets-main-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  group: pr-targets-main-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:

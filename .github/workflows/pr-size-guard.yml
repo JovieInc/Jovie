@@ -57,6 +57,12 @@ jobs:
     name: ${{ github.event_name == 'merge_group' && 'PR Size Guard' || 'PR Size Guard (merge-group inactive)' }}
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
+    # The same compare + member pull reads also decide the fork policy; the
+    # dependent `Fork PR Gate` job below consumes this verdict instead of a
+    # second workflow re-reading every member from the shared GITHUB_TOKEN
+    # quota on every group rebuild (JOV-7744).
+    outputs:
+      fork_verdict: ${{ steps.bootstrap-policy.outputs.fork_verdict || steps.member-policy.outputs.fork_verdict }}
     # The trusted policy has a 45s aggregate API deadline. Keep this producer
     # terminal well before merge-group admission's 6-minute external-check deadline.
     # The job clock starts at runner assignment, before image provisioning: a
@@ -79,6 +85,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Run exact-base bootstrap size policy
+        id: bootstrap-policy
         if: github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,10 +108,11 @@ jobs:
             timeout --kill-after=5s 40s bash --noprofile --norc <<'BOOTSTRAP_POLICY'
           set -euo pipefail
           git fetch --refetch --filter=blob:limit=1g --no-tags --depth=1 origin "$BOOTSTRAP_HEAD"
-          node scripts/lib/merge-group-member-policy.mjs --policy=size
+          node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
           BOOTSTRAP_POLICY
 
-      - name: Enforce combined-tree payload and member size policy
+      - name: Enforce combined-tree payload and member size and fork policy
+        id: member-policy
         if: github.event.merge_group.base_sha != '7641ffa76d03326542541c62080735c28190a1f0'
         env:
           # The synthetic head controls this workflow definition. Never expose
@@ -112,7 +120,30 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
-        run: node scripts/lib/merge-group-member-policy.mjs --policy=size
+        run: node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
+
+  # Active native-queue required-context producer for `Fork PR Gate` on the
+  # exact combined head. It reads only the verdict above: a missing verdict
+  # (policy error, cancellation) fails closed. Outside merge groups the job is
+  # skipped under a distinct name so a skipped check can never satisfy the
+  # jovie-bot `Fork PR Gate` source status.
+  merge-group-fork:
+    name: ${{ github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)' }}
+    needs: [merge-group-size]
+    if: always() && github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions: {}
+    steps:
+      - name: Require the exact-group fork policy verdict
+        env:
+          FORK_VERDICT: ${{ needs.merge-group-size.outputs.fork_verdict }}
+        run: |
+          if [[ "$FORK_VERDICT" != pass ]]; then
+            echo "::error::Fork policy verdict for this merge group is '${FORK_VERDICT:-missing}'. Next: read the PR Size Guard job log for the failing member."
+            exit 1
+          fi
+          echo "Every merge-group member passed the fork policy."
 
   size:
     name: ${{ github.event_name == 'pull_request' && 'PR Size Guard' || 'PR Size Guard (source inactive)' }}
