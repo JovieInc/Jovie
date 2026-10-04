@@ -39,6 +39,18 @@ describe('artist-parser', () => {
         'Artist B',
       ]);
     });
+
+    it('does not split and/& when the whole name matches a known provider artist', () => {
+      expect(splitByConjunction('Tones And I', ['Tones And I'])).toEqual([
+        'Tones And I',
+      ]);
+      expect(splitByConjunction('Above & Beyond', ['Above & Beyond'])).toEqual([
+        'Above & Beyond',
+      ]);
+      expect(
+        splitByConjunction('Artist A and Artist B', ['Tones And I'])
+      ).toEqual(['Artist A', 'Artist B']);
+    });
   });
 
   describe('parseMainArtists', () => {
@@ -65,26 +77,27 @@ describe('artist-parser', () => {
       });
     });
 
-    it('conservatively splits short "&" collaborations into two main artists', () => {
+    it('does not split and/& when the whole name is a provider artist', () => {
       const credits = parseMainArtists([
-        { id: '1', name: 'Artist A & Artist B' },
+        { id: 'david-guetta', name: 'David Guetta' },
+        { id: 'tones-and-i', name: 'Tones And I' },
+        { id: 'nicky-romero', name: 'Nicky Romero' },
+        { id: 'above-and-beyond', name: 'Above & Beyond' },
       ]);
-      expect(credits).toHaveLength(2);
-      expect(credits[0]).toMatchObject({
-        name: 'Artist A',
-        role: 'main_artist',
-        joinPhrase: null,
-        position: 0,
-        isPrimary: true,
-        spotifyId: '1',
-      });
-      expect(credits[1]).toMatchObject({
-        name: 'Artist B',
-        role: 'main_artist',
-        joinPhrase: ' & ',
-        position: 1,
-        isPrimary: true,
-      });
+
+      expect(credits.map(credit => credit.name)).toEqual([
+        'David Guetta',
+        'Tones And I',
+        'Nicky Romero',
+        'Above & Beyond',
+      ]);
+      expect(credits.map(credit => credit.spotifyId)).toEqual([
+        'david-guetta',
+        'tones-and-i',
+        'nicky-romero',
+        'above-and-beyond',
+      ]);
+      expect(credits.every(credit => credit.role === 'main_artist')).toBe(true);
     });
 
     it('keeps every Spotify album artist as a primary credit', () => {

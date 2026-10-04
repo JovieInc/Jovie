@@ -164,6 +164,7 @@ export function ComposerAttachButton({
 }
 
 export interface ComposerMicButtonProps {
+  readonly buttonRef?: React.Ref<HTMLButtonElement>;
   readonly isListening: boolean;
   readonly isSupported: boolean;
   /**
@@ -181,6 +182,7 @@ export interface ComposerMicButtonProps {
 }
 
 export function ComposerMicButton({
+  buttonRef,
   isListening,
   isSupported,
   unavailableHint = null,
@@ -243,6 +245,7 @@ export function ComposerMicButton({
   return (
     <SimpleTooltip content={tooltip}>
       <Button
+        ref={buttonRef}
         type='button'
         variant='ghost'
         size='icon'

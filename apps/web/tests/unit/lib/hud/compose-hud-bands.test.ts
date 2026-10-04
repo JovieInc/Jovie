@@ -49,12 +49,14 @@ describe('composeHudForPresentation', () => {
         'action-required',
         'shipper',
         'factory-health',
+        'exceptions',
       ]);
       expect(getHudNeedBand(sections).map(entry => entry.testId)).toEqual([
         HUD_SECTION_TEST_IDS['cash-mrr'],
         HUD_SECTION_TEST_IDS['action-required'],
         HUD_SECTION_TEST_IDS.shipper,
         HUD_SECTION_TEST_IDS['factory-health'],
+        HUD_SECTION_TEST_IDS.exceptions,
       ]);
 
       const noiseIds = getHudNoiseBand(sections).map(entry => entry.id);
@@ -88,7 +90,8 @@ describe('composeHudForPresentation', () => {
       expect(needIds.filter(id => id === 'action-required')).toHaveLength(1);
       expect(needIds.filter(id => id === 'shipper')).toHaveLength(1);
       expect(needIds.filter(id => id === 'factory-health')).toHaveLength(1);
-      expect(needIds).toHaveLength(4);
+      expect(needIds.filter(id => id === 'exceptions')).toHaveLength(1);
+      expect(needIds).toHaveLength(5);
     }
   });
 

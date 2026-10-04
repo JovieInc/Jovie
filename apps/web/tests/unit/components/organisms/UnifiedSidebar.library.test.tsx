@@ -236,6 +236,16 @@ describe('UnifiedSidebar library route', () => {
     expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
       collapsed: false,
     });
+    const row = screen
+      .getByRole('link', { name: /Inbox —/ })
+      .closest('[data-sidebar-brand-row]');
+    expect(row).toContainElement(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    );
+    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+      'href',
+      '/app'
+    );
   });
 
   it('shows the identity switcher when the account has multiple identities', () => {
@@ -416,6 +426,37 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the collapse toggle reachable while the brand row stages out (JOV-4522)', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    // In the 52px icon rail the brand cluster and header actions collapse on
+    // max-width while the toggle moves first and centers — before this the
+    // fixed-width chrome pushed it past the clipped rail edge.
+    const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
+    expect(toggle.className).toContain(
+      'group-data-[collapsible=icon]:order-first'
+    );
+    expect(toggle.className).toContain('group-data-[collapsible=icon]:mx-auto');
+
+    const brandRow = toggle.closest('[data-sidebar-brand-row]');
+    expect(brandRow).not.toBeNull();
+    const stagedCluster = brandRow?.querySelector(
+      '[data-sidebar-header-actions]'
+    );
+    expect(stagedCluster).not.toBeNull();
+    expect(stagedCluster?.className).toContain(
+      'group-data-[collapsible=icon]:max-w-0'
+    );
+    expect(stagedCluster?.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
+    );
   });
 
   it('turns the logo into a workspace selector for admins', () => {

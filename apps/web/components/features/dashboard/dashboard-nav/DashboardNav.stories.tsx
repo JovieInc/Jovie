@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
+import { RenderedSidebarFamily } from '@/.storybook/rendered-family';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { InboxRuntimeNotification } from '@/components/features/opportunity-inbox/InboxRuntimeNotification';
@@ -12,6 +14,15 @@ import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider'
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { DashboardNav } from './DashboardNav';
+
+function StorySidebarProvider({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <SidebarProvider open={open} onOpenChange={setOpen}>
+      {children}
+    </SidebarProvider>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -55,15 +66,17 @@ const meta = {
       <QueryClientProvider client={queryClient}>
         <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
           <DashboardDataProvider value={dashboardData}>
-            <SidebarProvider>
-              <div className='flex min-h-[42rem] bg-base'>
-                <Sidebar>
-                  <SidebarContent>
-                    <Story />
-                  </SidebarContent>
-                </Sidebar>
-              </div>
-            </SidebarProvider>
+            <StorySidebarProvider>
+              <RenderedSidebarFamily name='dashboard-nav' owner='DashboardNav'>
+                <div className='flex h-screen min-h-[42rem] bg-base'>
+                  <Sidebar>
+                    <SidebarContent>
+                      <Story />
+                    </SidebarContent>
+                  </Sidebar>
+                </div>
+              </RenderedSidebarFamily>
+            </StorySidebarProvider>
           </DashboardDataProvider>
         </AppFlagProvider>
       </QueryClientProvider>

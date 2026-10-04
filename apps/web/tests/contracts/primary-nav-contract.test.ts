@@ -89,7 +89,6 @@ describe('primary marketing navigation contract', () => {
       'Music Smart Links',
       'Fan Notifications',
       'Instant Merch',
-      'YouTube Thumbnails',
       'CLI',
     ]);
   });

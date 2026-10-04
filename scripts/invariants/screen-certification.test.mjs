@@ -144,6 +144,26 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('registers the money route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/money/page.tsx',
+      'apps/web/app/app/money/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.money');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
+  it('registers the admin chat playground route and layout for both viewports', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
+      'apps/web/app/app/(shell)/admin/chat-playground/layout.tsx',
+    ]) {
+      const entry = classifyScreenPath(path).entry;
+      assert.equal(entry?.id, 'web.admin-chat-playground');
+      assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
     const platforms = [...new Set(gated().map(e => e.platform))].sort();
@@ -193,6 +213,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
     assert.equal(
       kindOf('apps/web/app/app/(shell)/library/page.tsx'),
+      'registered'
+    );
+    assert.equal(
+      kindOf('apps/web/app/(dynamic)/playlists/page.tsx'),
       'registered'
     );
   });
@@ -332,6 +356,33 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.smartlink-release',
       'web.smartlink-track',
     ]);
+  });
+
+  it('registers the canonical Links workspace and its legacy redirect', () => {
+    const sources = [
+      'apps/web/app/app/(shell)/links/page.tsx',
+      'apps/web/app/app/(shell)/dashboard/links/page.tsx',
+    ];
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.links');
+
+    assert.deepEqual(screen, {
+      id: 'web.links',
+      platform: 'web',
+      owner: 'links',
+      sources,
+      viewports: ['desktop', 'mobile'],
+    });
+    for (const source of sources) assert.equal(kindOf(source), 'registered');
+
+    const result = evaluateChangedScreens({
+      changedFiles: sources.map(path => ({ path, status: 'M' })),
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(
+      result.changedScreens.map(changed => changed.id),
+      ['web.links']
+    );
   });
 
   it('registers every protected revenue screen source', () => {

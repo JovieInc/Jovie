@@ -1,7 +1,7 @@
 import { z } from 'zod';
-
 import { chatStartAction } from './actions/chat-start';
 import { contactCreateAction } from './actions/contact-create';
+import { FLEET_ACTIONS } from './actions/fleet';
 import { releaseCreateAction } from './actions/release-create';
 import { taskCreateAction } from './actions/task-create';
 import type { ActionDescriptor, ActionDescriptorPayload } from './descriptor';
@@ -20,6 +20,7 @@ export const ACTION_MANIFEST = [
   contactCreateAction,
   releaseCreateAction,
   taskCreateAction,
+  ...FLEET_ACTIONS,
 ] as const satisfies readonly ActionDescriptor[];
 
 export function getActionDescriptor(id: ActionId): ActionDescriptor {
@@ -72,6 +73,11 @@ export function buildDescriptorPayload(
  * schemas referenced by relative path into generated/schemas/.
  * Serialized deterministically by generate.ts.
  */
+// Preserve canonical IDs while avoiding the reserved temporary-file suffix.
+export function actionSchemaFileId(id: string): string {
+  return id === 'work.next' ? 'work-next' : id;
+}
+
 export function buildDiscoveryDocument() {
   return {
     contract: 'jovie-actions',
@@ -95,10 +101,10 @@ export function buildDiscoveryDocument() {
       deprecatedAt: action.deprecatedAt,
       sunsetAt: action.sunsetAt,
       schemas: {
-        input: `schemas/${action.id}.input.json`,
-        output: `schemas/${action.id}.output.json`,
-        invocation: `schemas/${action.id}.invocation.json`,
-        result: `schemas/${action.id}.result.json`,
+        input: `schemas/${actionSchemaFileId(action.id)}.input.json`,
+        output: `schemas/${actionSchemaFileId(action.id)}.output.json`,
+        invocation: `schemas/${actionSchemaFileId(action.id)}.invocation.json`,
+        result: `schemas/${actionSchemaFileId(action.id)}.result.json`,
       },
     })),
   };
