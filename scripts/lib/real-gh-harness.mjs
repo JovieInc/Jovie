@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { basename, delimiter, dirname, join } from 'node:path';
+import { basename, delimiter, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -123,8 +123,22 @@ export function storedZip(files) {
  * `route(pathWithQuery)` returns `{ status?, body }` (string, Buffer or JSON
  * value) or null for a 404. Resolves with exit code, output and the API paths
  * gh actually requested.
+ * @param {object} opts
+ * @param {string} opts.script
+ * @param {Record<string, string | undefined>} [opts.env]
+ * @param {(path: string) => { status?: number, body: unknown } | null} opts.route
+ * @param {string} [opts.gh]
+ * @param {boolean} [opts.allowCallerGhOverride] Let a deliberate caller `gh`
+ * fixture win for negative-control tests. Normal harness runs must leave this
+ * false so host shims cannot replace the resolved real CLI.
  */
-export async function runWithRealGh({ script, env = {}, route, gh }) {
+export async function runWithRealGh({
+  script,
+  env = {},
+  route,
+  gh,
+  allowCallerGhOverride = false,
+}) {
   const binary = gh ?? resolveRealGh();
   if (!binary) throw new Error('real gh binary is not installed');
   const requests = [];
@@ -163,7 +177,14 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   // platform quirks can't resurrect a shim.
   const ghDir = mkdtempSync(join(tmpdir(), 'real-gh-bin-'));
   copyFileSync(binary, join(ghDir, basename(binary)));
-  const { PATH: callerPath, ...restEnv } = env;
+  const basePath = process.env.PATH ?? '';
+  const callerPath = env.PATH ?? basePath;
+  const callerPrefix = callerPath.endsWith(basePath)
+    ? callerPath.slice(0, callerPath.length - basePath.length)
+    : '';
+  const childPath = allowCallerGhOverride
+    ? `${callerPrefix}${ghDir}${delimiter}${basePath}`
+    : `${ghDir}${delimiter}${callerPath}`;
   try {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
@@ -177,11 +198,8 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
           GH_PROMPT_DISABLED: '1',
           HTTP_PROXY: proxy,
           http_proxy: proxy,
-          ...restEnv,
-          PATH: `${ghDir}${delimiter}${
-            callerPath ??
-            `${dirname(binary)}${delimiter}${process.env.PATH ?? ''}`
-          }`,
+          ...env,
+          PATH: childPath,
         },
       });
       let stdout = '';

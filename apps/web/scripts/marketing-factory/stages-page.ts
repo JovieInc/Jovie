@@ -259,6 +259,9 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
   const { record, issues } = buildFactoryPageRecord(ctx, null);
   checks.check('page-record-schema', issues.length === 0, issues.join('; '));
+  if (issues.length > 0) {
+    return result(checks, null, { notes: { record } });
+  }
   // No asset passes unrendered: each must reach the record the page renders.
   const carried = new Set(
     Object.values(
@@ -275,17 +278,13 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
   // The candidate the local build previews (FACTORY_PREVIEW_RECORD).
   const previewDir = join(ctx.runDir, 'render', 'preview-records');
   const recordId = `${ctx.brief.family}.${ctx.brief.slug}`;
-  if (issues.length === 0) {
-    writeJson(
-      join(previewDir, recordId.replace('.', '-'), 'page-record.json'),
-      record
-    );
-  }
+  writeJson(
+    join(previewDir, recordId.replace('.', '-'), 'page-record.json'),
+    record
+  );
   const measured = await ctx.providers.measureRender(ctx.brief.route, {
     outDir: join(ctx.runDir, 'render'),
-    ...(issues.length === 0
-      ? { preview: { recordId, runsDir: previewDir } }
-      : {}),
+    preview: { recordId, runsDir: previewDir },
   });
   if (measured.status !== 'ok') {
     return result(checks, null, {
