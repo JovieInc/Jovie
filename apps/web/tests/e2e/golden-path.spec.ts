@@ -91,15 +91,14 @@ async function clearOnboardingRateLimits() {
 }
 
 /**
- * Approve the newly provisioned Better Auth user via direct Neon HTTP query.
+ * Wait for the Better Auth create hook to provision the linked app user.
  *
- * The onboarding page's server component creates users via the WebSocket
- * pool, but concurrent SSR renders in Next.js can abort the pool queries.
- * Provisioning happens in the Better Auth create hook; this update makes the
- * ephemeral test identity eligible to enter onboarding.
- *
+ * Read-only: the stranger keeps the status real provisioning gives it. This
+ * step used to approve every fresh user with a direct UPDATE, which hid
+ * sign-ups stranded in waitlist_pending (JOV-7701 detector escape). With the
+ * gate on, a confirmed artist is admitted only by ICP auto-accept at claim.
  */
-async function ensureDbUser(betterAuthUserId: string) {
+async function awaitProvisionedAppUser(betterAuthUserId: string) {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) throw new Error('DATABASE_URL required for DB user creation');
 
@@ -112,10 +111,7 @@ async function ensureDbUser(betterAuthUserId: string) {
     .poll(
       async () => {
         const [user] = await sql`
-          UPDATE users
-          SET user_status = 'waitlist_approved', updated_at = NOW()
-          WHERE better_auth_user_id = ${betterAuthUserId}
-          RETURNING id
+          SELECT id FROM users WHERE better_auth_user_id = ${betterAuthUserId}
         `;
         return user?.id ?? null;
       },
@@ -126,10 +122,6 @@ async function ensureDbUser(betterAuthUserId: string) {
       }
     )
     .toBeTruthy();
-
-  // The sign-in response is still withheld at this point, so the browser has
-  // neither the new session cookie nor a chance to cache the pending state.
-  // Approving here removes the old cache-invalidation race entirely.
 }
 
 /* ------------------------------------------------------------------ */
@@ -157,14 +149,12 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
     entryPath: '/signup',
-    beforeResponseFulfill: ensureDbUser,
+    beforeResponseFulfill: awaitProvisionedAppUser,
   });
 
   // OTP verification hard-navigates to /start as soon as Better Auth returns.
-  // New app users begin in the pending waitlist state, so approve the linked
-  // app row while the sign-in response is withheld from the browser. This
-  // preserves the real session cookie and lets the first /start mount perform
-  // the one authoritative claim without racing the start-route auth gate.
+  // The linked app row exists before the sign-in response reaches the
+  // browser, so the first /start mount performs the one authoritative claim.
   try {
     const automaticStartNavigationPromise = page.waitForURL(
       url => url.pathname === '/start',

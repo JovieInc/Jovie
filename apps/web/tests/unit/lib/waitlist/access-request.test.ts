@@ -12,6 +12,7 @@ const approveWaitlistEntryInTx = vi.fn();
 const finalizeWaitlistApproval = vi.fn().mockResolvedValue(undefined);
 const invalidateProxyUserStateCache = vi.fn().mockResolvedValue(undefined);
 const notifySlackWaitlist = vi.fn().mockResolvedValue(undefined);
+const countOpenCohortLearnings = vi.fn();
 
 // Track tx mutations to assert against
 let userRow: { id: string; userStatus: string } | null = null;
@@ -33,6 +34,11 @@ vi.mock('@/lib/waitlist/approval', () => ({
     approveWaitlistEntryInTx(...args),
   finalizeWaitlistApproval: (...args: unknown[]) =>
     finalizeWaitlistApproval(...args),
+}));
+
+vi.mock('@/lib/waitlist/cohort-learnings', () => ({
+  MAX_OPEN_COHORT_LEARNINGS: 10,
+  countOpenCohortLearnings: () => countOpenCohortLearnings(),
 }));
 
 vi.mock('@/lib/waitlist/settings', () => ({
@@ -187,6 +193,8 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
       autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
     });
     tryReserveAutoAcceptSlot.mockReset();
+    countOpenCohortLearnings.mockReset();
+    countOpenCohortLearnings.mockResolvedValue(0);
     approveWaitlistEntryInTx.mockReset();
     finalizeWaitlistApproval.mockClear();
     invalidateProxyUserStateCache.mockClear();
@@ -286,6 +294,96 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
       updatedRows.find(row => row.statusReason === 'chat_started')
     ).toMatchObject({ source: 'waitlist_form', fullName: 'Test Creator' });
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
+  });
+
+  describe('ICP auto-accept at claim', () => {
+    const artistInput = {
+      ...baseInput,
+      data: {
+        ...baseInput.data,
+        spotifyUrl: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
+      } as never,
+    };
+    const openSettings = {
+      gateEnabled: true,
+      autoAcceptEnabled: true,
+      autoAcceptAfterDays: 1,
+      autoAcceptDailyLimit: 10,
+      autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
+    };
+
+    it('admits a confirmed artist into a free daily slot', async () => {
+      getWaitlistSettings.mockResolvedValue(openSettings);
+      tryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: true,
+        reason: 'reserved',
+      });
+      approveWaitlistEntryInTx.mockResolvedValue({
+        outcome: 'approved',
+        entryId: 'entry-new',
+        profileId: null,
+        email: 'creator@example.com',
+        fullName: 'Test Creator',
+        clerkId: null,
+      });
+
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest(artistInput);
+
+      expect(result).toMatchObject({ status: 'approved', outcome: 'accepted' });
+      expect(approveWaitlistEntryInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        'entry-new',
+        expect.objectContaining({ reason: 'qualified_auto_accept' })
+      );
+    });
+
+    it('waitlists a confirmed artist as capacity-full when no slot is free', async () => {
+      getWaitlistSettings.mockResolvedValue(openSettings);
+      tryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: false,
+        reason: 'capacity_full',
+      });
+
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest(artistInput);
+
+      expect(result.status).toBe('waitlisted');
+      expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+      expect(
+        updatedRows.find(row => row.statusReason === 'waitlist_capacity_full')
+      ).toBeTruthy();
+    });
+
+    it('fails closed when open learnings cannot be read', async () => {
+      getWaitlistSettings.mockResolvedValue(openSettings);
+      countOpenCohortLearnings.mockResolvedValue(null);
+
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest(artistInput);
+
+      expect(result.status).toBe('waitlisted');
+      expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+    });
+
+    it('holds admission while open learnings are at the cap', async () => {
+      getWaitlistSettings.mockResolvedValue(openSettings);
+      countOpenCohortLearnings.mockResolvedValue(10);
+
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      await submitWaitlistAccessRequest(artistInput);
+
+      expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+    });
   });
 
   it('fails closed when the authenticated app user row is missing', async () => {

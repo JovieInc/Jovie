@@ -24,6 +24,10 @@ import {
   type WaitlistApprovalResult,
 } from '@/lib/waitlist/approval';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import {
+  countOpenCohortLearnings,
+  MAX_OPEN_COHORT_LEARNINGS,
+} from '@/lib/waitlist/cohort-learnings';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import {
   type InterviewResponses,
@@ -33,7 +37,10 @@ import {
   evaluateWaitlistQualification,
   type QualificationDecision,
 } from '@/lib/waitlist/qualification';
-import { getWaitlistSettings } from '@/lib/waitlist/settings';
+import {
+  getWaitlistSettings,
+  tryReserveAutoAcceptSlot,
+} from '@/lib/waitlist/settings';
 import {
   hashEmailForWaitlist,
   isUnqualifiedSignupEntry,
@@ -262,6 +269,8 @@ async function decideAccess(params: {
   readonly email: string;
   readonly data: WaitlistRequestPayload;
   readonly interviewResponses?: InterviewResponses;
+  /** ICP auto-accept may admit this request (see isIcpAutoAcceptOpen). */
+  readonly icpAutoAcceptOpen: boolean;
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
@@ -284,11 +293,29 @@ async function decideAccess(params: {
         responses: params.interviewResponses,
       })
     : null;
-  const qualification = evaluateWaitlistQualification({
+  let qualification = evaluateWaitlistQualification({
     email: params.email,
     payload: params.data,
     config: { mode, interview },
   });
+
+  // A confirmed artist the gate would waitlist takes a daily auto-accept slot
+  // when one is free; otherwise it is waitlisted as capacity-full.
+  if (
+    params.icpAutoAcceptOpen &&
+    qualification.reasonCode === 'waitlist_gate_enabled'
+  ) {
+    const reservation = await tryReserveAutoAcceptSlot(params.tx);
+    qualification = evaluateWaitlistQualification({
+      email: params.email,
+      payload: params.data,
+      config: {
+        mode,
+        interview,
+        autoAcceptReserved: reservation.shouldAutoAccept,
+      },
+    });
+  }
 
   if (qualification.status === 'blocked') {
     return {
@@ -426,6 +453,28 @@ async function handleExistingEntryResubmission(params: {
   };
 }
 
+/**
+ * ICP auto-accept (JOV-3379, EVENT 2026-10-03 on JOV-7701): a request with a
+ * confirmed Spotify artist profile is admitted at once while auto-accept is
+ * on, a daily slot is free, and the current cohort's open learnings are under
+ * the cap. Linear is read here, before the transaction; unknown fails closed.
+ */
+async function isIcpAutoAcceptOpen(
+  data: WaitlistRequestPayload
+): Promise<boolean> {
+  if (!data.spotifyUrl) return false;
+  const settings = await getWaitlistSettings();
+  if (
+    !settings.gateEnabled ||
+    !settings.autoAcceptEnabled ||
+    settings.autoAcceptDailyLimit <= settings.autoAcceptedToday
+  ) {
+    return false;
+  }
+  const openLearnings = await countOpenCohortLearnings();
+  return openLearnings !== null && openLearnings < MAX_OPEN_COHORT_LEARNINGS;
+}
+
 export async function submitWaitlistAccessRequest(
   input: WaitlistAccessRequestInput
 ): Promise<WaitlistAccessRequestResult> {
@@ -443,6 +492,7 @@ export async function submitWaitlistAccessRequest(
   const syntheticCanary = input.syntheticRunId
     ? buildProductionWaitlistCanaryMarker(input.syntheticRunId)
     : null;
+  const icpAutoAcceptOpen = await isIcpAutoAcceptOpen(input.data);
 
   // Wrap the serializable transaction with bounded retry on transient
   // 40001/40P01 conflicts. This block must be idempotent; the transaction
@@ -525,6 +575,7 @@ export async function submitWaitlistAccessRequest(
           email: normalizedEmail,
           data: input.data,
           interviewResponses: input.interviewResponses,
+          icpAutoAcceptOpen,
         });
 
         const nextStatus = decision.qualification.status;

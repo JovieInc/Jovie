@@ -3366,7 +3366,14 @@ describe('CI E2E smoke workflow', () => {
       'Golden path requires the dedicated real-auth lane'
     );
     expect(goldenPathSpec).toContain('prepareBetterAuthEmailOtp(page, {');
-    expect(goldenPathSpec).toContain('beforeResponseFulfill: ensureDbUser,');
+    expect(goldenPathSpec).toContain(
+      'beforeResponseFulfill: awaitProvisionedAppUser,'
+    );
+    // JOV-7701 detector escape: the lane must never approve its own fresh
+    // users; admission comes from the product (ICP auto-accept or payment).
+    for (const spec of [goldenPathSpec, moneyPathSpec]) {
+      expect(spec).not.toMatch(/user_status\s*=\s*'waitlist_approved'/);
+    }
     expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );
