@@ -1,0 +1,22 @@
+Implemented and published as [draft PR #19852](https://github.com/JovieInc/Jovie/pull/19852), commit `a0b99c8ae803d027588465c8d4dc6c4b19a13293`. The PR remains draft, open, clean, and unmerged.
+
+What changed:
+
+- Added a fail-closed weekly runner and receipt generator in [weekly-agent-readiness.mjs](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T164255Z-JOV-5329-codex-f6697b/scripts/weekly-agent-readiness.mjs).
+- Paxel execution requires the YC token, Docker, a pinned uploader hash, and shell validation before execution.
+- Receipts require fresh 100/100 is-agentic results, no Essential failures, Paxel profile deltas, and one concrete ship from each loop.
+- Raised Jovie’s page-certification threshold from 90 to 100.
+- Added the weekday operating procedure in [weekly-agent-readiness.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T164255Z-JOV-5329-codex-f6697b/docs/operations/weekly-agent-readiness.md).
+- Added six regression tests and registered them in CI.
+
+Verification:
+
+- All focused tests passed: 6 agent-readiness, 23 SEO certification, 11 CI inventory.
+- Biome, Turbo typecheck, script typecheck, documentation parity/freshness, diff checks, and secret scans passed.
+- All applicable hosted gates passed, including Source Validation, Exact-head Coverage, Security Evidence, Migration Guard, and visual capture.
+
+Current provider evidence:
+
+- `jov.ie`: 100/100, 9/9 Essential checks.
+- `logyourbody.com`: 77/100. Separate-repository remediation is tracked in [LYB-66](https://linear.app/jovie/issue/LYB-66/restore-logyourbodycom-is-agentic-score-to-100100).
+- Paxel’s first profile delta could not be generated because this unattended host has no YC SSO token. The workflow fails closed until that one-time authentication is completed.
