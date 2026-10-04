@@ -18,6 +18,84 @@ import {
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
+test('source contract rejects a malformed story before queue admission', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const script = workflow.jobs.deterministic.steps
+    .find(step => step.name === 'Run deterministic source contract')
+    .run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-story-types-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const types = join(root, 'types');
+  for (const dir of [repo, bin, types]) mkdirSync(dir);
+  const story = join(repo, 'PersonCell.stories.ts');
+  const calls = join(root, 'pnpm.log');
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    // Unrelated prerequisites are isolated; the story boundary invokes the
+    // real TypeScript compiler rather than returning a canned failure.
+    writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    writeFileSync(
+      join(bin, 'pnpm'),
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "$FIXTURE_CALLS"
+case "$*" in
+  '--filter @jovie/web run typecheck:stories')
+    exec "$FIXTURE_NODE" "$FIXTURE_TSC" --noEmit --strict --skipLibCheck --typeRoots "$FIXTURE_TYPES" "$FIXTURE_STORY" ;;
+esac
+exit 0
+`,
+      { mode: 0o755 }
+    );
+    const writeStory = invalid =>
+      writeFileSync(
+        story,
+        `type PersonCellProps = { name: string };\nconst args: Partial<PersonCellProps> = { name: 'Anonymous Fan'${invalid ? ', anonymous: true' : ''} };\n`
+      );
+    writeStory(true);
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'Source story type test');
+    git('config', 'user.email', 'source-story-types@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'malformed story');
+    git('remote', 'add', 'origin', repo);
+    const invoke = () => {
+      writeFileSync(calls, '');
+      return spawnSync('/bin/bash', ['-eo', 'pipefail', '-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          FIXTURE_CALLS: calls,
+          FIXTURE_NODE: process.execPath,
+          FIXTURE_TSC: createRequire(import.meta.url).resolve(
+            'typescript/bin/tsc'
+          ),
+          FIXTURE_TYPES: types,
+          FIXTURE_STORY: story,
+        },
+      });
+    };
+    const rejected = invoke();
+    assert.notEqual(rejected.status, 0, rejected.stdout + rejected.stderr);
+    assert.match(rejected.stdout + rejected.stderr, /TS2353/);
+    assert.match(readFileSync(calls, 'utf8'), /typecheck:stories\n$/);
+    writeStory(false);
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'use supported story props');
+    const accepted = invoke();
+    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+    assert.match(readFileSync(calls, 'utf8'), /component-ship-gate/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('trusted UI admission rejects hover-only affordances even when the head lacks the checker', () => {
   const workflow = load(
     readFileSync('.github/workflows/source-validation.yml', 'utf8')
