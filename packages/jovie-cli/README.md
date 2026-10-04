@@ -25,6 +25,7 @@ automated install. A repository build is not proof that npm has the package.
 
 | Command | Request |
 | --- | --- |
+| `music resolve <input>` | Read-only `resolve` tool on `/api/music/mcp`; artist names/URLs/MBIDs, track URLs/ISRCs, album URLs/UPCs, and artist/title searches |
 | `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels, Instagram profiles, TikTok profiles, and Linktree |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
@@ -41,6 +42,20 @@ that Spotify artist. Otherwise it creates an unclaimed profile. The response
 has `profileUrl` and, when unclaimed, a `claimUrl`. The claim URL is not an
 ownership token: the artist still verifies that they own the Spotify artist.
 Creation is anonymous and rate limited per IP.
+
+`music resolve` returns provider links with provenance, ambiguity candidates, and
+core MusicBrainz artist facts when an exact URL relation or MBID identifies the
+artist. Matching names alone do not establish cross-provider identity. Social
+and metadata links are separate from listening links. Embedded release groups
+can be incomplete; `releaseGroupsComplete` reports that boundary.
+
+```sh
+jovie music resolve https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm --json
+jovie music resolve 51972833-bb04-46b7-9401-45a5ab449ebd --json
+jovie music resolve USABC1234567 --kind track --territory GB --json
+jovie music resolve "Take Me Over" --kind track --artist "Tim White" --json
+jovie music resolve 123456789012 --kind album --json
+```
 
 `creator lookup` is read-only. It returns the display name, bio, avatar URL,
 and public links extracted by the existing ingestion strategy without creating

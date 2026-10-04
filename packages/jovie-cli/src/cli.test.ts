@@ -472,3 +472,69 @@ describe('machine-readable special commands', () => {
     }
   });
 });
+
+describe('jovie music resolve', () => {
+  it('dispatches the resolver flags and prints the resulting identity as JSON', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+    const result = {
+      status: 'resolved',
+      mbid: '51972833-bb04-46b7-9401-45a5ab449ebd',
+      artistMetadata: { isnis: ['0000000427529721'] },
+    };
+    const fetchImpl: FetchImplementation = async (url, init) => {
+      expect(String(url)).toBe('https://jov.ie/api/music/mcp');
+      const body = JSON.parse(String(init?.body));
+      expect(body.params.arguments).toEqual({
+        kind: 'artist',
+        input: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+      });
+      return Response.json({
+        jsonrpc: '2.0',
+        id: 'jovie-music-resolve',
+        result: { structuredContent: result, isError: false },
+      });
+    };
+    await expect(
+      runCli(
+        [
+          'music',
+          'resolve',
+          'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+          '--json',
+        ],
+        { fetchImpl, stdout: stdout.output, stderr: stderr.output }
+      )
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read())).toEqual(result);
+    expect(stderr.read()).toBe('');
+  });
+
+  it('exits with a structured retryable failure when the resolver fails', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+    const fetch = createFetch(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'jovie-music-resolve',
+        result: {
+          isError: true,
+          structuredContent: {
+            error: { code: 'UPSTREAM_FAILURE', retryable: true },
+          },
+        },
+      })
+    );
+    await expect(
+      runCli(['music', 'resolve', 'Tim White', '--json'], {
+        fetchImpl: fetch.fetchImpl,
+        stdout: stdout.output,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(1);
+    expect(JSON.parse(stdout.read())).toMatchObject({
+      error: { apiCode: 'UPSTREAM_FAILURE', retryable: true },
+    });
+    expect(stderr.read()).toBe('');
+  });
+});

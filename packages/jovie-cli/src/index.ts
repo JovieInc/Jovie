@@ -15,6 +15,7 @@ export {
   JovieRequestError,
   lookupCreator,
   normalizeBaseUrl,
+  resolveMusic,
   validateUsername,
 } from './client.js';
 export { COMMANDS, type CommandSpec } from './commands.js';

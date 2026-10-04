@@ -410,7 +410,12 @@ export async function runCli(
     } else {
       writeLine(stdout, JSON.stringify(result, null, values.json ? 0 : 2));
     }
-    if (result && typeof result === 'object' && 'status' in result) {
+    if (
+      internalInvocation &&
+      result &&
+      typeof result === 'object' &&
+      'status' in result
+    ) {
       const status = (result as { status: string }).status;
       return status === 'completed' || status === 'handoff'
         ? 0
