@@ -240,6 +240,40 @@ export async function ensureLinearLabel({
   return { ok: true, id };
 }
 
+/** Existing team label id by exact name, or null when Linear has none. */
+export async function findLinearLabelId({
+  name,
+  apiKey,
+  fetchImpl,
+  teamId = JOVIE_TEAM_ID,
+}) {
+  const cacheKey = `${teamId}:${name}`;
+  if (labelCache.has(cacheKey)) {
+    return { ok: true, id: labelCache.get(cacheKey) };
+  }
+  const found = await linearGraphql(
+    {
+      query: `
+        query FindTeamLabel($teamId: String!, $name: String!) {
+          team(id: $teamId) {
+            labels(filter: { name: { eq: $name } }) { nodes { id name } }
+          }
+        }
+      `,
+      variables: { teamId, name },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_lookup'
+  );
+  if (!found.ok) return found;
+  const id =
+    (found.data?.team?.labels?.nodes ?? []).find(label => label?.name === name)
+      ?.id ?? null;
+  if (id) labelCache.set(cacheKey, id);
+  return { ok: true, id };
+}
+
 // Dedup by fingerprint in the title or the remediation:<fingerprint> label.
 export async function upsertLinearIssueByTitleFingerprint({
   fingerprint,
@@ -251,6 +285,8 @@ export async function upsertLinearIssueByTitleFingerprint({
   createStateName = null,
   // Optional label ids applied only when a new issue is created.
   createLabelIds = [],
+  // Optional label ids kept on create and on every update or reopen.
+  keepLabelIds = [],
   // undefined distinguishes "omitted" from an explicit false. A stable
   // labelKey reopens unless the caller opts out.
   reopenTerminal = undefined,
@@ -377,9 +413,9 @@ export async function upsertLinearIssueByTitleFingerprint({
     if (createStateName && !createStateId) {
       return { ok: false, reason: 'linear_create_state_missing' };
     }
-    const createIds = labelId
-      ? [...new Set([...createLabelIds, labelId])]
-      : createLabelIds;
+    const createIds = [
+      ...new Set([...createLabelIds, ...keepLabelIds, labelId].filter(Boolean)),
+    ];
     const created = await linearGraphql(
       {
         query: `
@@ -453,13 +489,17 @@ export async function upsertLinearIssueByTitleFingerprint({
               : backlogState.id,
         }
       : {}),
-    ...(labelId && Array.isArray(existingLabelNodes)
+    ...((labelId || keepLabelIds.length > 0) &&
+    Array.isArray(existingLabelNodes)
       ? {
           labelIds: [
-            ...new Set([
-              ...existingLabelNodes.map(label => label?.id).filter(Boolean),
-              labelId,
-            ]),
+            ...new Set(
+              [
+                ...existingLabelNodes.map(label => label?.id),
+                ...keepLabelIds,
+                labelId,
+              ].filter(Boolean)
+            ),
           ],
         }
       : {}),

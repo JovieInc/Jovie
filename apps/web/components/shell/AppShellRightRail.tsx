@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { SHELL_RAIL_ALLOCATION } from '@/components/shell/rail-motion';
 import { cn } from '@/lib/utils';
 
 export interface AppShellRightRailProps {
@@ -35,9 +36,10 @@ export function AppShellRightRail({
         // below lg so it cannot clip the sheet; desktop alone owns the
         // self-stretch in-flow slot and clipping beside route content.
         'relative z-30 h-0 w-0 shrink-0 overflow-visible lg:sticky lg:top-0 lg:z-10 lg:flex lg:h-full lg:min-h-0 lg:w-fit lg:flex-col lg:self-stretch lg:overflow-hidden lg:p-1.5',
-        // Mirror the left sidebar mount language so inner drawer width changes
-        // reclaim canvas space with the same cinematic timing.
-        'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',
+        // Shared rail-motion contract (JOV-4522): the same allocation class
+        // the left sidebar mount uses, so both rails reclaim/yield canvas on
+        // identical timing.
+        SHELL_RAIL_ALLOCATION,
         'lg:rounded-(--app-shell-radius)',
         className
       )}

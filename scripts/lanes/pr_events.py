@@ -36,7 +36,7 @@ LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 # Agent/automation-owned prefixes that are not lane branches (a codex run, a manual agent
 # session). Their drafts are still lane-owned work: the reconcile sweep owes them a
 # disposition instead of counting them forever (JOV-7079).
-AGENT_BRANCH = re.compile(r"^(tim|codex|agent|claude|linear|dependabot|devin|hyperagent|n)/")
+AGENT_BRANCH = re.compile(r"^(tim|codex|agent|claude|cursor|linear|dependabot|devin|hyperagent|n)/")
 # A draft's "keep draft until the parent/dependency lands" note is revalidated against live
 # state every sweep: while the referenced PR is open the draft holds; once it merges or
 # closes the draft is stale work, not parked state.
@@ -1181,6 +1181,120 @@ def retire_orphan(lane, linear, pr: dict, open_prs: list[dict], *, host, now: fl
     return "adopted"
 
 
+# JOV-7708: parked work rots. A PR the lanes gave up on (`lane-fix-exhausted`) or the queue
+# keeps ejecting (`queue-poison`) for longer than PARKED_S, on an agent-owned branch with no
+# hold, sends its issue back to the pool to rebuild from main. The PR stays open (JOV-INV-011:
+# only an explicit `duplicate` label retires it); `lane-rebuild` marks it requeued, once, and
+# lets `lane_runner.in_flight_issues` admit the issue again.
+PARKED_S = 48 * 3600
+PARKED_LABELS = frozenset({PREFIX + EXHAUSTED, POISON_LABEL})
+REBUILD_LABEL = "lane-rebuild"
+ISSUE_REF = re.compile(r"(?i)\bjov-\d+\b")
+POOL_LABEL = "agent-ready"  # lane_runner.SHARED_LABEL; this module does not import the runner
+
+
+def parked_requeue_enabled() -> bool:
+    return os.environ.get("LANES_PARKED_REQUEUE", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def parked_candidates(prs: list[dict], now: float) -> list[dict]:
+    """Pure first cut: agent-owned same-repo PRs, not queued, unheld, carrying a parked label,
+    not yet requeued, open longer than PARKED_S. parked_since then measures the label's age."""
+    rows = []
+    for pr in prs:
+        labels = {label.lower() for label in label_names(pr)}
+        created = iso_ts(pr.get("createdAt"))
+        if (agent_owned(pr) and labels & PARKED_LABELS and not labels & HOLD_LABELS
+                and REBUILD_LABEL not in labels
+                and not pr.get("isCrossRepository") and not pr.get("isInMergeQueue")
+                and created is not None and now - created > PARKED_S):
+            rows.append(pr)
+    return rows
+
+
+def parked_since(number: int, labels: set[str], sh=run) -> float | None:
+    """When the PR became parked: per parked label it still carries, its latest `labeled`
+    event; the earliest of those. None when unreadable or no event is found."""
+    read = sh(["gh", "api", "--paginate", f"repos/{REPO}/issues/{number}/events", "--jq",
+               '.[] | select(.event == "labeled") | [.label.name, .created_at] | @tsv'])
+    if read.returncode != 0:
+        return None
+    latest: dict[str, float] = {}
+    for line in (read.stdout or "").splitlines():
+        name, _, at = line.partition("\t")
+        stamp = iso_ts(at.strip())
+        if name in labels & PARKED_LABELS and stamp is not None:
+            latest[name] = max(latest.get(name, 0.0), stamp)
+    return min(latest.values()) if latest else None
+
+
+def pr_issue(pr: dict) -> str | None:
+    """The Linear issue a PR implements: its lane branch, else a JOV id in head or title."""
+    found = LANE_BRANCH.match(pr.get("headRefName") or "")
+    if found:
+        return found.group("issue").upper()
+    ref = ISSUE_REF.search(pr.get("headRefName") or "") or ISSUE_REF.search(pr.get("title") or "")
+    return ref.group(0).upper() if ref else None
+
+
+def requeue_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *, host, now: float) -> bool:
+    """Return a parked PR's issue to the pool with a rebuild-from-main note. Never closes the PR.
+    A failed read, a hold, a queue entry, a live repair claim, a done issue or another open PR
+    for the same issue leaves everything as it is."""
+    number, head = pr["number"], pr.get("headRefOid")
+    identifier = pr_issue(pr)
+    if not identifier or not linear or any(
+            other["number"] != number and pr_issue(other) == identifier for other in open_prs):
+        return False
+    owner, name = lane.REPO_SLUG.split("/")
+    try:
+        read = lane.sh(["gh", "api", "graphql", "-f", f"query={RETIREMENT_QUERY}",
+                        "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"number={number}"])
+        data = json.loads(read.stdout) if read.returncode == 0 else {}
+        live = data["data"]["repository"]["pullRequest"]
+        labels = {node["name"].lower() for node in live["labels"]["nodes"]}
+        if (data.get("errors") or live["labels"]["pageInfo"]["hasNextPage"] is not False
+                or live["state"] != "OPEN" or not head or live["headRefOid"] != head
+                or live["isCrossRepository"] is not False or live["isInMergeQueue"] is not False
+                or labels & HOLD_LABELS or REBUILD_LABEL in labels or not labels & PARKED_LABELS):
+            return False
+    except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.SubprocessError):
+        return False
+    record = read_state(host, "fix-attempts.json").get(str(number), {})
+    if in_flight(record, {"headRefOid": record.get("sha")}, now) or lane.claimed_elsewhere(number, head, "fix"):
+        return False
+    hours = int((now - since) // 3600)
+    parked = ", ".join(f"`{label}`" for label in sorted(labels & PARKED_LABELS))
+    try:
+        issue = linear_issue(linear, identifier)
+        if not issue or issue["state"]["type"] in ("completed", "canceled"):
+            return False
+        linear.move(issue["id"], "Todo")
+        found = linear.gql('query($n:String!){issueLabels(filter:{name:{eq:$n}}){nodes{id}}}',
+                           {"n": POOL_LABEL})["issueLabels"]["nodes"]
+        if found:
+            linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                       {"id": issue["id"], "l": found[0]["id"]})
+        linear.comment(issue["id"], f"🤖 lanes: PR #{number} has been parked ({parked}) for {hours}h (JOV-7708). "
+                                    "Rebuild from current main. Use its branch "
+                                    f"`{pr.get('headRefName')}` as reference only: check what already landed, "
+                                    "and do not rebase it or copy whole files from it. The old PR stays open "
+                                    "until the rebuild lands and it is labeled `duplicate`.")
+    except Exception:
+        return False
+    if lane.sh(["gh", "api", "-X", "POST", f"repos/{lane.REPO_SLUG}/issues/{number}/labels",
+                "-f", f"labels[]={REBUILD_LABEL}"]).returncode != 0:
+        return False
+    lane.sh(["gh", "pr", "comment", str(number), "--repo", lane.REPO_SLUG, "--body",
+             f"🤖 lanes: parked ({parked}) for {hours}h. {identifier} is back in the pool to rebuild from "
+             "main (JOV-7708); this PR stays open. When the rebuild lands, label this PR `duplicate` "
+             "and the sweep retires it (JOV-INV-011)."])
+    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "parked-requeue", "origin": "autonomous-lane",
+                  "pr": number, "head": head, "parkedHours": hours, "issue": identifier,
+                  "endedAt": lane.now_iso()})
+    return True
+
+
 def sync_main(host, lane, pr: dict, now: float) -> str:
     """No-model first answer to a merge-queue removal: GitHub merges main into the branch
     (exact head, no force), so the PR gets a new head, fresh CI and a fresh enroll. The queue
@@ -1210,8 +1324,9 @@ def ledger(host, receipt: dict) -> None:
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
-pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title url isDraft
-headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt labels(first:30){nodes{name}}
+pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
+baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt
+labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
@@ -1235,6 +1350,21 @@ def open_prs_state(lane) -> list[dict] | None:
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
             node["labels"] = node.get("labels", {}).get("nodes", [])
+            files = node.pop("files", {}) or {}
+            node["files"] = files.get("nodes") or []
+            total = files.get("totalCount")
+            node["filesComplete"] = isinstance(total, int) and total == len(node["files"])
+            if isinstance(total, int) and not node["filesComplete"]:
+                listed = lane.sh(["gh", "api", "--paginate", "--slurp",
+                                  f"repos/{lane.REPO_SLUG}/pulls/{node['number']}/files?per_page=100"], timeout=120)
+                try:
+                    pages = json.loads(listed.stdout) if listed.returncode == 0 else None
+                    node["files"] = [{"path": row["filename"], "additions": row.get("additions", 0),
+                                      "deletions": row.get("deletions", 0), "changeType": row.get("status", "")}
+                                     for page_rows in pages for row in page_rows]
+                    node["filesComplete"] = total == len(node["files"])
+                except (ValueError, KeyError, TypeError):
+                    node["filesComplete"] = False
             prs.append(node)
         if not page["pageInfo"]["hasNextPage"]:
             return prs
@@ -1249,7 +1379,8 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
     held with a reason (a hold label, or `lane-fix-exhausted` after bug intake). JOV-7079:
     every open PR also gets one truthful disposition in `dispositions`, and a stale
     agent-owned draft has a repair or live dependency disposition. Retirement requires
-    explicit duplicate authority; age, provider state and retry exhaustion never grant it."""
+    explicit duplicate authority; age, provider state and retry exhaustion never grant it
+    here. Parked work past PARKED_S is requeued, never closed (`requeue_parked`, JOV-7708)."""
     plan = {"label": [], "unlabel": [], "reset": [], "stale": [], "close": [], "orphans": [],
             "depHolds": [], "dispositions": [], "counts": {}}
     lane_groups: dict[str, list[dict]] = {}
@@ -1416,8 +1547,24 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
                 if row["pr"] == number:
                     row.update(state="hold:retirement-unavailable", reason="retirement refused or failed",
                                next="preserve source; revalidate retirement authority")
+    parked = []
+    for pr in parked_candidates(prs, now) if parked_requeue_enabled() else []:
+        since = parked_since(pr["number"], {label.lower() for label in label_names(pr)}, lane.sh)
+        if since is None or now - since <= PARKED_S:
+            continue
+        if linear is None:
+            try:
+                linear = linear_factory()
+            except Exception:
+                linear = False
+        if requeue_parked(lane, linear, pr, since, prs, host=host, now=now):
+            parked.append(pr["number"])
+            for row in plan["dispositions"]:
+                if row["pr"] == pr["number"]:
+                    row.update(reason=f"parked {int((now - since) // 3600)}h; issue requeued",
+                               next="the issue rebuilds from main; label this PR `duplicate` once it lands")
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
-              "closed": closed, "orphans": plan["orphans"],
+              "closed": closed, "parkedRequeued": parked, "orphans": plan["orphans"],
               "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
               "holdNags": next_nags}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
@@ -1431,6 +1578,12 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     swept = reconcile(host, lane, linear_factory, now)
     prs = queued_prs(lane, TICK_KINDS + ("dequeued",))
     outcomes = {"reconciled": swept["counts"]} if swept else {}
+    overlap = getattr(lane, "file_overlap", None)
+    inventory = getattr(lane, "overlap_prs_summary", None)
+    if overlap is not None and callable(inventory):
+        overlap_prs = inventory()
+        outcomes["fileOverlap"] = (overlap.reconcile_open_prs(host, lane, overlap_prs)
+                                   if overlap_prs is not None else {"status": "inventory-unavailable"})
     intake = convert_intake(lane, linear_factory, lane.sh, now)
     if intake:
         outcomes["intake"] = intake

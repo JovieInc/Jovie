@@ -13,7 +13,7 @@ cat >"$BIN_DIR/git" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >>"$GIT_CALLS"
-if [[ " $* " == *" fetch "* && "${SCAN_TEST_SCENARIO:-}" == "repair-failure" ]]; then
+if [[ " $* " == *" fetch "* && "${SCAN_TEST_SCENARIO:-}" =~ ^(repair-failure|gitleaks-repair-failure)$ ]]; then
   exit 42
 fi
 case "${1:-}" in
@@ -96,6 +96,26 @@ cat >"$BIN_DIR/gitleaks" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >>"$GITLEAKS_CALLS"
+count="$(wc -l <"$GITLEAKS_CALLS")"
+case "${SCAN_TEST_SCENARIO:-}" in
+  gitleaks-corruption | gitleaks-unrepaired | gitleaks-repair-failure)
+    if [[ "$SCAN_TEST_SCENARIO" != gitleaks-corruption || $count -eq 1 ]]; then
+      echo '12:00PM ERR [git] fatal: unable to read tree (0123456789abcdef0123456789abcdef01234567)' >&2
+      echo '12:00PM ERR failed to scan Git repository error="stderr is not empty"' >&2
+      echo '12:00PM INF no leaks found' >&2
+    fi
+    ;;
+  gitleaks-incomplete)
+    echo '12:00PM ERR failed to start scan: permission denied' >&2
+    ;;
+  gitleaks-finding)
+    echo '12:00PM WRN leaks found: 1' >&2
+    exit 1
+    ;;
+  gitleaks-exit-error)
+    exit 42
+    ;;
+esac
 EOF
 
 chmod +x "$BIN_DIR/git" "$BIN_DIR/trufflehog" "$BIN_DIR/gitleaks"
@@ -104,6 +124,61 @@ fail() {
   echo "FAIL: $*" >&2
   exit 1
 }
+
+# Gitleaks 8.21.2 can emit a Git reader error and still exit 0 with
+# "no leaks found". Exercise the shipped script, including bounded repair.
+run_gitleaks_scenario() {
+  local scenario="$1" mode="${2:-publication}" status=0
+  export SCAN_TEST_SCENARIO="$scenario"
+  export GIT_CALLS="$TEST_ROOT/$scenario.$mode.git-calls"
+  export GITLEAKS_CALLS="$TEST_ROOT/$scenario.$mode.gitleaks-calls"
+  export TRUFFLEHOG_COUNT="$TEST_ROOT/$scenario.$mode.trufflehog-count"
+  export SECRET_SCAN_REMOTE_CURRENT_REF='refs/pull/14493/head'
+  export SECRET_SCAN_REMOTE_CURRENT_SHA='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  export SECRET_SCAN_REMOTE_BASE_SHA='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  : >"$GIT_CALLS"
+  : >"$GITLEAKS_CALLS"
+  PATH="$BIN_DIR:$PATH" GITLEAKS_BIN="$BIN_DIR/gitleaks" TRUFFLEHOG_BIN="$BIN_DIR/trufflehog" \
+    bash "$SCAN_SCRIPT" "$mode" origin/main >"$TEST_ROOT/$scenario.$mode.output" 2>&1 || status=$?
+  printf '%s\n' "$status"
+}
+
+for mode in publication ci-pr full; do
+  status="$(run_gitleaks_scenario gitleaks-corruption "$mode")"
+  [[ $status -eq 0 ]] || fail "Gitleaks checkout recovery failed in $mode: $status"
+  [[ "$(wc -l <"$TEST_ROOT/gitleaks-corruption.$mode.gitleaks-calls")" -eq 2 ]] \
+    || fail 'Gitleaks corruption must retry exactly once'
+  [[ "$(grep -c '^fetch ' "$TEST_ROOT/gitleaks-corruption.$mode.git-calls")" -eq 1 ]] \
+    || fail 'Gitleaks recovery must use one successful fetch'
+  grep -q '+refs/pull/14493/head:refs/secret-scan/repair-current' "$TEST_ROOT/gitleaks-corruption.$mode.git-calls" \
+    || fail 'Gitleaks recovery must fetch the stable source ref'
+
+  status="$(run_gitleaks_scenario gitleaks-unrepaired "$mode")"
+  [[ $status -ne 0 ]] || fail "Gitleaks incomplete scan must fail closed in $mode"
+  [[ "$(wc -l <"$TEST_ROOT/gitleaks-unrepaired.$mode.gitleaks-calls")" -eq 2 ]] \
+    || fail 'Gitleaks recovery must stop after one retry'
+  grep -q 'Secret scan incomplete' "$TEST_ROOT/gitleaks-unrepaired.$mode.output" \
+    || fail 'Gitleaks failed recovery must explain the incomplete scan'
+  if grep -q 'PASS: secret scan' "$TEST_ROOT/gitleaks-unrepaired.$mode.output"; then
+    fail 'incomplete Gitleaks scan must not publish a success receipt'
+  fi
+done
+
+for scenario in gitleaks-incomplete gitleaks-finding gitleaks-exit-error gitleaks-repair-failure; do
+  status="$(run_gitleaks_scenario "$scenario")"
+  [[ $status -ne 0 ]] || fail "$scenario must fail the scan"
+  [[ "$(wc -l <"$TEST_ROOT/$scenario.publication.gitleaks-calls")" -eq 1 ]] \
+    || fail "$scenario must not retry the scanner"
+  if [[ "$scenario" != gitleaks-repair-failure ]]; then
+    [[ "$(grep -c '^fetch ' "$TEST_ROOT/$scenario.publication.git-calls" || true)" -eq 0 ]] \
+      || fail "$scenario must not repair the checkout"
+  fi
+  if [[ "$scenario" == gitleaks-finding ]]; then
+    [[ $status -eq 1 ]] || fail 'Gitleaks findings must preserve their exit status'
+  elif [[ "$scenario" == gitleaks-exit-error ]]; then
+    [[ $status -eq 42 ]] || fail 'Gitleaks errors must preserve their exit status'
+  fi
+done
 
 run_scenario() {
   local scenario="$1"

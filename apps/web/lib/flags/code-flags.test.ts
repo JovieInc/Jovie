@@ -7,6 +7,11 @@ describe('code flags', () => {
     delete process.env.FEATURE_CANVAS_GRAIN;
   });
 
+  it('keeps flag keys in alphabetical order so concurrent additions merge cleanly', () => {
+    const keys = Object.keys(CODE_FLAGS);
+    expect(keys).toEqual([...keys].sort());
+  });
+
   it('defaults to the registry value when no env override is set', () => {
     expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(CODE_FLAGS.CANVAS_GRAIN);
   });

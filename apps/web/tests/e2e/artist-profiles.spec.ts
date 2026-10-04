@@ -134,12 +134,13 @@ test.describe('Artist Profiles Landing', () => {
     );
   });
 
-  test('singular artist-profile alias preserves the canonical experience', async ({
+  test('singular artist-profile alias redirects to the canonical experience', async ({
     page,
   }) => {
     await page.goto('/artist-profile', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
+    await expect(page).toHaveURL(/\/artist-profiles$/);
     await expect(
       page.getByRole('heading', {
         name: /the link your music deserves\./i,
