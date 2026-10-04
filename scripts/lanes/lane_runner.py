@@ -4754,6 +4754,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         issue = labeled
         if local:
             sweep_lane_prs(host, name, linear)
+        # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
+        # autoscaled count would admit more parked PRs as capacity rises.
         budget = None if red or adopt or labeled else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
