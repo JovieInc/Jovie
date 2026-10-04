@@ -119,6 +119,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     title: 'Product',
     links: [
       { href: APP_ROUTES.PRODUCT, label: 'Product' },
+      { href: APP_ROUTES.AI, label: 'AI Operating System' },
       { href: APP_ROUTES.CARD, label: 'Jovie Card' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
