@@ -93,6 +93,34 @@ describe('normalizeKernelCertificationRow', () => {
     expect(row.state).toBe('working');
   });
 
+  it('projects kernel-blocked receipts as failed without changing valid evidence in the same tier', () => {
+    const row = fixtureRow('receipt-drift', {
+      packet: fixturePacket('receipt-drift', {
+        visualProof: [
+          fixtureReceipt('visual_proof', 'current'),
+          {
+            ...fixtureReceipt('visual_proof', 'stale'),
+            sourceSha: 'f'.repeat(40),
+          },
+          { ...fixtureReceipt('visual_proof', 'unbound'), sourceSha: null },
+          { ...fixtureReceipt('visual_proof', 'missing-digest'), digest: null },
+        ],
+      }),
+    });
+
+    expect(row.tiers.visual_proof).toBe('failed');
+    expect(
+      row.evidence.filter(receipt => receipt.tier === 'visual_proof')
+    ).toEqual([
+      expect.objectContaining({ id: 'current', status: 'passed' }),
+      expect.objectContaining({ id: 'stale', status: 'failed' }),
+      expect.objectContaining({ id: 'unbound', status: 'failed' }),
+      expect.objectContaining({ id: 'missing-digest', status: 'failed' }),
+    ]);
+    expect(row.state).toBe('working');
+    expect(row.decision.available).toBe(false);
+  });
+
   it('reports a missing source tier and a variant without proof', () => {
     const row = fixtureRow('nosource', {
       packet: fixturePacket('nosource', {

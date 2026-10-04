@@ -1,7 +1,7 @@
 'use client';
 
 import { uploadPresigned } from '@vercel/blob/client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
@@ -771,7 +771,7 @@ export function useChatFileAttachments({
     setIsDragOver(false);
   }, [resetKey]);
 
-  const aggregate = useCallback(() => {
+  const aggregate = useMemo(() => {
     const total = pendingFiles.length;
     const done = pendingFiles.filter(f => f.status === 'ready').length;
     const uploading = pendingFiles.filter(
@@ -881,6 +881,6 @@ export function useChatFileAttachments({
     toFileUIParts,
     dropZoneRef,
     accept: ACCEPTED_TYPES,
-    aggregate: aggregate(),
+    aggregate,
   };
 }

@@ -65,6 +65,7 @@ vi.mock('@/hooks/useSearchUrlSync', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME: 'whitespace-normal',
   convertContextMenuItems: () => [],
   createMultiFieldFilterFn: () => () => true,
   ExportCSVButton: () => <button type='button'>Export</button>,
@@ -91,7 +92,23 @@ vi.mock('@/components/organisms/table', () => ({
     <button type='submit'>{submitAriaLabel}</button>
   ),
   TableBulkActionsToolbar: () => null,
-  UnifiedTable: () => <div data-testid='desktop-table'>Desktop table</div>,
+  UnifiedTable: ({
+    columns,
+  }: {
+    columns: Array<{ id: string; meta?: { cellContentClassName?: string } }>;
+  }) => (
+    <div
+      data-testid='desktop-table'
+      data-multiline-columns={columns
+        .filter(column =>
+          column.meta?.cellContentClassName?.includes('whitespace-normal')
+        )
+        .map(column => column.id)
+        .join(',')}
+    >
+      Desktop table
+    </div>
+  ),
   useRowSelection: (rowIds: string[]) => mockUseRowSelection(rowIds),
 }));
 
@@ -190,6 +207,10 @@ describe('AdminUsersTableUnified', () => {
 
       renderUsersTable();
 
+      expect(screen.getByTestId('desktop-table')).toHaveAttribute(
+        'data-multiline-columns',
+        'name'
+      );
       expect(screen.getByTestId('desktop-table')).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Users' })).toBeNull();
       expect(screen.getByText(/Showing 1–1 of 1 users/)).toBeInTheDocument();

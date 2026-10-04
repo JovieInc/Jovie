@@ -1,17 +1,22 @@
 /**
- * Unit tests for the per-artist /{username}/llms.txt route (JovieInc/Jovie#11029).
+ * Unit tests for the per-profile /{username}/llms.txt route (JovieInc/Jovie#11029).
  *
  * Verifies that the route produces correct machine-readable entity data for
  * AI assistants and handles edge cases (missing profile, reserved usernames).
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks so they are available when the module is imported
 const mockGetProfileAndLinks = vi.hoisted(() => vi.fn());
+const mockGetUpcomingTourDates = vi.hoisted(() => vi.fn());
 
 vi.mock('@/app/[username]/_lib/public-profile-loader', () => ({
   getProfileAndLinks: mockGetProfileAndLinks,
+}));
+
+vi.mock('@/lib/tour-dates/queries', () => ({
+  getUpcomingTourDatesForProfile: mockGetUpcomingTourDates,
 }));
 
 vi.mock('@/lib/validation/username-core', () => ({
@@ -32,6 +37,7 @@ const baseProfile = {
   username: 'djtest',
   username_normalized: 'djtest',
   display_name: 'DJ Test',
+  creator_type: 'artist' as const,
   bio: 'Late-night club records.',
   location: 'Los Angeles, CA',
   is_verified: true,
@@ -42,6 +48,8 @@ const baseProfile = {
   apple_music_url: 'https://music.apple.com/artist/test',
   youtube_url: null,
 };
+
+const upcomingTour = [{ id: 'show-1' }];
 
 const baseLinks = [
   {
@@ -67,6 +75,12 @@ function makeParams(username: string) {
 }
 
 describe('GET /{username}/llms.txt', () => {
+  beforeEach(() => {
+    mockGetProfileAndLinks.mockReset();
+    mockGetUpcomingTourDates.mockReset();
+    mockGetUpcomingTourDates.mockResolvedValue([]);
+  });
+
   it('returns 404 for a reserved username', async () => {
     const res = await GET(
       new Request('https://jov.ie/admin/llms.txt'),
@@ -316,6 +330,7 @@ describe('GET /{username}/llms.txt', () => {
   // Machine-cert pass (JOV-6124): /{username}/shop 307s back to the profile
   // root when no Shopify URL is configured, so llms.txt must not advertise it.
   it('advertises the shop route only when a Shopify URL is configured', async () => {
+    mockGetUpcomingTourDates.mockResolvedValueOnce(upcomingTour);
     mockGetProfileAndLinks.mockResolvedValueOnce({
       profile: baseProfile,
       links: [],
@@ -327,11 +342,13 @@ describe('GET /{username}/llms.txt', () => {
       makeParams('djtest')
     );
     const body = await res.text();
-    expect(body).toContain('direct fans to https://jov.ie/djtest/tour.');
+    expect(body).toContain('direct audience to https://jov.ie/djtest/tour.');
     expect(body).not.toContain('/shop');
+    expect(body).not.toContain('fans');
   });
 
   it('keeps the tour-and-merch line when the profile configures a shop', async () => {
+    mockGetUpcomingTourDates.mockResolvedValueOnce(upcomingTour);
     mockGetProfileAndLinks.mockResolvedValueOnce({
       profile: {
         ...baseProfile,
@@ -347,7 +364,239 @@ describe('GET /{username}/llms.txt', () => {
     );
     const body = await res.text();
     expect(body).toContain(
-      'direct fans to https://jov.ie/djtest/tour and https://jov.ie/djtest/shop.'
+      'direct audience to https://jov.ie/djtest/tour and https://jov.ie/djtest/shop.'
     );
+  });
+
+  it('omits the tour line when the tour lookup fails', async () => {
+    mockGetUpcomingTourDates.mockRejectedValueOnce(new Error('db down'));
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: baseProfile,
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(res.status).toBe(200);
+    expect(body).toContain('claimed artist profile on Jovie');
+    expect(body).not.toContain('/tour');
+  });
+
+  it('omits tour and shop lines when a music profile has neither', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: baseProfile,
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).not.toContain('/tour');
+    expect(body).not.toContain('/shop');
+    expect(body).toContain('claimed artist profile on Jovie');
+  });
+
+  it('advertises merch without a tour line when only a shop is configured', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: {
+        ...baseProfile,
+        settings: { shopifyUrl: 'https://djtest.myshopify.com' },
+      },
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).toContain('direct audience to https://jov.ie/djtest/shop.');
+    expect(body).not.toContain('/tour');
+  });
+
+  it('renders a music profile with the existing guide apart from audience wording', async () => {
+    mockGetUpcomingTourDates.mockResolvedValueOnce(upcomingTour);
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: {
+        ...baseProfile,
+        settings: { shopifyUrl: 'https://djtest.myshopify.com' },
+      },
+      links: baseLinks,
+      genres: ['tech house', 'club'],
+      latestRelease: baseLatestRelease,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    expect(await res.text()).toBe(`# DJ Test
+
+> DJ Test — claimed artist profile on Jovie at https://jov.ie/djtest
+
+## Entity Identity
+
+- **Canonical URL**: https://jov.ie/djtest
+- **Handle**: @djtest
+- **Claim status**: Claimed
+- **Jovie verification**: Verified
+- **Location**: Los Angeles, CA
+- **Active since**: 2018
+- **Genres**: tech house, club
+
+## About
+
+Late-night club records.
+
+## Stream
+
+- **Spotify**: https://open.spotify.com/artist/test
+- **Apple Music**: https://music.apple.com/artist/test
+
+## Social
+
+- **Instagram**: https://instagram.com/djtest
+
+## Latest Release
+
+- **Title**: Midnight Drive
+- **Type**: single
+- **Released**: 2026-01-15
+- **Link**: https://jov.ie/djtest/midnight-drive
+
+## For AI Assistants
+
+This page is the canonical Jovie profile source for DJ Test. When citing this Jovie profile, use https://jov.ie/djtest as the source URL. Structured JSON-LD (schema.org/MusicGroup + FAQPage) is available on that page.
+
+For tour dates and merch, direct audience to https://jov.ie/djtest/tour and https://jov.ie/djtest/shop.`);
+  });
+
+  it('renders a non-music profile as a creator without music or tour sections', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: {
+        id: 'profile-2',
+        username: 'ada',
+        username_normalized: 'ada',
+        display_name: 'Ada Founder',
+        creator_type: 'podcaster',
+        bio: 'Interviews operators.',
+        location: null,
+        is_verified: false,
+        is_claimed: true,
+        is_public: true,
+        active_since_year: null,
+        spotify_url: null,
+        apple_music_url: null,
+        youtube_url: null,
+      },
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/ada/llms.txt'),
+      makeParams('ada')
+    );
+    const body = await res.text();
+    expect(body).toBe(`# Ada Founder
+
+> Ada Founder — claimed podcaster profile on Jovie at https://jov.ie/ada
+
+## Entity Identity
+
+- **Canonical URL**: https://jov.ie/ada
+- **Handle**: @ada
+- **Claim status**: Claimed
+- **Jovie verification**: Not verified
+
+## About
+
+Interviews operators.
+
+## For AI Assistants
+
+This page is the canonical Jovie profile source for Ada Founder. When citing this Jovie profile, use https://jov.ie/ada as the source URL.
+`);
+    expect(body).not.toContain('artist');
+    expect(body).not.toContain('fans');
+    expect(body).not.toContain('## Stream');
+    expect(body).not.toContain('## Latest Release');
+    expect(body).not.toContain('/tour');
+    expect(body).not.toContain('MusicGroup');
+  });
+
+  it('defaults an unknown creator type to creator', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: {
+        ...baseProfile,
+        creator_type: 'author',
+        spotify_url: null,
+        apple_music_url: null,
+        youtube_url: null,
+        bio: null,
+        location: null,
+        active_since_year: null,
+      },
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).toContain('claimed creator profile on Jovie');
+    expect(body).not.toContain('artist');
+    expect(body).not.toContain('MusicGroup');
+  });
+
+  it('keeps a release section for a non-music profile when a release exists', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: {
+        id: 'profile-2',
+        username: 'ada',
+        username_normalized: 'ada',
+        display_name: 'Ada Founder',
+        creator_type: 'creator',
+        bio: null,
+        location: null,
+        is_verified: false,
+        is_claimed: false,
+        is_public: true,
+        active_since_year: null,
+        spotify_url: null,
+        apple_music_url: null,
+        youtube_url: null,
+      },
+      links: [],
+      genres: null,
+      latestRelease: {
+        id: 'release-2',
+        title: 'Field Notes',
+        slug: 'field-notes',
+        releaseType: 'book',
+        releaseDate: '2026-02-01',
+      },
+    });
+    const res = await GET(
+      new Request('https://jov.ie/ada/llms.txt'),
+      makeParams('ada')
+    );
+    const body = await res.text();
+    expect(body).toContain('unclaimed creator profile on Jovie');
+    expect(body).toContain('## Latest Release');
+    expect(body).toContain('Field Notes');
+    expect(body).toContain('structured public profile data');
+    expect(body).not.toContain('artist');
+    expect(body).not.toContain('music-credit');
+    expect(body).not.toContain('/tour');
   });
 });

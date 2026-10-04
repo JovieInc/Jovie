@@ -168,3 +168,52 @@ describe('UnifiedTable responsive columns', () => {
     }
   );
 });
+
+describe('UnifiedTable row mode geometry', () => {
+  it.each([
+    ['two-line', '56px', '48px'],
+    ['description', '72px', '64px'],
+    ['controls', '96px', '88px'],
+  ] as const)(
+    'shares the %s geometry between loading and data rows',
+    (rowMode, rowHeight, contentHeight) => {
+      const { rerender } = render(
+        <UnifiedTable
+          data={contacts}
+          columns={columns}
+          rowMode={rowMode}
+          isLoading
+          enableVirtualization={false}
+        />
+      );
+      const table = screen.getByRole('table');
+      expect(table.style.getPropertyValue('--table-row-height')).toBe(
+        rowHeight
+      );
+      expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
+        contentHeight
+      );
+      expect(table.querySelector('tbody tr')).toHaveStyle({
+        height: rowHeight,
+      });
+      rerender(
+        <UnifiedTable
+          data={contacts}
+          columns={columns}
+          rowMode={rowMode}
+          enableVirtualization={false}
+        />
+      );
+      expect(screen.getByRole('table')).toHaveAttribute(
+        'data-table-row-mode',
+        rowMode
+      );
+      expect(
+        screen
+          .getByRole('table')
+          .style.getPropertyValue('--table-cell-content-height')
+      ).toBe(contentHeight);
+      expect(roleOrder()).toEqual(['press', 'bookings', 'management']);
+    }
+  );
+});

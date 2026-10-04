@@ -28,6 +28,8 @@ export async function GET() {
       content_text: entry.summary,
       date_published: entry.date ? `${entry.date}T00:00:00Z` : undefined,
       _jovie: {
+        availability: entry.availability,
+        prerequisites: entry.prerequisites ?? [],
         tertiary: formatCustomerChangelogTertiary(
           entry.date,
           entry.technicalVersion

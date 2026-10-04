@@ -1,41 +1,57 @@
 ---
-paths: ["apps/desktop/**", "apps/macos/**", "docs/macos/**"]
+paths: ["apps/desktop/**", "apps/macos/**", "apps/ios/JovieMac/**", "apps/ios/JovieMac.xcodeproj/**", "apps/ios/Packages/JovieKit/**", "docs/macos/**"]
 ---
 
-# Mac (Electron product + Swift MenuMonitor)
+# Mac (native direction, Electron shipped until parity)
 
-Read this before touching `apps/desktop`, `apps/macos`, or any proposed Mac
-Swift/WKWebView shell. Detail and evidence:
-[`docs/macos/swift-control-invariants.md`](../../docs/macos/swift-control-invariants.md).
-Ops-receipt sibling: [`docs/MACOS_SWIFT_CONTROL_ADR.md`](../../docs/MACOS_SWIFT_CONTROL_ADR.md).
+Read this before Mac or shared Swift work. The accepted direction and exit
+criteria are in [the native Mac ADR](../../docs/macos/ADR-swift-native-mac.md).
+The [stack receipt](../../docs/macos/swift-control-invariants.md) distinguishes
+current owners from planned targets. The [earlier Electron-only ADR](../../docs/MACOS_SWIFT_CONTROL_ADR.md)
+is historical; its rewrite prohibition is superseded.
 
-The Mac product is **Electron**, not Swift. iOS SwiftUI is not a Mac rewrite
-template. Standalone Swift Ovie (`JovieInc/ovie`) is deprecated (JOV-3854).
+## Current stack and target
 
-## Current stack
-
-| Surface | Owner | Not |
+| Surface | Current owner | Direction |
 | --- | --- | --- |
-| Packaged Mac / Ovie door | `apps/desktop` Electron `BrowserWindow` | Swift app, WKWebView product shell |
-| Ops HUD | hosted `/hud?ovie=mac` | A second native HUD |
-| Operator shipping menu | `apps/macos/MenuMonitor` SwiftUI `MenuBarExtra` | Product UI, iOS-parity SwiftUI |
-| iOS WKWebView | public-profile browser only | Precedent for a Mac webview shell |
+| Shipped Mac app / Ovie door | `apps/desktop` Electron `BrowserWindow` | Keep improving it until a tested native cutover. |
+| Native Mac development | `apps/ios/JovieMac` sibling target with explicit Debug fixtures; default and Release unavailable | Live SwiftUI/AppKit product and native chat remain planned on shared iOS client behavior. |
+| Shared Swift core | Existing iOS clients/models/repositories | Extract into `apps/ios/Packages/JovieKit` in consumed, tested slices. |
+| Operator shipping menu | `apps/macos/MenuMonitor` `MenuBarExtra` | Accessory only; no second product HUD. |
+| Occasional complex web screens | Existing web surfaces | Isolated, registered, on-demand WebKit bridges. |
 
-## Proposed Swift-control invariants (JOV-5359)
+## Delivery rules
 
-Proposed slugs, not adopted into `canon/invariants.jsonl`:
+- Ship the high-value Electron navigation, streaming, lifecycle, and measurement
+  fixes first. Keep auth, security, and update work shipping during migration.
+- Reuse iOS transport, models, cache, and conversation state. Build one native
+  Mac chat path: cached launch, type, send, stream, cancel/retry, switch, sleep/wake.
+  A native sidebar around hosted chat does not satisfy that path.
+- Share client contracts and `JovieTheme`; platform shells may differ. Keep
+  UIKit/AppKit behind platform interfaces. Do not invent a second backend,
+  action-policy implementation, token family, or product app repository.
+- Session work outlives views. Hidden UI may pause visual activity without
+  interrupting streams, uploads, or pending actions; reconcile on return.
+- Preserve native auth flow binding, PKCE, cancellation, replay protection,
+  secure session storage, and recovery. A fixture or unsigned prototype does
+  not establish authenticated behavior.
+- Register each on-demand WebKit surface with route, owner, boundary, exit issue,
+  and review date. Do not host the entire daily chat workflow in a webview.
+- Retire Electron only after native parity, production signing/notarization,
+  updates, session migration, and rollback are demonstrated. Follow path-selected
+  tests for source changes; native release acceptance still requires real Mac
+  evidence. Never report source checks as installed-app proof.
 
-| Slug | Rule |
+## Proposed control slugs
+
+These remain proposed, not adopted into `canon/invariants.jsonl`:
+
+| Slug | Status and boundary |
 | --- | --- |
-| `JOV-INV-013` | Packaged Mac Ovie is `apps/desktop` Chromium `BrowserWindow` loading hosted `/hud?ovie=mac`; do not start a Swift or WKWebView Mac product shell or revive `JovieInc/ovie`. |
-| `JOV-INV-014` | `apps/macos/MenuMonitor` stays a menu-bar shipping accessory; do not expand it into product UI, Ovie HUD, or iOS-parity SwiftUI. |
-| `JOV-INV-015` | iOS Swift extends `JovieTheme` and existing organisms; Mac Swift stays inside MenuMonitor presentation owners; do not invent a parallel token or atom family. |
-| `JOV-INV-016` | iOS and Mac Swift UI land with the existing path-selected lint/unit/MenuMonitor gates; do not require full Xcode, device, or E2E suites as a merge condition for a UI change. |
+| `JOV-INV-013` | The former Electron-only prohibition is superseded. Target one native Mac product on shared iOS foundations; keep Electron shipped until cutover. |
+| `JOV-INV-014` | MenuMonitor stays an operator accessory, not a second product HUD. |
+| `JOV-INV-015` | Shared Swift extends existing design-system and client owners; no parallel Mac token/atom family. |
+| `JOV-INV-016` | Source changes use path-selected lint/unit/build gates; signing, parity, and runtime claims require their own release evidence. |
 
-## Do not
-
-- Rewrite Mac Ovie or the artist app in Swift.
-- Host `/hud`, `/app/ov/chat`, or `/app/chat` in WKWebView.
-- Add a second macOS Swift target or Xcode Mac app.
-- Copy iOS atoms, themes, or shells onto MenuMonitor.
-- Treat MenuMonitor CI as a reason to run full iOS device or E2E suites.
+Do not revive the deprecated standalone Swift Ovie implementation, fold product UI
+into MenuMonitor, or treat the development target as a qualified live product.

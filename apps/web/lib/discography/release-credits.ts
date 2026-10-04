@@ -181,15 +181,174 @@ function creditMatchesProviderById(
   return providerKey ? creditIdentityKeys(credit).includes(providerKey) : false;
 }
 
+const CREDIT_FRAGMENT_JOINS = [' and ', ' & ', ' x '] as const;
+const CREDIT_MISMATCH_WARN_TTL_MS = 60 * 60 * 1000;
+const CREDIT_MISMATCH_WARN_MAX = 500;
+const warnedCreditMismatches = new Map<string, number>();
+
+function comparableCreditName(name: string): string {
+  return name.trim().toLowerCase().replaceAll(/\s+/g, ' ');
+}
+
+function namesEquivalent(left: string, right: string): boolean {
+  return comparableCreditName(left) === comparableCreditName(right);
+}
+
+/**
+ * Find consecutive stored credits that were split out of one provider artist.
+ * "Tones" + "I" rejoins to "Tones And I"; unrelated neighbors do not.
+ */
+function findSplitFragmentSpan(
+  credits: readonly CanonicalReleaseCredit[],
+  claimed: readonly boolean[],
+  providerName: string
+): { start: number; end: number } | null {
+  const target = comparableCreditName(providerName);
+  if (!target) return null;
+
+  for (let start = 0; start < credits.length; start += 1) {
+    if (claimed[start]) continue;
+    const parts = [credits[start]?.name ?? ''];
+    for (let end = start + 1; end < credits.length; end += 1) {
+      if (claimed[end]) break;
+      parts.push(credits[end]?.name ?? '');
+      const matched = CREDIT_FRAGMENT_JOINS.some(
+        join => comparableCreditName(parts.join(join)) === target
+      );
+      if (matched) return { start, end: end + 1 };
+      if (comparableCreditName(parts.join(' & ')).length > target.length) {
+        break;
+      }
+    }
+  }
+
+  return null;
+}
+
+function repairedProviderCredit(
+  head: CanonicalReleaseCredit,
+  provider: ProviderPrimaryArtist
+): CanonicalReleaseCredit {
+  return {
+    ...head,
+    artistId: null,
+    handle: null,
+    name: provider.name,
+    role: 'main_artist',
+    isPrimary: true,
+    spotifyId: provider.provider === 'spotify' ? (provider.id ?? null) : null,
+    appleMusicId:
+      provider.provider === 'apple_music' ? (provider.id ?? null) : null,
+    musicbrainzId:
+      provider.provider === 'musicbrainz' ? (provider.id ?? null) : null,
+    deezerId: provider.provider === 'deezer' ? (provider.id ?? null) : null,
+  };
+}
+
+/**
+ * Collapse stored credits that are split variants of a provider artist name.
+ * Already-correct names stay put. Fragments that do not rejoin a provider
+ * name are left alone so a real mismatch can still be reported.
+ */
+export function repairSplitProviderCredits(
+  storedPrimaries: readonly CanonicalReleaseCredit[],
+  providerArtists: readonly ProviderPrimaryArtist[]
+): CanonicalReleaseCredit[] {
+  if (providerArtists.length === 0 || storedPrimaries.length === 0) {
+    return [...storedPrimaries];
+  }
+
+  const claimed = storedPrimaries.map(() => false);
+  for (const provider of providerArtists) {
+    const exact = storedPrimaries.findIndex(
+      (credit, index) =>
+        !claimed[index] && namesEquivalent(credit.name, provider.name)
+    );
+    if (exact >= 0) claimed[exact] = true;
+  }
+
+  const skip = new Set<number>();
+  const replacements = new Map<number, CanonicalReleaseCredit>();
+  for (const provider of providerArtists) {
+    const alreadyMatched = storedPrimaries.some(
+      (credit, index) =>
+        claimed[index] &&
+        !replacements.has(index) &&
+        !skip.has(index) &&
+        namesEquivalent(credit.name, provider.name)
+    );
+    if (alreadyMatched) continue;
+
+    const span = findSplitFragmentSpan(storedPrimaries, claimed, provider.name);
+    if (!span) continue;
+    for (let index = span.start; index < span.end; index += 1) {
+      claimed[index] = true;
+      if (index !== span.start) skip.add(index);
+    }
+    const head = storedPrimaries[span.start];
+    if (!head) continue;
+    replacements.set(span.start, repairedProviderCredit(head, provider));
+  }
+
+  const repaired: CanonicalReleaseCredit[] = [];
+  storedPrimaries.forEach((credit, index) => {
+    if (skip.has(index)) return;
+    repaired.push(replacements.get(index) ?? credit);
+  });
+  return repaired;
+}
+
+export function creditProviderMismatchWarningKey(input: {
+  readonly entityType: string;
+  readonly entityId: string;
+  readonly mismatch: CreditProviderMismatch;
+}): string {
+  return [
+    input.entityType,
+    input.entityId,
+    input.mismatch.provider,
+    input.mismatch.storedNames.join('\u0000'),
+    input.mismatch.providerNames.join('\u0000'),
+  ].join('|');
+}
+
+/** One warning per entity mismatch per warm instance, not once per render. */
+export function shouldReportCreditProviderMismatch(
+  key: string,
+  now = Date.now()
+): boolean {
+  const previous = warnedCreditMismatches.get(key);
+  if (previous !== undefined && now - previous < CREDIT_MISMATCH_WARN_TTL_MS) {
+    return false;
+  }
+
+  warnedCreditMismatches.delete(key);
+  warnedCreditMismatches.set(key, now);
+  while (warnedCreditMismatches.size > CREDIT_MISMATCH_WARN_MAX) {
+    const oldest = warnedCreditMismatches.keys().next().value;
+    if (oldest === undefined) break;
+    warnedCreditMismatches.delete(oldest);
+  }
+  return true;
+}
+
+export function resetCreditProviderMismatchWarnings(): void {
+  warnedCreditMismatches.clear();
+}
+
 export function reconcilePrimaryArtists(input: {
   readonly storedCredits: readonly CanonicalReleaseCredit[];
   readonly providerArtists?: readonly ProviderPrimaryArtist[];
 }): ReconciledPrimaryCredits {
-  const storedPrimaries = selectPrimaryArtistCredits(input.storedCredits);
-  const storedNonPrimaries = input.storedCredits.filter(
-    credit => !storedPrimaries.includes(credit)
-  );
   const providerArtists = input.providerArtists ?? [];
+  const originalPrimaries = selectPrimaryArtistCredits(input.storedCredits);
+  const storedPrimaries = repairSplitProviderCredits(
+    originalPrimaries,
+    providerArtists
+  );
+  const storedNonPrimaries = input.storedCredits.filter(
+    credit => !originalPrimaries.includes(credit)
+  );
 
   if (providerArtists.length === 0) {
     return { primaryArtists: storedPrimaries, mismatch: null };

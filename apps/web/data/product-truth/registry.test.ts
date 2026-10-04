@@ -133,6 +133,42 @@ describe('product-truth capabilities', () => {
     expect(getProductCapability(null)).toBeNull();
     expect(getProductCapability('unknown')).toBeNull();
   });
+
+  it('certifies the live profile summary and public Ask without a flag or marketing route', () => {
+    for (const id of [
+      'agent-readable-profile-summary',
+      'public-ask',
+    ] as const) {
+      const capability = getProductCapability(id);
+      expect(capability).toMatchObject({
+        maturity: 'general_availability',
+        publication: 'public',
+        access: 'open',
+        entitlementKeys: [],
+      });
+      expect(capability?.flagKey).toBeUndefined();
+      expect(capability?.marketing).toMatchObject({
+        audience: 'general',
+        proofAuthorized: true,
+      });
+      expect(Object.values(ROUTE_CAPABILITY_BINDINGS)).not.toContain(id);
+    }
+
+    expect(
+      getProductCapability('agent-readable-profile-summary')?.evidence.routes
+    ).toEqual(['/{username}/llms.txt']);
+    expect(getProductCapability('public-ask')?.evidence.routes).toEqual([
+      '/{username}',
+      '/api/profile/{username}/ask',
+    ]);
+    expect(getCapabilityRoutes('agent-readable-profile-summary')).toEqual([
+      '/{username}/llms.txt',
+    ]);
+    expect(getCapabilityRoutes('public-ask')).toEqual([
+      '/api/profile/{username}/ask',
+      '/{username}',
+    ]);
+  });
 });
 
 describe('featureAvailability projection', () => {

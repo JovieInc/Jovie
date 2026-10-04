@@ -51,6 +51,7 @@ export { NativeSelect } from './native-select';
 export {
   Popover,
   PopoverAnchor,
+  PopoverClose,
   PopoverContent,
   PopoverTrigger,
 } from './popover';

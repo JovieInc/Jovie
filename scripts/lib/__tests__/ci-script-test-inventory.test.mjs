@@ -5,6 +5,7 @@ import {
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
 } from '../../ci-fast-lanes.mjs';
+import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import {
   collectCiCommands,
   expandPackageScripts,
@@ -20,6 +21,16 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const EXCEPTIONS = { ...RUNNER_ONLY_EXCEPTIONS, ...KNOWN_RED_ORPHANS };
 
 describe('scripts test inventory guard', () => {
+  it('runs the inventory in source validation control commands before queue admission', () => {
+    const commands = buildControlTestCommands().map(([command, args]) =>
+      [command, ...args].join(' ')
+    );
+    expect(
+      commands.some(command =>
+        command.includes('lib/__tests__/ci-script-test-inventory.test.mjs')
+      )
+    ).toBe(true);
+  });
   it('runs every scripts/ test file from some CI entry point', async () => {
     const { unrun } = await inventoryScriptTests(REPO_ROOT);
     const orphans = unrun.filter(file => !Object.hasOwn(EXCEPTIONS, file));

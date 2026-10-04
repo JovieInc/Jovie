@@ -4,6 +4,11 @@ import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
+import {
   createRateLimitHeaders,
   getClientIP,
   healthLimiter,
@@ -51,16 +56,27 @@ export async function GET(request: Request) {
         status: 429,
         headers: {
           ...HEALTH_CHECK_CONFIG.cacheHeaders,
+          ...HEALTH_DETAIL_HEADERS,
           ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );
   }
 
+  const authorized = await canReadHealthDetail(request, '/api/health/env');
+  const rateHeaders = createRateLimitHeaders(rateLimitResult);
+
   try {
-    // Get current environment validation
+    // Local validation chooses 200 vs 503. Error strings stay on the authorized body.
     const currentValidation = validateEnvironment('runtime');
     const envInfo = getEnvironmentInfo();
+    const healthy =
+      currentValidation.critical.length === 0 &&
+      currentValidation.errors.length === 0;
+
+    if (!authorized) {
+      return publicHealthLiveness(healthy, rateHeaders);
+    }
 
     // We have access to startup validation but don't need to use it directly
     // It's mainly for reference that startup validation occurred
@@ -133,12 +149,22 @@ export async function GET(request: Request) {
         : HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeaders(rateLimitResult),
+        ...HEALTH_DETAIL_HEADERS,
+        ...rateHeaders,
       },
     });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
+
+    void captureWarning('Environment health check crashed', error, {
+      service: 'env',
+      route: '/api/health/env',
+    });
+
+    if (!authorized) {
+      return publicHealthLiveness(false, rateHeaders);
+    }
 
     const body: EnvHealthResponse = {
       service: 'env',
@@ -176,16 +202,13 @@ export async function GET(request: Request) {
       { error: errorMessage },
       'health/env'
     );
-    void captureWarning('Environment health check crashed', error, {
-      service: 'env',
-      route: '/api/health/env',
-    });
 
     return NextResponse.json(body, {
       status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeaders(rateLimitResult),
+        ...HEALTH_DETAIL_HEADERS,
+        ...rateHeaders,
       },
     });
   }

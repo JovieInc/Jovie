@@ -6,6 +6,9 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
+import { getSmartLinksHeroCopy } from '@/data/smartLinksHeroCopy';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SmartLinksDemo } from './SmartLinksDemo';
 
 const SMART_LINKS_HERO_PHOTO = {
@@ -33,6 +36,10 @@ const steps = [
 ] as const;
 
 export function SmartLinksLanding() {
+  const hero = getSmartLinksHeroCopy(
+    isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')
+  );
+
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
       <section
@@ -48,15 +55,17 @@ export function SmartLinksLanding() {
                 id='smart-links-title'
                 className='marketing-h1-linear mt-5 max-w-3xl text-balance line-clamp-2'
               >
-                One Link. Their Music App.
+                {hero.title}
               </h1>
               <p className='mt-6 max-w-xl text-base leading-7 text-secondary-token sm:text-lg'>
-                Let visitors choose where to listen. The action stays put while
-                the service moves, and their choice follows the next song.
+                {hero.intro}
               </p>
               <div className='mt-8 flex flex-wrap gap-3'>
                 <Button asChild variant='primary' size='md'>
-                  <Link href={`${APP_ROUTES.SIGNUP}?source=smart-links`}>
+                  <Link
+                    href={`${APP_ROUTES.SIGNUP}?source=smart-links`}
+                    prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
+                  >
                     Create a Smart Link
                   </Link>
                 </Button>
@@ -127,6 +136,7 @@ export function SmartLinksLanding() {
             <Button asChild variant='secondary' size='md'>
               <Link
                 href={`${APP_ROUTES.SIGNUP}?source=smart-links&intent=create`}
+                prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
               >
                 Create a Smart Link
               </Link>

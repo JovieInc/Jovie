@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "generate": "tsx ./generate.ts",
-    "check:generated": "tsx ./generate.ts --check"
+    "check:generated": "tsx ./generate.ts --check",
+    "generate:fleet-cli": "tsx ./generate-fleet-cli.ts",
+    "check:fleet-cli": "tsx ./generate-fleet-cli.ts --check"
   },
   "dependencies": {
     "zod": "^4.6.5"

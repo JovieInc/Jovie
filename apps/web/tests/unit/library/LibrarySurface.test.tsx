@@ -997,22 +997,21 @@ describe('LibrarySurface', () => {
         name: 'More actions',
       })
     ).toBeInTheDocument();
-    // Approval status stays a single accessible editor on the Details tab.
+    // Approval status stays a single accessible editor on the Overview tab.
     expect(
       drawer.getByRole('button', { name: 'Approval Status' })
     ).toBeInTheDocument();
-    fireEvent.click(drawer.getByRole('tab', { name: 'Links' }));
     expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    fireEvent.click(drawer.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
     expect(
       drawer.getAllByRole('button', {
         name: /Play Preview for Take Me Over/u,
       }).length
     ).toBeGreaterThan(0);
-    fireEvent.click(drawer.getByRole('tab', { name: 'Details' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
     expect(drawer.getByText('68/100')).toBeDefined();
     expect(drawer.getByText('Progressive House')).toBeDefined();
@@ -1292,10 +1291,14 @@ describe('LibrarySurface', () => {
     expect(within(entityHeader).getByText('Take Me Over')).toBeInTheDocument();
     const workspace = drawer.querySelector('[data-right-rail-workspace]');
     expect(workspace).toHaveAttribute('data-surface-variant', 'flat');
-    expect(tabs.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
-    expect(tabs.getByRole('tab', { name: 'Assets' })).toBeInTheDocument();
-    expect(tabs.getByRole('tab', { name: 'Links' })).toBeInTheDocument();
-    expect(tabs.getByRole('tab', { name: 'Rights' })).toBeInTheDocument();
+    expect(tabs.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
+    expect(tabs.getByRole('tab', { name: 'Files' })).toBeInTheDocument();
+    expect(
+      tabs.queryByRole('tab', { name: 'Details' })
+    ).not.toBeInTheDocument();
+    expect(tabs.queryByRole('tab', { name: 'Assets' })).not.toBeInTheDocument();
+    expect(tabs.queryByRole('tab', { name: 'Links' })).not.toBeInTheDocument();
+    expect(tabs.queryByRole('tab', { name: 'Rights' })).not.toBeInTheDocument();
     expect(
       tabs.queryByRole('tab', { name: 'Presence' })
     ).not.toBeInTheDocument();
@@ -1323,14 +1326,14 @@ describe('LibrarySurface', () => {
     const overflowButton = drawer.getByRole('button', {
       name: 'More actions',
     });
-    fireEvent.click(drawer.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
     const [previewButton] = drawer.getAllByRole('button', {
       name: /Play Preview for Take Me Over/u,
     });
     if (!previewButton) {
       throw new Error('Expected a drawer preview button');
     }
-    fireEvent.click(drawer.getByRole('tab', { name: 'Links' }));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
     expect(overflowButton.className).toContain('focus-visible:ring-ring');
@@ -1554,7 +1557,7 @@ describe('LibrarySurface', () => {
     ]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
-    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
 
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
@@ -1587,7 +1590,7 @@ describe('LibrarySurface', () => {
     ]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
-    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
     fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
       target: {
         files: [

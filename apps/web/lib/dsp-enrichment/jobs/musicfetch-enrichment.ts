@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { type DbOrTransaction, db as plainDb } from '@/lib/db';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { musicfetchCircuitBreaker } from '@/lib/discography/musicfetch-circuit-breaker';
 import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import {
   extractAllMusicFetchServices,
@@ -53,6 +54,7 @@ export const musicFetchEnrichmentPayloadSchema = z.object({
   creatorProfileId: z.string().uuid(),
   spotifyUrl: z.string().url(),
   dedupKey: z.string(),
+  recoveryClaimed: z.boolean().optional(),
 });
 
 export type MusicFetchEnrichmentPayload = z.infer<
@@ -65,6 +67,7 @@ export type MusicFetchEnrichmentPayload = z.infer<
 
 export interface MusicFetchEnrichmentResult {
   creatorProfileId: string;
+  status: 'complete' | 'failed';
   dspFieldsUpdated: string[];
   socialLinksInserted: number;
   socialLinksUpdated: number;
@@ -459,6 +462,7 @@ export async function processMusicFetchEnrichmentJob(
 
   const result: MusicFetchEnrichmentResult = {
     creatorProfileId,
+    status: 'failed',
     dspFieldsUpdated: [],
     socialLinksInserted: 0,
     socialLinksUpdated: 0,
@@ -534,6 +538,10 @@ export async function processMusicFetchEnrichmentJob(
   }
 
   if (!artistData) {
+    if (musicfetchCircuitBreaker.getState() === 'OPEN') {
+      await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'idle');
+      throw new Error('MusicFetch circuit breaker open; retry enrichment');
+    }
     logger.warn('MusicFetch enrichment: API returned no data', {
       creatorProfileId,
       spotifyUrl,
@@ -638,6 +646,7 @@ export async function processMusicFetchEnrichmentJob(
 
   // Mark enrichment as complete
   await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
+  result.status = 'complete';
 
   return result;
 }

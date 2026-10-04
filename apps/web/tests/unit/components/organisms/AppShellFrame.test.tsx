@@ -68,6 +68,25 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
+  it('keeps the header and route on the same token-owned paint plane', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main content</div>}
+      />
+    );
+
+    const plane = screen.getByRole('main');
+    // A white blend overlay brightened only the route while the opaque
+    // header masked it, creating an extra elevation despite identical tokens.
+    const decorativePaint = Array.from(
+      plane.querySelectorAll<HTMLElement>('*')
+    ).filter(element => element.style.mixBlendMode === 'overlay');
+    expect(decorativePaint).toHaveLength(0);
+    expect(plane).toHaveClass('bg-(--app-shell-content-surface)');
+  });
+
   it('allocates the right rail beside the main column instead of overlaying it', () => {
     render(
       <AppShellFrame
@@ -193,6 +212,28 @@ describe('AppShellFrame', () => {
       'data-app-shell-sidebar-mount',
       'true'
     );
+  });
+
+  it('composes the shared rail-motion tokens on every shell allocation slot (JOV-4522)', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div>Right rail</div>}
+      />
+    );
+
+    // The allocation and main-plane slots must not re-declare ad-hoc
+    // duration/easing pairs — they all compose rail-motion.ts constants.
+    const frameSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/AppShellFrame.tsx'),
+      'utf8'
+    );
+    expect(frameSource).toContain('SHELL_RAIL_ALLOCATION');
+    expect(frameSource).toContain('SHELL_RAIL_MAIN_PLANE');
+    expect(frameSource).toContain('SHELL_RAIL_FRAME_GAP');
+    expect(frameSource).not.toMatch(/className='[^']*duration-cinematic/);
   });
 
   it('keeps main-plane geometry on the same reduced-motion-safe rail contract', () => {

@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
 import {
@@ -224,6 +225,42 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
 const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
 
 describe('merge_group workflow contract', () => {
+  it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
+    const script = CI_WORKFLOW.slice(
+      CI_WORKFLOW.indexOf('# CHANGELOG.md is customer-facing web content'),
+      CI_WORKFLOW.indexOf('# Test paths')
+    );
+    const directory = mkdtempSync(join(tmpdir(), 'changelog-ci-routing-'));
+    try {
+      for (const { files, builds } of [
+        { files: 'CHANGELOG.md', builds: true },
+        { files: 'docs/changelog.md', builds: false },
+        { files: 'README.md', builds: false },
+      ]) {
+        const output = join(directory, 'outputs');
+        writeFileSync(output, '');
+        const result = spawnSync(
+          'bash',
+          ['-c', 'emit_ci_lanes() { :; };\n' + script],
+          {
+            env: {
+              ...process.env,
+              CHANGED_FILES: files,
+              GITHUB_OUTPUT: output,
+            },
+            encoding: 'utf8',
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(output, 'utf8')).toContain('run_build=' + builds);
+        expect(readFileSync(output, 'utf8')).toContain(
+          'has_code_changes=' + builds
+        );
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
@@ -305,12 +342,14 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('runs source checks once per revision and never on ready_for_review', () => {
+  it('revalidates size after contract edits without draft-state or label churn', () => {
     const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
     // Draft state does not change the source SHA. The original source checks
     // remain authoritative when the owner pairs ready with native auto-merge.
-    expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(
+      'types: [opened, synchronize, reopened, edited]'
+    );
     expect(FORK_GATE_WORKFLOW).toContain(
       `pull_request:\n    ${sourceRevisionTrigger}`
     );
@@ -825,9 +864,12 @@ describe('merge_group workflow contract', () => {
     );
     expect(unitTests).not.toContain('fail-fast: true');
     expect(unitTests).not.toContain('fail-fast: false');
-    expect(unitTests).toContain('Preserve failed unit-shard diagnosis');
+    expect(unitTests).toContain('Preserve completed unit-shard diagnosis');
     expect(unitTests).toContain(
-      "if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}"
+      "if: ${{ always() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}"
+    );
+    expect(unitTests).toContain(
+      'VITEST_JUNIT_OUTPUT_FILE: test-report.quarantine.junit.xml'
     );
     expect(unitTests).toContain(
       'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'
@@ -997,6 +1039,46 @@ describe('merge_group workflow contract', () => {
       expect(job).toContain("github.event_name == 'workflow_dispatch'");
       expect(job).not.toContain("github.event_name == 'pull_request'");
       expect(job).toContain('runs-on: ubuntu-latest');
+    }
+  });
+
+  it('uses the trusted-base blog profile inside stable PR Ready aggregates', () => {
+    const paths = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const blog = getJobBlock(CI_WORKFLOW, 'ci-blog-content');
+    const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    const sourceReady = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+
+    expect(paths).toContain(
+      'git show "${BASE_SHA}:scripts/lib/blog-content-ci.mjs"'
+    );
+    expect(paths).toContain('--policy-ref "$BASE_SHA"');
+    expect(paths).toContain('reason:"trusted-classifier-unavailable"');
+    expect(paths).toContain('--qualification-profile "$profile"');
+    expect(blog).toContain('name: Blog Content Qualification');
+    expect(blog).toContain(
+      "needs.ci-path-changes.outputs.blog_content_only == 'true'"
+    );
+    expect(blog).toContain('tests/unit/lib/blog/publication.test.ts');
+    expect(blog).toContain('scripts/marketing-factory/blog-adapter.test.ts');
+    expect(blog).toContain('pnpm turbo build --filter=@jovie/web');
+    expect(blog).toContain('qualificationStartedAt');
+    expect(blog).toContain('confirmedLiveAt:null');
+    expect(mergeReady).toContain('ci-blog-content');
+    expect(sourceReady).toContain('ci-blog-content');
+    expect(receipt).toContain('ci-blog-content');
+    expect(receipt).toContain('web_results="[\\"$BLOG\\",\\"$FAST\\"]"');
+
+    for (const jobId of [
+      'ci-unit-tests',
+      'ci-build-layout',
+      'ci-build-ovie',
+      'ci-typecheck-ovie',
+      'ci-storybook-surfaces',
+    ]) {
+      expect(getJobBlock(CI_WORKFLOW, jobId)).toContain(
+        "needs.ci-path-changes.outputs.blog_content_only != 'true'"
+      );
     }
   });
 
@@ -1586,6 +1668,11 @@ describe('merge_group workflow contract', () => {
     expect(ios).toContain("outputs.run_ios == 'true'");
     expect(macos).toContain("outputs.run_macos == 'true'");
     expect(crossProduct).toContain("outputs.run_cross_product == 'true'");
+    expect(
+      getStepRunScript(crossProduct, 'Run model-free shared contracts')
+        .trim()
+        .split('\n')
+    ).toContain('pnpm --filter @jovie/release-channel-contracts test');
     expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining')).toContain(
       'CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}'
     );
@@ -2265,7 +2352,7 @@ ${selectedGateScript}`,
 
     expect(coalesce).toContain('timeout-minutes: 5');
     expect(coalesce).toContain(
-      "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
+      "needs.release-source.outputs.eligible == 'true'"
     );
     // No universal fixed delay: the bounded window derives from merge-queue
     // depth and is capped inside the 5-minute job budget.
@@ -2290,7 +2377,7 @@ ${selectedGateScript}`,
     expect(coalesce).toContain('echo "is_current=false"');
     expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
-      'needs: [coalesce-production, fleet-promotion]'
+      'needs: [release-source, coalesce-production, fleet-promotion]'
     );
     expect(authorize).toContain(
       "needs.coalesce-production.outputs.is_current == 'true'"
@@ -2343,7 +2430,10 @@ ${selectedGateScript}`,
     expect(PRODUCTION_RELEASE_WORKFLOW).toContain('  promote-production:');
     expect(PRODUCTION_RELEASE_WORKFLOW).not.toContain('concurrency:');
 
-    expect(verified).toContain("github.event.workflow_run.event == 'push'");
+    expect(verified).toContain("needs.release-source.result == 'success'");
+    expect(verified).toContain(
+      "fromJSON(needs.release-source.outputs.ci || '{}').event == 'push'"
+    );
     expect(verified).toContain(
       "needs.authorize-production.result == 'success'"
     );
@@ -3179,9 +3269,254 @@ describe('PR targets main (no stacked bases)', () => {
     expect(workflow).toMatch(/^on:\n  pull_request:\n    types:/m);
     expect(workflow).not.toMatch(/branches:\s*\[main/);
     expect(workflow).toContain('merge_group:');
-    expect(workflow).toContain('"$base" != "main"');
+    expect(workflow).toContain("live.base.ref !== 'main'");
     expect(workflow).toContain('PRs must target main');
     expect(workflow).toContain('Retarget the pull request base to main');
+  });
+
+  const parsed =
+    /** @type {{ jobs: Record<string, { steps: { uses: string, with: { script: string } }[] }>, permissions: Record<string, string> }} */ (
+      load(workflow)
+    );
+  const guard = parsed.jobs['pr-targets-main'].steps[0];
+  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+  const execute = new AsyncFunction(
+    'context',
+    'github',
+    'core',
+    guard.with.script
+  );
+  const head = '396a3116a3d237f8d433e0803c2001debf371637';
+  const repository = { full_name: 'JovieInc/Jovie' };
+
+  function fixture({
+    eventBase = 'main',
+    liveBase = 'main',
+    headRepo = repository,
+  } = {}) {
+    const context = {
+      eventName: 'pull_request',
+      repo: { owner: 'JovieInc', repo: 'Jovie' },
+      payload: {
+        pull_request: {
+          number: 20317,
+          head: { sha: head, repo: headRepo },
+          base: { ref: eventBase, repo: repository },
+        },
+      },
+    };
+    const live = {
+      number: 20317,
+      state: 'open',
+      head: { sha: head, repo: headRepo },
+      base: { ref: liveBase, repo: repository },
+    };
+    const requests = [];
+    const messages = [];
+    const github = {
+      rest: {
+        pulls: {
+          get: async request => {
+            requests.push(request);
+            return { data: live };
+          },
+        },
+      },
+    };
+    const core = { info: message => messages.push(message) };
+    return { context, live, github, core, requests, messages };
+  }
+
+  it('accepts the current main base when the queued event still names the landed parent', async () => {
+    const f = fixture({
+      eventBase: 'codex/pr-drain-native-scanner-runtime-recovered',
+    });
+    await execute(f.context, f.github, f.core);
+    expect(f.requests).toEqual([
+      {
+        owner: 'JovieInc',
+        repo: 'Jovie',
+        pull_number: 20317,
+        headers: { 'Cache-Control': 'no-cache' },
+      },
+    ]);
+    expect(f.messages).toEqual([`PR #20317 targets main at ${head}`]);
+  });
+
+  it('rejects a current stacked base even when the old event names main', async () => {
+    const f = fixture({ liveBase: 'codex/other-parent' });
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow(
+      'PRs must target main'
+    );
+    expect(f.messages).toEqual([]);
+  });
+
+  it.each([
+    [
+      'changed head',
+      live => {
+        live.head.sha = 'a'.repeat(40);
+      },
+    ],
+    [
+      'closed PR',
+      live => {
+        live.state = 'closed';
+      },
+    ],
+    [
+      'wrong PR',
+      live => {
+        live.number = 20318;
+      },
+    ],
+    [
+      'foreign base repository',
+      live => {
+        live.base.repo = { full_name: 'other/Jovie' };
+      },
+    ],
+    [
+      'changed head repository',
+      live => {
+        live.head.repo = { full_name: 'other/Jovie' };
+      },
+    ],
+    [
+      'missing base',
+      live => {
+        delete live.base;
+      },
+    ],
+    [
+      'missing head',
+      live => {
+        delete live.head;
+      },
+    ],
+  ])('rejects %s before issuing a passing receipt', async (_name, change) => {
+    const f = fixture();
+    change(f.live);
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow(
+      'PR source identity changed'
+    );
+    expect(f.messages).toEqual([]);
+  });
+
+  it('preserves fork-policy ownership with a read-only guard and no source checkout', async () => {
+    const f = fixture({ headRepo: { full_name: 'contributor/Jovie' } });
+    await execute(f.context, f.github, f.core);
+    expect(f.messages).toHaveLength(1);
+    expect(parsed.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+    });
+    expect(parsed.jobs['pr-targets-main'].steps).toHaveLength(1);
+    expect(guard.uses).toMatch(/^actions\/github-script@[0-9a-f]{40}$/);
+    expect(guard.with.script).not.toContain('${{');
+  });
+
+  it.each([
+    [
+      'malformed head',
+      context => {
+        context.payload.pull_request.head.sha = 'short';
+      },
+    ],
+    [
+      'missing PR',
+      context => {
+        delete context.payload.pull_request;
+      },
+    ],
+    [
+      'invalid number',
+      context => {
+        context.payload.pull_request.number = 0;
+      },
+    ],
+    [
+      'unsupported event',
+      context => {
+        context.eventName = 'workflow_dispatch';
+      },
+    ],
+    [
+      'foreign repository',
+      context => {
+        context.repo.owner = 'other';
+      },
+    ],
+  ])('rejects %s without requesting PR metadata', async (_name, change) => {
+    const f = fixture();
+    change(f.context);
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow();
+    expect(f.requests).toEqual([]);
+    expect(f.messages).toEqual([]);
+  });
+
+  it('fails closed when GitHub cannot return current metadata', async () => {
+    const f = fixture();
+    f.github.rest.pulls.get = async () => {
+      throw new Error('GitHub unavailable');
+    };
+    await expect(execute(f.context, f.github, f.core)).rejects.toThrow(
+      'GitHub unavailable'
+    );
+    expect(f.messages).toEqual([]);
+  });
+
+  it('accepts an authenticated main merge group without a PR lookup', async () => {
+    const f = fixture();
+    await execute(
+      {
+        ...f.context,
+        eventName: 'merge_group',
+        payload: {
+          merge_group: {
+            base_ref: 'refs/heads/main',
+            base_sha: 'b'.repeat(40),
+            head_sha: head,
+          },
+        },
+      },
+      f.github,
+      f.core
+    );
+    expect(f.requests).toEqual([]);
+    expect(f.messages).toEqual(['Merge group targets main']);
+  });
+
+  it.each([
+    [
+      'feature base',
+      {
+        base_ref: 'refs/heads/feature',
+        base_sha: 'b'.repeat(40),
+        head_sha: head,
+      },
+    ],
+    ['missing group', undefined],
+    ['missing base SHA', { base_ref: 'refs/heads/main', head_sha: head }],
+    [
+      'missing head SHA',
+      { base_ref: 'refs/heads/main', base_sha: 'b'.repeat(40) },
+    ],
+  ])('rejects a merge group with %s', async (_name, group) => {
+    const f = fixture();
+    await expect(
+      execute(
+        {
+          ...f.context,
+          eventName: 'merge_group',
+          payload: { merge_group: group },
+        },
+        f.github,
+        f.core
+      )
+    ).rejects.toThrow('Merge group must target main');
+    expect(f.requests).toEqual([]);
+    expect(f.messages).toEqual([]);
   });
 });
 
@@ -3758,22 +4093,75 @@ describe('merge-group Playwright artifact guard', () => {
   });
 });
 
-describe('merge-queue green enroll scan window (JOV-6831)', () => {
+describe('merge-queue green enroll scan window and failure hold', () => {
   const ENROLL = readFileSync(
     resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
     'utf8'
   );
 
   it('pages through every open PR instead of one oldest-first window', () => {
-    expect(ENROLL).toContain('after: $cursor');
-    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
-    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).toContain('github.paginate(github.rest.pulls.list');
+    expect(ENROLL).toContain(
+      'github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit'
+    );
+    expect(ENROLL).not.toContain(
+      'github.rest.commits.listPullRequestsAssociatedWithCommit'
+    );
+    expect(ENROLL).toContain("state: 'open', base: 'main', per_page: 100");
+    expect(ENROLL).toContain('pullRequest(number: $number)');
+    expect(ENROLL).not.toContain('pullRequests(');
     expect(ENROLL).not.toMatch(/direction:\s*ASC/);
   });
 
-  it('keeps the rejected-head rule: no re-enqueue without a new push', () => {
+  it('persists the exact-head failure before any bounded re-enrollment', () => {
+    expect(ENROLL).toContain('workflow_run:');
     expect(ENROLL).toContain(
-      'if (removedAt && committedAt && removedAt > committedAt) continue;'
+      'github.event.workflow_run.workflow_id == 178737329'
     );
+    expect(ENROLL).toContain(
+      "github.event.workflow_run.event == 'merge_group'"
+    );
+    expect(ENROLL).toContain(
+      'node scripts/merge-group-failure-hold.mjs --event-path "$GITHUB_EVENT_PATH"'
+    );
+    expect(ENROLL).toContain('failurePolicy.revisionFailureDisposition({');
+    expect(ENROLL).toContain("failure.action === 'block'");
+    expect(ENROLL).toContain("failure.action === 'retry-once'");
+    expect(ENROLL).toContain(
+      "if (removedUnchangedHead && failure.action !== 'retry-once') continue;"
+    );
+    for (const runtimePath of [
+      'scripts/merge-group-failure-hold.mjs',
+      'scripts/lib/merge-queue-guard.mjs',
+      'scripts/lib/pre-land-changelog.mjs',
+      'scripts/version-fanout-guard.mjs',
+    ]) {
+      expect(ENROLL).toContain(runtimePath);
+    }
+    expect(ENROLL).toContain('FAILURE_RETRY_CONTEXT');
+    expect(ENROLL.indexOf('FAILURE_RETRY_CONTEXT')).toBeLessThan(
+      ENROLL.indexOf('enqueuePullRequest(input:')
+    );
+  });
+
+  it('keeps a denied dequeue from failing the exact-head hold', () => {
+    const hold = ENROLL.slice(
+      ENROLL.indexOf('  hold-failed-revision:'),
+      ENROLL.indexOf('\n  enroll:')
+    );
+    expect(hold).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
+    expect(hold).toContain('permission-pull-requests: write');
+    expect(hold).toContain('permission-statuses: write');
+    expect(hold).not.toContain('permission-merge-queues:');
+    expect(hold).not.toContain('permission-administration:');
+    expect(hold).toContain('Resource not accessible by integration');
+    expect(hold).toContain('not in queue');
+    const script = readFileSync(
+      resolve(REPO_ROOT, 'scripts/merge-group-failure-hold.mjs'),
+      'utf8'
+    );
+    expect(script).toContain('resource not accessible by integration');
+    expect(script).toContain('not in queue');
+    expect(script).toContain('dequeueOutcome');
   });
 });

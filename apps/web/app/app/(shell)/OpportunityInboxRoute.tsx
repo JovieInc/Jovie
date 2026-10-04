@@ -28,27 +28,41 @@ type SelectedProfile = NonNullable<
 async function resolveProfileRailSeed(clerkUserId: string): Promise<{
   readonly profileId: string | null;
   readonly selectedProfile: SelectedProfile | null;
+  readonly profileContextAvailable: boolean;
 }> {
   try {
     const dashboardData = await getDashboardShellData(clerkUserId);
     if (dashboardData.dashboardLoadError) {
-      return { profileId: null, selectedProfile: null };
+      return {
+        profileId: null,
+        selectedProfile: null,
+        profileContextAvailable: false,
+      };
     }
     const selectedProfile = dashboardData.selectedProfile;
     if (!selectedProfile) {
-      return { profileId: null, selectedProfile: null };
+      return {
+        profileId: null,
+        selectedProfile: null,
+        profileContextAvailable: true,
+      };
     }
 
     return {
       profileId: selectedProfile.id,
       selectedProfile,
+      profileContextAvailable: true,
     };
   } catch (error) {
     logger.error(
       '[opportunity-inbox] profile rail data resolution failed; rendering inbox without profile data',
       error
     );
-    return { profileId: null, selectedProfile: null };
+    return {
+      profileId: null,
+      selectedProfile: null,
+      profileContextAvailable: false,
+    };
   }
 }
 
@@ -78,13 +92,33 @@ export async function OpportunityInboxRoute() {
     redirect(buildAppShellSignInUrl(APP_ROUTES.DASHBOARD));
   }
 
-  const inbox = tourDates ? { ...baseInbox, tourDates } : baseInbox;
+  const inbox = tourDates
+    ? ({
+        ...baseInbox,
+        tourDates,
+        availability: {
+          suggestedActions:
+            baseInbox.availability?.suggestedActions ?? 'unknown',
+          tourDates: tourDates.availability ?? 'unknown',
+        },
+      } as const)
+    : ({
+        ...baseInbox,
+        availability: {
+          suggestedActions:
+            baseInbox.availability?.suggestedActions ?? 'unknown',
+          tourDates: profileRailSeed.profileContextAvailable
+            ? 'not_requested'
+            : 'unknown',
+        },
+      } as const);
   const connectedDSPs: readonly AvailableDSP[] = profileRailSeed.selectedProfile
     ? getCanonicalProfileDSPs(profileRailSeed.selectedProfile, initialLinks)
     : [];
 
   return (
     <OpportunityInboxPageClient
+      key={clerkUserId}
       inbox={inbox}
       initialLinks={initialLinks}
       connectedDSPs={connectedDSPs}

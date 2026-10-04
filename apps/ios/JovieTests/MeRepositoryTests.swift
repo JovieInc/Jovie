@@ -140,3 +140,127 @@ struct MeRepositoryTests {
     #expect(await cache.load(for: "user_789") == nil)
   }
 }
+
+func ownedProfileExpiryReceipt(_ authorization: NativeRequestAuthorization) throws -> NativeSessionExpiryReceipt {
+  try nativeExpiryReceipt {
+    try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorization, allowRetry: false)
+  }
+}
+
+struct PausedMeCache: MeCaching {
+  enum Phase: CaseIterable, Sendable { case write, fallback }
+  let base: MeCache
+  let gate: ProfileLoadGate
+  let phase: Phase
+  func load(for userID: String) async -> CachedMeSnapshot? {
+    let snapshot = await base.load(for: userID)
+    if phase == .fallback { _ = await gate.wait() }
+    return snapshot
+  }
+  func store(_ response: MobileMeResponse, for userID: String) async {
+    if phase == .write { _ = await gate.wait() }
+    await base.store(response, for: userID)
+  }
+  func store(_ response: MobileMeResponse, for userID: String, ifOwnedBy owner: NativeSessionOwnership) async -> Bool {
+    if phase == .write { _ = await gate.wait() }
+    return await base.store(response, for: userID, ifOwnedBy: owner)
+  }
+  func remove(for userID: String) async { await base.remove(for: userID) }
+  func remove(for userID: String, ifOwnedBy owner: NativeSessionOwnership) async {
+    await base.remove(for: userID, ifOwnedBy: owner)
+  }
+}
+
+extension MeRepositoryTests {
+  enum OwnedFailure: CaseIterable, Sendable { case expiry, superseded, cancellation, transport }
+
+  @Test(arguments: OwnedFailure.allCases)
+  func ownedTerminalAndAbandonedResultsBypassWarmCache(failure: OwnedFailure) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "a", userID: "same-user", expiresAt: .distantFuture)
+      let authorization = try #require(NativeSessionTokenStore.requestAuthorization())
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let suite = "OwnedMeFailures-\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suite)!
+      defer { defaults.removePersistentDomain(forName: suite) }
+      let cache = MeCache(defaults: defaults)
+      await cache.store(.previewReady, for: "same-user")
+      let error: Error
+      switch failure {
+      case .expiry: error = NativeSessionRequestError.expired(try ownedProfileExpiryReceipt(authorization))
+      case .superseded: error = NativeSessionRequestError.superseded
+      case .cancellation: error = CancellationError()
+      case .transport: error = APIClientError.transportFailed(code: -1009)
+      }
+      let repository = MeRepository(apiClient: MutableAPIClient(mode: .failure(error)), cache: cache)
+      do {
+        let result = try await repository.loadMe(for: "same-user", ifOwnedBy: owner)
+        #expect(failure == .transport)
+        #expect(result == MeRepositoryResult(response: .previewReady, isStale: true))
+      } catch let received {
+        if failure == .cancellation { #expect(received is CancellationError) }
+        else { #expect(received as? NativeSessionRequestError == error as? NativeSessionRequestError) }
+        #expect(failure != .transport)
+      }
+      #expect(await cache.load(for: "same-user")?.response == .previewReady)
+    }
+  }
+
+  enum WhileCacheSuspended: CaseIterable, Sendable { case current, replacement, passiveExpiry }
+
+  @Test(arguments: PausedMeCache.Phase.allCases, WhileCacheSuspended.allCases)
+  func ownedRepositoryRechecksAtActualCacheWriteAndAfterFallback(
+    phase: PausedMeCache.Phase, change: WhileCacheSuspended
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      NativeSessionTokenStore.save(token: "same-token", userID: "same-user", expiresAt: .distantFuture)
+      let owner = NativeSessionTokenStore.captureOwnership()
+      let suite = "OwnedMeSink-\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suite)!
+      defer { defaults.removePersistentDomain(forName: suite) }
+      let cache = MeCache(defaults: defaults)
+      await cache.store(.previewNeedsOnboarding, for: "same-user")
+      let gate = ProfileLoadGate()
+      let mode: MutableAPIClient.Mode = phase == .write ? .success(.previewReady)
+        : .failure(APIClientError.transportFailed(code: -1009))
+      let repository = MeRepository(
+        apiClient: MutableAPIClient(mode: mode), cache: PausedMeCache(base: cache, gate: gate, phase: phase)
+      )
+      let task = Task { () -> Result<MeRepositoryResult, Error> in
+        let result: Result<MeRepositoryResult, Error>
+        do { result = .success(try await repository.loadMe(for: "same-user", ifOwnedBy: owner)) }
+        catch { result = .failure(error) }
+        await gate.ownerFinished()
+        return result
+      }
+      #expect(await gate.waitUntilEntered(), "The real repository must reach its cache boundary")
+      if change == .replacement {
+        NativeSessionTokenStore.save(token: "same-token", userID: "same-user", expiresAt: .distantFuture)
+        await cache.store(.previewNeedsOnboarding, for: "same-user")
+      } else if change == .passiveExpiry {
+        UserDefaults.standard.set(1, forKey: "ie.jov.Jovie.nativeSession.expiresAt")
+        #expect(NativeSessionTokenStore.load() == nil)
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      await gate.complete(true)
+      let result = await task.value
+      switch result {
+      case let .success(value):
+        #expect(change == .current)
+        #expect(value.isStale == (phase == .fallback))
+      case let .failure(error):
+        if change == .passiveExpiry {
+          guard case let .expired(receipt)? = error as? NativeSessionRequestError else {
+            Issue.record("Passive expiry must retain its exact receipt"); return
+          }
+          #expect(receipt.ownership == context.ownership)
+        } else { #expect(error as? NativeSessionRequestError == .superseded) }
+        #expect(change != .current)
+      }
+      let expected: MobileMeResponse = change == .current && phase == .write ? .previewReady : .previewNeedsOnboarding
+      #expect(await cache.load(for: "same-user")?.response == expected)
+      #expect(await MeCache(defaults: defaults).load(for: "same-user")?.response == expected)
+      #expect(NativeSessionTokenStore.captureSessionContext() == context)
+    }
+  }
+}

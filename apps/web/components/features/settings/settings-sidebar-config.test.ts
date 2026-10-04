@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  artistSettingsNavigation,
+  userSettingsNavigation,
+} from '@/components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   filterSettingsGroups,
@@ -6,21 +10,25 @@ import {
   SETTINGS_SIDEBAR_GROUPS,
 } from './settings-sidebar-config';
 
-// Nav-structure snapshot: the settings IA is a reviewed fixture (approved
-// 2026-07-03 via Design Shootout, `settings-ia`). Changing the groups or
-// their membership requires a deliberate update here — see #12645.
+const LIVE_SETTINGS = [...userSettingsNavigation, ...artistSettingsNavigation];
 
 describe('SETTINGS_SIDEBAR_GROUPS', () => {
-  it('defines the approved 4-group IA', () => {
+  it('projects the live settings rail and no other list', () => {
     expect(SETTINGS_SIDEBAR_GROUPS.map(group => group.id)).toEqual([
-      'profile',
       'account',
-      'workspace',
-      'billing',
+      'profile',
     ]);
+    expect(
+      SETTINGS_SIDEBAR_GROUPS.flatMap(group => group.items.map(item => item.id))
+    ).toEqual(LIVE_SETTINGS.map(item => item.id));
+    expect(
+      SETTINGS_SIDEBAR_GROUPS.flatMap(group =>
+        group.items.map(item => item.href)
+      )
+    ).toEqual(LIVE_SETTINGS.map(item => item.href));
   });
 
-  it('assigns the 11 sub-pages to their approved groups', () => {
+  it('keeps account rows on the user rail and profile rows on the artist rail', () => {
     const membership = Object.fromEntries(
       SETTINGS_SIDEBAR_GROUPS.map(group => [
         group.id,
@@ -29,11 +37,33 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     );
 
     expect(membership).toEqual({
-      profile: ['artist-profile', 'contacts', 'appearance'],
-      account: ['account', 'data-privacy', 'delete-account'],
-      workspace: ['connections', 'retargeting-ads'],
-      billing: ['billing', 'usage', 'referral'],
+      account: userSettingsNavigation.map(item => item.id),
+      profile: artistSettingsNavigation.map(item => item.id),
     });
+  });
+
+  it('does not list redirected or removed settings rows', () => {
+    const hrefs = SETTINGS_SIDEBAR_GROUPS.flatMap(group =>
+      group.items.map(item => item.href)
+    );
+
+    expect(hrefs).not.toContain(APP_ROUTES.SETTINGS_APPEARANCE);
+    // The retired route no longer has an APP_ROUTES entry on Main.
+    expect(hrefs).not.toContain('/app/settings/retargeting-ads');
+    expect(hrefs).not.toContain(APP_ROUTES.SETTINGS_DELETE_ACCOUNT);
+  });
+
+  it('keeps each live row label, icon and tooltip when the rail changes', () => {
+    const rows = SETTINGS_SIDEBAR_GROUPS.flatMap(group => group.items);
+    for (const live of LIVE_SETTINGS) {
+      expect(rows.find(row => row.id === live.id)).toEqual({
+        id: live.id,
+        label: live.name,
+        href: live.href,
+        icon: live.icon,
+        ...(live.description ? { title: live.description } : {}),
+      });
+    }
   });
 
   it('points every item at a settings route', () => {
@@ -51,31 +81,30 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
 });
 
 describe('filterSettingsGroups', () => {
-  it('returns all 11 items for an empty query', () => {
+  it('returns every live row for an empty query', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '');
     const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).toHaveLength(11);
+    expect(ids).toEqual(LIVE_SETTINGS.map(item => item.id));
   });
 
   it('filters by item label, case-insensitively', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'PRIVACY');
     expect(groups).toHaveLength(1);
-    expect(groups[0].items.map(item => item.id)).toEqual(['data-privacy']);
+    expect(groups[0]?.items.map(item => item.id)).toEqual(['data-privacy']);
   });
 
   it('matches a group label and keeps its visible items', () => {
-    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'billing');
-    expect(groups.map(group => group.id)).toEqual(['billing']);
-    expect(groups[0].items.map(item => item.id)).toEqual([
-      'billing',
-      'usage',
-      'referral',
-    ]);
+    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'account');
+    expect(groups.map(group => group.id)).toEqual(['account']);
+    expect(groups[0]?.items.map(item => item.id)).toEqual(
+      userSettingsNavigation.map(item => item.id)
+    );
   });
 
-  it('drops groups with no matching items', () => {
-    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'referral');
-    expect(groups.map(group => group.id)).toEqual(['billing']);
+  it('matches a single billing row without inventing a billing group', () => {
+    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'billing');
+    expect(groups.map(group => group.id)).toEqual(['account']);
+    expect(groups[0]?.items.map(item => item.id)).toEqual(['billing']);
   });
 
   it('returns an empty list when nothing matches', () => {
@@ -93,11 +122,13 @@ describe('filterSettingsGroups', () => {
     }
   });
 
-  it('shows admins the same 11 items as creators', () => {
+  it('shows admins the same rows as creators', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '', {
       isAdmin: true,
     });
-    expect(groups.flatMap(group => group.items)).toHaveLength(11);
+    expect(groups.flatMap(group => group.items).map(item => item.id)).toEqual(
+      LIVE_SETTINGS.map(item => item.id)
+    );
   });
 });
 

@@ -312,6 +312,142 @@ describe('MarketingCertificationStore', () => {
     );
   });
 
+  it('grows a persisted registry with fail-closed placeholders and preserves evidence', async () => {
+    const records = new Map<string, string>();
+    const backend = jsonbBackend(records);
+    const original = new MarketingCertificationStore(
+      backend,
+      REGISTRY.slice(0, 1)
+    );
+    const first = await original.ingestPacket(
+      packet(REGISTRY[0]),
+      '2026-09-04T20:01:00.000Z'
+    );
+    await original.recordFounderDecision({
+      assuranceProfile: assuranceProfile(REGISTRY[0]),
+      decidedAt: '2026-09-04T20:01:01.000Z',
+      decision: decision(first.admission.decisionEvidenceDigest!),
+      subjectId: REGISTRY[0].id,
+    });
+    const before = JSON.parse(records.get(MARKETING_CERTIFICATION_STORE_KEY)!);
+    const expanded = new MarketingCertificationStore(backend, REGISTRY);
+
+    const inspected = await expanded.inspectLedger('2026-09-04T20:02:00.000Z');
+    expect(inspected.registryIds).toEqual(REGISTRY.map(entry => entry.id));
+    expect(JSON.parse(records.get(MARKETING_CERTIFICATION_STORE_KEY)!)).toEqual(
+      before
+    );
+    const projection = await expanded.projectLedger('2026-09-04T20:02:00.000Z');
+    expect(projection.rows[1]).toMatchObject({
+      admission: { state: 'working' },
+      decisions: [],
+      packet: { source: null },
+    });
+    expect(
+      JSON.parse(records.get(MARKETING_CERTIFICATION_STORE_KEY)!).records[
+        REGISTRY[0].id
+      ]
+    ).toEqual(before.records[REGISTRY[0].id]);
+    await expect(
+      expanded.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:03:00.000Z')
+    ).resolves.toMatchObject({ identityId: REGISTRY[1].id });
+    await expect(original.projectLedger()).rejects.toBeInstanceOf(
+      MarketingCertificationRegistryDriftError
+    );
+  });
+
+  it('retries registry growth against concurrent evidence without overwriting it', async () => {
+    const records = new Map<string, unknown>();
+    const backend = memoryBackend(records);
+    const original = new MarketingCertificationStore(
+      backend,
+      REGISTRY.slice(0, 1)
+    );
+    await original.projectLedger('2026-09-04T20:00:00.000Z');
+    let raced = false;
+    const expanded = new MarketingCertificationStore(
+      {
+        ...backend,
+        async compareAndSet(key, expected, next, ttl) {
+          if (!raced) {
+            raced = true;
+            await original.ingestPacket(
+              packet(REGISTRY[0]),
+              '2026-09-04T20:01:00.000Z'
+            );
+            return false;
+          }
+          return backend.compareAndSet(key, expected, next, ttl);
+        },
+      },
+      REGISTRY
+    );
+    const projection = await expanded.projectLedger('2026-09-04T20:02:00.000Z');
+    expect(raced).toBe(true);
+    expect(projection.rows[0].packet).toEqual(packet(REGISTRY[0]));
+    expect(projection.rows[1].packet.source).toBeNull();
+  });
+
+  it('reconciles registry growth before the first evidence ingest', async () => {
+    const records = new Map<string, unknown>();
+    const backend = memoryBackend(records);
+    await new MarketingCertificationStore(
+      backend,
+      REGISTRY.slice(0, 1)
+    ).projectLedger('2026-09-04T20:00:00.000Z');
+    await expect(
+      new MarketingCertificationStore(backend, REGISTRY).ingestPacket(
+        packet(REGISTRY[1]),
+        '2026-09-04T20:01:00.000Z'
+      )
+    ).resolves.toMatchObject({ identityId: REGISTRY[1].id });
+  });
+
+  it('does not repair corrupt records while extending the registry', async () => {
+    const records = new Map<string, unknown>();
+    const backend = memoryBackend(records);
+    await new MarketingCertificationStore(
+      backend,
+      REGISTRY.slice(0, 1)
+    ).projectLedger();
+    const ledger = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    ledger.records[REGISTRY[0].id].packet.subject.id = 'incorrect-identity';
+    const corrupted = JSON.stringify(ledger);
+    records.set(MARKETING_CERTIFICATION_STORE_KEY, corrupted);
+    await expect(
+      new MarketingCertificationStore(backend, REGISTRY).projectLedger()
+    ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
+    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(corrupted);
+  });
+
+  it('bounds registry extension contention without persisting partial additions', async () => {
+    const records = new Map<string, unknown>();
+    const backend = memoryBackend(records);
+    await new MarketingCertificationStore(
+      backend,
+      REGISTRY.slice(0, 1)
+    ).projectLedger();
+    const before = records.get(MARKETING_CERTIFICATION_STORE_KEY);
+    let attempts = 0;
+    const store = new MarketingCertificationStore(
+      {
+        ...backend,
+        async compareAndSet() {
+          attempts += 1;
+          return false;
+        },
+      },
+      REGISTRY
+    );
+    await expect(store.projectLedger()).rejects.toThrow(
+      'initialization lost compare-and-set repeatedly'
+    );
+    expect(attempts).toBe(5);
+    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(before);
+  });
+
   it('validates initialization and the exact registry denominator', async () => {
     const records = new Map<string, unknown>();
     const store = new MarketingCertificationStore(

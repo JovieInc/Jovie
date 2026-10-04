@@ -1,7 +1,13 @@
 'use client';
 
-import { Popover, PopoverContent, PopoverTrigger, Switch } from '@jovie/ui';
-import * as PopoverPrimitive from '@radix-ui/react-popover';
+import {
+  IconButton,
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+  Switch,
+} from '@jovie/ui';
 import { LayoutGrid, LayoutList, Settings2, X } from 'lucide-react';
 import { memo, type ReactNode, useCallback, useId } from 'react';
 import { cn } from '@/lib/utils';
@@ -156,12 +162,11 @@ export function DisplayMenuDropdown({
           <span className='text-app font-semibold text-primary-token'>
             Display
           </span>
-          <PopoverPrimitive.Close
-            aria-label='Close'
-            className='rounded-full border-0 bg-transparent p-1 text-tertiary-token shadow-none transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none'
-          >
-            <X className='h-4 w-4' />
-          </PopoverPrimitive.Close>
+          <PopoverClose asChild>
+            <IconButton variant='secondary' size='sm' ariaLabel='Close'>
+              <X aria-hidden='true' />
+            </IconButton>
+          </PopoverClose>
         </div>
 
         {/* ── View Mode ──────────────────────────────────────────── */}

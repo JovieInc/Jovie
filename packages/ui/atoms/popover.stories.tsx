@@ -1,7 +1,12 @@
 import { Button } from '@jovie/ui/atoms/button';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+} from './popover';
 
 const meta: Meta<typeof Popover> = {
   title: 'UI/Atoms/Popover',
@@ -241,9 +246,11 @@ export const Controlled: Story = {
             <p className='text-sm text-secondary-token'>
               This popover&apos;s state is controlled externally.
             </p>
-            <Button size='sm' onClick={() => setOpen(false)} className='w-full'>
-              Close
-            </Button>
+            <PopoverClose asChild>
+              <Button size='sm' className='w-full'>
+                Close
+              </Button>
+            </PopoverClose>
           </div>
         </PopoverContent>
       </Popover>

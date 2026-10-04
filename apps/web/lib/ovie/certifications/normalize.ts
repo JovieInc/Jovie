@@ -218,6 +218,9 @@ export function normalizeKernelCertificationRow(
   const { packet, admission } = input;
   const receipts = packetReceipts(packet);
   const blockedTiers = new Set(admission.blockers.map(b => b.tier));
+  const blockedReceipts = new Set(
+    admission.blockers.map(blocker => `${blocker.tier}:${blocker.id}`)
+  );
   const tiers = Object.fromEntries(
     OVIE_CERTIFICATION_TIERS.map(tier => [
       tier,
@@ -228,7 +231,13 @@ export function normalizeKernelCertificationRow(
   const evidence: OvieCertificationEvidence[] = receipts.map(receipt => ({
     id: receipt.id,
     tier: receipt.tier,
-    status: receiptStatus(receipt.status),
+    // A provider's pass is not current proof when the kernel rejects its
+    // source binding, digest, or required media relationship.
+    status:
+      receipt.status === 'passed' &&
+      blockedReceipts.has(`${receipt.tier}:${receipt.id}`)
+        ? 'failed'
+        : receiptStatus(receipt.status),
     summary: receipt.summary,
     ref: receipt.ref,
     href: resolveEvidenceHref(receipt.ref, packet.source),

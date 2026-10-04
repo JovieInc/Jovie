@@ -2,19 +2,19 @@
 * @itstimwhite
 
 # Frontend components
-/components/ @itstimwhite
-/app/ @itstimwhite
+/apps/web/components/ @itstimwhite
+/apps/web/app/ @itstimwhite
 
 # API routes
-/app/api/ @itstimwhite
+/apps/web/app/api/ @itstimwhite
 
 # Database and migrations
-/supabase/ @itstimwhite
-/types/db.ts @itstimwhite
+/apps/web/drizzle/ @itstimwhite
+/apps/web/types/db.ts @itstimwhite
 
 # Configuration files
-/next.config.js @itstimwhite
-/tailwind.config.js @itstimwhite
+/apps/web/next.config.js @itstimwhite
+/apps/web/tailwind.config.js @itstimwhite
 /tsconfig.json @itstimwhite
 /package.json @itstimwhite
 
