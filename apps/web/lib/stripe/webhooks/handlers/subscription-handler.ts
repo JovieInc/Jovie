@@ -30,6 +30,7 @@ import { expireReferralOnChurn } from '@/lib/referrals/service';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
+import { admitPaidUser } from '@/lib/waitlist/paid-admission';
 
 import { BaseSubscriptionHandler } from '../base-handler';
 import type {
@@ -183,6 +184,9 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
+      // Paying admits, including a subscription that turns active after an
+      // incomplete checkout (3DS, delayed payment).
+      await admitPaidUser({ appUserId: result.appUserId, cacheKeys: [userId] });
       enqueuePaidWelcomeAfterEntitlement({
         appUserId: result.appUserId,
         clerkUserId: userId,
@@ -312,6 +316,9 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
+      // Paying admits, including a subscription that turns active after an
+      // incomplete checkout (3DS, delayed payment).
+      await admitPaidUser({ appUserId: result.appUserId, cacheKeys: [userId] });
       enqueuePaidWelcomeAfterEntitlement({
         appUserId: result.appUserId,
         clerkUserId: userId,
