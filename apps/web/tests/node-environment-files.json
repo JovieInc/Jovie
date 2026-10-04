@@ -176,7 +176,6 @@
   "lib/merch/mockups.test.ts",
   "lib/merch/orders.test.ts",
   "lib/merch/pricing.test.ts",
-  "lib/merch/qa-gate.test.ts",
   "lib/merch/safety.test.ts",
   "lib/merch/service.test.ts",
   "lib/merch/source-candidates.test.ts",
