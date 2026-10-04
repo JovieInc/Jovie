@@ -76,10 +76,10 @@ describe('billing detector plans', () => {
     }
   });
 
-  it('files stale reconciliation or webhooks older than an hour', () => {
+  it('files reconciliation older than 36 hours or webhooks older than 2 hours', () => {
     expect(
       planBillingSyncIntake({
-        lastReconciliationAt: new Date(NOW - 27 * 60 * 60 * 1000).toISOString(),
+        lastReconciliationAt: new Date(NOW - 37 * 60 * 60 * 1000).toISOString(),
         now: NOW,
       }).action
     ).toBe('upsert');
@@ -87,10 +87,18 @@ describe('billing detector plans', () => {
       planBillingSyncIntake({
         lastReconciliationAt: new Date(NOW - 60 * 60 * 1000).toISOString(),
         unprocessedWebhooks: 2,
-        oldestUnprocessedAt: new Date(NOW - 2 * 60 * 60 * 1000).toISOString(),
+        oldestUnprocessedAt: new Date(NOW - 121 * 60 * 1000).toISOString(),
         now: NOW,
       }).action
     ).toBe('upsert');
+    expect(
+      planBillingSyncIntake({
+        lastReconciliationAt: new Date(NOW - 35 * 60 * 60 * 1000).toISOString(),
+        unprocessedWebhooks: 2,
+        oldestUnprocessedAt: new Date(NOW - 119 * 60 * 1000).toISOString(),
+        now: NOW,
+      }).action
+    ).toBe('resolve');
     expect(
       planBillingSyncIntake({
         lastReconciliationAt: new Date(NOW - 60 * 60 * 1000).toISOString(),

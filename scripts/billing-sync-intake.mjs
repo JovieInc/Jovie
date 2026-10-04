@@ -8,8 +8,8 @@ import {
 } from './lib/linear-issue-intake.mjs';
 
 export const BILLING_SYNC_STALE_KEY = 'billing-sync-stale';
-const STALE_MS = 26 * 60 * 60 * 1000;
-const STUCK_MS = 60 * 60 * 1000;
+const STALE_MS = 36 * 60 * 60 * 1000;
+const STUCK_MS = 2 * 60 * 60 * 1000;
 
 export function planBillingSyncIntake({
   lastReconciliationAt = null,
@@ -62,7 +62,7 @@ export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
       fingerprint: plan.key,
       labelKey: plan.key,
       comment:
-        'Billing reconciliation is fresh and stuck webhooks are under an hour.',
+        'Billing reconciliation is under 36 hours old and no webhook has been unprocessed for more than 2 hours.',
       runId,
       fetchImpl,
     });
@@ -72,7 +72,7 @@ export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
     labelKey: plan.key,
     title: `P1: billing sync is stale (${plan.key})`,
     description: [
-      'Billing reconciliation heartbeat is older than 26 hours, or unprocessed webhooks have been waiting more than an hour.',
+      'Billing reconciliation heartbeat is older than 36 hours, or unprocessed webhooks have been waiting more than 2 hours.',
       '',
       `- reconciliation stale: ${plan.reconciliationStale}`,
       `- webhooks stuck: ${plan.webhooksStuck}`,
