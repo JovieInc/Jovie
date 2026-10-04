@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,8 +15,8 @@ import {
   verifyFactoryRun,
   writeJson,
 } from './receipts';
-import { fixtureCaptures } from './render-measurer';
-import { runFactory } from './run';
+import { fixtureCaptures, sha256Digest } from './render-measurer';
+import { FACTORY_MAX_REWORKS, runFactory } from './run';
 
 const PAGE_ID = 'solutions-founders';
 const brief = loadFactoryBrief('solutions', 'founders');
@@ -168,6 +168,167 @@ describe('factory:run --dry end to end', () => {
         'copy#1: artifact digest does not match the receipt',
       ])
     );
+  });
+});
+
+const REJECTION = 'mobile@390: the subhead line breaks strand one word';
+const dryCopy = brief.dry?.copy as { slots: { slot: string; text: string }[] };
+
+/**
+ * Dry providers whose render depends on the previewed record, like a real
+ * render, and whose vision judge rejects the first page it sees.
+ */
+function reworkProviders(input: {
+  readonly copyHearsFindings: boolean;
+  readonly judgeRejects: (review: number) => boolean;
+}) {
+  const reviewed: string[][] = [];
+  const providers = dryProviders(brief, {
+    async generate(request) {
+      if (request.stage !== 'copy') {
+        return { status: 'ok', value: brief.dry?.[request.stage] };
+      }
+      const shorten =
+        input.copyHearsFindings && request.feedback.includes(REJECTION);
+      const slots = dryCopy.slots.map(slot =>
+        shorten && slot.slot === 'subhead'
+          ? {
+              ...slot,
+              text: 'Jovie gives founders one public page that turns each visitor into a subscriber you can reach again.',
+            }
+          : slot
+      );
+      return { status: 'ok', value: { slots } };
+    },
+    async measureRender(route, at) {
+      const preview = at?.preview;
+      const recordDigest = preview
+        ? sha256Digest(
+            JSON.stringify(
+              readJson(
+                join(
+                  preview.runsDir,
+                  preview.recordId.replace('.', '-'),
+                  'page-record.json'
+                )
+              )
+            )
+          )
+        : 'no-preview';
+      const metrics = { cls: 0.01, lcpMs: 900 };
+      return {
+        status: 'ok',
+        ...metrics,
+        captures: fixtureCaptures(route, metrics).map(capture => ({
+          ...capture,
+          screenshot: {
+            path: capture.screenshot.path,
+            digest: sha256Digest(`${capture.screenshot.path}#${recordDigest}`),
+          },
+        })),
+      };
+    },
+    async reviewVisual(request) {
+      reviewed.push(request.captures.map(c => c.screenshot.digest));
+      const reject = input.judgeRejects(reviewed.length);
+      return {
+        status: 'reviewed',
+        judgeModel: 'fixture:google/gemini-3-pro',
+        verdict: reject ? 'fail' : 'pass',
+        score: reject ? 0.3 : 0.9,
+        findings: reject ? [REJECTION] : [],
+        judges: [],
+      };
+    },
+  });
+  return { providers, reviewed };
+}
+
+describe('factory:run visual rework', () => {
+  it('routes a visual rejection back to copy, re-renders and re-judges a new page', async () => {
+    const { providers, reviewed } = reworkProviders({
+      copyHearsFindings: true,
+      judgeRejects: review => review === 1,
+    });
+    const manifest = await run({ providers });
+
+    expect(manifest).toMatchObject({ status: 'complete', stoppedAt: null });
+    expect(verifyFactoryRun(runDir())).toEqual([]);
+    expect(manifest.reworks).toEqual([
+      {
+        iteration: 1,
+        rejectedAt: 'adversarial-trust',
+        reworkFrom: 'copy',
+        rejectedRenderDigest: expect.stringMatching(/^sha256:/),
+        findings: [REJECTION],
+      },
+    ]);
+    // The owning stage reran with the judge's findings as its feedback.
+    expect(record('05-copy.rework-1.attempt-1.json').feedbackIn).toContain(
+      REJECTION
+    );
+    const first = record('13-render.attempt-1.json').receipt.outputDigest;
+    const second = record('13-render.rework-1.attempt-1.json').receipt
+      .outputDigest;
+    expect(second).not.toBe(first);
+    expect(manifest.reworks?.[0]?.rejectedRenderDigest).toBe(first);
+    expect(
+      manifest.chain.find(link => link.stage === 'render')?.outputDigest
+    ).toBe(second);
+    // The judge saw new screenshots, not the rejected ones again.
+    expect(reviewed).toHaveLength(2);
+    expect(reviewed[1]).not.toEqual(reviewed[0]);
+    // The rejection was not retried in place on the same screenshots.
+    expect(
+      existsSync(join(runDir(), '15-adversarial-trust.attempt-2.json'))
+    ).toBe(false);
+  });
+
+  it('fails when a rework renders the rejected page again', async () => {
+    const { providers, reviewed } = reworkProviders({
+      copyHearsFindings: false,
+      judgeRejects: () => true,
+    });
+    const manifest = await run({ providers });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
+    expect(manifest.reason).toMatch(/no new render/);
+    expect(reviewed).toHaveLength(1);
+  });
+
+  it('stops after the rework limit when every new render is rejected', async () => {
+    let edits = 0;
+    const { providers } = reworkProviders({
+      copyHearsFindings: false,
+      judgeRejects: () => true,
+    });
+    const manifest = await run({
+      providers: {
+        ...providers,
+        async generate(request) {
+          if (request.stage !== 'copy') return providers.generate(request);
+          // Each rework changes the page, but never enough for the judge.
+          const tail = request.feedback.length > 0 ? ` (v${++edits})` : '';
+          return {
+            status: 'ok',
+            value: {
+              slots: dryCopy.slots.map(slot =>
+                slot.slot === 'subhead'
+                  ? { ...slot, text: `${slot.text}${tail}` }
+                  : slot
+              ),
+            },
+          };
+        },
+      },
+    });
+
+    expect(manifest).toMatchObject({
+      status: 'failed',
+      stoppedAt: 'adversarial-trust',
+    });
+    expect(manifest.reworks).toHaveLength(FACTORY_MAX_REWORKS);
+    expect(manifest.reason).toMatch(/still rejected after 2 rework/);
   });
 });
 

@@ -43,6 +43,15 @@ export interface StageResult {
   readonly notes: Readonly<Record<string, unknown>>;
   /** Set when a model, render or media provider is unreachable. */
   readonly unavailable: string | null;
+  /**
+   * A rejection that retrying this stage cannot fix: the harness reruns
+   * from `stage` with `findings` as its feedback, then re-renders and
+   * re-judges, instead of retrying here on the same inputs.
+   */
+  readonly rework?: {
+    readonly stage: FactoryStage;
+    readonly findings: readonly string[];
+  } | null;
 }
 
 export type StageRunner = (ctx: StageContext) => Promise<StageResult>;
