@@ -1,7 +1,10 @@
 import { act, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OnboardingShell } from './OnboardingShell';
+import {
+  buildEntryProfileBuilderState,
+  OnboardingShell,
+} from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
@@ -158,5 +161,61 @@ describe('OnboardingShell status', () => {
     builderState.current = null;
 
     expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+  });
+
+  it('previews the prebuilt page behind /start?handle= before the chat knows anything (JOV-7753)', () => {
+    render(
+      <OnboardingShell sessionLabel='pending' entryProfile={MEGARAN_ENTRY} />
+    );
+
+    expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+  });
+
+  it('keeps the rail hidden for an open handle with no page yet', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        entryProfile={{ status: 'available', handle: 'newartist' }}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('onboarding-profile-rail')
+    ).not.toBeInTheDocument();
+  });
+});
+
+const MEGARAN_ENTRY = {
+  status: 'claimable',
+  handle: 'megaran',
+  displayName: 'Mega Ran',
+  avatarUrl: 'https://blob.example.com/a.png',
+  spotifyId: null,
+  spotifyUrl: null,
+  genres: ['hip hop'],
+  socialLinks: ['https://instagram.com/megaran'],
+  linkPlatforms: ['instagram'],
+  linkCount: 1,
+} as const;
+
+describe('buildEntryProfileBuilderState (JOV-7753)', () => {
+  it('maps a prebuilt page to rail preview state and nothing else', () => {
+    expect(buildEntryProfileBuilderState(MEGARAN_ENTRY)).toEqual({
+      artist: {
+        id: 'handle-megaran',
+        name: 'Mega Ran',
+        url: '',
+        imageUrl: 'https://blob.example.com/a.png',
+        genres: ['hip hop'],
+      },
+      artistConfirmed: false,
+      handle: 'megaran',
+      socialLinks: ['https://instagram.com/megaran'],
+    });
+    expect(
+      buildEntryProfileBuilderState({ status: 'available', handle: 'x-y-z' })
+        .artist
+    ).toBeNull();
+    expect(buildEntryProfileBuilderState(null).artist).toBeNull();
   });
 });

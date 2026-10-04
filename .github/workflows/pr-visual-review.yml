@@ -192,8 +192,17 @@ jobs:
         run: |
           set -euo pipefail
           marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-detector\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
-          if ! grep -Eq "$marketing_surface" "$RUNNER_TEMP/changed-files.txt"; then
-            echo "No marketing surface changed; DOM certification skipped."
+          # JOV-7710: the composed shell main plane must read as one material.
+          shell_surface='^(apps/web/(app/demo/|components/(organisms|molecules|atoms|features|shell)/|styles/|tests/e2e/utils/shell-material-detector\.ts|tests/product-screenshots/(route-dom-|shell-material-))|packages/ui/)'
+          tests=
+          if grep -Eq "$marketing_surface" "$RUNNER_TEMP/changed-files.txt"; then
+            tests='certifies every marketing route'
+          fi
+          if grep -Eq "$shell_surface" "$RUNNER_TEMP/changed-files.txt"; then
+            tests="${tests:+$tests|}single-material main plane"
+          fi
+          if [ -z "$tests" ]; then
+            echo "No marketing or shell surface changed; DOM certification skipped."
             exit 0
           fi
           pnpm exec playwright test \
@@ -202,7 +211,7 @@ jobs:
             --project=screenshots \
             --workers=1 \
             --retries=0 \
-            -g 'deliberate-red|certifies every marketing route'
+            -g "deliberate-red|$tests"
 
       - name: Stop server
         if: always()

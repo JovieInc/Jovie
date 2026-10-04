@@ -36,7 +36,7 @@ const accepted = () =>
 
 /**
  * First-party beacon sink for client-only signup funnel steps
- * (signup-funnel/v1). Anonymous and fire-and-forget: bots, rate-limited
+ * (signup-funnel/v2). Anonymous and fire-and-forget: bots, rate-limited
  * sources, and a degraded limiter are acknowledged and dropped so the
  * measured product path never sees an error. Nothing identifying is stored.
  */

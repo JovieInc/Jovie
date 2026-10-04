@@ -93,6 +93,20 @@ type CliValues = {
 
 const USAGE_HINT = 'Run `jovie --help` for usage.';
 
+/** `JOVIE_TIMEOUT_MS` bounds every request (1s-120s); CI shortens it. */
+export function timeoutFromEnv(
+  value = process.env.JOVIE_TIMEOUT_MS
+): number | undefined {
+  if (value === undefined || value === '') return undefined;
+  const ms = Number(value);
+  if (!Number.isInteger(ms) || ms < 1_000 || ms > 120_000) {
+    throw new UsageError(
+      'JOVIE_TIMEOUT_MS must be a whole number of milliseconds from 1000 to 120000.'
+    );
+  }
+  return ms;
+}
+
 class UsageError extends Error {
   readonly code = 'USAGE_ERROR' as const;
 }
@@ -133,6 +147,9 @@ Options:
   --debug                Print error details (stack and cause) to stderr
   -h, --help             Show this help
   -v, --version          Show the installed CLI version
+
+Environment:
+  JOVIE_TIMEOUT_MS       Request deadline in ms, retries included (default 30000)
 
 Examples:
   jovie creator lookup https://www.youtube.com/@creator --json
@@ -359,7 +376,7 @@ async function execute(
       baseUrl,
       workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
       fetchImpl: dependencies.fetchImpl,
-      timeoutMs: dependencies.timeoutMs,
+      timeoutMs: dependencies.timeoutMs ?? timeoutFromEnv(),
       userAgent: `jovie-cli/${CLI_VERSION}`,
     }
   );
@@ -424,6 +441,7 @@ export async function runCli(
         version: CLI_VERSION,
         workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
         baseUrl: normalizeBaseUrl(values.baseUrl),
+        timeoutMs: dependencies.timeoutMs ?? timeoutFromEnv(),
         fetchImpl: dependencies.fetchImpl,
       });
       return 0;
@@ -511,7 +529,12 @@ export function closedPipeListener(
   exit: (code: number) => void
 ): (error: NodeJS.ErrnoException) => void {
   return error => {
-    if (error.code === 'EPIPE' || error.code === 'ERR_STREAM_DESTROYED') {
+    // Windows reports a closed pipe as EOF rather than EPIPE.
+    if (
+      error.code === 'EPIPE' ||
+      error.code === 'EOF' ||
+      error.code === 'ERR_STREAM_DESTROYED'
+    ) {
       exit(Number(process.exitCode ?? 0));
       return;
     }
