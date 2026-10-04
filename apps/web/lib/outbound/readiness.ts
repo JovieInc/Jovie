@@ -70,6 +70,12 @@ export interface ReadinessInputs {
     readonly pendingRouted: number;
     readonly dailySendCap: number;
   } | null;
+  /** jov.ie's deployed build; null when build-info could not be read. */
+  readonly production: {
+    readonly sha: string | null;
+    readonly deployedAt: string | null;
+    readonly behindMain: number | null;
+  } | null;
   /** Null when Linear could not be read. */
   readonly issues: ReadonlyMap<string, LinearIssueState> | null;
   readonly openGrowthLoopChildren: number | null;
@@ -105,6 +111,9 @@ export const READINESS_BLOCKING_ISSUES = [
     owner: 'profiles',
   },
 ] as const;
+
+/** Lagging main this long means fixes aren't live, so outbound waits. */
+export const PRODUCTION_STALE_AFTER_HOURS = 6;
 
 const linearUrl = (id: string) => `https://linear.app/jovie/issue/${id}`;
 const DAY_MS = 86_400_000;
@@ -200,6 +209,41 @@ export function buildOutboundReadiness(
       : `${evidence.covered} of ${evidence.built} built profiles have any DSP, surface or release evidence`,
     owner: 'resolver (JOV-6746)',
     href: linearUrl('JOV-6746'),
+  });
+
+  const prod = input.production;
+  const prodAgeHours =
+    prod?.deployedAt != null
+      ? Math.floor(
+          (input.now.getTime() - Date.parse(prod.deployedAt)) / 3_600_000
+        )
+      : null;
+  // Main always moves; production is stale once it lags for hours, not commits.
+  const prodStale =
+    prod?.behindMain != null &&
+    prod.behindMain > 0 &&
+    prodAgeHours !== null &&
+    prodAgeHours >= PRODUCTION_STALE_AFTER_HOURS;
+  items.push({
+    id: 'production',
+    label: 'Production runs current main',
+    status:
+      !prod || prod.behindMain === null || prodAgeHours === null
+        ? 'unknown'
+        : prodStale
+          ? 'red'
+          : 'green',
+    detail: !prod
+      ? 'Production build-info could not be read.'
+      : `${prod.sha?.slice(0, 7) ?? 'unknown build'} · deployed ${
+          prodAgeHours === null ? 'at an unknown time' : `${prodAgeHours}h ago`
+        } · ${
+          prod.behindMain === null
+            ? 'distance to main not measured'
+            : `${prod.behindMain} commits behind main`
+        }`,
+    owner: 'release',
+    href: null,
   });
 
   const send = input.sendPath;
