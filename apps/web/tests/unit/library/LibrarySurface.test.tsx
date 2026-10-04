@@ -403,10 +403,9 @@ describe('LibrarySurface', () => {
       expect(source).not.toMatch(localRecipePattern);
     }
 
-    // Release/approval badge accents live in their semantic helpers
-    // (lib/library/{release,approval}-status.ts) — guarded for distinctness
-    // in library-system-b-compliance.test.ts and approval-status.test.ts.
-    expect(source).toContain('releaseStatusClasses');
+    // Status renders as the shared glyph everywhere; the approval editor in
+    // Details keeps its semantic accent helper.
+    expect(source).toContain('LibraryStatusGlyph');
     expect(source).toContain('libraryApprovalStatusClasses');
     expect(source).toContain('PageToolbarTabButton');
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
@@ -446,7 +445,9 @@ describe('LibrarySurface', () => {
       ),
     ].map(match => match[0]);
 
-    expect(statusPillClasses).toHaveLength(4);
+    // Status is a glyph on tiles, rows, table and inspector; only the
+    // approval editor in Details still renders as a word pill.
+    expect(statusPillClasses).toHaveLength(1);
     for (const className of statusPillClasses ?? []) {
       expect(className).toContain('truncate');
       expect(className).toContain('rounded-full');
@@ -581,7 +582,7 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-grid-density-toggle')
     ).toBeInTheDocument();
     expect(
-      screen.getByTestId('library-release-status-release-1')
+      screen.getByTestId('library-status-glyph-release-1')
     ).toBeInTheDocument();
   });
 
@@ -692,49 +693,36 @@ describe('LibrarySurface', () => {
     expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
-  it('keeps grid-card status chrome off the media frame', () => {
-    const { container } = renderLibrary([
+  it('keeps a tile to artwork, title, one status glyph and one meta line', () => {
+    renderLibrary([
       buildAsset({
         status: 'draft',
         approvalStatus: 'needs_review',
+        providerCount: 3,
       }),
     ]);
     clickGridView();
-
-    const redFixture = document.createElement('article');
-    redFixture.innerHTML = [
-      '<div class="system-b-library-card-artwork">',
-      '<span class="system-b-library-card-status">Draft</span>',
-      '</div>',
-    ].join('');
-    expect(
-      redFixture.querySelector(
-        '.system-b-library-card-artwork .system-b-library-card-status'
-      )
-    ).not.toBeNull();
 
     const cardButton = screen.getByRole('button', {
       name: /View Take Me Over/u,
     });
     const artwork = cardButton.querySelector('.system-b-library-card-artwork');
-    const statusStack = screen.getByTestId(
-      'library-card-status-stack-release-1'
-    );
+    const glyph = screen.getByTestId('library-status-glyph-release-1');
 
-    expect(artwork?.querySelector('.system-b-library-card-status')).toBeNull();
-    expect(statusStack).toContainElement(
-      screen.getByTestId('library-release-status-release-1')
+    // Only playback belongs on the artwork; status sits beside the title.
+    expect(artwork).not.toContainElement(glyph);
+    expect(cardButton).toContainElement(glyph);
+    expect(within(cardButton).getAllByRole('img')).toHaveLength(1);
+    expect(screen.getByTestId('library-card-meta-release-1')).toHaveTextContent(
+      /^Single · 2026$/u
     );
-    expect(statusStack).toContainElement(
-      screen.getByTestId('library-approval-status-release-1')
-    );
-    expect(statusStack).toHaveClass('min-h-11');
-    expect(container.querySelector('.system-b-library-card')).toContainElement(
-      statusStack
-    );
+    // No stacked word pills, provider counts or asset-kind pills on tiles.
+    expect(within(cardButton).queryByText('Draft')).toBeNull();
+    expect(within(cardButton).queryByText('Artwork')).toBeNull();
+    expect(within(cardButton).queryByText('3')).toBeNull();
   });
 
-  it('surfaces Approval Status on list rows, grid cards, and filter chips (#10384)', async () => {
+  it('folds release and approval into one glyph on rows, tiles and filters (#10384)', async () => {
     renderLibrary([
       buildAsset({
         status: 'released',
@@ -754,49 +742,34 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    // List view includes the Approval column cell for every row.
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-2')
-    ).toHaveTextContent('Needs Review');
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
+    const expectGlyphs = () => {
+      expect(
+        screen.getByTestId('library-status-glyph-release-1')
+      ).toHaveAccessibleName('Released · Not approved');
+      expect(
+        screen.getByTestId('library-status-glyph-release-1')
+      ).toHaveAttribute('data-status-glyph', 'done');
+      expect(
+        screen.getByTestId('library-status-glyph-release-2')
+      ).toHaveAccessibleName('Released · Needs review');
+      expect(
+        screen.getByTestId('library-status-glyph-release-2')
+      ).toHaveAttribute('data-status-glyph', 'in_review');
+      expect(
+        screen.getByTestId('library-status-glyph-release-3')
+      ).toHaveAccessibleName('Draft · Approved');
+    };
 
+    expectGlyphs();
     clickGridView();
+    expectGlyphs();
 
-    // Grid cards surface both axes with explicit labels so Release "Draft"
-    // never collides with Approval "Draft" (#10384 / JOV-3333).
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Released');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-2')
-    ).toHaveTextContent('Needs Review');
-
-    // Filter rail exposes Approval Status as a first-class chip group (#10384).
+    // Filter rail still exposes both axes as first-class chip groups.
     fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const rail = screen.getByTestId('library-filter-panel');
     expect(screen.getByRole('group', { name: 'Work Filters' })).toBe(rail);
     expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
     expect(within(rail).getByText('Release Status')).toBeInTheDocument();
-    expect(
-      within(rail).getByRole('button', { name: /Needs Review/u })
-    ).toBeInTheDocument();
 
     fireEvent.click(
       within(rail).getByRole('button', { name: /Needs Review/u })
@@ -804,18 +777,14 @@ describe('LibrarySurface', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-approval-status-release-2')
+        screen.getByTestId('library-status-glyph-release-2')
       ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-approval-status-release-1')
-      ).toBeNull();
-      expect(
-        screen.queryByTestId('library-approval-status-release-3')
-      ).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-1')).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-3')).toBeNull();
     });
   });
 
-  it('disambiguates Release Draft from Approval Draft when both axes are draft (#10384)', () => {
+  it('says Draft once when release and approval are both draft (#10384)', () => {
     renderLibrary([
       buildAsset({
         status: 'draft',
@@ -823,21 +792,22 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
+    const row = screen.getByTestId('library-release-row-release-1');
+    expect(within(row).getAllByTestId(/^library-status-glyph-/u)).toHaveLength(
+      1
+    );
     expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAccessibleName('Draft');
 
     clickGridView();
 
     expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Draft');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAccessibleName('Draft');
     expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAttribute('data-status-glyph', 'todo');
   });
 
   it('filters Release Draft and Approval Draft independently in the filter rail (#10384)', async () => {
@@ -883,14 +853,12 @@ describe('LibrarySurface', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-release-status-release-a')
+        screen.getByTestId('library-status-glyph-release-a')
       ).toBeInTheDocument();
       expect(
-        screen.getByTestId('library-release-status-release-c')
+        screen.getByTestId('library-status-glyph-release-c')
       ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-release-status-release-b')
-      ).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-b')).toBeNull();
     });
 
     fireEvent.click(
@@ -905,18 +873,16 @@ describe('LibrarySurface', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-approval-status-release-b')
+        screen.getByTestId('library-status-glyph-release-b')
       ).toBeInTheDocument();
       expect(
-        screen.getByTestId('library-approval-status-release-c')
+        screen.getByTestId('library-status-glyph-release-c')
       ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-approval-status-release-a')
-      ).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-a')).toBeNull();
     });
   });
 
-  it('renders Archived approval status on list and grid badges (#10384)', () => {
+  it('marks archived work with the canceled glyph on rows and tiles (#10384)', () => {
     renderLibrary([
       buildAsset({
         status: 'released',
@@ -924,18 +890,13 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Archived');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Archived');
+    const glyph = () => screen.getByTestId('library-status-glyph-release-1');
+    expect(glyph()).toHaveAccessibleName('Archived');
+    expect(glyph()).toHaveAttribute('data-status-glyph', 'canceled');
 
     clickGridView();
 
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Archived');
+    expect(glyph()).toHaveAccessibleName('Archived');
   });
 
   it('keeps Approval Status once in the detail rail editor only', () => {
@@ -946,10 +907,10 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
     const drawer = within(screen.getByTestId('library-asset-drawer'));
-    // Hero shows release status only — no duplicate approval pill.
+    // Hero shows the same glyph as the tile, with its words beside it.
     expect(
-      drawer.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
+      drawer.getByTestId('library-status-glyph-release-1')
+    ).toHaveTextContent('Released · Not approved');
     expect(
       drawer.queryByTestId('library-approval-status-release-1')
     ).not.toBeInTheDocument();
@@ -980,10 +941,7 @@ describe('LibrarySurface', () => {
 
     expect(screen.getByTestId('library-surface')).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Take Me Over' })).toBeDefined();
-    expect(screen.getByText('Tim White')).toBeDefined();
-    expect(screen.getAllByText('Artwork').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Lyrics').length).toBeGreaterThan(0);
+    expect(screen.getByText('Single · 2026')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: /View Take Me Over/u }));
 
@@ -1254,7 +1212,7 @@ describe('LibrarySurface', () => {
     expect(
       screen.getByRole('heading', { name: 'Never Say A Word Hoodie' })
     ).toBeInTheDocument();
-    expect(screen.getByText('$68.00')).toBeInTheDocument();
+    expect(screen.getByText('Hoodie · $68.00')).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -1465,8 +1423,8 @@ describe('LibrarySurface', () => {
 
     // Production data populates the real fields.
     expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAccessibleName('Released · Not approved');
     expect(
       screen.getByTestId('library-catalog-length-release-1')
     ).toHaveTextContent('3:32');
@@ -1674,21 +1632,24 @@ describe('LibrarySurface', () => {
     expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
   });
 
-  it('counts tracks in the singular for one-track releases on grid cards', () => {
+  it('gives each tile one meta line: type then year, or type then price', () => {
     renderLibrary([
-      buildAsset({ releaseType: 'album', trackCount: 1 }),
+      buildAsset({ releaseType: 'album', trackCount: 9 }),
       buildAsset({
         id: 'release-2',
-        title: 'Second Album',
-        releaseType: 'album',
-        trackCount: 9,
+        title: 'Undated',
+        releaseType: 'ep',
+        releaseDate: null,
       }),
     ]);
     clickGridView();
 
-    expect(screen.getByText('1 Track')).toBeInTheDocument();
-    expect(screen.getByText('9 Tracks')).toBeInTheDocument();
-    expect(screen.queryByText('1 Tracks')).not.toBeInTheDocument();
+    expect(screen.getByTestId('library-card-meta-release-1')).toHaveTextContent(
+      /^Album · 2026$/u
+    );
+    expect(screen.getByTestId('library-card-meta-release-2')).toHaveTextContent(
+      /^Ep$/u
+    );
   });
 
   it('does not render route filtering as a second shell search surface', () => {
@@ -1881,13 +1842,32 @@ describe('LibrarySurface', () => {
     ).toBeNull();
   });
 
-  it('labels the grid-card provider count badge', () => {
-    renderLibrary([buildAsset({ providerCount: 3 })]);
+  it('shows a scrub strip on the tile that owns the player and seeks it', () => {
+    audioMock.playbackState = {
+      ...audioMock.basePlaybackState,
+      activeTrackId: 'release-1',
+      isPlaying: true,
+      playbackStatus: 'playing',
+      currentTime: 10,
+      duration: 30,
+    };
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Other Song' }),
+    ]);
     clickGridView();
 
-    expect(screen.getByRole('img', { name: '3 Providers' })).toHaveTextContent(
-      '3'
-    );
+    expect(screen.queryByTestId('library-card-scrub-release-2')).toBeNull();
+    const scrub = within(
+      screen.getByTestId('library-card-scrub-release-1')
+    ).getByRole('slider', { name: 'Scrub Take Me Over' });
+    expect(scrub).toHaveAttribute('aria-valuenow', '10');
+
+    fireEvent.keyDown(scrub, { key: 'End' });
+    expect(audioMock.seek).toHaveBeenCalledWith(30);
+    expect(
+      screen.getByRole('button', { name: 'Pause Preview for Take Me Over' })
+    ).toBeInTheDocument();
   });
 
   it('stacks duplicate release versions into one row (JOV-3089)', () => {

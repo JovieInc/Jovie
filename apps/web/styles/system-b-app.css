@@ -1260,6 +1260,24 @@
   );
 }
 
+:where(.system-b-library-card-scrub) {
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--system-b-cinematic-black) 72%, transparent),
+    transparent
+  );
+  color: var(--color-text-tooltip);
+}
+
+/* The scrub sits on artwork in every theme, so its waveform inks are light. */
+.system-b-library-card-scrub .text-tertiary-token {
+  color: color-mix(in oklab, var(--color-text-tooltip) 70%, transparent);
+}
+
+.system-b-library-card-scrub .text-primary-token {
+  color: var(--color-text-tooltip);
+}
+
 :where(.system-b-library-media-thumbnail) {
   background: var(--system-b-cinematic-black);
 }

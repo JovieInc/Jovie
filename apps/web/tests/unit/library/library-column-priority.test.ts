@@ -14,27 +14,22 @@ describe('library column priority', () => {
     );
 
     expect(layout.hiddenIds).toEqual(
-      expect.arrayContaining([
-        'shareUrl',
-        'type',
-        'providers',
-        'status',
-        'approval',
-      ])
+      expect.arrayContaining(['shareUrl', 'type'])
     );
+    // The status glyph is 40px and never drops, unlike the old word pills.
+    expect(layout.hiddenIds).not.toContain('status');
     expect(layout.hiddenIds).not.toContain('release');
     expect(layout.hiddenIds).not.toContain('releaseDate');
     expect(layout.hiddenIds).not.toContain('actions');
   });
 
-  it('keeps release and approval together on a wide table', () => {
+  it('keeps status and providers on a wide table', () => {
     const layout = resolveColumnPriorityLayout(
       columnPrioritySpecsFromDefs(LIBRARY_TABLE_COLUMNS),
       1100
     );
 
     expect(layout.hiddenIds).not.toContain('status');
-    expect(layout.hiddenIds).not.toContain('approval');
     expect(layout.hiddenIds).not.toContain('providers');
   });
 

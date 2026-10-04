@@ -374,15 +374,20 @@ describe('library data', () => {
   });
 
   it('exposes density-aware grid layout classes', () => {
-    expect(LIBRARY_GRID_DENSITY_LAYOUT.comfortable).toContain(
-      'sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
-    );
+    // Tiles fill the container by minimum width, so an open inspector or the
+    // Mac window keeps a dense grid; phones always get two columns.
     expect(LIBRARY_GRID_DENSITY_LAYOUT.compact).toContain(
-      'sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+      'sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]'
+    );
+    expect(LIBRARY_GRID_DENSITY_LAYOUT.comfortable).toContain(
+      'sm:grid-cols-[repeat(auto-fill,minmax(11.5rem,1fr))]'
     );
     expect(LIBRARY_GRID_DENSITY_LAYOUT.spacious).toContain(
-      'sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3'
+      'sm:grid-cols-[repeat(auto-fill,minmax(16rem,1fr))]'
     );
+    for (const layout of Object.values(LIBRARY_GRID_DENSITY_LAYOUT)) {
+      expect(layout).toMatch(/^grid grid-cols-2 /u);
+    }
   });
 });
 
