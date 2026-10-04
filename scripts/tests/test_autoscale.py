@@ -19,7 +19,10 @@ def obs(**over):
             "cooling": [], "cooldownAt": {}, "rateBankAt": {}, "codexUnleasedAvailable": 2,
             "productiveRunRate": {"devin": 0.8, "codex": 0.8}, "starts": {"devin": 10, "codex": 10}, "alerts": [],
             "gateWaitMedianS24h": 100, "githubRemaining": 4000, "linearRemaining": 2000, "linearLimit": 2500,
-            "linearRateLimitedAt": None, "disk": {"admitted": True, "freePct": 40}}
+            "linearRateLimitedAt": None, "mergeThroughputFresh": True,
+            "mergeThroughput": {"queueDepth": 4, "queueWaitP50Minutes": 5, "mergedPerHour": 30,
+                                "openedPerHour": 20, "ejectionRate": 0.1},
+            "disk": {"admitted": True, "freePct": 40}}
     base.update(over); return base
 def sample(**over):
     base = {"cpuCount": 16, "load1": 1.0, "memAvailableBytes": 16 * GIB,
@@ -84,8 +87,8 @@ class AutoscaleTest(unittest.TestCase):
             (state / "autoscale.json").write_text("{")
             self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 4); (state / "autoscale.json").write_text(json.dumps({"schema": "other", "observedAt": NOW, "lanes": {}})); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 4); fresh = {"schema": A.SCHEMA, "observedAt": NOW - 601, "lanes": {"devin": {"effective": 6, "floor": 1, "ceiling": 8}}}; (state / "autoscale.json").write_text(json.dumps(fresh)); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 4)
             fresh["observedAt"] = NOW; (state / "autoscale.json").write_text(json.dumps(fresh)); self.assertEqual(A.effective_slots(state, "missing", 4, NOW), 4); self.assertEqual(A.effective_slots(state, "devin", 0, NOW), 0); fresh["lanes"]["devin"]["effective"] = True; (state / "autoscale.json").write_text(json.dumps(fresh)); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 4); fresh["lanes"]["devin"] = {"effective": 99, "floor": 1, "ceiling": 8}
-            (state / "autoscale.json").write_text(json.dumps(fresh)); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 8); fresh["lanes"]["devin"] = {"effective": 0, "floor": 1, "ceiling": 8}; (state / "autoscale.json").write_text(json.dumps(fresh)); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 1); recorded = decide(None, obs(), sample(), {"devin": 4}, cfg(mode="observe", intervalS=60), NOW); self.assertEqual((self.lane(recorded, "devin")["effective"], self.lane(recorded, "devin")["lastReason"]), (4, "hold:scale-up-held"))
-            A.write_state(state, recorded); saved = json.loads((state / "autoscale.json").read_text()); self.assertNotIn("_changed", saved); self.assertEqual((saved["lanes"]["devin"]["effective"], (state / "autoscale.json").stat().st_mode & 0o777), (4, 0o644))
+            (state / "autoscale.json").write_text(json.dumps(fresh)); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 8); fresh["lanes"]["devin"] = {"effective": 0, "floor": 1, "ceiling": 8}; (state / "autoscale.json").write_text(json.dumps(fresh)); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 1); recorded = decide(None, obs(), sample(), {"devin": 4}, cfg(mode="observe", intervalS=60), NOW); self.assertEqual((self.lane(recorded, "devin")["effective"], self.lane(recorded, "devin")["lastReason"]), (5, "sustained-demand"))
+            A.write_state(state, recorded); saved = json.loads((state / "autoscale.json").read_text()); self.assertNotIn("_changed", saved); self.assertEqual((saved["lanes"]["devin"]["effective"], (state / "autoscale.json").stat().st_mode & 0o777), (5, 0o644))
             with env(SYMPHONY_AUTOSCALE="observe"):
                 self.assertEqual(lane.Host(state=state).slots("devin", 4), 4); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 4)
     def test_cadence_streaks_and_one_lane(self):
@@ -94,12 +97,12 @@ class AutoscaleTest(unittest.TestCase):
                          (4, "hold:up-streak", 29))
         state = decide(state, seen, host, bases, options, when + 60)
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"], self.lane(state, "devin")["upStreak"]),
-                         (4, "hold:scale-up-held", 0))
+                         (5, "sustained-demand", 0))
         seen, host = obs(runningByProvider={"devin": 4}), sample(); state, when = ticks(29, None, seen, host, bases, options, NOW); state = decide(state, obs(unhealthy=["devin"], runningByProvider={"devin": 4}), host, bases, options, when + 60); self.assertEqual((self.lane(state, "devin")["upStreak"], self.lane(state, "devin")["effective"]), (0, 4)); state, when = ticks(29, state, seen, host, bases, options, when + 120); self.assertEqual(self.lane(state, "devin")["effective"], 4)
-        held = decide(state, seen, host, bases, options, when + 60); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (4, "hold:scale-up-held")); both = {"devin": 4, "codex": 3}; state = decide(None, obs(), host, both, cfg(intervalS=60), NOW)
-        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"], self.lane(state, "devin")["lastReason"]), (4, 3, "hold:scale-up-held"))
+        held = decide(state, seen, host, bases, options, when + 60); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (5, "sustained-demand")); both = {"devin": 4, "codex": 3}; state = decide(None, obs(), host, both, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"], self.lane(state, "devin")["lastReason"]), (5, 3, "sustained-demand"))
         ranked = decide(None, obs(eligiblePoolByProvider={"devin": 1, "codex": 9}), sample(), both, cfg(intervalS=60), NOW)
-        self.assertEqual((self.lane(ranked, "codex")["effective"], self.lane(ranked, "devin")["effective"]), (3, 4))
+        self.assertEqual((self.lane(ranked, "codex")["effective"], self.lane(ranked, "devin")["effective"]), (4, 4))
     def test_increase_blockers_budgets_and_decreases(self):
         self.held("devin", obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}, "codex": {"reason": "within-budget"}},
                                maintenanceQueueByProvider={"devin": 4}), bases={"devin": 4}, reason="hold:over-budget")
@@ -125,7 +128,7 @@ class AutoscaleTest(unittest.TestCase):
                   bases={"devin": 4}, reason="hold:low-productive-rate")
         allowed = decide(None, obs(starts={"devin": 4}, productiveRunRate={"devin": 0.1}, runningByProvider={"devin": 4}),
                          sample(), {"devin": 4}, cfg(intervalS=60), NOW)
-        self.assertEqual((self.lane(allowed, "devin")["effective"], self.lane(allowed, "devin")["lastReason"]), (4, "hold:scale-up-held")); cooled = {"lanes": {"devin": {"effective": 4}}, "host": {"lastChangeAt": NOW}}
+        self.assertEqual((self.lane(allowed, "devin")["effective"], self.lane(allowed, "devin")["lastReason"]), (5, "sustained-demand")); cooled = {"lanes": {"devin": {"effective": 4}}, "host": {"lastChangeAt": NOW}}
         self.held("devin", obs(runningByProvider={"devin": 4}), sample(memAvailableBytes=6 * GIB), {"devin": 4},
                   "hold:host-cooldown", previous=cooled)
         previous = {"lanes": {"devin": {"effective": 6, "upStreak": 30}}}
@@ -154,6 +157,29 @@ class AutoscaleTest(unittest.TestCase):
                 ("gate-pressure", obs(gateWaitMedianS24h=1201), sample())):
             state = decide({"lanes": {"devin": {"effective": 4}}}, seen, host, {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (3, reason))
         held = decide(hot, obs(alerts=["failed-runs"]), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (4, "hold:host-cooldown"))
+    def test_merge_throughput_brake_blocks_growth_and_steps_down_after_one_interval(self):
+        deficit = obs(mergeThroughput={"queueDepth": 30, "queueWaitP50Minutes": 22, "mergedPerHour": 6,
+                                      "openedPerHour": 31, "ejectionRate": 0.55})
+        state = decide(None, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]),
+                         (4, "hold:merge-throughput"))
+        self.assertEqual(state["throughputBrake"]["reasons"], ["merge-deficit"])
+        self.assertEqual(state["throughputBrake"]["signal"]["ejectionRate"], 0.55)
+        state = decide(state, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW + 61)
+        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]),
+                         (3, "merge-throughput"))
+        self.assertTrue(state["throughputBrake"]["sustained"])
+        state = decide(state, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW + 182)
+        self.assertEqual(self.lane(state, "devin")["effective"], 2)
+        state = decide(state, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW + 303)
+        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]),
+                         (2, "hold:throughput-floor"))
+        wait = obs(mergeThroughput={"queueDepth": 12, "queueWaitP50Minutes": A.MERGE_QUEUE_WAIT_BRAKE_MIN,
+                                   "mergedPerHour": 40, "openedPerHour": 20, "ejectionRate": 0.2})
+        waited = decide(None, wait, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual(waited["throughputBrake"]["reasons"], ["queue-wait"])
+        unknown = decide(None, obs(mergeThroughputFresh=False), sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual(self.lane(unknown, "devin")["lastReason"], "hold:merge-throughput-unknown")
     def test_idle_decay_and_ceilings(self):
         bases = {"devin": 4}
         seen = obs(eligiblePoolByProvider={"devin": 0}, runningByProvider={"devin": 0},
@@ -164,11 +190,11 @@ class AutoscaleTest(unittest.TestCase):
         codex = obs(eligiblePoolByProvider={"codex": 0}, runningByProvider={"codex": 0},
                     newIssueBudgetByProvider={"codex": {"reason": "within-budget"}})
         state, when = ticks(30, None, codex, host, {"codex": 3}, options, NOW); self.assertEqual(self.lane(state, "codex")["effective"], 2); state, _ = ticks(40, state, codex, host, {"codex": 3}, options, when + 60); self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["lastReason"]), (2, "hold:idle-floor")); codex_obs = obs(runningByProvider={"codex": 3}, codexUnleasedAvailable=1, eligiblePoolByProvider={"codex": 8})
-        state = decide(None, codex_obs, host, {"codex": 3}, cfg(intervalS=60), NOW); self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["ceiling"], self.lane(state, "codex")["lastReason"]), (3, 4, "hold:scale-up-held")); capped = decide({"lanes": {"codex": {"effective": 6}}}, codex_obs, host, {"codex": 3}, cfg(intervalS=60), NOW + 120); self.assertEqual((self.lane(capped, "codex")["effective"], self.lane(capped, "codex")["lastReason"]), (3, "hold:scale-up-held"))
+        state = decide(None, codex_obs, host, {"codex": 3}, cfg(intervalS=60), NOW); self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["ceiling"], self.lane(state, "codex")["lastReason"]), (4, 4, "sustained-demand")); capped = decide({"lanes": {"codex": {"effective": 6}}}, codex_obs, host, {"codex": 3}, cfg(intervalS=60), NOW + 120); self.assertEqual((self.lane(capped, "codex")["effective"], self.lane(capped, "codex")["lastReason"]), (4, "hold:lane-ceiling"))
         named = decide(None, obs(runningByProvider={"codex": 3}, codexUnleasedAvailable=10), host, {"codex": 3},
                        cfg(intervalS=60, max={"codex": 3}), NOW)
         self.assertEqual(self.lane(named, "codex")["effective"], 3); unknown = decide(None, obs(codexUnleasedAvailable=None, runningByProvider={"codex": 3}), host, {"codex": 3}, cfg(intervalS=60), NOW); self.assertEqual(self.lane(unknown, "codex")["effective"], 3); self.assertLessEqual(self.lane(unknown, "codex")["ceiling"], 3); both = {"devin": 4, "codex": 3}; state = decide(None, obs(), host, both, cfg(intervalS=60, hostMax=8), NOW)
-        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"]), (4, 3)); later = decide(state, obs(), host, both, cfg(intervalS=60, hostMax=8), NOW + 120); self.assertEqual((self.lane(later, "devin")["effective"], self.lane(later, "codex")["effective"]), (4, 3)); small = decide(None, obs(), sample(cpuCount=2), both, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"]), (5, 3)); later = decide(state, obs(), host, both, cfg(intervalS=60, hostMax=8), NOW + 120); self.assertEqual((self.lane(later, "devin")["effective"], self.lane(later, "codex")["effective"]), (5, 3)); small = decide(None, obs(), sample(cpuCount=2), both, cfg(intervalS=60), NOW)
         self.assertEqual((self.lane(small, "devin")["effective"], self.lane(small, "codex")["effective"], self.lane(small, "devin")["lastReason"]),
                          (4, 3, "hold:host-ceiling"))
         self.assertGreaterEqual(small["host"]["ceiling"], 7)
@@ -181,14 +207,16 @@ class AutoscaleTest(unittest.TestCase):
         with patch.object(Path, "read_text", side_effect=AssertionError("read")), \
                 patch.object(urllib.request, "urlopen", side_effect=AssertionError("network")):
             pure = decide(None, obs(), sample(), {"devin": 4}, cfg(intervalS=60), NOW)
-        self.assertEqual((self.lane(pure, "devin")["effective"], self.lane(pure, "devin")["lastReason"]), (4, "hold:scale-up-held")); self.assertEqual(pure["schema"], A.SCHEMA); self.assertLessEqual(len(pure["history"]), 50)
+        self.assertEqual((self.lane(pure, "devin")["effective"], self.lane(pure, "devin")["lastReason"]), (5, "sustained-demand")); self.assertEqual(pure["schema"], A.SCHEMA); self.assertLessEqual(len(pure["history"]), 50)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "doctor.json").write_text(json.dumps({
                 "observed": {"now": NOW, "eligiblePoolByProvider": {"devin": 4},
                              "newIssueBudgetByProvider": {"devin": {"reason": "within-budget"}},
                              "capacityByProvider": {"devin": {"running": 4, "slots": 4}}, "githubRemaining": 4000,
-                             "gateWaitMedianS24h": 10, "tick": {"unhealthy": []}, "codexAttribution": {"unleasedAvailable": 1}},
+                             "gateWaitMedianS24h": 10, "tick": {"unhealthy": []}, "codexAttribution": {"unleasedAvailable": 1},
+                             "mergeThroughput": {"observedAt": NOW, "queueDepth": 30, "queueWaitP50Minutes": 38,
+                                                 "mergedPerHour": 6, "openedPerHour": 31, "ejectionRate": 0.55}},
                 "alerts": {"gate-timeouts": {"since": NOW}}, "statusFeed": "https://gist.example/status"}))
             (root / "lanes-status.json").write_text(json.dumps({"throughput": {"providers": {"devin": {"productiveRunRate": 0.9, "workerStarts": 8}}}})); (root / "api-budget.json").write_text(json.dumps({"schema": 1, "remaining": 2000, "limit": 2500, "reset": 1730000000000, "rateLimitedAt": None, "observedAt": "2026-10-02T23:51:00Z"})); (root / "cooldown").mkdir(); (root / "cooldown" / "devin").write_text(str(NOW + 50)); os.utime(root / "cooldown" / "devin", (NOW - 600, NOW - 600))
             (root / "codex-accounts.json").write_text(json.dumps({"alpha": {"lastKind": "rate", "lastRunAt": NOW - 100}, "beta": {"lastKind": "ok", "lastRunAt": NOW}}))
@@ -197,37 +225,44 @@ class AutoscaleTest(unittest.TestCase):
             self.assertTrue(collected["doctorFresh"])
             self.assertEqual((collected["runningByProvider"]["devin"], collected["productiveRunRate"]["devin"], collected["alerts"],
                               collected["linearRemaining"], collected["linearLimit"], collected["linearRateLimitedAt"], collected["rateBankAt"]["codex"]), (4, 0.9, ["gate-timeouts"], 2000, 2500, None, NOW - 100))
-            alien = {"schema": 1, "remaining": 2400, "limit": 2500, "reset": 1730000000000, "rateLimitedAt": None, "observedAt": "2026-10-02T23:51:00Z"}; (root / "api-budget.json").write_text(json.dumps(alien)); seen = A.collect(root, {"disk": {"admitted": True, "freePct": 40}}, NOW); self.assertEqual((seen["linearRemaining"], seen["linearLimit"], seen["linearRateLimitedAt"]), (2400, 2500, None)); self.assertIsNone(A._budget_unknown(seen)); kept = decide({"lanes": {"devin": {"effective": 6}}}, obs(linearRemaining=seen["linearRemaining"], linearLimit=seen["linearLimit"], linearRateLimitedAt=seen["linearRateLimitedAt"]), sample(), {"devin": 4}, cfg(intervalS=60), NOW); self.assertEqual((self.lane(kept, "devin")["effective"], self.lane(kept, "devin")["lastReason"]), (4, "hold:scale-up-held"))
+            self.assertTrue(collected["mergeThroughputFresh"]); self.assertEqual(collected["mergeThroughput"], {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6, "openedPerHour": 31, "ejectionRate": 0.55})
+            alien = {"schema": 1, "remaining": 2400, "limit": 2500, "reset": 1730000000000, "rateLimitedAt": None, "observedAt": "2026-10-02T23:51:00Z"}; (root / "api-budget.json").write_text(json.dumps(alien)); seen = A.collect(root, {"disk": {"admitted": True, "freePct": 40}}, NOW); self.assertEqual((seen["linearRemaining"], seen["linearLimit"], seen["linearRateLimitedAt"]), (2400, 2500, None)); self.assertIsNone(A._budget_unknown(seen)); kept = decide({"lanes": {"devin": {"effective": 6}}}, obs(linearRemaining=seen["linearRemaining"], linearLimit=seen["linearLimit"], linearRateLimitedAt=seen["linearRateLimitedAt"]), sample(), {"devin": 4}, cfg(intervalS=60), NOW); self.assertEqual((self.lane(kept, "devin")["effective"], self.lane(kept, "devin")["lastReason"]), (6, "hold:not-saturated"))
             quiet = {**alien, "remaining": 0, "rateLimitedAt": A._iso(NOW - 30), "observedAt": A._iso(NOW)}; (root / "api-budget.json").write_text(json.dumps(quiet)); hit = A.collect(root, {"disk": {"admitted": True, "freePct": 40}}, NOW); self.assertEqual((hit["linearRemaining"], hit["linearLimit"]), (0, 2500)); self.assertAlmostEqual(hit["linearRateLimitedAt"], NOW - 30, delta=1); self.assertIsNone(A._budget_unknown(hit)); down = decide({"lanes": {"devin": {"effective": 6}}, "host": {"lastChangeAt": NOW}}, obs(linearRemaining=hit["linearRemaining"], linearLimit=hit["linearLimit"], linearRateLimitedAt=hit["linearRateLimitedAt"]), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(down, "devin")["effective"], self.lane(down, "devin")["lastReason"]), (3, "linear-ratelimited"))
             (root / "api-budget.json").write_text(json.dumps({"linearRemaining": 1800, "linearLimit": 2500, "linearRateLimitedAt": NOW - 100})); legacy = A.collect(root, {}, NOW); self.assertEqual((legacy["linearRemaining"], legacy["linearLimit"]), (1800, 2500)); self.assertAlmostEqual(legacy["linearRateLimitedAt"], NOW - 100, delta=1)
             self.assertIn("devin", collected["cooling"]); self.assertGreater(NOW - collected["cooldownAt"]["devin"], A.MULTIPLICATIVE_WINDOW_S)
             (root / "doctor.json").write_text("{")
-            self.assertFalse(A.collect(root, {}, NOW)["doctorFresh"]); env_file = root / "linear.env"; env_file.write_text("LINEAR_API_KEY=test\n"); client = lane.Linear(env_file); client.state = root / "state"; headers = {"X-RateLimit-Requests-Remaining": "1800", "X-RateLimit-Requests-Limit": "2500", "X-RateLimit-Requests-Reset": "99"}
-            # The shared cooldown dir and api-budget.json live under LANES_STATE; a unit test
-            # must not read the host's real cooldown or overwrite its budget snapshot.
-            for guard in (patch.dict(os.environ, {"LINEAR_COOLDOWN_STATE_DIR": str(root / "linear-cooldown")}),
-                          patch.object(lane, "linear_cooldown_until", return_value=None),
-                          patch.object(lane, "record_linear_budget"),
-                          patch.object(lane, "publish_linear_cooldown", return_value=NOW + 60)):
-                guard.start(); self.addCleanup(guard.stop)
-            with patch.object(lane.urllib.request, "urlopen", return_value=_Body(b'{"data": {"ok": 1}}', headers)):
-                self.assertEqual(client.gql("q", {}), {"ok": 1})
-            saved = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((saved["schema"], saved["remaining"], saved["limit"], saved["reset"], saved["rateLimitedAt"]), (1, 1800, 2500, 99, None)); self.assertRegex(saved["observedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"); self.assertNotIn("linearRemaining", saved); body = json.dumps({"errors": [{"message": "limited", "extensions": {"code": "RATELIMITED"}}]}).encode(); error = urllib.error.HTTPError("https://api.linear.app/graphql", 400, "bad", None, io.BytesIO(body))
-            with patch.object(lane.urllib.request, "urlopen", side_effect=error):
-                with self.assertRaises(lane.LinearRateLimited):
-                    client.gql("q", {})
-            limited_budget = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((limited_budget["remaining"], limited_budget["limit"]), (1800, 2500)); self.assertRegex(limited_budget["rateLimitedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"); self.assertNotIn("linearRateLimitedAt", limited_budget); parsed_limit = A.collect(client.state, {}, time.time()); self.assertAlmostEqual(parsed_limit["linearRateLimitedAt"], time.time(), delta=5)
-            A.record_linear_budget(client.state, {"X-RateLimit-Requests-Remaining": "1000"}, 200, b""); partial = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((partial["schema"], partial["remaining"], partial["limit"], partial["reset"]), (1, 1000, 2500, 99)); self.assertRegex(partial["rateLimitedAt"], r"Z$")
-            A.record_linear_budget(client.state, {"X-RateLimit-Requests-Remaining": "10", "X-RateLimit-Requests-Limit": "2500", "X-RateLimit-Complexity-Remaining": "1"}, 429, b""); throttled = json.loads((client.state / "api-budget.json").read_text()); self.assertEqual((throttled["remaining"], throttled["limit"]), (10, 2500)); self.assertRegex(throttled["rateLimitedAt"], r"Z$")
-            with patch.object(lane.autoscale, "record_linear_budget", side_effect=RuntimeError("disk")), \
-                    patch.object(lane.urllib.request, "urlopen", return_value=_Body(b'{"data": {"ok": 1}}')):
-                self.assertEqual(client.gql("q", {}), {"ok": 1})
-            limited = urllib.error.HTTPError("https://api.linear.app/graphql", 400, "bad", None,
-                                              io.BytesIO(b'{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'))
-            with patch.object(lane.autoscale, "record_linear_budget", side_effect=RuntimeError("disk")), \
-                    patch.object(lane.urllib.request, "urlopen", side_effect=limited):
-                with self.assertRaises(lane.LinearRateLimited):
-                    client.gql("q", {})
+            self.assertFalse(A.collect(root, {}, NOW)["doctorFresh"]);
+            env_file = root / "linear.env"
+            env_file.write_text("LINEAR_API_KEY=test\n")
+            client = lane.Linear(env_file)
+            state = root / "state"
+            headers = {"X-RateLimit-Requests-Remaining": "1800", "X-RateLimit-Requests-Limit": "2500", "X-RateLimit-Requests-Reset": "99"}
+            # Consume Main's budget receipt and preserve its actual cooldown behavior.
+            with patch.object(lane, "lane_state_dir", return_value=state):
+                with patch.object(lane.urllib.request, "urlopen", return_value=_Body(b'{"data": {"ok": 1}}', headers)):
+                    self.assertEqual(client.gql("q", {}), {"ok": 1})
+                saved = json.loads((state / "api-budget.json").read_text())
+                self.assertEqual((saved["schema"], saved["remaining"], saved["limit"], saved["reset"], saved["rateLimitedAt"]), (1, 1800, 2500, 99, None))
+                self.assertNotIn("linearRemaining", saved)
+                self.assertRegex(saved["observedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+                body = json.dumps({"errors": [{"message": "limited", "extensions": {"code": "RATELIMITED"}}]}).encode()
+                error = urllib.error.HTTPError("https://api.linear.app/graphql", 400, "bad", None, io.BytesIO(body))
+                with patch.object(lane.urllib.request, "urlopen", side_effect=error):
+                    with self.assertRaises(lane.LinearRateLimited):
+                        client.gql("q", {})
+                limited = json.loads((state / "api-budget.json").read_text())
+                self.assertEqual((limited["remaining"], limited["limit"]), (1800, 2500))
+                self.assertRegex(limited["rateLimitedAt"], r"Z$")
+                self.assertAlmostEqual(A.collect(state, {}, time.time())["linearRateLimitedAt"], time.time(), delta=5)
+                self.assertGreater(lane.linear_cooldown_until(client.key), time.time())
+                lane.record_linear_budget({"X-RateLimit-Requests-Remaining": "1000"}, rate_limited=False)
+                partial = json.loads((state / "api-budget.json").read_text())
+                self.assertEqual((partial["schema"], partial["remaining"], partial["limit"], partial["reset"]), (1, 1000, 2500, 99))
+                self.assertEqual(partial["rateLimitedAt"], limited["rateLimitedAt"])
+                with patch.object(lane.urllib.request, "urlopen") as request:
+                    with self.assertRaises(lane.LinearRateLimited):
+                        client.gql("q", {})
+                    request.assert_not_called()
     def test_dispatch_worker_doctor_and_hud(self):
         spawned = []
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
@@ -242,10 +277,10 @@ class AutoscaleTest(unittest.TestCase):
                     patch.object(lane.doctor, "run", return_value={}), \
                     patch.object(lane.urllib.request, "urlopen", side_effect=AssertionError("network")):
                 self.assertEqual(lane.dispatch(host), 0)
-            tick = json.loads((host.state / "tick.json").read_text()); self.assertIn("boom", tick["autoscaleError"])
-            expected = [name for name, spec in lane.load_providers().items() if spec.get("enabled", True)
-                        for _ in range(spec.get("slots", 1))]
-            self.assertEqual(tick["spawned"], expected); self.assertEqual(spawned, tick["spawned"])
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertIn("boom", tick["autoscaleError"])
+            self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent"])
+            self.assertEqual(spawned, tick["spawned"])
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp)
             (root / "doctor.json").write_text(json.dumps({"observed": {"now": time.time(), "capacityByProvider": {"devin": {"running": 4}},

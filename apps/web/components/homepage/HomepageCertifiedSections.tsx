@@ -22,7 +22,23 @@ export interface HomepageCertifiedSectionsProps {
   readonly previews: HomepageCertifiedPreviews;
 }
 
-type HomepageSection = (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number];
+export interface HomepageEditorialFeatureSectionContent {
+  readonly id: string;
+  readonly headline: string;
+  readonly body: string;
+}
+
+export interface HomepageEditorialFeaturePreview {
+  readonly image: MarketingExportImage;
+  /** Omit when the record does not own an editorial caption. */
+  readonly caption?: string;
+}
+
+export interface HomepageEditorialFeatureSectionProps {
+  readonly section: HomepageEditorialFeatureSectionContent;
+  /** This source-backed phone row supports one or two real exports. */
+  readonly previews: readonly HomepageEditorialFeaturePreview[];
+}
 
 function EditorialSection({
   children,
@@ -33,7 +49,7 @@ function EditorialSection({
   children: ReactNode;
   dataMedia: 'true' | 'false';
   rhythm: 'product' | 'text';
-  section: HomepageSection;
+  section: HomepageEditorialFeatureSectionContent;
 }>) {
   return (
     <section
@@ -57,7 +73,7 @@ function EditorialSection({
 function ProfileSurface({
   image,
   caption,
-}: Readonly<{ image: MarketingExportImage; caption: string }>) {
+}: Readonly<{ image: MarketingExportImage; caption?: string }>) {
   return (
     <figure className='homepage-next-step'>
       <ArtistProfilePhoneFrame
@@ -75,21 +91,29 @@ function ProfileSurface({
           width={image.width}
         />
       </ArtistProfilePhoneFrame>
-      <figcaption className='homepage-next-step__caption'>{caption}</figcaption>
+      {caption ? (
+        <figcaption className='homepage-next-step__caption'>
+          {caption}
+        </figcaption>
+      ) : null}
     </figure>
   );
 }
 
 /**
- * Pen My0zu (JOV-6946): one section, one job. The hero already shows the
- * profile; this section proves the next steps a visitor takes from it, with
- * real captures of jov.ie/tim. The retired connected chapter, numbered
- * outcomes, visibility block, and lenses slider replayed the hero argument.
+ * Record-owned editorial split using the certified homepage phone treatment.
+ * The caller supplies its own copy and one or two real screenshot exports;
+ * this renderer adds no canned copy or borrowed second capture.
  */
-export function HomepageCertifiedSections({
+export function HomepageEditorialFeatureSection({
+  section,
   previews,
-}: HomepageCertifiedSectionsProps) {
-  const section = HOMEPAGE_LAUNCH_COPY.certified.sections[0];
+}: HomepageEditorialFeatureSectionProps) {
+  if (previews.length < 1 || previews.length > 2) {
+    throw new Error(
+      `Homepage editorial feature ${section.id} requires one or two real previews`
+    );
+  }
 
   return (
     <EditorialSection dataMedia='true' rhythm='product' section={section}>
@@ -105,15 +129,37 @@ export function HomepageCertifiedSections({
           <p className='homepage-certified-section__body'>{section.body}</p>
         </div>
         <div className='homepage-next-steps' data-homepage-visual={section.id}>
-          {section.steps.map(step => (
+          {previews.map(preview => (
             <ProfileSurface
-              caption={step.caption}
-              image={previews[step.id]}
-              key={step.id}
+              caption={preview.caption}
+              image={preview.image}
+              key={`${section.id}-${preview.image.publicUrl}`}
             />
           ))}
         </div>
       </div>
     </EditorialSection>
+  );
+}
+
+/**
+ * Pen My0zu (JOV-6946): one section, one job. The hero already shows the
+ * profile; this section proves the next steps a visitor takes from it, with
+ * real captures of jov.ie/tim. The retired connected chapter, numbered
+ * outcomes, visibility block, and lenses slider replayed the hero argument.
+ */
+export function HomepageCertifiedSections({
+  previews,
+}: HomepageCertifiedSectionsProps) {
+  const section = HOMEPAGE_LAUNCH_COPY.certified.sections[0];
+
+  return (
+    <HomepageEditorialFeatureSection
+      section={section}
+      previews={section.steps.map(step => ({
+        caption: step.caption,
+        image: previews[step.id],
+      }))}
+    />
   );
 }

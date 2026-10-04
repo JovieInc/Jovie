@@ -70,12 +70,6 @@ export const APP_FLAG_DEFAULTS = {
    */
   PAID_WELCOME_EMAIL: false,
   /**
-   * Merch pre-publish QA gate (JOV-4739). Default OFF until a real visual
-   * reviewer lands — the stub reviewer routes every new candidate to
-   * quarantine when enabled.
-   */
-  MERCH_QA_GATE: false,
-  /**
    * Anonymous agent profile creation (POST /api/agents/profiles). Kill switch
    * for the public CLI/MCP write path; default on.
    */
@@ -119,7 +113,6 @@ export const APP_FLAG_KEYS = {
   PROFILE_SEARCH_MONITORING: 'profile_search_monitoring',
   ONBOARDING_WOW_TASK_QUEUE: 'onboarding_wow_task_queue',
   PAID_WELCOME_EMAIL: 'paid_welcome_email',
-  MERCH_QA_GATE: 'merch_qa_gate',
   AGENT_PROFILE_CREATE: 'agent_profile_create',
   CREATOR_FINANCE: 'creator_finance',
   VISIBILITY_AUDIT_OFFER: 'visibility_audit_offer',
@@ -148,7 +141,6 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   PROFILE_SEARCH_MONITORING: 'code:PROFILE_SEARCH_MONITORING',
   ONBOARDING_WOW_TASK_QUEUE: 'code:ONBOARDING_WOW_TASK_QUEUE',
   PAID_WELCOME_EMAIL: 'code:PAID_WELCOME_EMAIL',
-  MERCH_QA_GATE: 'code:MERCH_QA_GATE',
   AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
   CREATOR_FINANCE: 'code:CREATOR_FINANCE',
   VISIBILITY_AUDIT_OFFER: 'code:VISIBILITY_AUDIT_OFFER',
@@ -204,8 +196,6 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Seed real onboarding presence-build tasks with live chat artifacts (JOV-3988)',
   PAID_WELCOME_EMAIL:
     'Send one idempotent paid-welcome email after verified subscription entitlement. Default off — Tim publishes prod override and approves the first live send (JOV-6445).',
-  MERCH_QA_GATE:
-    'Merch pre-publish visual QA gate: persisted receipts, quarantine queue, fail-closed publish evidence (JOV-4739). Default off until a real visual reviewer replaces the stub.',
   AGENT_PROFILE_CREATE:
     'Anonymous agent profile creation via POST /api/agents/profiles (public CLI/MCP write path).',
   CREATOR_FINANCE:
@@ -262,8 +252,6 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Retain until task seeding has an independent queue incident stop control.',
   PAID_WELCOME_EMAIL:
     'Retain while external-recipient delivery requires a founder-controlled stop.',
-  MERCH_QA_GATE:
-    'Remove when the real visual reviewer is mandatory and the stub path is deleted.',
   AGENT_PROFILE_CREATE:
     'Retain while the anonymous public write path needs an abuse stop control.',
   CREATOR_FINANCE:
@@ -335,7 +323,6 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PROFILE_SEARCH_MONITORING', // JOV-2659 server runner remains separately health-gated
   'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
-  'MERCH_QA_GATE', // JOV-4739 publish gate; default off until a real visual reviewer replaces the stub — no Statsig gate
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
   'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate
   'VISIBILITY_AUDIT_OFFER', // default off; no Statsig gate

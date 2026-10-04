@@ -39,8 +39,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
-import autoscale  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
@@ -98,8 +98,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_claude_lane.py",
-              "scripts/tests/test_issue_routing.py", "scripts/tests/test_autoscale.py"]
+              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
+              "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
@@ -1525,7 +1525,6 @@ class Linear:
                 raw = error.read()
             except Exception:
                 raw = b""
-            self._capture_budget(getattr(error, "headers", None), getattr(error, "code", 0), raw)
             if error.code == 429 or _body_is_rate_limited(error.code, raw):
                 record_linear_budget(getattr(error, "headers", None), rate_limited=True)
                 raise LinearRateLimited(publish_linear_cooldown(self.key, getattr(error, "headers", None))) from None
@@ -1533,8 +1532,6 @@ class Linear:
         with response as handle:
             raw = handle.read()
             headers = getattr(handle, "headers", None)
-            status = getattr(handle, "status", 200)
-        self._capture_budget(headers, status, raw)
         payload = json.loads(raw.decode() or "{}")
         if _data_is_rate_limited(payload):
             record_linear_budget(headers, rate_limited=True)
@@ -1543,16 +1540,6 @@ class Linear:
         if payload.get("errors"):
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
-
-    def _capture_budget(self, headers, status: int, raw: bytes) -> None:
-        """Linear rate-limit headers are local input for autoscale. Capture never changes gql's result."""
-        try:
-            state = getattr(self, "state", None)
-            if state is None:
-                state = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes"))
-            autoscale.record_linear_budget(state, headers, status, raw)
-        except Exception:
-            return
 
     def _paginated_lane_issues(self, label: str) -> list[dict]:
         """Up to 500 Todo issues. Only the claim-scan cache fill calls this."""
@@ -4731,7 +4718,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         slot.release()
         return 1
     linear = Linear(host.linear_env)
-    linear.state = host.state
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))

@@ -330,9 +330,16 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
-`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. Scale-up
-above today's base is held until the JOV-7587 merge-queue brake lands; scale-down
-still drops one slot after 30 idle ticks, floor `ceil(base/2)`.
+`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. The
+doctor samples one-hour merge throughput every five minutes: queue depth,
+current queue-wait p50, merged/hour, opened/hour, and queue-entry ejection rate.
+Scale-up stops immediately while merged/hour is below opened/hour or queue-wait
+p50 is at least 30 minutes. After that brake stays active for one full autoscale
+interval, each enabled lane steps down by one per interval to `ceil(base/2)`.
+After more than one interval, the doctor files or reopens the single Linear
+remediation `remediation:symphony-bottleneck-merge-queue`. Missing or stale
+throughput evidence blocks growth but does not trigger a blind scale-down.
+Idle scale-down uses the same floor.
 `SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
 divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
 disk or memory emergencies cut immediately and ignore that cooldown. Tim set

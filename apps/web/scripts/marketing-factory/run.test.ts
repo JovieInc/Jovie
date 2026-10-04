@@ -68,6 +68,28 @@ afterEach(() => {
 });
 
 describe('factory:run content stages', () => {
+  it('blocks copy when an active variant has no renderer in this page family', async () => {
+    const generated: string[] = [];
+    const manifest = await run({
+      brief: {
+        ...brief,
+        hero: { useCase: 'claim-conversion', conversion: 'claim-profile' },
+      },
+      providers: dryProviders(brief, {
+        async generate(request) {
+          generated.push(request.stage);
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        },
+      }),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'layout' });
+    expect(
+      record('05-layout.attempt-3.json').receipt.invariantsFailed
+    ).toContain('family-renderer:hero-1');
+    expect(generated).not.toContain('copy');
+  });
+
   it('never calls the copy model when the story layout fails', async () => {
     const generated: string[] = [];
     const manifest = await run({
