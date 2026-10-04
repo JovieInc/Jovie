@@ -1,0 +1,64 @@
+{
+  "schema": "jovie.art-direction/v1",
+  "id": "one-light",
+  "title": "One Light",
+  "status": "active",
+  "surfaces": ["homepage", "marketing"],
+  "thesis": "A near-black field lit by one source that finds one focal element; everything else is darkness, type and restraint.",
+  "referenceIds": ["raycast-com", "vercel-com", "apple-com", "linear-app"],
+  "principles": {
+    "light": [
+      "Exactly one light source per frame; its direction sets every rim, border highlight, text sheen and gradient falloff on the page.",
+      "Light falls off into true shell black before the section edge; spill into the next section only on purpose."
+    ],
+    "composition": [
+      "One focal element per fold, centred on the optical axis or on the claim's baseline; nothing competes with it.",
+      "Generous vertical pacing: the fold breathes, the next section arrives late."
+    ],
+    "type": [
+      "One dominant step then a compressed tail (100/50/40/30): the claim at display scale, supporting copy close to UI scale.",
+      "Tight tracking on display, no more than two weights on screen."
+    ],
+    "motion": [
+      "The light moves, not the layout: slow drift or reveal of the light source under the cinematic tier; UI stays still.",
+      "Reduced motion shows the lit end state with no drift."
+    ],
+    "color": [
+      "One accent hue per section, carried by the light itself, never a second hue in the same field.",
+      "Neutral UI and type; colour exists only in the light and the editorial card fills."
+    ]
+  },
+  "tokenMap": [
+    {
+      "principle": "near-black field",
+      "jovie": "--color-bg-surface-0 (#07080A shell); no pure #000"
+    },
+    {
+      "principle": "one accent hue in the light",
+      "jovie": "accent rotation blue (Ion) -> purple (Ultra) -> pink (Pulse); orange rare on marketing; OKLCH chroma is the contrast lever"
+    },
+    {
+      "principle": "display claim + compressed tail",
+      "jovie": "display scale 32-96 for the claim, UI 14/16 for support; depth ratio 100/50/40/30"
+    },
+    {
+      "principle": "light drift motion",
+      "jovie": "cinematic tier (420ms, --ds-motion-cinematic-easing) for reveals; subtle tier for hover; motion-policy intentionality gate"
+    },
+    {
+      "principle": "single CTA",
+      "jovie": "28px ActionButton pill, weight 510, radius 999; 44px invisible hit target"
+    },
+    {
+      "principle": "content width",
+      "jovie": "--ds-public-content-max 1298px"
+    }
+  ],
+  "antiGoals": [
+    "Two hues in one background (reads as stock).",
+    "A literal object as the focal point when the background should be abstract light.",
+    "Copying any reference's object, streak shape or composition: borrow the lighting logic only."
+  ],
+  "decidedBy": "refs agent, provisional (taste feedback rides post-ship review, JOV-7081)",
+  "updatedAt": "2026-10-04T00:00:00.000Z"
+}
