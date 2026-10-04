@@ -698,10 +698,14 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
         self.assertEqual(providers["codex"]["reasoningEffort"], "xhigh")
         self.assertIn("xhigh", providers["codex"]["cmd"])
-        # Tim 2026-09-26: Devin and Codex are the shipping lanes; every other lane stays off.
+        # Tim 2026-10-03 (JOV-7706): Claude Code and Hyperagent join Devin and Codex as regular lanes.
         enabled = {name for name, spec in providers.items() if spec.get("enabled", True)}
-        self.assertTrue(enabled <= {"devin", "codex"}, enabled)
-        self.assertIn("devin", enabled)
+        self.assertEqual(enabled, {"devin", "codex", "claude", "hyperagent"})
+        # Claude rides the subscription wrapper with a routed model; never a bare `claude` with API env.
+        claude = providers["claude"]
+        self.assertIn("{here}/claude_lane.py", claude["cmd"])
+        self.assertEqual(claude["cmd"][claude["cmd"].index("--model") + 1], "{model}")
+        self.assertEqual({route["model"] for route in claude["routes"]}, {"claude-opus-5-5", "claude-sonnet-5-5"})
         # Every lane run is a fresh worktree; Devin refuses untrusted dirs unless told not to.
         cmd = providers["devin"]["cmd"]
         self.assertEqual(cmd[cmd.index("--respect-workspace-trust") + 1], "false")
@@ -1315,12 +1319,16 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
 
     def test_hyperagent_without_actual_dispatch_proof_holds_before_any_provider_process(self):
-        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
-                                 FakeLinear([]), issue("JOV-6871"))
-        self.assertEqual(receipt["verdict"], "remote-held")
-        self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
-        self.assertNotIn("agentExit", receipt)
-        self.assertFalse((self.host.state / "worktrees").exists())
+        for api in ({"__name__": "hyperagent"}, {"mcp_call": None}, ["invalid-api"]):
+            with self.subTest(api=api), patch("runpy.run_path", return_value=api), \
+                    patch.object(lane.shutil, "which", return_value="/fake/hyperagent"):
+                receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
+                                         FakeLinear([]), issue("JOV-6871"))
+                self.assertEqual(receipt["verdict"], "remote-held")
+                self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
+                self.assertNotIn("agentExit", receipt)
+                self.assertFalse((self.host.state / "worktrees").exists())
+                self.assertEqual(self.ledger()[-1]["verdict"], "remote-held")
 
     def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
