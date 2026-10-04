@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   build: vi.fn(),
   error: vi.fn(),
 }));
+vi.mock('@/lib/auth/session', () => ({
+  getSessionContext: vi.fn(),
+  setupDbSession: vi.fn(),
+}));
 vi.mock('@/lib/db', () => ({
   db: { select: mocks.select },
   doesTableExist: mocks.exists,
@@ -133,6 +137,19 @@ describe('loadCapabilityEvidence', () => {
       'capability evidence: profile exposure read failed',
       expect.any(Error)
     );
+  });
+
+  it('marks outcome observations stale when their latest event lags the freshness window', async () => {
+    mocks.where
+      .mockResolvedValueOnce([{ count: 12, latest: '2026-10-02' }])
+      .mockResolvedValueOnce([{ count: 3, latest: '2026-09-29' }]);
+    const result = await loadCapabilityEvidence(now);
+    expect(result.exposure.stale).toBe(false);
+    expect(result.outcome).toMatchObject({
+      measured: true,
+      count: 3,
+      stale: true,
+    });
   });
 
   it('preserves stale exposure and fails closed when certification is unreadable', async () => {

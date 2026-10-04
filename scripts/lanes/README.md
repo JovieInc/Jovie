@@ -17,6 +17,7 @@ The harness, not the model, owns:
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
@@ -36,6 +37,7 @@ The harness, not the model, owns:
 | Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
+| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `backup/<host>/<name>-<date>` first, else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
@@ -175,7 +177,14 @@ Gaps closed after the first week (no PR may sit unowned):
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
   drafts receive `repair`, or `hold:dependency` while a named dependency is open.
   A landed dependency releases repair; it never grants authority to discard the branch.
-  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement. Every
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
+  exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
+  carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
+  latest `labeled` event) sends its issue to Todo + `agent-ready` with a rebuild-from-main note,
+  unless the issue is done or another open PR carries it. The PR stays open and gets
+  `lane-rebuild` (once), which stops it holding the issue in `in_flight_issues()`; label it
+  `duplicate` once the rebuild lands. Holds, the merge queue and live repair claims skip it;
+  `LANES_PARKED_REQUEUE=0` turns it off (`requeue_parked()`). Every
   close path re-reads the live source head, state, complete labels, fork and queue status;
   revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
@@ -459,7 +468,7 @@ alert `escalation-needs-human`.
 ```sh
 python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
   scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py \
-  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py \
+  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py scripts/tests/test_worktree_sweep.py \
   scripts/tests/test_remediation.py
 ```
 
@@ -523,10 +532,15 @@ publication `public`, `marketing.proofAuthorized` true, maturity not
 description names a `GATED_PATH_PREFIXES` path or clearly targets a
 homepage, landing, or marketing page. `worker()` calls
 `design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
-gated issue with an incomplete brief is not claimed, and the runner writes
-`needs-design-brief` plus the matching Linear label at most once. The label
-routes a design pass — it does not itself block — and the next claim admits
-the issue once steps 1–9 are complete.
+gated issue with an incomplete brief gets `needs-design-brief` plus the
+matching Linear label at most once, and goes to the design/brief lane: the
+same provider claims it once (`run_brief`) with a brief-only prompt, writes
+steps 1–9 to `.design-brief.md`, and the runner appends that inline to the
+issue under `<!-- design-gate:brief-lane -->`. No PR is opened, so merge sync
+cannot close the issue before it is built. The issue returns to Todo; a
+complete brief is admitted on the next claim, an incomplete one (usually step
+9, which needs a real Pen or ImageGen artifact) stays held for a design pass
+and is never re-run. Linked `Design brief:` docs are never overwritten.
 
 `doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
 `needsBrief`, `missingSteps`), deduped; incomplete briefs also increment

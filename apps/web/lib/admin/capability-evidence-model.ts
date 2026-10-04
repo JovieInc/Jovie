@@ -109,7 +109,7 @@ export function deriveCapabilityStage(
       ? 'configured-unobserved'
       : 'deployed-only';
   }
-  if (record.exposure.stale) return 'stale-observation';
+  if (record.exposure.stale || record.outcome.stale) return 'stale-observation';
   if (
     record.rollout.configuredPercent !== null &&
     record.rollout.configuredPercent < 100

@@ -129,6 +129,16 @@ describe('deriveCapabilityStage', () => {
     ).toBe('stale-observation');
   });
 
+  it('does not call stale zero-count outcomes healthy', () => {
+    expect(
+      deriveCapabilityStage(
+        baseRecord({
+          outcome: observation({ count: 0, latestAt: null, stale: true }),
+        })
+      )
+    ).toBe('stale-observation');
+  });
+
   it('is stale-client when the running client build differs from deployed', () => {
     expect(
       deriveCapabilityStage(baseRecord({ clientSha: 'c'.repeat(40) }))

@@ -19,7 +19,6 @@ export const PERFORMANCE_THRESHOLDS = {
 
 // Table names for schema operations
 export const TABLE_NAMES = {
-  clickEvents: 'click_events',
   creatorProfiles: 'creator_profiles',
   dailyProfileViews: 'daily_profile_views',
   stripeWebhookEvents: 'stripe_webhook_events',

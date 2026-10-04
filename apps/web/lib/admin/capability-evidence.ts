@@ -1,13 +1,11 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
-import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
-import { clickEvents, dailyProfileViews } from '@/lib/db/schema/analytics';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  getCanonicalCustomerLinkOutcome,
+  getCanonicalCustomerProfileExposure,
+} from '@/lib/db/queries/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { getDeployedBuildInfo } from '@/lib/observability/build-info';
-import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import type {
   CapabilityCertification,
   CapabilityEvidenceRecord,
@@ -87,35 +85,12 @@ async function observeProfileExposure(
 ): Promise<CapabilityObservation> {
   const population = `${CUSTOMER_POPULATION}; bot-filtered upstream at write time`;
   try {
-    if (
-      !(await doesTableExist(TABLE_NAMES.creatorProfiles)) ||
-      !(await doesTableExist(TABLE_NAMES.dailyProfileViews))
-    ) {
-      return unmeasured(population);
-    }
-    const [row] = await db
-      .select({
-        count: drizzleSql<number>`coalesce(sum(${dailyProfileViews.viewCount}), 0)::int`,
-        latest: drizzleSql<string | null>`max(${dailyProfileViews.viewDate})`,
-      })
-      .from(dailyProfileViews)
-      .innerJoin(
-        creatorProfiles,
-        eq(creatorProfiles.id, dailyProfileViews.creatorProfileId)
-      )
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(
-        and(
-          drizzleSql`${dailyProfileViews.viewDate} >= (current_date - ${EVIDENCE_WINDOW_DAYS})::text::date`,
-          eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isClaimed, true),
-          drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
-        )
-      );
-    const latest = row?.latest ?? null;
+    const row = await getCanonicalCustomerProfileExposure(EVIDENCE_WINDOW_DAYS);
+    if (row === null) return unmeasured(population);
+    const latest = row.latestAt;
     const stale =
       latest === null || daysSince(latest, now) > OBSERVATION_STALE_AFTER_DAYS;
-    return measured(Number(row?.count ?? 0), latest, stale, population);
+    return measured(row.count, latest, stale, population);
   } catch (error) {
     captureError('capability evidence: profile exposure read failed', error);
     return unmeasured(
@@ -125,40 +100,17 @@ async function observeProfileExposure(
   }
 }
 
-async function observeLinkTapOutcome(): Promise<CapabilityObservation> {
+async function observeLinkTapOutcome(
+  now: Date
+): Promise<CapabilityObservation> {
   const population = `${CUSTOMER_POPULATION}; is_bot = false`;
   try {
-    if (
-      !(await doesTableExist(TABLE_NAMES.creatorProfiles)) ||
-      !(await doesTableExist(TABLE_NAMES.clickEvents))
-    ) {
-      return unmeasured(population);
-    }
-    const [row] = await db
-      .select({
-        count: drizzleSql<number>`count(*)::int`,
-        latest: drizzleSql<
-          string | null
-        >`max(${clickEvents.createdAt}::date)::text`,
-      })
-      .from(clickEvents)
-      .innerJoin(
-        creatorProfiles,
-        eq(creatorProfiles.id, clickEvents.creatorProfileId)
-      )
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(
-        and(
-          drizzleSql`${clickEvents.createdAt} >= now() - make_interval(days => ${EVIDENCE_WINDOW_DAYS})`,
-          eq(clickEvents.isBot, false),
-          eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isClaimed, true),
-          drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
-        )
-      );
-    const latest = row?.latest ?? null;
-    const stale = latest === null;
-    return measured(Number(row?.count ?? 0), latest, stale, population);
+    const row = await getCanonicalCustomerLinkOutcome(EVIDENCE_WINDOW_DAYS);
+    if (row === null) return unmeasured(population);
+    const latest = row.latestAt;
+    const stale =
+      latest === null || daysSince(latest, now) > OBSERVATION_STALE_AFTER_DAYS;
+    return measured(row.count, latest, stale, population);
   } catch (error) {
     captureError('capability evidence: link tap outcome read failed', error);
     return unmeasured(
@@ -213,7 +165,7 @@ export async function loadCapabilityEvidence(
 
   const [exposure, outcome] = await Promise.all([
     observeProfileExposure(now),
-    observeLinkTapOutcome(),
+    observeLinkTapOutcome(now),
   ]);
 
   const rollout: CapabilityRollout = {
