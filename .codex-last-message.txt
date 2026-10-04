@@ -1,0 +1,18 @@
+Implemented and published as draft PR [#19716](https://github.com/JovieInc/Jovie/pull/19716).
+
+- Fix jobs now reconcile live PR state before checkout/install/push.
+- Merged targets cancel with a durable, source-preserving receipt and zero installs.
+- Shared pnpm store pruning was removed; lane and agent installs force hardlink imports.
+- Bug-to-test now recognizes Python `test_*.py` suites.
+- JOV-7306 moved to In Review.
+
+Verification:
+
+- 179 Python lane tests passed.
+- 20 bug-to-test Vitest tests passed.
+- Typecheck: 17/17 tasks passed.
+- Biome and Python compilation passed.
+- Exact-head hosted CI is fully green.
+- PR remains draft, mergeable, and unmerged as required.
+
+Environment note: setup detected the host-default Node/pnpm mismatch; all validation used pinned Node 24.21.0 and pnpm 9.15.9 via mise.
