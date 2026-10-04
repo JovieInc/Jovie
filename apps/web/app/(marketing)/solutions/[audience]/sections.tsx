@@ -101,9 +101,10 @@ function slotText(
 const FACTORY_MEDIA_SIZES = '(min-width: 1024px) 50vw, 100vw';
 
 /**
- * Factory-rendered media (JOV-7765). The frame takes the asset's own aspect
- * ratio from the record, so nothing shifts while it loads. Video is
- * click-to-play behind its poster, with captions, and never autoplays, which also keeps it
+ * Factory-rendered media (JOV-7765). The image or video carries the asset's
+ * intrinsic width and height, which browsers map to its aspect ratio, so the
+ * box is reserved before anything loads (CLS 0). Video is click-to-play
+ * behind its poster, with captions, and never autoplays, which also keeps it
  * still for reduced-motion visitors. The digest attribute lets the design
  * loop prove a re-render reached the page.
  */
@@ -112,14 +113,15 @@ function FactoryGeneratedMedia({
 }: Readonly<{ media: GeneratedPageAssetRef }>) {
   return (
     <div
-      className='relative min-w-0 overflow-hidden rounded-xl border border-subtle bg-surface-0'
-      style={{ aspectRatio: `${media.width} / ${media.height}` }}
+      className='min-w-0 overflow-hidden rounded-xl border border-subtle bg-surface-0'
       data-factory-media={media.id}
       data-factory-media-digest={media.digest}
     >
       {media.mime.startsWith('video/') ? (
         <video
-          className='h-full w-full object-cover'
+          className='block h-auto w-full'
+          width={media.width}
+          height={media.height}
           controls
           playsInline
           preload='none'
@@ -139,9 +141,10 @@ function FactoryGeneratedMedia({
         <Image
           src={media.id}
           alt={media.alt}
-          fill
+          width={media.width}
+          height={media.height}
           sizes={FACTORY_MEDIA_SIZES}
-          className='object-cover'
+          className='block h-auto w-full'
         />
       )}
     </div>

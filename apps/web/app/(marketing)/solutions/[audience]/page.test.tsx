@@ -47,10 +47,17 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('next/image', () => ({
-  default: (props: { readonly alt?: string; readonly src?: unknown }) => (
+  default: (props: {
+    readonly alt?: string;
+    readonly src?: unknown;
+    readonly width?: number;
+    readonly height?: number;
+  }) => (
     <img
       alt={props.alt ?? ''}
       src={typeof props.src === 'string' ? props.src : ''}
+      width={props.width}
+      height={props.height}
     />
   ),
 }));
@@ -362,9 +369,13 @@ describe('generated media slot (JOV-7765)', () => {
     );
     const frame = heroFrame(container);
 
-    expect(frame.style.aspectRatio).toBe('1600 / 900');
+    const image = frame.querySelector('img');
+
     expect(frame).toHaveAttribute('data-factory-media-digest', digest);
-    expect(frame.querySelector('img')).toHaveAttribute('alt', 'Generated hero');
+    expect(image).toHaveAttribute('alt', 'Generated hero');
+    // Intrinsic size on the element is what reserves its box (CLS 0).
+    expect(image).toHaveAttribute('width', '1600');
+    expect(image).toHaveAttribute('height', '900');
     expect(frame.querySelector('video')).toBeNull();
   });
 
@@ -387,6 +398,8 @@ describe('generated media slot (JOV-7765)', () => {
     const video = heroFrame(container).querySelector('video');
 
     expect(video).not.toBeNull();
+    expect(video).toHaveAttribute('width', '1280');
+    expect(video).toHaveAttribute('height', '720');
     expect(video).toHaveAttribute(
       'poster',
       '/marketing/factory/hero-poster.avif'
