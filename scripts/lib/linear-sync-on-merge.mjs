@@ -430,7 +430,26 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
     body: JSON.stringify({ query, variables }),
   });
   if (!response.ok) {
-    throw new Error(`Linear HTTP ${response.status}`);
+    // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
+    // lifecycle key is shared with Summer and agents, so name it plainly.
+    /** @type {any} */
+    const body = await response.json().catch(() => null);
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+    const limited = errors.some(
+      (/** @type {any} */ error) => error?.extensions?.code === 'RATELIMITED'
+    );
+    const detail = errors
+      .map((/** @type {any} */ error) => String(error?.message ?? ''))
+      .filter(Boolean)
+      .join('; ');
+    throw Object.assign(
+      new Error(
+        limited
+          ? `Linear rate limited (HTTP ${response.status})`
+          : `Linear HTTP ${response.status}${detail ? `: ${detail}` : ''}`
+      ),
+      { rateLimited: limited }
+    );
   }
   const payload =
     /** @type {{ errors?: unknown, data?: Record<string, any> }} */ (
@@ -527,7 +546,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier }
+    nodes { identifier updatedAt }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -775,6 +794,8 @@ export async function syncLinearIssueOnMerge(options = {}) {
 
   const lookups = [];
   if (sweep) {
+    /** @type {{ identifier: string, updatedAt: string }[]} */
+    const found = [];
     let after = null;
     for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
       const data = await linearGraphql(fetchImpl, apiKey, SWEEP_QUERY, {
@@ -786,11 +807,23 @@ export async function syncLinearIssueOnMerge(options = {}) {
         after,
       });
       for (const node of data.issues?.nodes ?? []) {
-        if (typeof node?.identifier === 'string') lookups.push(node.identifier);
+        if (typeof node?.identifier === 'string') {
+          found.push({
+            identifier: node.identifier,
+            updatedAt: String(node.updatedAt ?? ''),
+          });
+        }
       }
       if (data.issues?.pageInfo?.hasNextPage !== true) break;
       after = data.issues.pageInfo.endCursor;
     }
+    // Least recently touched first: when a budget runs out mid-sweep, the
+    // next sweep starts where this one could not reach.
+    found.sort(
+      (left, right) =>
+        (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0)
+    );
+    lookups.push(...found.map(entry => entry.identifier));
   } else {
     lookups.push(ref.issueId || ref.identifier);
   }
@@ -798,7 +831,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
   const results = [];
   const failures = [];
-  for (const lookupId of lookups) {
+  for (const [index, lookupId] of lookups.entries()) {
     try {
       results.push(
         await reconcileIssueLifecycle({
@@ -820,6 +853,15 @@ export async function syncLinearIssueOnMerge(options = {}) {
       const message = error instanceof Error ? error.message : String(error);
       failures.push(`${lookupId}: ${message}`);
       log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
+      if (/** @type {{ rateLimited?: boolean }} */ (error)?.rateLimited) {
+        const deferred = lookups.length - index - 1;
+        if (deferred > 0) {
+          failures.push(
+            `${deferred} issue(s) deferred to the next sweep by the Linear rate limit`
+          );
+        }
+        break;
+      }
     }
   }
   const reasons = [...failures];

@@ -338,9 +338,50 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual([]);
   });
 
+  it('stops a sweep at the Linear rate limit, oldest issue first, and defers the rest', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    world.issues['JOV-1'].updatedAt = '2026-10-03T13:00:00Z';
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      updatedAt: '2026-10-03T09:00:00Z',
+    };
+    const asked = [];
+    const limited = intercept(fetchImpl, async (_url, body) => {
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      asked.push(body.variables.issueId);
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({
+          errors: [
+            {
+              message: 'Rate limit exceeded',
+              extensions: { code: 'RATELIMITED' },
+            },
+          ],
+        }),
+      };
+    });
+    await expect(sweep(limited)).rejects.toThrow(
+      /JOV-2: Linear rate limited \(HTTP 400\); 1 issue\(s\) deferred to the next sweep/
+    );
+    expect(asked).toEqual(['JOV-2']);
+  });
+
   it('surfaces Linear HTTP and GraphQL errors, and skips unknown issues', async () => {
     for (const [response, error] of [
       [{ ok: false, status: 500, json: async () => ({}) }, /Linear HTTP 500/],
+      [
+        {
+          ok: false,
+          status: 400,
+          json: async () => ({ errors: [{ message: 'Query too complex' }] }),
+        },
+        /Linear HTTP 400: Query too complex/,
+      ],
       [
         json({ errors: [{ message: 'rate limited' }, 'x'] }),
         /rate limited; Linear request failed/,
