@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ContactCertificationInspection } from '@/lib/contacts/certification';
 import { OutboundRail, type OutboundRailProps } from './OutboundRail';
@@ -55,7 +55,7 @@ describe('OutboundRail', () => {
   it('blocks approval until the current facts are certified', () => {
     const props = renderRail({ certification: certification('needs_review') });
     expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
-    expect(screen.getByText('Certify facts to approve')).toBeInTheDocument();
+    expect(screen.getByText('Certify facts to approve.')).toBeInTheDocument();
     act(() => sendOutboundRailCommand('approve'));
     expect(props.onApprove).not.toHaveBeenCalled();
   });
@@ -87,10 +87,21 @@ describe('OutboundRail', () => {
     );
   });
 
-  it('rejects with the chosen reason from the keyboard', () => {
+  it('confirms before rejecting, then records the chosen reason', async () => {
     const props = renderRail();
     act(() => sendOutboundRailCommand('reject'));
+    expect(props.onReject).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reject' }));
     expect(props.onReject).toHaveBeenCalledWith('not_a_fit');
+  });
+
+  it('asks to resolve a conflict before approving', () => {
+    renderRail({ certification: certification('conflicted') });
+    expect(
+      screen.getByText('Resolve the conflict to approve.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
   });
 
   it('says when there is no way to reach someone', () => {

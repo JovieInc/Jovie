@@ -2,6 +2,7 @@
 
 import {
   Button,
+  ConfirmDialog,
   Select,
   SelectContent,
   SelectItem,
@@ -102,12 +103,15 @@ function MessageSection({
   row,
   pending,
   canApprove,
+  blockedReason,
   onApprove,
   onSaveCopy,
 }: Readonly<{
   row: OutboundRow;
   pending: string | null;
   canApprove: boolean;
+  /** Why Approve is disabled, shown in place of the edit hint. */
+  blockedReason: string;
   onApprove: (copy: OutboundCopy) => void;
   onSaveCopy: (copy: OutboundCopy) => void;
 }>) {
@@ -197,7 +201,7 @@ function MessageSection({
               ? 'Edited · needs approval'
               : canApprove
                 ? ''
-                : 'Certify facts to approve'}
+                : blockedReason}
           </span>
         </div>
       </div>
@@ -222,7 +226,8 @@ export function OutboundRail({
   onReject,
 }: OutboundRailProps) {
   const [reason, setReason] = useState<OutboundRejectReason>('not_a_fit');
-  const reject = useCallback(() => onReject(reason), [onReject, reason]);
+  const [confirmReject, setConfirmReject] = useState(false);
+  const reject = useCallback(() => setConfirmReject(true), []);
   useRailCommand('reject', Boolean(row) && pending === null, reject);
   const grouped = useMemo(() => {
     const groups = new Map<
@@ -311,7 +316,6 @@ export function OutboundRail({
               <Button
                 size='sm'
                 variant='tertiary'
-                destructive
                 className='ml-auto'
                 disabled={pending !== null}
                 loading={pending === 'reject'}
@@ -320,6 +324,18 @@ export function OutboundRail({
                 Reject
               </Button>
             </div>
+            <ConfirmDialog
+              open={confirmReject}
+              onOpenChange={setConfirmReject}
+              title={`Reject ${row.name}?`}
+              description={`Reason: ${OUTBOUND_REJECT_REASON_LABELS[reason]}. The reason feeds qualification learning, and you can approve them later.`}
+              confirmLabel='Reject'
+              variant='destructive'
+              onConfirm={() => {
+                setConfirmReject(false);
+                onReject(reason);
+              }}
+            />
             <p
               role='status'
               aria-live='polite'
@@ -338,6 +354,11 @@ export function OutboundRail({
             row={row}
             pending={pending}
             canApprove={certified}
+            blockedReason={
+              certification?.status === 'conflicted'
+                ? 'Resolve the conflict to approve.'
+                : 'Certify facts to approve.'
+            }
             onApprove={onApprove}
             onSaveCopy={onSaveCopy}
           />
@@ -345,7 +366,7 @@ export function OutboundRail({
             <div className='flex items-center gap-2 px-1 pb-2 text-xs'>
               {row.profilePath ? (
                 <a
-                  className='inline-flex items-center gap-1 text-link'
+                  className='inline-flex items-center gap-1 text-primary-token underline-offset-2 hover:underline'
                   href={row.profilePath}
                   target='_blank'
                   rel='noreferrer'
