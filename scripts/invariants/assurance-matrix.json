@@ -3,7 +3,7 @@
   "contract": "jovie.certification/v1",
   "issue": "JOV-6064",
   "extends": "JOV-5853",
-  "matrixRevision": "2026-10-03.1",
+  "matrixRevision": "2026-10-03.3",
   "asOf": "2026-10-03T00:00:00Z",
   "evidenceMaxAgeMs": 2592000000,
   "scope": {
@@ -51,6 +51,11 @@
         "id": "ui:visual-qa-surfaces",
         "kind": "ui-inventory",
         "source": "apps/web/lib/visual-qa/registry.ts#VISUAL_QA_SURFACES"
+      },
+      {
+        "id": "ui:supported-platforms",
+        "kind": "ui-inventory",
+        "source": "apps/web/lib/platform/supported-platforms.ts#SUPPORTED_PLATFORMS"
       }
     ]
   },
@@ -997,16 +1002,18 @@
           },
           {
             "ref": "scripts/invariants/screen-certification.mjs",
-            "enforcement": "not-wired",
+            "enforcement": "scheduled",
             "inventory": [
               "ui:ownership-registry",
               "ui:app-screens",
               "ui:screen-cert-routes"
-            ]
+            ],
+            "liveStatus": "red",
+            "lastVerifiedLiveFiring": "2026-10-03T18:28:52Z"
           },
           {
             "ref": "apps/web/tests/e2e/electron-titlebar-geometry.spec.ts",
-            "enforcement": "not-wired"
+            "enforcement": "scheduled"
           },
           {
             "ref": ".github/workflows/visual-regression.yml",
@@ -1018,7 +1025,7 @@
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
-          "Full screen-certification gate never runs in CI.",
+          "Rendered screen certification runs only after merge (screenshots.yml) and is red on main; nothing blocks before merge.",
           "Header/title alignment tolerance in storybook-elevation equals 2px + content inset; title x has only a lower bound (JOV-7207 audit).",
           "Zoom/text-resize never exercised."
         ],
@@ -1101,6 +1108,69 @@
       }
     },
     {
+      "id": "AM-018",
+      "surface": "Shell, rail, player and component motion",
+      "failureClass": "ui-motion",
+      "whatCanGoWrong": "Dead time before response, desynchronized width/opacity/translate, non-interruptible or non-reversible transitions, stale transforms after repeated cycles, reduced-motion violations, raw motion values.",
+      "covers": ["ui:ownership-registry", "ui:app-screens"],
+      "owner": "design-system",
+      "sources": ["JOV-7713", "JOV-4522", "JOV-4130"],
+      "invalidatesOn": [
+        "apps/web/lib/animation",
+        "apps/web/components/organisms/sidebar",
+        "apps/web/components/shell",
+        "apps/web/eslint-rules/no-raw-motion-values.js"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/eslint-rules/no-raw-motion-values.js"
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/eslint-rules/no-raw-motion-values.test.ts"
+            }
+          ]
+        },
+        "detectPreRelease": { "state": "absent", "evidence": [] },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": { "state": "absent", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      },
+      "ui": {
+        "class": 4,
+        "judgment": "mixed",
+        "severity": "high",
+        "authority": [
+          ".claude/rules/motion.md",
+          "apps/web/lib/animation/motion-primitives.ts"
+        ],
+        "detectors": [
+          {
+            "ref": "apps/web/eslint-rules/no-raw-motion-values.js",
+            "enforcement": "pr-blocking",
+            "inventory": ["ui:ownership-registry"],
+            "deliberateRed": "apps/web/eslint-rules/no-raw-motion-values.test.ts",
+            "liveStatus": "green"
+          },
+          {
+            "ref": "apps/web/lib/hooks/useReducedMotion.test.ts",
+            "enforcement": "merge-group-blocking"
+          }
+        ],
+        "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
+        "blindSpots": [
+          "No runtime capture of initial/mid/final geometry for rail/player transitions.",
+          "No repeated-cycle drift (ghost width, stale transform) check.",
+          "No reduced-motion consumer audit."
+        ],
+        "remediationOwner": "JOV-7710"
+      }
+    },
+    {
       "id": "AM-019",
       "surface": "Reversible controls and interaction state machines",
       "failureClass": "ui-interaction-state-machine",
@@ -1134,6 +1204,10 @@
             {
               "kind": "test",
               "ref": "apps/web/components/atoms/RailToggleButton.test.tsx"
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx"
             }
           ]
         },
@@ -1164,20 +1238,378 @@
             "enforcement": "merge-group-blocking"
           },
           {
+            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "liveStatus": "green"
+          },
+          {
             "ref": "apps/ovie/scripts/desktop-sidebar-contract.test.mjs",
-            "enforcement": "not-wired"
+            "enforcement": "merge-group-blocking"
           },
           {
             "ref": "apps/ovie/scripts/app-shell-invariants.test.mjs",
-            "enforcement": "not-wired"
+            "enforcement": "merge-group-blocking"
           }
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
-          "No reversible-control transition-graph certification (expanded->collapsed->expanded, repeated, keyboard, mixed input, hydrated).",
-          "apps/ovie shell contract tests are not executed by any CI job."
+          "Reversible-control certification covers the sidebar state machine in jsdom only; composed shell placement, Electron titlebar and the right rail are not yet driven.",
+          "apps/ovie app-shell invariants check source strings (e.g. titlebar marker) rather than rendered geometry."
         ],
         "remediationOwner": "JOV-7710"
+      }
+    },
+    {
+      "id": "AM-020",
+      "surface": "Per-surface UI state coverage (loading, empty, error, partial, stale, locked, offline)",
+      "failureClass": "ui-state-completeness",
+      "whatCanGoWrong": "A surface ships without a required state, invents a success empty state, shows stale content as current, or silently falls through an unsupported state.",
+      "covers": ["ui:ownership-registry", "ui:app-screens"],
+      "owner": "design-system",
+      "sources": ["JOV-7713", "JOV-6928"],
+      "invalidatesOn": [
+        "apps/web/data/designSystem/uiOwnershipRegistry.ts",
+        "apps/web/data/appScreens",
+        "apps/web/components"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/data/designSystem/uiOwnershipRegistry.ts"
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/design-system/ui-ownership-registry.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/design-system/app-screen-registry.test.ts"
+            }
+          ]
+        },
+        "blockPromotion": { "state": "unknown", "evidence": [] },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      },
+      "ui": {
+        "class": 6,
+        "judgment": "deterministic",
+        "severity": "medium",
+        "authority": ["apps/web/data/designSystem/uiOwnershipRegistry.ts"],
+        "detectors": [
+          {
+            "ref": "apps/web/tests/unit/design-system/ui-ownership-registry.test.ts",
+            "enforcement": "merge-group-blocking",
+            "inventory": ["ui:ownership-registry"]
+          },
+          {
+            "ref": ".github/workflows/visual-a11y.yml",
+            "enforcement": "scheduled",
+            "inventory": ["ui:ownership-registry"],
+            "liveStatus": "red",
+            "lastVerifiedLiveFiring": "2026-10-03T12:41:20Z"
+          }
+        ],
+        "requiredEvidence": ["web-desktop", "web-mobile"],
+        "blindSpots": [
+          "Declared requiredStates are not proven to render; no per-state rendered capture on exact build.",
+          "Late-arriving data semantic swaps are not modelled as a state."
+        ],
+        "remediationOwner": "JOV-6928"
+      }
+    },
+    {
+      "id": "AM-021",
+      "surface": "Accessibility of app and public UI (names, keyboard, focus, targets, zoom)",
+      "failureClass": "ui-accessibility",
+      "whatCanGoWrong": "Missing names/roles/states, unreachable keyboard paths, invisible or lost focus, small targets, broken Escape, reduced-motion or 200% zoom failures.",
+      "covers": [
+        "ui:ownership-registry",
+        "ui:app-screens",
+        "ui:marketing-surfaces"
+      ],
+      "owner": "design-system",
+      "sources": ["JOV-7713", "JOV-6220"],
+      "invalidatesOn": [
+        "packages/ui",
+        "apps/web/components",
+        "apps/web/lib/a11y",
+        "apps/web/lib/a11y-gates"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            { "kind": "source", "ref": "apps/web/eslint.config.js" },
+            {
+              "kind": "test",
+              "ref": "apps/web/lib/a11y/modal-focus-boundary.test.tsx"
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/scripts/lint-touch-target.ts"
+            },
+            { "kind": "source", "ref": ".github/workflows/visual-a11y.yml" }
+          ]
+        },
+        "blockPromotion": {
+          "state": "blocking-unproven",
+          "evidence": [{ "kind": "source", "ref": "scripts/ci-fast-lanes.mjs" }]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      },
+      "ui": {
+        "class": 7,
+        "judgment": "deterministic",
+        "severity": "high",
+        "authority": [".claude/rules/ui.md", "DESIGN.md"],
+        "detectors": [
+          {
+            "ref": "apps/web/scripts/lint-contrast-ratchet.mjs",
+            "enforcement": "pr-blocking",
+            "inventory": ["ui:ownership-registry", "ui:marketing-surfaces"],
+            "deliberateRed": "scripts/invariants/gate-integrity.test.mjs",
+            "liveStatus": "green"
+          },
+          {
+            "ref": "apps/web/scripts/lint-touch-target.ts",
+            "enforcement": "pr-blocking",
+            "inventory": ["ui:ownership-registry"]
+          },
+          {
+            "ref": "apps/web/tests/e2e/storybook-overlay-collisions.spec.ts",
+            "enforcement": "path-selected-blocking"
+          },
+          {
+            "ref": ".github/workflows/visual-a11y.yml",
+            "enforcement": "scheduled",
+            "inventory": ["ui:ownership-registry"],
+            "liveStatus": "red",
+            "lastVerifiedLiveFiring": "2026-10-03T12:41:20Z"
+          }
+        ],
+        "requiredEvidence": ["web-desktop", "web-mobile"],
+        "blindSpots": [
+          "Story axe lane is not a merge gate and has been red for days without remediation routing.",
+          "No 200% zoom / text-scaling check.",
+          "Focus continuity after shell transitions not asserted."
+        ],
+        "remediationOwner": "JOV-6220"
+      }
+    },
+    {
+      "id": "AM-022",
+      "surface": "Responsive, mobile and packaged-desktop parity of supported surfaces",
+      "failureClass": "ui-responsive-platform-parity",
+      "whatCanGoWrong": "Desktop assumptions break mobile, drawer/sheet/rail parity drifts, safe areas or orientation break, packaged Mac differs from browser for the same surface.",
+      "covers": [
+        "ui:supported-platforms",
+        "ui:visual-qa-surfaces",
+        "ui:screen-cert-routes"
+      ],
+      "owner": "design-system",
+      "sources": ["JOV-7713", "JOV-6928"],
+      "invalidatesOn": [
+        "apps/web/lib/visual-qa",
+        "apps/web/lib/platform/supported-platforms.ts",
+        "apps/desktop",
+        "apps/web/components/organisms"
+      ],
+      "layers": {
+        "prevent": { "state": "absent", "evidence": [] },
+        "detectPreRelease": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/chat/mobile-chat-certification.ts"
+            },
+            {
+              "kind": "source",
+              "ref": "scripts/invariants/ios-web-no-scroll-jank.mjs"
+            }
+          ]
+        },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      },
+      "ui": {
+        "class": 8,
+        "judgment": "deterministic",
+        "severity": "high",
+        "authority": [
+          "apps/web/lib/visual-qa/viewports.ts",
+          "apps/web/lib/platform/supported-platforms.ts"
+        ],
+        "detectors": [
+          {
+            "ref": "apps/web/lib/visual-qa/registry.ts",
+            "enforcement": "manual",
+            "inventory": ["ui:visual-qa-surfaces"]
+          },
+          {
+            "ref": "scripts/invariants/screen-certification.mjs",
+            "enforcement": "scheduled",
+            "inventory": ["ui:screen-cert-routes"],
+            "liveStatus": "red",
+            "lastVerifiedLiveFiring": "2026-10-03T18:28:52Z"
+          },
+          {
+            "ref": ".github/workflows/screenshots.yml",
+            "enforcement": "scheduled",
+            "inventory": ["ui:visual-qa-surfaces"],
+            "liveStatus": "red",
+            "lastVerifiedLiveFiring": "2026-10-03T18:28:52Z"
+          }
+        ],
+        "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
+        "blindSpots": [
+          "Mobile proof only exists in the post-merge screen-certification run.",
+          "Packaged Mac parity verified manually through dogfood ledgers, not machine-compared."
+        ],
+        "remediationOwner": "JOV-6928"
+      }
+    },
+    {
+      "id": "AM-023",
+      "surface": "Content and data-dependent robustness of rendered UI",
+      "failureClass": "ui-content-robustness",
+      "whatCanGoWrong": "Long names/locales, missing images, zero/large counts, bad aspect ratios, dynamic columns or late-arriving data break geometry or semantics.",
+      "covers": [
+        "ui:ownership-registry",
+        "ui:app-screens",
+        "ui:marketing-surfaces"
+      ],
+      "owner": "design-system",
+      "sources": ["JOV-7713"],
+      "invalidatesOn": [
+        "apps/web/components",
+        "apps/web/components/organisms/table"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/components/atoms/ArtworkFrame.tsx"
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/atoms/ArtworkFrame.test.tsx"
+            }
+          ]
+        },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": { "state": "absent", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      },
+      "ui": {
+        "class": 9,
+        "judgment": "deterministic",
+        "severity": "medium",
+        "authority": ["DESIGN.md"],
+        "detectors": [
+          {
+            "ref": "apps/web/tests/unit/atoms/ArtworkFrame.test.tsx",
+            "enforcement": "merge-group-blocking"
+          }
+        ],
+        "requiredEvidence": ["web-desktop", "web-mobile"],
+        "blindSpots": [
+          "No stress-content fixtures (long strings, missing media, extreme counts) run against primitives or screens.",
+          "Artwork must route through ArtworkFrame (JOV-5455) but adoption is not ratcheted; raw artwork images can bypass it."
+        ],
+        "remediationOwner": "JOV-7713"
+      }
+    },
+    {
+      "id": "AM-024",
+      "surface": "Visual quality and taste boundary on exact-build captures",
+      "failureClass": "ui-visual-taste",
+      "whatCanGoWrong": "A surface passes every deterministic check yet looks mediocre, or an AI aesthetic score masks a deterministic failure.",
+      "covers": [
+        "ui:app-screens",
+        "ui:marketing-surfaces",
+        "ui:visual-qa-surfaces"
+      ],
+      "owner": "design-system",
+      "sources": ["JOV-7713", "JOV-6944", "JOV-6039"],
+      "invalidatesOn": [
+        "apps/web/scripts/design-ci-judge-router.ts",
+        "scripts/invariants/design-surfaces.mjs",
+        "canon/invariants.jsonl"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "scripts/invariants/design-surfaces.mjs"
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/scripts/design-ci-judge-router.ts"
+            }
+          ]
+        },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": { "state": "absent", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      },
+      "ui": {
+        "class": 10,
+        "judgment": "taste",
+        "severity": "medium",
+        "authority": ["DESIGN.md", "canon/invariants.jsonl"],
+        "detectors": [
+          {
+            "ref": "scripts/invariants/design-surfaces.mjs",
+            "enforcement": "pr-blocking"
+          },
+          {
+            "ref": "apps/web/scripts/design-ci-judge-router.ts",
+            "enforcement": "manual",
+            "inventory": ["ui:app-screens", "ui:marketing-surfaces"]
+          },
+          {
+            "ref": ".github/workflows/pr-visual-review.yml",
+            "enforcement": "advisory"
+          }
+        ],
+        "requiredEvidence": ["web-desktop", "web-mobile"],
+        "blindSpots": [
+          "No bounded visual evaluator on exact-build captures compared against approved Pen references.",
+          "Taste scores must never override deterministic RED; enforced by policy only."
+        ],
+        "remediationOwner": "JOV-6040"
       }
     }
   ],
@@ -1186,7 +1618,8 @@
       "id": "ESC-UI-001",
       "summary": "Sidebar toggle works only from one state",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
       "row": "AM-019"
     },
     {
@@ -1204,11 +1637,32 @@
       "row": "AM-016"
     },
     {
+      "id": "ESC-UI-004",
+      "summary": "Chat empty state swapped greeting for insight after data arrived (semantic swap)",
+      "issue": "JOV-7150",
+      "caught": false,
+      "row": "AM-020"
+    },
+    {
       "id": "ESC-UI-005",
       "summary": "One main/table surface rendered as multiple arbitrary background materials",
       "issue": "JOV-7710",
       "caught": false,
       "row": "AM-017"
+    },
+    {
+      "id": "ESC-UI-006",
+      "summary": "Album/editorial artwork compressed (aspect-ratio damage)",
+      "issue": "JOV-7713",
+      "caught": false,
+      "row": "AM-023"
+    },
+    {
+      "id": "ESC-UI-007",
+      "summary": "Mobile chat/profile UI regressions (phone-column jank)",
+      "issue": "JOV-6929",
+      "caught": false,
+      "row": "AM-022"
     },
     {
       "id": "ESC-UI-008",

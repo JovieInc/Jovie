@@ -367,12 +367,13 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_worktree_pool.py -q',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_sweep.py" --fail-under=85',
 
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/execution_attempt.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_pool.py" --fail-under=85',
     ].join(' && ')
   ),
   ...STRUCTURAL_PYTEST_PARTS,
@@ -411,6 +412,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/evals/summer-ops-card-copy.test.mjs',
+  'scripts/funnel-judge/rubric.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
@@ -480,6 +482,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
+  'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
@@ -499,6 +502,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
+  'scripts/lib/__tests__/production-environment-secrets.test.mjs',
   'scripts/lib/__tests__/pr-review-workflow.test.mjs',
   'scripts/lib/__tests__/pr-review-contracts.test.mjs',
   'scripts/lib/__tests__/pr-review-kernel.test.mjs',
@@ -513,6 +517,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/qa-swarm.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/ratchet-core.test.mjs',
+  'scripts/lib/__tests__/domain-expiry.test.mjs',
   'scripts/lib/__tests__/remediation-sweep.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
   'scripts/lib/__tests__/remediation-reopen.test.mjs',

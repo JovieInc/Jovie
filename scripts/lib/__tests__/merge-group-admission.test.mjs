@@ -8,7 +8,9 @@ import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
+  isTransientApiError,
   MERGE_GROUP_ADMISSION_WAIT_MS,
+  MergeGroupAdmissionError,
   normalizeLiveQueueEntriesPage,
   parseQueueHeadPullRequestNumber,
   runAdmissionFromEnv,
@@ -807,7 +809,752 @@ describe('merge-group admission evidence', () => {
     );
   });
 
+  // Regression: 2026-10-03 runs 37151507995 / 37154869758 failed valid groups
+  // with "API rate limit already exceeded for site ID installation" (JOV-7744).
+  it('waits out a rate-limited live queue read within the budget, then admits', async () => {
+    let elapsed = 0;
+    const statuses = [];
+    const loadLiveQueueEntries = vi.fn(async () => {
+      if (elapsed < 30) {
+        throw new MergeGroupAdmissionError(
+          'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.'
+        );
+      }
+      return [liveEntry()];
+    });
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns: async ({ checkName }) =>
+        checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries,
+      loadQueueRef: async () => queueRef(),
+      maxWaitMs: 60,
+      now: () => elapsed,
+      onStatus: message => statuses.push(message),
+      pollIntervalMs: 15,
+      sleep: async delayMs => {
+        elapsed += delayMs;
+      },
+    });
+
+    expect(result.admitted).toBe(true);
+    expect(elapsed).toBe(30);
+    expect(statuses.filter(s => /GitHub API unavailable/.test(s))).toHaveLength(
+      2
+    );
+  });
+
+  it('fails at the deadline when the quota never recovers', async () => {
+    let elapsed = 0;
+    await expect(
+      waitForMergeGroupAdmission({
+        event: event(),
+        loadCheckRuns: async ({ checkName }) =>
+          checkPage(checkName, 'completed', 'success'),
+        loadLiveQueueEntries: async () => [liveEntry()],
+        loadQueueRef: async () => {
+          throw new MergeGroupAdmissionError(
+            'GitHub API 403 for /repos/x/git/ref/y: API rate limit exceeded for installation',
+            { status: 403 }
+          );
+        },
+        maxWaitMs: 6,
+        now: () => elapsed,
+        onStatus: () => {},
+        pollIntervalMs: 3,
+        sleep: async delayMs => {
+          elapsed += delayMs;
+        },
+      })
+    ).rejects.toThrow(/within 6ms \(still pending: GitHub API unavailable/);
+  });
+
+  it('treats only rate-limit, timeout and gateway signatures as retryable', () => {
+    const graphqlLimit = new MergeGroupAdmissionError(
+      'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.'
+    );
+    expect(isTransientApiError(graphqlLimit)).toBe(true);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API 429 for /x: secondary rate limit',
+          {
+            status: 429,
+          }
+        )
+      )
+    ).toBe(true);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API 403 for /x: Resource not accessible',
+          {
+            status: 403,
+          }
+        )
+      )
+    ).toBe(false);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'live merge queue GraphQL returned errors: Not found'
+        )
+      )
+    ).toBe(false);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'PR Size Guard completed with rate limit failure'
+        )
+      )
+    ).toBe(false);
+    expect(isTransientApiError(new Error('API rate limit exceeded'))).toBe(
+      false
+    );
+    // Run 37156957426 (2026-10-03 22:02Z) failed a valid group on a 10 s abort.
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API request failed for /graphql: The operation was aborted due to timeout'
+        )
+      )
+    ).toBe(true);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API 502 for /graphql: Bad Gateway',
+          {
+            status: 502,
+          }
+        )
+      )
+    ).toBe(true);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError(
+          'GitHub API request failed for /graphql: getaddrinfo ENOTFOUND'
+        )
+      )
+    ).toBe(false);
+    expect(
+      isTransientApiError(
+        new MergeGroupAdmissionError('GitHub API 500 for /graphql: boom', {
+          status: 500,
+        })
+      )
+    ).toBe(false);
+  });
+
   it('defaults to a multi-minute admission budget', () => {
     expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBe(360_000);
   });
 });
+
+const QUOTA_RESPONSE_NOW = Date.parse('2026-10-03T12:00:00Z');
+const INSTALLATION_QUOTA =
+  'API rate limit already exceeded for site ID installation.';
+const STRUCTURED_QUOTA = { type: 'RATE_LIMITED', message: 'quota exhausted' };
+const resetHeaders = (delayMs, skewMs = 0) => ({
+  date: new Date(QUOTA_RESPONSE_NOW + skewMs).toUTCString(),
+  'x-ratelimit-remaining': '0',
+  'x-ratelimit-reset': String((QUOTA_RESPONSE_NOW + skewMs + delayMs) / 1_000),
+});
+/**
+ * @param {Record<string, string>} [headers]
+ * @param {Array<{ type?: any, message?: string }>} [errors]
+ */
+const graphqlQuotaResponse = (headers = {}, errors = [STRUCTURED_QUOTA]) =>
+  Response.json({ ...liveQueuePayload([null]), errors }, { headers });
+const completeProofKinds = [
+  'graphql',
+  'ref',
+  'Fork PR Gate',
+  'PR Size Guard',
+  'ref',
+  'graphql',
+];
+
+async function withQuotaResponses(respond, verify) {
+  const directory = await mkdtemp(
+    join(tmpdir(), 'merge-admission-http-quota-')
+  );
+  const eventPath = join(directory, 'event.json');
+  const outputPath = join(directory, 'output.txt');
+  await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+  const state = { elapsed: 0, requests: [], sleeps: [] };
+  const fetchTasks = [];
+  const expectedFetchErrors = new Set();
+  state.output = () => readFile(outputPath, 'utf8');
+  state.noOutput = () =>
+    expect(state.output()).rejects.toMatchObject({ code: 'ENOENT' });
+  const env = {
+    GH_TOKEN: 'test-token',
+    GITHUB_API_URL: 'https://api.github.test',
+    GITHUB_EVENT_PATH: eventPath,
+    GITHUB_OUTPUT: outputPath,
+    GITHUB_REPOSITORY: 'JovieInc/Jovie',
+    GITHUB_SHA: HEAD,
+  };
+  state.run = () =>
+    runAdmissionFromEnv(env, {
+      now: () => QUOTA_RESPONSE_NOW + state.elapsed,
+      onStatus: () => {},
+      sleep: async delayMs => {
+        await state.noOutput();
+        state.sleeps.push(delayMs);
+        state.elapsed += delayMs;
+      },
+      fetchImpl: (url, init) => {
+        const task = (async () => {
+          const href = String(url);
+          const kind = href.endsWith('/graphql')
+            ? 'graphql'
+            : href.includes('/git/ref/')
+              ? 'ref'
+              : new URL(href).searchParams.get('check_name');
+          const request = {
+            kind,
+            at: state.elapsed,
+            cursor:
+              kind === 'graphql'
+                ? JSON.parse(String(init.body)).variables.cursor
+                : null,
+          };
+          // Record before asynchronous file reads to preserve concurrent call order.
+          state.requests.push(request);
+          await state.noOutput();
+          const response = await respond(request, state);
+          if (response instanceof Error) {
+            expectedFetchErrors.add(response);
+            throw response;
+          }
+          if (response) return response;
+          if (kind === 'graphql')
+            return Response.json(liveQueuePayload([liveQueueNode()]));
+          if (kind === 'ref') return Response.json(queueRef());
+          expect(['Fork PR Gate', 'PR Size Guard']).toContain(kind);
+          return Response.json(checkPage(kind, 'completed', 'success').data);
+        })();
+        fetchTasks.push(task);
+        return task;
+      },
+    });
+  let verificationError;
+  let verificationFailed = false;
+  try {
+    await verify(state);
+  } catch (error) {
+    verificationFailed = true;
+    verificationError = error;
+  }
+  const settled = await Promise.allSettled(fetchTasks);
+  let cleanupError;
+  try {
+    await rm(directory, { force: true, recursive: true });
+  } catch (error) {
+    cleanupError = error;
+  }
+  if (verificationFailed) throw verificationError;
+  for (const result of settled) {
+    if (
+      result.status === 'rejected' &&
+      !expectedFetchErrors.has(result.reason)
+    ) {
+      throw result.reason;
+    }
+  }
+  if (cleanupError) throw cleanupError;
+}
+
+describe('HTTP quota scheduling and structured GraphQL errors', () => {
+  it.each([
+    [403, 'ref'],
+    [429, 'PR Size Guard'],
+  ])(
+    'honors REST %s Retry-After and repeats every proof after %s',
+    async (status, limitedKind) => {
+      await withQuotaResponses(
+        (request, state) => {
+          if (request.kind === limitedKind && state.sleeps.length === 0) {
+            return Response.json(
+              { message: 'API rate limit exceeded' },
+              {
+                status,
+                headers: { 'retry-after': '120' },
+              }
+            );
+          }
+        },
+        async state => {
+          await expect(state.run()).resolves.toMatchObject({ admitted: true });
+          expect(state.sleeps).toEqual([121_000]);
+          const fresh = state.requests.filter(request => request.at > 0);
+          expect(fresh.map(request => request.kind)).toEqual(
+            completeProofKinds
+          );
+          expect(fresh.every(request => request.at >= 121_000)).toBe(true);
+          await expect(state.output()).resolves.toContain(
+            'admitted=true\nobsolete=false'
+          );
+        }
+      );
+    }
+  );
+
+  it.each([
+    [STRUCTURED_QUOTA, -60_000, '60', 91_000],
+    [{ message: INSTALLATION_QUOTA }, 60_000, null, 121_000],
+    [
+      { message: 'API rate limit already exceeded for installation ID 12345.' },
+      0,
+      null,
+      121_000,
+    ],
+  ])(
+    'restarts complete pages for GraphQL quota %j',
+    async (error, skew, seconds, waitMs) => {
+      let pages = 0;
+      await withQuotaResponses(
+        request => {
+          if (request.kind !== 'graphql') return;
+          pages += 1;
+          if (pages === 1) {
+            return Response.json(
+              liveQueuePayload([liveQueueNode()], {
+                hasNextPage: true,
+                endCursor: 'old-page-2',
+              })
+            );
+          }
+          if (pages === 2) {
+            return graphqlQuotaResponse(
+              {
+                ...resetHeaders(90_000, skew),
+                'retry-after':
+                  seconds ??
+                  new Date(QUOTA_RESPONSE_NOW + skew + 120_000).toUTCString(),
+              },
+              [error]
+            );
+          }
+          return Response.json(
+            liveQueuePayload([liveQueueNode({ id: 'MQE_fresh' })])
+          );
+        },
+        async state => {
+          await expect(state.run()).resolves.toMatchObject({
+            admitted: true,
+            liveEntry: { id: 'MQE_fresh' },
+          });
+          expect(state.sleeps).toEqual([waitMs]);
+          expect(
+            state.requests
+              .filter(request => request.kind === 'graphql')
+              .map(request => request.cursor)
+          ).toEqual([null, 'old-page-2', null, null]);
+          expect(state.requests.slice(2).map(request => request.kind)).toEqual(
+            completeProofKinds
+          );
+          expect(state.requests[2].at).toBe(waitMs);
+        }
+      );
+    }
+  );
+
+  it.each(
+    /** @type {Array<[string, any[]]>} */ ([
+      [
+        'mixed',
+        [
+          { type: 'FORBIDDEN', message: 'denied' },
+          { type: 'RATE_LIMITED', message: INSTALLATION_QUOTA },
+        ],
+      ],
+      [
+        'reversed mixed',
+        [
+          { type: 'RATE_LIMITED', message: INSTALLATION_QUOTA },
+          { message: 'not found' },
+        ],
+      ],
+      ...['FORBIDDEN', null, {}, ''].map(type => [
+        `explicit type ${JSON.stringify(type)}`,
+        [{ type, message: INSTALLATION_QUOTA }],
+      ]),
+    ])
+  )(
+    'fails immediately on %s despite valid quota headers',
+    async (/** @type {any} */ _, /** @type {any[]} */ errors) => {
+      for (const status of [200, 403, 429, 502, 503, 504]) {
+        await withQuotaResponses(
+          () =>
+            Response.json(
+              {
+                ...liveQueuePayload([liveQueueNode()]),
+                errors,
+              },
+              { status, headers: { 'retry-after': '120' } }
+            ),
+          async state => {
+            await expect(state.run()).rejects.toThrow();
+            expect(state.requests).toHaveLength(1);
+            expect(state.sleeps).toEqual([]);
+            await state.noOutput();
+          }
+        );
+      }
+    }
+  );
+
+  it.each([401, 500])(
+    'keeps HTTP %s nonretryable despite quota text',
+    async status => {
+      await withQuotaResponses(
+        () =>
+          Response.json(
+            {
+              message: INSTALLATION_QUOTA,
+              errors: [STRUCTURED_QUOTA],
+            },
+            { status, headers: { 'retry-after': '120' } }
+          ),
+        async state => {
+          await expect(state.run()).rejects.toThrow(`GitHub API ${status}`);
+          expect(state.requests).toHaveLength(1);
+          expect(state.sleeps).toEqual([]);
+          await state.noOutput();
+        }
+      );
+    }
+  );
+
+  it.each([
+    ['malformed retry', { 'retry-after': '120seconds' }],
+    ['negative retry', { 'retry-after': '-1' }],
+    ['overflow retry', { 'retry-after': '999999999999999999999999' }],
+    [
+      'invalid reset with valid retry',
+      {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': 'invalid',
+        'retry-after': '120',
+      },
+    ],
+    [
+      'invalid remaining',
+      { ...resetHeaders(120_000), 'x-ratelimit-remaining': '0x' },
+    ],
+    ['invalid response date', { 'retry-after': '120', date: 'invalid' }],
+    ['reset beyond budget', resetHeaders(400_000)],
+    ['insufficient request allowance', { 'retry-after': '350' }],
+  ])('does not retry early for %s', async (_, headers) => {
+    await withQuotaResponses(
+      () => graphqlQuotaResponse(headers),
+      async state => {
+        await expect(state.run()).rejects.toThrow(
+          /quota|rate.limit|deadline|reset/i
+        );
+        expect(state.requests).toHaveLength(1);
+        expect(state.sleeps).toEqual([]);
+        await state.noOutput();
+      }
+    );
+  });
+
+  it.each([{}, { 'retry-after': '2' }])(
+    'uses only current headers while retaining the 15s floor: %j',
+    async headers => {
+      await withQuotaResponses(
+        (_, state) => {
+          if (state.requests.length === 1)
+            return graphqlQuotaResponse(resetHeaders(120_000));
+          if (state.requests.length === 2) return graphqlQuotaResponse(headers);
+        },
+        async state => {
+          await expect(state.run()).resolves.toMatchObject({ admitted: true });
+          expect(state.sleeps).toEqual([121_000, 15_000]);
+          expect(state.requests[2].at).toBe(136_000);
+        }
+      );
+    }
+  );
+
+  it('keeps all retries inside the original absolute deadline', async () => {
+    await withQuotaResponses(
+      (_, state) =>
+        graphqlQuotaResponse({
+          'retry-after': state.requests.length === 1 ? '339' : '20',
+        }),
+      async state => {
+        await expect(state.run()).rejects.toThrow(
+          /quota|rate.limit|deadline|reset/i
+        );
+        expect(state.requests).toHaveLength(2);
+        expect(state.requests[1].at).toBe(340_000);
+        expect(state.sleeps).toEqual([340_000]);
+        await state.noOutput();
+      }
+    );
+  });
+
+  it('retains 15s no-header retries and healthy polling without a new wait cap', async () => {
+    await withQuotaResponses(
+      (request, state) => {
+        if (request.kind === 'graphql' && state.sleeps.length < 3) {
+          return graphqlQuotaResponse({}, [{ message: INSTALLATION_QUOTA }]);
+        }
+        if (request.kind === 'PR Size Guard' && state.sleeps.length === 3) {
+          return Response.json(checkPage(request.kind, 'in_progress').data);
+        }
+      },
+      async state => {
+        await expect(state.run()).resolves.toMatchObject({ admitted: true });
+        expect(state.sleeps).toEqual([15_000, 15_000, 15_000, 15_000]);
+        expect(
+          state.requests
+            .filter(request => request.kind === 'graphql')
+            .map(request => request.at)
+        ).toEqual([0, 15_000, 30_000, 45_000, 60_000, 60_000]);
+      }
+    );
+  });
+
+  it.each(['success', 'failing gate', 'changed source'])(
+    'invalidates pre-wait final proof: %s',
+    async outcome => {
+      let pages = 0;
+      await withQuotaResponses(
+        (request, state) => {
+          if (request.kind === 'graphql') {
+            pages += 1;
+            if (pages === 2)
+              return graphqlQuotaResponse({ 'retry-after': '20' });
+            if (state.sleeps.length) {
+              return Response.json(
+                liveQueuePayload([
+                  liveQueueNode({
+                    id: 'MQE_reenqueued',
+                    enqueuer: {
+                      __typename: 'Bot',
+                      login: 'another-native-writer',
+                    },
+                    pullRequest: {
+                      baseRefName: 'main',
+                      number: 123,
+                      headRefOid:
+                        outcome === 'changed source'
+                          ? '5'.repeat(40)
+                          : SOURCE_HEAD,
+                    },
+                  }),
+                ])
+              );
+            }
+          }
+          if (
+            request.kind === 'Fork PR Gate' &&
+            state.sleeps.length &&
+            outcome === 'failing gate'
+          ) {
+            return Response.json(
+              checkPage(request.kind, 'completed', 'failure').data
+            );
+          }
+        },
+        async state => {
+          if (outcome === 'success') {
+            await expect(state.run()).resolves.toMatchObject({
+              admitted: true,
+              liveEntry: { id: 'MQE_reenqueued' },
+            });
+          } else {
+            await expect(state.run()).rejects.toThrow(
+              outcome === 'failing gate'
+                ? /Fork PR Gate completed with failure/
+                : /source head changed/
+            );
+            await state.noOutput();
+          }
+          expect(state.sleeps).toEqual([21_000]);
+          if (outcome === 'changed source') expect(pages).toBe(3);
+          if (outcome !== 'changed source') {
+            expect(
+              state.requests
+                .filter(request => request.at > 0)
+                .map(request => request.kind)
+            ).toEqual(
+              outcome === 'success'
+                ? completeProofKinds
+                : completeProofKinds.slice(0, 4)
+            );
+          }
+        }
+      );
+    }
+  );
+});
+
+it('keeps mixed GraphQL responses terminal through normalization', () => {
+  let captured;
+  try {
+    normalizeLiveQueueEntriesPage({
+      errors: [
+        { type: 'FORBIDDEN', message: 'Resource not accessible' },
+        { type: 'RATE_LIMITED', message: 'API rate limit exceeded' },
+      ],
+    });
+  } catch (error) {
+    captured = error;
+  }
+  expect(captured).toBeInstanceOf(MergeGroupAdmissionError);
+  expect(isTransientApiError(captured)).toBe(false);
+});
+
+it.each(['RATE_LIMITED', {}, null, 0, false])(
+  'rejects malformed GraphQL errors %j even beside valid queue data',
+  async errors => {
+    for (const status of [200, 403, 429, 502, 503, 504]) {
+      await withQuotaResponses(
+        () =>
+          Response.json(
+            {
+              ...liveQueuePayload([liveQueueNode()]),
+              errors,
+              message: 'API rate limit exceeded',
+            },
+            { status, headers: { 'retry-after': '120' } }
+          ),
+        async state => {
+          await expect(state.run()).rejects.toThrow(/errors must be an array/);
+          expect(state.requests).toHaveLength(1);
+          expect(state.sleeps).toEqual([]);
+          await state.noOutput();
+        }
+      );
+    }
+  }
+);
+
+it('retains empty GraphQL errors beside valid queue data', async () => {
+  await withQuotaResponses(
+    request => {
+      if (request.kind === 'graphql') {
+        return Response.json({
+          ...liveQueuePayload([liveQueueNode()]),
+          errors: [],
+        });
+      }
+    },
+    async state => {
+      await expect(state.run()).resolves.toMatchObject({ admitted: true });
+      expect(state.sleeps).toEqual([]);
+    }
+  );
+});
+
+const transientFailure = status =>
+  status === 'timeout'
+    ? new Error('The operation was aborted due to timeout')
+    : Response.json({ message: 'GitHub gateway unavailable' }, { status });
+
+describe('retained transient recovery with fresh admission proof', () => {
+  it.each([
+    ['timeout', 'graphql'],
+    [502, 'ref'],
+    [503, 'Fork PR Gate'],
+    [504, 'graphql'],
+  ])('restarts every proof after %s from %s', async (status, failedKind) => {
+    let failed = false;
+    await withQuotaResponses(
+      request => {
+        if (!failed && request.kind === failedKind) {
+          failed = true;
+          return transientFailure(status);
+        }
+      },
+      async state => {
+        await expect(state.run()).resolves.toMatchObject({ admitted: true });
+        expect(state.sleeps).toEqual([15_000]);
+        expect(
+          state.requests
+            .filter(request => request.at > 0)
+            .map(request => request.kind)
+        ).toEqual(completeProofKinds);
+        await expect(state.output()).resolves.toContain(
+          'admitted=true\nobsolete=false'
+        );
+      }
+    );
+  });
+
+  it.each(['timeout', 502, 503, 504])(
+    'rejects a changed source after final-read %s',
+    async status => {
+      let pages = 0;
+      await withQuotaResponses(
+        request => {
+          if (request.kind !== 'graphql') return;
+          pages += 1;
+          if (pages === 2) return transientFailure(status);
+          if (pages > 2) {
+            return Response.json(
+              liveQueuePayload([
+                liveQueueNode({
+                  pullRequest: {
+                    baseRefName: 'main',
+                    number: 123,
+                    headRefOid: '5'.repeat(40),
+                  },
+                }),
+              ])
+            );
+          }
+        },
+        async state => {
+          await expect(state.run()).rejects.toThrow(/source head changed/);
+          expect(state.sleeps).toEqual([15_000]);
+          expect(pages).toBe(3);
+          expect(
+            state.requests
+              .filter(request => request.at > 0)
+              .map(request => request.kind)
+          ).toEqual(['graphql']);
+          await state.noOutput();
+        }
+      );
+    }
+  );
+});
+
+it.each([502, 503, 504])(
+  'honors structured GraphQL quota cooldown inside gateway %s',
+  async status => {
+    await withQuotaResponses(
+      (_, state) => {
+        if (state.requests.length === 1) {
+          return Response.json(
+            {
+              ...liveQueuePayload([liveQueueNode()]),
+              errors: [STRUCTURED_QUOTA],
+              message: 'GitHub gateway unavailable',
+            },
+            { status, headers: { 'retry-after': '120' } }
+          );
+        }
+      },
+      async state => {
+        await expect(state.run()).resolves.toMatchObject({ admitted: true });
+        expect(state.sleeps).toEqual([121_000]);
+        expect(state.requests.slice(1).map(request => request.kind)).toEqual(
+          completeProofKinds
+        );
+        expect(
+          state.requests.slice(1).every(request => request.at >= 121_000)
+        ).toBe(true);
+        await expect(state.output()).resolves.toContain(
+          'admitted=true\nobsolete=false'
+        );
+      }
+    );
+  }
+);

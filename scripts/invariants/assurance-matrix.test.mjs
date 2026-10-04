@@ -13,6 +13,7 @@ import {
   rowCertification,
   UI_FAILURE_CLASSES,
   uiAssuranceReport,
+  uiEvidenceRequirements,
   validateAssuranceMatrix,
 } from './assurance-matrix.mjs';
 
@@ -177,7 +178,7 @@ describe('assurance matrix (JOV-6064)', () => {
     mutated.rows[0].owner = 'operations';
     const changed = assuranceMatrixReceipt(mutated);
     assert.notEqual(receipt.digest, changed.digest);
-    assert.equal(receipt.matrixRevision, '2026-10-03.1');
+    assert.equal(receipt.matrixRevision, '2026-10-03.3');
   });
 });
 
@@ -213,7 +214,7 @@ describe('UI assurance matrix (JOV-7713)', () => {
   const classReport = (matrix, row) =>
     uiAssuranceReport(matrix).classes.find(item => item.row === row.id);
 
-  it('reports every UI class and keeps an uncovered class UNKNOWN, not green', () => {
+  it('reports every UI class from exactly one checked-in row', () => {
     const matrix = healthy();
     assert.deepEqual(validateAssuranceMatrix(matrix), []);
     const report = uiAssuranceReport(matrix);
@@ -221,10 +222,24 @@ describe('UI assurance matrix (JOV-7713)', () => {
       report.classes.map(item => item.failureClass),
       [...UI_FAILURE_CLASSES]
     );
-    for (const item of report.classes.filter(c => c.row === null))
-      assert.equal(item.status, 'UNKNOWN');
+    assert.ok(report.classes.every(item => item.row !== null));
     assert.equal(report.totals.green, 0, 'current gaps stay visible');
     assert.ok(report.escapes.total > report.escapes.caught);
+  });
+
+  it('deliberate red: a dropped UI class is UNKNOWN and fails validation', () => {
+    const matrix = healthy();
+    matrix.rows = matrix.rows.filter(row => row.failureClass !== 'ui-motion');
+    matrix.uiEscapeCorpus = matrix.uiEscapeCorpus.filter(entry =>
+      matrix.rows.some(row => row.id === entry.row)
+    );
+    assert.ok(
+      validateAssuranceMatrix(matrix).includes('ui:class:ui-motion:missing-row')
+    );
+    const motion = uiAssuranceReport(matrix).classes.find(
+      item => item.failureClass === 'ui-motion'
+    );
+    assert.equal(motion.status, 'UNKNOWN');
   });
 
   it('certifies the neighbor row GREEN when every proof is present', () => {
@@ -295,5 +310,18 @@ describe('UI assurance matrix (JOV-7713)', () => {
         errors.includes(expected),
         `expected ${expected}, got ${errors.join('; ')}`
       );
+  });
+
+  it('names the exact-build UI evidence a changed path owes before Done', () => {
+    const matrix = healthy();
+    const owed = uiEvidenceRequirements(matrix, [
+      'apps/web/components/atoms/RailToggleButton.tsx',
+    ]);
+    const row = owed.find(
+      item => item.failureClass === 'ui-interaction-state-machine'
+    );
+    assert.ok(row, 'reversible-control row is invalidated');
+    assert.ok(row.targets.includes('macos-electron'));
+    assert.deepEqual(uiEvidenceRequirements(matrix, ['docs/README.md']), []);
   });
 });

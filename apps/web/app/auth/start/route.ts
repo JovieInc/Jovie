@@ -5,6 +5,7 @@ import {
   createAuthAnalyticsEvent,
   isAuthClient,
   isAuthIntent,
+  isValidNativeAttempt,
   parseDesktopLoopbackPortParam,
   sanitizeReturnTo,
 } from '@jovie/auth-routing';
@@ -266,6 +267,15 @@ export async function GET(request: Request) {
     );
   }
 
+  const attempts = url.searchParams.getAll('native_attempt');
+  const nativeAttempt = attempts[0];
+  if (attempts.length > 1 || !isValidNativeAttempt(rawClient, nativeAttempt)) {
+    return NextResponse.json(
+      { error: 'Invalid native_attempt' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
   const returnTo = sanitizeReturnTo(
     rawClient,
     getStringParam(url, 'return_to')
@@ -330,6 +340,7 @@ export async function GET(request: Request) {
       returnTo,
       state,
       codeChallenge,
+      ...(nativeAttempt !== undefined ? { nativeAttempt } : {}),
       desktopFlow,
       // Declared by Mac app builds that can redeem a typed return code.
       desktopReturnCode: getStringParam(url, 'desktop_return_code') === '1',

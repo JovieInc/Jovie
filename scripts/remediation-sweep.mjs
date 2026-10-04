@@ -2,6 +2,11 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import {
+  COMPANY_DOMAINS,
+  parseRdap,
+  parseWhois,
+} from './lib/domain-expiry.mjs';
 import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
 import {
   EXHAUSTED_LABEL,
@@ -124,6 +129,52 @@ export async function loadVercelDeployments({
   return deployments;
 }
 
+async function rdapBaseUrl(domain, fetchImpl, cache) {
+  cache.services ??= fetchImpl('https://data.iana.org/rdap/dns.json', {
+    signal: AbortSignal.timeout(15_000),
+  }).then(response => (response.ok ? response.json() : { services: [] }));
+  const tld = domain.split('.').at(-1);
+  const services = (await cache.services).services ?? [];
+  return services.find(([tlds]) => tlds.includes(tld))?.[1]?.[0] ?? null;
+}
+
+/** Whois first; RDAP for registries without port-43 whois (.app, .dev). */
+export async function loadDomainRecords({
+  domains = COMPANY_DOMAINS,
+  whois = domain =>
+    execFileAsync('whois', [domain], { timeout: 30_000 }).then(
+      ({ stdout }) => stdout
+    ),
+  fetchImpl = fetch,
+} = {}) {
+  const cache = {};
+  const records = [];
+  for (const domain of domains) {
+    let record = { domain, observed: false, registered: null };
+    try {
+      record = parseWhois(domain, await whois(domain));
+    } catch (error) {
+      console.error(`whois ${domain}: ${error?.message ?? error}`);
+    }
+    if (!record.observed) {
+      try {
+        const base = await rdapBaseUrl(domain, fetchImpl, cache);
+        const response = base
+          ? await fetchImpl(new URL(`domain/${domain}`, base), {
+              headers: { accept: 'application/rdap+json' },
+              signal: AbortSignal.timeout(15_000),
+            })
+          : null;
+        if (response?.ok) record = parseRdap(domain, await response.json());
+      } catch (error) {
+        console.error(`rdap ${domain}: ${error?.message ?? error}`);
+      }
+    }
+    records.push(record);
+  }
+  return records;
+}
+
 function warn(message) {
   console.error(message);
   if (process.env.GITHUB_ACTIONS === 'true')
@@ -142,6 +193,7 @@ async function main() {
       loadOpenPullRequests(process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie'),
     loadHealth: () => loadSummerHealth(),
     loadDeployments: () => loadVercelDeployments({ token: token?.token }),
+    loadDomains: () => loadDomainRecords(),
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,
