@@ -413,7 +413,7 @@ async function capture({ appPath, out, settleMs }) {
   const rawDir = join(out, 'raw');
   mkdirSync(rawDir, { recursive: true });
   runQuietly('xcrun', ['simctl', 'boot', udid]);
-  run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 300_000 });
+  run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 600_000 });
   run('xcrun', ['simctl', 'ui', udid, 'appearance', 'dark']);
   run('xcrun', [
     'simctl',

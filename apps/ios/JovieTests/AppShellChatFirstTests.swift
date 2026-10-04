@@ -55,7 +55,7 @@ struct AppShellChatFirstTests {
     )
   }
 
-  @Test func uiTestingStorefrontChatSeedsAFinishedMerchExchange() {
+  @Test func uiTestingStorefrontChatSeedsAFinishedMerchExchange() throws {
     #expect(LaunchMode.uiTestingStorefrontChat.defaultInitialTab == .chat)
     #expect(LaunchMode.uiTestingStorefrontChat.opensChatOnLaunch)
     #expect(LaunchMode.uiTestingStorefrontChat.usesLiveAuth == false)
@@ -84,6 +84,12 @@ struct AppShellChatFirstTests {
     #expect(payload.options.map(\.designName) == [
       "Night Drive Tee", "Summer Run Hoodie", "Afterglow Cap",
     ])
+    // Every card paints a bundled mockup, never the generic glyph.
+    MobileChatStorefrontFixture.primeMockupImages()
+    for option in payload.options {
+      let url = try #require(option.mockupURL)
+      #expect(AvatarImageCache.image(for: url) != nil, "\(option.designName) has no bundled mockup")
+    }
     // Store copy bans em and en dashes.
     for item in timeline {
       #expect(!item.content.contains("\u{2014}") && !item.content.contains("\u{2013}"))

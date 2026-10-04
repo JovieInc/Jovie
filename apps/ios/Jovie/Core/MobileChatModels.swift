@@ -1,5 +1,6 @@
 import Foundation
 import JovieKit
+import UIKit
 
 /// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
 /// (JOV-3608). Exercises entity mentions (all four kinds), a skill
@@ -199,8 +200,27 @@ enum MobileChatStorefrontFixture {
 
   static let userProse = "Make merch for my summer tour."
 
+  /// Bundled mockups (Assets.xcassets) keyed by the fixture URLs below.
+  /// Generated artwork for fictional designs, not real merch.
+  static let mockupAssets: [(url: String, asset: String)] = [
+    ("https://fixtures.jov.ie/storefront/night-drive-tee.jpg", "StorefrontMerchNightDriveTee"),
+    ("https://fixtures.jov.ie/storefront/summer-run-hoodie.jpg", "StorefrontMerchSummerRunHoodie"),
+    ("https://fixtures.jov.ie/storefront/afterglow-cap.jpg", "StorefrontMerchAfterglowCap"),
+  ]
+
   static let merchOptionsJSON =
-    #"{"success":true,"generationId":"gen-storefront","options":[{"id":"opt-1","option_number":1,"design_name":"Night Drive Tee","product_type":"Tee","concept":"Chrome headline type on black.","mockup_urls":[],"price_recommendation":{"sale_price":"$38.00"}},{"id":"opt-2","option_number":2,"design_name":"Summer Run Hoodie","product_type":"Hoodie","concept":"Tour dates down the sleeve.","mockup_urls":[],"price_recommendation":{"sale_price":"$68.00"}},{"id":"opt-3","option_number":3,"design_name":"Afterglow Cap","product_type":"Cap","concept":"Embroidered sunset mark.","mockup_urls":[],"price_recommendation":{"sale_price":"$32.00"}}]}"#
+    #"{"success":true,"generationId":"gen-storefront","options":[{"id":"opt-1","option_number":1,"design_name":"Night Drive Tee","product_type":"Tee","concept":"Chrome road lines under a night sky.","mockup_urls":["https://fixtures.jov.ie/storefront/night-drive-tee.jpg"],"price_recommendation":{"sale_price":"$38.00"}},{"id":"opt-2","option_number":2,"design_name":"Summer Run Hoodie","product_type":"Hoodie","concept":"Sunset arc with sleeve marks.","mockup_urls":["https://fixtures.jov.ie/storefront/summer-run-hoodie.jpg"],"price_recommendation":{"sale_price":"$68.00"}},{"id":"opt-3","option_number":3,"design_name":"Afterglow Cap","product_type":"Cap","concept":"Embroidered sunset mark.","mockup_urls":["https://fixtures.jov.ie/storefront/afterglow-cap.jpg"],"price_recommendation":{"sale_price":"$32.00"}}]}"#
+
+  /// Seeds the image cache so the merch cards paint the bundled mockups on
+  /// their first frame with no network. UI-testing launch mode only.
+  static func primeMockupImages() {
+    for mockup in mockupAssets {
+      guard let url = URL(string: mockup.url), let image = UIImage(named: mockup.asset) else {
+        continue
+      }
+      AvatarImageCache.store(image, for: url)
+    }
+  }
 
   static var assistantReply: String {
     """

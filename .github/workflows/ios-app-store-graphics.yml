@@ -55,6 +55,10 @@ jobs:
       - name: Install Chromium for the compositor
         run: pnpm exec playwright install chromium
 
+      # A cold hosted simulator can take minutes to boot; overlap it with the build.
+      - name: Boot the capture simulator
+        run: xcrun simctl boot "$(jq -r .device.simulator apps/ios/app-store/storefront.json)" || true
+
       - name: Build simulator app
         timeout-minutes: 20
         run: |
@@ -68,7 +72,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Capture fixture screens
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: >-
           node apps/ios/scripts/app-store-graphics.mjs capture
           --app .build/app-store-graphics/Build/Products/Debug-iphonesimulator/Jovie.app
