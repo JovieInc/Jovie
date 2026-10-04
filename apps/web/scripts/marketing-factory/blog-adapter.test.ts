@@ -294,7 +294,7 @@ function factoryRecord(
       unsupportedClaims: [],
     },
     publication,
-  };
+  } satisfies Omit<BlogFactoryRecord, 'stageArtifacts' | 'receipts'>;
   const stages = publication ? FACTORY_STAGES : FACTORY_STAGES.slice(0, -1);
   const stageArtifacts = stages.map(stage =>
     defineBlogStageArtifact(core, stage)
