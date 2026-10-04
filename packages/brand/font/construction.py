@@ -269,8 +269,13 @@ class _Flatten:
             prev = (x, y)
         self._p = p
 
-    def qCurveTo(self, *pts):
-        raise NotImplementedError
+    def qCurveTo(self, c, p):
+        # Skia quadratics use one control point. Exact degree elevation lets
+        # them share the cubic sampler without changing contour geometry.
+        p0 = self._p
+        c1 = tuple(p0[i] + 2 * (c[i] - p0[i]) / 3 for i in (0, 1))
+        c2 = tuple(p[i] + 2 * (c[i] - p[i]) / 3 for i in (0, 1))
+        self.curveTo(c1, c2, p)
 
     def closePath(self):
         if self._p != self._start:

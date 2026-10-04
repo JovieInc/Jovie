@@ -1,10 +1,162 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
+import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
+
+const certificationOverrides = vi.hoisted(() =>
+  vi.fn<() => Record<string, unknown>>()
+);
+
+vi.mock('@/lib/queries/useOvieCertificationsQuery', () => ({
+  useOvieCertificationsQuery: () => ({
+    data: {
+      contract: 'jovie.ovie-certification-inventory/v1',
+      generatedAt: '2026-09-27T00:00:00.000Z',
+      universal: false,
+      domains: [
+        {
+          domain: 'flows',
+          label: 'Flows',
+          status: 'connected',
+          rowCount: 0,
+          note: null,
+        },
+      ],
+      counts: {
+        working: 0,
+        review_ready: 0,
+        founder_locked: 0,
+        shipped: 0,
+        monitored: 0,
+        total: 0,
+      },
+      queue: {
+        contract: 'jovie.certification-inbox/v1',
+        needsYou: [],
+        blocked: [],
+        stale: [],
+        returned: [],
+        certified: [],
+        superseded: [],
+      },
+      rows: [],
+      issues: [],
+    },
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+    ...(certificationOverrides() ?? {}),
+  }),
+  useOvieCertificationDecisionMutation: () => ({ mutateAsync: vi.fn() }),
+  getCertificationDecisionErrorMessage: () =>
+    'The decision could not be recorded. Try again.',
+}));
 
 describe('TimActionRequiredSection observation states', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    certificationOverrides.mockReset();
+  });
+
+  it.each([
+    { label: 'unavailable', data: undefined, isError: true },
+    {
+      label: 'unexpected contract',
+      data: { ...fixtureInventory(), contract: 'unexpected' },
+      isError: false,
+    },
+    {
+      label: 'uncovered',
+      data: {
+        ...fixtureInventory(),
+        domains: [],
+        rows: [],
+        queue: { ...fixtureInventory().queue, needsYou: [] },
+      },
+      isError: false,
+    },
+  ])(
+    'does not claim healthy empty when certification is $label',
+    async ({ data, isError }) => {
+      certificationOverrides.mockReturnValue({ data, isError });
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            issues: [],
+            fetchedAt: '2026-09-27T00:00:00.000Z',
+            available: true,
+            observation: 'empty',
+            errorMessage: null,
+          }),
+          { status: 200 }
+        )
+      );
+      await act(async () => {
+        render(<TimActionRequiredSection />);
+      });
+      expect(
+        screen.getByTestId('needs-you-judgments-observation')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Nothing needs you.')).toBeNull();
+      expect(screen.queryByTestId('tim-action-observation')).toBeNull();
+    }
+  );
+
+  it('waits for both observations before showing the aggregate decision count', async () => {
+    certificationOverrides.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        issues: [
+          {
+            id: 'task-1',
+            identifier: 'JOV-12',
+            title: 'Review task',
+            priority: 2,
+            daysOld: 0,
+            url: 'https://linear.app/jovie/issue/JOV-12',
+          },
+        ],
+        fetchedAt: new Date().toISOString(),
+        available: true,
+        observation: 'fresh',
+        errorMessage: null,
+      })
+    );
+    let view: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(<TimActionRequiredSection />);
+    });
+    expect(screen.getByText('Review task')).toBeInTheDocument();
+    expect(screen.queryByText('1', { exact: true })).toBeNull();
+    certificationOverrides.mockReturnValue({
+      data: fixtureInventory(),
+      isLoading: false,
+    });
+    view!.rerender(<TimActionRequiredSection />);
+    expect(screen.getByText('2', { exact: true })).toBeInTheDocument();
+  });
+
+  it('reports both unavailable sources and retains their separate recovery controls', async () => {
+    certificationOverrides.mockReturnValue({ data: undefined, isError: true });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('linear down', { status: 503 })
+    );
+    await act(async () => {
+      render(<TimActionRequiredSection />);
+    });
+    expect(
+      screen.getByTestId('needs-you-judgments-observation')
+    ).toHaveAttribute('data-state', 'unavailable');
+    expect(screen.getByTestId('tim-action-observation')).toHaveAttribute(
+      'data-state',
+      'unavailable'
+    );
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(2);
+    expect(screen.queryByText('Nothing needs you.')).toBeNull();
   });
 
   it('shows empty after a successful observation with no issues', async () => {
