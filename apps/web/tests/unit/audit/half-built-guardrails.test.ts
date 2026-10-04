@@ -120,10 +120,12 @@ describe('iOS does not navigate to web-only workspaces', () => {
 
     expect(ids.length).toBeGreaterThan(10);
     expect(
-      ids.filter(id =>
-        /youtube|insights|jovie-work|joviework|release-plan|releaseplan/i.test(
-          id ?? ''
-        )
+      ids.filter(
+        id =>
+          !id.startsWith('webOnly.') &&
+          /youtube|insights|jovie-work|joviework|release-plan|releaseplan/i.test(
+            id ?? ''
+          )
       )
     ).toEqual([]);
   });

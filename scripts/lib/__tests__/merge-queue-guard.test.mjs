@@ -1039,14 +1039,16 @@ describe('absolute update-branch subprocess deadline', () => {
   });
 
   it('SIGKILLs a timed-out child instead of abandoning it', async () => {
+    // Test termination without requiring a cold Node runtime to boot before the deadline.
+    const executable = process.platform === 'win32' ? process.execPath : '/bin/sh';
+    const args = process.platform === 'win32'
+      ? ['-e', 'process.stdout.write(String(process.pid)); setInterval(() => {}, 1000)']
+      : ['-c', 'printf "%s" "$$"; while :; do :; done'];
     let failure;
     try {
       await execFileTerminating(
-        process.execPath,
-        [
-          '-e',
-          'process.stdout.write(String(process.pid)); setInterval(() => {}, 1000)',
-        ],
+        executable,
+        args,
         { encoding: 'utf8', timeout: 150 }
       );
     } catch (error) {
