@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
+import { Button } from '@jovie/ui';
 import { LoaderCircle } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
@@ -23,6 +24,8 @@ export type OnboardingEntryMode =
 interface OnboardingChatEmptyIntroProps {
   readonly mode: OnboardingEntryMode;
   readonly entryProfile?: StartEntryProfile | null;
+  /** Taken handle: focus the composer so the visitor can ask for another name. */
+  readonly onTryAnotherName?: () => void;
 }
 
 const MAX_ENTRY_ICONS = 6;
@@ -34,13 +37,13 @@ function getHandleEntryCopy(entry: StartEntryProfile): {
   switch (entry.status) {
     case 'claimable':
       return {
-        title: 'Your Page Is Ready',
+        title: 'Your page is ready',
         support: `We built jov.ie/${entry.handle} from your public links. Send the message below to claim it.`,
       };
     case 'claimed':
       return {
-        title: 'This Page Is Taken',
-        support: `jov.ie/${entry.handle} is already claimed. If it's yours, sign in. Otherwise, tell me the name you want.`,
+        title: 'This page is taken',
+        support: `jov.ie/${entry.handle} is already claimed. If it's yours, sign in.`,
       };
     case 'available':
       return {
@@ -114,17 +117,17 @@ function getEntryCopy(mode: OnboardingEntryMode): {
   switch (mode) {
     case 'spotify_handoff':
       return {
-        title: 'Getting Your Artist Ready',
+        title: 'Getting your artist ready',
         support: 'Your message is on its way.',
       };
     case 'prompt_handoff':
       return {
-        title: 'Getting This Ready',
+        title: 'Getting this ready',
         support: 'Your message is on its way.',
       };
     case 'restoring_intent':
       return {
-        title: 'Restoring Your Start',
+        title: 'Restoring your start',
         support: 'Checking the handoff from your last step.',
       };
     case 'blank':
@@ -139,6 +142,7 @@ function getEntryCopy(mode: OnboardingEntryMode): {
 export function OnboardingChatEmptyIntro({
   mode,
   entryProfile,
+  onTryAnotherName,
 }: OnboardingChatEmptyIntroProps) {
   if (mode === 'handle_entry' && entryProfile) {
     const copy = getHandleEntryCopy(entryProfile);
@@ -158,6 +162,18 @@ export function OnboardingChatEmptyIntro({
           <p className='mx-auto mt-2 max-w-112 text-sm leading-6 text-secondary-token'>
             {copy.support}
           </p>
+          {entryProfile.status === 'claimed' && onTryAnotherName ? (
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              className='mt-4'
+              onClick={onTryAnotherName}
+              data-testid='onboarding-entry-try-another-name'
+            >
+              Try Another Name
+            </Button>
+          ) : null}
         </div>
       </div>
     );

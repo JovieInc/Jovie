@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
   OnboardingChatEmptyIntro,
   OnboardingComposerAmbientMark,
@@ -23,7 +23,7 @@ describe('OnboardingChatEmptyIntro', () => {
   it('replaces blank controls with one stable handoff status', () => {
     render(<OnboardingChatEmptyIntro mode='spotify_handoff' />);
 
-    expect(screen.getByText('Getting Your Artist Ready')).toBeTruthy();
+    expect(screen.getByText('Getting your artist ready')).toBeTruthy();
     expect(screen.getByRole('status')).toHaveTextContent(
       'Preparing your first message'
     );
@@ -55,7 +55,7 @@ describe('OnboardingChatEmptyIntro', () => {
       />
     );
 
-    expect(screen.getByText('Your Page Is Ready')).toBeTruthy();
+    expect(screen.getByText('Your page is ready')).toBeTruthy();
     expect(screen.getByText('Mega Ran')).toBeTruthy();
     expect(screen.getByText('jov.ie/megaran')).toBeTruthy();
     expect(screen.getByText('8 links')).toBeTruthy();
@@ -75,10 +75,13 @@ describe('OnboardingChatEmptyIntro', () => {
       />
     );
 
-    expect(screen.getByText('This Page Is Taken')).toBeTruthy();
+    expect(screen.getByText('This page is taken')).toBeTruthy();
     expect(
       screen.getByTestId('onboarding-entry-profile').dataset.entryStatus
     ).toBe('claimed');
+    expect(
+      screen.queryByTestId('onboarding-entry-try-another-name')
+    ).toBeNull();
   });
 
   it('invites an open handle without a profile card', () => {
@@ -91,5 +94,24 @@ describe('OnboardingChatEmptyIntro', () => {
 
     expect(screen.getByText('Claim jov.ie/newartist')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-entry-profile')).toBeNull();
+  });
+
+  it('gives a taken handle a next step instead of a dead end', () => {
+    const onTryAnotherName = vi.fn();
+    render(
+      <OnboardingChatEmptyIntro
+        mode='handle_entry'
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+        onTryAnotherName={onTryAnotherName}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('onboarding-entry-try-another-name'));
+    expect(onTryAnotherName).toHaveBeenCalledTimes(1);
   });
 });

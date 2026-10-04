@@ -607,6 +607,7 @@ interface OnboardingMessageRegionProps {
   readonly shouldDockComposer: boolean;
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
+  readonly onTryAnotherName: () => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -615,6 +616,7 @@ function OnboardingMessageRegion({
   displayMessages,
   entryMode,
   entryProfile,
+  onTryAnotherName,
   hasConversationStarted,
   isBusy,
   isStreaming,
@@ -656,6 +658,7 @@ function OnboardingMessageRegion({
             <OnboardingChatEmptyIntro
               mode={entryMode}
               entryProfile={entryProfile}
+              onTryAnotherName={onTryAnotherName}
             />
           </div>
         }
@@ -756,6 +759,10 @@ export function OnboardingChat({
   const setComposerInput = useCallback((nextInput: string) => {
     latestInputRef.current = nextInput;
     setInput(nextInput);
+  }, []);
+
+  const focusComposer = useCallback(() => {
+    composerInputRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -1176,6 +1183,7 @@ export function OnboardingChat({
             displayMessages={displayMessages}
             entryMode={entryMode}
             entryProfile={entryProfile}
+            onTryAnotherName={focusComposer}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}
