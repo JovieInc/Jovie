@@ -259,6 +259,11 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                    "title": "fix: JOV-6871", "headRefName": self.branch, "headRefOid": "a" * 40,
                    "body": "<!-- linear-issue-id:JOV-6871 -->"}
         from unittest.mock import patch
+        # Host attestation never leaks into fixtures; tests that need one write their own.
+        self.attestation = Path(self.tmp.name) / "attestation.json"
+        attest = patch.object(remote, "ATTESTATION", self.attestation)
+        attest.start()
+        self.addCleanup(attest.stop)
         def read(args, **kwargs):
             self.assertEqual(args[:3], ["gh", "pr", "view"])
             return type("Read", (), {"returncode": 0, "stdout": json.dumps(self.pr)})()
@@ -391,6 +396,142 @@ class ProductionRemoteEntryTest(unittest.TestCase):
             result = self.run_entry()
         self.assertEqual(result["reasons"], ["resume_not_admitted"])
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_actual_entry_refreshes_the_proof_from_live_identity_and_owner_attestation(self):
+        import time
+        self.spec = {"model": self.model, "agentId": "agent-1", "agentName": "GLM 5.3 Developer"}
+        self.attestation.write_text(json.dumps(owner_attestation(time.time() + 3600)))
+        self.agents = [{"id": "agent-1", "name": "GLM 5.3 Developer", "executionMode": "auto"}]
+        original = self.call
+
+        def call(name, args):
+            if name == "list_agents":
+                self.calls.append((name, args))
+                return {"agents": self.agents}
+            return original(name, args)
+
+        from unittest.mock import patch
+        with patch("runpy.run_path", return_value={"mcp_call": call}):
+            result = self.run_entry()
+        self.assertEqual(result["proofRefresh"], "fresh")
+        self.assertEqual(result["verdict"], "verified-not-queued")
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_actual_entry_without_attestation_holds_before_any_remote_call(self):
+        self.spec = {"model": self.model, "agentId": "agent-1", "agentName": "GLM 5.3 Developer"}
+        result = self.run_entry()
+        self.assertEqual(result["proofRefresh"], "owner-attestation-missing")
+        self.assertEqual(result["reasons"], ["remote-preflight-unverified"])
+        self.assertFalse(self.calls)
+
+
+def owner_attestation(expires, **extra):
+    return {"agentId": "agent-1", "model": "z-ai/glm-5.3", "repository": "JovieInc/Jovie",
+            "currentInstructions": True, "allInCap": True, "balanceUsd": 20, "maxCostUsd": 2,
+            "attestedAt": 0, "expiresAt": expires, "attestedBy": "owner", **extra}
+
+
+class ProofRefreshTest(unittest.TestCase):
+    """JOV-7706: the proof joins a live list_agents identity read and the owner's attestation."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "attestation.json"
+        self.spec = {"model": "z-ai/glm-5.3", "agentId": "agent-1", "agentName": "GLM 5.3 Developer"}
+        self.agents = [{"id": "agent-1", "name": "GLM 5.3 Developer", "executionMode": "auto"}]
+        self.now = 10_000
+
+    def call(self, name, _args):
+        assert name == "list_agents"
+        if isinstance(self.agents, Exception):
+            raise self.agents
+        return {"agents": self.agents}
+
+    def refresh(self, attestation=None):
+        if attestation is not None:
+            self.path.write_text(attestation if isinstance(attestation, str) else json.dumps(attestation))
+        return remote.refresh_proof(self.spec, self.call, self.now, self.path)
+
+    def test_fresh_proof_is_verified_and_short_lived(self):
+        proof, reason = self.refresh(owner_attestation(self.now + 3600))
+        self.assertIsNone(reason)
+        self.assertEqual(proof["source"], "hyperagent-identity+owner-attestation")
+        self.assertEqual(proof["expiresAt"], self.now + remote.PROOF_TTL_S)
+        self.assertTrue(remote.verified({**self.spec, "verifiedRemote": proof}, self.now))
+        soon, _ = self.refresh(owner_attestation(self.now + 60))
+        self.assertEqual(soon["expiresAt"], self.now + 60)
+
+    def test_every_missing_or_mismatched_input_holds(self):
+        self.assertEqual(self.refresh(), (None, "owner-attestation-missing"))
+        self.assertEqual(self.refresh("{not json")[1], "owner-attestation-unreadable")
+        self.assertEqual(self.refresh("[]")[1], "owner-attestation-unreadable")
+        self.assertEqual(self.refresh(owner_attestation(self.now - 1))[1], "owner-attestation-expired")
+        self.assertEqual(self.refresh(owner_attestation(self.now + 60, agentId="other"))[1],
+                         "owner-attestation-mismatch")
+        self.assertEqual(self.refresh(owner_attestation(self.now + 60, allInCap=False))[1],
+                         "owner-attestation-incomplete")
+        self.assertEqual(self.refresh(owner_attestation(self.now + 60, maxCostUsd=50))[1],
+                         "owner-attestation-incomplete")
+        self.agents = [{"id": "agent-1", "name": "Renamed", "executionMode": "auto"}]
+        self.assertEqual(self.refresh(owner_attestation(self.now + 60))[1], "remote-agent-identity-unverified")
+        self.agents = [{"id": "agent-1", "name": "GLM 5.3 Developer", "executionMode": "confirm"}]
+        self.assertEqual(self.refresh()[1], "remote-agent-not-auto")
+        self.agents = RuntimeError("HTTP 401 invalid_grant")
+        self.assertEqual(self.refresh()[1], "remote-oauth-expired")
+
+    def test_unreadable_attestation_path_holds(self):
+        self.path.mkdir()
+        self.assertEqual(self.refresh(), (None, "owner-attestation-unreadable"))
+
+    def test_health_entrypoint(self):
+        import io
+        from contextlib import redirect_stdout
+        from unittest.mock import patch
+        self.path.write_text(json.dumps(owner_attestation(self.now + 3600, agentId="cmtj3n2q901i407adklzzq01t")))
+        self.agents = [{"id": "cmtj3n2q901i407adklzzq01t", "name": "GLM 5.3 Developer", "executionMode": "auto"}]
+        with patch.object(remote, "ATTESTATION", self.path), redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(remote.main(["health"], call=self.call, clock=lambda: self.now), 0)
+            self.agents = []
+            self.assertEqual(remote.main(["health"], call=self.call, clock=lambda: self.now), 1)
+            with patch("shutil.which", return_value=None):
+                self.assertEqual(remote.main(["health"]), 1)
+        self.assertIn("available: true agent=GLM 5.3 Developer", out.getvalue())
+        self.assertIn("reason=transport-missing", out.getvalue())
+        with redirect_stdout(io.StringIO()), patch("sys.stderr", io.StringIO()):
+            self.assertEqual(remote.main(["nope"]), 2)
+
+    def test_run_refreshes_an_expired_proof_and_holds_when_it_cannot(self):
+        calls = []
+
+        def call(name, args):
+            calls.append(name)
+            if name == "list_agents":
+                return {"agents": [{"id": "agent-1", "executionMode": "auto"}]}
+            if name == "create_thread":
+                return {"threadId": "t"}
+            return {"thread": {"id": "t", "namedAgentId": "agent-1"}, "isRunning": False,
+                    "awaitingApproval": False, "messages": [{"role": "assistant",
+                    "content": "https://github.com/JovieInc/Jovie/pull/7 head: " + "a" * 40}]}
+
+        marker = "<!-- hyperagent-attempt-id:" + hashlib.sha256(b"a1").hexdigest() + " -->"
+        pr = {"number": 7, "url": "https://github.com/JovieInc/Jovie/pull/7", "state": "OPEN",
+              "title": "JOV-1 fix", "body": "<!-- linear-issue-id:JOV-1 --> " + marker,
+              "headRefName": "hyperagent/jov-1-x", "headRefOid": "a" * 40}
+        fresh = {"agentId": "agent-1", "model": "z-ai/glm-5.3", "repository": "JovieInc/Jovie",
+                 "currentInstructions": True, "allInCap": True, "balanceUsd": 5, "maxCostUsd": 1,
+                 "executionMode": "auto", "source": remote.PROOF_SOURCES[1], "evidenceSha256": "d" * 64,
+                 "verifiedAt": self.now, "expiresAt": self.now + 60}
+        stale = {**fresh, "verifiedAt": 0, "expiresAt": 1}
+        spec = {"model": "z-ai/glm-5.3", "verifiedRemote": stale}
+        run = lambda refresh, path: remote.run(spec, "JOV-1", "a1", "hyperagent/jov-1-x", "p", path, call,
+                                               lambda n: pr, lambda p: {"verdict": "landing"},
+                                               clock=lambda: self.now, pause=lambda s: None, refresh=refresh)
+        held = run(lambda s, n: (None, "owner-attestation-expired"), Path(self.tmp.name) / "a.jsonl")
+        self.assertEqual(held["reasons"], ["remote-preflight-unverified"])
+        self.assertEqual(calls, [])
+        done = run(lambda s, n: (fresh, None), Path(self.tmp.name) / "b.jsonl")
+        self.assertEqual(done["verdict"], "landing")
 
 
 if __name__ == "__main__":
