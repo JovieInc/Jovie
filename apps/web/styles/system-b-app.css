@@ -1269,6 +1269,16 @@
   color: var(--color-text-tooltip);
 }
 
+/* A table cell child with no min-content width: it fills its cell, but an
+   auto-layout table can shrink the column so long text truncates. A plain
+   rule, not a zero-width utility: utilities emitted by this build land after
+   the global sheet and would override responsive widths elsewhere (the shell
+   right rail's lg:w-fit). */
+:where(.system-b-library-fluid-cell) {
+  width: 0;
+  min-width: 100%;
+}
+
 /* The scrub sits on artwork in every theme, so its waveform inks are light. */
 .system-b-library-card-scrub .text-tertiary-token {
   color: color-mix(in oklab, var(--color-text-tooltip) 70%, transparent);

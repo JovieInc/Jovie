@@ -374,10 +374,10 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     id: 'title',
     header: 'Title',
     cell: ({ row }) => (
-      // w-0 min-w-full: no min-content width, so the auto-layout table
-      // shrinks this column and long titles truncate instead of pushing
-      // trailing columns out of the container.
-      <span className='system-b-library-release-title block w-0 min-w-full truncate'>
+      // Fluid cell: no min-content width, so the auto-layout table shrinks
+      // this column and long titles truncate instead of pushing trailing
+      // columns out of the container.
+      <span className='system-b-library-release-title system-b-library-fluid-cell block truncate'>
         {row.original.title}
       </span>
     ),

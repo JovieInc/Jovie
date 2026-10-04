@@ -516,9 +516,9 @@ const ReleaseCell = memo(function ReleaseCell({
   const isPreviewPlaying = playingPreviewId === asset.id;
 
   return (
-    // w-0 min-w-full: no min-content width, so long titles truncate instead
-    // of widening the table past its container.
-    <div className='flex w-0 min-w-full items-center gap-2.5'>
+    // system-b-library-fluid-cell: no min-content width, so long titles
+    // truncate instead of widening the table past its container.
+    <div className='system-b-library-fluid-cell flex items-center gap-2.5'>
       <ArtworkFrame
         size='thumbnail'
         className='system-b-library-artwork-shell group/artwork h-10 w-10'

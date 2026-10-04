@@ -86,3 +86,21 @@ describe('library right-rail System B structural compliance', () => {
     expect(surface).toContain('ApprovalStatusEditor');
   });
 });
+
+describe('library sources feeding the system-b-app.css Tailwind build', () => {
+  it('never emit a zero-width utility that would collapse the shell right rail', () => {
+    // That build's utilities load after the global sheet, so a zero-width
+    // utility here overrides the rail's lg:w-fit and hides the inspector.
+    for (const path of [
+      'app/app/(shell)/library/LibrarySurface.tsx',
+      'components/features/library/library-catalog-columns.tsx',
+    ]) {
+      const source = readSource(path);
+      expect(source).not.toMatch(/['"\s`]w-0['"\s`]/u);
+      expect(source).not.toContain('[width:0');
+    }
+    expect(readSource('styles/system-b-app.css')).toMatch(
+      /:where\(\.system-b-library-fluid-cell\)\s*\{\s*width: 0;\s*min-width: 100%;/u
+    );
+  });
+});
