@@ -326,3 +326,98 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     ).toThrowError(/references unknown claims/u);
   });
 });
+
+describe('generated media slot (JOV-7765)', () => {
+  const digest = `sha256:${'b'.repeat(64)}`;
+
+  function withHeroMedia(media: PageRecord['media'][string]) {
+    const record = factoryRecord();
+    return definePage({
+      ...record,
+      media: { ...record.media, 'hero-1': media },
+    });
+  }
+
+  function heroFrame(container: HTMLElement) {
+    const frame = container.querySelector<HTMLElement>(
+      '[data-factory-media-digest]'
+    );
+    expect(frame).not.toBeNull();
+    return frame as HTMLElement;
+  }
+
+  it('reserves the render aspect ratio and exposes its digest', () => {
+    const { container } = render(
+      <SolutionsRecordBody
+        record={withHeroMedia({
+          kind: 'generated',
+          id: '/marketing/factory/hero.avif',
+          alt: 'Generated hero',
+          mime: 'image/avif',
+          width: 1600,
+          height: 900,
+          digest,
+        })}
+      />
+    );
+    const frame = heroFrame(container);
+
+    expect(frame.style.aspectRatio).toBe('1600 / 900');
+    expect(frame).toHaveAttribute('data-factory-media-digest', digest);
+    expect(frame.querySelector('img')).toHaveAttribute('alt', 'Generated hero');
+    expect(frame.querySelector('video')).toBeNull();
+  });
+
+  it('renders captioned video click-to-play behind its poster, never autoplaying', () => {
+    const { container } = render(
+      <SolutionsRecordBody
+        record={withHeroMedia({
+          kind: 'generated',
+          id: '/marketing/factory/hero.mp4',
+          alt: 'Generated walkthrough',
+          mime: 'video/mp4',
+          width: 1280,
+          height: 720,
+          digest,
+          poster: '/marketing/factory/hero-poster.avif',
+          captions: '/marketing/factory/hero.vtt',
+        })}
+      />
+    );
+    const video = heroFrame(container).querySelector('video');
+
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute(
+      'poster',
+      '/marketing/factory/hero-poster.avif'
+    );
+    expect(video).toHaveAttribute('controls');
+    expect(video).toHaveAttribute('preload', 'none');
+    expect(video).not.toHaveAttribute('autoplay');
+    expect(video).not.toHaveAttribute('loop');
+    expect(video?.querySelector('track')).toHaveAttribute(
+      'src',
+      '/marketing/factory/hero.vtt'
+    );
+    expect(video?.querySelector('source')).toHaveAttribute('type', 'video/mp4');
+  });
+
+  it('puts a re-render on the page as a new artifact', () => {
+    const markup = (hash: string) =>
+      renderToStaticMarkup(
+        <SolutionsRecordBody
+          record={withHeroMedia({
+            kind: 'generated',
+            id: '/marketing/factory/hero.avif',
+            alt: 'Generated hero',
+            mime: 'image/avif',
+            width: 1600,
+            height: 900,
+            digest: hash,
+          })}
+        />
+      );
+
+    expect(markup(digest)).not.toBe(markup(`sha256:${'c'.repeat(64)}`));
+  });
+});
