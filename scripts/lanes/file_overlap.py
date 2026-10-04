@@ -239,9 +239,16 @@ def open_pr_decisions(prs: list[dict], mode: str | None = None) -> list[dict]:
             decision = classify_pair(left, right)
             if decision:
                 owned = queue_owned(by_number.get(decision["laterPr"]))
-                decision["actionTaken"] = "flag" if mode == "flag" or owned else decision["policyAction"]
+                # Sequencing waits for the first PR to land; one that is not queued or armed may
+                # never land (#20148 held queued #20469 on 2026-10-04), so it only flags.
+                idle = decision["policyAction"] == "sequence" \
+                    and not queue_owned(by_number.get(decision["firstPr"]))
+                decision["actionTaken"] = "flag" if mode == "flag" or owned or idle \
+                    else decision["policyAction"]
                 if owned:
                     decision["queueOwned"] = True
+                if idle:
+                    decision["firstIdle"] = True
                 decisions.append(decision)
     return decisions
 

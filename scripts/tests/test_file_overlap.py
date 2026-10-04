@@ -193,6 +193,7 @@ class SequencingTest(unittest.TestCase):
                                sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
                                ledger=lambda *_args: None)
         first = pr(20148, [changed("scripts/lanes/lane_runner.py")])
+        first["isInMergeQueue"] = True
         later = pr(20469, [changed("scripts/lanes/lane_runner.py")])
         with tempfile.TemporaryDirectory() as tmp, \
                 patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
@@ -205,6 +206,49 @@ class SequencingTest(unittest.TestCase):
             released = overlap.reconcile_open_prs(host, lane, [first, later])
         self.assertEqual(released["released"], 1)
         self.assertIn(["gh", "api", "-X", "DELETE", "repos/JovieInc/Jovie/issues/20469/labels/hold"], calls)
+
+    def test_0116_incident_replay_holds_nothing(self):
+        # 2026-10-04 01:16Z: unqueued #20148 and draft #20166 held queued #20469/#20447 and
+        # idle #20388; every merge group behind the holds failed Fork PR Gate.
+        calls = []
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",
+                               sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
+                               ledger=lambda *_args: None)
+        idle = pr(20148, [changed("scripts/lanes/lane_runner.py"), changed("scripts/ci-fast-lanes.mjs")])
+        draft = pr(20166, [changed("scripts/lanes/lane_runner.py")])
+        draft["isDraft"] = True
+        queued_head = pr(20469, [changed("scripts/lanes/lane_runner.py"), changed("scripts/lanes/README.md")])
+        queued_head["isInMergeQueue"] = True
+        queued = pr(20447, [changed("scripts/ci-fast-lanes.mjs")])
+        queued["isInMergeQueue"] = True
+        later_idle = pr(20388, [changed("scripts/ci-fast-lanes.mjs")])
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            host = SimpleNamespace(state=Path(tmp))
+            result = overlap.reconcile_open_prs(host, lane, [idle, draft, queued_head, queued, later_idle])
+        self.assertTrue(result["pairs"])
+        self.assertNotIn(20166, {row["firstPr"] for row in result["pairs"]} | {row["laterPr"] for row in result["pairs"]})
+        owned = {20469, 20447}
+        for row in result["pairs"]:
+            if row["actionTaken"] != "flag":  # only an idle PR may wait behind a queued one
+                self.assertIn(row["firstPr"], owned)
+                self.assertNotIn(row["laterPr"], owned)
+        # Queued PRs are never labeled, un-armed or retargeted.
+        self.assertFalse(any(str(number) in " ".join(args) for args in calls for number in owned))
+
+    def test_sequence_still_holds_behind_a_queued_first_pr(self):
+        calls = []
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",
+                               sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
+                               ledger=lambda *_args: None)
+        first = pr(20139, [changed("scripts/lanes/doctor.py")], title="foundational lane contracts")
+        first["isInMergeQueue"] = True
+        later = pr(20148, [changed("scripts/lanes/doctor.py")], body="Land after #20139.")
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            result = overlap.reconcile_open_prs(SimpleNamespace(state=Path(tmp)), lane, [first, later])
+        self.assertEqual(result["pairs"][0]["actionTaken"], "sequence")
+        self.assertTrue(any("labels[]=hold" in call for args in calls for call in args))
 
 
 if __name__ == "__main__":
