@@ -350,6 +350,9 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(drain(repo)) or "pool empty")
         return 0
     if args.recycle:
+        if (args.recycle / PRESERVED_REPAIR).exists():
+            print(f"worktree-new: {args.recycle} contains a preserved repair; left in place", file=sys.stderr)
+            return 1
         slot = recycle(repo, args.recycle, args.base, args.size, log=sys.stdout)
         if slot:
             print(f"worktree-new: {args.recycle} recycled into the pool as {slot}")

@@ -255,7 +255,7 @@ daemon|daemon: false|background process for optimization (disabled in Jovie due 
 ```bash
 scripts/agent/worktree-new ../Jovie-agent-1 -b agent/task-name   # fetch, take a pool slot, install
 cd ../Jovie-agent-1 && pnpm turbo build
-scripts/agent/worktree-new --recycle ../Jovie-agent-1             # clean: back to the pool; dirty: refused
+scripts/agent/worktree-new --recycle ../Jovie-agent-1             # clean: back to the pool; dirty/preserved: refused
 ```
 
 | Cache | Location | Shared how |

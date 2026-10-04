@@ -102,6 +102,15 @@ def index_locked(path: Path) -> bool:
         return False
 
 
+def ensure_sbin_on_path(environ=os.environ) -> None:
+    """launchd's PATH omits /usr/sbin, where macOS ships lsof; without it every
+    liveness check fails closed and no cleanup ever runs. Entry points call this
+    so `lsof` resolves by name for the whole process tree."""
+    parts = environ.get("PATH", "").split(os.pathsep)
+    if "/usr/sbin" not in parts:
+        environ["PATH"] = os.pathsep.join([p for p in parts if p] + ["/usr/sbin"])
+
+
 def busy_reason(path: Path, run=subprocess.run) -> str | None:
     """Why a worktree must not be destroyed; None only when it is provably idle.
 

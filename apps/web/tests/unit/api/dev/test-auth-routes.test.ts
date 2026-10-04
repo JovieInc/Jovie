@@ -3,7 +3,6 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  mockBuildIosAuthCompleteUrl,
   mockBuildBetterAuthSessionCookieDescriptor,
   mockBuildDevTestAuthCookieDescriptors,
   mockCreateStoredNativeExchangeCode,
@@ -20,7 +19,6 @@ const {
   mockSanitizeDevTestAuthRedirectPath,
   mockResolveConfiguredNativeTestBetterAuthUserId,
 } = vi.hoisted(() => ({
-  mockBuildIosAuthCompleteUrl: vi.fn(),
   mockBuildBetterAuthSessionCookieDescriptor: vi.fn(),
   mockBuildDevTestAuthCookieDescriptors: vi.fn(),
   mockCreateStoredNativeExchangeCode: vi.fn(),
@@ -38,8 +36,8 @@ const {
   mockResolveConfiguredNativeTestBetterAuthUserId: vi.fn(),
 }));
 
-vi.mock('@jovie/auth-routing', () => ({
-  buildIosAuthCompleteUrl: mockBuildIosAuthCompleteUrl,
+vi.mock('@jovie/auth-routing', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/auth-routing')>()),
   sanitizeReturnTo: mockSanitizeReturnTo,
 }));
 
@@ -109,12 +107,6 @@ describe('dev test-auth routes', () => {
         ? value
         : null
     );
-    mockBuildIosAuthCompleteUrl.mockImplementation(({ code, state }) => {
-      const url = new URL('ie.jov.jovie://auth/complete');
-      url.searchParams.set('code', code);
-      url.searchParams.set('state', state);
-      return url.toString();
-    });
     mockCreateStoredNativeExchangeCode.mockResolvedValue({});
     mockEnsureDevTestAuthActor.mockResolvedValue({
       persona: 'creator',
@@ -1080,4 +1072,88 @@ describe('dev test-auth routes', () => {
     });
     expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
   });
+  it.each(['callback', 'provider'] as const)(
+    'echoes correlated iOS %s handback through its real builder',
+    async kind => {
+      const nativeAttempt = 'a'.repeat(43);
+      const callback = await import(
+        '@/app/api/dev/test-auth/mobile-callback/route'
+      );
+      const provider = await import(
+        '@/app/api/dev/test-auth/mobile-provider-complete/route'
+      );
+      const response =
+        kind === 'callback'
+          ? await callback.POST(
+              new NextRequest(
+                'http://localhost:3000/api/dev/test-auth/mobile-callback',
+                {
+                  method: 'POST',
+                  body: JSON.stringify({ nativeAttempt }),
+                }
+              )
+            )
+          : await provider.GET(
+              new NextRequest(
+                `http://localhost:3000/api/dev/test-auth/mobile-provider-complete?code_challenge=c&code_challenge_method=S256&native_attempt=${nativeAttempt}`
+              )
+            );
+      const body = kind === 'callback' ? await response.json() : null;
+      expect(response.status).toBe(kind === 'callback' ? 200 : 307);
+      const url = new URL(
+        body?.callbackUrl ?? response.headers.get('location')
+      );
+      expect(url.searchParams.getAll('native_attempt')).toEqual([
+        nativeAttempt,
+      ]);
+      if (body) expect(body.nativeAttempt).toBe(nativeAttempt);
+      expect(mockCreateStoredNativeExchangeCode).toHaveBeenCalledWith(
+        expect.objectContaining({ nativeAttempt })
+      );
+    }
+  );
+
+  it.each([null, '', 'short'])(
+    'rejects invalid JSON attempt %s before dev actor/code creation',
+    async nativeAttempt => {
+      const { POST } = await import(
+        '@/app/api/dev/test-auth/mobile-callback/route'
+      );
+      const response = await POST(
+        new NextRequest(
+          'http://localhost:3000/api/dev/test-auth/mobile-callback',
+          {
+            method: 'POST',
+            body: JSON.stringify({ nativeAttempt }),
+          }
+        )
+      );
+      expect(response.status).toBe(400);
+      expect(
+        mockResolveConfiguredNativeTestBetterAuthUserId
+      ).not.toHaveBeenCalled();
+      expect(mockEnsureLiveDevTestAuthActor).not.toHaveBeenCalled();
+      expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['', 'short', `${'a'.repeat(43)}&native_attempt=${'a'.repeat(43)}`])(
+    'rejects invalid/duplicate provider query %s before actor/code creation',
+    async attempt => {
+      const { GET } = await import(
+        '@/app/api/dev/test-auth/mobile-provider-complete/route'
+      );
+      const response = await GET(
+        new NextRequest(
+          `http://localhost:3000/api/dev/test-auth/mobile-provider-complete?code_challenge=c&code_challenge_method=S256&native_attempt=${attempt}`
+        )
+      );
+      expect(response.status).toBe(400);
+      expect(
+        mockResolveConfiguredNativeTestBetterAuthUserId
+      ).not.toHaveBeenCalled();
+      expect(mockEnsureLiveDevTestAuthActor).not.toHaveBeenCalled();
+      expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
+    }
+  );
 });

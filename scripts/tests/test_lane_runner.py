@@ -339,6 +339,74 @@ class WorkstreamAdmissionTest(unittest.TestCase):
         self.assertEqual(lane.workstreams.KEYS[-1], "human-decision")
 
 
+class HotspotAdmissionTest(unittest.TestCase):
+    """JOV-7708: an issue aimed at a hotspot an open PR holds waits instead of conflicting."""
+
+    def titled(self, identifier, title, description="body", labels=()):
+        task = issue(identifier, labels=labels)
+        task.title, task.description = title, description
+        return task
+
+    def open_pr(self, number, *paths, labels=()):
+        return {"number": number, "files": [{"path": path} for path in paths],
+                "labels": [{"name": name} for name in labels]}
+
+    def test_seed_and_shared_files_are_hotspots_held_by_the_oldest_active_pr(self):
+        prs = [self.open_pr(30, "apps/web/lib/flags/code-flags.ts", "apps/web/a.ts"),
+               self.open_pr(20, "apps/web/a.ts"),
+               self.open_pr(10, "scripts/lanes/hud.py", labels=["lane-fix-exhausted"]),
+               self.open_pr(11, "scripts/lanes/doctor.py", labels=["hold"]),
+               self.open_pr(40, "apps/web/b.ts")]
+        self.assertEqual(lane.hotspot_holds(prs), {"apps/web/lib/flags/code-flags.ts": 30,
+                                                   "apps/web/a.ts": 20})
+
+    def test_predicted_touch_prefers_named_files_then_the_workstream_area(self):
+        named = self.titled("JOV-1", "Lane cooldown", "Edit `lane_runner.py` and lib/flags/code-flags.ts.")
+        self.assertEqual(lane.predicted_touch(named), frozenset({"lane_runner.py", "lib/flags/code-flags.ts"}))
+        area = self.titled("JOV-2", "Symphony lanes admission singleflight", "no paths here")
+        self.assertEqual(lane.predicted_touch(area), lane.LANES_HARNESS)
+        self.assertEqual(lane.predicted_touch(self.titled("JOV-3", "Sidebar jank on profile")), frozenset())
+
+    def test_held_hotspot_rejects_only_issues_that_would_touch_it(self):
+        holds = {"apps/web/lib/flags/code-flags.ts": 30, "scripts/lanes/lane_runner.py": 41}
+        flag = self.titled("JOV-1", "Add a flag", "Register it in lib/flags/code-flags.ts")
+        lanes_work = self.titled("JOV-2", "Symphony lane cooldown shared across hosts")
+        product = self.titled("JOV-3", "Sidebar jank on profile")
+        self.assertEqual(lane.pool_rejections([flag, lanes_work, product], holds),
+                         {"JOV-1": "hotspot-held:apps/web/lib/flags/code-flags.ts#30",
+                          "JOV-2": "hotspot-held:scripts/lanes/lane_runner.py#41"})
+        self.assertEqual(lane.pick_issue([flag, lanes_work, product], {}, holds=holds).identifier, "JOV-3")
+        # No holds (or an unreadable read) admits as before.
+        self.assertEqual(lane.pool_rejections([flag, lanes_work, product], {}), {})
+        self.assertEqual(lane.pick_issue([lanes_work, product], {}).identifier, "JOV-2")
+
+    def test_a_suffix_hint_never_matches_a_different_file(self):
+        holds = {"apps/web/lib/commands/registry.ts": 7}
+        self.assertIsNone(lane.held_hotspot(frozenset({"data/product-truth/registry.ts"}), holds))
+        self.assertIsNone(lane.held_hotspot(frozenset({"istry.ts"}), holds))
+        self.assertEqual(lane.held_hotspot(frozenset({"registry.ts"}), holds),
+                         ("apps/web/lib/commands/registry.ts", 7))
+
+    def test_open_hotspot_holds_fails_open_when_github_is_unreadable(self):
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1, stdout="", stderr="502")):
+            self.assertEqual(lane.open_hotspot_holds(), {})
+        listed = json.dumps([self.open_pr(5, "scripts/lanes/hud.py")])
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=listed, stderr="")):
+            self.assertEqual(lane.open_hotspot_holds(), {"scripts/lanes/hud.py": 5})
+
+
+class RebuildInFlightTest(unittest.TestCase):
+    """JOV-7708: a parked PR the sweep requeued stays open but releases its issue."""
+
+    def test_rebuild_labeled_pr_does_not_hold_its_issue(self):
+        listed = json.dumps([
+            {"headRefName": "devin/jov-7-20261001t0900", "body": "", "labels": [{"name": "lane-rebuild"}]},
+            {"headRefName": "codex/jov-8-20261001t0900", "body": "", "labels": [{"name": "lane-fix-exhausted"}]},
+            {"headRefName": "tim/x", "body": "linear-issue-id: JOV-9", "labels": []}])
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=listed, stderr="")):
+            self.assertEqual(lane.in_flight_issues(), frozenset({"JOV-8", "JOV-9"}))
+
+
 class PromptTest(unittest.TestCase):
     def test_contract_names_branch_issue_and_independent_gate(self):
         prompt = lane.render_prompt(issue("JOV-42"), "devin/jov-42-x", "prior decision: use tokens")
@@ -1282,6 +1350,17 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_blocked_last_overlap_candidate_never_runs_or_claims_the_issue(self):
+        self.linear.issues[0].description = "Edit `scripts/lanes/lane_runner.py`."
+        existing = {"number": 1, "files": ["scripts/lanes/lane_runner.py"], "isDraft": False}
+        with patch.object(lane, "overlap_inventory", return_value=([existing], [])), \
+                patch.object(lane, "open_hotspot_holds", return_value={}), \
+                patch.object(lane, "run_issue") as run, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            lane.worker(self.host, "devin")
+        run.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+
     def test_event_cleanup_waits_until_all_productive_selections_decline(self):
         for chosen in ("event", "poll", "adopt", "issue", "idle"):
             with self.subTest(chosen=chosen):
@@ -1446,6 +1525,62 @@ class WorkerTest(unittest.TestCase):
         self.assertIn("Recovery owner: JOV-3", self.linear.comments[-1][1])
         self.assertFalse(lane.failures_path(self.host).exists())
         self.assertEqual(len(self.execs), 1)
+
+    def test_recovery_handoff_loop_backs_off_and_comments_once_jov_7690(self):
+        # Replays JOV-7658 (2026-10-03): 95 claim -> recovery-handoff -> reexec cycles about
+        # 2 s apart, one Linear move and comment each, until Linear rate-limited the pool.
+        handoff = lane.RecoveryHandoff("preserved-issue-needs-execution-reconciliation", Path("/retained"), "JOV-3")
+        runs = []
+        lane.run_issue = lambda *args: runs.append(args[-1].identifier) or {
+            "verdict": "recovery-handoff", "recovery": handoff.evidence}
+        cooldowns = lane.handoff_cooldown_path(self.host)
+        for _ in range(5):  # the hot loop: every reexec rescans immediately
+            lane.worker(self.host, "devin")
+        self.assertEqual(runs, ["JOV-3"], "a cooling issue is not re-claimed")
+        row = json.loads(cooldowns.read_text())["JOV-3"]
+        self.assertEqual(row["count"], 1)
+        self.assertAlmostEqual(row["until"] - time.time(), lane.HANDOFF_BACKOFF_S, delta=30)
+        spans = []
+        # Freeze the clock: the span is the backoff the note wrote, not worker wall time.
+        with patch("time.time", return_value=1_000_000_000.0):
+            for _ in range(5):  # each cooldown expiry admits exactly one more claim
+                data = json.loads(cooldowns.read_text()); before = data["JOV-3"]["count"]
+                data["JOV-3"]["until"] = 0; cooldowns.write_text(json.dumps(data))
+                start = time.time()
+                lane.worker(self.host, "devin"); lane.worker(self.host, "devin")
+                row = json.loads(cooldowns.read_text())["JOV-3"]
+                self.assertEqual(row["count"], before + 1)
+                spans.append(round(row["until"] - start, -1))
+        self.assertEqual(len(runs), 6)
+        self.assertEqual(spans, [600, 1200, 2400, 4800, 9600])
+        self.assertEqual(lane.HANDOFF_BACKOFF_CAP_S, 21600)
+        handoff_comments = [body for _, body in self.linear.comments if "Preserved work retained" in body]
+        self.assertEqual(len(handoff_comments), 2, "first handoff and the Nth, never one per loop")
+        self.assertIn(f"Handed back {lane.HANDOFF_COMMENT_AT} times", handoff_comments[1])
+        self.assertFalse(lane.failures_path(self.host).exists())
+        self.assertEqual(lane.note_recovery_handoff(self.host, "JOV-9", now=0)["until"], 300)
+        for _ in range(20): capped = lane.note_recovery_handoff(self.host, "JOV-9", now=0)
+        self.assertEqual(capped["until"], lane.HANDOFF_BACKOFF_CAP_S)
+
+    def test_preserved_work_holds_its_issue_out_of_every_claim_path_jov_7690(self):
+        worktrees = self.host.state / "worktrees"
+        named = worktrees / "20261003T163759Z-JOV-7658-devin-0816ea"
+        unnamed = worktrees / "20261003T183421Z-JOV-7632-devin-50b668"  # marker issue: null
+        for path, marker_issue in ((named, "JOV-7658"), (unnamed, None)):
+            path.mkdir(parents=True)
+            (path / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps(
+                {"schema": "jovie-preserved-repair/v1", "runId": path.name, "pr": None, "issue": marker_issue}))
+        (worktrees / "20261003T000000Z-JOV-5-devin-aaaaaa").mkdir()  # no marker: claimable
+        held = lane.held_back_issues(self.host)
+        self.assertEqual(held, frozenset({"JOV-7658", "JOV-7632"}))
+        pool = [issue("JOV-7658", priority=1), issue("JOV-7632", priority=1), issue("JOV-5", priority=3)]
+        self.assertEqual(lane.pick_issue(pool, {}, held_back=held).identifier, "JOV-5")
+        self.assertEqual(lane.pick_issue(pool, {}).identifier, "JOV-7658", "default stays unchanged")
+        lane.save_escalation(self.host, {"events": {"disk-low": {
+            "status": "claimed", "lane": "devin", "running": False, "issueId": "id-JOV-7658",
+            "identifier": "JOV-7658", "title": "t"}}})
+        self.assertIsNone(lane.claim_labeled_event(self.host, "devin", self.linear))
+        self.assertFalse(lane.load_escalation(self.host)["events"]["disk-low"].get("running"))
 
     def test_failures_retry_then_return_to_triage(self):
         lane.run_issue = lambda *a: {"verdict": "held", "reasons": ["code-change-without-test"]}
@@ -3330,7 +3465,7 @@ class UpdateTest(unittest.TestCase):
 
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
-            tmp = Path(tmp)
+            tmp = Path(tmp).resolve()  # macOS /var -> /private/var must match .resolve() below
             origin, clone = tmp / "origin.git", tmp / "clone"
             self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
             self.git("clone", "-q", str(origin), str(clone), cwd=tmp)

@@ -270,4 +270,44 @@ describe('NativeReturnPage (native auth bounce)', () => {
       `ie.jov.jovie://auth/complete?code=${CODE}&state=${STATE}`
     );
   });
+  it('uses the same correlated iOS link for automatic and manual handback', () => {
+    const nativeAttempt = 'a'.repeat(43);
+    setPathname('/auth/ios/complete');
+    setSearchParams(
+      `code=${CODE}&state=${STATE}&native_attempt=${nativeAttempt}`
+    );
+    render(<NativeReturnPage />);
+    const href = screen
+      .getByRole('link', { name: 'Return to Jovie' })
+      .getAttribute('href')!;
+    expect(new URL(href).searchParams.getAll('native_attempt')).toEqual([
+      nativeAttempt,
+    ]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      href
+    );
+  });
+
+  it.each([
+    ['/auth/ios/complete', ''],
+    ['/auth/ios/complete', 'short'],
+    [
+      '/auth/ios/complete',
+      `${'a'.repeat(43)}&native_attempt=${'b'.repeat(43)}`,
+    ],
+    ['/auth/native-return', 'a'.repeat(43)],
+  ])(
+    'offers neither handback for invalid attempt on %s (%s)',
+    (path, attempt) => {
+      setPathname(path);
+      setSearchParams(`code=${CODE}&state=${STATE}&native_attempt=${attempt}`);
+      render(<NativeReturnPage />);
+      expect(
+        screen.queryByRole('link', { name: 'Return to Jovie' })
+      ).toBeNull();
+      expect(screen.queryByTestId('native-protocol-launcher')).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
 });

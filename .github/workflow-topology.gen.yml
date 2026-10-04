@@ -241,6 +241,7 @@ nodes:
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
+      - Quarantine Recovery
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -680,6 +681,9 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
+      - schedule
+      - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:sync_done
     jobCount: 1
   - name: M2 Revenue-Path Canary
@@ -877,7 +881,7 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:notify-failure
-    jobCount: 5
+    jobCount: 6
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -1012,11 +1016,12 @@ nodes:
       - desktop-release
       - iOS TestFlight
       - Lane Fix Relay
+      - Linear Sync on Merge
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:publish-customer-changelog
-    jobCount: 12
+    terminalReceipt: job:remediation-customer-changelog
+    jobCount: 13
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1064,8 +1069,9 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:recover-quarantine
-    jobCount: 1
+      - workflow_run
+    terminalReceipt: job:publish-queue-results
+    jobCount: 2
   - name: Remediation Sweep
     path: .github/workflows/remediation-sweep.yml
     active: true
@@ -1490,6 +1496,9 @@ edges:
   - from: Changed-Evidence Test Suites
     to: Lane Fix Relay
     type: workflow_run
+  - from: Production Controller
+    to: Linear Sync on Merge
+    type: workflow_run
   - from: Source Validation
     to: Merge Queue Green Enroll
     type: workflow_run
@@ -1514,6 +1523,9 @@ edges:
   - from: Production Release
     to: Canary Health Gate
     type: workflow_call
+  - from: CI
+    to: Quarantine Recovery
+    type: workflow_run
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run

@@ -48,8 +48,11 @@ class PoolTest(unittest.TestCase):
         self.env.start()
         self.install = patch.object(pool_mod, "INSTALL", ["true"])
         self.install.start()
+        self.disk = patch.object(pool_mod, "free_gb", return_value=100)
+        self.disk.start()
 
     def tearDown(self):
+        self.disk.stop()
         self.install.stop()
         self.env.stop()
         self.tmp.cleanup()
@@ -208,6 +211,21 @@ class PoolTest(unittest.TestCase):
         self.assertIsNone(pool_mod.recycle(self.repo, path, "no-such-base", log=log, root=self.root))
         self.assertIn("not recycled", log.getvalue())
         self.assertTrue(path.exists())
+
+    def test_cli_never_removes_an_ignored_preserved_repair(self):
+        path = self.finished("preserved")
+        ignore = self.out / "ignore"
+        ignore.write_text(ignore.read_text() + pool_mod.PRESERVED_REPAIR + "\n")
+        marker = path / pool_mod.PRESERVED_REPAIR
+        marker.write_text('{"unpublished": true}')
+        self.assertTrue(pool_mod.is_clean(path), "the preservation marker is ignored")
+        with patch.object(pool_mod, "CACHE_ROOT", self.root), redirect_stdout(io.StringIO()), \
+             patch("sys.stderr", new_callable=io.StringIO):
+            code = pool_mod.main(["--recycle", str(path), "--repo", str(self.repo), "--base", "main"])
+        self.assertEqual(code, 1)
+        self.assertTrue(path.exists())
+        self.assertEqual(marker.read_text(), '{"unpublished": true}')
+        self.assertIn("feat/preserved", git(self.repo, "branch", "--list", "feat/preserved"))
 
     def test_cli_recycles_removes_or_refuses(self):
         clean, full, dirty = self.finished("clean"), self.finished("full"), self.finished("dirty")

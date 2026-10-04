@@ -473,6 +473,67 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(body).toContain('searchSpotifyArtist');
   });
 
+  it('does not repeat the opener when a reloaded client resends only its newest message', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.executeChatTurnMock.mockRejectedValue(new Error('provider down'));
+    // The server already holds this session's first turn and its opener.
+    hoisted.dbSelectMock.mockImplementation(
+      (fields: Record<string, unknown> | undefined) => ({
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({
+              limit: async () => {
+                if (fields && 'content' in fields) {
+                  return [
+                    {
+                      id: 'm1',
+                      role: 'user',
+                      content: 'hi',
+                      clientMessageId: 'first-hi',
+                    },
+                    {
+                      id: 'm2',
+                      role: 'assistant',
+                      content: "Hey, I'm Jovie. What are you working on?",
+                      clientMessageId: null,
+                    },
+                    // This request's message, persisted on reserve.
+                    {
+                      id: 'm3',
+                      role: 'user',
+                      content: 'hi',
+                      clientMessageId: 'reload-hi',
+                    },
+                  ];
+                }
+                if (fields && Object.keys(fields).length === 1) {
+                  return [{ id: 'conv_existing' }];
+                }
+                return [];
+              },
+            }),
+          }),
+        }),
+      })
+    );
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({
+        mode: 'onboarding',
+        messages: [{ ...userMessage('hi'), id: 'reload-hi' }],
+      }),
+      'req-reload'
+    );
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-onboarding-fallback')).toMatch(
+      /^get_artist:/
+    );
+  });
+
   it('honors LLM failure injection only when the server env enables it', async () => {
     vi.resetModules();
     stubRuntimeEnv();

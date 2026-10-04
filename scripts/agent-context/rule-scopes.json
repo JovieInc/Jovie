@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "23d91bef0e33b24e3338d39624ddd5fd43123d59a8fbfae3ce80b2e4aae4e22b"
+    "bodySha256": "7f3b0dba3ee3214064fe9d7d78c2374d1de1193497df38338aba883fece617b2"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "c095a5c80b805429d92dfb98fa96e3b66bce96d552b5d4fa980d61d6b3067aea"
+    "bodySha256": "6330d61625978df2b2d670131ab2ee57329f02c418ae37547c73f08a10bf58c0"
   },
   {
     "file": ".claude/rules/macos.md",
