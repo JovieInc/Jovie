@@ -14,6 +14,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
+import type { AppFlagName } from '@/lib/flags/contracts';
 
 /**
  * Backend chat tools that are deliberately NOT exposed as user-visible
@@ -94,6 +95,8 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Pro-only; chat surfaces it conversationally rather than via slash.',
   researchArtistPresence:
     'Onboarding presence-build system event; not a model-invoked or slash tool.',
+  checkLinkDrift:
+    'Onboarding presence-build system event; not a model-invoked or slash tool.',
   surfaceLibraryOpportunities:
     'Onboarding presence-build system event; not a model-invoked or slash tool.',
   assembleArtistProfile:
@@ -157,6 +160,8 @@ export interface NavCommand {
   readonly href: string;
   /** Optional shortcut hint rendered on the cmd+k row. */
   readonly shortcutLabel?: string;
+  /** Hide this row unless the flag is on. A missing value stays hidden. */
+  readonly requiredFlag?: AppFlagName;
 }
 
 export type Command = SkillCommand | NavCommand;
@@ -199,7 +204,8 @@ function nav(
   label: string,
   description: string,
   iconName: string,
-  href: string
+  href: string,
+  requiredFlag?: AppFlagName
 ): NavCommand {
   return {
     kind: 'nav',
@@ -209,7 +215,17 @@ function nav(
     iconName,
     surfaces: CMDK_ONLY,
     href,
+    ...(requiredFlag ? { requiredFlag } : {}),
   };
+}
+
+/** Skills stay visible. Nav rows with a required flag render only when it is on. */
+export function isCommandVisible(
+  command: Command,
+  flags: Partial<Record<AppFlagName, boolean>>
+): boolean {
+  if (command.kind !== 'nav' || !command.requiredFlag) return true;
+  return flags[command.requiredFlag] === true;
 }
 
 // Nav entries mirror the primary dashboard sidebar (`dashboard-nav/config.ts`)
@@ -266,7 +282,8 @@ export const COMMANDS: readonly Command[] = [
     'Identity',
     'Monitor your identity, public pages, and search presence.',
     'User',
-    APP_ROUTES.PRESENCE
+    APP_ROUTES.PRESENCE,
+    'PROFILES_WORKSPACE'
   ),
   nav(
     'go-connections',
@@ -288,6 +305,34 @@ export const COMMANDS: readonly Command[] = [
     'Manage your release catalog and smart links.',
     'Layers',
     APP_ROUTES.RELEASES
+  ),
+  nav(
+    'go-youtube',
+    'YouTube',
+    'Open the YouTube workspace.',
+    'Youtube',
+    APP_ROUTES.YOUTUBE_REVIVAL
+  ),
+  nav(
+    'go-insights',
+    'Insights',
+    'Open the insights workspace.',
+    'LineChart',
+    APP_ROUTES.INSIGHTS
+  ),
+  nav(
+    'go-jovie-work',
+    'Jovie work',
+    'Open autonomous work for this identity.',
+    'ListTodo',
+    APP_ROUTES.JOVIE_WORK
+  ),
+  nav(
+    'go-tour-dates',
+    'Tour dates',
+    'Open scheduled dates.',
+    'CalendarDays',
+    APP_ROUTES.TOUR_DATES
   ),
   nav(
     'go-calendar',

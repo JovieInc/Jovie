@@ -207,8 +207,11 @@ function resolveLibraryProfileVisibility(
 export function buildLibraryReleaseAssets(
   releases: readonly ReleaseViewModel[],
   approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>,
-  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>
+  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>,
+  /** The profile's own name; a release with no credited artist is theirs. */
+  fallbackArtistName?: string
 ): LibraryReleaseAsset[] {
+  const ownerArtist = fallbackArtistName?.trim() || 'Unknown Artist';
   return releases.map(release => {
     const providers = release.providers.flatMap(provider => {
       const url = normalizeHttpUrl(provider.url);
@@ -241,7 +244,7 @@ export function buildLibraryReleaseAssets(
     return {
       id: release.id,
       title: release.title,
-      artist: release.artistNames?.[0]?.trim() || 'Unknown Artist',
+      artist: release.artistNames?.[0]?.trim() || ownerArtist,
       artworkUrl,
       previewUrl,
       ...(previewVerification ? { previewVerification } : {}),

@@ -92,6 +92,7 @@ async function main() {
     steps: FUNNEL_STEPS,
     outDir,
     throttleMobile: !values['no-throttle'],
+    bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET || undefined,
   });
 
   const displayName = displayNameFrom(captures, handle);

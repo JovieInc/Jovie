@@ -3,7 +3,7 @@
 No dependencies: signs the app JWT with the openssl CLI. Caches the token until 10 min before expiry."""
 from __future__ import annotations
 
-import base64, json, os, subprocess, sys, time, urllib.request
+import base64, calendar, json, os, subprocess, sys, time, urllib.request
 from pathlib import Path
 
 APP_ID = os.environ.get("JOVIE_BOT_APP_ID", "2934433")
@@ -41,5 +41,75 @@ def token(now: int | None = None) -> str:
         os.umask(old)
     return data["token"]
 
+# One GitHub budget per installation (JOV-7587): every gh call on a lanes host (workers,
+# doctor, reconcile, agents) goes through the shim, so the shim is where polling yields.
+# GitHub's own rateLimit is the shared truth across hosts; each host re-reads it at most
+# once a minute and holds read-only polling below the floor until the reset, keeping the
+# rest of the hour for writes (enqueue, merge, comments) instead of starting a quota storm.
+BUDGET = Path(os.environ.get("JOVIE_GITHUB_BUDGET", Path.home() / ".local/state/jovie-lanes/github-budget.json"))
+FLOOR = int(os.environ.get("JOVIE_GITHUB_FLOOR", "600"))
+BUDGET_TTL_S = 60
+READ_COMMANDS = {("pr", "list"), ("pr", "view"), ("pr", "checks"), ("pr", "status"), ("pr", "diff"),
+                 ("run", "list"), ("run", "view"), ("issue", "list"), ("issue", "view"), ("search",)}
+# `gh api` sends a POST as soon as it has a field or a body, so those are writes for REST.
+WRITE_FLAGS = {"-X", "--method", "-f", "-F", "--field", "--raw-field", "--input"}
+BUDGET_QUERY = "query={rateLimit{remaining resetAt}}"
+
+
+def is_poll(args: list[str]) -> bool:
+    """Read-only calls a lane can skip for one tick. Writes, the budget read itself and
+    anything unknown pass."""
+    if not args:
+        return False
+    if args[0] == "api":
+        if len(args) > 1 and args[1] == "graphql":
+            return not any("mutation" in arg or arg == BUDGET_QUERY for arg in args)
+        return not any(arg.split("=")[0] in WRITE_FLAGS for arg in args)
+    return tuple(args[:2]) in READ_COMMANDS or tuple(args[:1]) in READ_COMMANDS
+
+
+def read_budget(gh_token: str, now: float, fetch=None) -> dict | None:
+    try:
+        cached = json.loads(BUDGET.read_text())
+        if now - cached["observedAt"] < BUDGET_TTL_S:
+            return cached
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    try:
+        if fetch is None:
+            req = urllib.request.Request("https://api.github.com/graphql", method="POST",
+                                         data=json.dumps({"query": "{rateLimit{remaining resetAt}}"}).encode(),
+                                         headers={"Authorization": f"Bearer {gh_token}"})
+            limit = json.load(urllib.request.urlopen(req, timeout=10))["data"]["rateLimit"]
+        else:
+            limit = fetch()
+        reset = calendar.timegm(time.strptime(limit["resetAt"], "%Y-%m-%dT%H:%M:%SZ"))
+        budget = {"remaining": int(limit["remaining"]), "resetAt": reset, "observedAt": now}
+    except (OSError, ValueError, KeyError, TypeError):
+        return None  # an unreadable budget never blocks work
+    BUDGET.parent.mkdir(parents=True, exist_ok=True)
+    tmp = BUDGET.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(budget))
+    os.replace(tmp, BUDGET)
+    return budget
+
+
+def hold(args: list[str], gh_token: str, now: float | None = None, fetch=None) -> str | None:
+    """Why this call waits, or None. Only polling ever waits."""
+    now = time.time() if now is None else now
+    if not is_poll(args):
+        return None
+    budget = read_budget(gh_token, now, fetch)
+    if budget and budget["remaining"] < FLOOR and now < budget["resetAt"]:
+        return f"github-budget-floor: {budget['remaining']} GraphQL points left (< {FLOOR}) until reset"
+    return None
+
+
 if __name__ == "__main__":
-    sys.stdout.write(token())
+    value = token()
+    if sys.argv[1:2] == ["--guard"]:
+        reason = hold(sys.argv[2:], value)
+        if reason:
+            sys.stderr.write(f"gh: {reason}\n")
+            sys.exit(75)
+    sys.stdout.write(value)
