@@ -82,7 +82,9 @@ export function spawnProcessGroup(command, args, options = {}) {
  */
 export function killProcessGroup(child, signal = 'SIGTERM') {
   const pid = child && typeof child.pid === 'number' ? child.pid : null;
-  if (pid === null) return;
+  // kill(0) and kill(-0) signal the caller's own process group, so a pid read
+  // from a half-written pid file (Number('') === 0) would SIGKILL the runner.
+  if (pid === null || !Number.isSafeInteger(pid) || pid <= 0) return;
   try {
     process.kill(-pid, signal);
   } catch {

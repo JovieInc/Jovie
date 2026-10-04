@@ -750,6 +750,95 @@ describe('failure classification and revision-scoped suppression', () => {
 });
 
 describe('terminal failure hold application', () => {
+  // Replays run 37167458268 (2026-10-04 01:15Z): admission ran out of the
+  // installation quota and PR Ready reported it. No source revision failed.
+  const ADMISSION_QUOTA_STEPS = [
+    'Require live queue membership and external admission checks',
+    'Evaluate combined-head checks',
+  ];
+  const ADMISSION_QUOTA_TEXT = [
+    'Process completed with exit code 1.',
+    'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.',
+  ].join('\n');
+
+  it('classifies an admission quota failure as transient admission, never a source failure', () => {
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText: ADMISSION_QUOTA_TEXT,
+      })
+    ).toBe('transient-admission');
+    for (const admissionText of [
+      'Process completed with exit code 1.\nGitHub API 503 for /graphql: Service Unavailable',
+      'GitHub API request failed for /graphql: The operation was aborted due to timeout',
+      'GitHub API 403 for /repos/x/y/commits/z/check-runs: API rate limit exceeded for installation',
+    ]) {
+      expect(
+        classifyMergeGroupFailure({
+          conclusion: 'failure',
+          failedSteps: ADMISSION_QUOTA_STEPS,
+          admissionText,
+        })
+      ).toBe('transient-admission');
+    }
+    // A real admission denial, missing evidence, or another failed step still
+    // counts against the revision.
+    for (const input of [
+      {
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText:
+          'Process completed with exit code 1.\nPR #42 is not a live member of this merge group',
+      },
+      { failedSteps: ADMISSION_QUOTA_STEPS, admissionText: '' },
+      {
+        failedSteps: [...ADMISSION_QUOTA_STEPS, 'Run unit tests'],
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+      {
+        failedSteps: ['Evaluate combined-head checks'],
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+    ]) {
+      expect(
+        classifyMergeGroupFailure({ conclusion: 'failure', ...input })
+      ).not.toBe('transient-admission');
+    }
+  });
+
+  it('spends no retry and keeps merge intent for an admission quota failure', async () => {
+    const writeStatus = vi.fn();
+    const dequeuePullRequest = vi.fn();
+    const disableAutoMerge = vi.fn();
+    const readPullRequest = vi.fn(async () => ({
+      id: 'PR_42',
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+      autoMergeRequest: { enabledAt: '2026-10-04T01:00:00Z' },
+    }));
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+      { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
+    );
+    expect(result).toMatchObject({
+      prNumber: 42,
+      classification: 'transient-admission',
+      skipped: true,
+      statusWritten: false,
+      dequeued: false,
+      autoMergeDisabled: false,
+    });
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(dequeuePullRequest).not.toHaveBeenCalled();
+    expect(disableAutoMerge).not.toHaveBeenCalled();
+  });
+
   it('persists before dequeueing and disabling the exact unchanged head', async () => {
     let state = {
       id: 'PR_42',

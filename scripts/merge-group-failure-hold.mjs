@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
   MERGE_GROUP_FAILURE_CONCLUSIONS,
@@ -36,6 +37,16 @@ const INSTRUCTION_CONTRACT_STEP = 'Evaluate repository instruction contracts';
 const INSTRUCTION_FAILURE_SUMMARIES = new Set([
   INSTRUCTION_CONTRACT_STEP,
   'Join exact lane results',
+  'Evaluate combined-head checks',
+]);
+// Merge Group Admission and the PR Ready summary that reports it. When the
+// admission step only gave up on API quota or a gateway error, the group says
+// nothing about the source revision (JOV-7780: run 37167458268).
+export const ADMISSION_STEP =
+  'Require live queue membership and external admission checks';
+export const TRANSIENT_ADMISSION_CLASS = 'transient-admission';
+const ADMISSION_FAILURE_SUMMARIES = new Set([
+  ADMISSION_STEP,
   'Evaluate combined-head checks',
 ]);
 const RETRY_DESCRIPTION =
@@ -137,6 +148,20 @@ function hasOnlyBudgetErrors(text) {
   return budgetFound;
 }
 
+function hasOnlyTransientAdmissionErrors(text) {
+  const errors = String(text ?? '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  let transientFound = false;
+  for (const error of errors) {
+    if (error === RUNNER_EXIT_FAILURE) continue;
+    if (!isTransientAdmissionFailureMessage(error)) return false;
+    transientFound = true;
+  }
+  return transientFound;
+}
+
 function instructionErrorsFromLog(log) {
   const errors = [];
   for (const line of log.split('\n')) {
@@ -155,12 +180,13 @@ function instructionErrorsFromLog(log) {
   return errors.includes(RUNNER_EXIT_FAILURE) ? errors : null;
 }
 
-/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[] }} [input] */
+/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string }} [input] */
 export function classifyMergeGroupFailure({
   conclusion,
   failedSteps = [],
   annotationText = '',
   changedFiles,
+  admissionText = '',
 } = {}) {
   if (!MERGE_GROUP_FAILURE_CONCLUSIONS.has(conclusion)) {
     fail(`unsupported terminal conclusion ${JSON.stringify(conclusion)}`);
@@ -178,6 +204,17 @@ export function classifyMergeGroupFailure({
     }
     if (steps.some(step => RETRYABLE_PRODUCT_FAILURE_STEPS.has(step))) {
       return 'retryable-product';
+    }
+    if (
+      steps.includes(ADMISSION_STEP) &&
+      steps.every(
+        step =>
+          ADMISSION_FAILURE_SUMMARIES.has(step) ||
+          INFRASTRUCTURE_STEP.test(step)
+      ) &&
+      hasOnlyTransientAdmissionErrors(admissionText)
+    ) {
+      return TRANSIENT_ADMISSION_CLASS;
     }
     // A capped instruction file that is already over on the queue base fails
     // every PR. That is repairable by moving main, not by holding the victim.
@@ -498,7 +535,7 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 /**
- * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string }} input
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string }} input
  * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
  */
 export async function applyMergeGroupFailure(
@@ -511,6 +548,7 @@ export async function applyMergeGroupFailure(
     annotationText = '',
     changedFiles,
     mainSha,
+    admissionText = '',
   },
   { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
 ) {
@@ -521,12 +559,32 @@ export async function applyMergeGroupFailure(
     failedSteps,
     annotationText,
     changedFiles,
+    admissionText,
   });
+  const groupHeadSha = String(run.head_sha).toLowerCase();
+  // Quota or gateway trouble in admission spends no retry and removes no merge
+  // intent; GitHub already ejected the group and enrollment re-arms it.
+  if (classification === TRANSIENT_ADMISSION_CLASS) {
+    return {
+      schema: FAILURE_HOLD_SCHEMA,
+      repository,
+      prNumber: front.prNumber,
+      sourceHeadSha,
+      mergeGroupHeadSha: groupHeadSha,
+      workflowRunId: run.id,
+      workflowRunAttempt: run.run_attempt,
+      classification,
+      skipped: true,
+      statusWritten: false,
+      dequeued: false,
+      dequeueOutcome: 'not-attempted',
+      autoMergeDisabled: false,
+    };
+  }
   const recordedMainSha = String(mainSha ?? '').toLowerCase();
   if (classification === 'base-branch' && !SHA.test(recordedMainSha)) {
     fail('current main sha is unavailable');
   }
-  const groupHeadSha = String(run.head_sha).toLowerCase();
   let current = await readPullRequest(front.prNumber);
   // A run whose group GitHub already rebuilt says nothing about the live
   // entry. Disabling auto-merge then ejects the fresh group and rebuilds
@@ -731,6 +789,35 @@ function readPullRequest(repository, prNumber) {
   return pr;
 }
 
+// Failure annotations of the jobs whose admission step failed. Unreadable
+// evidence returns '' and leaves the failure to the source classes.
+function admissionEvidence(repository, jobs) {
+  const failedJobs = jobs.filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step => step?.name === ADMISSION_STEP && step?.conclusion === 'failure'
+      )
+  );
+  const messages = [];
+  for (const job of failedJobs) {
+    const checkRunId = String(job.check_run_url ?? '').match(
+      /\/check-runs\/([1-9][0-9]*)$/
+    )?.[1];
+    if (!checkRunId) return '';
+    try {
+      const notes = restPages(
+        `repos/${repository}/check-runs/${checkRunId}/annotations`
+      ).filter(note => note?.annotation_level === 'failure');
+      if (notes.some(note => typeof note.message !== 'string')) return '';
+      messages.push(...notes.map(note => note.message));
+    } catch {
+      return '';
+    }
+  }
+  return messages.join('\n');
+}
+
 function instructionContractEvidence(repository, run, jobs, baseSha) {
   const failedJobs = jobs.filter(
     job =>
@@ -846,11 +933,15 @@ async function main(argv) {
     jobs,
     front.baseSha
   );
+  const admissionText = failedSteps.includes(ADMISSION_STEP)
+    ? admissionEvidence(repository, jobs)
+    : '';
   const preview = classifyMergeGroupFailure({
     conclusion: run.conclusion,
     failedSteps,
     annotationText: evidence.annotationText,
     changedFiles: evidence.changedFiles,
+    admissionText,
   });
   const mainSha =
     preview === 'base-branch'
@@ -872,6 +963,7 @@ async function main(argv) {
       annotationText: evidence.annotationText,
       changedFiles: evidence.changedFiles,
       mainSha,
+      admissionText,
     },
     {
       writeStatus: async receipt =>
@@ -901,8 +993,9 @@ async function main(argv) {
     }
   );
   const serialized = JSON.stringify(result);
-  // A superseded run holds nothing, so enrollment receives no receipt.
-  if (process.env.GITHUB_OUTPUT && !result.superseded) {
+  // A superseded or transient-admission run holds nothing, so enrollment
+  // receives no receipt.
+  if (process.env.GITHUB_OUTPUT && !result.superseded && !result.skipped) {
     appendFileSync(
       process.env.GITHUB_OUTPUT,
       `failure_receipt=${serialized}\n`

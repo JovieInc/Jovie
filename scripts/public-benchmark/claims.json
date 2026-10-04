@@ -1,0 +1,47 @@
+{
+  "schema": "jovie.public-benchmark.claims/v1",
+  "issue": "JOV-7152",
+  "states": {
+    "candidate": "Measured, not enforced. A failing candidate needs gap-closing work.",
+    "holding": "Passed the last run. The weekly gate fails if it stops passing.",
+    "certified": "Holding and approved for publication. Publication approval is a founder decision, never set by an agent."
+  },
+  "claims": [
+    {
+      "id": "profile-speed.lcp",
+      "metric": "speed.lcp.median",
+      "better": "lower",
+      "state": "candidate"
+    },
+    {
+      "id": "profile-speed.tbt",
+      "metric": "speed.tbt.median",
+      "better": "lower",
+      "state": "candidate"
+    },
+    {
+      "id": "profile-speed.cls",
+      "metric": "speed.cls.median",
+      "better": "lower",
+      "state": "candidate"
+    },
+    {
+      "id": "profile-speed.ttfb",
+      "metric": "speed.ttfb.median",
+      "better": "lower",
+      "state": "candidate"
+    },
+    {
+      "id": "profile-speed.bytes",
+      "metric": "speed.bytes.median",
+      "better": "lower",
+      "state": "candidate"
+    },
+    {
+      "id": "profile-agent-readiness.score",
+      "metric": "agent.score",
+      "better": "higher",
+      "state": "candidate"
+    }
+  ]
+}

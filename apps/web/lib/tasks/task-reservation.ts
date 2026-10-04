@@ -42,3 +42,27 @@ export async function reserveTaskNumber(
 
   return row.taskNumber;
 }
+
+/** Reserves `count` consecutive task numbers and returns the first one. */
+export async function reserveTaskNumbers(
+  profileId: string,
+  count: number,
+  client: DbOrTransaction = db
+): Promise<number> {
+  const [row] = await client
+    .update(creatorProfiles)
+    .set({
+      nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${count}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profileId))
+    .returning({
+      firstTaskNumber: drizzleSql<number>`${creatorProfiles.nextTaskNumber} - ${count}`,
+    });
+
+  if (!row) {
+    throw new Error('Profile not found');
+  }
+
+  return row.firstTaskNumber;
+}

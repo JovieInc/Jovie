@@ -443,6 +443,7 @@ echo "── Dependencies ──────────────────
 if command -v pnpm &>/dev/null; then
   if [[ "$IS_WORKTREE" == "true" ]]; then
     info "Git worktree detected (.git is a file). Dependencies are still per-worktree."
+    info "Next time, scripts/agent/worktree-new <dir> -b <branch> hands out a pre-installed one."
   fi
 
   SETUP_CACHE_DIR="$REPO_ROOT/node_modules/.cache/jovie-setup"
@@ -471,6 +472,39 @@ if command -v pnpm &>/dev/null; then
 else
   warn "Skipping pnpm install — pnpm not available"
   MISSING+=("pnpm install")
+fi
+
+# ─── 5.1. Worktree pool ─────────────────────────────────────────────────────
+# Local Macs keep pre-installed worktrees under ~/.cache/jovie so the next
+# `scripts/agent/worktree-new` is ready in seconds (JOV-7705). The filler runs
+# detached, holds one lock per pool, and refuses below its free-disk floor.
+if [[ "$(uname -s)" == "Darwin" && "${CI:-false}" != "true" && "$IS_WORKTREE" != "true" ]] \
+  && command -v python3 &>/dev/null && command -v pnpm &>/dev/null; then
+  echo ""
+  echo "── Worktree pool ───────────────────────────────────────────────────────"
+  mkdir -p "${JOVIE_CACHE_ROOT:-$HOME/.cache/jovie}"
+  nohup "$REPO_ROOT/scripts/agent/worktree-new" --repo "$REPO_ROOT" --fill \
+    >>"${JOVIE_CACHE_ROOT:-$HOME/.cache/jovie}/worktree-pool-fill.log" 2>&1 </dev/null &
+  success "Filling the worktree pool in the background (scripts/agent/worktree-new --status)"
+fi
+
+# ─── 5.2. Git object maintenance ────────────────────────────────────────────
+# Agent fetches leave one small pack each: the main clone reached 1311 packs and
+# 122k loose objects (JOV-7723). `git maintenance start` registers the clone and
+# schedules git's own hourly prefetch + commit-graph and daily loose-objects +
+# incremental-repack. That strategy never prunes unreachable objects, which matters
+# because lanes clones borrow this object store through alternates; registering also
+# turns off the auto-gc that would prune them.
+if [[ "$(uname -s)" == "Darwin" && "${CI:-false}" != "true" && "$IS_WORKTREE" != "true" ]]; then
+  echo ""
+  echo "── Git maintenance ─────────────────────────────────────────────────────"
+  if git config --global --get-all maintenance.repo 2>/dev/null | grep -qxF "$REPO_ROOT"; then
+    success "Git maintenance already scheduled for $REPO_ROOT"
+  elif git -C "$REPO_ROOT" maintenance start 2>/dev/null; then
+    success "Scheduled git maintenance (incremental strategy) for $REPO_ROOT"
+  else
+    warn "Could not schedule git maintenance; run: git -C \"$REPO_ROOT\" maintenance start"
+  fi
 fi
 
 # ─── 5.5. Turbopack cache ──────────────────────────────────────────────────

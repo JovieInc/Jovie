@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as jestDomMatchers from '@testing-library/jest-dom/matchers';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +101,19 @@ function isDirectoryEntry(entry: string): boolean {
   return entry.endsWith('/');
 }
 
+function withoutComments(source: string): string {
+  // Parse before printing so template interpolation and regular expressions
+  // cannot confuse a standalone scanner into treating comment text as code.
+  const parsed = ts.createSourceFile(
+    'node-environment.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS
+  );
+  return ts.createPrinter({ removeComments: true }).printFile(parsed);
+}
+
 // Every file the node project selects, with directory entries expanded.
 function files(): string[] {
   return entries().flatMap(entry => {
@@ -148,7 +162,9 @@ describe('tests/node-environment-files.json', () => {
       const path = resolve(webRoot, entry);
       // Missing entries are reported by the stale-list check above.
       if (!existsSync(path)) return [];
-      const match = readFileSync(path, 'utf8').match(DOM_OR_REACT_REFERENCE);
+      const match = withoutComments(readFileSync(path, 'utf8')).match(
+        DOM_OR_REACT_REFERENCE
+      );
       return match ? [`${entry} (references "${match[0]}")`] : [];
     });
     expect(domBound).toEqual([]);
@@ -186,12 +202,40 @@ describe('tests/node-environment-files.json', () => {
     }
   });
 
+  it('ignores browser words in comments while retaining executable references', () => {
+    const comments =
+      '// Two real gh runs per discovered screen.\n/* window.document; */';
+    expect(withoutComments(comments)).not.toMatch(DOM_OR_REACT_REFERENCE);
+    for (const code of [
+      'window.scrollTo(0, 0);',
+      "import { Card } from '@/components/molecules/Card';",
+      'screen.getByRole("button");',
+    ]) {
+      expect(withoutComments(`${comments}\n${code}`)).toMatch(
+        DOM_OR_REACT_REFERENCE
+      );
+    }
+    expect(
+      withoutComments('const url = "https://screen.example/path";')
+    ).toContain('"https://screen.example/path"');
+    expect(withoutComments('/* browser */screen.getByRole("button");')).toMatch(
+      DOM_OR_REACT_REFERENCE
+    );
+    expect(
+      withoutComments(
+        'const value = `proof-${id}`;\n// discovered screen.\nconst pattern = /proof/;'
+      )
+    ).not.toMatch(DOM_OR_REACT_REFERENCE);
+  });
+
   it('lists only files that use no jest-dom matchers', () => {
     expect(Object.keys(jestDomMatchers)).toContain('toBeInTheDocument');
     const matcherUsers = files().flatMap(entry => {
       const path = resolve(webRoot, entry);
       if (!existsSync(path)) return [];
-      const match = readFileSync(path, 'utf8').match(JEST_DOM_MATCHER_CALL);
+      const match = withoutComments(readFileSync(path, 'utf8')).match(
+        JEST_DOM_MATCHER_CALL
+      );
       return match ? [`${entry} (calls "${match[1]}")`] : [];
     });
     expect(matcherUsers).toEqual([]);

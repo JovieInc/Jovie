@@ -58,6 +58,24 @@ function extractionFailure(error: ExtractionError) {
       return fail(504, 'SOURCE_TIMEOUT', 'The source platform timed out.', {
         'Retry-After': RETRY_AFTER_TRANSIENT,
       });
+    case 'LOGIN_REQUIRED':
+      return fail(
+        502,
+        'SOURCE_LOGIN_WALL',
+        "The platform showed a login page instead of this profile. Try the creator's YouTube channel URL."
+      );
+    case 'SOCIAL_HTML_DISABLED':
+      return fail(
+        422,
+        'SOURCE_UNSUPPORTED',
+        "Jovie does not read this platform's pages from its servers. Try the creator's YouTube channel URL."
+      );
+    case 'EMPTY_RESPONSE':
+      return fail(
+        502,
+        'SOURCE_EMPTY',
+        "The platform returned no public profile data. Try the creator's YouTube channel URL."
+      );
     default:
       return fail(502, 'LOOKUP_FAILED', 'Creator data could not be extracted.');
   }
@@ -93,11 +111,7 @@ export async function GET(request: Request) {
   try {
     const creator = await lookupCreator(parsed.data.url);
     if (!creator) {
-      return fail(
-        422,
-        'UNSUPPORTED_URL',
-        'Use a YouTube channel, Instagram profile, TikTok profile, or Linktree URL.'
-      );
+      return fail(422, 'UNSUPPORTED_URL', 'Use a YouTube channel URL.');
     }
 
     return NextResponse.json(creator, { headers: NO_STORE_HEADERS });
@@ -105,7 +119,14 @@ export async function GET(request: Request) {
     if (error instanceof ExtractionError) {
       const response = extractionFailure(error);
       if (
-        !['NOT_FOUND', 'RATE_LIMITED', 'FETCH_TIMEOUT'].includes(error.code)
+        ![
+          'NOT_FOUND',
+          'RATE_LIMITED',
+          'FETCH_TIMEOUT',
+          'LOGIN_REQUIRED',
+          'EMPTY_RESPONSE',
+          'SOCIAL_HTML_DISABLED',
+        ].includes(error.code)
       ) {
         captureError('Agent creator lookup failed', error);
       }
