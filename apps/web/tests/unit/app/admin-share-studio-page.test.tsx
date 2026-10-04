@@ -108,13 +108,12 @@ describe('Share preview page composition', () => {
     expect(
       screen.getByRole('link', { name: 'Open selected release' })
     ).toHaveAttribute('href', releaseContext.canonicalUrl);
+    expect(screen.getByRole('link', { name: /^Song$/ })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
     expect(
-      screen.getByRole('link', { name: 'Song', exact: true })
-    ).toHaveAttribute('aria-current', 'true');
-    expect(
-      screen
-        .getByRole('link', { name: 'Next', exact: true })
-        .getAttribute('href')
+      screen.getByRole('link', { name: /^Next$/ }).getAttribute('href')
     ).toContain('release=artist%3Anext&blog=news');
     expect(
       screen.getByText(/No public playlist sample is available/)
