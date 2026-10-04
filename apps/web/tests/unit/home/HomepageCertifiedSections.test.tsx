@@ -1,7 +1,10 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
+import {
+  HomepageCertifiedSections,
+  HomepageEditorialFeatureSection,
+} from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
@@ -74,6 +77,39 @@ describe('HomepageCertifiedSections', () => {
     );
     expect(section.querySelector('.homepage-chapter-visual')).toBeNull();
     expect(section).not.toHaveTextContent(/Listener|Collaborator|Investor/);
+  });
+
+  it('renders one record-owned editorial section with one real capture', () => {
+    render(
+      <HomepageEditorialFeatureSection
+        section={{
+          id: 'capture-1',
+          headline: 'Build a direct relationship.',
+          body: 'Subscribers hear when you have news.',
+        }}
+        previews={[{ image: HOMEPAGE_MEDIA_MAP.pay.asset }]}
+      />
+    );
+
+    const section = screen.getByTestId('marketing-section-feature-split');
+    expect(section).toHaveAttribute('data-marketing-variant', 'editorial');
+    expect(section).toHaveAttribute(
+      'data-homepage-testid',
+      'homepage-section-capture-1'
+    );
+    expect(
+      within(section).getByRole('heading', {
+        level: 2,
+        name: 'Build a direct relationship.',
+      })
+    ).toBeInTheDocument();
+    expect(section).toHaveTextContent('Subscribers hear when you have news.');
+    expect(within(section).getAllByRole('img')).toHaveLength(1);
+    expect(within(section).getByRole('img')).toHaveAttribute(
+      'src',
+      HOMEPAGE_MEDIA_MAP.pay.asset.publicUrl
+    );
+    expect(section.querySelector('figcaption')).toBeNull();
   });
 
   it('records publication and fallback receipts for every homepage asset', () => {

@@ -25,7 +25,7 @@ on:
     workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
   pull_request_target:
-    types: [unlabeled, reopened]
+    types: [labeled, unlabeled, reopened]
   # Reconciliation sweep (JOV-7589): re-enrolls green PRs whose dequeue left no
   # event-driven wake. Bounded by the shared concurrency group; 15 minutes caps
   # how long a green dequeued head can sit unarmed.
@@ -73,6 +73,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
@@ -113,6 +114,7 @@ jobs:
     needs: [hold-failed-revision]
     if: >-
       always() &&
+      github.event.action != 'labeled' &&
       (github.event_name != 'workflow_run' ||
        (github.event.workflow_run.conclusion == 'success' &&
         (github.event.workflow_run.event == 'pull_request' ||
@@ -131,6 +133,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
@@ -296,6 +299,73 @@ jobs:
             }
             core.info(`enqueued=${enqueued}`);
 
+  # A blocking label on a queued PR fails Fork PR Gate and PR Size Guard for
+  # every merge group containing it, so the whole queue behind it is rebuilt
+  # (2026-10-04: #20442, #20381, #20398). Remove just that PR instead. This is
+  # also the documented way to push a fix to a queued PR: add `hold`, push,
+  # remove `hold`; the `unlabeled` wake re-enrolls the new head once CLEAN.
+  dequeue-held:
+    name: Dequeue a held queued PR
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'labeled' &&
+      contains(fromJSON('["hold","gated","incident","do-not-merge","queue-poison"]'), github.event.label.name)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions: {}
+    steps:
+      - name: Generate Jovie Bot dequeue token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Remove the held PR from the merge queue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request?.number;
+            const sourceHead = context.payload.pull_request?.head?.sha;
+            const rawLabel = context.payload.label?.name;
+            const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
+            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
+            if (!Number.isSafeInteger(number) || number <= 0 ||
+                typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
+              core.info('Ignoring an incomplete blocking-label event');
+              return;
+            }
+            const { repository } = await github.graphql(
+              `query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){id state headRefOid isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}}}}`,
+              { owner, repo, number }
+            );
+            const pr = repository?.pullRequest;
+            // An old event cannot remove a replacement head or a PR whose hold
+            // was removed while this job waited. Dequeue has no expected-head CAS.
+            const labels = pr?.labels;
+            if (pr?.state !== 'OPEN' || pr.headRefOid !== sourceHead ||
+                pr.isInMergeQueue !== true || typeof pr.id !== 'string' || !pr.id ||
+                labels?.pageInfo?.hasNextPage !== false || !Array.isArray(labels.nodes) ||
+                labels.nodes.some(item => typeof item?.name !== 'string') ||
+                !labels.nodes.some(item => item.name.toLowerCase() === label)) {
+              core.info(`#${number} no longer matches the queued blocking-label event`);
+              return;
+            }
+            try {
+              await github.graphql(
+                `mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}`,
+                { id: pr.id }
+              );
+              core.notice(`DEQUEUED #${number}: labeled ${context.payload.label.name} while queued`);
+            } catch (error) {
+              // A denied dequeue leaves today's behaviour: its merge group fails the gate.
+              core.warning(`dequeue of held #${number} failed: ${error.message}`);
+            }
+
   # Runs only after the hold has dropped merge intent. A green PR dequeued by
   # another member of the group, or by the base branch, gets squash auto-merge
   # back on that same SHA. Two rearms per SHA; the enroll job is not involved.
@@ -344,4 +414,5 @@ jobs:
       - name: Rearm green victims of this merge group
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
         run: node scripts/merge-group-victim-rearm.mjs --event-path "$GITHUB_EVENT_PATH"

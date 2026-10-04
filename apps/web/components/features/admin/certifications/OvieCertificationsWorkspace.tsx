@@ -7,6 +7,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { PageShell } from '@/components/organisms/PageShell';
@@ -320,12 +321,16 @@ function FreshnessMeta({
 
 export function OvieCertificationsWorkspace() {
   const query = useOvieCertificationsQuery();
-  const decision = useOvieCertificationDecisionMutation();
+  const { mutateAsync } = useOvieCertificationDecisionMutation();
   const [stateFilter, setStateFilter] =
     useState<CertificationStateFilter>('all');
   const [domainFilter, setDomainFilter] =
     useState<CertificationDomainFilter>('all');
+  // Needs You judgment cards deep-link here with ?row=<rowId> so the founder
+  // lands on the exact evidence rail, not a re-search.
+  const linkedRowId = useSearchParams().get('row');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => setSelectedId(linkedRowId), [linkedRowId]);
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'state', desc: false },
   ]);
@@ -365,7 +370,7 @@ export function OvieCertificationsWorkspace() {
       setPendingDecision(kind);
       setDecisionError(null);
       try {
-        await decision.mutateAsync({
+        await mutateAsync({
           rowId: selected.id,
           evidenceDigest: selected.decision.evidenceDigest,
           decision: kind,
@@ -381,7 +386,7 @@ export function OvieCertificationsWorkspace() {
         setPendingDecision(null);
       }
     },
-    [decision, selected]
+    [mutateAsync, selected]
   );
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays

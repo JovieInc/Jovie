@@ -1512,7 +1512,13 @@ jobs:
           JOVIE_AGENT_PROFILE: coder
         run: |
           set -euo pipefail
-          open_notes="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open --limit 100 --json number,headRefName,headRefOid,isDraft --jq '[.[] | select(.headRefName | startswith("release/daily-changelog-"))]')"
+          # The release-writer token has an independent REST quota; avoid making
+          # publication depend on the installation-wide GraphQL quota.
+          open_notes="$(
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" \
+            | jq '[.[][]? | select(.head.ref | startswith("release/daily-changelog-"))]'
+          )"
           test "$(jq length <<<"$open_notes")" -le 1 || { echo '::error::Multiple customer-note writers'; exit 1; }
           if [ "$(jq length <<<"$open_notes")" = 1 ]; then
             pr="$(jq -r '.[0].number' <<<"$open_notes")"
@@ -1554,3 +1560,100 @@ jobs:
           path: ${{ runner.temp }}/customer-changelog/plan.json
           if-no-files-found: ignore
           retention-days: 30
+
+  # Publication runs after Production Verified and never touches production,
+  # so production-marker-state keeps the generation verified when it fails
+  # (JOV-7724). The failure files here instead of freezing later releases.
+  remediation-customer-changelog:
+    name: File customer changelog remediation
+    needs: [publish-customer-changelog]
+    if: ${{ always() && needs.publish-customer-changelog.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve customer changelog publication remediation
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-customer-changelog
+          REMEDIATION_SOURCE: production-controller.yml:customer-changelog
+          REMEDIATION_CONCLUSION: ${{ needs.publish-customer-changelog.result }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
+  # JOV-7773: a generation that wrote its verified marker and then hit an
+  # interrupting failure classifies recovery_available, which blocks every
+  # later release. A full rerun drops the attempt-1 marker artifacts, so heal
+  # in-band instead: dispatch the bounded marker re-proof, which queues in the
+  # production-mutation FIFO behind this run and admits only once this attempt
+  # has completed and still owns canonical production.
+  heal-interrupted-marker:
+    name: Heal interrupted verified marker
+    needs:
+      [
+        authorize-production,
+        production-release,
+        production-verified,
+        remediation-post-deploy-smoke,
+        remediation-auth-smoke,
+      ]
+    if: ${{ always() && needs.production-verified.outputs.verified == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch bounded marker recovery for an interrupted generation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
+          RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
+          MARKER_RECOVERY: ${{ needs.authorize-production.outputs.marker_recovery }}
+          VERIFIED_RESULT: ${{ needs.production-verified.result }}
+          SMOKE_REMEDIATION_RESULT: ${{ needs.remediation-post-deploy-smoke.result }}
+          AUTH_REMEDIATION_RESULT: ${{ needs.remediation-auth-smoke.result }}
+          CONTROLLER_RUN: ${{ github.run_id }}
+          CONTROLLER_ATTEMPT: ${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only jobs that can fail after the marker write interrupt a verified
+          # generation. Publication jobs never do (production-marker-state).
+          interrupted=false
+          for result in "$VERIFIED_RESULT" "$SMOKE_REMEDIATION_RESULT" "$AUTH_REMEDIATION_RESULT"; do
+            case "$result" in
+              success|skipped) ;;
+              *) interrupted=true ;;
+            esac
+          done
+          if [ "$interrupted" != true ]; then
+            echo "Verified generation $EXPECTED_SHA finished without interruption; nothing to heal."
+            exit 0
+          fi
+          if [ "$MARKER_RECOVERY" = true ] || [ "$RUN_WEB" != true ]; then
+            echo "::warning::Interrupted generation $EXPECTED_SHA is not an exact promoted primary; the Production Controller Health audit owns it."
+            exit 0
+          fi
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+            [[ "$DEPLOYMENT_ID" =~ ^dpl_[A-Za-z0-9]+$ ]] &&
+            [[ "$CONTROLLER_RUN" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$CONTROLLER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Interrupted generation lacks exact SHA, deployment, or attempt evidence for marker recovery."
+            exit 1
+          }
+          gh workflow run production-marker-recovery.yml --ref main \
+            -f sha="$EXPECTED_SHA" \
+            -f deployment_id="$DEPLOYMENT_ID" \
+            -f controller_run="$CONTROLLER_RUN" \
+            -f controller_attempt="$CONTROLLER_ATTEMPT"
+          echo "::notice::Dispatched bounded marker recovery for interrupted generation $EXPECTED_SHA ($CONTROLLER_RUN/$CONTROLLER_ATTEMPT)."

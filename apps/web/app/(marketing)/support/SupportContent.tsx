@@ -60,7 +60,7 @@ export function SupportChannels() {
               <Card asChild key={channel.title} className='p-6'>
                 <article>
                   <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-                  <h3 className='mt-4 font-medium text-primary-token'>
+                  <h3 className='mt-4 text-base font-medium text-primary-token'>
                     {channel.title}
                   </h3>
                   <p className='mt-2 text-sm leading-relaxed text-secondary-token'>

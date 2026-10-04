@@ -3080,6 +3080,119 @@ ${selectedGateScript}`,
   });
 });
 
+describe('merge-group supersession watchdog', () => {
+  const OWN = 'refs/heads/gh-readonly-queue/main/pr-20546-' + '1'.repeat(40);
+  const NEXT = 'refs/heads/gh-readonly-queue/main/pr-20546-' + '2'.repeat(40);
+  const line = ref => `${'f'.repeat(40)}\t${ref}`;
+
+  function runWatchdog(listings, { queueRef = OWN, maxSeconds = '60' } = {}) {
+    const job =
+      /** @type {{ jobs: Record<string, { permissions: Record<string, string>, steps: { run: string, env: Record<string, string> }[] }> }} */ (
+        load(CI_WORKFLOW)
+      ).jobs['ci-merge-group-watchdog'];
+    const root = mkdtempSync(join(tmpdir(), 'mg-watchdog-'));
+    try {
+      const bin = join(root, 'bin');
+      mkdirSync(bin);
+      listings.forEach((listing, index) =>
+        writeFileSync(join(root, `listing-${index}`), listing ?? '')
+      );
+      // Each git call consumes the next listing; null = unreadable listing.
+      // The token must reach git only as config env, never in argv.
+      writeFileSync(
+        join(bin, 'git'),
+        `#!/bin/bash
+n=$(cat "${root}/count" 2>/dev/null || echo 0); echo $((n + 1)) > "${root}/count"
+printf '%s\\n' "$*" >> "${root}/git.log"
+[[ "$GIT_CONFIG_VALUE_0" == "AUTHORIZATION: basic "* ]] || exit 9
+f="${root}/listing-$n"; [[ -f "$f" ]] || exit 1
+${listings.map((l, i) => (l === null ? `[[ $n == ${i} ]] && exit 128` : '')).join('\n')}
+cat "$f"
+`,
+        { mode: 0o755 }
+      );
+      writeFileSync(
+        join(bin, 'gh'),
+        `#!/bin/bash\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n`,
+        { mode: 0o755 }
+      );
+      writeFileSync(join(bin, 'sleep'), '#!/bin/bash\n/bin/sleep 0.05\n', {
+        mode: 0o755,
+      });
+      const result = spawnSync('bash', ['-c', job.steps[0].run], {
+        encoding: 'utf8',
+        timeout: 90_000,
+        env: {
+          PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`,
+          GH_TOKEN: 'synthetic-test-token',
+          QUEUE_REF: queueRef,
+          REPOSITORY: 'JovieInc/Jovie',
+          RUN_ID: '37193704778',
+          POLL_SECONDS: '0',
+          MAX_SECONDS: maxSeconds,
+        },
+      });
+      const read = name => {
+        try {
+          return readFileSync(join(root, name), 'utf8');
+        } catch {
+          return '';
+        }
+      };
+      return {
+        job,
+        status: result.status,
+        stdout: result.stdout,
+        gh: read('gh.log'),
+        git: read('git.log'),
+      };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it('cancels only after two consecutive reads show a successor group', () => {
+    const r = runWatchdog([line(OWN), `${line(NEXT)}\n`, line(NEXT)]);
+    expect(r.status).toBe(0);
+    expect(r.gh).toBe('run cancel 37193704778 --repo JovieInc/Jovie\n');
+    expect(r.stdout).toContain(`superseded by ${NEXT}`);
+    expect(r.git.trim().split('\n')).toHaveLength(3);
+    expect(r.git).toContain(
+      'ls-remote https://github.com/JovieInc/Jovie refs/heads/gh-readonly-queue/main/pr-20546-*'
+    );
+    expect(r.git).not.toContain('synthetic-test-token');
+    expect(r.job.permissions).toEqual({ actions: 'write' });
+  });
+
+  it('never cancels on a flap, an unreadable listing, or a group that left without a successor', () => {
+    // Successor once, own ref back, unreadable read between two misses, then
+    // the group leaves the queue (merged or removed for its own failure).
+    const r = runWatchdog([
+      line(NEXT),
+      line(OWN),
+      line(NEXT),
+      null,
+      line(NEXT),
+      '',
+    ]);
+    expect(r.status).toBe(0);
+    expect(r.gh).toBe('');
+    expect(r.stdout).toContain('left the queue without a successor');
+  });
+
+  it('stays idle outside a main queue ref and within its time budget', () => {
+    const idle = runWatchdog([line(NEXT), line(NEXT)], {
+      queueRef: 'refs/heads/main',
+    });
+    expect(idle.gh).toBe('');
+    expect(idle.git).toBe('');
+    const queued = runWatchdog([], { maxSeconds: '1' });
+    expect(queued.status).toBe(0);
+    expect(queued.gh).toBe('');
+    expect(queued.stdout).toContain('watchdog budget elapsed');
+  });
+});
+
 describe('PR Size Guard merge-base comparison', () => {
   const tempRoots = [];
 

@@ -255,7 +255,7 @@ daemon|daemon: false|background process for optimization (disabled in Jovie due 
 ```bash
 scripts/agent/worktree-new ../Jovie-agent-1 -b agent/task-name   # fetch, take a pool slot, install
 cd ../Jovie-agent-1 && pnpm turbo build
-git worktree remove --force ../Jovie-agent-1
+scripts/agent/worktree-new --recycle ../Jovie-agent-1             # clean: back to the pool; dirty/preserved: refused
 ```
 
 | Cache | Location | Shared how |
@@ -263,7 +263,7 @@ git worktree remove --force ../Jovie-agent-1
 | Worktree pool (installed `node_modules` + warm `apps/web/.cache/tsbuildinfo`) | `~/.cache/jovie/worktree-pool/<repo>/` | `worktree-new` moves a slot to your path and refills in the background; `--status`, `--fill`, `--drain` |
 | pnpm content store | `pnpm store path` (same APFS volume) | hardlinked into each worktree; never prune it while worktrees install |
 | Turbo local cache | main checkout's `.turbo/cache` | Turbo 2.8+ resolves it through the git common dir for every worktree |
-| Git objects | main checkout's `.git` | every linked worktree shares them |
+| Git objects | main checkout's `.git` | every linked worktree shares them; `setup.sh` runs `git maintenance start` (incremental strategy, never prunes: lanes clones borrow these objects via alternates) |
 
 All shared caches live under `$JOVIE_CACHE_ROOT` (default `~/.cache/jovie`). Cleanup tools must not delete that root wholesale: `worktree-new --drain` (or `disk_guard`, below the pool's 30 GiB floor) removes pool slots safely.
 

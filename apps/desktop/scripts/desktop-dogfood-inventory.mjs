@@ -208,7 +208,7 @@ const settingsSurfaces = settingsRoutes.map(([id, title, route]) =>
     route,
     sources: [
       ROUTE_SOURCE,
-      'apps/web/components/features/settings/settings-sidebar-config.ts',
+      'apps/web/components/features/dashboard/dashboard-nav/config.ts',
     ],
   })
 );

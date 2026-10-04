@@ -48,10 +48,11 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=24.21.0 <25"
+    "node": ">=24.21.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "chaos:gate": "node scripts/chaos-blackbox.mjs --bin dist/cli.js --profile pr && node scripts/chaos-mutation-proof.mjs --dist dist",
     "dev": "tsx src/cli.ts",
     "lint": "biome check .",
     "pack:dry": "tsx scripts/pack-dry.ts",
