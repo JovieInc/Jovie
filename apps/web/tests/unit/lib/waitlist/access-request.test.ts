@@ -300,7 +300,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     const artistInput = {
       ...baseInput,
       data: {
-        ...baseInput.data,
+        ...(baseInput.data as object),
         spotifyUrl: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
       } as never,
     };
