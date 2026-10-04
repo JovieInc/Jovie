@@ -15,6 +15,7 @@ import {
   type ResolvedArtistMetadata,
   type ResolvedDspLink,
 } from './in-house-contracts';
+import { verifyArtistUrl } from './verified-artist';
 
 /**
  * Official DSP and MusicBrainz calls only. A third-party link aggregator
@@ -644,21 +645,8 @@ export function createDefaultInHouseSources(
         ];
       }
       if (!provider || !isArtistUrl(href, provider)) return [];
-      return [
-        {
-          name: '',
-          url: href,
-          mbid: null,
-          links: [
-            {
-              provider,
-              url: href,
-              provenance: 'input_url',
-              confidence: PROVENANCE_CONFIDENCE.input_url,
-            },
-          ],
-        },
-      ];
+      const verified = await verifyArtistUrl(href, provider, signal);
+      return verified ? [verified] : [];
     },
     async artistByMbid(mbid) {
       const { getMusicBrainzArtist } = await import(

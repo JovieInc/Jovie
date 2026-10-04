@@ -6,6 +6,7 @@ import {
   type InHouseSources,
   PROVENANCE_CONFIDENCE,
   resolveInHouse,
+  sameCatalogName,
 } from './in-house';
 
 function sources(overrides: Partial<InHouseSources> = {}): InHouseSources {
@@ -48,16 +49,55 @@ describe('in-house cross-DSP resolver', () => {
     });
 
     expect(result).toMatchObject({
-      status: 'resolved',
+      status: 'no_match',
       kind: 'artist',
-      links: [
-        expect.objectContaining({
-          provider: 'apple_music',
-          provenance: 'input_url',
-        }),
-      ],
+      links: [],
+      confidence: 0,
     });
   });
+
+  it.each([
+    ['東京', '大阪', false],
+    ['!!!', '???', false],
+    ['', '', false],
+    ['&', 'and', false],
+    ['\u0301', '\u0301', false],
+    ['東京', ' 東京 ', true],
+    ['Мир', 'мир', true],
+    ['محمد', 'محمد', true],
+    ['हिंदी', 'हिंदी', true],
+    ['हिंदी', 'हदी', false],
+    ['عَلَم', 'عِلْم', false],
+    ['Café', 'Cafe\u0301', true],
+    ['Café', 'Cafe', false],
+    ['ＡＢＣ', 'abc', true],
+    ['A & B', 'a and b', true],
+    ['Signal—Fire!', 'signal fire', true],
+    ['PAPA', 'РАРА', false],
+  ])('compares catalog names %s / %s safely', (left, right, expected) => {
+    expect(sameCatalogName(left, right)).toBe(expected);
+  });
+
+  it.each([
+    ['東京', '大阪'],
+    ['!!!', '???'],
+    ['हिंदी', 'हदी'],
+  ])(
+    'does not resolve a distinct Unicode or empty-normalized artist %s / %s',
+    async (artist, foundArtist) => {
+      const result = await resolveInHouse(
+        { kind: 'track', artist, title: 'Signal Fire' },
+        sources({
+          searchTracks: async () => [{ ...apple, artist: foundArtist }],
+        })
+      );
+      expect(result).toMatchObject({
+        status: 'no_match',
+        links: [],
+        confidence: 0,
+      });
+    }
+  );
 
   it('resolves a track ISRC across Spotify, Apple Music, Deezer, and MusicBrainz', async () => {
     const result = await resolveInHouse(
@@ -337,7 +377,7 @@ describe('in-house cross-DSP resolver', () => {
 
   it('normalizes exact artist/title searches and deduplicates provider links by evidence', async () => {
     const result = await resolveInHouse(
-      { kind: 'track', artist: 'The ÁrtiSt', title: 'Signal Fire' },
+      { kind: 'track', artist: 'The ARTIST', title: 'Signal Fire' },
       sources({
         searchTracks: async () => [{ ...apple, confidence: 0.72 }],
         trackByIsrc: async () => [

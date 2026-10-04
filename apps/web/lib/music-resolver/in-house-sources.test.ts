@@ -397,6 +397,17 @@ describe('createDefaultInHouseSources', () => {
   });
 
   it('resolves artist URLs, MBIDs, and recording url-rels', async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        results: [
+          {
+            wrapperType: 'artist',
+            artistId: 44,
+            artistName: 'Artist',
+          },
+        ],
+      })
+    );
     const relations = [
       relation('http://open.spotify.com/artist/artist-id?app=music'),
       relation('https://example.com/not-a-dsp'),

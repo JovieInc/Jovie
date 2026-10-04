@@ -1,6 +1,10 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/spotify/client', () => ({
+  isSpotifyAvailable: vi.fn(() => false),
+}));
 
 const { mockExecute, mockLimit, mockWarn } = vi.hoisted(() => ({
   mockExecute: vi.fn((fn: () => Promise<unknown>) => fn()),
@@ -164,21 +168,16 @@ describe('Music resolver MusicBrainz integration', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('treats a missing URL relation as absence, retaining only the supplied provider URL', async () => {
+  it('keeps an unverified artist unresolved when the provider is unavailable', async () => {
     mockResponse({}, 404);
     const result = await resolveInHouse({ kind: 'artist', url: TIM_SPOTIFY });
     expect(result).toMatchObject({
-      status: 'resolved',
+      status: 'upstream_error',
       mbid: null,
       title: null,
+      links: [],
+      confidence: 0,
     });
-    expect(result.links).toEqual([
-      expect.objectContaining({
-        provider: 'spotify',
-        url: TIM_SPOTIFY,
-        provenance: 'input_url',
-      }),
-    ]);
     expect(result.artistMetadata).toBeUndefined();
   });
 });
