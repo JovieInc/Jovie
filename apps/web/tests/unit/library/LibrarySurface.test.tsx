@@ -416,8 +416,15 @@ describe('LibrarySurface', () => {
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
-    expect(source).toContain('ReleaseAudioAssetPanel');
-    expect(source).toContain('LibraryInspectorAssetSlots');
+    expect(source).toContain('LibraryFilesPanel');
+    const filesPanelSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/library/LibraryFilesPanel.tsx'
+      ),
+      'utf8'
+    );
+    expect(filesPanelSource).toContain('ReleaseAudioAssetPanel');
     expect(source).toContain('function LibraryFilterPanel');
     expect(source).toContain("data-testid='library-filter-active-indicator'");
     expect(source).toContain("surfaceMode='table'");
@@ -513,6 +520,21 @@ describe('LibrarySurface', () => {
       'font-semibold',
       'text-primary-token'
     );
+  });
+
+  it('exposes the YouTube ledger directly from every Work state', () => {
+    const emptyLibrary = renderLibrary([]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
+
+    emptyLibrary.unmount();
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
   });
 
   it('uses the canonical Spotify sync owner for an empty connected library', () => {
@@ -1454,7 +1476,9 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-a'));
     let drawer = within(screen.getByTestId('library-asset-drawer'));
     fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
-    expect(drawer.getByText('1 stem file')).toBeInTheDocument();
+    expect(drawer.getAllByTestId(/^library-file-download:/)).toHaveLength(1);
+    expect(drawer.getByText('a.zip')).toBeInTheDocument();
+    expect(drawer.queryByText('b-one.zip')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('library-release-row-release-b'));
     drawer = within(screen.getByTestId('library-asset-drawer'));
@@ -1465,10 +1489,13 @@ describe('LibrarySurface', () => {
     expect(drawer.getByTestId('library-asset-entity-header')).toHaveTextContent(
       'Release B'
     );
-    expect(drawer.queryByText('1 stem file')).not.toBeInTheDocument();
+    expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
 
     fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
-    expect(drawer.getByText('2 stem files')).toBeInTheDocument();
+    expect(drawer.getAllByTestId(/^library-file-download:/)).toHaveLength(2);
+    expect(drawer.getByText('b-one.zip')).toBeInTheDocument();
+    expect(drawer.getByText('b-two.zip')).toBeInTheDocument();
+    expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
   });
 
   it('opens the Files tab for the selected work from Share Privately', () => {
@@ -1750,11 +1777,19 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
 
+    // Missing audio is not a broken state — acquisition sits behind Add File.
+    expect(screen.getByTestId('library-files-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
+
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
       screen.getByLabelText('Upload audio for Take Me Over')
     ).toHaveAttribute('accept', expect.stringContaining('audio/mpeg'));
     expect(screen.queryByTestId('library-audio-ready')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-file-back'));
+    fireEvent.click(screen.getByTestId('library-file-artwork:release-1'));
     expect(screen.getByTestId('library-artwork-object')).toBeInTheDocument();
     expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
   });
@@ -1782,6 +1817,7 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
+    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
     fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
       target: {
         files: [

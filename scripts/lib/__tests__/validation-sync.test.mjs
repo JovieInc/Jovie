@@ -362,7 +362,7 @@ describe('validation sync: facts', () => {
         github,
         repository: REPO,
         attachmentUrls: Array.from(
-          { length: 11 },
+          { length: 61 },
           (_, index) => `https://github.com/${REPO}/pull/${200 + index}`
         ),
       })
