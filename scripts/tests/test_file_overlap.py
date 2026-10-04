@@ -133,6 +133,31 @@ class PredictionAndAdmissionTest(unittest.TestCase):
 
 
 class SequencingTest(unittest.TestCase):
+    def test_saved_stack_hold_releases_when_retargeted_child_becomes_queue_owned(self):
+        for ownership in ({"isInMergeQueue": True}, {"autoMergeRequest": {"enabledAt": "2026-10-04T01:00:00Z"}}):
+            with self.subTest(ownership=ownership), tempfile.TemporaryDirectory() as tmp, \
+                    patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+                calls = []
+                lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",
+                    sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
+                    ledger=lambda *_args: None)
+                parent = pr(20141, [changed("scripts/lanes/lane_runner.py")], branch="codex/parent")
+                child = pr(20166, [changed("scripts/lanes/lane_runner.py")], base="codex/parent")
+                host = SimpleNamespace(state=Path(tmp))
+                overlap.reconcile_open_prs(host, lane, [parent, child])
+                child.update(ownership, baseRefName="main", labels=[{"name": "hold"}])
+                calls.clear()
+                recovered = overlap.reconcile_open_prs(host, lane, [parent, child])
+                self.assertEqual(recovered["pairs"][0]["actionTaken"], "flag")
+                self.assertEqual(recovered["released"], 1)
+                self.assertIn(["gh", "api", "-X", "DELETE", "repos/JovieInc/Jovie/issues/20166/labels/hold"], calls)
+                self.assertFalse(any("--disable-auto" in args or "labels[]=lane-fix-dequeued" in args for args in calls))
+                self.assertEqual(recovered["metrics"]["rebases_caused_by_overlap"], 0)
+                self.assertTrue(all(row["actionTaken"] == "flag" for row in overlap.read_state(host.state)["active"].values()))
+                calls.clear()
+                overlap.reconcile_open_prs(host, lane, [parent, child])
+                self.assertEqual(calls, [])
+
     def test_queue_ownership_does_not_release_duplicate_migration_blocks(self):
         for ownership in (
                 {"isInMergeQueue": True},

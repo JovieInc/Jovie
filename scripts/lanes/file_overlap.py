@@ -418,10 +418,12 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
     desired = {_key(row): row for row in decisions}
     if mode == "enforce":
         # Retargeting a legacy child to main removes the base-branch evidence.  Preserve the
-        # dependency until its recorded parent actually leaves the open inventory.
+        # dependency until its recorded parent leaves the open inventory or the native
+        # queue owns ordering. Never restore an old hold over that current decision.
         for key, row in previous_pr.items():
             if row.get("policyAction") == "stack" and row.get("firstPr") in by_number \
-                    and row.get("laterPr") in by_number:
+                    and row.get("laterPr") in by_number \
+                    and not queue_owned(by_number[row["laterPr"]]):
                 for current_key, current in list(desired.items()):
                     if current.get("firstPr") == row.get("firstPr") and current.get("laterPr") == row.get("laterPr"):
                         del desired[current_key]
