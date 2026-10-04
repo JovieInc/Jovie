@@ -1,0 +1,19 @@
+Implemented and published JOV-7398.
+
+- Draft PR: [#19865](https://github.com/JovieInc/Jovie/pull/19865)
+- Commit: `7329df3257`
+- Added fail-closed whole-diff classification, trusted-base controls, scoped rendered candidate qualification, deliberate-red fixtures, and latency collection.
+- Documented the audited baseline and residual coupling in [BLOG_CONTENT_CI.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T192534Z-JOV-7398-codex-10a6d3/docs/operations/BLOG_CONTENT_CI.md).
+- Recorded an honest `n=0` before/after baseline; no latency improvement or SLA is claimed.
+- The narrow path remains disabled until JOV-7396 and JOV-7397 proofs exist on the trusted base.
+
+Verification passed:
+
+- Full `pnpm ci:control:test`
+- CI harness and merge-queue checks
+- Focused classifier, latency, workflow, conflict-isolation, and Shipping SLO tests
+- Documentation parity/freshness checks
+- Biome, diff checks, secret scans, and pre-push gates
+- Hosted PR CI: 14 successful, 0 failing, 0 pending
+
+JOV-7398 is In Review. The PR remains draft, unready, and unmerged as required. No task deviations; the only remaining limitation is intentional—Markdown is still bundled into the application deployment.
