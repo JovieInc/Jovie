@@ -668,3 +668,238 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.equal(workflow.jobs.enroll['timeout-minutes'], 5);
 });
+
+const dequeueScript = workflow.jobs['dequeue-held'].steps.find(
+  step => step.with?.script
+).with.script;
+const runDequeue = new AsyncFunction(
+  'github',
+  'context',
+  'core',
+  dequeueScript
+);
+const labelEvent = (label = 'hold') => ({
+  pull_request: { number: 7, head: { sha } },
+  label: { name: label },
+});
+/** @param {Record<string, unknown>} overrides */
+const heldPR = (overrides = {}) => ({
+  id: 'PR_7',
+  state: 'OPEN',
+  headRefOid: sha,
+  isInMergeQueue: true,
+  labels: { pageInfo: { hasNextPage: false }, nodes: [{ name: 'hold' }] },
+  ...overrides,
+});
+
+/**
+ * @param {{ payload?: object, currentPR?: unknown, readError?: Error,
+ * mutationError?: Error, beforeReadResponse?: () => Promise<void> }} options
+ */
+async function dequeueFixture({
+  payload = labelEvent(),
+  currentPR = heldPR(),
+  readError,
+  mutationError,
+  beforeReadResponse,
+} = {}) {
+  /** @type {Record<string, unknown>[]} */
+  const reads = [];
+  /** @type {Record<string, unknown>[]} */
+  const mutations = [];
+  /** @type {string[]} */
+  const warnings = [];
+  /** @type {string[]} */
+  const notices = [];
+  await runDequeue(
+    {
+      graphql: async (
+        /** @type {string} */ query,
+        /** @type {Record<string, unknown>} */ variables
+      ) => {
+        if (query.includes('mutation(')) {
+          assert.match(query, /dequeuePullRequest/);
+          assert.doesNotMatch(
+            query,
+            /enqueuePullRequest|disablePullRequestAutoMerge/
+          );
+          mutations.push(variables);
+          if (mutationError) throw mutationError;
+          return { dequeuePullRequest: { clientMutationId: null } };
+        }
+        reads.push(variables);
+        assert.deepEqual(variables, {
+          owner: 'JovieInc',
+          repo: 'Jovie',
+          number: 7,
+        });
+        if (readError) throw readError;
+        await beforeReadResponse?.();
+        return { repository: { pullRequest: currentPR } };
+      },
+    },
+    { repo: { owner: 'JovieInc', repo: 'Jovie' }, payload },
+    {
+      info() {},
+      notice: (/** @type {string} */ message) => notices.push(message),
+      warning: (/** @type {string} */ message) => warnings.push(message),
+    }
+  );
+  return { reads, mutations, warnings, notices };
+}
+
+for (const label of [
+  'hold',
+  'gated',
+  'incident',
+  'do-not-merge',
+  'queue-poison',
+]) {
+  test(`dequeues the unchanged queued head while ${label} is still present`, async () => {
+    const result = await dequeueFixture({
+      payload: labelEvent(label),
+      currentPR: heldPR({
+        labels: { pageInfo: { hasNextPage: false }, nodes: [{ name: label }] },
+      }),
+    });
+    assert.equal(result.reads.length, 1);
+    assert.deepEqual(result.mutations, [{ id: 'PR_7' }]);
+    assert.deepEqual(result.warnings, []);
+    assert.deepEqual(result.notices, [
+      `DEQUEUED #7: labeled ${label} while queued`,
+    ]);
+  });
+}
+
+test('an old labeled event cannot dequeue the same head after its label is removed', async () => {
+  const result = await dequeueFixture({
+    currentPR: heldPR({
+      labels: { pageInfo: { hasNextPage: false }, nodes: [] },
+    }),
+  });
+  assert.equal(result.reads.length, 1);
+  assert.deepEqual(result.mutations, []);
+});
+
+test('an old labeled event cannot dequeue a replacement head even if it is still held', async () => {
+  const result = await dequeueFixture({
+    currentPR: heldPR({ headRefOid: 'b'.repeat(40) }),
+  });
+  assert.equal(result.reads.length, 1);
+  assert.deepEqual(result.mutations, []);
+});
+
+test('a different remaining blocking label does not revive the removed event label', async () => {
+  const result = await dequeueFixture({
+    currentPR: heldPR({
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: [{ name: 'incident' }],
+      },
+    }),
+  });
+  assert.deepEqual(result.mutations, []);
+});
+
+test('incomplete historical label events make no API calls', async () => {
+  for (const payload of [
+    {},
+    { ...labelEvent(), pull_request: { number: 0, head: { sha } } },
+    { ...labelEvent(), pull_request: { number: 7, head: { sha: 'unknown' } } },
+    { ...labelEvent(), pull_request: { number: 7, head: { sha: [sha] } } },
+    labelEvent('enhancement'),
+  ]) {
+    const result = await dequeueFixture({ payload });
+    assert.deepEqual(result.reads, []);
+    assert.deepEqual(result.mutations, []);
+  }
+});
+
+test('incomplete, unqueued or closed current PR evidence cannot authorize a dequeue', async () => {
+  for (const currentPR of [
+    null,
+    heldPR({ id: null }),
+    heldPR({ state: 'CLOSED' }),
+    heldPR({ isInMergeQueue: false }),
+    heldPR({ isInMergeQueue: 'true' }),
+    heldPR({ labels: null }),
+    heldPR({ labels: { nodes: [{ name: 'hold' }] } }),
+    heldPR({
+      labels: { pageInfo: { hasNextPage: true }, nodes: [{ name: 'hold' }] },
+    }),
+    heldPR({ labels: { pageInfo: { hasNextPage: false }, nodes: null } }),
+    heldPR({ labels: { pageInfo: { hasNextPage: false }, nodes: [null] } }),
+    heldPR({
+      labels: { pageInfo: { hasNextPage: false }, nodes: [{ name: 1 }] },
+    }),
+  ]) {
+    const result = await dequeueFixture({ currentPR });
+    assert.equal(result.reads.length, 1);
+    assert.deepEqual(result.mutations, []);
+  }
+});
+
+test('current-state read failure rejects and dequeue denial preserves warning behavior', async () => {
+  const readError = new Error('read denied');
+  await assert.rejects(
+    dequeueFixture({ readError }),
+    error => error === readError
+  );
+  const result = await dequeueFixture({
+    mutationError: new Error('dequeue denied'),
+  });
+  assert.equal(result.reads.length, 1);
+  assert.deepEqual(result.mutations, [{ id: 'PR_7' }]);
+  assert.deepEqual(result.warnings, [
+    'dequeue of held #7 failed: dequeue denied',
+  ]);
+  assert.deepEqual(result.notices, []);
+});
+
+test('blocking label matching preserves GitHub case-insensitive event semantics', async () => {
+  const result = await dequeueFixture({
+    payload: labelEvent('HOLD'),
+    currentPR: heldPR({
+      labels: { pageInfo: { hasNextPage: false }, nodes: [{ name: 'Hold' }] },
+    }),
+  });
+  assert.deepEqual(result.mutations, [{ id: 'PR_7' }]);
+  assert.deepEqual(result.notices, ['DEQUEUED #7: labeled HOLD while queued']);
+});
+
+test('a deferred current-state read cannot dequeue a repaired head after its hold is removed', async () => {
+  /** @type {() => void} */
+  let signalRead = () => {};
+  /** @type {() => void} */
+  let releaseRead = () => {};
+  /** @type {Promise<void>} */
+  const readStarted = new Promise(resolve => {
+    signalRead = resolve;
+  });
+  /** @type {Promise<void>} */
+  const readGate = new Promise(resolve => {
+    releaseRead = resolve;
+  });
+  const currentPR = heldPR();
+  const pending = dequeueFixture({
+    currentPR,
+    beforeReadResponse: async () => {
+      signalRead();
+      await readGate;
+    },
+  });
+  try {
+    // A settled invocation must not make a regressed/missing read hang the test.
+    await Promise.race([readStarted, pending]);
+    currentPR.headRefOid = 'b'.repeat(40);
+    currentPR.labels.nodes = [];
+    releaseRead();
+    const result = await pending;
+    assert.equal(result.reads.length, 1);
+    assert.deepEqual(result.mutations, []);
+    assert.deepEqual(result.notices, []);
+  } finally {
+    releaseRead();
+    await Promise.allSettled([pending]);
+  }
+});
