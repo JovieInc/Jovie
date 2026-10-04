@@ -178,7 +178,7 @@ describe('assurance matrix (JOV-6064)', () => {
     mutated.rows[0].owner = 'operations';
     const changed = assuranceMatrixReceipt(mutated);
     assert.notEqual(receipt.digest, changed.digest);
-    assert.equal(receipt.matrixRevision, '2026-10-03.2');
+    assert.equal(receipt.matrixRevision, '2026-10-03.3');
   });
 });
 

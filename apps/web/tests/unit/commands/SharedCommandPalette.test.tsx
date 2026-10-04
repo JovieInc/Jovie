@@ -151,6 +151,24 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(navs.length).toBeGreaterThan(0);
   });
 
+  it('uses Identity/Work language with no artist/music categorization (JOV-7630)', () => {
+    for (const command of commandsForSurface('cmdk')) {
+      expect(command.label).not.toMatch(/\bartist|music\b/i);
+      expect(command.description).not.toMatch(/\bartist|music\b/i);
+      expect(command.iconName).not.toBe('Music');
+    }
+    expect(commandsForSurface('cmdk')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'nav',
+          id: 'go-presence',
+          label: 'Identity',
+          href: APP_ROUTES.PRESENCE,
+        }),
+      ])
+    );
+  });
+
   it('omits nav entries from the chat-slash surface', () => {
     const slashCmds = commandsForSurface('chat-slash');
     const slashNavs = slashCmds.filter(c => c.kind === 'nav');
@@ -430,7 +448,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     const releasesNav = screen
       .getAllByRole('option')
       .find(el =>
-        el.textContent?.includes('Open the releases view of your work')
+        el.textContent?.includes('Manage your release catalog and smart links')
       );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);

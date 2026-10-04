@@ -245,7 +245,7 @@ export function buildCommands(
       'generateReleasePitch',
       'Generate pitch',
       'Draft a destination-aware release pitch in chat.',
-      'Music',
+      'Megaphone',
       [{ kind: 'release', required: true }]
     ),
     skill(
@@ -282,8 +282,8 @@ export function buildCommands(
     nav(
       'go-presence',
       PRODUCT_ONTOLOGY.identity.label,
-      PRODUCT_ONTOLOGY.identity.definition,
-      'Waypoints',
+      'Monitor your identity, public pages, and search presence.',
+      'User',
       APP_ROUTES.PRESENCE
     ),
     nav(
@@ -324,8 +324,8 @@ export function buildCommands(
     nav(
       'go-releases',
       'Releases',
-      'Open the releases view of your work.',
-      'Music',
+      'Manage your release catalog and smart links.',
+      'Layers',
       APP_ROUTES.RELEASES
     ),
     nav(
