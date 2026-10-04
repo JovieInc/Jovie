@@ -1,0 +1,12 @@
+STATUS: NEEDS_CONTEXT
+
+Jovie is on `tables/one-table-system`, preparing PR #20534. No branch files have been changed.
+
+gstack `1.91.18.0` is available; installed version is `0.14.5.0`.
+
+RECOMMENDATION: Choose A to use the current shipping workflow.
+
+- A) Upgrade now — Completeness: 10/10
+- B) Always auto-upgrade — Completeness: 10/10
+- C) Not now — Completeness: 8/10
+- D) Never ask again — Completeness: 6/10
