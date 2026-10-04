@@ -168,7 +168,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             pool = (None if any(value is None for value in pool_by_provider.values()) else
                     len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
             linear_error = None
-        except Exception as error:
+        except (Exception, SystemExit) as error:
             design_census = None
             pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
             candidate_counts, rejected = {}, {}

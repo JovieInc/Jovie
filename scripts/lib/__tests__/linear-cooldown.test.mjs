@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
 import { resolveLabelId } from '../../deprecation-intake.mjs';
+import { scanSource } from '../../invariants/latency-sensitive-execution.mjs';
 import { fileLinearIssue } from '../../qa-swarm/linear.mjs';
 import {
   activeResetAt,
@@ -35,6 +36,12 @@ afterEach(() => {
 });
 
 describe('shared linear cooldown', () => {
+  it('has no blocking filesystem calls in the shared request helper', () => {
+    const file = new URL('../linear-cooldown.mjs', import.meta.url);
+    const source = fs.readFileSync(file, 'utf8');
+    assert.deepEqual(scanSource('scripts/lib/linear-cooldown.mjs', source), []);
+  });
+
   it('hashes the key with the API URL and never writes the raw key', () => {
     const key = 'lin_api_test_secret';
     const hash = credentialHash(key);
@@ -105,13 +112,13 @@ describe('shared linear cooldown', () => {
     }
   });
 
-  it('honors a legacy single file and a legacy orchestrator directory', () => {
+  it('honors a legacy single file and a legacy orchestrator directory', async () => {
     const key = 'legacy-secret';
     const now = Date.now();
     const resetAt = now + 90_000;
     const legacyFile = join(root, `${legacyKeyHash(key)}.json`);
     fs.writeFileSync(legacyFile, JSON.stringify({ schema: 1, resetAt }));
-    assert.equal(activeResetAt(key, now) > now, true);
+    assert.equal((await activeResetAt(key, now)) > now, true);
 
     fs.unlinkSync(legacyFile);
     const legacyRoot = mkdtempSync(join(tmpdir(), 'linear-legacy-'));
@@ -127,20 +134,20 @@ describe('shared linear cooldown', () => {
         legacyRoots: [legacyRoot],
         strict: false,
       });
-      assert.equal(store.read(now), resetAt);
+      assert.equal(await store.read(now), resetAt);
     } finally {
       rmSync(legacyRoot, { recursive: true, force: true });
     }
   });
 
-  it('a failed publish never throws', () => {
+  it('a failed publish never throws', async () => {
     const key = 'unwritable-secret';
     const blocker = join(root, 'blocked');
     fs.writeFileSync(blocker, 'not a directory');
     const previousDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
     process.env.LINEAR_COOLDOWN_STATE_DIR = blocker;
     try {
-      const resetAt = publishLaneCooldown(
+      const resetAt = await publishLaneCooldown(
         key,
         { get: () => undefined },
         Date.now(),
@@ -157,7 +164,12 @@ describe('callers honor the cooldown', () => {
   it('qa-swarm, deprecation intake and synthetic intake do not call Linear while cooling', async () => {
     const key = 'caller-secret';
     process.env.LINEAR_API_KEY = key;
-    publishLaneCooldown(key, { get: () => undefined }, Date.now(), () => 0);
+    await publishLaneCooldown(
+      key,
+      { get: () => undefined },
+      Date.now(),
+      () => 0
+    );
     let calls = 0;
     const fetchImpl = async () => {
       calls += 1;

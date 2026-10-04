@@ -447,10 +447,10 @@ function backoffFailure(error) {
 }
 
 /** @param {ReturnType<typeof credentialBackoff>} store @param {number} nowMs */
-function enforceBackoff(store, nowMs) {
+async function enforceBackoff(store, nowMs) {
   let resetAt = 0;
   try {
-    resetAt = store.read(nowMs);
+    resetAt = await store.read(nowMs);
   } catch (error) {
     throw backoffFailure(error);
   }
@@ -497,7 +497,7 @@ export async function graphql(
   let rateLimitAttempts = 0;
   let rateLimitWaitedMs = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    enforceBackoff(backoff, nowImpl());
+    await enforceBackoff(backoff, nowImpl());
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -608,7 +608,7 @@ export async function graphql(
         );
         err.resetAt = Math.ceil(nowImpl() + delayMs);
         try {
-          backoff.publish(err.resetAt);
+          await backoff.publish(err.resetAt);
         } catch (error) {
           throw backoffFailure(error);
         }

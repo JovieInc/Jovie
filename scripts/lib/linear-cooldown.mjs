@@ -1,25 +1,14 @@
 /**
- * One Linear cooldown per API key, shared by the lane runner and every JS client.
- *
- * Canonical records live in a private directory named by sha256(API_URL + NUL + key):
- *   $LINEAR_COOLDOWN_STATE_DIR/<hash>/<resetAt>-<id>.json
- *   else $LANES_STATE/linear-cooldown/<hash>/...
- *   else $LINEAR_BACKOFF_STATE_DIR/<hash>/...   (existing orchestrator override)
- *   else ~/.local/state/jovie-lanes/linear-cooldown/<hash>/...
- *
- * Each record is {"schema":1,"resetAt":<epoch ms>}. Writers add a record; readers
- * keep the latest deadline, so a later writer cannot shorten an earlier one.
- * The raw key is never written.
- *
- * Transition reads, never writes:
- *   ~/.local/state/jovie-linear-backoff/<same hash>/   (orchestrator before this PR)
- *   <root>/<sha256(key)>.json                          (lane runner single-file cooldown)
+ * Per-credential Linear cooldown shared by Python lanes and JS clients.
+ * Private records use <root>/<sha256(API_URL + NUL + key)>/<resetAt>-<id>.json
+ * with {schema:1,resetAt:<epoch ms>}; additive writes keep the latest reset.
+ * Raw credentials are never written; both legacy forms are read only.
  */
 
 import { createHash, randomUUID } from 'node:crypto';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 export const LINEAR_API_URL = 'https://api.linear.app/graphql';
 export const COOLDOWN_FLOOR_MS = 60_000;
@@ -59,18 +48,18 @@ function stateError() {
   });
 }
 
-function privateDirectory(path, repair = false) {
-  fs.mkdirSync(path, { recursive: true, mode: 0o700 });
+async function privateDirectory(path, repair = false) {
+  await fs.mkdir(path, { recursive: true, mode: 0o700 });
   if (repair) {
     try {
-      const current = fs.lstatSync(path);
+      const current = await fs.lstat(path);
       if (current.isDirectory() && (current.mode & 0o077) !== 0)
-        fs.chmodSync(path, 0o700);
+        await fs.chmod(path, 0o700);
     } catch {
       // the stat check below reports a directory this process cannot make private
     }
   }
-  const stat = fs.lstatSync(path);
+  const stat = await fs.lstat(path);
   if (
     !stat.isDirectory() ||
     (stat.mode & 0o077) !== 0 ||
@@ -79,26 +68,21 @@ function privateDirectory(path, repair = false) {
     throw stateError();
 }
 
-/**
- * Latest future reset in one scope directory. Strict mode throws on a malformed
- * or non-private record. Loose mode ignores those records.
- * @param {string} directory @param {number} nowMs @param {boolean} strict
- */
-function readScope(directory, nowMs, strict) {
-  if (!fs.existsSync(directory)) return 0;
+/** @param {string} directory @param {number} nowMs @param {boolean} strict */
+async function readScope(directory, nowMs, strict) {
   try {
-    if (strict) privateDirectory(directory);
-    const names = fs.readdirSync(directory);
+    if (strict) {
+      await fs.lstat(directory);
+      await privateDirectory(dirname(directory));
+      await privateDirectory(directory);
+    }
+    const names = await fs.readdir(directory);
     if (names.length > 1000) {
       if (strict) throw stateError();
       names.length = 1000;
     }
     let resetAt = 0;
     for (const name of names) {
-      if (name.startsWith('.pending-')) {
-        if (strict) throw stateError();
-        continue;
-      }
       if (!/^\d+-[0-9a-f-]+\.json$/.test(name)) {
         if (strict) throw stateError();
         continue;
@@ -106,7 +90,7 @@ function readScope(directory, nowMs, strict) {
       const path = join(directory, name);
       let record;
       try {
-        const stat = fs.lstatSync(path);
+        const stat = await fs.lstat(path);
         if (
           !stat.isFile() ||
           stat.size > 256 ||
@@ -116,7 +100,7 @@ function readScope(directory, nowMs, strict) {
           if (strict) throw stateError();
           continue;
         }
-        record = JSON.parse(fs.readFileSync(path, 'utf8'));
+        record = JSON.parse(await fs.readFile(path, 'utf8'));
       } catch (error) {
         if (error?.code === 'ENOENT') continue;
         if (error?.code === 'BACKOFF_STATE_INVALID') throw error;
@@ -135,7 +119,7 @@ function readScope(directory, nowMs, strict) {
       if (record.resetAt > nowMs) resetAt = Math.max(resetAt, record.resetAt);
       else if (strict) {
         try {
-          fs.unlinkSync(path);
+          await fs.unlink(path);
         } catch (error) {
           if (error?.code !== 'ENOENT') throw error;
         }
@@ -143,6 +127,7 @@ function readScope(directory, nowMs, strict) {
     }
     return resetAt;
   } catch (error) {
+    if (error?.code === 'ENOENT') return 0;
     if (error?.code === 'BACKOFF_STATE_INVALID') throw error;
     if (strict) throw stateError();
     return 0;
@@ -150,10 +135,10 @@ function readScope(directory, nowMs, strict) {
 }
 
 /** Lane-runner single file: `<root>/<sha256(key)>.json`. Malformed files are ignored. */
-function readLegacyFile(root, keyHash, nowMs) {
+async function readLegacyFile(root, keyHash, nowMs) {
   try {
     const record = JSON.parse(
-      fs.readFileSync(join(root, `${keyHash}.json`), 'utf8')
+      await fs.readFile(join(root, `${keyHash}.json`), 'utf8')
     );
     if (
       record?.schema !== 1 ||
@@ -168,8 +153,7 @@ function readLegacyFile(root, keyHash, nowMs) {
 }
 
 /**
- * @param {string} key
- * @param {string} root
+ * @param {string} key @param {string} root
  * @param {{ legacyRoots?: string[], strict?: boolean }} [options]
  */
 export function credentialBackoff(
@@ -180,24 +164,19 @@ export function credentialBackoff(
   const scope = credentialHash(key);
   const keyHash = legacyKeyHash(key);
   const directory = join(root, scope);
-
-  function read(nowMs) {
+  async function read(nowMs) {
     try {
       if (strict) {
-        privateDirectory(root);
-        privateDirectory(directory);
+        await privateDirectory(root);
+        await privateDirectory(directory);
       }
-      let resetAt = readScope(directory, nowMs, strict);
-      resetAt = Math.max(resetAt, readLegacyFile(root, keyHash, nowMs));
+      let resetAt = await readScope(directory, nowMs, strict);
+      resetAt = Math.max(resetAt, await readLegacyFile(root, keyHash, nowMs));
       for (const legacy of legacyRoots) {
         const legacyScope = join(legacy, scope);
-        if (!fs.existsSync(legacyScope)) {
-          resetAt = Math.max(resetAt, readLegacyFile(legacy, keyHash, nowMs));
-          continue;
-        }
-        if (strict) privateDirectory(legacy);
-        resetAt = Math.max(resetAt, readScope(legacyScope, nowMs, strict));
-        resetAt = Math.max(resetAt, readLegacyFile(legacy, keyHash, nowMs));
+        const scopeReset = await readScope(legacyScope, nowMs, strict);
+        const fileReset = await readLegacyFile(legacy, keyHash, nowMs);
+        resetAt = Math.max(resetAt, scopeReset, fileReset);
       }
       return resetAt;
     } catch (error) {
@@ -206,34 +185,32 @@ export function credentialBackoff(
       throw stateError();
     }
   }
-
-  function publish(resetAt) {
+  async function publish(resetAt) {
     const id = randomUUID();
     const staging = join(directory, `.pending-${id}`);
     try {
       if (!Number.isSafeInteger(resetAt) || resetAt <= 0) throw stateError();
-      // Loose writers tighten a directory they own. Strict readers never chmod, so a
-      // group-readable scope still fails closed before any request.
-      privateDirectory(root, !strict);
-      privateDirectory(directory, !strict);
-      const fd = fs.openSync(staging, 'wx', 0o600);
+      // Only loose writers repair permissions; strict readers fail closed.
+      await privateDirectory(root, !strict);
+      await privateDirectory(directory, !strict);
+      const fd = await fs.open(staging, 'wx', 0o600);
       try {
-        fs.writeFileSync(fd, JSON.stringify({ schema: 1, resetAt }));
-        fs.fsyncSync(fd);
+        await fd.writeFile(JSON.stringify({ schema: 1, resetAt }));
+        await fd.sync();
       } finally {
-        fs.closeSync(fd);
+        await fd.close();
       }
-      fs.chmodSync(staging, 0o600);
-      fs.renameSync(staging, join(directory, `${resetAt}-${id}.json`));
-      const dir = fs.openSync(directory, 'r');
+      await fs.chmod(staging, 0o600);
+      await fs.rename(staging, join(directory, `${resetAt}-${id}.json`));
+      const dir = await fs.open(directory, 'r');
       try {
-        fs.fsyncSync(dir);
+        await dir.sync();
       } finally {
-        fs.closeSync(dir);
+        await dir.close();
       }
     } catch (error) {
       try {
-        fs.unlinkSync(staging);
+        await fs.unlink(staging);
       } catch {
         // a crashed publication is removed when we can; strict readers still fail closed on leftovers
       }
@@ -242,7 +219,6 @@ export function credentialBackoff(
       throw stateError();
     }
   }
-
   return { read, publish, scope, directory };
 }
 
@@ -291,17 +267,17 @@ export function laneDeadlineMs(
   return Math.ceil(resetAt);
 }
 
-export function activeResetAt(key, nowMs = Date.now(), env = process.env) {
+export async function activeResetAt(key, now = Date.now(), env = process.env) {
   const root = canonicalCooldownRoot(env);
   const store = credentialBackoff(key, root, {
     legacyRoots: legacyCooldownRoots(root, env),
     strict: false,
   });
-  const resetAt = store.read(nowMs);
-  return resetAt > nowMs ? resetAt : null;
+  const resetAt = await store.read(now);
+  return resetAt > now ? resetAt : null;
 }
 
-export function publishLaneCooldown(
+export async function publishLaneCooldown(
   key,
   headers,
   nowMs = Date.now(),
@@ -314,26 +290,13 @@ export function publishLaneCooldown(
     legacyRoots: legacyCooldownRoots(root, env),
     strict: false,
   });
-  let resetAt = requested;
-  try {
-    const existing = store.read(nowMs);
-    if (existing > resetAt) resetAt = existing;
-  } catch {
-    // fail open: still try to publish the deadline we computed
-  }
-  try {
-    store.publish(resetAt);
-  } catch {
-    // an unwritable state dir must not raise; this process still treats the call as limited
-  }
+  // Loose stores handle inaccessible state; this call still reports rate limiting.
+  const resetAt = Math.max(requested, await store.read(nowMs));
+  await store.publish(resetAt);
   return resetAt;
 }
 
-/**
- * Shared GraphQL POST. An active cooldown returns without calling the network.
- * HTTP 429, HTTP 400 RATELIMITED, and HTTP 200 whose errors carry that code
- * publish the lane deadline and return rateLimited.
- */
+/** Shared GraphQL POST: skip active cooldowns; publish deadlines on rate limits. */
 export async function linearRequest({
   key,
   query,
@@ -345,7 +308,7 @@ export async function linearRequest({
   env = process.env,
 }) {
   if (!key) return { ok: false, reason: 'missing_linear_api_key' };
-  const cooling = activeResetAt(key, nowMs, env);
+  const cooling = await activeResetAt(key, nowMs, env);
   if (cooling)
     return {
       ok: false,
@@ -381,7 +344,7 @@ export async function linearRequest({
   }
   const status = Number(response?.status ?? 0);
   if (status === 429 || isRateLimitedBody(status, data)) {
-    const resetAt = publishLaneCooldown(
+    const resetAt = await publishLaneCooldown(
       key,
       response?.headers,
       nowMs,

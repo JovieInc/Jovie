@@ -696,7 +696,8 @@ describe('durable credential budget', () => {
     });
   });
 
-  it('fails closed on malformed or non-private state without making a request', async () => {
+  it('fails closed on malformed or non-private state without making a request', async t => {
+    const fetch = t.mock.method(globalThis, 'fetch', async () => limited());
     for (const variant of [
       'json',
       'schema',
@@ -731,21 +732,14 @@ describe('durable credential budget', () => {
           fs.unlinkSync(path);
           fs.symlinkSync('/dev/null', path);
         }
-        let calls = 0;
         await assert.rejects(
-          graphql(
-            query,
-            {},
-            {
-              fetchImpl: async () => {
-                calls++;
-                return limited();
-              },
-            }
+          (variant === 'json' ? linear.updateComment : linear.setIssueLabels)(
+            'issue-1',
+            variant === 'json' ? 'blocked' : ['label-1']
           ),
           (/** @type {any} */ error) => error.code === 'BACKOFF_STATE_INVALID'
         );
-        assert.equal(calls, 0);
+        assert.equal(fetch.mock.callCount(), 0);
       });
     }
   });
