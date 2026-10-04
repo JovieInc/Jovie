@@ -263,6 +263,34 @@ export function contentDensity(buffer, { top, bottom }) {
   return samples ? edges / samples : 0;
 }
 
+/**
+ * Share of sampled pixels that differ visibly between two same-size frames.
+ * A blinking caret or a spinner glyph stays far below 0.1%; a timeline still
+ * seeding or scrolling moves whole regions.
+ */
+export function frameDifference(a, b) {
+  const first = decodePng(a);
+  const second = decodePng(b);
+  if (first.width !== second.width || first.height !== second.height) return 1;
+  let changed = 0;
+  let samples = 0;
+  for (let y = 0; y < first.height; y += 2) {
+    for (let x = 0; x < first.width; x += 2) {
+      const i = (y * first.width + x) * first.channels;
+      const j = (y * second.width + x) * second.channels;
+      samples++;
+      if (
+        Math.abs(first.pixels[i] - second.pixels[j]) > 16 ||
+        Math.abs(first.pixels[i + 1] - second.pixels[j + 1]) > 16 ||
+        Math.abs(first.pixels[i + 2] - second.pixels[j + 2]) > 16
+      ) {
+        changed++;
+      }
+    }
+  }
+  return changed / samples;
+}
+
 function escapeHtml(text) {
   return text.replace(
     /[&<>"]/g,
@@ -358,17 +386,19 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
   await sleep(settleMs);
   let previous;
   let density = 0;
+  let difference = 1;
   while (true) {
     run('xcrun', ['simctl', 'io', udid, 'screenshot', '--type=png', file], {
       stdio: 'ignore',
     });
     const buffer = readFileSync(file);
     density = contentDensity(buffer, spec.contentCheck);
-    const settled = previous && sha256(previous) === sha256(buffer);
+    difference = previous ? frameDifference(previous, buffer) : 1;
+    const settled = difference < 0.001;
     if (settled && density >= spec.contentCheck.minDensity) return buffer;
     if (Date.now() > deadline) {
       throw new Error(
-        `${screen.id}: ${settled ? 'screen body is empty' : 'screen never settled'} (content density ${(density * 100).toFixed(2)}%)`
+        `${screen.id}: ${settled ? 'screen body is empty' : 'screen never settled'} (content density ${(density * 100).toFixed(2)}%, last frame change ${(difference * 100).toFixed(2)}%)`
       );
     }
     previous = buffer;

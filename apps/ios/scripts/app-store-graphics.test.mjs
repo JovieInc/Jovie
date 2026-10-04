@@ -8,6 +8,7 @@ import { deflateSync } from 'node:zlib';
 import {
   contentDensity,
   decodePng,
+  frameDifference,
   loadStorefront,
   marketingVersion,
   pngInfo,
@@ -182,6 +183,19 @@ test('contentDensity separates an empty screen from a screen with content', () =
   assert.equal(contentDensity(blankCapture, CHECK), 0);
   assert.ok(contentDensity(contentCapture, CHECK) >= CHECK.minDensity);
   assert.equal(contentDensity(contentCapture, { top: 0.5, bottom: 0.5 }), 0);
+});
+
+test('frameDifference ignores a caret blink but not a moved region', () => {
+  const caret = pixelPng(40, 40, (x, y) =>
+    x === 20 && y === 20 ? [240, 240, 240] : [7, 8, 10]
+  ).png;
+  assert.ok(frameDifference(blankCapture, caret) < 0.01);
+  assert.equal(frameDifference(blankCapture, blankCapture), 0);
+  assert.ok(frameDifference(blankCapture, contentCapture) > 0.05);
+  assert.equal(
+    frameDifference(blankCapture, pixelPng(20, 20, () => [0, 0, 0]).png),
+    1
+  );
 });
 
 test('screen files are ordered for fastlane deliver', () => {
