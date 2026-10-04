@@ -271,6 +271,15 @@ describe('DashboardNav', () => {
       'aria-current',
       'page'
     );
+    audience.unmount();
+
+    mockUsePathname.mockReturnValue(APP_ROUTES.INSIGHTS);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams());
+    const insights = renderDashboardNav({ renderFn: fastRender });
+    expect(insights.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('uses New Chat consistently for the elevated nav action and page title', async () => {
