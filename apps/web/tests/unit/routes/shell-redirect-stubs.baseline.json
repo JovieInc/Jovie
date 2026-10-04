@@ -39,8 +39,8 @@
     "/app/releases",
     "/app/settings",
     "/app/settings/admin",
+    "/app/settings/artist-profile",
     "/app/settings/delete-account",
-    "/app/settings/profile",
     "/app/threads",
     "/app/tipping",
     "/app/tracks"

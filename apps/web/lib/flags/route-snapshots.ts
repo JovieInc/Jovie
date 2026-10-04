@@ -6,6 +6,8 @@ import type { AppFlagName } from './contracts';
 const SHELL_CHROME_FLAG_NAMES = [
   'STRIPE_CONNECT_ENABLED',
   'INBOX_HOME',
+  'YOUTUBE_WORKSPACE_NAV',
+  'JOVIE_WORK_NAV',
   // Identity is a primary-rail href. The client must see the resolved flag
   // or the row stays visible and 404s while PROFILES_WORKSPACE is off.
   'PROFILES_WORKSPACE',
@@ -63,8 +65,8 @@ function isDashboardProfileRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.DASHBOARD_PROFILE);
 }
 
-function isArtistProfileSettingsRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+function isProfileSettingsRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS_PROFILE);
 }
 
 function isDashboardSectionRoute(pathname: string | null): boolean {
@@ -75,7 +77,7 @@ function needsAppleWalletProfilePassFlag(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||
     (isDashboardSectionRoute(pathname) && !isChatShellRoute(pathname)) ||
-    isArtistProfileSettingsRoute(pathname)
+    isProfileSettingsRoute(pathname)
   );
 }
 

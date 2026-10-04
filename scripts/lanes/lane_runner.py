@@ -39,6 +39,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
@@ -97,8 +98,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_claude_lane.py",
-              "scripts/tests/test_issue_routing.py"]
+              "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
+              "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
@@ -464,8 +465,11 @@ class Host:
     # once only makes all of them time out.
     gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
 
-    def slots(self, provider: str, default: int) -> int:
+    def base_slots(self, provider: str, default: int) -> int:
         return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+
+    def slots(self, provider: str, default: int) -> int:
+        return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
 
 
 def load_providers(path: Path = HERE / "providers.json") -> dict:
@@ -4748,7 +4752,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         issue = labeled
         if local:
             sweep_lane_prs(host, name, linear)
-        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
+        # autoscaled count would admit more parked PRs as capacity rises.
+        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
         overlap_blocked = False
@@ -4937,6 +4943,13 @@ def dispatch(host: Host) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
     try:
         tick["disk"] = disk_guard.check(host)
+        if autoscale.mode() != "off":
+            try:
+                bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
+                         for name, spec in load_providers().items()}
+                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases)
+            except Exception as error:  # a bad sample never blocks the spawn loop
+                tick["autoscaleError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             # Before admission: a critically full disk is exactly when the sweep must still run.
             tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
@@ -5132,6 +5145,16 @@ def release_identity(host: Host) -> dict:
             "bundleDigest": digest, "objects": manifest}
 
 
+# Per-host tuning (LANES_SLOTS_DEVIN=2, SYMPHONY_FILE_OVERLAP_GUARD=flag, ...) must not reach the
+# release self-test: the fixtures assume defaults, so a tuned host refused every release.
+HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_")
+
+
+def selftest_env(scratch: Path) -> dict:
+    env = {key: value for key, value in os.environ.items() if not key.startswith(HOST_KNOB_PREFIXES)}
+    return {**env, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+
+
 def install_release(host: Host) -> int:
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
@@ -5165,7 +5188,7 @@ def install_release(host: Host) -> int:
         try:
             test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                                   cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                                  env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+                                  env=selftest_env(scratch))
         except subprocess.TimeoutExpired:
             refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
             raise

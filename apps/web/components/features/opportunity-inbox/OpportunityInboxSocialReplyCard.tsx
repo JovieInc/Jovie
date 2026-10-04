@@ -78,6 +78,35 @@ export function OpportunityInboxSocialReplyCard({
             ·
           </span>
           <span>{reply.platform}</span>
+          {reply.videoTitle ? (
+            <>
+              <span
+                aria-hidden='true'
+                className='system-b-opportunity-inbox-card-dot'
+              >
+                ·
+              </span>
+              <span
+                data-testid={`social-reply-video-${card.id}`}
+                className='text-quaternary-token'
+              >
+                {reply.videoTitle}
+              </span>
+            </>
+          ) : null}
+          {typeof reply.likeCount === 'number' ? (
+            <>
+              <span
+                aria-hidden='true'
+                className='system-b-opportunity-inbox-card-dot'
+              >
+                ·
+              </span>
+              <span className='text-quaternary-token'>
+                {reply.likeCount} {reply.likeCount === 1 ? 'like' : 'likes'}
+              </span>
+            </>
+          ) : null}
           <span
             aria-hidden='true'
             className='system-b-opportunity-inbox-card-dot'

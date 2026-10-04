@@ -142,6 +142,17 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("codex-broken", doctor.judge(obs(codex={"error": "no codex", "accounts": {}, "available": []})))
         self.assertNotIn("hud-stale", doctor.judge(obs(hudExpected=False, hudBeatAge=None)))
 
+    def test_sustained_merge_queue_brake_files_only_after_one_interval(self):
+        signal = {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6,
+                  "openedPerHour": 31, "ejectionRate": 0.55}
+        brake = {"active": True, "heldForS": 1800, "intervalS": 1800, "signal": signal}
+        self.assertNotIn("bottleneck:merge-queue", doctor.judge(obs(autoscale={"throughputBrake": brake})))
+        alert = doctor.judge(obs(autoscale={"throughputBrake": {**brake, "heldForS": 1801}}))[
+            "bottleneck:merge-queue"]
+        self.assertIn("30", alert)
+        self.assertIn("6 merged/h vs 31 opened/h", alert)
+        self.assertIn("ejection rate 0.55", alert)
+
 
 class FakeTracker:
     def __init__(self):
@@ -336,6 +347,55 @@ class ReconcileTest(unittest.TestCase):
         finally:
             os.environ.pop("LANES_ESCALATION", None)
 
+    def test_merge_queue_remediation_reopens_the_deduplicated_issue(self):
+        class FakeLinear:
+            def __init__(self):
+                self.moves, self.comments = [], []
+
+            def gql(self, query, variables):
+                self.query, self.variables = query, variables
+                return {"issues": {"nodes": [{"id": "remediation", "state": {"type": "completed"}}]}}
+
+            def move(self, issue_id, state):
+                self.moves.append((issue_id, state))
+
+            def comment(self, issue_id, text):
+                self.comments.append((issue_id, text))
+
+        linear = FakeLinear()
+        tracker = doctor.Tracker(linear, "gem")
+        self.assertEqual(tracker.title("bottleneck:merge-queue"),
+                         "remediation:symphony-bottleneck-merge-queue")
+        self.assertEqual(tracker.open("bottleneck:merge-queue", "queue stalled"), "remediation")
+        self.assertEqual(linear.moves, [("remediation", "Triage")])
+        self.assertIn("fired again", linear.comments[0][1])
+
+    def test_reopened_merge_queue_owner_survives_notification_failure_without_duplicate(self):
+        class FakeLinear:
+            def __init__(self):
+                self.moves, self.creates = [], []
+
+            def gql(self, query, variables):
+                if "issueCreate" in query:
+                    self.creates.append(variables)
+                    return {"issueCreate": {"issue": {"id": "duplicate"}}}
+                return {"issues": {"nodes": [{"id": "remediation", "state": {"type": "completed"}}]}}
+
+            def move(self, issue_id, state):
+                self.moves.append((issue_id, state))
+
+            def comment(self, issue_id, text):
+                raise RuntimeError("notification unavailable")
+
+        linear = FakeLinear()
+        tracker = doctor.Tracker(linear, "gem")
+        with mock.patch.object(tracker, "apply_alert_label"), mock.patch.object(tracker, "_team", return_value={
+            "id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]}, "labels": {"nodes": []},
+        }), mock.patch.object(tracker, "_remediation_label_id", return_value=None):
+            self.assertEqual(tracker.open("bottleneck:merge-queue", "queue stalled"), "remediation")
+        self.assertEqual(linear.moves, [("remediation", "Triage")])
+        self.assertEqual(linear.creates, [])
+
     def test_new_condition_generation_reopens_completed_liveness_owner(self):
         class FakeLinear:
             def __init__(self):
@@ -358,6 +418,42 @@ class ReconcileTest(unittest.TestCase):
         doctor.Tracker(linear, "gem").contradict_invariant(event)
         self.assertEqual(linear.moves, [("owner", "Triage")])
         self.assertIn("gem:provider-idle:devin:2", linear.comments[0][1])
+
+
+class MergeThroughputSampleTest(unittest.TestCase):
+    def test_samples_the_five_signals_and_uses_the_bounded_cache(self):
+        metrics = {
+            "window": {"hours": 1},
+            "occupancy": {"inQueue": 30},
+            "queueWaitMinutes": {"p50": 38},
+            "intake": {"mergesPerHour": 6, "opensPerHour": 31},
+            "ejections": {"rate": 0.55},
+        }
+        calls = []
+
+        def succeed(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout=json.dumps(metrics), stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            sampled, error = doctor.sample_merge_throughput(state, 1000.0, run=succeed)
+            self.assertIsNone(error)
+            self.assertEqual(
+                {key: sampled[key] for key in ("queueDepth", "queueWaitP50Minutes", "mergedPerHour",
+                                                "openedPerHour", "ejectionRate")},
+                {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6,
+                 "openedPerHour": 31, "ejectionRate": 0.55})
+            cached, error = doctor.sample_merge_throughput(
+                state, 1100.0, run=lambda *_args, **_kwargs: self.fail("fresh cache must avoid GitHub reads"))
+            self.assertEqual(cached, sampled)
+            self.assertIsNone(error)
+            stale, error = doctor.sample_merge_throughput(
+                state, 1301.0,
+                run=lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="GitHub down"))
+            self.assertEqual(stale, sampled)
+            self.assertIn("GitHub down", error)
+        self.assertIn("--autoscale", calls[0])
 
 
 class OrphanPrTest(unittest.TestCase):
@@ -603,8 +699,8 @@ class RunnablePoolTest(unittest.TestCase):
                 with mock.patch.object(lane, "load_providers", return_value=providers), \
                         mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
                     capacity = doctor.host_capacity(lane.Host(state=state), lane)
-                self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0},
-                    "codex": {"slots": 0, "running": 1}, "claude": {"slots": 0, "running": 0}})
+                self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0, "base": 4},
+                    "codex": {"slots": 0, "running": 1, "base": 0}, "claude": {"slots": 0, "running": 0, "base": 0}})
                 feed_lane = SimpleNamespace(HOST="mac", provider_throughput=throughput_stub)
                 feed = doctor.status_feed(SimpleNamespace(state=state), feed_lane,
                                           obs(capacityByProvider=capacity), {}, {})
@@ -812,11 +908,11 @@ class RunTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "test"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {"count": 0, "available": [], "accounts": {}})})
             tracker = FakeTracker()
-            os.environ["LANES_SELFTEST"] = "1"  # no gist from a unit test
-            try:
+            # No gist from a unit test, and the host's own overlap-guard knob (a lane host may run
+            # SYMPHONY_FILE_OVERLAP_GUARD=flag) must not leak into the release self-test.
+            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+                os.environ.pop("SYMPHONY_FILE_OVERLAP_GUARD", None)
                 result = doctor.run(host, lane, codex, tracker)
-            finally:
-                os.environ.pop("LANES_SELFTEST", None)
             self.assertIn("provider-down:devin", result["alerts"])
             self.assertIn("linear-down", result["alerts"])
             self.assertEqual(result["eventsOpen"], 0)

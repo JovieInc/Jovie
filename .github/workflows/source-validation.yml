@@ -111,6 +111,20 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts/agent-context | tar -x -C "$guard_root"
           node "$guard_root/scripts/agent-context/merge-budget.mjs" --base "$trusted_ref" --head "$EXPECTED_HEAD"
+      - name: Validate UI interaction source from trusted base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "$BASE_BRANCH"
+          trusted_ref="$(git rev-parse --verify "refs/remotes/origin/$BASE_BRANCH^{commit}")"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/ui-interaction-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/design-frontend-skill-check.mjs | tar -x -C "$guard_root"
+          node "$guard_root/scripts/design-frontend-skill-check.mjs" --diff-base "$trusted_ref"
       - name: Run deterministic source contract
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -127,6 +141,7 @@ jobs:
           pnpm typecheck
           pnpm run typecheck:scripts
           pnpm --filter @jovie/web run typecheck:tests
+          pnpm --filter @jovie/web run typecheck:stories
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate

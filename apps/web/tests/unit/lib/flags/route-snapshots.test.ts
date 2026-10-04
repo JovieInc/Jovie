@@ -31,6 +31,8 @@ describe('route flag snapshots', () => {
         expect.arrayContaining([
           'STRIPE_CONNECT_ENABLED',
           'INBOX_HOME',
+          'YOUTUBE_WORKSPACE_NAV',
+          'JOVIE_WORK_NAV',
           'PROFILES_WORKSPACE',
         ])
       );
@@ -63,9 +65,9 @@ describe('route flag snapshots', () => {
       expect.arrayContaining(['CHAT_JANK_MONITOR'])
     );
 
-    expect(
-      resolveAppShellRouteFlagNames(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
-    ).toEqual(expect.arrayContaining(['APPLE_WALLET_PROFILE_PASS']));
+    expect(resolveAppShellRouteFlagNames(APP_ROUTES.SETTINGS_PROFILE)).toEqual(
+      expect.arrayContaining(['APPLE_WALLET_PROFILE_PASS'])
+    );
   });
 
   it('does not include unrelated runtime flags in trimmed shell payloads', () => {
