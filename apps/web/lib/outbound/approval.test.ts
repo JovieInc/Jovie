@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   draftOutboundCopy,
   evaluateOutboundSend,
-  type OutboundCopy,
   type OutboundLedgerRow,
   type OutboundTarget,
   outboundCopyEvidenceKey,
@@ -11,6 +10,7 @@ import {
   outboundTargetRevision,
   resolveOutboundApproval,
 } from './approval';
+import type { OutboundCopy } from './types';
 
 const TARGET: OutboundTarget = {
   leadId: 'lead-1',
