@@ -1,0 +1,8 @@
+DONE — [PR #20587](https://github.com/JovieInc/Jovie/pull/20587) is green.
+
+- Root cause: missing customer changelog decision in the PR body.
+- Fix: added `<!-- customer-changelog/v1 {"releaseWorthy":false} -->`.
+- Source Validation and PR Ready now pass at `0dc4bb0`.
+- All required checks pass.
+- Branch is clean and matches origin; no code commit or push was needed for this metadata-only repair.
+- PR remains an open draft, not in the merge queue; repository automation owns the ready transition.
