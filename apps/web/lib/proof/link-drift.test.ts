@@ -120,7 +120,8 @@ describe('link drift detection', () => {
     expect(findings).toEqual([
       expect.objectContaining({
         kind: 'broken-links',
-        value: '2 of your 3 bio links (1 dead, 1 redirect to a homepage)',
+        value:
+          '2 of the 3 bio links we could check (1 dead, 1 redirect to a homepage)',
       }),
     ]);
   });

@@ -229,7 +229,8 @@ function brokenLinksFinding(input: LinkDriftInput): LinkDriftFinding | null {
   return {
     kind: 'broken-links',
     label: 'Broken links',
-    value: `${broken.length} of your ${checked.length} bio links (${parts.join(', ')})`,
+    // Social hosts and bot walls are not checked; count only what was.
+    value: `${broken.length} of the ${checked.length} bio links we could check (${parts.join(', ')})`,
     source: input.bioPageUrl,
     observedAt: input.healthCheckedAt,
   };
