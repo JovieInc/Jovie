@@ -1,5 +1,5 @@
 /**
- * Signup funnel contract (signup-funnel/v1).
+ * Signup funnel contract (signup-funnel/v2).
  *
  * One stable id per funnel and one ordered step list per funnel, shared by the
  * client beacon, the server recorder, and the Summer aggregate. Steps follow
@@ -7,10 +7,14 @@
  * qualification, not before onboarding.
  *
  * Events carry no identifiers at all: no user id, profile id, handle, email,
- * or URL. Counts are event counts, not unique visitors.
+ * or URL. A server-derived reporting cohort is allowed so customer-only
+ * metrics can exclude synthetic principals without persisting identity.
+ * Counts are event counts, not unique visitors.
  */
 
-export const SIGNUP_FUNNEL_CONTRACT_VERSION = 'signup-funnel/v1';
+import type { AccountMetricCohort } from '@/lib/utils/email';
+
+export const SIGNUP_FUNNEL_CONTRACT_VERSION = 'signup-funnel/v2';
 
 export const SIGNUP_FUNNEL_STEPS = {
   /** Fan lands on a public profile and asks for updates from the artist. */
@@ -77,6 +81,8 @@ export interface SignupFunnelStepInput<
   readonly outcome?: SignupFunnelOutcome;
   readonly surface?: SignupFunnelSurface;
   readonly reason?: string;
+  /** Server-derived metric cohort. Browser beacons are always unattributed. */
+  readonly cohort?: AccountMetricCohort;
 }
 
 export function isSignupFunnelStep(

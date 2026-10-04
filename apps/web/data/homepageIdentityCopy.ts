@@ -67,6 +67,39 @@ export const HOMEPAGE_IDENTITY_COPY = {
       },
     },
   ],
+  // Plain answers to the questions a first visit raises. Every answer names a
+  // shipped surface: the free plan, jov.ie/you/llms.txt and the read-only
+  // profile API (lib/agent/site-llms-guidance.ts).
+  faq: {
+    heading: 'Questions',
+    items: [
+      {
+        question: 'What is Jovie?',
+        answer:
+          'Jovie gives you one public profile at jov.ie/you. It holds your name, your story, your work and your links, plus ways to reach you, like events and payments.',
+      },
+      {
+        question: 'How do I claim my name?',
+        answer:
+          'Type the name you want after jov.ie/ and select Claim. If the name is free, Jovie walks you through setting up the rest of your profile.',
+      },
+      {
+        question: 'Who is Jovie for?',
+        answer:
+          'Anyone who wants to be easy to find and easy to reach: founders, investors, creators, authors and the people they work with.',
+      },
+      {
+        question: 'What does it mean to be reachable by agents?',
+        answer:
+          'Every public profile also has a machine-readable summary at jov.ie/you/llms.txt and read-only structured data, so AI assistants can find you and describe you accurately.',
+      },
+      {
+        question: 'Does it cost anything?',
+        answer:
+          'Your public Jovie profile is free. Paid plans add more tools, and the pricing page lists what each one includes.',
+      },
+    ],
+  },
   close: {
     headline: 'Make it your Jovie profile.',
   },
