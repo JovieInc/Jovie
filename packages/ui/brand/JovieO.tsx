@@ -2,7 +2,9 @@
 
 import {
   type CSSProperties,
+  type Ref,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
@@ -23,21 +25,32 @@ import {
   type JovieOState,
   playOutcome,
 } from './jovie-o-motion';
+import { attachOvieEyes, blink, glance, perk } from './ovie-eyes';
 
 export type JovieOVariant = 'jovie' | 'ov';
+
+export interface JovieOHandle {
+  blink(): Promise<void>;
+  /** Look toward a direction, dx/dy in -1..1. Ovie only. */
+  glance(dx: number, dy: number): Promise<void>;
+  perk(): Promise<void>;
+}
 
 export interface JovieOProps {
   /** Rendered height in px. Picks the pixel master (16/24/32) or display. */
   readonly size?: number;
   readonly state?: JovieOState;
-  /** 'ov' draws Ovie's OV pair: the same O plus the v. */
+  /** 'ov' draws Ovie's OV pair, the same O plus the v, with living eyes. */
   readonly variant?: JovieOVariant;
   /** Force a master (the wordmark passes its own so seams match). */
   readonly master?: JovieOMaster;
   /** Accessible name. Omit when the mark is decorative or labelled nearby. */
   readonly label?: string;
+  /** Turn off Ovie's ambient blink / glance / perk (eyes still respond to the handle). */
+  readonly still?: boolean;
   readonly className?: string;
   readonly style?: CSSProperties;
+  readonly ref?: Ref<JovieOHandle>;
 }
 
 const BUSY: ReadonlySet<JovieOState> = new Set(['loading', 'thinking']);
@@ -52,8 +65,10 @@ export function JovieO({
   variant = 'jovie',
   master,
   label,
+  still = false,
   className,
   style,
+  ref,
 }: JovieOProps) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const parts = jovieOParts(master ?? masterForSize(size));
@@ -64,11 +79,16 @@ export function JovieO({
   const rootRef = useRef<SVGSVGElement>(null);
   const turnRef = useRef<SVGGElement>(null);
   const tailRef = useRef<SVGPathElement>(null);
+  const counterRef = useRef<SVGEllipseElement>(null);
+  const notchRef = useRef<SVGPolygonElement>(null);
+  const vRef = useRef<SVGGElement>(null);
 
   // data-jo-state is driven from here, not straight from props, so the loop's
   // live position can be sampled before the CSS loop is switched off.
   const [domState, setDomState] = useState<JovieOState>(state);
   const fromRef = useRef<{ rotation: number; tail: number } | null>(null);
+  const busyRef = useRef(BUSY.has(state));
+  busyRef.current = BUSY.has(state);
 
   useLayoutEffect(() => {
     if (state === domState) return;
@@ -93,6 +113,38 @@ export function JovieO({
     fromRef.current = null;
     void playOutcome({ root, turn, tail }, domState, from);
   }, [domState]);
+
+  const eyes = () => {
+    const root = rootRef.current;
+    const irises = [counterRef.current, notchRef.current].filter(
+      (el): el is SVGEllipseElement | SVGPolygonElement => el !== null
+    );
+    const o = turnRef.current;
+    return root && o ? { root, irises, o, v: vRef.current } : null;
+  };
+
+  useImperativeHandle(ref, () => ({
+    blink: () => {
+      const els = eyes();
+      return els ? blink(els) : Promise.resolve();
+    },
+    glance: (dx, dy) => {
+      const els = eyes();
+      return els && ov ? glance(els, dx, dy) : Promise.resolve();
+    },
+    perk: () => {
+      const els = eyes();
+      return els ? perk(els) : Promise.resolve();
+    },
+  }));
+
+  useLayoutEffect(() => {
+    if (!ov || still) return;
+    const els = eyes();
+    if (!els) return;
+    return attachOvieEyes(els, () => busyRef.current);
+    // eyes() reads refs only; re-attach when the variant or stillness changes.
+  }, [ov, still]);
 
   const cut = `jo-cut-${uid}`;
   const notchMask = `jo-notch-${uid}`;
@@ -166,6 +218,7 @@ export function JovieO({
             />
           )}
           <ellipse
+            ref={counterRef}
             className='jo-iris'
             cx={parts.cx}
             cy={parts.cy}
@@ -191,6 +244,7 @@ export function JovieO({
           >
             <rect width={width} height={parts.box} fill='#fff' />
             <polygon
+              ref={notchRef}
               className='jo-lid'
               points={vPoints(notchWithBleed)}
               fill='#000'
@@ -202,7 +256,7 @@ export function JovieO({
         <circle cx={parts.cx} cy={parts.cy} r={parts.r} mask={`url(#${cut})`} />
       </g>
       {ov ? (
-        <g className='jo-v' mask={`url(#${notchMask})`}>
+        <g ref={vRef} className='jo-v' mask={`url(#${notchMask})`}>
           <polygon points={vPoints(v.outer)} />
         </g>
       ) : null}
