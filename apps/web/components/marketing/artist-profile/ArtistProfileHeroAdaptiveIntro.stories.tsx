@@ -10,13 +10,14 @@ const meta = {
     docs: {
       description: {
         component:
-          'Exact source-backed ArtistProfileHeroAdaptiveIntro body: the /artist-profiles hero plus the inline trust strip and the mounted adaptive section.',
+          'Exact source-backed ArtistProfileHeroAdaptiveIntro body: the /artist-profiles hero and the mounted adaptive section. The trust strip renders only once a brand grants permission for the page (JOV-7795).',
       },
     },
   },
   args: {
     hero: ARTIST_PROFILE_COPY.hero,
     adaptive: ARTIST_PROFILE_COPY.adaptive,
+    logoPlacement: { page: '/artist-profiles' },
   },
 } satisfies Meta<typeof ArtistProfileHeroAdaptiveIntro>;
 

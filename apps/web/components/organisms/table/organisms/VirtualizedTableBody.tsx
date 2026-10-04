@@ -5,6 +5,7 @@
 import type { VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import React from 'react';
 import type { Row, RowData, VisibilityState } from '@/lib/tanstack-table';
+import { COLUMN_SNAP_STAGGER_CAP } from '../column-snap';
 import {
   type ContextMenuItemType,
   TableContextMenu,
@@ -271,7 +272,7 @@ export function VirtualizedTableBody<TData extends RowData>({
             rowRefsMap={rowRefsMap}
             shouldEnableKeyboardNav={shouldEnableKeyboardNav}
             shouldVirtualize={useVirtual}
-            focusedIndex={focusedIndex}
+            isFocused={focusedIndex === rowIndex}
             isSelected={isRowSelected?.(rowData, rowIndex)}
             onRowClick={onRowClick}
             onRowContextMenu={onRowContextMenu}
@@ -282,7 +283,9 @@ export function VirtualizedTableBody<TData extends RowData>({
             measureElement={rowVirtualizer?.measureElement}
             onRowShiftClick={onRowShiftClick}
             columnSnap={columnSnap}
-            columnSnapOrder={listIndex}
+            // Rows past the stagger cap share one delay; capping the prop keeps
+            // memoized rows stable while the virtual window scrolls.
+            columnSnapOrder={Math.min(listIndex, COLUMN_SNAP_STAGGER_CAP)}
           />
         );
 

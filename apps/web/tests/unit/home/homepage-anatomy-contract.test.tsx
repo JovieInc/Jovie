@@ -7,9 +7,12 @@ import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityFaq } from '@/components/homepage/HomepageIdentityFaq';
-import { HomepageLogoStrip } from '@/components/homepage/HomepageLogoStrip';
+import {
+  HOMEPAGE_LOGO_PLACEMENT,
+  HomepageLogoStrip,
+} from '@/components/homepage/HomepageLogoStrip';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { PROOF_REGISTRY } from '@/data/product-truth/proof';
+import { permittedLogoAssetIds } from '@/data/product-truth/logo-permissions';
 
 vi.mock('@/lib/flags/homepage-v3', () => ({ HOMEPAGE_V3_ENABLED: true }));
 vi.mock('@/components/providers/ClientProviders', () => ({
@@ -50,10 +53,8 @@ function order(container: HTMLElement, node: Element): number {
   return [...container.querySelectorAll('*')].indexOf(node);
 }
 
-const PERMISSIONED_HOMEPAGE_LOGOS = PROOF_REGISTRY.filter(
-  proof =>
-    proof.kind === 'logo' &&
-    (!proof.audiences || proof.audiences.includes('general'))
+const PERMISSIONED_HOMEPAGE_LOGOS = permittedLogoAssetIds(
+  HOMEPAGE_LOGO_PLACEMENT
 );
 
 describe('homepage anatomy contract', { timeout: 60_000 }, () => {
@@ -102,14 +103,14 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
     expect(within(footer).getAllByRole('link').length).toBeGreaterThan(8);
   });
 
-  it('shows the logo strip only with permissioned, audience-neutral logos', async () => {
+  it('shows the logo strip only with an active permission covering /', async () => {
     const { container } = await renderHomeRoute();
     const strip = container.querySelector(
       '[data-homepage-testid="homepage-logo-strip"]'
     );
 
     if (PERMISSIONED_HOMEPAGE_LOGOS.length === 0) {
-      // Zero-proof path: no strip, and no unpermissioned label marks.
+      // No grants cover `/`: no strip, and no unpermissioned marks.
       expect(strip).toBeNull();
       expect(screen.queryByTestId('marketing-section-logo-cloud')).toBeNull();
       expect(screen.queryByTestId('homepage-trust')).toBeNull();
@@ -130,14 +131,10 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
     );
   });
 
-  it('renders the strip from logo ids and nothing for an empty set', () => {
-    const { container, rerender } = render(<HomepageLogoStrip logoIds={[]} />);
+  it('renders nothing when no permission covers the homepage', () => {
+    if (PERMISSIONED_HOMEPAGE_LOGOS.length > 0) return;
+    const { container } = render(<HomepageLogoStrip />);
     expect(container).toBeEmptyDOMElement();
-
-    rerender(<HomepageLogoStrip logoIds={['awal']} />);
-    expect(
-      screen.getByTestId('marketing-section-logo-cloud')
-    ).toBeInTheDocument();
   });
 
   it('renders the FAQ as a bounded disclosure list from the homepage copy', () => {

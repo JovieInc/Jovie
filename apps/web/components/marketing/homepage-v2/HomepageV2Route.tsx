@@ -54,7 +54,7 @@ export function HomepageV2Route() {
 export function HomepageV2BelowHero() {
   return (
     <>
-      <HomeTrustSection />
+      <HomeTrustSection placement={{ page: '/new' }} />
       <div aria-hidden='true' className='section-gradient-divider' />
       <HomepageV2SystemOverview />
       <HomepageV2Spotlight />
