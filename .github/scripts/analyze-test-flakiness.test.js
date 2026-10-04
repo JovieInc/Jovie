@@ -362,3 +362,142 @@ test('a terminal JUnit failure with retry history is never a successful flaky re
     ['failure']
   );
 });
+
+// JOV-7744: completed-run evidence is read from the shared GITHUB_TOKEN quota
+// once per (run id, attempt), not once per report wake.
+function withFakeGitHub(routes, fn) {
+  const https = require('node:https');
+  const { EventEmitter } = require('node:events');
+  const original = https.get;
+  const paths = [];
+  https.get = (options, onResponse) => {
+    paths.push(options.path);
+    const route = routes(options.path);
+    const res = new EventEmitter();
+    res.statusCode = route.status ?? 200;
+    process.nextTick(() => {
+      onResponse(res);
+      res.emit('data', JSON.stringify(route.body ?? {}));
+      res.emit('end');
+    });
+    return new EventEmitter();
+  };
+  return Promise.resolve(fn(paths)).finally(() => {
+    https.get = original;
+  });
+}
+
+test('a repeat wake reads only the run list; a new run costs only its own evidence', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const flakiness = require('./analyze-test-flakiness');
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flaky-cache-'));
+  flakiness.setRunEvidenceCacheDir(cacheDir);
+  let runs = [1, 2].map(id => ({ id, run_attempt: 1, conclusion: 'success' }));
+  const routes = p =>
+    p.includes('/actions/workflows/ci.yml/runs?')
+      ? { body: { workflow_runs: runs } }
+      : { body: p.includes('/jobs') ? { jobs: [] } : { artifacts: [] } };
+  try {
+    const first = await withFakeGitHub(routes, async paths => {
+      await flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie');
+      return paths;
+    });
+    assert.equal(first.length, 5);
+    const second = await withFakeGitHub(routes, async paths => {
+      await flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie');
+      return paths;
+    });
+    assert.deepEqual(second, [first[0]]);
+    runs = [{ id: 3, run_attempt: 1, conclusion: 'success' }, ...runs];
+    const third = await withFakeGitHub(routes, async paths => {
+      await flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie');
+      return paths;
+    });
+    assert.deepEqual(third.slice(1).sort(), [
+      '/repos/JovieInc/Jovie/actions/runs/3/artifacts?per_page=100',
+      '/repos/JovieInc/Jovie/actions/runs/3/jobs',
+    ]);
+    // A rerun is new evidence: attempt 2 of run 1 is read again.
+    runs = runs.map(r => (r.id === 1 ? { ...r, run_attempt: 2 } : r));
+    const rerun = await withFakeGitHub(routes, async paths => {
+      await flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie');
+      return paths;
+    });
+    assert.equal(rerun.filter(p => p.includes('/runs/1/')).length, 2);
+  } finally {
+    flakiness.setRunEvidenceCacheDir('');
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  }
+});
+
+test('a failed artifact read is never cached and still downloads that run', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const flakiness = require('./analyze-test-flakiness');
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flaky-cache-'));
+  flakiness.setRunEvidenceCacheDir(cacheDir);
+  const runs = [
+    { id: 7, run_attempt: 1 },
+    { id: 8, run_attempt: 1 },
+    { id: 9, run_attempt: 1 },
+  ];
+  let failing = true;
+  const routes = p => {
+    if (p.includes('/runs/7/') && failing) return { status: 502, body: {} };
+    if (p.includes('/runs/8/'))
+      return { body: { artifacts: [{ name: 'unit-flaky-3-1-0' }] } };
+    return { body: { artifacts: [{ name: 'repo-health-receipt' }] } };
+  };
+  try {
+    const selected = await withFakeGitHub(routes, () =>
+      flakiness.runsWithUnitFlakeArtifacts('t', 'JovieInc', 'Jovie', runs)
+    );
+    assert.deepEqual(
+      selected.map(r => r.id),
+      [7, 8]
+    );
+    failing = false;
+    const retried = await withFakeGitHub(routes, async paths => {
+      await flakiness.runsWithUnitFlakeArtifacts(
+        't',
+        'JovieInc',
+        'Jovie',
+        runs
+      );
+      return paths;
+    });
+    assert.deepEqual(retried, [
+      '/repos/JovieInc/Jovie/actions/runs/7/artifacts?per_page=100',
+    ]);
+  } finally {
+    flakiness.setRunEvidenceCacheDir('');
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  }
+});
+
+test('the evidence cache keeps the newest runs and keys on content', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { boundRunEvidenceCache } = require('./analyze-test-flakiness');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flaky-bound-'));
+  try {
+    for (const id of [5, 40, 300, 12])
+      fs.writeFileSync(path.join(dir, `jobs-${id}-1.json`), `[${id}]`);
+    const first = boundRunEvidenceCache(dir, 2);
+    assert.deepEqual(fs.readdirSync(dir).sort(), [
+      'jobs-300-1.json',
+      'jobs-40-1.json',
+    ]);
+    assert.match(first, /^[0-9a-f]{16}$/);
+    assert.equal(boundRunEvidenceCache(dir, 2), first);
+    fs.writeFileSync(path.join(dir, 'jobs-40-1.json'), '[41]');
+    assert.notEqual(boundRunEvidenceCache(dir, 2), first);
+    assert.equal(boundRunEvidenceCache(path.join(dir, 'missing')), null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -114,21 +114,74 @@ async function fetchRunJobs(token, owner, repo, runId) {
 }
 
 /**
- * Fetch artifacts for a workflow run
+ * Fetch artifacts for a workflow run. Errors propagate so a failed read is
+ * never cached as "no artifacts".
  */
 async function fetchRunArtifacts(token, owner, repo, runId) {
+  const data = await githubRequest(
+    `/repos/${owner}/${repo}/actions/runs/${runId}/artifacts?per_page=100`,
+    token
+  );
+  return data.artifacts || [];
+}
+
+/**
+ * Completed-run evidence is immutable per (run id, attempt). Every CI,
+ * changed-evidence, and E2E completion on main wakes this report, and an
+ * uncached wake re-reads ~30 runs' jobs and artifacts from the repository's
+ * shared 1,000/h GITHUB_TOKEN quota (JOV-7744). With FLAKY_RUN_CACHE_DIR
+ * restored between wakes, only runs not seen before cost API calls. Only
+ * successful loads are stored; a failed read stays uncached.
+ */
+function createRunEvidenceCache(dir) {
+  return async function runEvidence(kind, run, load) {
+    const attempt = run?.run_attempt;
+    if (
+      !dir ||
+      !Number.isSafeInteger(run?.id) ||
+      !Number.isSafeInteger(attempt)
+    ) {
+      return load();
+    }
+    const file = path.join(dir, `${kind}-${run.id}-${attempt}.json`);
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {}
+    const value = await load();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(value));
+    return value;
+  };
+}
+
+let runEvidence = createRunEvidenceCache(process.env.FLAKY_RUN_CACHE_DIR);
+
+const RUN_EVIDENCE_CACHE_KEEP = 400; // ~13 report windows of runs
+
+/**
+ * Keep the newest entries by run id and return a content digest, so the
+ * workflow saves a new cache entry only when the evidence changed.
+ */
+function boundRunEvidenceCache(dir, keep = RUN_EVIDENCE_CACHE_KEEP) {
+  let names = [];
   try {
-    const data = await githubRequest(
-      `/repos/${owner}/${repo}/actions/runs/${runId}/artifacts?per_page=100`,
-      token
-    );
-    return data.artifacts || [];
-  } catch (error) {
-    console.warn(
-      `Could not fetch artifacts for run ${runId}: ${error.message}`
-    );
-    return [];
+    names = fs.readdirSync(dir).filter(name => name.endsWith('.json'));
+  } catch {
+    return null;
   }
+  const runId = name => Number(name.split('-')[1]) || 0;
+  names.sort((a, b) => runId(b) - runId(a) || a.localeCompare(b));
+  for (const name of names.slice(keep)) fs.rmSync(path.join(dir, name));
+  const hash = crypto.createHash('sha256');
+  for (const name of names.slice(0, keep).sort()) {
+    hash.update(name).update(fs.readFileSync(path.join(dir, name)));
+  }
+  return hash.digest('hex').slice(0, 16);
+}
+
+/** Test seam: route run evidence through a cache rooted at dir. */
+function setRunEvidenceCacheDir(dir) {
+  runEvidence = createRunEvidenceCache(dir);
 }
 
 /**
@@ -254,7 +307,9 @@ function parseJunitXml(xml) {
  * annotated with run metadata.
  */
 async function collectRunFailureRecords(token, owner, repo, run) {
-  const artifacts = await fetchRunArtifacts(token, owner, repo, run.id);
+  const artifacts = await runEvidence('artifacts', run, () =>
+    fetchRunArtifacts(token, owner, repo, run.id)
+  );
   const junitArtifacts = artifacts.filter(
     a =>
       !a.expired && /unit-test|test-report|junit|playwright/i.test(a.name || '')
@@ -396,7 +451,9 @@ async function analyzeFailureSignatures(token, owner, repo, mainRuns) {
 
   for (const run of candidates) {
     try {
-      const records = await collectRunFailureRecords(token, owner, repo, run);
+      const records = await runEvidence('junit', run, () =>
+        collectRunFailureRecords(token, owner, repo, run)
+      );
       allRecords.push(...records);
     } catch (error) {
       console.warn(`Run ${run.id}: ${error.message}`);
@@ -484,7 +541,9 @@ async function analyzeFlakiness(token, owner, repo) {
 
   const runsWithJobs = [];
   for (const run of runs) {
-    const jobs = await fetchRunJobs(token, owner, repo, run.id);
+    const jobs = await runEvidence('jobs', run, () =>
+      fetchRunJobs(token, owner, repo, run.id)
+    );
     runsWithJobs.push({ run, jobs });
   }
 
@@ -537,7 +596,10 @@ async function analyzeFlakiness(token, owner, repo) {
     if (runHadFailure) runsWithFailures++;
   }
 
-  const unitStats = collectUnitRetryFlakes(runs, `${owner}/${repo}`);
+  const unitStats = collectUnitRetryFlakes(
+    await runsWithUnitFlakeArtifacts(token, owner, repo, runs),
+    `${owner}/${repo}`
+  );
 
   return {
     testStats,
@@ -715,6 +777,32 @@ function calculateUnitRetryFlakes(unitStats, runsAnalyzed) {
     });
   }
   return flakyTests;
+}
+
+/**
+ * Skip `gh run download` (one or more API calls per run) for runs whose
+ * cached artifact list proves they uploaded no unit-flaky-* report. A run
+ * whose list cannot be read is still downloaded, as before.
+ */
+async function runsWithUnitFlakeArtifacts(token, owner, repo, runs) {
+  const prefix = UNIT_FLAKY_ARTIFACT_PATTERN.replace(/\*$/, '');
+  const selected = [];
+  for (const run of runs) {
+    try {
+      const artifacts = await runEvidence('artifacts', run, () =>
+        fetchRunArtifacts(token, owner, repo, run.id)
+      );
+      if (artifacts.some(a => !a.expired && a.name?.startsWith(prefix))) {
+        selected.push(run);
+      }
+    } catch (error) {
+      console.warn(
+        `Could not list artifacts for run ${run.id}: ${error.message}`
+      );
+      selected.push(run);
+    }
+  }
+  return selected;
 }
 
 /**
@@ -1013,8 +1101,16 @@ async function main() {
         `quarantine_candidates=${JSON.stringify(candidates)}`,
         `cluster_count=${clusters.length}`,
         `signature_quarantine_candidates=${clusters.filter(c => c.quarantineCandidate).length}`,
-      ].join('\n');
-      fs.appendFileSync(process.env.GITHUB_OUTPUT, output + '\n');
+      ];
+      const evidenceDigest = process.env.FLAKY_RUN_CACHE_DIR
+        ? boundRunEvidenceCache(process.env.FLAKY_RUN_CACHE_DIR)
+        : null;
+      // Written before the high-flakiness exit so a red report still saves
+      // the evidence it already paid for.
+      if (evidenceDigest) {
+        output.push(`run_evidence_key=flaky-run-evidence-${evidenceDigest}`);
+      }
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, output.join('\n') + '\n');
     }
 
     // Exit with error if high flakiness detected
@@ -1068,5 +1164,8 @@ module.exports = {
   parseJunitXml,
   clusterFailureRecords,
   analyzeFailureSignatures,
+  runsWithUnitFlakeArtifacts,
+  boundRunEvidenceCache,
+  setRunEvidenceCacheDir,
   QUARANTINE_MIN_OCCURRENCES,
 };

@@ -13,7 +13,9 @@ on:
 
 concurrency:
   group: test-flakiness-report
-  cancel-in-progress: true
+  # A newer wake replaces only a pending run. Cancelling a running report
+  # discarded API reads it had already spent and never cached (JOV-7744).
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -27,6 +29,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Completed-run jobs/artifacts are immutable per (run id, attempt), so
+      # each wake reads only runs it has not seen (JOV-7744).
+      - name: Restore completed-run evidence
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .flaky-run-cache
+          key: flaky-run-evidence-${{ github.run_id }}
+          restore-keys: flaky-run-evidence-
+
       # Keep exhaustive seven-day quarantine collection off this hot path.
       # Merge-queue volume exceeds GitHub's 1,000-result search window, and
       # missing quarantine evidence cannot authorize a ledger change.
@@ -37,7 +48,17 @@ jobs:
           # gh run download reads Unit Tests unit-flaky-* artifacts.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          FLAKY_RUN_CACHE_DIR: .flaky-run-cache
         run: node .github/scripts/analyze-test-flakiness.js
+
+      # The analyzer bounds the cache and emits a content-digest key (also on
+      # a red high-flakiness exit); an unchanged cache matches an existing key.
+      - name: Save completed-run evidence
+        if: ${{ !cancelled() && steps.analyze.outputs.run_evidence_key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .flaky-run-cache
+          key: ${{ steps.analyze.outputs.run_evidence_key }}
 
       - name: Check flaky-rate ratchet
         id: ratchet
