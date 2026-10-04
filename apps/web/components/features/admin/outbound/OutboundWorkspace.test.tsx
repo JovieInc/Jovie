@@ -18,6 +18,7 @@ vi.mock('@/lib/queries/useOutboundQuery', () => ({
   useOutboundCertificationQuery: () => ({ data: undefined, isLoading: false }),
   useOutboundDecisionMutation: () => ({ mutateAsync: mocks.decide }),
   useOutboundFactReviewMutation: () => ({ mutateAsync: vi.fn() }),
+  useOutboundRefreshEvidenceMutation: () => ({ mutateAsync: vi.fn() }),
   getOutboundDecisionErrorMessage: () => 'refused',
 }));
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
