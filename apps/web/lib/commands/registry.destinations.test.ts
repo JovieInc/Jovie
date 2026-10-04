@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
+import { APP_ROUTES } from '@/constants/routes';
 import { COMMANDS } from './registry';
 
 function navHref(id: string): string | undefined {
@@ -8,8 +8,8 @@ function navHref(id: string): string | undefined {
 }
 
 describe('command destinations', () => {
-  it('opens Releases on the library releases view', () => {
-    expect(navHref('go-releases')).toBe(buildLibraryViewRoute('releases'));
+  it('opens the Releases workspace', () => {
+    expect(navHref('go-releases')).toBe(APP_ROUTES.RELEASES);
   });
 
   it('gives shipped workspaces a command row', () => {
