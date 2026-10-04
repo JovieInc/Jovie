@@ -4,12 +4,11 @@ import { Button, IconButton } from '@jovie/ui';
 import { Heart, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Avatar } from '@/components/molecules/Avatar';
+import { followerTier } from '@/lib/ovie/lists/learner';
 import type { ListMember } from '@/lib/ovie/lists/model';
 import type { ListCreator } from '@/lib/ovie/lists/types';
 import { cn } from '@/lib/utils';
 import { StarRating } from './StarRating';
-
-const COMPACT = new Intl.NumberFormat('en', { notation: 'compact' });
 
 export function creatorDisplayName(creator: ListCreator | undefined): string {
   if (!creator) return 'Unknown creator';
@@ -21,8 +20,9 @@ export function creatorFacts(creator: ListCreator | undefined): string {
   if (!creator) return 'Profile no longer available';
   const facts = [
     (creator.genres ?? []).slice(0, 2).join(', '),
+    // Same tier labels the learner explains with, so rows and WHY agree.
     typeof creator.spotifyFollowers === 'number'
-      ? `${COMPACT.format(creator.spotifyFollowers)} followers`
+      ? followerTier(creator.spotifyFollowers)
       : '',
     creator.location?.split(',')[0]?.trim() ?? '',
   ].filter(Boolean);
@@ -62,7 +62,7 @@ export function CreatorSourcingRow({
   const suggested = member.state === 'suggested';
   return (
     <li
-      className='flex min-h-12 items-center gap-3 border-b border-subtle px-4 py-2'
+      className='flex min-h-8 items-center gap-3 border-b border-subtle px-4 py-1'
       data-testid='creator-sourcing-row'
       data-state={member.state}
     >
@@ -74,27 +74,27 @@ export function CreatorSourcingRow({
         shape='person'
         verified={Boolean(creator?.isVerified)}
       />
-      <div className='min-w-0 flex-1'>
-        <div className='flex min-w-0 items-baseline gap-2'>
-          <span className='truncate text-app font-medium text-primary-token'>
-            {name}
-          </span>
-          {meta ? (
-            <span className='truncate text-xs text-tertiary-token'>{meta}</span>
-          ) : null}
-        </div>
-        <p className='truncate text-xs text-tertiary-token'>
+      {/* One 32px line (Pen Xe4PP): name, then quiet facts, then WHY. */}
+      <div className='flex min-w-0 flex-1 items-baseline gap-2'>
+        <span className='shrink-0 truncate text-app font-medium text-primary-token'>
+          {name}
+        </span>
+        <span className='min-w-0 truncate text-xs text-tertiary-token'>
           {creatorFacts(creator)}
-        </p>
+        </span>
+        {meta ? (
+          <span className='shrink-0 truncate text-xs text-tertiary-token'>
+            {meta}
+          </span>
+        ) : null}
         {suggested && member.suggestionReasons?.length ? (
-          <ul
-            aria-label={`Why ${name} was suggested`}
-            className='mt-0.5 flex flex-wrap gap-x-3 text-xs text-secondary-token'
+          <span
+            className='shrink-0 truncate rounded-sm bg-surface-0 px-1.5 text-xs text-secondary-token'
+            title={member.suggestionReasons.join('\n')}
           >
-            {member.suggestionReasons.map(reason => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
+            <span className='sr-only'>Why suggested: </span>
+            {member.suggestionReasons[0]}
+          </span>
         ) : null}
       </div>
       <div className='flex shrink-0 items-center gap-1'>
@@ -111,7 +111,7 @@ export function CreatorSourcingRow({
             </Button>
             <Button
               size='sm'
-              variant='secondary'
+              variant='primary'
               disabled={busy}
               onClick={onAccept}
               aria-label={`Add ${name} to the list`}
