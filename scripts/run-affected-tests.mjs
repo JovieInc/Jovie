@@ -387,6 +387,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
+  'scripts/lib/__tests__/remediation-signal.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
   'scripts/lib/__tests__/product-lane-classifier.test.mjs',
@@ -1049,9 +1050,15 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
   '.github/workflows/linear-sync-on-merge.yml',
   'scripts/lib/linear-sync-on-merge.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/validation-lifecycle.mjs',
+  'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+  'scripts/lib/validation-sync.mjs',
+  'scripts/lib/__tests__/validation-sync.test.mjs',
+  'scripts/lib/__tests__/fixtures/validation-world.mjs',
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
+  '.github/workflow-topology.gen.yml',
   '.claude/rules/linear.md',
   '.github/MERGE_QUEUE.md',
   '.github/workflows/README.md',
@@ -1082,6 +1089,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'doctor',
     'hud',
     'disk_guard',
+    'worktree_sweep',
     'hyperagent_lane',
     'execution_attempt',
   ].flatMap(name => [
@@ -1220,11 +1228,15 @@ function planAffectedTests(
       pythonUnittestTests: [],
       scriptVitestTests: [
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+        'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+        'scripts/lib/__tests__/validation-sync.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
       scriptVitestCoverageArgs: [
         '--coverage',
         '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.include=lib/validation-lifecycle.mjs',
+        '--coverage.include=lib/validation-sync.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
         '--coverage.thresholds.perFile=true',

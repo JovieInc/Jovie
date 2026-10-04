@@ -27,6 +27,7 @@ import {
   type VisibilityState,
 } from '@/lib/tanstack-table';
 import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
+import { ColumnSnapMotion } from '../ColumnSnapMotion';
 import { columnPrioritySpecsFromDefs, readColumnId } from '../column-priority';
 import {
   type ColumnCompactItem,
@@ -279,6 +280,14 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
   /**
+   * Layout-snap columns when they appear or disappear.
+   * Short, interruptible, and skipped when the user prefers reduced motion.
+   * Dense admin tables pass false.
+   * @default true
+   */
+  readonly columnSnap?: boolean;
+
+  /**
    * Whether there are more pages to load (infinite scroll)
    */
   readonly hasNextPage?: boolean;
@@ -411,7 +420,7 @@ function HiddenHeaderSortStatus({
  * />
  * ```
  */
-export function UnifiedTable<TData extends RowData>({
+function UnifiedTableContent<TData extends RowData>({
   data,
   columns,
   isLoading = false,
@@ -453,6 +462,7 @@ export function UnifiedTable<TData extends RowData>({
   enablePinning = false,
   columnVisibility,
   onColumnVisibilityChange,
+  columnSnap = true,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -462,6 +472,9 @@ export function UnifiedTable<TData extends RowData>({
   renderExpandedContent,
   getExpandableRowId,
 }: UnifiedTableProps<TData>) {
+  // Cell identity follows the table option. The provider disables layout
+  // animation for reduced motion without remounting cells after hydration.
+  const snapColumns = columnSnap;
   const resolvedRowHeight = rowMode
     ? TABLE_ROW_MODES[rowMode].rowHeight
     : rowHeight;
@@ -692,6 +705,8 @@ export function UnifiedTable<TData extends RowData>({
           getRowClassName={getRowClassName}
           getRowTestId={getRowTestId}
           onRowShiftClick={onRowShiftClick}
+          columnSnap={snapColumns}
+          columnSnapOrder={index}
         />
       );
 
@@ -758,6 +773,7 @@ export function UnifiedTable<TData extends RowData>({
       contextMenuSearchPlaceholder,
       contextMenuSearchMode,
       rowRefs,
+      snapColumns,
     ]
   );
 
@@ -828,7 +844,10 @@ export function UnifiedTable<TData extends RowData>({
             {caption ?? 'Loading table data'}
           </caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <LoadingTableBody
             rows={loadingRowCount}
@@ -856,7 +875,10 @@ export function UnifiedTable<TData extends RowData>({
         >
           <caption className='sr-only'>{caption ?? 'Empty table'}</caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <tbody>
             <tr>
@@ -888,7 +910,10 @@ export function UnifiedTable<TData extends RowData>({
               {caption ?? 'Grouped table data'}
             </caption>
             {!hideHeader && (
-              <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+              <UnifiedTableHeader
+                headerGroups={table.getHeaderGroups()}
+                columnSnap={snapColumns}
+              />
             )}
             <GroupedTableBody
               groupedData={groupedData}
@@ -918,7 +943,10 @@ export function UnifiedTable<TData extends RowData>({
         >
           <caption className='sr-only'>{caption ?? 'Data table'}</caption>
           {!hideHeader && (
-            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+            <UnifiedTableHeader
+              headerGroups={table.getHeaderGroups()}
+              columnSnap={snapColumns}
+            />
           )}
           <VirtualizedTableBody
             rows={rows}
@@ -949,6 +977,7 @@ export function UnifiedTable<TData extends RowData>({
             renderExpandedContent={renderExpandedContent}
             getExpandableRowId={getExpandableRowId}
             columnCount={columnCount}
+            columnSnap={snapColumns}
           />
           {/* Infinite scroll sentinel + loading indicator */}
           {onLoadMore && (
@@ -978,5 +1007,15 @@ export function UnifiedTable<TData extends RowData>({
         </table>
       </div>
     </ColumnCompactProvider>
+  );
+}
+
+export function UnifiedTable<TData extends RowData>(
+  props: UnifiedTableProps<TData>
+) {
+  return (
+    <ColumnSnapMotion enabled={props.columnSnap ?? true}>
+      <UnifiedTableContent {...props} />
+    </ColumnSnapMotion>
   );
 }

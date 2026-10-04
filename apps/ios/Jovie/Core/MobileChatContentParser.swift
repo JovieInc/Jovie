@@ -91,6 +91,14 @@ enum MobileChatContentParser {
     )
 
     var segments: [MobileChatRenderableSegment] = []
+    var emittedMerchIDs: Set<String> = []
+    func appendMerchArtifacts(for toolName: String? = nil) {
+      for result in merchArtifacts where toolName == nil || result.toolName == toolName {
+        if emittedMerchIDs.insert(result.artifact.id).inserted {
+          segments.append(.merchArtifact(result.artifact))
+        }
+      }
+    }
     var cursor = sanitized.startIndex
 
     while cursor < sanitized.endIndex {
@@ -141,12 +149,8 @@ enum MobileChatContentParser {
         resultState: toolName.flatMap { resultStates[$0] }
       ) {
         segments.append(.toolCall(model))
-        if
-          let toolName,
-          let artifact = merchArtifacts[toolName],
-          model.state == .succeeded
-        {
-          segments.append(.merchArtifact(artifact))
+        if let toolName, model.state == .succeeded {
+          appendMerchArtifacts(for: toolName)
         }
         if
           let toolName,
@@ -160,7 +164,9 @@ enum MobileChatContentParser {
       cursor = closeRange.upperBound
     }
 
-    return suppressMerchEnumerationProse(in: segments, hasMerchArtifacts: !merchArtifacts.isEmpty)
+    // Results without a successful call anchor still describe valid designs.
+    appendMerchArtifacts()
+    return suppressMerchEnumerationProse(in: segments, hasMerchArtifacts: !emittedMerchIDs.isEmpty)
   }
 
   static func displayText(from content: String, isStreaming: Bool) -> String {
@@ -298,15 +304,21 @@ enum MobileChatContentParser {
     return sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  private struct MerchResult {
+    let sourceOffset: Int
+    let toolName: String
+    var artifact: MobileChatMerchArtifact
+  }
+
   private struct ParsedToolResults {
     let states: [String: MobileChatToolCallState]
-    let merchArtifacts: [String: MobileChatMerchArtifact]
+    let merchArtifacts: [MerchResult]
     let videoProposals: [String: MobileChatVideoProposalPayload]
   }
 
   private static func parseToolResults(from content: String) -> ParsedToolResults {
     var states: [String: MobileChatToolCallState] = [:]
-    var merchArtifacts: [String: MobileChatMerchArtifact] = [:]
+    var merchResults: [MerchResult] = []
     var videoProposals: [String: MobileChatVideoProposalPayload] = [:]
     let fallbackToolName = extractMostRecentToolName(from: content)
     let patterns = [
@@ -340,7 +352,8 @@ enum MobileChatContentParser {
         let trimmedName = toolName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
 
-        states[trimmedName] = resolveResultState(from: block)
+        let resultState = resolveResultState(from: block)
+        states[trimmedName] = resultState
 
         if
           videoProposalToolNames.contains(trimmedName),
@@ -352,6 +365,7 @@ enum MobileChatContentParser {
         }
 
         guard
+          resultState == .succeeded,
           merchArtifactToolNames.contains(trimmedName),
           let jsonPayload = extractJsonPayload(from: block),
           let artifact = decodeMerchArtifact(from: jsonPayload)
@@ -359,10 +373,24 @@ enum MobileChatContentParser {
           return
         }
 
-        merchArtifacts[trimmedName] = artifact
+        merchResults.append(MerchResult(
+          sourceOffset: match.range.location, toolName: trimmedName, artifact: artifact
+        ))
       }
     }
 
+    // Regex passes are grouped by dialect; only merch observations are reordered.
+    // A stable ID retains its first successful position/name and latest payload.
+    var merchArtifacts: [MerchResult] = []
+    var positions: [String: Int] = [:]
+    for result in merchResults.sorted(by: { $0.sourceOffset < $1.sourceOffset }) {
+      if let index = positions[result.artifact.id] {
+        merchArtifacts[index].artifact = result.artifact
+      } else {
+        positions[result.artifact.id] = merchArtifacts.count
+        merchArtifacts.append(result)
+      }
+    }
     return ParsedToolResults(
       states: states,
       merchArtifacts: merchArtifacts,

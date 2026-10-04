@@ -4,11 +4,12 @@
 // data, runs the review and writes pr-review-receipt.json. Never posts.
 //
 // Env: PR_NUMBER, HEAD_SHA, GITHUB_REPOSITORY, GITHUB_TOKEN (read-only),
-//      PR_REVIEW_AI_GATEWAY_API_KEY, RISK_JSON (optional path), OUT (path).
+//      PR_REVIEW_AI_GATEWAY_API_KEY, OUT (path).
 // Replay (learn loop): PR_NUMBER, REPLAY_BASE_SHA, REPLAY_HEAD_SHA instead of
 //      HEAD_SHA/GITHUB_*; commits must already be in the local clone.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { classifyCiRisk, loadCiHarnessManifest } from '../lib/ci-harness.mjs';
 import { assembleReceipt } from '../lib/pr-review-contracts.mjs';
 import { collectContext, runGit } from './context.mjs';
 import {
@@ -52,6 +53,29 @@ export function readRiskRuleIds(path) {
     return Array.isArray(risk.matchedRules)
       ? risk.matchedRules.map(rule => rule?.id).filter(Boolean)
       : [];
+  } catch {
+    return null;
+  }
+}
+
+/** @param {{ baseSha: string, headSha: string, git?: typeof runGit }} target */
+export async function classifyReviewRisk({ baseSha, headSha, git = runGit }) {
+  if (!SHA_RE.test(baseSha) || !SHA_RE.test(headSha)) return null;
+  try {
+    // Trusted main policy classifies the entire exact diff as data, including
+    // deleted files and paths excluded from bounded prompt context.
+    const paths = (await git(['diff', '--name-only', baseSha, headSha]))
+      .split('\n')
+      .map(path => path.trim())
+      .filter(Boolean);
+    const risk = classifyCiRisk(paths, loadCiHarnessManifest(), {
+      // Manifest relaxations inspect checked-out HEAD; this checkout is trusted
+      // main, so keep PR package changes conservatively classified as risk.
+      isVersionOnlyPackageManifestChange: () => false,
+      isDependencyOnlyPackageManifestChange: () => false,
+    });
+    if (risk.errors.length > 0) return null;
+    return risk.matchedRules.map(rule => rule.id);
   } catch {
     return null;
   }
@@ -175,7 +199,10 @@ async function main() {
   }
 
   const { routes, prices, routing } = selectRoutes(rankReviewModels(), env);
-  const riskRuleIds = readRiskRuleIds(env.RISK_JSON);
+  const riskRuleIds = await classifyReviewRisk({
+    baseSha,
+    headSha: expectedHead,
+  });
   const context = await collectContext({ baseSha, headSha: expectedHead });
   if (riskRuleIds === null) context.truncated.push('risk-classification');
   const receipt = await runReview({

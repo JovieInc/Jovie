@@ -47,6 +47,8 @@ export const APP_ROUTES = {
   CALENDAR: '/app/calendar',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
+  /** Private Money overview — individual financial owner only (JOV-4618). */
+  MONEY: '/app/money',
   LIBRARY: '/app/library',
   /** Canonical user-facing smart-link workspace (JOV-7160). */
   LINKS: '/app/links',
@@ -89,6 +91,8 @@ export const APP_ROUTES = {
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
+  /** Internal visual catalog for canonical chat lifecycle and artifact states. */
+  ADMIN_CHAT_PLAYGROUND: '/app/ov/chat-playground',
   /** Founder home: business and production reality in one scan. */
   ADMIN_NOW: '/hud',
   ADMIN_OPS: '/hud',

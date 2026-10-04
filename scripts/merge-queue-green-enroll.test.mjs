@@ -19,6 +19,17 @@ const run = new AsyncFunction(
   script
 );
 const sha = 'a'.repeat(40);
+const mainSha = 'c'.repeat(40);
+test('both native queue mutation clients request repository contents write', () => {
+  for (const job of [
+    workflow.jobs['hold-failed-revision'],
+    workflow.jobs.enroll,
+  ]) {
+    const token = job.steps.find(step => step.id === 'app-token');
+    assert.equal(token.with['permission-contents'], 'write');
+    assert.equal(token.with['permission-pull-requests'], 'write');
+  }
+});
 const candidate = number => ({
   number,
   draft: false,
@@ -40,18 +51,22 @@ const current = number => ({
   timelineItems: { nodes: [] },
 });
 
-async function fixture({
-  roster = [candidate(1)],
-  overrides = {},
-  dry = false,
-  failRead = false,
-  failMutation = false,
-  statuses = [],
-  mutationError = undefined,
-  failureReceipt = '',
-  eventName = 'workflow_dispatch',
-  payload = {},
-} = {}) {
+async function fixture(
+  /** @type {any} */ {
+    roster = [candidate(1)],
+    overrides = {},
+    dry = false,
+    failRead = false,
+    failMutation = false,
+    statuses = [],
+    mutationError = undefined,
+    failureReceipt = '',
+    currentMainSha = mainSha,
+    eventName = 'workflow_dispatch',
+    payload = {},
+    associatedPages,
+  } = {}
+) {
   const mutations = [];
   const reads = [];
   const warnings = [];
@@ -60,6 +75,16 @@ async function fixture({
   const gets = [];
   const github = {
     rest: {
+      git: {
+        getRef: async params => {
+          assert.deepEqual(params, {
+            owner: 'JovieInc',
+            repo: 'Jovie',
+            ref: 'heads/main',
+          });
+          return { data: { object: { sha: currentMainSha } } };
+        },
+      },
       pulls: {
         list: Symbol('pulls.list'),
         get: async params => {
@@ -73,8 +98,8 @@ async function fixture({
           };
         },
       },
-      commits: { listPullRequestsAssociatedWithCommit: Symbol('associated') },
       repos: {
+        listPullRequestsAssociatedWithCommit: Symbol('associated'),
         listCommitStatusesForRef: Symbol('statuses.list'),
         createCommitStatus: async receipt => statusWrites.push(receipt),
       },
@@ -83,16 +108,14 @@ async function fixture({
       if (endpoint === github.rest.repos.listCommitStatusesForRef)
         return statuses;
       inventories.push(endpoint);
-      if (
-        endpoint === github.rest.commits.listPullRequestsAssociatedWithCommit
-      ) {
+      if (endpoint === github.rest.repos.listPullRequestsAssociatedWithCommit) {
         assert.deepEqual(params, {
           owner: 'JovieInc',
           repo: 'Jovie',
           commit_sha: sha,
           per_page: 100,
         });
-        return roster;
+        return associatedPages === undefined ? roster : associatedPages;
       }
       assert.equal(endpoint, github.rest.pulls.list);
       assert.deepEqual(params, {
@@ -210,7 +233,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
   );
   assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
   assert.equal(token.with['permission-actions'], 'read');
-  assert.equal(token.with['permission-contents'], 'read');
+  assert.equal(token.with['permission-contents'], 'write');
   assert.equal(token.with['permission-pull-requests'], 'write');
   assert.equal(token.with['permission-statuses'], 'write');
   assert.equal(token.with['permission-merge-queues'], undefined);
@@ -328,6 +351,60 @@ test('definitive rejected mutation releases retry while ambiguous errors preserv
   );
 });
 
+test('a moved base permits one reserved enqueue and only explicit rejection releases it', async () => {
+  const recordedMainSha = 'd'.repeat(40);
+  const baseHold = {
+    ...retryFailure,
+    description: `class=base-branch;n=1;run=123;try=1;main=${recordedMainSha}`,
+  };
+  const retry = await fixture({ statuses: [baseHold] });
+  assert.deepEqual(retry.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(retry.statusWrites, [
+    {
+      owner: 'JovieInc',
+      repo: 'Jovie',
+      sha,
+      state: 'success',
+      context: 'jovie-queue-failure-retry/v1',
+      description: 'spent:run=123;try=1',
+      target_url: baseHold.target_url,
+    },
+  ]);
+  const spent = { ...retry.statusWrites[0], creator: baseHold.creator };
+  const blocked = await fixture({ statuses: [spent, baseHold] });
+  assert.deepEqual(blocked.mutations, []);
+  assert.deepEqual(blocked.statusWrites, []);
+
+  const rejected = await fixture({
+    statuses: [baseHold],
+    mutationError: Object.assign(new Error('rejected'), {
+      data: { enqueuePullRequest: null },
+      errors: [{ type: 'UNPROCESSABLE', path: ['enqueuePullRequest'] }],
+    }),
+  });
+  assert.deepEqual(rejected.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(
+    rejected.statusWrites.map(item => item.description),
+    ['spent:run=123;try=1', 'released:run=123;try=1']
+  );
+  const released = {
+    ...rejected.statusWrites[1],
+    creator: baseHold.creator,
+  };
+  const reattempt = await fixture({ statuses: [released, spent, baseHold] });
+  assert.deepEqual(reattempt.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(reattempt.statusWrites, retry.statusWrites);
+
+  for (const currentMainSha of [recordedMainSha, '', 'unknown']) {
+    const held = await fixture({
+      statuses: [released, spent, baseHold],
+      currentMainSha,
+    });
+    assert.deepEqual(held.mutations, []);
+    assert.deepEqual(held.statusWrites, []);
+  }
+});
+
 test('a PR wake reads only its current candidate instead of rescanning the whole queue', async () => {
   const roster = Array.from({ length: 113 }, (_, i) => candidate(i + 1));
   for (const { eventName, payload } of [
@@ -391,6 +468,8 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
     head: { ...candidate(7).head, ref: 'codex/source' },
   };
   const roster = [
+    null,
+    { state: 'open' },
     valid,
     { ...valid, number: 8, head: { ...valid.head, sha: 'b'.repeat(40) } },
     { ...valid, number: 9, head: { ...valid.head, ref: 'other' } },
@@ -417,6 +496,64 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
   assert.deepEqual(result.gets, [7]);
   assert.deepEqual(result.reads, [7]);
   assert.equal(result.mutations.length, 1);
+});
+
+test('commit association uses the repos route and tolerates an empty page', async () => {
+  assert.match(
+    script,
+    /github\.paginate\(github\.rest\.repos\.listPullRequestsAssociatedWithCommit/
+  );
+  assert.doesNotMatch(
+    script,
+    /github\.rest\.commits\.listPullRequestsAssociatedWithCommit/
+  );
+  const payload = {
+    workflow_run: {
+      head_sha: sha,
+      head_branch: 'codex/source',
+      pull_requests: [],
+    },
+  };
+  for (const associatedPages of [[], null, { data: [] }]) {
+    const result = await fixture({
+      associatedPages,
+      eventName: 'workflow_run',
+      payload,
+    });
+    assert.equal(result.inventories.length, 1);
+    assert.deepEqual(result.gets, []);
+    assert.deepEqual(result.reads, []);
+    assert.deepEqual(result.mutations, []);
+  }
+});
+
+test('paginated commit associations enqueue each exact open main PR once', async () => {
+  const head = {
+    sha,
+    ref: 'codex/source',
+    repo: { full_name: 'JovieInc/Jovie' },
+  };
+  const row = number => ({
+    ...candidate(number),
+    state: 'open',
+    base: { ref: 'main' },
+    head,
+  });
+  const result = await fixture({
+    associatedPages: [row(7), row(7), row(8)],
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        head_sha: sha,
+        head_branch: 'codex/source',
+        pull_requests: [],
+      },
+    },
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.gets, [7, 8]);
+  assert.deepEqual(result.reads, [7, 8]);
+  assert.equal(result.mutations.length, 2);
 });
 
 test('duplicated automatic PR associations do not multiply live reads or enqueue mutations', async () => {

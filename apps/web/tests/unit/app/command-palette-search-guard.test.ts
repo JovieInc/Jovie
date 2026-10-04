@@ -34,7 +34,7 @@ describe('command palette search shell guard', () => {
     expect(authShell).not.toContain('isSearchActive=');
     expect(sidebar).toContain('HeaderSearchSurfaceFromContext');
     expect(sidebar).toMatch(
-      /<DashboardNav>[\s\S]*?<HeaderSearchSurfaceFromContext[\s\S]*?<\/DashboardNav>/
+      /<DashboardNav(?:\s[^>]*)?>[\s\S]*?<HeaderSearchSurfaceFromContext[\s\S]*?<\/DashboardNav>/
     );
     expect(navigation).toContain("data-sidebar-search-slot='true'");
     expect(authShell).toContain('commandPaletteHeader');

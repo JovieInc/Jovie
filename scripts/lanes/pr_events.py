@@ -36,7 +36,7 @@ LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 # Agent/automation-owned prefixes that are not lane branches (a codex run, a manual agent
 # session). Their drafts are still lane-owned work: the reconcile sweep owes them a
 # disposition instead of counting them forever (JOV-7079).
-AGENT_BRANCH = re.compile(r"^(tim|codex|agent|claude|linear|dependabot|devin|hyperagent|n)/")
+AGENT_BRANCH = re.compile(r"^(tim|codex|agent|claude|cursor|linear|dependabot|devin|hyperagent|n)/")
 # A draft's "keep draft until the parent/dependency lands" note is revalidated against live
 # state every sweep: while the referenced PR is open the draft holds; once it merges or
 # closes the draft is stale work, not parked state.
@@ -290,12 +290,12 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
                        next="revalidated every sweep; goes stale when the dependency lands")
         elif holds:
             row.update(state="hold:" + sorted(holds)[0], next="explicit hold; rechecked every sweep")
+        elif pr.get("isInMergeQueue"):
+            row.update(state="queued", next="the merge queue lands or ejects it")
         elif live or number in labeled:
             kind = labeled.get(number) or live[0]
             row.update(state="advancing", reason=f"{PREFIX}{kind}",
                        next="a lane works the labeled event")
-        elif pr.get("isInMergeQueue"):
-            row.update(state="queued", next="the merge queue lands or ejects it")
         elif pr.get("mergeStateStatus") == "CLEAN" and not pr.get("isDraft"):
             row.update(state="ready", next="enroll in the merge queue")
         elif pr.get("rollup") in ("PENDING", "EXPECTED") or idle_s < ORPHAN_GRACE_S:
@@ -742,9 +742,10 @@ def queued_prs(lane, kinds) -> list[dict]:
     return prs
 
 
-def consume(lane, pr: dict, kinds=None) -> None:
+def consume(lane, pr: dict, kinds=None, *, timeout: float | None = None) -> None:
     for kind in kinds if kinds is not None else pr.get("eventKinds") or []:
-        lane.sh(["gh", "api", "-X", "DELETE", f"repos/{lane.REPO_SLUG}/issues/{pr['number']}/labels/{PREFIX}{kind}"])
+        lane.sh(["gh", "api", "-X", "DELETE", f"repos/{lane.REPO_SLUG}/issues/{pr['number']}/labels/{PREFIX}{kind}"],
+                **({"timeout": timeout} if timeout is not None else {}))
 
 
 def iso_ts(stamp: str | None) -> float | None:
@@ -775,6 +776,8 @@ def may_take(name: str, pr: dict, record: dict, order: list[str], now: float) ->
 def needs_work(lane, pr: dict) -> bool:
     """The PR's own state still backs its labels: conflicts and red checks are re-read, while a
     merge-queue removal or review feedback stands until a new head answers it."""
+    if pr.get("isInMergeQueue") is True:
+        return False
     kinds = set(pr.get("eventKinds") or [])
     if kinds & {"dequeued", "review", "stale"}:
         return True
@@ -883,15 +886,32 @@ def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: f
 
 
 def fresh_reentry(lane, pr: dict, record: dict) -> dict | None:
-    """Under the existing claim fence, a cached head cannot consume another head's exhaustion."""
-    if not record.get("count") or same_generation(record, pr.get("headRefOid")):
-        return pr
+    """Every selected repair needs fresh target ownership before any generation is charged."""
     live = lane.reconcile_fix_target(pr)
     if not live or live.get("state") != "OPEN" or live.get("headRefOid") != pr.get("headRefOid") \
-            or live.get("headRefName") != pr.get("headRefName") or live.get("isCrossRepository") \
+            or live.get("headRefName") != pr.get("headRefName") or live.get("isCrossRepository") is not False \
+            or live.get("isInMergeQueue") is not False \
             or {label.lower() for label in label_names(live)} & HOLD_LABELS:
         return None
     return live
+
+
+def current_repair_claim(host, lane, pr: dict, expected: dict, now: float | None = None) -> dict | None:
+    """Recheck local preservation after the last remote read, before the existing CAS."""
+    try:
+        paths = [host.state / name for name in ("fix-attempts.json", "held.json")]
+        attempts, held = [json.loads(path.read_text()) if path.exists() else {} for path in paths]
+        if not isinstance(attempts, dict) or not isinstance(held, dict):
+            return None
+        record, entry = attempts.get(str(pr["number"]), {}), held.get(str(pr["number"]), {})
+        if not isinstance(record, dict) or not isinstance(entry, dict) or record != expected:
+            return None
+        if preservation_reason(pr, record, lane.MAX_FIX_ATTEMPTS, held=entry,
+                               now=time.time() if now is None else now, allow_reentry=True):
+            return None
+        return entry
+    except (OSError, ValueError, TypeError):
+        return None
 
 
 def read_state(host, name: str) -> dict:
@@ -921,9 +941,9 @@ def queue_failure(lane, number: int, limit: int = 4000) -> str:
 
 def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = None) -> dict | None:
     """Under the claim lock: the first event-queued PR this lane may fix. Records the attempt,
-    posts the cross-host claim and consumes the labels. A label whose PR no longer needs work
-    (or is out of scope) is consumed; one on a spent head or a head a fix is still running on
-    stays, so the PR shows why it is waiting and the relay does not re-add it."""
+    posts the cross-host claim and consumes the labels. Resolved or out-of-scope labels wait
+    for bounded cleanup after productive selection declines. Spent and active heads retain
+    their signals, so the PR shows why it is waiting and the relay does not re-add them."""
     now = time.time() if now is None else now
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
@@ -933,13 +953,15 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
     order = cost_order(providers)
     disabled = set(providers) - set(order)
     for pr in sorted(prs, key=lambda item: item["number"]):
+        if pr.get("isInMergeQueue") is True:
+            continue  # Preserve events while native landing owns the target.
         record = attempts.get(str(pr["number"]), {})
         needs_repair = needs_work(lane, pr)
         if preservation_reason(pr, record, lane.MAX_FIX_ATTEMPTS, now=now, allow_reentry=needs_repair):
             continue
         if not in_scope(pr, "red", disabled) or not needs_repair:
-            consume(lane, pr)
-            continue
+            continue  # Cleanup runs only after both repair selectors and new work decline.
+
         if spent(record, pr["headRefOid"], lane.MAX_FIX_ATTEMPTS) or in_flight(record, pr, now):
             continue
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
@@ -947,18 +969,25 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
                 and str(pr["number"]) not in read_state(host, "synced.json"):
             continue  # the tick's no-model sync with main goes first
         if not fixable_hold(held.get(str(pr["number"])), pr["headRefOid"]):
-            consume(lane, pr)  # intake owns this head; the label must not keep queueing fixes
-            continue
+            continue  # A stronger preservation hold retains the source signal.
         if not may_take(name, pr, record, order, now) or lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
         pr = fresh_reentry(lane, pr, record)
-        if pr is None or not needs_work(lane, pr):
+        if pr is None or not in_scope(pr, "red", disabled) or not needs_work(lane, pr):
             continue
-        entry = held.get(str(pr["number"]), {})
+        if "dequeued" in (pr.get("eventKinds") or []):
+            failure = queue_failure(lane, pr["number"])
+            if lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+                continue
+            pr = fresh_reentry(lane, pr, record)
+            if pr is None or not in_scope(pr, "red", disabled) or not needs_work(lane, pr):
+                continue
+            pr = {**pr, "queueFailure": failure}
+        entry = current_repair_claim(host, lane, pr, record, now)
+        if entry is None:
+            continue
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
-        if "dequeued" in (pr.get("eventKinds") or []):
-            pr = {**pr, "queueFailure": queue_failure(lane, pr["number"])}
         if not charge_reentry(lane, path, pr, record, name, now):
             continue
         if PREFIX + EXHAUSTED in {label.lower() for label in label_names(pr)}:
@@ -967,6 +996,49 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         lane.post_claim(pr["number"], pr["headRefOid"], "fix")
         consume(lane, pr)
         return pr
+    return None
+
+
+def cleanup_one_event(host, lane, prs: list[dict], now: float | None = None) -> int | None:
+    """One bounded maintenance candidate after work selection; snapshots never grant writes.
+
+    Rotate with the existing scan TTL so a refused first row cannot starve later rows.
+    The caller retains claim.lock; this path never charges or grants re-entry. At most
+    three 30-second commands (owner, target, one deletion) bound maintenance per idle scan.
+    """
+    now = time.time() if now is None else now
+    try:
+        path = host.state / "fix-attempts.json"
+        attempts = json.loads(path.read_text()) if path.exists() else {}
+        if not isinstance(attempts, dict):
+            return None
+        providers = lane.load_providers()
+        disabled = set(providers) - set(cost_order(providers))
+        candidates = sorted((pr for pr in prs if pr.get("isInMergeQueue") is not True
+                             and set(pr.get("eventKinds") or []) & set(FIX_KINDS)
+                             and (not in_scope(pr, "red", disabled) or not needs_work(lane, pr))),
+                            key=lambda pr: pr["number"])
+        if not candidates:
+            return None
+        pr = candidates[int(now // getattr(lane, "CLAIM_SCAN_TTL_S", 60)) % len(candidates)]
+        record = attempts.get(str(pr["number"]), {})
+        if not isinstance(record, dict) or preservation_reason(pr, record, lane.MAX_FIX_ATTEMPTS, now=now):
+            return None
+        if lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix", timeout=30):
+            return None
+        live = fresh_reentry(lane, pr, record)
+        if live is None or (in_scope(live, "red", disabled) and needs_work(lane, live)):
+            return None
+        entry = current_repair_claim(host, lane, live, record, now)
+        if entry is None or preservation_reason(live, record, lane.MAX_FIX_ATTEMPTS, held=entry, now=now):
+            return None
+        kinds = [kind for kind in pr.get("eventKinds") or []
+                 if kind in FIX_KINDS and PREFIX + kind in label_names(live)]
+        if kinds:
+            consume(lane, live, kinds[:1], timeout=30)
+            return pr["number"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        return None
     return None
 
 
@@ -986,8 +1058,6 @@ def charge_reentry(lane, path: Path, pr: dict, expected: dict, name: str, now: f
 def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     """The lane is the PR's writer (JOV-INV-022): a CLEAN lane draft whose head no diff policy
     held is marked ready together with its native merge intent. Returns what happened."""
-    if reason := maintenance_hold(host, lane, pr, now):
-        return f"held:{reason}"
     entry = held.get(str(pr["number"]), {})
     if entry.get("sha") == pr["headRefOid"]:
         code = entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
@@ -1002,15 +1072,13 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     revoked = lane.publication_revocation(host, pr.get("headRefName"))
     if revoked:
         return f"revoked:{revoked.get('reason', '?')}"
-    lane.sh(["gh", "pr", "ready", str(pr["number"]), "--repo", lane.REPO_SLUG])
-    queued = lane.sh(["gh", "pr", "merge", str(pr["number"]), "--repo", lane.REPO_SLUG, "--auto"])
-    if queued.returncode != 0:
-        lane.update_json(host.state / "requeue.json",
-                         lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
+    outcome = lane.publish_verified(host, pr)
+    if outcome not in {"landing", "verified-not-queued"}:
+        return outcome
     receipt = {"schema": "jovie-lane-run/v1", "kind": "ready-green", "origin": "autonomous-lane",
                "attribution": {"category": "finalizer-only", "provider": "lane-event"},
                "pr": pr["number"], "headSha": pr["headRefOid"],
-               "prUrl": pr.get("url"), "verdict": "landing" if queued.returncode == 0 else "verified-not-queued",
+               "prUrl": pr.get("url"), "verdict": outcome,
                "endedAt": lane.now_iso()}
     ledger(host, receipt)
     return receipt["verdict"]
@@ -1113,6 +1181,120 @@ def retire_orphan(lane, linear, pr: dict, open_prs: list[dict], *, host, now: fl
     return "adopted"
 
 
+# JOV-7708: parked work rots. A PR the lanes gave up on (`lane-fix-exhausted`) or the queue
+# keeps ejecting (`queue-poison`) for longer than PARKED_S, on an agent-owned branch with no
+# hold, sends its issue back to the pool to rebuild from main. The PR stays open (JOV-INV-011:
+# only an explicit `duplicate` label retires it); `lane-rebuild` marks it requeued, once, and
+# lets `lane_runner.in_flight_issues` admit the issue again.
+PARKED_S = 48 * 3600
+PARKED_LABELS = frozenset({PREFIX + EXHAUSTED, POISON_LABEL})
+REBUILD_LABEL = "lane-rebuild"
+ISSUE_REF = re.compile(r"(?i)\bjov-\d+\b")
+POOL_LABEL = "agent-ready"  # lane_runner.SHARED_LABEL; this module does not import the runner
+
+
+def parked_requeue_enabled() -> bool:
+    return os.environ.get("LANES_PARKED_REQUEUE", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def parked_candidates(prs: list[dict], now: float) -> list[dict]:
+    """Pure first cut: agent-owned same-repo PRs, not queued, unheld, carrying a parked label,
+    not yet requeued, open longer than PARKED_S. parked_since then measures the label's age."""
+    rows = []
+    for pr in prs:
+        labels = {label.lower() for label in label_names(pr)}
+        created = iso_ts(pr.get("createdAt"))
+        if (agent_owned(pr) and labels & PARKED_LABELS and not labels & HOLD_LABELS
+                and REBUILD_LABEL not in labels
+                and not pr.get("isCrossRepository") and not pr.get("isInMergeQueue")
+                and created is not None and now - created > PARKED_S):
+            rows.append(pr)
+    return rows
+
+
+def parked_since(number: int, labels: set[str], sh=run) -> float | None:
+    """When the PR became parked: per parked label it still carries, its latest `labeled`
+    event; the earliest of those. None when unreadable or no event is found."""
+    read = sh(["gh", "api", "--paginate", f"repos/{REPO}/issues/{number}/events", "--jq",
+               '.[] | select(.event == "labeled") | [.label.name, .created_at] | @tsv'])
+    if read.returncode != 0:
+        return None
+    latest: dict[str, float] = {}
+    for line in (read.stdout or "").splitlines():
+        name, _, at = line.partition("\t")
+        stamp = iso_ts(at.strip())
+        if name in labels & PARKED_LABELS and stamp is not None:
+            latest[name] = max(latest.get(name, 0.0), stamp)
+    return min(latest.values()) if latest else None
+
+
+def pr_issue(pr: dict) -> str | None:
+    """The Linear issue a PR implements: its lane branch, else a JOV id in head or title."""
+    found = LANE_BRANCH.match(pr.get("headRefName") or "")
+    if found:
+        return found.group("issue").upper()
+    ref = ISSUE_REF.search(pr.get("headRefName") or "") or ISSUE_REF.search(pr.get("title") or "")
+    return ref.group(0).upper() if ref else None
+
+
+def requeue_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *, host, now: float) -> bool:
+    """Return a parked PR's issue to the pool with a rebuild-from-main note. Never closes the PR.
+    A failed read, a hold, a queue entry, a live repair claim, a done issue or another open PR
+    for the same issue leaves everything as it is."""
+    number, head = pr["number"], pr.get("headRefOid")
+    identifier = pr_issue(pr)
+    if not identifier or not linear or any(
+            other["number"] != number and pr_issue(other) == identifier for other in open_prs):
+        return False
+    owner, name = lane.REPO_SLUG.split("/")
+    try:
+        read = lane.sh(["gh", "api", "graphql", "-f", f"query={RETIREMENT_QUERY}",
+                        "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"number={number}"])
+        data = json.loads(read.stdout) if read.returncode == 0 else {}
+        live = data["data"]["repository"]["pullRequest"]
+        labels = {node["name"].lower() for node in live["labels"]["nodes"]}
+        if (data.get("errors") or live["labels"]["pageInfo"]["hasNextPage"] is not False
+                or live["state"] != "OPEN" or not head or live["headRefOid"] != head
+                or live["isCrossRepository"] is not False or live["isInMergeQueue"] is not False
+                or labels & HOLD_LABELS or REBUILD_LABEL in labels or not labels & PARKED_LABELS):
+            return False
+    except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.SubprocessError):
+        return False
+    record = read_state(host, "fix-attempts.json").get(str(number), {})
+    if in_flight(record, {"headRefOid": record.get("sha")}, now) or lane.claimed_elsewhere(number, head, "fix"):
+        return False
+    hours = int((now - since) // 3600)
+    parked = ", ".join(f"`{label}`" for label in sorted(labels & PARKED_LABELS))
+    try:
+        issue = linear_issue(linear, identifier)
+        if not issue or issue["state"]["type"] in ("completed", "canceled"):
+            return False
+        linear.move(issue["id"], "Todo")
+        found = linear.gql('query($n:String!){issueLabels(filter:{name:{eq:$n}}){nodes{id}}}',
+                           {"n": POOL_LABEL})["issueLabels"]["nodes"]
+        if found:
+            linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                       {"id": issue["id"], "l": found[0]["id"]})
+        linear.comment(issue["id"], f"🤖 lanes: PR #{number} has been parked ({parked}) for {hours}h (JOV-7708). "
+                                    "Rebuild from current main. Use its branch "
+                                    f"`{pr.get('headRefName')}` as reference only: check what already landed, "
+                                    "and do not rebase it or copy whole files from it. The old PR stays open "
+                                    "until the rebuild lands and it is labeled `duplicate`.")
+    except Exception:
+        return False
+    if lane.sh(["gh", "api", "-X", "POST", f"repos/{lane.REPO_SLUG}/issues/{number}/labels",
+                "-f", f"labels[]={REBUILD_LABEL}"]).returncode != 0:
+        return False
+    lane.sh(["gh", "pr", "comment", str(number), "--repo", lane.REPO_SLUG, "--body",
+             f"🤖 lanes: parked ({parked}) for {hours}h. {identifier} is back in the pool to rebuild from "
+             "main (JOV-7708); this PR stays open. When the rebuild lands, label this PR `duplicate` "
+             "and the sweep retires it (JOV-INV-011)."])
+    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "parked-requeue", "origin": "autonomous-lane",
+                  "pr": number, "head": head, "parkedHours": hours, "issue": identifier,
+                  "endedAt": lane.now_iso()})
+    return True
+
+
 def sync_main(host, lane, pr: dict, now: float) -> str:
     """No-model first answer to a merge-queue removal: GitHub merges main into the branch
     (exact head, no force), so the PR gets a new head, fresh CI and a fresh enroll. The queue
@@ -1142,8 +1324,9 @@ def ledger(host, receipt: dict) -> None:
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
-pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title url isDraft
-headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt labels(first:30){nodes{name}}
+pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
+baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt
+labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
@@ -1167,6 +1350,21 @@ def open_prs_state(lane) -> list[dict] | None:
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
             node["labels"] = node.get("labels", {}).get("nodes", [])
+            files = node.pop("files", {}) or {}
+            node["files"] = files.get("nodes") or []
+            total = files.get("totalCount")
+            node["filesComplete"] = isinstance(total, int) and total == len(node["files"])
+            if isinstance(total, int) and not node["filesComplete"]:
+                listed = lane.sh(["gh", "api", "--paginate", "--slurp",
+                                  f"repos/{lane.REPO_SLUG}/pulls/{node['number']}/files?per_page=100"], timeout=120)
+                try:
+                    pages = json.loads(listed.stdout) if listed.returncode == 0 else None
+                    node["files"] = [{"path": row["filename"], "additions": row.get("additions", 0),
+                                      "deletions": row.get("deletions", 0), "changeType": row.get("status", "")}
+                                     for page_rows in pages for row in page_rows]
+                    node["filesComplete"] = total == len(node["files"])
+                except (ValueError, KeyError, TypeError):
+                    node["filesComplete"] = False
             prs.append(node)
         if not page["pageInfo"]["hasNextPage"]:
             return prs
@@ -1181,7 +1379,8 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
     held with a reason (a hold label, or `lane-fix-exhausted` after bug intake). JOV-7079:
     every open PR also gets one truthful disposition in `dispositions`, and a stale
     agent-owned draft has a repair or live dependency disposition. Retirement requires
-    explicit duplicate authority; age, provider state and retry exhaustion never grant it."""
+    explicit duplicate authority; age, provider state and retry exhaustion never grant it
+    here. Parked work past PARKED_S is requeued, never closed (`requeue_parked`, JOV-7708)."""
     plan = {"label": [], "unlabel": [], "reset": [], "stale": [], "close": [], "orphans": [],
             "depHolds": [], "dispositions": [], "counts": {}}
     lane_groups: dict[str, list[dict]] = {}
@@ -1348,8 +1547,24 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
                 if row["pr"] == number:
                     row.update(state="hold:retirement-unavailable", reason="retirement refused or failed",
                                next="preserve source; revalidate retirement authority")
+    parked = []
+    for pr in parked_candidates(prs, now) if parked_requeue_enabled() else []:
+        since = parked_since(pr["number"], {label.lower() for label in label_names(pr)}, lane.sh)
+        if since is None or now - since <= PARKED_S:
+            continue
+        if linear is None:
+            try:
+                linear = linear_factory()
+            except Exception:
+                linear = False
+        if requeue_parked(lane, linear, pr, since, prs, host=host, now=now):
+            parked.append(pr["number"])
+            for row in plan["dispositions"]:
+                if row["pr"] == pr["number"]:
+                    row.update(reason=f"parked {int((now - since) // 3600)}h; issue requeued",
+                               next="the issue rebuilds from main; label this PR `duplicate` once it lands")
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
-              "closed": closed, "orphans": plan["orphans"],
+              "closed": closed, "parkedRequeued": parked, "orphans": plan["orphans"],
               "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
               "holdNags": next_nags}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
@@ -1363,6 +1578,12 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     swept = reconcile(host, lane, linear_factory, now)
     prs = queued_prs(lane, TICK_KINDS + ("dequeued",))
     outcomes = {"reconciled": swept["counts"]} if swept else {}
+    overlap = getattr(lane, "file_overlap", None)
+    inventory = getattr(lane, "overlap_prs_summary", None)
+    if overlap is not None and callable(inventory):
+        overlap_prs = inventory()
+        outcomes["fileOverlap"] = (overlap.reconcile_open_prs(host, lane, overlap_prs)
+                                   if overlap_prs is not None else {"status": "inventory-unavailable"})
     intake = convert_intake(lane, linear_factory, lane.sh, now)
     if intake:
         outcomes["intake"] = intake
@@ -1375,6 +1596,13 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     for pr in prs:
         if reason := maintenance_hold(host, lane, pr, now):
             outcomes[pr["number"]] = f"held:{reason}"
+            # A finished final self-push stays spent for repair, but its completed
+            # independent gate may authorize promotion through the shared consumer.
+            if "green" in pr["eventKinds"]:
+                outcome = ready_green(host, lane, pr, held, now)
+                if outcome in {"landing", "verified-not-queued"}:
+                    outcomes[pr["number"]] = outcome
+                    consume(lane, pr, ["green"])
             continue
         if "dequeued" in pr["eventKinds"] and str(pr["number"]) not in synced and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \

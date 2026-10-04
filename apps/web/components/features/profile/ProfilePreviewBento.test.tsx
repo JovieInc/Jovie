@@ -23,7 +23,7 @@ function renderBento(
 }
 
 describe('ProfilePreviewBento', () => {
-  it('keeps the overlay in flow under the phone, outside the phone preview', () => {
+  it('pins the overlay to the hero corner, outside the phone preview', () => {
     renderBento({
       phonePreviewTestId: 'phone-preview',
       overlay: <div data-testid='dsp-strip'>strip</div>,
@@ -32,16 +32,10 @@ describe('ProfilePreviewBento', () => {
     const phonePreview = screen.getByTestId('phone-preview');
     const strip = screen.getByTestId('dsp-strip');
 
-    expect(phonePreview).toBeInTheDocument();
-    expect(strip).toBeInTheDocument();
-    // Regression: the DSP strip used to be absolutely positioned inside the
-    // hero and could cover the preview's Listen now CTA.
+    // Regression (JOV-7192): the strip must never share the phone's bottom
+    // CTA band. It lives outside the phone in the hero's top-left corner;
+    // the storybook clearance spec measures the rendered geometry.
     expect(phonePreview).not.toContainElement(strip);
-    expect(strip.className).not.toContain('absolute');
-    expect(
-      phonePreview.compareDocumentPosition(strip) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
   });
 
   it('renders the phone preview directly when no overlay is supplied', () => {

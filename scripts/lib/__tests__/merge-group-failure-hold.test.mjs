@@ -1,8 +1,21 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  budgets,
+  emitBudgetErrors,
+  evaluate,
+  references,
+} from '../../agent-context/check.mjs';
 import {
   applyMergeGroupFailure,
   classifyDequeueDenial,
@@ -15,6 +28,7 @@ import {
   retrySpentDescription,
   revisionFailureDisposition,
   sourceHeadForRun,
+  supersededByLiveEntry,
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -176,6 +190,153 @@ process.stdout.write(JSON.stringify(result));
   }
 });
 
+it.each([
+  ['annotations', 'base-branch'],
+  ['unavailable', 'base-branch'],
+  ['missing', 'base-branch'],
+  ['raw-log', 'base-branch'],
+  ['truncated-log', 'unclassified'],
+  ['empty-error-log', 'unclassified'],
+  ['mixed-annotations', 'unclassified'],
+  ['mixed-log', 'unclassified'],
+  ['informational-log', 'unclassified'],
+  ['malformed-log', 'unclassified'],
+  ['paginated-mixed', 'unclassified'],
+  ['incomplete-pages', 'unclassified'],
+])(
+  'reads complete instruction errors by check identity or job log: %s',
+  (mode, classification) => {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-annotations-'));
+    try {
+      const fixturePath = join(dir, 'fixture.json');
+      const callsPath = join(dir, 'calls.jsonl');
+      const eventPath = join(dir, 'event.json');
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          repository: { full_name: REPOSITORY },
+          workflow_run: { id: run.id },
+        })
+      );
+      writeFileSync(
+        join(dir, 'gh'),
+        `#!${process.execPath}
+const fs = require('node:fs');
+const f = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.HOLD_TEST_CALLS, JSON.stringify(args) + '\\n');
+let result;
+if (args[0] === 'run') {
+  if (['annotations', 'mixed-annotations', 'paginated-mixed', 'incomplete-pages'].includes(f.mode)) process.exit(1);
+  const prefix = 'instruction-contracts\\tEvaluate repository instruction contracts\\t2026-10-03T05:00:00.000Z ';
+  const lines = f.mode === 'informational-log'
+    ? ['Observed: CLAUDE.md: 6081 bytes exceeds 6000']
+    : [f.mode === 'raw-log' ? '::error::CLAUDE.md: 6081 bytes exceeds 6000' : '##[error]CLAUDE.md: 6081 bytes exceeds 6000'];
+  if (f.mode === 'mixed-log') lines.push('::error::docs/agent-context/RESULTS.md: broken link missing.md');
+  if (f.mode === 'malformed-log') lines.push('::error file=unknown::unrecognized failure');
+  if (f.mode === 'empty-error-log') lines.push('##[error]');
+  if (f.mode !== 'truncated-log') lines.push('##[error]Process completed with exit code 1.');
+  process.stdout.write(lines.map(line => prefix + line).join('\\n'));
+  process.exit(0);
+}
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: f.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: f.source, isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].includes('/jobs?')) result = { jobs: [{
+  id: 17,
+  check_run_url: f.mode === 'missing' ? undefined : 'https://api.github.com/repos/JovieInc/Jovie/check-runs/29',
+  steps: [{ name: 'Evaluate repository instruction contracts', conclusion: 'failure' }]
+}] };
+else if (args[1].includes('/annotations')) {
+  if (!['annotations', 'mixed-annotations', 'paginated-mixed', 'incomplete-pages'].includes(f.mode) || !args[1].includes('/check-runs/29/annotations')) process.exit(1);
+  const budget = { annotation_level: 'failure', message: 'CLAUDE.md: 6081 bytes exceeds 6000' };
+  const broken = { annotation_level: 'failure', message: 'docs/agent-context/RESULTS.md: broken link missing.md' };
+  const page = new URL('https://example.test/' + args[1]).searchParams.get('page');
+  if (page === '2' && f.mode === 'incomplete-pages') process.exit(1);
+  result = f.mode === 'mixed-annotations' ? [budget, broken]
+    : ['paginated-mixed', 'incomplete-pages'].includes(f.mode)
+      ? page === '2' ? [broken] : Array(100).fill(budget)
+      : [budget, { annotation_level: 'failure', message: 'Process completed with exit code 1.' }];
+} else if (args[1].includes('/compare/')) result = { files: [{ filename: 'README.md' }] };
+else if (args[1].endsWith('/commits/main')) result = { sha: f.main };
+else if (args[1].includes('/statuses')) result = [];
+else result = f.run;
+process.stdout.write(JSON.stringify(result));
+`,
+        { mode: 0o755 }
+      );
+      {
+        writeFileSync(
+          fixturePath,
+          JSON.stringify({ run, timeline, source: SOURCE, main: BASE, mode })
+        );
+        writeFileSync(callsPath, '');
+        const execution = spawnSync(
+          process.execPath,
+          [
+            resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+            '--event-path',
+            eventPath,
+          ],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: `${dir}:${process.env.PATH}`,
+              HOLD_TEST_FIXTURE: fixturePath,
+              HOLD_TEST_CALLS: callsPath,
+            },
+          }
+        );
+        expect(execution.status, execution.stderr).toBe(0);
+        expect(JSON.parse(execution.stdout).classification, mode).toBe(
+          classification
+        );
+        const calls = readFileSync(callsPath, 'utf8')
+          .trim()
+          .split('\n')
+          .map(line => JSON.parse(line));
+        expect(
+          calls.some(args => String(args[1]).includes('/check-runs/17/'))
+        ).toBe(false);
+        expect(
+          calls.some(args => String(args[1]).includes('/check-runs/29/'))
+        ).toBe(mode !== 'missing');
+        expect(
+          calls.some(args => args[0] === 'run' && args.includes('17'))
+        ).toBe(
+          [
+            'unavailable',
+            'missing',
+            'raw-log',
+            'truncated-log',
+            'empty-error-log',
+            'mixed-log',
+            'informational-log',
+            'malformed-log',
+            'incomplete-pages',
+          ].includes(mode)
+        );
+        if (['paginated-mixed', 'incomplete-pages'].includes(mode)) {
+          expect(
+            calls.some(args =>
+              String(args[1]).endsWith(
+                '/check-runs/29/annotations?per_page=100&page=2'
+              )
+            )
+          ).toBe(true);
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
+
 it('completes the hold CLI when gh denies dequeuePullRequest', () => {
   const dir = mkdtempSync(join(tmpdir(), 'failure-hold-deny-'));
   try {
@@ -199,7 +360,7 @@ if (args[1] === 'graphql') {
   const pr = query.includes('timelineItems')
     ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
     : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
-        isInMergeQueue: true, mergeQueueEntry: { id: 'MQE_42' }, autoMergeRequest: null };
+        isInMergeQueue: true, mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: fixture.run.head_sha } }, autoMergeRequest: null };
   process.stdout.write(JSON.stringify({ data: { repository: { pullRequest: pr } } }));
 } else if (args.includes('POST')) {
   process.stdout.write('{}');
@@ -321,6 +482,168 @@ describe('failure classification and revision-scoped suppression', () => {
     expect(classify('startup_failure')).toBe('transient-infrastructure');
   });
 
+  it('classifies an over-cap base separately from a PR that grew the capped file', () => {
+    const step = ['Evaluate repository instruction contracts'];
+    const text = 'CLAUDE.md: 6081 bytes exceeds 6000';
+    expect(classify('failure', step)).toBe('unclassified');
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: step,
+        annotationText: text,
+        changedFiles: ['apps/web/page.tsx'],
+      })
+    ).toBe('base-branch');
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [
+          ...step,
+          'Join exact lane results',
+          'Evaluate combined-head checks',
+        ],
+        annotationText: text,
+        changedFiles: ['apps/web/page.tsx'],
+      })
+    ).toBe('base-branch');
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: step,
+        annotationText: text,
+        changedFiles: ['CLAUDE.md'],
+      })
+    ).toBe('deterministic-source');
+  });
+
+  it('requires exclusively valid capped-file budget errors, including actual evaluator diagnostics', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'instruction-errors-'));
+    try {
+      for (const file of [...Object.keys(budgets), ...references]) {
+        mkdirSync(dirname(join(dir, file)), { recursive: true });
+        writeFileSync(join(dir, file), '# Valid\n');
+      }
+      symlinkSync('CLAUDE.md', join(dir, 'AGENTS.md'));
+      writeFileSync(join(dir, 'CLAUDE.md'), 'x'.repeat(6081));
+      const decide = annotationText =>
+        classifyMergeGroupFailure({
+          conclusion: 'failure',
+          failedSteps: ['Evaluate repository instruction contracts'],
+          annotationText,
+          changedFiles: ['docs/agent-context/RESULTS.md'],
+        });
+      const pure = evaluate(dir);
+      expect(pure.errors).toEqual(['CLAUDE.md: 6081 bytes exceeds 6000']);
+      expect(decide(pure.errors.join('\n'))).toBe('base-branch');
+      writeFileSync(
+        join(dir, 'docs/agent-context/RESULTS.md'),
+        '[missing](missing.md)'
+      );
+      const mixed = evaluate(dir);
+      expect(mixed.errors).toEqual([
+        ...pure.errors,
+        'docs/agent-context/RESULTS.md: broken link missing.md',
+      ]);
+      const emitted = [];
+      emitBudgetErrors(mixed.errors, error => emitted.push(error));
+      expect(emitted).toEqual(mixed.errors.map(error => `::error::${error}`));
+      for (const text of [
+        mixed.errors.join('\n'),
+        'CLAUDE.md: 6000 bytes exceeds 6000',
+        'CLAUDE.md: 5 bytes exceeds 6000',
+        'CLAUDE.md: 9007199254740992 bytes exceeds 6000',
+        'other.md: 6081 bytes exceeds 6000',
+        'CLAUDE.md: 6081 bytes exceeds 0',
+        'Info: CLAUDE.md: 6081 bytes exceeds 6000',
+        'CLAUDE.md: 6081 bytes exceeds 6000\nmissing: DESIGN.md',
+        'CLAUDE.md: 6081 bytes exceeds 6000\nProcess completed with exit code 2.',
+      ])
+        expect(decide(text), text).toBe('unclassified');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('requeues a base-branch hold only after main moves', () => {
+    const recorded = 'e'.repeat(40);
+    const moved = 'f'.repeat(40);
+    const baseHold = status({
+      description: `class=base-branch;n=2;run=123;try=1;main=${recorded}`,
+    });
+    expect(disposition([baseHold])).toMatchObject({
+      action: 'block',
+      reason: 'base-branch-failure',
+    });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [baseHold],
+        currentMainSha: recorded,
+      })
+    ).toMatchObject({ action: 'block', reason: 'base-branch-failure' });
+    expect(
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses: [baseHold],
+        currentMainSha: moved,
+      })
+    ).toMatchObject({ action: 'retry-once', reason: 'base-branch-resolved' });
+  });
+
+  it('reserves a moved-base retry once and releases only a rejected enqueue', () => {
+    const baseHold = status({
+      description: `class=base-branch;n=2;run=123;try=1;main=${BASE}`,
+    });
+    const spent = status({
+      context: 'jovie-queue-failure-retry/v1',
+      description: 'spent:run=123;try=1',
+    });
+    const released = { ...spent, description: 'released:run=123;try=1' };
+    const decide = (statuses, currentMainSha = GROUP) =>
+      revisionFailureDisposition({
+        repository: REPOSITORY,
+        statuses,
+        currentMainSha,
+      });
+    expect(decide([spent, baseHold])).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    expect(decide([released, spent, baseHold])).toMatchObject({
+      action: 'retry-once',
+      reason: 'base-branch-resolved',
+    });
+    expect(decide([spent, released, baseHold])).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    for (const main of ['', 'invalid', BASE]) {
+      expect(decide([baseHold], main)).toMatchObject({
+        action: 'block',
+        reason: 'base-branch-failure',
+      });
+    }
+  });
+
+  it('does not classify other unexplained failures as a base budget failure', () => {
+    for (const otherFailure of [
+      'Run structural pytest shards',
+      'Enforce authed route initial JS budgets',
+    ]) {
+      expect(
+        classifyMergeGroupFailure({
+          conclusion: 'failure',
+          failedSteps: [
+            'Evaluate repository instruction contracts',
+            otherFailure,
+          ],
+          annotationText: 'CLAUDE.md: 6081 bytes exceeds 6000',
+          changedFiles: ['scripts/own-failing-check.mjs'],
+        })
+      ).toBe('unclassified');
+    }
+  });
+
   it('releases only an explicitly rejected enqueue, preserving ambiguous outcomes', () => {
     const rejected = {
       data: { enqueuePullRequest: null },
@@ -422,13 +745,102 @@ describe('failure classification and revision-scoped suppression', () => {
 });
 
 describe('terminal failure hold application', () => {
+  // Replays run 37167458268 (2026-10-04 01:15Z): admission ran out of the
+  // installation quota and PR Ready reported it. No source revision failed.
+  const ADMISSION_QUOTA_STEPS = [
+    'Require live queue membership and external admission checks',
+    'Evaluate combined-head checks',
+  ];
+  const ADMISSION_QUOTA_TEXT = [
+    'Process completed with exit code 1.',
+    'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.',
+  ].join('\n');
+
+  it('classifies an admission quota failure as transient admission, never a source failure', () => {
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText: ADMISSION_QUOTA_TEXT,
+      })
+    ).toBe('transient-admission');
+    for (const admissionText of [
+      'Process completed with exit code 1.\nGitHub API 503 for /graphql: Service Unavailable',
+      'GitHub API request failed for /graphql: The operation was aborted due to timeout',
+      'GitHub API 403 for /repos/x/y/commits/z/check-runs: API rate limit exceeded for installation',
+    ]) {
+      expect(
+        classifyMergeGroupFailure({
+          conclusion: 'failure',
+          failedSteps: ADMISSION_QUOTA_STEPS,
+          admissionText,
+        })
+      ).toBe('transient-admission');
+    }
+    // A real admission denial, missing evidence, or another failed step still
+    // counts against the revision.
+    for (const input of [
+      {
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText:
+          'Process completed with exit code 1.\nPR #42 is not a live member of this merge group',
+      },
+      { failedSteps: ADMISSION_QUOTA_STEPS, admissionText: '' },
+      {
+        failedSteps: [...ADMISSION_QUOTA_STEPS, 'Run unit tests'],
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+      {
+        failedSteps: ['Evaluate combined-head checks'],
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+    ]) {
+      expect(
+        classifyMergeGroupFailure({ conclusion: 'failure', ...input })
+      ).not.toBe('transient-admission');
+    }
+  });
+
+  it('spends no retry and keeps merge intent for an admission quota failure', async () => {
+    const writeStatus = vi.fn();
+    const dequeuePullRequest = vi.fn();
+    const disableAutoMerge = vi.fn();
+    const readPullRequest = vi.fn(async () => ({
+      id: 'PR_42',
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+      autoMergeRequest: { enabledAt: '2026-10-04T01:00:00Z' },
+    }));
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+      { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
+    );
+    expect(result).toMatchObject({
+      prNumber: 42,
+      classification: 'transient-admission',
+      skipped: true,
+      statusWritten: false,
+      dequeued: false,
+      autoMergeDisabled: false,
+    });
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(dequeuePullRequest).not.toHaveBeenCalled();
+    expect(disableAutoMerge).not.toHaveBeenCalled();
+  });
+
   it('persists before dequeueing and disabling the exact unchanged head', async () => {
     let state = {
       id: 'PR_42',
       state: 'OPEN',
       headRefOid: SOURCE,
       isInMergeQueue: true,
-      mergeQueueEntry: { id: 'MQE_42' },
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
       autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
     };
     const order = [];
@@ -461,6 +873,41 @@ describe('terminal failure hold application', () => {
     });
   });
 
+  it('records a base-branch hold that can requeue after main moves', async () => {
+    const main = 'e'.repeat(40);
+    const writeStatus = vi.fn();
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: ['Evaluate repository instruction contracts'],
+        annotationText: 'CLAUDE.md: 6081 bytes exceeds 6000',
+        changedFiles: ['README.md'],
+        mainSha: main,
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(),
+      }
+    );
+    expect(result).toMatchObject({
+      classification: 'base-branch',
+      retryDisposition: 'requeue-after-base-moves',
+      mainSha: main,
+    });
+    expect(writeStatus.mock.calls[0][0].description).toBe(
+      `class=base-branch;n=1;run=123;try=1;main=${main}`
+    );
+  });
+
   it('records the old revision but never mutates an already-new source head', async () => {
     const dequeuePullRequest = vi.fn();
     const disableAutoMerge = vi.fn();
@@ -487,6 +934,71 @@ describe('terminal failure hold application', () => {
     expect(disableAutoMerge).not.toHaveBeenCalled();
   });
 
+  it('ignores a superseded group failure while the exact source is still queued', async () => {
+    const LIVE_GROUP = 'f'.repeat(40);
+    for (const mergeQueueEntry of [
+      { id: 'MQE_42', headCommit: { oid: LIVE_GROUP } },
+      { id: 'MQE_42', headCommit: null },
+    ]) {
+      const writeStatus = vi.fn();
+      const dequeuePullRequest = vi.fn();
+      const disableAutoMerge = vi.fn();
+      const result = await applyMergeGroupFailure(failureInput, {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: true,
+          mergeQueueEntry,
+          autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+        })),
+        dequeuePullRequest,
+        disableAutoMerge,
+      });
+      expect(result).toMatchObject({
+        superseded: true,
+        mergeGroupHeadSha: GROUP,
+        liveMergeGroupHeadSha: mergeQueueEntry.headCommit?.oid ?? null,
+        statusWritten: false,
+        dequeued: false,
+        autoMergeDisabled: false,
+      });
+      // No retry is spent and the live entry keeps its place in the queue.
+      expect(writeStatus).not.toHaveBeenCalled();
+      expect(dequeuePullRequest).not.toHaveBeenCalled();
+      expect(disableAutoMerge).not.toHaveBeenCalled();
+    }
+  });
+
+  it('only treats a live queued exact source as superseded', () => {
+    const queued = {
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+    };
+    expect(supersededByLiveEntry(queued, SOURCE, GROUP)).toBe(false);
+    expect(supersededByLiveEntry(queued, SOURCE, 'f'.repeat(40))).toBe(true);
+    expect(
+      supersededByLiveEntry(
+        { ...queued, isInMergeQueue: false, mergeQueueEntry: null },
+        SOURCE,
+        'f'.repeat(40)
+      )
+    ).toBe(false);
+    expect(supersededByLiveEntry(queued, NEW_SOURCE, 'f'.repeat(40))).toBe(
+      false
+    );
+    expect(
+      supersededByLiveEntry(
+        { ...queued, state: 'CLOSED' },
+        SOURCE,
+        'f'.repeat(40)
+      )
+    ).toBe(false);
+  });
+
   it('classifies only the integration denial and an already-removed queue', () => {
     const denied = Object.assign(new Error('Command failed: gh api graphql'), {
       stderr: 'gh: Resource not accessible by integration\n',
@@ -510,7 +1022,7 @@ describe('terminal failure hold application', () => {
       state: 'OPEN',
       headRefOid: SOURCE,
       isInMergeQueue: true,
-      mergeQueueEntry: { id: 'MQE_42' },
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
       autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
     };
     const order = [];
@@ -549,13 +1061,15 @@ describe('terminal failure hold application', () => {
       writeStatus: vi.fn(),
       readPullRequest: vi.fn(async () => {
         reads += 1;
-        const queued = reads < 3;
+        const queued = reads < 4;
         return {
           id: 'PR_42',
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: queued,
-          mergeQueueEntry: queued ? { id: 'MQE_42' } : null,
+          mergeQueueEntry: queued
+            ? { id: 'MQE_42', headCommit: { oid: GROUP } }
+            : null,
           autoMergeRequest: null,
         };
       }),
@@ -582,7 +1096,7 @@ describe('terminal failure hold application', () => {
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: true,
-          mergeQueueEntry: { id: 'MQE_42' },
+          mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
           autoMergeRequest: null,
         })),
         dequeuePullRequest: vi.fn(async () => {
@@ -603,7 +1117,7 @@ describe('terminal failure hold application', () => {
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: true,
-          mergeQueueEntry: { id: 'MQE_42' },
+          mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
           autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
         })),
         dequeuePullRequest: vi.fn(async () => {

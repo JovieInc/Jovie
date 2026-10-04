@@ -47,9 +47,9 @@ vi.mock('@/lib/auth/better-auth', () => ({
   },
 }));
 
-vi.mock('@jovie/auth-routing', () => ({
+vi.mock('@jovie/auth-routing', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/auth-routing')>()),
   createAuthAnalyticsEvent: mockCreateAuthAnalyticsEvent,
-  isAuthClient: (client: unknown) => client === 'ios' || client === 'electron',
 }));
 
 vi.mock('@/lib/auth/routing-state.server', () => ({
@@ -89,7 +89,10 @@ vi.mock('@/lib/env', () => ({
   },
 }));
 
-function createExchangeRequest(client: 'ios' | 'electron' = 'ios') {
+function createExchangeRequest(
+  client: 'ios' | 'electron' = 'ios',
+  nativeAttempt?: unknown
+) {
   return new NextRequest('https://jov.ie/api/auth/native/exchange', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -98,6 +101,7 @@ function createExchangeRequest(client: 'ios' | 'electron' = 'ios') {
       code: 'native_code',
       state: 'native_state',
       codeVerifier: 'native_verifier',
+      ...(nativeAttempt !== undefined ? { nativeAttempt } : {}),
     }),
   });
 }
@@ -196,6 +200,7 @@ describe('native auth exchange route (Better Auth)', () => {
 
     expect(response.status).toBe(401);
     expect(data.reason).toBe('ott_missing');
+    expect(data).not.toHaveProperty('exchangePhase');
   });
 
   it('returns 401 ott_user_mismatch when the OTT resolves to a different user', async () => {
@@ -213,6 +218,7 @@ describe('native auth exchange route (Better Auth)', () => {
     // Handled auth rejection — never a 500
     expect(response.status).toBe(401);
     expect(data.reason).toBe('ott_user_mismatch');
+    expect(data).not.toHaveProperty('exchangePhase');
     // Guard preserved: the exchange is rejected, no fresh session is minted
     expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
     // Handled failures are not reported as unhandled server errors
@@ -240,6 +246,7 @@ describe('native auth exchange route (Better Auth)', () => {
 
     expect(response.status).toBe(401);
     expect(data.reason).toBe('ott_user_mismatch');
+    expect(data).not.toHaveProperty('exchangePhase');
     expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
@@ -260,6 +267,7 @@ describe('native auth exchange route (Better Auth)', () => {
     // client restarts sign-in from a handled 401 (JOV-4853).
     expect(response.status).toBe(401);
     expect(data.reason).toBe('ott_invalid');
+    expect(data).not.toHaveProperty('exchangePhase');
     expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
     expect(mockCaptureError).not.toHaveBeenCalled();
     expect(mockCreateAuthAnalyticsEvent).toHaveBeenCalledWith(
@@ -287,6 +295,7 @@ describe('native auth exchange route (Better Auth)', () => {
 
     expect(response.status).toBe(401);
     expect(data.reason).toBe('ott_invalid');
+    expect(data).not.toHaveProperty('exchangePhase');
     expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
@@ -303,6 +312,7 @@ describe('native auth exchange route (Better Auth)', () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe('Native auth exchange failed');
+    expect(data).not.toHaveProperty('exchangePhase');
     expect(mockCaptureError).toHaveBeenCalled();
   });
 
@@ -318,8 +328,31 @@ describe('native auth exchange route (Better Auth)', () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe('Native auth exchange failed');
+    expect(data).not.toHaveProperty('exchangePhase');
     expect(mockCaptureError).toHaveBeenCalled();
   });
+
+  it.each([undefined, 'preconsume'] as const)(
+    'forwards only the explicit preliminary validation phase (%s)',
+    async exchangePhase => {
+      mockConsumeStoredNativeExchangeCode.mockResolvedValue({
+        ok: false,
+        reason: 'missing',
+        ...(exchangePhase ? { exchangePhase } : {}),
+      });
+      const { POST } = await import('@/app/api/auth/native/exchange/route');
+      const response = await POST(createExchangeRequest());
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        error: 'Invalid native auth exchange',
+        reason: 'missing',
+        ...(exchangePhase ? { exchangePhase } : {}),
+      });
+      expect(mockVerifyOneTimeToken).not.toHaveBeenCalled();
+      expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
+      expect(response.headers.get('cache-control')).toContain('no-store');
+    }
+  );
 
   it('returns 401 with reason for invalid exchange (wrong_code)', async () => {
     mockConsumeStoredNativeExchangeCode.mockResolvedValue({
@@ -405,6 +438,46 @@ describe('native auth exchange route (Better Auth)', () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe('Native auth exchange failed');
+    expect(data).not.toHaveProperty('exchangePhase');
     expect(mockCaptureError).toHaveBeenCalled();
   });
+  it.each([undefined, 'preconsume'] as const)(
+    'forwards wrong_attempt with only its actual phase (%s)',
+    async exchangePhase => {
+      mockConsumeStoredNativeExchangeCode.mockResolvedValue({
+        ok: false,
+        reason: 'wrong_attempt',
+        ...(exchangePhase ? { exchangePhase } : {}),
+      });
+      const { POST } = await import('@/app/api/auth/native/exchange/route');
+      const nativeAttempt = 'a'.repeat(43);
+      const response = await POST(createExchangeRequest('ios', nativeAttempt));
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        error: 'Invalid native auth exchange',
+        reason: 'wrong_attempt',
+        ...(exchangePhase ? { exchangePhase } : {}),
+      });
+      expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalledWith(
+        expect.objectContaining({ nativeAttempt })
+      );
+      expect(mockVerifyOneTimeToken).not.toHaveBeenCalled();
+      expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['ios', null],
+    ['ios', ''],
+    ['ios', 'short'],
+    ['electron', 'a'.repeat(43)],
+  ] as const)(
+    'rejects malformed/non-iOS JSON correlation (%s, %s)',
+    async (client, nativeAttempt) => {
+      const { POST } = await import('@/app/api/auth/native/exchange/route');
+      const response = await POST(createExchangeRequest(client, nativeAttempt));
+      expect(response.status).toBe(400);
+      expect(mockConsumeStoredNativeExchangeCode).not.toHaveBeenCalled();
+    }
+  );
 });

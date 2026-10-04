@@ -36,7 +36,11 @@ export const Default: Story = {
   },
 };
 
-/** Golden-path desktop rail height (1280×720). The DSP strip must sit under the phone. */
+/**
+ * Golden-path desktop rail at 1280×720: the app shell's right rail is ~692px
+ * tall there (measured from the 2026-10-03 keyframe). The DSP strip must stay
+ * clear of the phone's Listen now CTA.
+ */
 export const SideClearance: Story = {
   args: {
     placement: 'side',
@@ -45,7 +49,7 @@ export const SideClearance: Story = {
   render: () => (
     <div
       data-testid='onboarding-rail-clearance-fixture'
-      style={{ height: 720, width: 380 }}
+      style={{ height: 692, width: 380 }}
     >
       <OnboardingProfileRail placement='side' state={CONFIRMED_ARTIST_STATE} />
     </div>
