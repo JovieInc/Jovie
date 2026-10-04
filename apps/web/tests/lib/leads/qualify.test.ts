@@ -106,36 +106,35 @@ function setupDefaultMocks(
 describe('qualifyLead', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('FEATURE_LEAD_QUALIFY_GENERIC', '');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('does not certify commercial fit from a verified badge', async () => {
+  it('records a verified badge as an observation, not a qualifier input', async () => {
     setupDefaultMocks({ isVerified: true });
 
     const result = await qualifyLead('https://linktr.ee/testartist');
 
-    expect(result.status).toBe('disqualified');
+    expect(result.status).toBe('qualified');
     expect(result.hasSpotifyLink).toBe(true);
     expect(result.isLinktreeVerified).toBe(true);
-    expect(result.disqualificationReason).toBe('commercial_fit_review_needed');
+    expect(result.disqualificationReason).toBeNull();
   });
 
-  it('does not certify commercial fit from a legacy paid boolean', async () => {
+  it('records a legacy paid boolean as an observation, not a qualifier input', async () => {
     setupDefaultMocks({ hasPaidTier: true });
 
     const result = await qualifyLead('https://linktr.ee/testartist');
 
-    expect(result.status).toBe('disqualified');
+    expect(result.status).toBe('qualified');
     expect(result.hasSpotifyLink).toBe(true);
     expect(result.hasPaidTier).toBe(true);
-    expect(result.disqualificationReason).toBe('commercial_fit_review_needed');
+    expect(result.disqualificationReason).toBeNull();
   });
 
-  it('does not certify buy intent from public music-tool presence', async () => {
+  it('records public music-tool presence as an observation, not a qualifier input', async () => {
     setupDefaultMocks({
       links: [
         { url: 'https://open.spotify.com/artist/123', platformId: 'spotify' },
@@ -146,10 +145,10 @@ describe('qualifyLead', () => {
 
     const result = await qualifyLead('https://linktr.ee/testartist');
 
-    expect(result.status).toBe('disqualified');
+    expect(result.status).toBe('qualified');
     expect(result.hasSpotifyLink).toBe(true);
     expect(result.musicToolsDetected).toContain('linkfire');
-    expect(result.disqualificationReason).toBe('commercial_fit_review_needed');
+    expect(result.disqualificationReason).toBeNull();
   });
 
   it('deduplicates music tools when multiple links share a platform', async () => {
@@ -167,8 +166,7 @@ describe('qualifyLead', () => {
     expect(result.musicToolsDetected).toEqual(['linkfire', 'featurefm']);
   });
 
-  it('qualifies a named creator without Spotify when generic qualification is on', async () => {
-    vi.stubEnv('FEATURE_LEAD_QUALIFY_GENERIC', 'true');
+  it('qualifies a named creator without Spotify', async () => {
     setupDefaultMocks({
       displayName: 'Ada',
       links: [{ url: 'https://instagram.com/ada', platformId: 'instagram' }],
@@ -181,8 +179,7 @@ describe('qualifyLead', () => {
     expect(result.disqualificationReason).toBeNull();
   });
 
-  it('still rejects a blank identity when generic qualification is on', async () => {
-    vi.stubEnv('FEATURE_LEAD_QUALIFY_GENERIC', 'true');
+  it('still rejects a blank identity', async () => {
     setupDefaultMocks({
       displayName: '   ',
       links: [{ url: 'https://instagram.com/ada', platformId: 'instagram' }],
@@ -201,7 +198,7 @@ describe('qualifyLead', () => {
     expect(noLinks.disqualificationReason).toBe('insufficient_identity');
   });
 
-  it('should disqualify when no Spotify link is present', async () => {
+  it('should qualify when no Spotify link is present', async () => {
     setupDefaultMocks({
       links: [
         { url: 'https://instagram.com/testartist', platformId: 'instagram' },
@@ -211,12 +208,12 @@ describe('qualifyLead', () => {
 
     const result = await qualifyLead('https://linktr.ee/testartist');
 
-    expect(result.status).toBe('disqualified');
+    expect(result.status).toBe('qualified');
     expect(result.hasSpotifyLink).toBe(false);
-    expect(result.disqualificationReason).toBe('no_spotify');
+    expect(result.disqualificationReason).toBeNull();
   });
 
-  it('should disqualify free tier with Spotify but no music tools', async () => {
+  it('should qualify free tier with Spotify but no music tools', async () => {
     setupDefaultMocks({
       links: [
         { url: 'https://open.spotify.com/artist/123', platformId: 'spotify' },
@@ -226,12 +223,12 @@ describe('qualifyLead', () => {
 
     const result = await qualifyLead('https://linktr.ee/testartist');
 
-    expect(result.status).toBe('disqualified');
+    expect(result.status).toBe('qualified');
     expect(result.hasSpotifyLink).toBe(true);
     expect(result.hasPaidTier).toBe(false);
     expect(result.isLinktreeVerified).toBe(false);
     expect(result.musicToolsDetected).toHaveLength(0);
-    expect(result.disqualificationReason).toBe('commercial_fit_review_needed');
+    expect(result.disqualificationReason).toBeNull();
   });
 
   it('should extract display name, bio, avatar, and contact email correctly', async () => {
