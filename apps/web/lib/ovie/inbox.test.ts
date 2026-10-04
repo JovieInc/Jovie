@@ -70,19 +70,6 @@ describe('Ovie inbox projection', () => {
       }).issues
     ).toEqual(['Unavailable']);
   });
-  it('routes approval to the existing API without claiming execution', () => {
-    expect(
-      inboxDecisionRequest(
-        { kind: 'summer', id: 'sc_1' },
-        'approve',
-        '',
-        'action'
-      )
-    ).toEqual({
-      url: '/api/ovie/summer-cards/sc_1/decision',
-      body: { decision: 'approve', comment: undefined },
-    });
-  });
   it('binds certification decisions to exact evidence and action IDs', () => {
     const request = inboxDecisionRequest(
       { kind: 'certification', id: 'row', evidenceDigest: 'digest' },
@@ -113,27 +100,20 @@ describe('Ovie inbox projection', () => {
       decision: 'no',
       notes: 'Different direction',
     });
-    expect(() =>
-      inboxDecisionRequest(
-        { kind: 'summer', id: 'sc_1' },
-        'modify',
-        'Fix copy',
-        'a'
-      )
-    ).toThrow('rejecting');
   });
 });
 
 describe('Inbox coverage and producer adapters', () => {
-  it('rejects a design modification instead of approving the proposal', () => {
+  it.each([
+    [{ kind: 'summer', id: 'sc_1' }, 'rejecting'],
+    [
+      { kind: 'design', id: 'proposal', dayBucket: '2026-10-02' },
+      'Reject with notes',
+    ],
+  ] as const)('rejects unsupported modification for %j', (target, message) => {
     expect(() =>
-      inboxDecisionRequest(
-        { kind: 'design', id: 'proposal', dayBucket: '2026-10-02' },
-        'modify',
-        'Revise the direction',
-        'a'
-      )
-    ).toThrow('Reject with notes');
+      inboxDecisionRequest(target, 'modify', 'Revise the direction', 'a')
+    ).toThrow(message);
   });
 
   it('makes disconnected domains explicit', () => {
@@ -200,23 +180,6 @@ describe('Inbox coverage and producer adapters', () => {
       ).toThrow('linked work');
     }
   );
-  it('retains exact run and surface for screenshot review', () => {
-    expect(
-      inboxDecisionRequest(
-        { kind: 'visual', id: 'run', surfaceId: 'surface' },
-        'reject',
-        'Wrong layout',
-        'a'
-      )
-    ).toEqual({
-      url: '/api/admin/hud/visual-qa/run/review',
-      body: {
-        surfaceId: 'surface',
-        decision: 'rejected',
-        notes: 'Wrong layout',
-      },
-    });
-  });
 });
 
 describe('Certification Inbox convergence', () => {
@@ -305,13 +268,34 @@ describe('Certification Inbox convergence', () => {
   });
 });
 
-it('omits optional visual notes on approval', () => {
-  expect(
-    inboxDecisionRequest(
-      { kind: 'visual', id: 'run', surfaceId: 'surface' },
-      'approve',
-      '',
-      'a'
-    ).body
-  ).toEqual({ surfaceId: 'surface', decision: 'accepted', notes: undefined });
-});
+it.each([
+  [
+    { kind: 'summer', id: 'sc_1' },
+    'approve',
+    '',
+    '/api/ovie/summer-cards/sc_1/decision',
+    { decision: 'approve', comment: undefined },
+  ],
+  [
+    { kind: 'visual', id: 'run', surfaceId: 'surface' },
+    'reject',
+    'Wrong layout',
+    '/api/admin/hud/visual-qa/run/review',
+    { surfaceId: 'surface', decision: 'rejected', notes: 'Wrong layout' },
+  ],
+  [
+    { kind: 'visual', id: 'run', surfaceId: 'surface' },
+    'approve',
+    '',
+    '/api/admin/hud/visual-qa/run/review',
+    { surfaceId: 'surface', decision: 'accepted', notes: undefined },
+  ],
+] as const)(
+  'routes %j %s to the original API with its exact payload',
+  (target, decision, notes, url, body) => {
+    expect(inboxDecisionRequest(target, decision, notes, 'action')).toEqual({
+      url,
+      body,
+    });
+  }
+);
