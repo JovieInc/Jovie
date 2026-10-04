@@ -313,6 +313,18 @@ describe('UnifiedSidebar library route', () => {
     ).toHaveAttribute('href', '/timwhite');
   });
 
+  it('renders the restored Referral door in the actual Settings rail', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.SETTINGS_REFERRAL,
+      section: 'settings',
+    });
+    expect(screen.getByRole('link', { name: 'Referral' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SETTINGS_REFERRAL
+    );
+    expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+  });
+
   it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {
     renderUnifiedSidebar({
       overrideContent: <span>Library-owned sidebar</span>,

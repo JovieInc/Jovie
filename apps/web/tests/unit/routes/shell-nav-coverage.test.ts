@@ -79,6 +79,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Contextual autonomous work history reached from Home/Inbox',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
+  '/app/settings/referral':
+    'Referral code page is discoverable from the Settings Billing group',
   '/app/youtube':
     'YouTube ledger workspace reached from the contextual Work toolbar action',
 };

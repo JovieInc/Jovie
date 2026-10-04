@@ -84,6 +84,7 @@ export const APP_ROUTES = {
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_ANALYTICS: '/app/settings/analytics',
   SETTINGS_ADMIN: '/app/settings/admin',
+  SETTINGS_REFERRAL: '/app/settings/referral',
   /** @deprecated Use SETTINGS_DATA_PRIVACY instead */
   SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 

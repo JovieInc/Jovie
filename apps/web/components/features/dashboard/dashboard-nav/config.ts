@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CheckSquare,
   Gauge,
+  Gift,
   HandCoins,
   Home,
   IdCard,
@@ -242,6 +243,20 @@ export const userSettingsNavigation: SettingsNavItem[] = [
         'Subscription terms and consequential plan controls require a stable destination.',
     },
     icon: Banknote,
+  },
+  {
+    name: 'Referral',
+    href: APP_ROUTES.SETTINGS_REFERRAL,
+    id: 'referral',
+    admission: {
+      userJob: 'Share a referral link and understand its commission terms',
+      scope: 'account',
+      roles: ['status', 'account-control'],
+      canonicalRoute: APP_ROUTES.SETTINGS_REFERRAL,
+      screenRationale:
+        'The account-owned referral link and its terms need an explicit share destination.',
+    },
+    icon: Gift,
   },
   {
     name: 'Data & Privacy',

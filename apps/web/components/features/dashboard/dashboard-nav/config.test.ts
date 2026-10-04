@@ -10,6 +10,7 @@ import {
   mobilePrimaryNavigation,
   partitionCustomerNavigation,
   primaryNavigation,
+  userSettingsNavigation,
 } from './config';
 
 const CANONICAL_NAVIGATION = [
@@ -26,6 +27,20 @@ function toContract(
 }
 
 describe('canonical customer shell navigation', () => {
+  it('keeps restored Referral reachable in the live Settings rail after Billing', () => {
+    const billingIndex = userSettingsNavigation.findIndex(
+      item => item.id === 'billing'
+    );
+    expect(billingIndex).toBeGreaterThanOrEqual(0);
+    expect(userSettingsNavigation[billingIndex + 1]).toMatchObject({
+      id: 'referral',
+      name: 'Referral',
+      href: APP_ROUTES.SETTINGS_REFERRAL,
+    });
+    expect(
+      userSettingsNavigation.filter(item => item.id === 'referral')
+    ).toHaveLength(1);
+  });
   it('keeps the four job-level roots in the DESIGN.md order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
     expect(toContract(canonicalSidebarNavigation)).toEqual(
