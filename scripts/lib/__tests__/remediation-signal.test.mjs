@@ -276,6 +276,9 @@ describe('workflow wiring', () => {
     expect(bodies.matrix).toContain('e2e-full-matrix.yml:');
     expect(bodies.controller).toContain('production-monitor-post-deploy-smoke');
     expect(bodies.controller).toContain('REMEDIATION_MODE: auth-smoke');
+    expect(bodies.controller).toContain(
+      'production-monitor-customer-changelog'
+    );
     expect(bodies.health).toContain('production-monitor-controller-health');
     expect(bodies.release).toContain('production-monitor-vercel-deploy');
     expect(bodies.postdeploy).toContain('production-monitor-postdeploy-probes');
