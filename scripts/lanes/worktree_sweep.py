@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from disk_guard import lsof_command  # noqa: E402  (sibling module of the release)
+from disk_guard import ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
@@ -81,7 +81,7 @@ def live_paths(run) -> set[Path] | None:
     """Every absolute path in a process argv or cwd; None when either inventory fails."""
     try:
         ps = run(["ps", "-axo", "args="], capture_output=True, text=True, timeout=30)
-        lsof = run([lsof_command(), "-nP", "-a", "-d", "cwd", "-F", "n"], capture_output=True, text=True, timeout=120)
+        lsof = run(["lsof", "-nP", "-a", "-d", "cwd", "-F", "n"], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError):
         return None
     if ps.returncode != 0 or lsof.returncode not in (0, 1):
@@ -311,6 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", type=Path, default=Path(os.environ.get(
         "LANES_REPO", Path.home() / "devin-sweep/Jovie")))
     args = parser.parse_args(argv)
+    ensure_sbin_on_path()
     home = Path.home()
     args.state.mkdir(parents=True, exist_ok=True)
     with open(args.state / "disk-cleanup.lock", "a") as lock:

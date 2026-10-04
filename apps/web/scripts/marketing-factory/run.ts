@@ -48,6 +48,7 @@ import {
   FACTORY_RUNS_DIR,
   type FactoryRunManifest,
   FactoryRunManifestSchema,
+  factoryStageSourceDigest,
   readJson,
   type StageAttemptRecord,
   stageInputDigest,
@@ -149,6 +150,11 @@ function loadPriorChain(
   if (chain.length !== fromIndex) {
     throw new Error(
       `--from-stage ${fromStage}: earlier stages have not passed`
+    );
+  }
+  if (chain.some((link, index) => link.stage !== FACTORY_STAGES[index])) {
+    throw new Error(
+      '--from-stage: prior stage identities do not match the current spine order; rerun from truth'
     );
   }
   const issues = verifyFactoryRun(runDir).filter(issue =>
@@ -289,7 +295,8 @@ export async function runFactory(
     }
     const inputDigest = stageInputDigest(
       briefDigest,
-      manifest.chain.map(link => link.outputDigest)
+      manifest.chain.map(link => link.outputDigest),
+      factoryStageSourceDigest(stage, brief)
     );
     let feedback: readonly string[] = [];
     let passed = false;
