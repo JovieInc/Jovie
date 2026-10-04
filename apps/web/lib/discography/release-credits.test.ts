@@ -336,6 +336,30 @@ describe('release credit integrity', () => {
     expect(reconciled.mismatch).toBeNull();
   });
 
+  it('does not hide a provider id conflict behind a case-only name match', () => {
+    const reconciled = reconcilePrimaryArtists({
+      storedCredits: [
+        {
+          artistId: 'artist-tones',
+          spotifyId: 'different-spotify-artist',
+          name: 'Tones and I',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+      ],
+      providerArtists: [
+        { provider: 'spotify', id: 'tones-and-i', name: 'Tones And I' },
+      ],
+    });
+
+    expect(reconciled.primaryArtists).toHaveLength(2);
+    expect(reconciled.mismatch).toMatchObject({
+      addedNames: ['Tones And I'],
+    });
+  });
+
   it('does not treat unrelated neighbors as a split provider artist', () => {
     const reconciled = reconcilePrimaryArtists({
       storedCredits: [

@@ -181,6 +181,19 @@ function creditMatchesProviderById(
   return providerKey ? creditIdentityKeys(credit).includes(providerKey) : false;
 }
 
+function canMatchProviderByName(
+  credit: CanonicalReleaseCredit,
+  providerArtist: ProviderPrimaryArtist
+): boolean {
+  if (!providerIdentityKey(providerArtist.provider, providerArtist.id)) {
+    return true;
+  }
+  const providerPrefix = `provider:${providerArtist.provider}:`;
+  return !creditIdentityKeys(credit).some(key =>
+    key.startsWith(providerPrefix)
+  );
+}
+
 const CREDIT_FRAGMENT_JOINS = [' and ', ' & ', ' x '] as const;
 const CREDIT_MISMATCH_WARN_TTL_MS = 60 * 60 * 1000;
 const CREDIT_MISMATCH_WARN_MAX = 500;
@@ -381,8 +394,10 @@ export function reconcilePrimaryArtists(input: {
     }
 
     if (
-      storedPrimaries.some(credit =>
-        namesEquivalent(credit.name, providerArtist.name)
+      storedPrimaries.some(
+        credit =>
+          canMatchProviderByName(credit, providerArtist) &&
+          namesEquivalent(credit.name, providerArtist.name)
       )
     ) {
       continue;

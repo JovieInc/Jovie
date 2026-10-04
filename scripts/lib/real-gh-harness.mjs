@@ -176,7 +176,6 @@ export async function runWithRealGh({
   // shadow everything else. Copy, don't symlink, so wrapper detection and
   // platform quirks can't resurrect a shim.
   const ghDir = mkdtempSync(join(tmpdir(), 'real-gh-bin-'));
-  copyFileSync(binary, join(ghDir, basename(binary)));
   const basePath = process.env.PATH ?? '';
   const callerPath = env.PATH ?? basePath;
   const callerPrefix = callerPath.endsWith(basePath)
@@ -186,6 +185,7 @@ export async function runWithRealGh({
     ? `${callerPrefix}${ghDir}${delimiter}${basePath}`
     : `${ghDir}${delimiter}${callerPath}`;
   try {
+    copyFileSync(binary, join(ghDir, basename(binary)));
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
