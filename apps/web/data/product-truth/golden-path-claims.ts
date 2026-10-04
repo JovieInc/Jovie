@@ -344,6 +344,17 @@ export const WANTED_CLAIMS: readonly WantedClaim[] = [
     owner: 'JOV-7834',
   },
   {
+    id: 'dogfood.non-music-profile',
+    statement:
+      'A real public Jovie profile for a non-music creator: a founder, podcaster or author.',
+    answers:
+      'Studio 2026-10-04: non-music personas have no real page to judge; jov.ie/tim is an artist',
+    unlocks: ['homepage', 'claim', 'pricing'],
+    kind: 'product-proof',
+    generator: 'dogfood',
+    owner: 'JOV-7866',
+  },
+  {
     id: 'computed.link-drift-finding',
     statement:
       'A drift finding about the visitor: a public link that points somewhere stale.',
