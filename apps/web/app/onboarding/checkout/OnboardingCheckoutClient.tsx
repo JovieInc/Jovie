@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BadgeCheck, BarChart3, Bell, Sparkles } from 'lucide-react';
+import { BadgeCheck, BarChart3, Sparkles, Wallet } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/upgrade-offer';
@@ -18,9 +18,9 @@ import { PROOF_CLAIM_FUNNEL_EVENTS } from '@/lib/acquisition/proof-claim-funnel'
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
-import { ARTIST_VISIBILITY_OFFER } from '@/lib/billing/offer-truth';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
+import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
 
@@ -36,6 +36,8 @@ interface OnboardingCheckoutClientProps {
   readonly avatarUrl: string | null;
   readonly spotifyFollowers: number | null;
   readonly isDefaultUpsell: boolean;
+  /** Computed claim-time proof; empty hides the card (JOV-7794). */
+  readonly proofFindings?: readonly ClaimTimeFinding[];
 }
 
 // formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
@@ -50,9 +52,10 @@ function getAnnualSavingsPercent(
 
 const PRO_HIGHLIGHTS = [
   {
-    icon: Bell,
-    label: 'Visibility Monitoring',
-    detail: ARTIST_VISIBILITY_OFFER.pro.outcomes[0],
+    // JOV-7794: a certified capability, not internal-only monitoring.
+    icon: Wallet,
+    label: 'Payments',
+    detail: 'Take tips and payments on your profile',
   },
   {
     icon: BarChart3,
@@ -133,6 +136,42 @@ function ProfilePreviewCard({
   );
 }
 
+/** Max facts shown; the card proves real data, it is not a report. */
+const PROOF_FACT_LIMIT = 4;
+
+/**
+ * The visitor's own computed findings, shown before the price (JOV-7794).
+ * Renders nothing without a real finding: never a sample or placeholder.
+ */
+export function ClaimTimeProofCard({
+  findings,
+}: Readonly<{ findings: readonly ClaimTimeFinding[] }>) {
+  const facts = findings
+    .flatMap(finding => finding.facts)
+    .slice(0, PROOF_FACT_LIMIT);
+  if (facts.length === 0) return null;
+  return (
+    <ContentSurfaceCard className='mb-4 p-4' data-testid='claim-time-proof'>
+      <p className='text-xs font-medium text-tertiary-token'>
+        Found From Your Profile
+      </p>
+      <dl className='mt-2 space-y-1.5'>
+        {facts.map(fact => (
+          <div
+            key={`${fact.label}:${fact.value}`}
+            className='flex items-baseline justify-between gap-3'
+          >
+            <dt className='text-app text-secondary-token'>{fact.label}</dt>
+            <dd className='truncate text-app font-medium text-primary-token'>
+              {fact.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </ContentSurfaceCard>
+  );
+}
+
 interface BillingIntervalSelectorProps {
   readonly isAnnual: boolean;
   readonly savingsPercent: number;
@@ -200,6 +239,7 @@ export function OnboardingCheckoutClient({
   avatarUrl,
   spotifyFollowers,
   isDefaultUpsell,
+  proofFindings = [],
 }: OnboardingCheckoutClientProps) {
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
@@ -324,6 +364,8 @@ export function OnboardingCheckoutClient({
           spotifyFollowers={spotifyFollowers}
           username={username}
         />
+
+        <ClaimTimeProofCard findings={proofFindings} />
 
         {/* Pro highlights */}
         <ContentSurfaceCard className='mb-6 p-4'>

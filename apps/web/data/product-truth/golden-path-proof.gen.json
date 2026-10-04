@@ -1,6 +1,6 @@
 {
   "schema": "jovie.golden-path-proof/v1",
-  "asOf": "2026-10-04T02:20:20.652Z",
+  "asOf": "2026-10-04T05:52:03.377Z",
   "funnelStepIds": {
     "homepage": [],
     "claim": ["outreach", "claim-landing"],
@@ -89,23 +89,15 @@
       "detail": "certified: public-profile, artist-notifications"
     },
     {
-      "id": "start.metadata.one-conversation",
+      "id": "start.metadata.description",
       "step": "start",
       "route": "/start",
       "source": "apps/web/app/(dynamic)/start/page.tsx",
-      "copy": "Start your artist profile in one conversation.",
-      "nature": "outcome",
-      "evidenceClass": "none",
-      "status": "proof-gap",
-      "detail": "Median onboarding turns from first /start message to a live profile, measured from prod chat sessions.",
-      "request": {
-        "recordType": "proof-request",
-        "kind": "metric",
-        "claimId": "golden-path.start.metadata.one-conversation",
-        "pagesBlocked": ["/start"],
-        "suggestedLane": "measurement",
-        "generator": "dogfood"
-      }
+      "copy": "Claim your name and start your Jovie profile.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: public-profile"
     },
     {
       "id": "preview.research.verified-signals",
@@ -156,11 +148,33 @@
       "step": "upgrade",
       "route": "/app/settings/billing",
       "source": "apps/web/lib/entitlements/registry.ts",
-      "copy": "Continuous visibility monitoring, prioritized opportunities, and agentic fixes.",
+      "copy": "Take payments, launch releases and sell merch from your Jovie profile.",
       "nature": "capability",
       "evidenceClass": null,
-      "status": "uncertified-capability",
-      "detail": "uncertified capability: profile-monitoring"
+      "status": "admissible",
+      "detail": "certified: pay, release-launch, instant-merch"
+    },
+    {
+      "id": "upgrade.checkout.claim-time-proof",
+      "step": "upgrade",
+      "route": "/onboarding/checkout",
+      "source": "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx",
+      "copy": "Found From Your Profile",
+      "nature": "outcome",
+      "evidenceClass": "computed",
+      "status": "admissible",
+      "detail": "computed slot assembled-profile: Jovie built a profile from the visitor’s own data."
+    },
+    {
+      "id": "upgrade.checkout.payments",
+      "step": "upgrade",
+      "route": "/onboarding/checkout",
+      "source": "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx",
+      "copy": "Take tips and payments on your profile",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: pay"
     },
     {
       "id": "pricing.pro.note",
@@ -186,37 +200,21 @@
     }
   ],
   "evidenceCounts": {
-    "computed": 4,
+    "computed": 5,
     "dogfood": 3,
     "pilot": 0,
-    "none": 1
+    "none": 0
   },
   "statusCounts": {
-    "admissible": 13,
-    "proof-gap": 1,
-    "uncertified-capability": 1,
+    "admissible": 17,
+    "proof-gap": 0,
+    "uncertified-capability": 0,
     "invented-number": 0,
     "unbacked-offer": 0,
     "checkable-positioning": 0
   },
-  "prooflessPaywallSteps": ["upgrade", "pricing"],
+  "prooflessPaywallSteps": ["pricing"],
   "proofRequests": [
-    {
-      "recordType": "proof-request",
-      "kind": "metric",
-      "claimId": "golden-path.start.metadata.one-conversation",
-      "pagesBlocked": ["/start"],
-      "suggestedLane": "measurement",
-      "generator": "dogfood"
-    },
-    {
-      "recordType": "proof-request",
-      "kind": "metric",
-      "claimId": "golden-path.upgrade.paid-outcome",
-      "pagesBlocked": ["/app/settings/billing"],
-      "suggestedLane": "measurement",
-      "generator": "dogfood"
-    },
     {
       "recordType": "proof-request",
       "kind": "metric",
