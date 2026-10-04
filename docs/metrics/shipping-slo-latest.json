@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-04T13:09:37.989Z",
+  "ciP95Seconds": {
+    "pull_request": 629,
+    "merge_group": 825
+  },
+  "queueWaitP95Seconds": null,
+  "queueEjectionRate": null,
+  "leadTimeP95Seconds": {
+    "devin": null,
+    "codex": null,
+    "other": null
+  },
+  "remediationP95Seconds": {
+    "prRedToGreen": 3267,
+    "mainRedToGreen": null,
+    "productionPromoteHold": null
+  },
+  "productionLagP95Seconds": null,
+  "throughput": {
+    "mergesPerDay": 0,
+    "verifiedPerDay": 0,
+    "wowGrowth": null,
+    "growthTrend": "unknown"
+  },
+  "regressions": [
+    "throughput.merges_per_day",
+    "throughput.verified_per_day"
+  ],
+  "flatStall": false
+}
