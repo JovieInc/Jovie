@@ -133,6 +133,7 @@ describe('validation manifest', () => {
     for (const description of [
       '## Acceptance\n- [x] Done\n- [X] Shipped\n\n## Notes\nfree text',
       '## Completion evidence\n\n## Next\nlater',
+      '**Acceptance**\n- [x] Shipped\n**Notes**\nfree text after a bold heading',
       '## Goal\nShip the card.\n## Scope\nOne component.',
       'Mentions acceptance testing in prose only.',
     ]) {

@@ -1876,6 +1876,86 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
+  it.each(['inside', 'outside'] as const)(
+    'closes the inspector on Escape with focus %s and returns focus to the opener',
+    focusLocation => {
+      renderLibrary([buildAsset()]);
+
+      const row = screen.getByTestId('library-release-row-release-1');
+      row.focus();
+      fireEvent.click(row);
+      const drawer = screen.getByTestId('library-asset-drawer');
+      expect(drawer).toHaveAttribute('aria-hidden', 'false');
+
+      const focused =
+        focusLocation === 'inside'
+          ? within(drawer).getByRole('tab', { name: 'Files' })
+          : screen.getByRole('button', { name: /^Show filters/i });
+      focused.focus();
+      expect(focused).toHaveFocus();
+      fireEvent.keyDown(focused, { key: 'Escape' });
+
+      expect(drawer).toHaveAttribute('aria-hidden', 'true');
+      expect(row).toHaveFocus();
+    }
+  );
+
+  it('preserves the opener while changing assets with focus inside the inspector', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Another release' }),
+    ]);
+    const opener = screen.getByTestId('library-release-row-release-1');
+    const next = screen.getByTestId('library-release-row-release-2');
+    opener.focus();
+    fireEvent.click(opener);
+    const drawer = screen.getByTestId('library-asset-drawer');
+    const files = within(drawer).getByRole('tab', { name: 'Files' });
+    files.focus();
+    expect(files).toHaveFocus();
+
+    fireEvent.click(next);
+    expect(
+      within(drawer).getAllByText('Another release').length
+    ).toBeGreaterThan(0);
+    fireEvent.keyDown(files, { key: 'Escape' });
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+    expect(opener).toHaveFocus();
+
+    next.focus();
+    fireEvent.click(next);
+    within(drawer).getByRole('tab', { name: 'Files' }).focus();
+    fireEvent.keyDown(drawer, { key: 'Escape' });
+    expect(next).toHaveFocus();
+  });
+
+  it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
+    renderLibrary([buildAsset()]);
+    fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
+
+    const table = screen
+      .getByTestId('library-release-row-release-1')
+      .closest('table');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+  });
+
+  it('counts tracks in the singular for one-track releases on grid cards', () => {
+    renderLibrary([
+      buildAsset({ releaseType: 'album', trackCount: 1 }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Second Album',
+        releaseType: 'album',
+        trackCount: 9,
+      }),
+    ]);
+    clickGridView();
+
+    expect(screen.getByText('1 Track')).toBeInTheDocument();
+    expect(screen.getByText('9 Tracks')).toBeInTheDocument();
+    expect(screen.queryByText('1 Tracks')).not.toBeInTheDocument();
+  });
+
   it('does not render route filtering as a second shell search surface', () => {
     renderLibraryWithHeader([
       buildAsset(),

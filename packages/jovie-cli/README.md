@@ -25,7 +25,7 @@ automated install. A repository build is not proof that npm has the package.
 
 | Command | Request |
 | --- | --- |
-| `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels; Instagram, TikTok, and Linktree return `SOURCE_UNSUPPORTED` |
+| `creator lookup <url-or-handle>` | `GET /api/agents/creator-lookup`; accepts a profile URL or `platform:handle` (youtube, instagram, tiktok, linktree); resolves an existing Jovie profile first, then extracts YouTube channels; Instagram, TikTok, and Linktree sources return `SOURCE_UNSUPPORTED` |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
@@ -42,13 +42,17 @@ has `profileUrl` and, when unclaimed, a `claimUrl`. The claim URL is not an
 ownership token: the artist still verifies that they own the Spotify artist.
 Creation is anonymous and rate limited per IP.
 
-`creator lookup` is read-only. It returns the display name, bio, avatar URL,
-and public links extracted by the existing ingestion strategy without creating
-or changing a Jovie profile.
+`creator lookup` is read-only and never creates or changes a Jovie profile.
+When a public Jovie profile already holds that channel (matched by channel
+identity, not a username guess), the response is
+`{"exists":true,"username":...,"profileUrl":...}` and no source page is
+fetched. Otherwise it is `{"exists":false,...}` with the display name, bio,
+avatar URL, and public links extracted by the existing ingestion strategy.
 
 `--json` emits JSON for API responses and wraps text resources as
 `{"content":"..."}`. Failures print `{"error":{...}}`, and API failures carry
-the server's stable `apiCode` (for example `RATE_LIMITED`). Successful commands
+the server's stable `apiCode` (for example `RATE_LIMITED` or
+`ARTIST_NOT_FOUND`). Successful commands
 exit `0`, request/response failures exit `1`, and invalid usage exits `2`.
 
 `--help --json` returns `{ "content": "..." }`; `--version --json` returns `{ "version": "..." }`.
@@ -98,6 +102,7 @@ Tools: `lookup_creator`, `create_profile`, `get_artist`, `get_artist_guide`, `ge
 import { createProfile, fetchArtist, lookupCreator } from '@jovie/cli';
 
 const creator = await lookupCreator('https://www.youtube.com/@creator');
+// or by handle: await lookupCreator('youtube:@creator');
 const profile = await createProfile('https://open.spotify.com/artist/<id>');
 const artist = await fetchArtist('artist-username');
 ```

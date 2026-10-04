@@ -23,6 +23,7 @@ import { ARTIST_PROFILE_SECTION_TEST_IDS as testIds } from '@/data/artistProfile
 import { HERO_CODE_BINDING_BY_VARIANT } from '@/data/marketing/factory/heroDecision';
 import {
   findUnresolvedRecordClaims,
+  type GeneratedPageAssetRef,
   type PageAssetRef,
   type PageCompositionSection,
   type PageRecord,
@@ -97,10 +98,65 @@ function slotText(
   return entries.find(entry => names.includes(entry.slot))?.text;
 }
 
+const FACTORY_MEDIA_SIZES = '(min-width: 1024px) 50vw, 100vw';
+
+/**
+ * Factory-rendered media (JOV-7765). The image or video carries the asset's
+ * intrinsic width and height, which browsers map to its aspect ratio, so the
+ * box is reserved before anything loads (CLS 0). Video is click-to-play
+ * behind its poster, with captions, and never autoplays, which also keeps it
+ * still for reduced-motion visitors. The digest attribute lets the design
+ * loop prove a re-render reached the page.
+ */
+function FactoryGeneratedMedia({
+  media,
+}: Readonly<{ media: GeneratedPageAssetRef }>) {
+  return (
+    <div
+      className='min-w-0 overflow-hidden rounded-xl border border-subtle bg-surface-0'
+      data-factory-media={media.id}
+      data-factory-media-digest={media.digest}
+    >
+      {media.mime.startsWith('video/') ? (
+        <video
+          className='block h-auto w-full'
+          width={media.width}
+          height={media.height}
+          controls
+          playsInline
+          preload='none'
+          poster={media.poster}
+          aria-label={media.alt}
+        >
+          <source src={media.id} type={media.mime} />
+          <track
+            kind='captions'
+            src={media.captions}
+            srcLang='en'
+            label='English'
+            default
+          />
+        </video>
+      ) : (
+        <Image
+          src={media.id}
+          alt={media.alt}
+          width={media.width}
+          height={media.height}
+          sizes={FACTORY_MEDIA_SIZES}
+          className='block h-auto w-full'
+        />
+      )}
+    </div>
+  );
+}
+
 function FactorySectionMedia({
   media,
 }: Readonly<{ media: PageAssetRef | null }>) {
   if (!media) return null;
+  if (media.kind === 'generated')
+    return <FactoryGeneratedMedia media={media} />;
 
   return (
     <div
@@ -118,7 +174,7 @@ function FactorySectionMedia({
           src={media.id}
           alt={media.alt}
           fill
-          sizes='(min-width: 1024px) 50vw, 100vw'
+          sizes={FACTORY_MEDIA_SIZES}
           className='object-contain'
         />
       )}
