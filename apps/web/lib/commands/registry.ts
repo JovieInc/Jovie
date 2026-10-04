@@ -315,6 +315,13 @@ export function buildCommands(
       APP_ROUTES.CONTACTS_AUDIENCE
     ),
     nav(
+      'go-insights',
+      'Insights',
+      'Open the insights workspace.',
+      'LineChart',
+      APP_ROUTES.INSIGHTS
+    ),
+    nav(
       'go-links',
       'Links',
       'Open the links workspace. Shortcut G then K.',
