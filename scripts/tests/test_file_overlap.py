@@ -164,6 +164,48 @@ class SequencingTest(unittest.TestCase):
             written = json.loads((host.state / "file-overlap.json").read_text())
             self.assertEqual(written["active"], {})
 
+    def test_queue_owned_later_pr_is_flagged_never_held(self):
+        # 2026-10-04: holds on queued #20469/#20447 failed every merge group behind them.
+        calls = []
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",
+                               sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
+                               ledger=lambda *_args: None)
+        first = pr(20166, [changed("scripts/lanes/lane_runner.py")])
+        queued = pr(20469, [changed("scripts/lanes/lane_runner.py")])
+        queued["isInMergeQueue"] = True
+        armed = pr(20470, [changed("scripts/lanes/lane_runner.py")])
+        armed["autoMergeRequest"] = {"enabledAt": "2026-10-04T01:00:00Z"}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            host = SimpleNamespace(state=Path(tmp))
+            result = overlap.reconcile_open_prs(host, lane, [first, queued, armed])
+        later = {row["laterPr"]: row for row in result["pairs"]}
+        self.assertEqual(set(later), {20469, 20470})
+        for row in later.values():
+            self.assertEqual((row["policyAction"], row["actionTaken"], row["queueOwned"]),
+                             ("sequence", "flag", True))
+        self.assertFalse(any("labels[]=hold" in call or "--disable-auto" in call
+                             for args in calls for call in args))
+
+    def test_hold_on_a_pr_that_joins_the_queue_is_released(self):
+        calls = []
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",
+                               sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
+                               ledger=lambda *_args: None)
+        first = pr(20148, [changed("scripts/lanes/lane_runner.py")])
+        later = pr(20469, [changed("scripts/lanes/lane_runner.py")])
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+            host = SimpleNamespace(state=Path(tmp))
+            overlap.reconcile_open_prs(host, lane, [first, later])
+            self.assertTrue(any("labels[]=hold" in call for args in calls for call in args))
+            calls.clear()
+            later["labels"] = [{"name": "hold"}]
+            later["isInMergeQueue"] = True
+            released = overlap.reconcile_open_prs(host, lane, [first, later])
+        self.assertEqual(released["released"], 1)
+        self.assertIn(["gh", "api", "-X", "DELETE", "repos/JovieInc/Jovie/issues/20469/labels/hold"], calls)
+
 
 if __name__ == "__main__":
     unittest.main()

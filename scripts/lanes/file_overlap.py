@@ -220,17 +220,28 @@ def classify_pair(left: dict, right: dict, *, existing_first: bool = False) -> d
     }
 
 
+def queue_owned(pr: dict | None) -> bool:
+    """A PR the native merge queue already sequences: queued or armed for auto-merge.  The queue
+    tests combined trees and ejects real conflicts; a `hold` on a member fails every group behind
+    it (2026-10-04: holds on queued #20469/#20447 ejected the whole queue), so never hold one."""
+    return bool(pr) and (pr.get("isInMergeQueue") is True or bool(pr.get("autoMergeRequest")))
+
+
 def open_pr_decisions(prs: list[dict], mode: str | None = None) -> list[dict]:
     mode = guard_mode(mode)
     if mode == "off":
         return []
     eligible = [pr for pr in prs if not pr.get("isDraft")]
+    by_number = {_number(pr): pr for pr in eligible}
     decisions = []
     for index, left in enumerate(eligible):
         for right in eligible[index + 1:]:
             decision = classify_pair(left, right)
             if decision:
-                decision["actionTaken"] = "flag" if mode == "flag" else decision["policyAction"]
+                owned = queue_owned(by_number.get(decision["laterPr"]))
+                decision["actionTaken"] = "flag" if mode == "flag" or owned else decision["policyAction"]
+                if owned:
+                    decision["queueOwned"] = True
                 decisions.append(decision)
     return decisions
 
