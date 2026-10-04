@@ -1,0 +1,8 @@
+The ship skill paused because gstack v1.91.16.0 is available; installed is v0.14.5.0.
+
+RECOMMENDATION: Choose A to update the shipping workflow before resolving PR #20558.
+
+- A) Upgrade now — Completeness: 10/10
+- B) Always auto-upgrade — Completeness: 10/10
+- C) Not now — Completeness: 8/10
+- D) Never ask again — Completeness: 6/10
