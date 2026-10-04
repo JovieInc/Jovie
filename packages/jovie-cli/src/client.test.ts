@@ -13,6 +13,7 @@ import {
   normalizeBaseUrl,
   readResponseBody,
   reportIssue,
+  resolveMusic,
   validateUsername,
 } from './client.js';
 
@@ -510,5 +511,135 @@ describe('response decoding and preexisting cancellation', () => {
     await expect(fetchArtist('demo', { fetchImpl })).resolves.toEqual({
       artist: { username: 'demo' },
     });
+  });
+});
+
+describe('music resolution over the existing MCP transport', () => {
+  const id = 'jovie-music-resolve';
+  const response = (structuredContent: unknown, isError = false) =>
+    JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      result: { structuredContent, isError },
+    });
+
+  it('sends a read-only tool call with normalized arguments and MCP Accept headers', async () => {
+    const result = {
+      status: 'resolved',
+      mbid: '51972833-bb04-46b7-9401-45a5ab449ebd',
+      artistMetadata: { isnis: ['0000000427529721'] },
+    };
+    const { calls, fetchImpl } = createFetch(response(result));
+    await expect(
+      resolveMusic(
+        '  us-abc-12-34567  ',
+        { kind: 'track', territory: 'gb', artist: '  Tim White  ' },
+        { fetchImpl }
+      )
+    ).resolves.toEqual(result);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.input).toBe('https://jov.ie/api/music/mcp');
+    expect(calls[0]?.init?.method).toBe('POST');
+    expect(calls[0]?.init?.headers).toMatchObject({
+      Accept: 'application/json, text/event-stream',
+      'Content-Type': 'application/json',
+    });
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      jsonrpc: '2.0',
+      id,
+      method: 'tools/call',
+      params: {
+        name: 'resolve',
+        arguments: {
+          input: 'us-abc-12-34567',
+          kind: 'track',
+          territory: 'GB',
+          artist: 'Tim White',
+        },
+      },
+    });
+  });
+
+  it('defaults to an artist read and preserves ambiguity as a successful result', async () => {
+    const result = {
+      status: 'ambiguous',
+      links: [],
+      candidates: [
+        {
+          title: 'Tim White',
+          url: 'https://musicbrainz.org/artist/51972833-bb04-46b7-9401-45a5ab449ebd',
+        },
+      ],
+    };
+    const { calls, fetchImpl } = createFetch(response(result));
+    await expect(resolveMusic('Tim White', {}, { fetchImpl })).resolves.toEqual(
+      result
+    );
+    expect(JSON.parse(String(calls[0]?.init?.body)).params.arguments).toEqual({
+      kind: 'artist',
+      input: 'Tim White',
+    });
+  });
+
+  it.each([
+    ['', {}],
+    ['a'.repeat(501), {}],
+    ['Tim White', { kind: 'creator' }],
+    ['Title', { artist: '' }],
+    ['Title', { artist: 'a'.repeat(201) }],
+    ['Title', { territory: 'USA' }],
+  ])(
+    'rejects invalid CLI arguments before networking: %s %j',
+    async (input, flags) => {
+      const { calls, fetchImpl } = createFetch('{}');
+      await expect(
+        resolveMusic(input, flags, { fetchImpl })
+      ).rejects.toBeInstanceOf(JovieInputError);
+      expect(calls).toEqual([]);
+    }
+  );
+
+  it.each([
+    null,
+    {},
+    { jsonrpc: '2.0', id, result: { structuredContent: 'invalid' } },
+    { jsonrpc: '2.0', id, result: { structuredContent: [] } },
+    { jsonrpc: '1.0', id, result: { structuredContent: {} } },
+    { jsonrpc: '2.0', id: 'other', result: { structuredContent: {} } },
+    { jsonrpc: '2.0', id, error: { message: 'private' } },
+    { jsonrpc: '2.0', id, result: {} },
+  ])(
+    'rejects malformed MCP envelopes without echoing their payloads: %j',
+    async envelope => {
+      const { fetchImpl } = createFetch(JSON.stringify(envelope));
+      await expect(
+        resolveMusic('Tim White', {}, { fetchImpl })
+      ).rejects.toMatchObject({
+        apiCode: 'INVALID_RESPONSE',
+        retryable: false,
+      });
+    }
+  );
+
+  it('retains stable resolver errors and retry advice from HTTP 200 tool errors', async () => {
+    const { fetchImpl } = createFetch(
+      response({ error: { code: 'UPSTREAM_FAILURE', retryable: true } }, true)
+    );
+    await expect(
+      resolveMusic('Tim White', {}, { fetchImpl })
+    ).rejects.toMatchObject({ apiCode: 'UPSTREAM_FAILURE', retryable: true });
+    const malformed = createFetch(
+      response(
+        { error: { code: 'Bearer private-token', retryable: 'true' } },
+        true
+      )
+    );
+    await expect(
+      resolveMusic('Tim White', {}, { fetchImpl: malformed.fetchImpl })
+    ).rejects.toMatchObject({ apiCode: 'RESOLUTION_FAILED', retryable: false });
+    const missing = createFetch(response({}, true));
+    await expect(
+      resolveMusic('Tim White', {}, { fetchImpl: missing.fetchImpl })
+    ).rejects.toMatchObject({ apiCode: 'RESOLUTION_FAILED' });
   });
 });
