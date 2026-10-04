@@ -36,8 +36,10 @@ export function WaitlistKanbanCard({
   const isApproved = entry.status === 'invited' || entry.status === 'approved';
   const isSignedUp = entry.status === 'signed_up' || entry.status === 'claimed';
   const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';
-  const platformLabel =
-    PLATFORM_LABELS[entry.primarySocialPlatform] ?? entry.primarySocialPlatform;
+  const platformLabel = entry.primarySocialPlatform
+    ? (PLATFORM_LABELS[entry.primarySocialPlatform] ??
+      entry.primarySocialPlatform)
+    : null;
   const primaryGoalLabel = entry.primaryGoal
     ? (PRIMARY_GOAL_LABELS[entry.primaryGoal] ?? entry.primaryGoal)
     : null;
@@ -78,12 +80,14 @@ export function WaitlistKanbanCard({
           </div>
         )}
 
-        <div>
-          <span className='text-tertiary-token'>Platform: </span>
-          <Badge size='sm' variant='secondary'>
-            {platformLabel}
-          </Badge>
-        </div>
+        {platformLabel && (
+          <div>
+            <span className='text-tertiary-token'>Platform: </span>
+            <Badge size='sm' variant='secondary'>
+              {platformLabel}
+            </Badge>
+          </div>
+        )}
 
         {entry.primarySocialUrlNormalized && (
           <a

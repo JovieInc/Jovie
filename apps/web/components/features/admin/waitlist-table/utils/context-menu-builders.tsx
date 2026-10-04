@@ -22,7 +22,7 @@ export function createCopyMenuItems(
       id: 'copy-name',
       label: 'Copy Name',
       icon: <User className='h-3.5 w-3.5' />,
-      onClick: () => copyToClipboard(entry.fullName, 'name'),
+      onClick: () => copyToClipboard(entry.fullName ?? '', 'name'),
     },
   ];
 }
@@ -33,20 +33,22 @@ export function createCopyMenuItems(
 export function createExternalLinkMenuItems(
   entry: WaitlistEntryRow
 ): ContextMenuItemType[] {
-  const items: ContextMenuItemType[] = [
-    {
+  const items: ContextMenuItemType[] = [];
+
+  if (entry.primarySocialUrlNormalized) {
+    items.push({
       id: 'open-social',
       label: 'Open Primary Social',
       icon: <ExternalLink className='h-3.5 w-3.5' />,
       onClick: () => {
         globalThis.open(
-          entry.primarySocialUrlNormalized,
+          entry.primarySocialUrlNormalized!,
           '_blank',
           'noopener,noreferrer'
         );
       },
-    },
-  ];
+    });
+  }
 
   // Add Spotify link if available
   if (entry.spotifyUrlNormalized) {
@@ -99,7 +101,7 @@ export function createStatusActionMenuItems(
   if (canResendInvite && resendInvite) {
     items.push({
       id: 'resend-invite',
-      label: 'Resend invite',
+      label: 'Resend Invite',
       icon: <Mail className='h-3.5 w-3.5' />,
       onClick: () => {
         void resendInvite({ id: entry.id });

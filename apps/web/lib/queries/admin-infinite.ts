@@ -85,12 +85,12 @@ export interface AdminCreatorProfileRow {
 
 export interface WaitlistEntryRow {
   id: string;
-  fullName: string;
+  fullName: string | null;
   email: string;
   primaryGoal: string | null;
-  primarySocialUrl: string;
-  primarySocialPlatform: string;
-  primarySocialUrlNormalized: string;
+  primarySocialUrl: string | null;
+  primarySocialPlatform: string | null;
+  primarySocialUrlNormalized: string | null;
   spotifyUrl: string | null;
   spotifyUrlNormalized: string | null;
   spotifyArtistName: string | null;

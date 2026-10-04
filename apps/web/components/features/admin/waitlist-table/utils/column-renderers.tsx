@@ -25,7 +25,10 @@ import {
 /**
  * Renders a name cell with primary token styling
  */
-export function renderNameCell(value: string) {
+export function renderNameCell(value: string | null) {
+  if (!value) {
+    return <EmptyCell />;
+  }
   return <span className='font-medium text-primary-token'>{value}</span>;
 }
 
@@ -86,18 +89,23 @@ function extractUsername(url: string): string {
  * Renders the primary social platform cell
  */
 export function renderPrimarySocialCell(entry: WaitlistEntryRow) {
-  const platformLabel =
-    PLATFORM_LABELS[entry.primarySocialPlatform] ?? entry.primarySocialPlatform;
-  const username = extractUsername(entry.primarySocialUrlNormalized);
+  const url = entry.primarySocialUrlNormalized;
+  if (!entry.primarySocialPlatform && !url) {
+    return <EmptyCell />;
+  }
+
+  const platformLabel = entry.primarySocialPlatform
+    ? (PLATFORM_LABELS[entry.primarySocialPlatform] ??
+      entry.primarySocialPlatform)
+    : 'Social';
+  const username = url ? extractUsername(url) : '';
 
   return (
     <PlatformPill
       platformIcon={entry.primarySocialPlatform?.toLowerCase() ?? ''}
       platformName={platformLabel}
-      primaryText={`@${username}`}
-      onClick={() =>
-        globalThis.open(entry.primarySocialUrlNormalized, '_blank')
-      }
+      primaryText={username ? `@${username}` : '—'}
+      onClick={() => url && globalThis.open(url, '_blank')}
     />
   );
 }
