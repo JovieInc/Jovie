@@ -44,6 +44,10 @@ const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
 // repository's shared GITHUB_TOKEN quota. A 3 s cadence across ten queue
 // groups drained it within minutes on 2026-10-03 (JOV-7744).
 const POLL_INTERVAL_MS = 15_000;
+// Pending polls back off exponentially with ±20% jitter, so a dozen concurrent
+// groups stop polling in lockstep (2026-10-04 quota storms, JOV-7743).
+const MAX_POLL_INTERVAL_MS = 60_000;
+const POLL_JITTER = 0.2;
 const RATE_LIMIT_PATTERN = /\b(?:secondary )?rate limit\b/i;
 const MAX_API_REQUEST_MS = 10_000;
 const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
@@ -550,6 +554,7 @@ export async function waitForMergeGroupAdmission({
   now = Date.now,
   onStatus = message => console.log(message),
   pollIntervalMs = POLL_INTERVAL_MS,
+  random = Math.random,
   runContext = undefined,
   sleep = defaultSleep,
 }) {
@@ -569,6 +574,18 @@ export async function waitForMergeGroupAdmission({
   let lastGateStatus = null;
   let observedSourceHeadSha = null;
   let recoverySourceHeadSha = null;
+  // Live membership and the exact queue ref are proved on the first poll and
+  // re-proved before admitting; pending polls only read the two check pages.
+  let provenQueue = null;
+  let pendingPolls = 0;
+  const pendingDelayMs = () => {
+    if (pendingPolls <= 1) return pollIntervalMs;
+    const backoff = Math.min(
+      Math.max(pollIntervalMs, MAX_POLL_INTERVAL_MS),
+      pollIntervalMs * 2 ** Math.min(pendingPolls - 1, 16)
+    );
+    return Math.round(backoff * (1 - POLL_JITTER + 2 * POLL_JITTER * random()));
+  };
   const failStillPending = () => {
     fail(
       `required merge-group checks did not pass within ${maxWaitMs}ms${
@@ -625,7 +642,7 @@ export async function waitForMergeGroupAdmission({
     };
   };
 
-  const poll = async () => {
+  const proveQueue = async () => {
     const liveReceipt = await readLiveReceipt();
     if (!liveReceipt.admitted) {
       return { ...evidence, admitted: false, receipt: liveReceipt };
@@ -641,6 +658,16 @@ export async function waitForMergeGroupAdmission({
     if (!SHA_PATTERN.test(String(sourceHeadSha ?? ''))) {
       fail('live merge queue entry omitted its exact source head');
     }
+    return { liveReceipt, sourceHeadSha };
+  };
+
+  const poll = async () => {
+    if (!provenQueue) {
+      const proven = await proveQueue();
+      if (!('sourceHeadSha' in proven)) return proven;
+      provenQueue = proven;
+    }
+    const { liveReceipt, sourceHeadSha } = provenQueue;
     const pages = await Promise.all(
       REQUIRED_CHECKS.map(checkName =>
         loadCheckRuns({ ...evidence, checkName, deadlineMs })
@@ -702,11 +729,16 @@ export async function waitForMergeGroupAdmission({
     }
 
     let outcome;
-    let delayMs = pollIntervalMs;
+    let delayMs;
     try {
       outcome = await poll();
+      pendingPolls += 1;
+      delayMs = pendingDelayMs();
     } catch (error) {
+      delayMs = pollIntervalMs;
       if (!isTransientApiError(error)) throw error;
+      // Every proof repeats after an API recovery.
+      provenQueue = null;
       recoverySourceHeadSha ??= observedSourceHeadSha;
       if (error.retryAtMs !== undefined && error.retryAtMs !== null) {
         delayMs = Math.max(pollIntervalMs, error.retryAtMs - now());

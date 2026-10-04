@@ -133,7 +133,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     path: ['creator', 'lookup'],
     tool: 'lookup_creator',
     summary:
-      'Extract public creator fields from a YouTube, Instagram, TikTok, or Linktree URL without creating a profile.',
+      'Extract public creator fields from a YouTube channel URL without creating a profile.',
     arg: {
       name: 'url',
       description: 'Supported creator profile URL',

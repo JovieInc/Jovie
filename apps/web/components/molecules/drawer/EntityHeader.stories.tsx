@@ -51,6 +51,16 @@ export const Person: Story = {
   },
 };
 
+export const LongStableIdentity: Story = {
+  args: {
+    ...Person.args,
+    title: 'The Very Long Artist Name and Collaborating Orchestra',
+    subtitle: '@long-artist-name-and-orchestra',
+    stableLayout: true,
+    titleLineClamp: 1,
+  },
+};
+
 export const Connection: Story = {
   args: {
     thumbnail: (

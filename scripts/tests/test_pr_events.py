@@ -78,6 +78,8 @@ def fake_lane(shell, claimed=False):
             return runner.publish_verified(host, target)
     module.publish_verified = publish
     module.posted = posted
+    module.pruned = []
+    module.prune_held = lambda host, prs, now, complete=False: module.pruned.append(complete)
     return module
 
 
@@ -1068,7 +1070,9 @@ class GapTest(unittest.TestCase):
         shell = Shell({("gh", "api", "graphql"): page})
         (self.host.state / "fix-attempts.json").write_text(json.dumps({"4": {"count": 2}, "10": {"count": 2}}))
         linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}}, move=None, comment=None)
-        record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW)
+        lane = fake_lane(shell)
+        record = events.reconcile(self.host, lane, lambda: linear, NOW)
+        self.assertEqual(lane.pruned, [True], "a complete open-PR page prunes held.json")
         self.assertEqual(record["counts"]["dirty"], 1)
         self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/1/labels", "-f", "labels[]=lane-fix-conflict"],
                       shell.calls)
