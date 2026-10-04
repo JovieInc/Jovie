@@ -187,7 +187,8 @@ export function ReleaseCatalogPageClient({
           ...buildLibraryReleaseAssets(
             [...releases, ...archivedReleases],
             approvalStatusMap,
-            profileVisibilityMap
+            profileVisibilityMap,
+            artistName
           ).map(withShare),
           ...buildLibraryMerchAssets(
             [...merchCards, ...archivedMerchCards],

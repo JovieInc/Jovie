@@ -28,6 +28,9 @@
     "capability.voice.voice-assisted-profile-actions": "d705d57bccdf5353",
     "capability.youtube-thumbnails.channel-packaging": "cab8568f5c88b64e",
     "capability.youtube-thumbnails.youtube-thumbnail-preview": "2c87c40bd298355a",
+    "dogfood.tim.active-subscribers": "4c7c10146088b220",
+    "dogfood.tim.human-link-clicks-90d": "7f65346f1053bad8",
+    "dogfood.tim.known-contacts": "0f73686e51713c4b",
     "offer.enterprise.badge": "bb003448ade24d4d",
     "offer.enterprise.note": "91cfc665c5c743dc",
     "offer.enterprise.price": "ff6e88dca3e4b234",
@@ -108,6 +111,9 @@
     "capability.voice.voice-assisted-profile-actions": "voice",
     "capability.youtube-thumbnails.channel-packaging": "youtube-thumbnails",
     "capability.youtube-thumbnails.youtube-thumbnail-preview": "youtube-thumbnails",
+    "dogfood.tim.active-subscribers": "artist-notifications",
+    "dogfood.tim.human-link-clicks-90d": "smart-links",
+    "dogfood.tim.known-contacts": "artist-profiles",
     "offer.enterprise.badge": "public-profile",
     "offer.enterprise.note": "public-profile",
     "offer.enterprise.price": "public-profile",
@@ -227,10 +233,16 @@
     "youtube-thumbnails": ["/youtube-thumbnails"]
   },
   "proofDigests": {
+    "dogfood-tim-active-subscribers": "67d9aca689d805f6",
+    "dogfood-tim-human-link-clicks-90d": "718133099381f0a3",
+    "dogfood-tim-known-contacts": "fe22d0feee63bec2",
     "product-profile-pay-capture": "80c4f4f9d2fac56b",
     "product-profile-subscribe-capture": "bb1811a129b3983b"
   },
   "proofCapabilities": {
+    "dogfood-tim-active-subscribers": "artist-notifications",
+    "dogfood-tim-human-link-clicks-90d": "smart-links",
+    "dogfood-tim-known-contacts": "artist-profiles",
     "product-profile-pay-capture": "pay",
     "product-profile-subscribe-capture": "artist-profiles"
   }
