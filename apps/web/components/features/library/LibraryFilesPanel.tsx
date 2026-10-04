@@ -126,10 +126,7 @@ export function LibraryFilesPanel({
     setLocalArtwork({ assetId: asset.id, url: asset.artworkUrl });
   }, [asset.id, asset.artworkUrl]);
 
-  const focused =
-    focusedId !== null
-      ? (files.find(file => file.id === focusedId) ?? null)
-      : null;
+  const focused = files.find(file => file.id === focusedId) ?? null;
   const focusedKind: WorkFileKind | null =
     focused?.kind ??
     (focusedId === 'add:audio'
@@ -195,7 +192,8 @@ export function LibraryFilesPanel({
       id: 'add-download',
       label: 'Add Stems Or Downloads',
       href: stemsHref,
-      missing: Boolean(stemsHref),
+      missing:
+        Boolean(stemsHref) && !files.some(file => file.kind === 'download'),
     },
   ].filter(entry => entry.missing);
 

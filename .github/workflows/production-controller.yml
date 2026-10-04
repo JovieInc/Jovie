@@ -1554,3 +1554,30 @@ jobs:
           path: ${{ runner.temp }}/customer-changelog/plan.json
           if-no-files-found: ignore
           retention-days: 30
+
+  # Publication runs after Production Verified and never touches production,
+  # so production-marker-state keeps the generation verified when it fails
+  # (JOV-7724). The failure files here instead of freezing later releases.
+  remediation-customer-changelog:
+    name: File customer changelog remediation
+    needs: [publish-customer-changelog]
+    if: ${{ always() && needs.publish-customer-changelog.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve customer changelog publication remediation
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-customer-changelog
+          REMEDIATION_SOURCE: production-controller.yml:customer-changelog
+          REMEDIATION_CONCLUSION: ${{ needs.publish-customer-changelog.result }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs

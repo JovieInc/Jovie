@@ -108,6 +108,7 @@ describe('LibraryFilesPanel', () => {
     expect(list).toHaveTextContent('Published artwork');
     expect(list).toHaveTextContent('stems.zip');
     expect(list).toHaveTextContent('Restricted');
+    expect(screen.queryByTestId('library-add-download-acquisition')).toBeNull();
     expect(screen.queryByText('Video')).toBeNull();
     expect(screen.queryByText('Documents')).toBeNull();
     expect(screen.queryByText('Stems')).toBeNull();

@@ -310,6 +310,8 @@ describe('affected-test selector inventory', () => {
     );
     expect(args).toContain('--coverage');
     expect(args).toContain('--coverage.include=lib/linear-sync-on-merge.mjs');
+    expect(args).toContain('--coverage.include=lib/validation-lifecycle.mjs');
+    expect(args).toContain('--coverage.include=lib/validation-sync.mjs');
     expect(args).toContain('--coverage.thresholds.lines=85');
     expect(args).toContain('--coverage.thresholds.branches=70');
   });
@@ -3272,6 +3274,8 @@ describe('linear sync on merge selection', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+      'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+      'scripts/lib/__tests__/validation-sync.test.mjs',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });

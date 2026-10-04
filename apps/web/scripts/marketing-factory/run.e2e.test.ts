@@ -71,7 +71,7 @@ describe('factory:run --dry end to end', () => {
     expect(pageRecord).toMatchObject({
       id: 'solutions.founders',
       status: 'shadow',
-      heroVariant: 'split-link-claim',
+      heroVariant: 'f-layout-desktop-screenshot',
       proof: ['product-profile-subscribe-capture'],
       seo: { title: 'Claim your public profile', hub: null },
     });
@@ -103,7 +103,7 @@ describe('factory:run --dry end to end', () => {
     });
   });
 
-  it('fails render when a section has no /solutions renderer', async () => {
+  it('rejects an unknown story section before copy or render', async () => {
     const narrative = brief.dry?.narrative as {
       sections: { sectionId: string }[];
     };
@@ -125,10 +125,9 @@ describe('factory:run --dry end to end', () => {
       }),
     });
 
-    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
-    expect(record('13-render.attempt-2.json').feedbackIn.join('; ')).toContain(
-      'no solutions renderer for not-a-section'
-    );
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'layout' });
+    expect(manifest.chain.map(link => link.stage)).not.toContain('copy');
+    expect(manifest.chain.map(link => link.stage)).not.toContain('render');
   });
 
   it('fails render when the run cannot form a valid page record', async () => {
@@ -155,7 +154,7 @@ describe('factory:run --dry end to end', () => {
 
   it('catches a tampered artifact in a real run', async () => {
     await run();
-    const path = join(runDir(), '05-copy.attempt-1.json');
+    const path = join(runDir(), '09-copy.attempt-1.json');
     const tampered = readJson<StageAttemptRecord>(path);
     writeJson(path, {
       ...tampered,

@@ -226,3 +226,13 @@ struct ObservabilityTests {
 private enum TestError: Error {
   case example
 }
+
+
+extension ObservabilityTests {
+  @Test(arguments: ["native_attempt", "nativeAttempt"])
+  func nonceCorrelationIsRedactedWithoutTokenHeuristics(key: String) {
+    let nonce = String(repeating: "A", count: 43)
+    #expect(ObservabilityRedactor.sanitizedValue(nonce, key: key) as? String == ObservabilityRedactor.filteredValue)
+    #expect(ObservabilityRedactor.sanitizedValue("callback \(key)=\(nonce)") as? String == ObservabilityRedactor.filteredValue)
+  }
+}
