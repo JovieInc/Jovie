@@ -17,6 +17,7 @@ export type TableNavAction =
   | 'last'
   | 'activate'
   | 'toggle'
+  | 'select'
   | 'close'
   | null;
 
@@ -27,6 +28,8 @@ export type TableNavAction =
  * All navigation keys return null when target is a form element
  * so they don't conflict with typing in search inputs.
  * Escape is always available for closing drawers/panels.
+ * Shift+J/K arrive as `J`/`K`; they map to next/prev so a row handler can
+ * read `event.shiftKey` and extend the selection (Superhuman-style).
  */
 export function resolveTableNavAction(
   key: string,
@@ -39,9 +42,11 @@ export function resolveTableNavAction(
   switch (key) {
     case 'ArrowDown':
     case 'j':
+    case 'J':
       return 'next';
     case 'ArrowUp':
     case 'k':
+    case 'K':
       return 'prev';
     case 'Home':
       return 'first';
@@ -52,6 +57,8 @@ export function resolveTableNavAction(
     case ' ':
     case 'Spacebar':
       return 'toggle';
+    case 'x':
+      return 'select';
     default:
       return null;
   }

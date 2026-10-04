@@ -33,6 +33,7 @@ import {
   type ColumnCompactItem,
   ColumnCompactProvider,
 } from '../column-priority-context';
+import { COLUMN_SNAP_STAGGER_CAP } from '../column-snap';
 import { useColumnPriorityLayout } from '../hooks/useColumnPriorityLayout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
@@ -140,6 +141,13 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
 
   /**
+   * Toggles one row's selection from the keyboard (`x`; Shift+J/K extends).
+   * Use when selection is consumer-owned (for example `useRowSelection`).
+   * Without it, tables with `onRowSelectionChange` toggle TanStack selection.
+   */
+  readonly onToggleRowSelection?: (row: TData, rowIndex: number) => void;
+
+  /**
    * Context menu handler for row
    */
   readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
@@ -204,7 +212,8 @@ export interface UnifiedTableProps<TData extends RowData> {
       | 'badge'
       | 'button'
       | 'release'
-      | 'meta';
+      | 'meta'
+      | 'person';
   }>;
 
   /**
@@ -437,6 +446,7 @@ function UnifiedTableContent<TData extends RowData>({
   getRowId,
   onRowClick,
   onRowShiftClick,
+  onToggleRowSelection,
   onRowContextMenu,
   getContextMenuItems,
   contextMenuSearchable = false,
@@ -658,6 +668,32 @@ function UnifiedTableContent<TData extends RowData>({
   });
 
   // Initialize keyboard navigation
+  const hasKeyboardSelection =
+    Boolean(onToggleRowSelection) || Boolean(onRowSelectionChange);
+  const toggleRowSelection = useCallback(
+    (rowIndex: number) => {
+      const row = rows[rowIndex];
+      if (!row) return;
+      if (onToggleRowSelection) {
+        onToggleRowSelection(row.original, rowIndex);
+      } else {
+        row.toggleSelected();
+      }
+    },
+    [rows, onToggleRowSelection]
+  );
+  const extendRowSelection = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      // Reads the controlled `rowSelection`; pass it alongside the toggle.
+      for (const index of [fromIndex, toIndex]) {
+        if (rows[index] && !rows[index].getIsSelected()) {
+          toggleRowSelection(index);
+        }
+      }
+    },
+    [rows, toggleRowSelection]
+  );
+
   const { handleKeyDown } = useTableKeyboardNav({
     enabled: shouldEnableKeyboardNav,
     focusedIndex,
@@ -665,6 +701,8 @@ function UnifiedTableContent<TData extends RowData>({
     rowRefsMap: rowRefs,
     setFocusedIndex,
     onRowClick,
+    onToggleSelection: hasKeyboardSelection ? toggleRowSelection : undefined,
+    onExtendSelection: hasKeyboardSelection ? extendRowSelection : undefined,
   });
 
   // Row lookup map for grouped table mode — rebuilt when rows change
@@ -696,7 +734,7 @@ function UnifiedTableContent<TData extends RowData>({
           rowRefsMap={rowRefs}
           shouldEnableKeyboardNav={shouldEnableKeyboardNav}
           shouldVirtualize={false}
-          focusedIndex={focusedIndex}
+          isFocused={focusedIndex === index}
           isSelected={isRowSelected?.(rowData, index)}
           onRowClick={onRowClick}
           onRowContextMenu={onRowContextMenu}
@@ -706,7 +744,7 @@ function UnifiedTableContent<TData extends RowData>({
           getRowTestId={getRowTestId}
           onRowShiftClick={onRowShiftClick}
           columnSnap={snapColumns}
-          columnSnapOrder={index}
+          columnSnapOrder={Math.min(index, COLUMN_SNAP_STAGGER_CAP)}
         />
       );
 

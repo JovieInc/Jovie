@@ -1,0 +1,148 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ColumnDef, RowSelectionState } from '@/lib/tanstack-table';
+import { UnifiedTable } from './UnifiedTable';
+
+type Row = { id: string; name: string };
+
+const data: Row[] = [
+  { id: 'a', name: 'Ada' },
+  { id: 'b', name: 'Bo' },
+  { id: 'c', name: 'Cy' },
+  { id: 'd', name: 'Di' },
+];
+
+const columns: ColumnDef<Row, unknown>[] = [
+  { accessorKey: 'name', header: 'Name' },
+];
+
+function ConsumerOwnedSelection({
+  onSelection,
+}: {
+  readonly onSelection: (ids: string[]) => void;
+}) {
+  const [selected, setSelected] = useState<RowSelectionState>({});
+  return (
+    <UnifiedTable
+      data={data}
+      columns={columns}
+      rowMode='dense'
+      enableVirtualization={false}
+      enableKeyboardNavigation
+      getRowId={row => row.id}
+      getRowTestId={row => `row-${row.id}`}
+      rowSelection={selected}
+      onToggleRowSelection={row =>
+        setSelected(prev => {
+          const next = { ...prev };
+          if (next[row.id]) delete next[row.id];
+          else next[row.id] = true;
+          onSelection(Object.keys(next).sort());
+          return next;
+        })
+      }
+    />
+  );
+}
+
+describe('UnifiedTable keyboard selection', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+  });
+
+  it('toggles the focused row with x', () => {
+    const onSelection = vi.fn();
+    render(<ConsumerOwnedSelection onSelection={onSelection} />);
+
+    fireEvent.keyDown(screen.getByTestId('row-b'), { key: 'x' });
+    expect(onSelection).toHaveBeenLastCalledWith(['b']);
+    expect(screen.getByTestId('row-b')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    fireEvent.keyDown(screen.getByTestId('row-b'), { key: 'x' });
+    expect(onSelection).toHaveBeenLastCalledWith([]);
+  });
+
+  it('extends a contiguous range with Shift+J and Shift+ArrowUp', () => {
+    const onSelection = vi.fn();
+    render(<ConsumerOwnedSelection onSelection={onSelection} />);
+
+    fireEvent.keyDown(screen.getByTestId('row-a'), {
+      key: 'J',
+      shiftKey: true,
+    });
+    fireEvent.keyDown(screen.getByTestId('row-b'), {
+      key: 'J',
+      shiftKey: true,
+    });
+    expect(onSelection).toHaveBeenLastCalledWith(['a', 'b', 'c']);
+    expect(screen.getByTestId('row-c')).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByTestId('row-d'), {
+      key: 'ArrowUp',
+      shiftKey: true,
+    });
+    expect(onSelection).toHaveBeenLastCalledWith(['a', 'b', 'c', 'd']);
+  });
+
+  it('toggles TanStack selection when the table owns it', () => {
+    const onRowSelectionChange = vi.fn();
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        enableVirtualization={false}
+        enableKeyboardNavigation
+        getRowId={row => row.id}
+        getRowTestId={row => `row-${row.id}`}
+        rowSelection={{}}
+        onRowSelectionChange={onRowSelectionChange}
+      />
+    );
+
+    fireEvent.keyDown(screen.getByTestId('row-c'), { key: 'x' });
+    expect(onRowSelectionChange).toHaveBeenCalledTimes(1);
+    const updater = onRowSelectionChange.mock.calls[0][0];
+    expect(updater({})).toEqual({ c: true });
+  });
+
+  it('leaves x alone when the table has no selection', () => {
+    const onRowClick = vi.fn();
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        getRowTestId={row => `row-${row.id}`}
+        onRowClick={onRowClick}
+      />
+    );
+
+    const event = fireEvent.keyDown(screen.getByTestId('row-a'), { key: 'x' });
+    expect(event).toBe(true);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('applies the 32px dense row geometry', () => {
+    const { container } = render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        rowMode='dense'
+        enableVirtualization={false}
+      />
+    );
+
+    const table = container.querySelector('table');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('32px');
+    expect(table?.style.getPropertyValue('--table-cell-content-height')).toBe(
+      '24px'
+    );
+  });
+});
