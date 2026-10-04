@@ -47,6 +47,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
       'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
     ],
   ],
+  [
+    'apps/web/lib/leads/qualification-decision.ts',
+    ['apps/web/tests/lib/leads/qualification-decision.test.ts'],
+  ],
+  [
+    'apps/web/lib/leads/qualify.ts',
+    ['apps/web/tests/lib/leads/qualify.test.ts'],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -1085,6 +1093,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set(
     'worktree_sweep',
     'hyperagent_lane',
     'execution_attempt',
+    'gh_app_token',
   ].flatMap(name => [
     `scripts/lanes/${name}.py`,
     `scripts/tests/test_${name}.py`,
