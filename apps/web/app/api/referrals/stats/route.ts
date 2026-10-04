@@ -12,32 +12,22 @@ import {
   DEFAULT_COMMISSION_RATE_BPS,
   formatCommissionRate,
 } from '@/lib/referrals/config';
-import { getInternalUserId, getReferralStats } from '@/lib/referrals/service';
+import { getReferralStats } from '@/lib/referrals/service';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET() {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
-    if (!clerkUserId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
-    // Look up internal user ID
-    const internalUserId = await getInternalUserId(clerkUserId);
-
-    if (!internalUserId) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const stats = await getReferralStats(internalUserId);
+    const stats = await getReferralStats(appUserId);
 
     return NextResponse.json(
       {

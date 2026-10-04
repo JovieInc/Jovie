@@ -8,35 +8,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import {
-  getInternalUserId,
-  getOrCreateReferralCode,
-} from '@/lib/referrals/service';
+import { getOrCreateReferralCode } from '@/lib/referrals/service';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET() {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
-    if (!clerkUserId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
-    // Look up internal user ID
-    const internalUserId = await getInternalUserId(clerkUserId);
-
-    if (!internalUserId) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const result = await getOrCreateReferralCode(internalUserId);
+    const result = await getOrCreateReferralCode(appUserId);
 
     return NextResponse.json(
       { code: result.code, isNew: result.isNew },
@@ -57,8 +44,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
-    if (!clerkUserId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
@@ -74,18 +61,8 @@ export async function POST(request: NextRequest) {
     const customCode =
       typeof customCodeRaw === 'string' ? customCodeRaw.trim() : undefined;
 
-    // Look up internal user ID
-    const internalUserId = await getInternalUserId(clerkUserId);
-
-    if (!internalUserId) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
     const result = await getOrCreateReferralCode(
-      internalUserId,
+      appUserId,
       customCode || undefined
     );
 
