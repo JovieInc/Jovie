@@ -1,4 +1,8 @@
-import { JOVIE_O_EASE, skipOneShotMotion } from './jovie-o-motion';
+import {
+  JOVIE_O_EASE,
+  JOVIE_O_MOTION_TOKENS as M,
+  skipOneShotMotion,
+} from './jovie-o-motion';
 
 /**
  * Ovie's eyes (JOV-7760). In Ovie the O becomes OV, and the pair reads as
@@ -9,18 +13,22 @@ import { JOVIE_O_EASE, skipOneShotMotion } from './jovie-o-motion';
  * while the tab is hidden.
  */
 
+/**
+ * Motion durations are design-system tokens (see JOVIE_O_MOTION_TOKENS);
+ * the rest are schedules (how often, how long to hold), not motion.
+ */
 export const OVIE_EYES_TIMING = {
-  closeMs: 90,
-  holdMs: 40,
-  openMs: 170,
+  closeMs: M['--duration-ov-blink-close'],
+  holdMs: M['--duration-ov-blink-hold'],
+  openMs: M['--duration-ov-blink-open'],
   /** First blink after this long on the page, then a random gap in range. */
   firstBlinkMs: [5000, 9000],
   blinkGapMs: [11000, 24000],
   /** A page gets this many blinks at most; after that the eyes just watch. */
   maxBlinks: 6,
-  glanceMs: 380,
+  glanceMs: M['--duration-cinematic'],
   glanceHoldMs: 1100,
-  glanceReturnMs: 620,
+  glanceReturnMs: M['--duration-cinematic'],
   glanceCooldownMs: 2600,
   /** Pointer must be within this many px of the mark to draw a glance. */
   glanceRadiusPx: 520,
@@ -28,7 +36,7 @@ export const OVIE_EYES_TIMING = {
   glanceTurnDeg: 32,
   /** ...and the v leans this far, % of its width. */
   glanceLeanPct: 3,
-  perkMs: 520,
+  perkMs: M['--duration-cinematic'],
 } as const;
 
 const T = OVIE_EYES_TIMING;
@@ -53,7 +61,7 @@ export function blink(els: OvieEyesElements): Promise<void> {
     const shut = el.classList.contains('jo-lid') ? '1 0' : '0';
     return el.animate(
       [
-        { scale: '1', easing: E.in },
+        { scale: '1', easing: E.inOut },
         { scale: shut, offset: T.closeMs / total },
         { scale: shut, offset: (T.closeMs + T.holdMs) / total, easing: E.out },
         { scale: '1' },

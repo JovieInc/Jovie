@@ -12,8 +12,11 @@
  *
  * Loops are CSS (they run from server HTML before hydration). One-shots are
  * Web Animations started from the loop's live position, so nothing jumps.
- * Reduced motion: no rotation or travel anywhere; loops become a slow
- * opacity pulse and one-shots resolve instantly.
+ *
+ * Reduced motion is its own branch, not a slower version: loops stop on the
+ * static O, success and error are plain state changes (no landing, settle or
+ * shake), Ovie never blinks, glances or perks, and the wordmark jumps to its
+ * end state. Accessible state comes from the caller's label / live region.
  */
 
 export const JOVIE_O_STATES = [
@@ -26,28 +29,58 @@ export const JOVIE_O_STATES = [
 
 export type JovieOState = (typeof JOVIE_O_STATES)[number];
 
-/** Curves match the design-system motion tokens (design-system.css). */
+/**
+ * Every duration is a named token in apps/web/styles/design-system.css; this
+ * is its JS mirror (Web Animations cannot read CSS variables), pinned by
+ * apps/web/tests/unit/design-system/jovie-o-motion-tokens.test.ts.
+ */
+export const JOVIE_O_MOTION_TOKENS = {
+  '--duration-o-turn': 1250,
+  '--duration-o-wind': 1700,
+  '--duration-o-orbit': 2600,
+  '--duration-o-shake': 460,
+  '--duration-ov-blink-close': 90,
+  '--duration-ov-blink-hold': 40,
+  '--duration-ov-blink-open': 170,
+  '--stagger-glyph': 28,
+  '--duration-cinematic': 420,
+  '--duration-slower': 350,
+} as const;
+
+/** The design-system curves, by token name. */
+export const JOVIE_O_EASE_TOKENS = {
+  '--ease-out': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--ease-in-out': 'cubic-bezier(0.65, 0, 0.35, 1)',
+  '--ease-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+} as const;
+
+const M = JOVIE_O_MOTION_TOKENS;
+
 export const JOVIE_O_EASE = {
-  out: 'cubic-bezier(0.16, 1, 0.3, 1)',
-  inOut: 'cubic-bezier(0.65, 0, 0.35, 1)',
-  spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-  in: 'cubic-bezier(0.55, 0, 1, 0.45)',
+  out: JOVIE_O_EASE_TOKENS['--ease-out'],
+  inOut: JOVIE_O_EASE_TOKENS['--ease-in-out'],
+  spring: JOVIE_O_EASE_TOKENS['--ease-spring'],
 } as const;
 
 export const JOVIE_O_TIMING = {
   /** One turn of the loader. */
-  turnMs: 1250,
+  turnMs: M['--duration-o-turn'],
   /** One unwind + rewind of the tail. */
-  windMs: 1700,
+  windMs: M['--duration-o-wind'],
   /** Thinking: the seed's orbit including its rest at 12. */
-  orbitMs: 2600,
-  landMs: 420,
-  settleMs: 360,
-  shakeMs: 460,
+  orbitMs: M['--duration-o-orbit'],
+  landMs: M['--duration-cinematic'],
+  settleMs: M['--duration-slower'],
+  shakeMs: M['--duration-o-shake'],
   /** Shortest and longest tail during loading, % of the ring. */
   tailMin: 24,
   tailMax: 76,
 } as const;
+
+/** CSS reads the token by name, with the mirrored value as its fallback. */
+const cssMs = (token: keyof typeof M) => `var(${token},${M[token]}ms)`;
+const cssEase = (token: keyof typeof JOVIE_O_EASE_TOKENS) =>
+  `var(${token},${JOVIE_O_EASE_TOKENS[token]})`;
 
 const T = JOVIE_O_TIMING;
 const E = JOVIE_O_EASE;
@@ -60,18 +93,16 @@ const E = JOVIE_O_EASE;
 export const JOVIE_O_CSS = `
 .jo-turn,.jo-iris,.jo-v{transform-box:fill-box;transform-origin:50% 50%}
 .jo-lid{transform-box:fill-box;transform-origin:50% 0}
-[data-jo-state=loading] .jo-turn{animation:jo-turn ${T.turnMs}ms linear infinite}
-[data-jo-state=loading] .jo-tail{animation:jo-wind ${T.windMs}ms ${E.inOut} infinite}
-[data-jo-state=thinking] .jo-turn{animation:jo-orbit ${T.orbitMs}ms infinite}
+[data-jo-state=loading] .jo-turn{animation:jo-turn ${cssMs('--duration-o-turn')} linear infinite}
+[data-jo-state=loading] .jo-tail{animation:jo-wind ${cssMs('--duration-o-wind')} ${cssEase('--ease-in-out')} infinite}
+[data-jo-state=thinking] .jo-turn{animation:jo-orbit ${cssMs('--duration-o-orbit')} infinite}
 @keyframes jo-turn{to{transform:rotate(360deg)}}
 @keyframes jo-wind{0%,100%{stroke-dasharray:${T.tailMin} 200}50%{stroke-dasharray:${T.tailMax} 200}}
-@keyframes jo-orbit{0%{transform:rotate(0);animation-timing-function:${E.inOut}}72%,100%{transform:rotate(360deg)}}
+@keyframes jo-orbit{0%{transform:rotate(0);animation-timing-function:${cssEase('--ease-in-out')}}72%,100%{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){
-[data-jo-state] .jo-turn,[data-jo-state] .jo-tail{animation:none!important}
-[data-jo-state=loading] .jo-tail{stroke-dasharray:none}
-[data-jo-state=loading],[data-jo-state=thinking]{animation:jo-pulse 1600ms ${E.inOut} infinite}
+[data-jo-state] .jo-turn,[data-jo-state] .jo-tail{animation:none!important;transform:none}
+[data-jo-state] .jo-tail{stroke-dasharray:none}
 }
-@keyframes jo-pulse{50%{opacity:.45}}
 `;
 
 /**

@@ -8,6 +8,7 @@ import { JovieO } from './JovieO';
 import {
   JOVIE_O_EASE,
   type JovieOState,
+  JOVIE_O_MOTION_TOKENS as M,
   skipOneShotMotion,
 } from './jovie-o-motion';
 
@@ -29,10 +30,10 @@ export interface JovieWordmarkProps {
 }
 
 export const JOVIE_WORDMARK_TIMING = {
-  collapseMs: 340,
-  openMs: 440,
+  collapseMs: M['--duration-slower'],
+  openMs: M['--duration-cinematic'],
   /** Delay between letters, outermost first when collapsing. */
-  staggerMs: 28,
+  staggerMs: M['--stagger-glyph'],
 } as const;
 
 /** Below 24 px the Text master (open seam, looser spacing) takes over. */
