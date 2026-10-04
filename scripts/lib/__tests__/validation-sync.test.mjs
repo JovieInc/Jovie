@@ -23,6 +23,7 @@ import {
   listMergedFiles,
   listMergedLinkedPulls,
   mergedUiEvidence,
+  pullImplementsIssue,
   reconcileValidation,
 } from '../validation-sync.mjs';
 import {
@@ -529,6 +530,40 @@ describe('validation sync: facts', () => {
     }
   });
 
+  it('binds only pull requests that implement the issue, never a passing mention (#20371 / JOV-7192)', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.pulls[101] = {
+      ...world.pulls[101],
+      title: 'feat(acquisition): derive acquisition_eligible',
+      headRef: 'feat/jov-7696-acquisition-eligible',
+      body: 'Golden path nightly is red, tracked on JOV-1. Part of JOV-1.',
+    };
+    // A sweep sees only Linear's attachment, not a merge event.
+    expect((await evaluate(world, fetchImpl)).action).toBe('skip');
+    expect(world.issues['JOV-1'].state).toBe('In Review');
+    expect(world.updates).toEqual([]);
+
+    for (const pull of [
+      { title: 'fix(profile): card (JOV-1)' },
+      { head: { ref: 'codex/jov-1-card' } },
+      { body: '<!-- linear-issue-identifier:JOV-1 -->' },
+      { body: '<!-- summer-issue-bind -->\nJOV-1\ntaskKey:abc' },
+      { body: 'Fixes JOV-1' },
+      { body: 'Resolves https://linear.app/jovie/issue/JOV-1/card' },
+    ]) {
+      expect(pullImplementsIssue(pull, 'JOV-1')).toBe(true);
+    }
+    for (const pull of [
+      { title: 'fix: card (JOV-12)' },
+      { head: { ref: 'tim/jov-12-card' } },
+      { body: 'Fixes JOV-12' },
+      { body: 'Refs JOV-1' },
+    ]) {
+      expect(pullImplementsIssue(pull, 'JOV-1')).toBe(false);
+    }
+    expect(pullImplementsIssue({ title: 'JOV-1' }, 'not-an-id')).toBe(false);
+  });
+
   it('rejects an ambiguous link set', async () => {
     const github = async () => {
       throw new Error('not reached');
@@ -537,6 +572,7 @@ describe('validation sync: facts', () => {
       listMergedLinkedPulls({
         github,
         repository: REPO,
+        identifier: 'JOV-1',
         attachmentUrls: Array.from(
           { length: 61 },
           (_, index) => `https://github.com/${REPO}/pull/${200 + index}`

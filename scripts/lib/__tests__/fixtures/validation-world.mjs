@@ -64,7 +64,7 @@ export function createWorld(overrides = {}) {
     served: MAIN[2].slice(0, 7),
     markers: new Set([MAIN[2], MAIN[4]]),
     openPulls: [],
-    /** @type {Record<number, { mergeSha: string, mergedAt: string, files: string[], base?: string }>} */
+    /** @type {Record<number, { mergeSha: string, mergedAt: string, files: string[], base?: string, title?: string, body?: string, headRef?: string }>} */
     pulls: {
       101: {
         mergeSha: MAIN[1],
@@ -133,6 +133,9 @@ export function createWorld(overrides = {}) {
           merged_at: record.mergedAt,
           merge_commit_sha: record.mergeSha,
           base: { ref: record.base ?? 'main' },
+          title: record.title ?? 'feat(profile): editorial card',
+          body: record.body ?? '',
+          head: { ref: record.headRef ?? 'tim/jov-1-editorial-card' },
         });
       }
       match = /^repos\/JovieInc\/Jovie\/commits\/([0-9a-f]+)$/.exec(path);

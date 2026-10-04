@@ -236,12 +236,48 @@ export function createProductionFacts(input) {
 }
 
 /**
- * Merged pull requests in this repository linked to the issue, from Linear's
- * native attachments plus the merging pull request itself.
+ * Does this pull request implement the issue, rather than mention it? Linear
+ * attaches every pull request whose body names an issue, so a passing
+ * reference (#20371 naming JOV-7192) must not bind the issue's evidence. The
+ * title, the jov-N branch, the merge-sync identifier marker, Summer's issue
+ * bind, or a Linear closing keyword count; a bare mention or "Part of" does
+ * not.
+ *
+ * @param {{ title?: string, body?: string, head?: { ref?: string } }} pull
+ * @param {string} identifier
+ * @returns {boolean}
+ */
+export function pullImplementsIssue(pull, identifier) {
+  const match = /^JOV-(\d+)$/i.exec(identifier);
+  if (!match) return false;
+  const id = `JOV-${match[1]}`;
+  const exact = `${id}(?!\\d)`;
+  const title = String(pull?.title ?? '');
+  const body = String(pull?.body ?? '');
+  const branch = String(pull?.head?.ref ?? '');
+  return (
+    new RegExp(`\\b${exact}`, 'i').test(title) ||
+    new RegExp(`(?:^|[^A-Za-z0-9])jov-${match[1]}(?!\\d)`, 'i').test(branch) ||
+    new RegExp(`linear-issue-identifier:\\s*${exact}`, 'i').test(body) ||
+    new RegExp(`<!--\\s*summer-issue-bind\\s*-->\\s*${exact}`, 'i').test(
+      body
+    ) ||
+    new RegExp(
+      `\\b(?:clos(?:e[sd]?|ing)|fix(?:e[sd]|ing)?|resolv(?:e[sd]?|ing)|complet(?:e[sd]?|ing))\\b:?\\s+(?:https://linear\\.app/\\S*?/issue/)?${exact}`,
+      'i'
+    ).test(body)
+  );
+}
+
+/**
+ * Merged pull requests in this repository that implement the issue, from
+ * Linear's native attachments plus the merging pull request itself (whose
+ * link the merge sync already proved).
  *
  * @param {{
  *   readonly github: GithubGet,
  *   readonly repository: string,
+ *   readonly identifier: string,
  *   readonly attachmentUrls: readonly string[],
  *   readonly eventPull?: { number: number },
  * }} input
@@ -273,7 +309,9 @@ export async function listMergedLinkedPulls(input) {
     if (
       typeof body?.merged_at === 'string' &&
       /^[0-9a-f]{40}$/i.test(String(body?.merge_commit_sha ?? '')) &&
-      body?.base?.ref === 'main'
+      body?.base?.ref === 'main' &&
+      (number === input.eventPull?.number ||
+        pullImplementsIssue(body, input.identifier))
     ) {
       merged.push({
         number,
@@ -423,6 +461,7 @@ export async function reconcileValidation(ctx) {
   const merged = await listMergedLinkedPulls({
     github: ctx.github,
     repository: ctx.repository,
+    identifier: issue.identifier,
     attachmentUrls: issue.attachmentUrls,
     eventPull: ctx.eventPull,
   });
