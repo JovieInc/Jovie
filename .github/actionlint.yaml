@@ -8,6 +8,7 @@ self-hosted-runner:
     - jovie-ephemeral
     - jovie-fixed
     - jovie-mac
+    - jovie-native-subscription
     - jovie-runner
     - jovie-runner-image-canary
     - ubicloud-standard-2
@@ -17,6 +18,9 @@ self-hosted-runner:
 # the pinned actionlint version does not yet recognize it. Keep the exception
 # exact and path-scoped; every other workflow syntax check remains enforced.
 paths:
+  .github/workflows/source-validation.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section.*'
   .github/workflows/staging-controller.yml:
     ignore:
       - 'unexpected key "queue" for "concurrency" section.*'

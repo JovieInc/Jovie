@@ -149,10 +149,14 @@ jobs:
           [[ "$(git rev-parse --is-shallow-repository)" == false ]] || exit 1
           base_tip="$(git rev-parse --verify "refs/remotes/origin/$PR_BASE_REF^{commit}")"
           [[ "$base_tip" =~ ^[0-9a-f]{40}$ ]] || exit 1
-          merge_bases="$(git merge-base --all "$base_tip" "$PR_HEAD_SHA")"
-          [[ "$merge_bases" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          # Criss-cross histories (stacked branches merged back and forth) can
+          # have several merge bases; --all prints one per line and the
+          # single-SHA check then fails. Pick the lowest SHA deterministically
+          # so the diff base is stable across runs.
+          merge_base="$(git merge-base --all "$base_tip" "$PR_HEAD_SHA" | sort | head -n1)"
+          [[ "$merge_base" =~ ^[0-9a-f]{40}$ ]] || exit 1
           echo "base_tip=$base_tip" >> "$GITHUB_OUTPUT"
-          echo "sha=$merge_bases" >> "$GITHUB_OUTPUT"
+          echo "sha=$merge_base" >> "$GITHUB_OUTPUT"
 
       - name: Enforce projected combined-tree byte budget
         # merge_group enforces maxTrackedBytes on base + members and ejects the

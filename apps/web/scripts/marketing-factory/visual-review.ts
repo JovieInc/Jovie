@@ -262,8 +262,8 @@ export function auditVisualAdmission(input: {
 
 /**
  * Live vision judges, mirroring design-ci-judge-dispatch buildLiveJudges:
- * the cheap judge excludes the producer family, the flagship excludes the
- * cheap judge's family. Unreachable models leave the id null.
+ * both judges exclude the producer family, and the flagship also excludes
+ * the cheap judge's family. An unavailable escalation stays undecided.
  */
 export async function liveVisualJudges(
   transport: JudgeTransport | null,
@@ -277,7 +277,9 @@ export async function liveVisualJudges(
       subscriptionVisionTransport(): VisionTransport;
     }
 ): Promise<RouteJudges> {
-  const available = visionAvailability(transport?.available ?? (() => false));
+  const reachable = visionAvailability(transport?.available ?? (() => false));
+  const available = (model: string) =>
+    reachable(model) && sameFamilyFinding(model, producerModel) === null;
   const cheap = pickRoleModel('vision-judge', {
     available,
     modality: 'vision',

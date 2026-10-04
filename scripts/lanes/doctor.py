@@ -10,6 +10,7 @@ color `#E5484D`). `doctor.json` is what the HUD renders.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import shutil
@@ -23,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
+import file_overlap  # noqa: E402
 import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
@@ -139,7 +141,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     try:
         qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
         design_census = design_gate.apply_to_pool(
-            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo))
+            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
         eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
         budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
@@ -204,6 +206,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
         "designGate": design_census,
+        "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -398,6 +401,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+    stale_briefs = (obs.get("designGate") or {}).get("stale") or []
+    if stale_briefs:
+        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
+                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -759,7 +766,12 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                              "outcomes": {key: 0 for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")},
                              "incidents": [], "topBlocker": "capacity projector unavailable",
                              "founderJudgmentRequired": False, "controls": "show-only"}
+    overlap = obs.get("fileOverlap")
+    if not overlap:
+        overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
+                   {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
+            "fileOverlap": overlap,
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
@@ -832,6 +844,39 @@ def _issue_id(lane, host, identifier: str) -> str:
     return data["issues"]["nodes"][0]["id"]
 
 
+def apply_linear_budget(result: dict, state: Path) -> None:
+    """Copy the best-effort Linear snapshot onto the doctor report. Never raises."""
+    try:
+        budget = read_json(state / "api-budget.json", None)
+        if not isinstance(budget, dict):
+            return
+        result["linearBudget"] = {key: budget.get(key)
+                                  for key in ("remaining", "limit", "reset", "rateLimitedAt", "observedAt")}
+    except Exception:
+        return
+
+
+def locked_doctor_write(state: Path, write) -> None:
+    """Serialize doctor.json updates with the lane's budget stamp. A missing lock still writes."""
+    handle = None
+    try:
+        state.mkdir(parents=True, exist_ok=True)
+        handle = open(state / "doctor.lock", "a")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+    except OSError:
+        # flock can fail after open. Dropping the handle without closing it leaks an fd
+        # on every doctor tick.
+        if handle is not None:
+            handle.close()
+        handle = None
+    try:
+        write()
+    finally:
+        if handle is not None:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+            handle.close()
+
+
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
     previous = read_json(path, {})
@@ -856,6 +901,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
     result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    result["fileOverlap"] = obs.get("fileOverlap") or file_overlap.doctor_view(host.state)
     for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
         result[key] = result["remediation"].get(key, 0)
     result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}
@@ -872,8 +918,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(result, indent=1, default=str))
-    os.replace(tmp, path)
+    def write_report():
+        apply_linear_budget(result, host.state)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(result, indent=1, default=str))
+        os.replace(tmp, path)
+    locked_doctor_write(host.state, write_report)
     return result

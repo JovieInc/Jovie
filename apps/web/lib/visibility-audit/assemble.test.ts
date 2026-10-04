@@ -26,6 +26,29 @@ function withInput(
 }
 
 describe('visibility audit', () => {
+  it.each([
+    { cited: [], expected: '0%' },
+    { cited: [false, false], expected: '0%' },
+    { cited: [true, false], expected: '50%' },
+    { cited: [true, true, false], expected: '66.7%' },
+  ])('renders citation share as $expected', ({ cited, expected }) => {
+    const question = buildCanonicalQuestions('Tim White')[0]!.question;
+    const report = assembleVisibilityAudit(
+      withInput({
+        citationChecks: cited.map(value => ({
+          engine: 'chatgpt',
+          question,
+          cited: value,
+          matchedUrl: value ? 'https://jov.ie/tim' : null,
+          checkedAt: '2026-10-04T03:00:00Z',
+        })),
+      })
+    );
+    expect(renderVisibilityAuditMarkdown(report)).toContain(
+      `Share of citation: ${expected}.`
+    );
+  });
+
   it('builds the Tim /tim sample from verified profile evidence only', () => {
     const report = assembleVisibilityAudit(TIM_WHITE_VISIBILITY_AUDIT_INPUT);
     expect(report.profilePath).toBe('/tim');

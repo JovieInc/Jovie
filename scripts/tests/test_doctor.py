@@ -54,6 +54,11 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_design_brief_held_past_24h_alerts(self):
+        alerts = doctor.judge(obs(designGate={"stale": ["JOV-3"]}))
+        self.assertIn("JOV-3", alerts["design-brief-stale"])
+        self.assertEqual(doctor.judge(obs(designGate={"stale": []})), {})
+
     def test_escalation_alert_names_the_pr_and_class(self):
         alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
         self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
@@ -805,7 +810,34 @@ class RunTest(unittest.TestCase):
             written = json.loads((state / "doctor.json").read_text())
             self.assertEqual(set(written["alerts"]) >= {"provider-down:devin", "linear-down"}, True)
             self.assertEqual(written["conditions"]["linear-down"]["source"]["status"], "unknown")
+            self.assertEqual(written["fileOverlap"]["mode"], "enforce")
+            self.assertEqual(written["fileOverlap"]["pairs"], [])
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
+
+
+class DoctorLockTest(unittest.TestCase):
+    def test_flock_failure_closes_the_lock_fd_and_still_writes(self):
+        import fcntl
+        state = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(state, ignore_errors=True))
+        opened = []
+        real_open = open
+
+        def tracking_open(file, mode="r", *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if str(file).endswith("doctor.lock"):
+                opened.append(handle)
+            return handle
+
+        def fail_lock(handle, operation):
+            raise OSError("flock failed")
+
+        wrote = []
+        with mock.patch("builtins.open", tracking_open), mock.patch.object(fcntl, "flock", fail_lock):
+            doctor.locked_doctor_write(state, lambda: wrote.append("ok"))
+        self.assertEqual(wrote, ["ok"])
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(opened[0].closed)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import {
   planStaleDraftRollup,
   planSummerReceipts,
   planVercelFailure,
+  RECEIPT_STALE_MS,
   runRemediationSweep,
   VERCEL_TOKEN_MISSING_WARNING,
 } from '../remediation-sweep.mjs';
@@ -99,40 +100,70 @@ describe('remediation sweep selection', () => {
     ).toEqual([]);
   });
 
-  it('reopens Summer when uncommissioned or the newest receipt is older than 24h', () => {
-    const uncommissioned = {
+  it('files Summer receipts per provider on age, not on commissioning', () => {
+    const health = (ages, extra = {}) => ({
       commissioned: false,
-      receiptFreshness: { githubRead: { observedAt: ago(60_000) } },
+      receiptFreshness: Object.fromEntries(
+        Object.entries(ages).map(([name, age]) => [
+          name,
+          { status: 'stale', observedAt: age == null ? null : ago(age) },
+        ])
+      ),
+      ...extra,
+    });
+    const fresh = {
+      githubRead: 60_000,
+      linearRead: 60_000,
+      gbrainRead: 60_000,
     };
-    expect(evaluateSummerHealth(uncommissioned, NOW).reason).toBe(
-      'commissioned-false'
-    );
-    expect(planSummerReceipts(uncommissioned, NOW).fingerprint).toBe(
-      'remediation:summer-receipts-stale'
-    );
-    expect(evaluateSummerHealth(null, NOW).stale).toBe(false);
+    // Uncommissioned with fresh heartbeat receipts is not a remediation event.
+    expect(evaluateSummerHealth(health(fresh), NOW)).toMatchObject({
+      stale: false,
+      reason: 'fresh',
+    });
+    expect(planSummerReceipts(health(fresh), NOW)).toBeNull();
     expect(
       evaluateSummerHealth(
-        {
-          commissioned: true,
-          receiptFreshness: {
-            old: { observedAt: ago(2 * DAY_MS) },
-            newest: { observedAt: ago(DAY_MS) },
-            missing: { observedAt: null },
-          },
-        },
+        health({ ...fresh, linearRead: RECEIPT_STALE_MS }),
         NOW
       ).stale
     ).toBe(false);
+    // One dead provider is not hidden by fresh ones.
+    const linearDead = planSummerReceipts(
+      health({ ...fresh, linearRead: RECEIPT_STALE_MS + 1 }),
+      NOW
+    );
+    expect(linearDead).toMatchObject({
+      fingerprint: 'remediation:summer-receipts-stale',
+      reason: 'provider-receipts-stale:linearRead',
+    });
+    expect(linearDead.description).toContain('- linearRead: stale');
+    expect(linearDead.description).toContain('refreshCapabilityReceipts');
+    expect(linearDead.description).toContain('gate-7');
+    // Missing, invalid and absent timestamps are stale, never fresh.
     expect(
-      planSummerReceipts(
-        {
-          commissioned: true,
-          receipts: [{ observedAt: ago(DAY_MS + 1) }],
-        },
+      evaluateSummerHealth(
+        health(
+          { githubRead: 60_000, linearRead: null },
+          {
+            receiptFreshness: {
+              githubRead: { observedAt: ago(60_000) },
+              linearRead: { observedAt: null },
+              gbrainRead: { observedAt: 'not-a-date' },
+            },
+          }
+        ),
         NOW
       ).reason
-    ).toBe('receipt-older-than-24h');
+    ).toBe('provider-receipts-stale:linearRead,gbrainRead');
+    // A 200 with no usable body is an alarm, not a pass.
+    expect(evaluateSummerHealth(null, NOW)).toMatchObject({
+      stale: true,
+      reason: 'unreadable-health',
+    });
+    expect(planSummerReceipts([], NOW).fingerprint).toBe(
+      'remediation:summer-receipts-stale'
+    );
   });
 
   it('files a Vercel project only when the latest production deploy is ERROR', () => {
@@ -167,6 +198,16 @@ describe('remediation sweep selection', () => {
         'jovie-docs': { readyState: 'ERROR', uid: 'dpl_docs' },
         'jovie-web': { readyState: 'READY' },
       }),
+      loadDomains: async () => [
+        {
+          domain: 'jov.ie',
+          observed: true,
+          registered: true,
+          expiresAt: ago(-90 * DAY_MS),
+          statuses: ['ok'],
+          nameservers: ['ns1.vercel-dns.com'],
+        },
+      ],
       vercelTokenPresent: true,
       upsert,
     });

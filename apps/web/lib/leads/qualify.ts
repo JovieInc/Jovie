@@ -12,6 +12,7 @@ import {
 import type { LinktreePageProps } from '@/lib/ingestion/strategies/linktree/helpers';
 import { detectLinktreeVerification } from '@/lib/ingestion/strategies/linktree/paid-tier';
 import type { ExtractedLink } from '@/lib/ingestion/types';
+import { decideLeadQualification } from '@/lib/leads/qualification-decision';
 
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object'
@@ -54,7 +55,10 @@ export interface QualifyLeadOptions {
  *
  * Rules:
  * Legacy compatibility projection for the premade artist-profile job.
- * Only an explicit Spotify artist URL satisfies the identity prerequisite.
+ * Only an explicit Spotify artist URL satisfies the identity prerequisite,
+ * and that path still does not certify commercial fit.
+ * FEATURE_LEAD_QUALIFY_GENERIC=true qualifies a public name plus any public
+ * link, including creators with no Spotify URL.
  * Public badges, branding, and tool links are observations, never proof of
  * paid access or commercial intent.
  */
@@ -103,17 +107,14 @@ export async function qualifyLead(
   // Preserve the old binary return shape, but stop silently certifying
   // unsupported commercial inferences. The job-aware v2 contract records the
   // corresponding tri-state decisions and review reasons.
-  let status: 'qualified' | 'disqualified';
-  let disqualificationReason: string | null = null;
-
-  if (!hasSpotifyLink) {
-    status = 'disqualified';
-    disqualificationReason =
-      spotifyLinks.length > 0 ? 'spotify_artist_required' : 'no_spotify';
-  } else {
-    status = 'disqualified';
-    disqualificationReason = 'commercial_fit_review_needed';
-  }
+  const decision = decideLeadQualification({
+    displayName: extraction.displayName ?? null,
+    links: extraction.links,
+    hasSpotifyArtistUrl: hasSpotifyLink,
+    spotifyLinkCount: spotifyLinks.length,
+  });
+  const status = decision.status;
+  const disqualificationReason = decision.disqualificationReason;
 
   return {
     status,

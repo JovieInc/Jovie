@@ -59,7 +59,7 @@ Observed visibility is sampled AI-answer evidence. It does not measure referrals
 
 Answer-engine citation spot checks use the canonical question set. Paste manual results per engine. This generator does not query answer engines.
 
-Checks: 0. Cited: 0. Share of citation: 0.
+Checks: 0. Cited: 0. Share of citation: 0%.
 
 - Who is Tim White? (identity): not checked
 - Where is Tim White from? (identity): not checked

@@ -1,3 +1,4 @@
+import { formatShareOfCitation } from '@/lib/aeo/citation-monitor';
 import type { AuditFix, VisibilityAuditReport } from './types';
 
 function fixLine(fix: AuditFix): string {
@@ -115,7 +116,7 @@ export function renderVisibilityAuditMarkdown(
   lines.push(report.citations.disclosure, '');
   lines.push(report.citations.instruction, '');
   lines.push(
-    `Checks: ${report.citations.totalChecks}. Cited: ${report.citations.citedCount}. Share of citation: ${report.citations.shareOfCitation}.`,
+    `Checks: ${report.citations.totalChecks}. Cited: ${report.citations.citedCount}. Share of citation: ${formatShareOfCitation(report.citations.shareOfCitation)}.`,
     ''
   );
   for (const question of report.citations.questions) {

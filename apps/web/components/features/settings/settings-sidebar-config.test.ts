@@ -20,7 +20,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     ]);
   });
 
-  it('assigns the 10 sub-pages to their approved groups', () => {
+  it('assigns the 8 sub-pages to their approved groups', () => {
     const membership = Object.fromEntries(
       SETTINGS_SIDEBAR_GROUPS.map(group => [
         group.id,
@@ -29,9 +29,9 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     );
 
     expect(membership).toEqual({
-      profile: ['artist-profile', 'contacts', 'appearance'],
+      profile: ['artist-profile', 'contacts'],
       account: ['account', 'data-privacy', 'delete-account'],
-      workspace: ['connections', 'retargeting-ads'],
+      workspace: ['connections'],
       billing: ['billing', 'usage'],
     });
   });
@@ -51,10 +51,10 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
 });
 
 describe('filterSettingsGroups', () => {
-  it('returns all 10 items for an empty query', () => {
+  it('returns all 8 items for an empty query', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '');
     const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).toHaveLength(10);
+    expect(ids).toHaveLength(8);
   });
 
   it('filters by item label, case-insensitively', () => {
@@ -89,11 +89,11 @@ describe('filterSettingsGroups', () => {
     }
   });
 
-  it('shows admins the same 10 items as creators', () => {
+  it('shows admins the same 8 items as creators', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '', {
       isAdmin: true,
     });
-    expect(groups.flatMap(group => group.items)).toHaveLength(10);
+    expect(groups.flatMap(group => group.items)).toHaveLength(8);
   });
 });
 

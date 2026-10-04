@@ -9,6 +9,7 @@ vi.mock('@/lib/admin/middleware', () => ({
 }));
 
 import { NextResponse } from 'next/server';
+import { TIM_WHITE_VISIBILITY_AUDIT_INPUT } from '@/lib/visibility-audit/fixtures/tim-white';
 import { GET, POST } from './route';
 
 describe('/api/admin/visibility-audit', () => {
@@ -48,5 +49,54 @@ describe('/api/admin/visibility-audit', () => {
       })
     );
     expect(response.status).toBe(400);
+  });
+
+  it('assembles a parsed snapshot while dropping caller-supplied guard fields', async () => {
+    mocks.requireAdmin.mockResolvedValue(null);
+    const response = await POST(
+      new Request('https://jov.ie/api/admin/visibility-audit', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...TIM_WHITE_VISIBILITY_AUDIT_INPUT,
+          popularity: 87,
+          serpApiRequests: 10,
+          searchOwnership: [
+            {
+              query: 'Tim White',
+              rank: 1,
+              url: 'https://jov.ie/tim',
+              owned: true,
+              serpApiRequests: 10,
+            },
+          ],
+          catalogMismatches: [
+            {
+              isrc: 'USAAA1234567',
+              mismatchType: 'missing_from_dsp',
+              status: 'flagged',
+              providerId: 'spotify',
+              popularity: 87,
+              followers: 1200,
+            },
+          ],
+        }),
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    const { report } = await response.json();
+    expect(report.searchOwnership.serpApiRequests).toBe(0);
+    expect(report.catalog.mismatches).toEqual([
+      {
+        isrc: 'USAAA1234567',
+        mismatchType: 'missing_from_dsp',
+        status: 'flagged',
+        providerId: 'spotify',
+        externalTrackName: null,
+        externalAlbumName: null,
+      },
+    ]);
+    expect(JSON.stringify(report)).not.toMatch(/"popularity"|"followers"/);
   });
 });

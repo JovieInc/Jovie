@@ -1,7 +1,15 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 // Fake subscription CLIs: `claude` echoes stdin, `codex` writes its `-o` file.
 const bin = mkdtempSync(join(tmpdir(), 'copy-transport-bin-'));
@@ -37,6 +45,7 @@ const request = (model: string) => ({
 });
 
 describe('routedTransport', () => {
+  afterEach(() => vi.unstubAllGlobals());
   it('routes anthropic/* to the Claude CLI and openai/* to the Codex CLI', async () => {
     vi.resetModules();
     const { routedTransport } = await import('./transport');
@@ -59,6 +68,40 @@ describe('routedTransport', () => {
       'AI_GATEWAY_API_KEY missing'
     );
     expect(routedTransport('test-key').available?.('zai/glm-5.3')).toBe(true);
+  });
+
+  it('forwards Gateway policy without applying it to subscription CLIs', async () => {
+    const fetch = vi.fn(
+      async (_url: string, _options: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: 'gateway-reply' } }],
+          })
+        )
+    );
+    vi.stubGlobal('fetch', fetch);
+    const authorize = vi.fn(async () => ({ maxTokens: 256, provider: 'zai' }));
+    const { routedTransport } = await import('./transport');
+    const send = routedTransport('test-key', {
+      allowed: model => model === 'zai/glm-5.3',
+      authorize,
+    });
+    expect(send.available?.('zai/unknown')).toBe(false);
+    expect((await send(request('openai/gpt-5.6-sol'))).trim()).toBe(
+      'codex-reply'
+    );
+    expect(authorize).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(send(request('zai/unknown'))).rejects.toThrow(/not allowed/);
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(send(request('zai/glm-5.3'))).resolves.toBe('gateway-reply');
+    expect(authorize).toHaveBeenCalledWith(request('zai/glm-5.3'));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(fetch.mock.calls[0]![1].body as string);
+    expect(body).toMatchObject({
+      max_tokens: 256,
+      providerOptions: { gateway: { only: ['zai'] } },
+    });
   });
 
   it('surfaces a failing CLI as an error, never an empty verdict', async () => {

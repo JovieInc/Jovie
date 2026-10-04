@@ -2,7 +2,7 @@
   "name": "@jovie/cli",
   "private": false,
   "type": "module",
-  "description": "Jovie for AI agents: create artist profiles from a Spotify URL and read public artist data. CLI + MCP server + agent skill.",
+  "description": "Jovie for AI agents: extract public creator data, create Spotify artist profiles, and read public artist data. CLI + MCP server + agent skill.",
   "keywords": [
     "mcp",
     "mcp-server",
@@ -48,7 +48,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=24.21.0 <25"
+    "node": ">=24.21.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -5,7 +5,12 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import React, { useEffect, useId, useRef, useState } from 'react';
-
+import {
+  SHELL_RAIL_ALLOCATION,
+  SHELL_RAIL_SHEET,
+  SHELL_RAIL_TRAVEL,
+} from '@/components/shell/rail-motion';
+import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   getFocusableElements,
@@ -274,6 +279,10 @@ export function RightDrawer({
     drawerId
   );
   const [hasAnimated, setHasAnimated] = useState(false);
+  // Shared rail lifecycle (JOV-4522): `closing` keeps the panel visible while
+  // opacity/travel stage with the width give-back, instead of snapping to
+  // `invisible` at frame one. `data-rail-phase` is the certification hook.
+  const railPhase = useRailMotionPhase(isOpen);
 
   // Suppress the width/opacity transition on first paint so the panel appears
   // at its final size instead of animating in on hydration. The transition
@@ -341,6 +350,7 @@ export function RightDrawer({
         role='dialog'
         inert={!isOpen || !isActiveMobileDrawer ? true : undefined}
         tabIndex={isOpen ? -1 : undefined}
+        data-rail-phase={railPhase}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
           'overflow-hidden',
@@ -348,7 +358,7 @@ export function RightDrawer({
           'border-l border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
           'shadow-(--app-shell-drawer-shadow)',
           'pb-[env(safe-area-inset-bottom)]',
-          'transition-transform duration-cinematic ease-cinematic motion-reduce:transition-none',
+          SHELL_RAIL_SHEET,
           isOpen && isActiveMobileDrawer
             ? 'translate-x-0'
             : 'translate-x-full pointer-events-none',
@@ -369,6 +379,7 @@ export function RightDrawer({
       aria-label={ariaLabel}
       tabIndex={isOpen ? -1 : undefined}
       inert={isOpen ? undefined : true}
+      data-rail-phase={railPhase}
       className={cn(
         // Desktop inspector is an in-flow sibling of route content, but it
         // remains its own raised surface. This gives the shell one stable
@@ -376,17 +387,22 @@ export function RightDrawer({
         'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-drawer-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
-        'transition-[width,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',
+        SHELL_RAIL_ALLOCATION,
+        // The panel stays `visible` through `closing` so the opacity + 6px
+        // directional travel stage against the concurrent width give-back;
+        // `invisible` only applies once the rail has fully settled closed.
+        // Reopening mid-exit reverses in place — no snap, no stale overlay.
+        railPhase === 'closed' ? 'invisible' : 'visible',
         isOpen
-          ? 'visible opacity-100'
-          : 'opacity-0 pointer-events-none invisible',
+          ? 'opacity-100 translate-x-0'
+          : cn('opacity-0 pointer-events-none', SHELL_RAIL_TRAVEL.right),
         className
       )}
       style={{
         width: isOpen ? width : 0,
         maxWidth: '100vw',
         transitionDuration: hasAnimated ? undefined : '0ms',
-        willChange: hasAnimated ? 'width, opacity' : 'auto',
+        willChange: hasAnimated ? 'width, opacity, transform' : 'auto',
         contain: 'layout style paint',
       }}
     >

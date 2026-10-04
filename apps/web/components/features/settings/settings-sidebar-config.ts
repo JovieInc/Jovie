@@ -5,9 +5,7 @@ import {
   Gauge,
   Lock,
   type LucideIcon,
-  Palette,
   ShieldCheck,
-  Target,
   Trash2,
   UserRound,
 } from 'lucide-react';
@@ -53,12 +51,6 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
         href: APP_ROUTES.SETTINGS_CONTACTS,
         icon: Contact,
       },
-      {
-        id: 'appearance',
-        label: 'Appearance',
-        href: APP_ROUTES.SETTINGS_APPEARANCE,
-        icon: Palette,
-      },
     ],
   },
   {
@@ -94,12 +86,6 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
         label: 'Connections',
         href: APP_ROUTES.SETTINGS_CONNECTORS,
         icon: Cable,
-      },
-      {
-        id: 'retargeting-ads',
-        label: 'Retargeting Ads',
-        href: APP_ROUTES.SETTINGS_RETARGETING_ADS,
-        icon: Target,
       },
     ],
   },

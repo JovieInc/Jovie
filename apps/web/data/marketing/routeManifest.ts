@@ -299,35 +299,23 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/new/page.tsx',
     recipeId: 'homepage',
-    renderedSections: [
-      ...approvedBindings(
-        'components/marketing/homepage-v2/HomepageV2Route.tsx',
-        'hero',
-        'logo-cloud',
-        'feature-split',
-        'feature-split',
-        'feature-split',
-        'spec-wall',
-        'social-proof'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx',
-        'pricing',
-        'tier-cards-recommended'
-      ),
-      ...approvedBindings(
-        'components/marketing/homepage-v2/HomepageV2Route.tsx',
-        'cta'
-      ),
-    ],
+    renderedSections: [],
     bindingEvidence: {
-      status: 'verified',
-      source: 'route audit 2026-07-11',
+      status: 'unverified',
+      source: 'https://github.com/JovieInc/Jovie/pull/20188',
+      notes:
+        'Retired homepage-v2 alias redirects to /. It renders no recipe sections; homepage evidence belongs to the live / route.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.2.0',
     url: '/new',
     aliasOf: '/',
+    noindex: true,
+    healthCheck: {
+      path: '/new',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
+    },
   },
   {
     glob: '(marketing)/pricing/page.tsx',
@@ -487,13 +475,19 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-08-02',
+      source: 'JOV-7607 navigation audit 2026-10-03',
       notes:
-        'Alias renders the same route component and chrome as /artist-profiles. Release-cycle gallery is product evidence, not social proof.',
+        'The singular alias permanently redirects to /artist-profiles before this fallback page renders.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.0.0',
     url: '/artist-profile',
+    healthCheck: {
+      path: '/artist-profile',
+      expected: 'redirect',
+      allowedFinalPaths: ['/artist-profiles'],
+      requiresSharedChrome: false,
+    },
     productEvidence: {
       kind: 'framed-screenshot',
       componentPath:

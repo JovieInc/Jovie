@@ -80,17 +80,39 @@ describe('buildMoneyOverview states', () => {
 });
 
 describe('buildMoneyOverview metrics', () => {
+  it('uses the ledger bank sign convention for totals and daily cash flow', () => {
+    const o = overview([
+      tx({ daysAgo: 40, amount: 1200, category: 'payroll' }),
+      tx({ daysAgo: 20, amount: 1200, category: 'payroll' }),
+      tx({ daysAgo: 10, amount: -300, category: 'rent' }),
+      tx({ daysAgo: 5, amount: -200, category: 'creator:plugins' }),
+    ]);
+    expect(card(o, 'income').value).toBe(1200);
+    expect(card(o, 'burn').value).toBe(500);
+    expect(card(o, 'netCashFlow').value).toBe(700);
+    expect(o.personal.income.value).toBe(1200);
+    expect(o.personal.expenses.value).toBe(300);
+    expect(o.creator.expenses.value).toBe(200);
+    expect(o.trend.find(p => p.income === 1200)?.netCashFlow).toBe(1200);
+    expect(o.trend.find(p => p.personalExpenses === 300)?.netCashFlow).toBe(
+      -300
+    );
+    expect(o.trend.find(p => p.creatorExpenses === 200)?.netCashFlow).toBe(
+      -200
+    );
+  });
+
   it('excludes non-effective ledger rows from economics and trend totals', () => {
     const baseline = [
-      tx({ daysAgo: 40, amount: -100 }),
-      tx({ daysAgo: 10, amount: 20 }),
+      tx({ daysAgo: 40, amount: 100 }),
+      tx({ daysAgo: 10, amount: -20 }),
     ];
     const ignored = [
       ...['pending', 'superseded', 'removed'].map(status =>
-        tx({ daysAgo: 10, amount: 900, status })
+        tx({ daysAgo: 10, amount: -900, status })
       ),
       ...['transfer', 'cc_payment', 'reversal', 'duplicate'].map(flowKind =>
-        tx({ daysAgo: 10, amount: -900, flowKind })
+        tx({ daysAgo: 10, amount: 900, flowKind })
       ),
     ];
     const expected = overview(baseline);
@@ -104,8 +126,8 @@ describe('buildMoneyOverview metrics', () => {
 
   it('does not compare an empty prior window merely because older history exists', () => {
     const o = overview([
-      tx({ daysAgo: 90, amount: 600, category: 'rent' }),
-      tx({ daysAgo: 10, amount: 300, category: 'rent' }),
+      tx({ daysAgo: 90, amount: -600, category: 'rent' }),
+      tx({ daysAgo: 10, amount: -300, category: 'rent' }),
     ]);
     expect(o.personal.expenses.deltaAbs).toBeNull();
     expect(o.personal.expenses.deltaPct).toBeNull();
@@ -117,10 +139,10 @@ describe('buildMoneyOverview metrics', () => {
       institutions: [ACTIVE],
       accounts: [account({ currentBalance: '9000' })],
       transactions: [
-        tx({ daysAgo: 40, amount: -3000, category: 'payroll' }),
-        tx({ daysAgo: 10, amount: -3000, category: 'creator:royalties' }),
-        tx({ daysAgo: 5, amount: 600, category: 'rent' }),
-        tx({ daysAgo: 3, amount: 300, category: 'creator:plugins' }),
+        tx({ daysAgo: 40, amount: 3000, category: 'payroll' }),
+        tx({ daysAgo: 10, amount: 3000, category: 'creator:royalties' }),
+        tx({ daysAgo: 5, amount: -600, category: 'rent' }),
+        tx({ daysAgo: 3, amount: -300, category: 'creator:plugins' }),
       ],
       now: NOW,
     });
@@ -138,10 +160,10 @@ describe('buildMoneyOverview metrics', () => {
 
   it('splits personal and creator economics', () => {
     const o = overview([
-      tx({ daysAgo: 20, amount: 100, category: 'groceries' }),
-      tx({ daysAgo: 20, amount: 50, category: 'creator:domain' }),
-      tx({ daysAgo: 20, amount: -80, category: 'creator:royalties' }),
-      tx({ daysAgo: 20, amount: -200, category: 'payroll' }),
+      tx({ daysAgo: 20, amount: -100, category: 'groceries' }),
+      tx({ daysAgo: 20, amount: -50, category: 'creator:domain' }),
+      tx({ daysAgo: 20, amount: 80, category: 'creator:royalties' }),
+      tx({ daysAgo: 20, amount: 200, category: 'payroll' }),
     ]);
     expect(o.personal.expenses.value).toBe(100);
     expect(o.creator.expenses.value).toBe(50);
@@ -157,10 +179,10 @@ describe('buildMoneyOverview metrics', () => {
 
   it('marks spend decreases favorable and income decreases unfavorable', () => {
     const o = overview([
-      tx({ daysAgo: 45, amount: 600, category: 'rent' }),
-      tx({ daysAgo: 10, amount: 300, category: 'rent' }),
-      tx({ daysAgo: 45, amount: -1000, category: 'payroll' }),
-      tx({ daysAgo: 10, amount: -500, category: 'payroll' }),
+      tx({ daysAgo: 45, amount: -600, category: 'rent' }),
+      tx({ daysAgo: 10, amount: -300, category: 'rent' }),
+      tx({ daysAgo: 45, amount: 1000, category: 'payroll' }),
+      tx({ daysAgo: 10, amount: 500, category: 'payroll' }),
     ]);
     expect(o.personal.expenses.deltaAbs).toBe(-300);
     expect(o.personal.expenses.favorable).toBe(true);
@@ -173,8 +195,8 @@ describe('buildMoneyOverview metrics', () => {
       institutions: [ACTIVE],
       accounts: [account({ currentBalance: '1500' })],
       transactions: [
-        tx({ daysAgo: 20, amount: 1000, category: 'rent' }),
-        tx({ daysAgo: 10, amount: 500, category: 'food' }),
+        tx({ daysAgo: 20, amount: -1000, category: 'rent' }),
+        tx({ daysAgo: 10, amount: -500, category: 'food' }),
       ],
       now: NOW,
     });
@@ -185,8 +207,8 @@ describe('buildMoneyOverview metrics', () => {
 
   it('counts review queue and flags stale data', () => {
     const o = overview([
-      tx({ daysAgo: 10, amount: 5 }), // uncategorized → review
-      tx({ daysAgo: 10, amount: 5, category: 'rent' }),
+      tx({ daysAgo: 10, amount: -5 }), // uncategorized → review
+      tx({ daysAgo: 10, amount: -5, category: 'rent' }),
     ]);
     expect(o.reviewCount).toBe(1);
     expect(o.anomalies).toContain('stale-data');
@@ -197,8 +219,8 @@ describe('buildMoneyOverview metrics', () => {
       institutions: [ACTIVE],
       accounts: [account({ currentBalance: '1000' })],
       transactions: [
-        tx({ daysAgo: 20, amount: -300, category: 'payroll' }),
-        tx({ daysAgo: 10, amount: 100, category: 'rent' }),
+        tx({ daysAgo: 20, amount: 300, category: 'payroll' }),
+        tx({ daysAgo: 10, amount: -100, category: 'rent' }),
       ],
       now: NOW,
     });
