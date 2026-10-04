@@ -54,4 +54,23 @@ describe('library column priority', () => {
     expect(layout.hiddenIds).not.toContain('title');
     expect(layout.hiddenIds).not.toContain('status');
   });
+
+  it('leaves no placeholder compacts beside the title when columns hide', () => {
+    const compactFor = (id: string) =>
+      (
+        LIBRARY_CATALOG_TABLE_COLUMNS.find(column => column.id === id)?.meta as
+          | { compact?: (asset: unknown) => unknown }
+          | undefined
+      )?.compact;
+    const empty = { providers: [], totalDurationMs: null };
+
+    for (const metric of ['bpm', 'key', 'energy', 'rating']) {
+      expect(compactFor(metric)).toBeUndefined();
+    }
+    expect(compactFor('length')?.(empty)).toBeNull();
+    expect(compactFor('providers')?.(empty)).toBeNull();
+    expect(
+      compactFor('length')?.({ ...empty, totalDurationMs: 1000 })
+    ).not.toBeNull();
+  });
 });

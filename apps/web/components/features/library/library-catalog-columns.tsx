@@ -205,7 +205,8 @@ export const LibraryCatalogProvidersCell = memo(
 /**
  * Placeholder for catalog metrics the production schema does not carry yet
  * (BPM, musical key, energy, rating). Fixed-size em-dash so the dense row
- * never shifts when real values land.
+ * never shifts when real values land. Hidden metric columns leave no compact
+ * form behind: a run of dashes beside the title says nothing.
  */
 export type LibraryCatalogMetric = 'bpm' | 'key' | 'energy' | 'rating';
 
@@ -366,13 +367,17 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     size: 56,
     minSize: 56,
     enableSorting: false,
-    meta: { className: 'px-2', minWidth: 56 },
+    // The art names itself; a visible header would widen the column past 56.
+    meta: { className: 'px-2', minWidth: 56, headerVisibility: 'sr-only' },
   }),
   libraryCatalogColumnHelper.accessor('title', {
     id: 'title',
     header: 'Title',
     cell: ({ row }) => (
-      <span className='system-b-library-release-title block truncate'>
+      // w-0 min-w-full: no min-content width, so the auto-layout table
+      // shrinks this column and long titles truncate instead of pushing
+      // trailing columns out of the container.
+      <span className='system-b-library-release-title block w-0 min-w-full truncate'>
         {row.original.title}
       </span>
     ),
@@ -428,7 +433,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 4,
       minWidth: 72,
-      compact: asset => <LibraryCatalogMetricCell asset={asset} metric='bpm' />,
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -443,7 +447,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 4,
       minWidth: 72,
-      compact: asset => <LibraryCatalogMetricCell asset={asset} metric='key' />,
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -458,9 +461,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 3,
       minWidth: 80,
-      compact: asset => (
-        <LibraryCatalogMetricCell asset={asset} metric='energy' />
-      ),
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -475,9 +475,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 3,
       minWidth: 88,
-      compact: asset => (
-        <LibraryCatalogMetricCell asset={asset} metric='rating' />
-      ),
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -490,7 +487,10 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 5,
       minWidth: 80,
-      compact: asset => <LibraryCatalogLengthCell asset={asset} />,
+      compact: asset =>
+        asset.totalDurationMs ? (
+          <LibraryCatalogLengthCell asset={asset} />
+        ) : null,
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -512,7 +512,10 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 5,
       minWidth: 120,
-      compact: asset => <LibraryCatalogProvidersCell asset={asset} />,
+      compact: asset =>
+        asset.providers.length > 0 ? (
+          <LibraryCatalogProvidersCell asset={asset} />
+        ) : null,
     },
   }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];

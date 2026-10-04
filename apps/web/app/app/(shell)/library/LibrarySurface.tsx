@@ -516,7 +516,9 @@ const ReleaseCell = memo(function ReleaseCell({
   const isPreviewPlaying = playingPreviewId === asset.id;
 
   return (
-    <div className='flex min-w-0 items-center gap-2.5'>
+    // w-0 min-w-full: no min-content width, so long titles truncate instead
+    // of widening the table past its container.
+    <div className='flex w-0 min-w-full items-center gap-2.5'>
       <ArtworkFrame
         size='thumbnail'
         className='system-b-library-artwork-shell group/artwork h-10 w-10'
@@ -693,7 +695,10 @@ export const LIBRARY_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 3,
       minWidth: 120,
-      compact: asset => <LibraryCatalogProvidersCell asset={asset} />,
+      compact: asset =>
+        asset.providers.length > 0 ? (
+          <LibraryCatalogProvidersCell asset={asset} />
+        ) : null,
     },
   }),
   libraryColumnHelper.display({
