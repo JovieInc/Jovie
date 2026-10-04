@@ -1,9 +1,11 @@
 # Public profile benchmark: methodology
 
 Status: **draft for publication review**. Nothing on this page is a published
-claim. Comparative wording that names another company needs a founder decision
-(JOV-7152); until then, platforms other than Jovie are anonymized as
-Platform A, B, C.
+claim. Platforms other than Jovie are anonymized as Platform A, B, C.
+
+Naming rule (founder decision, 2026-10-04): another company is named only when
+the data is solid, on a marketing page where the claim drives conversion, and
+backed by fact. The claims gate enforces this; see "Claims and the gate".
 
 Methodology version: `2026-10-03.3`. Harness:
 `scripts/public-benchmark/public-benchmark.mjs`. Claims and gate:
@@ -128,6 +130,14 @@ Claim states in `claims.json`:
   passing or loses evidence.
 - `certified`: holding and approved for publication. Only a founder decision
   sets this state; the harness never does.
+
+A claim that names a competitor (`publication.namesCompetitors`) must be
+`certified` and carry a full publication record: the marketing page path
+(`surface`), what the claim buys (`conversionGoal`), the proof registry claim
+id (`proofClaimId`), the benchmark receipt, and `certifiedBy: founder` with a
+date. A certified claim also fails the gate unless its receipt comes from the
+hosted runner, never a laptop. The unit tests check the committed claims file
+against this rule on every PR.
 
 ## Reproduce it
 
