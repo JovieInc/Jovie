@@ -512,6 +512,41 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     );
   });
 
+  it.each([true, false])(
+    'reports Spotify identity conflict without a false profile receipt (pending=%s)',
+    async pending => {
+      setupDbSelectForCandidates(
+        [{ id: 'conv_waitlist', createdAt: new Date('2026-05-01') }],
+        waitlistDecisionMessageRows()
+      );
+      setupUpdateForPrimary(1);
+      if (pending) setupInsertAudit(true);
+      if (!pending)
+        mockGetDbUser.mockResolvedValue({
+          id: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
+          userStatus: 'waitlist_approved',
+        });
+      const { SpotifyProfileIdentityConflictError } = await import(
+        '@/lib/profile/spotify-profile-identity'
+      );
+      mockMaterializeClaimedOnboardingProfile.mockRejectedValue(
+        new SpotifyProfileIdentityConflictError()
+      );
+      const response = await POST(makeRequest());
+      const body = await response.json();
+      expect(response.status).toBe(pending ? 200 : 409);
+      expect(body).not.toHaveProperty('profile');
+      if (pending) {
+        expect(body).toMatchObject({
+          waitlist: { entryId: 'entry-1' },
+          profileError: { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+        });
+      } else expect(body.errorCode).toBe('SPOTIFY_IDENTITY_CONFLICT');
+      expect(mockCaptureError).not.toHaveBeenCalled();
+      expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+    }
+  );
+
   it('still returns the waitlist receipt when handle reservation fails', async () => {
     setupDbSelectForCandidates(
       [{ id: 'conv_waitlist', createdAt: new Date('2026-05-01') }],

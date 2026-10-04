@@ -57,6 +57,29 @@ describe('Sidebar row alignment', () => {
     expect(screen.getByText('General').className).toContain('px-2.5');
   });
 
+  it('stages section labels on the rail-motion contract (JOV-4522)', () => {
+    render(<SidebarGroupLabel>General</SidebarGroupLabel>);
+    const label = screen.getByText('General');
+    expect(label.className).toContain('motion-reduce:transition-none');
+    expect(label.className).toContain('group-data-[collapsible=icon]:-mt-7');
+    expect(label.className).toContain(
+      'group-data-[collapsible=icon]:opacity-0'
+    );
+  });
+
+  it('marks collapsible section labels as staged rail labels', () => {
+    render(
+      <SidebarCollapsibleGroup label='General'>
+        <div>Child</div>
+      </SidebarCollapsibleGroup>
+    );
+
+    expect(screen.getByText('General')).toHaveAttribute(
+      'data-rail-label',
+      'true'
+    );
+  });
+
   it('uses px-2.5 for collapsible section headers', () => {
     render(
       <SidebarCollapsibleGroup label='General'>

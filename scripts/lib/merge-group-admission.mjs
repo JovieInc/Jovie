@@ -40,7 +40,15 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
 // ci.yml `Merge Group Admission` job timeout with room for setup/checkout.
 export const MERGE_GROUP_ADMISSION_WAIT_MS = 360_000;
 const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
-const POLL_INTERVAL_MS = 3_000;
+// Every iteration spends one GraphQL and three REST calls from the
+// repository's shared GITHUB_TOKEN quota. A 3 s cadence across ten queue
+// groups drained it within minutes on 2026-10-03 (JOV-7744).
+const POLL_INTERVAL_MS = 15_000;
+// Pending polls back off exponentially with ±20% jitter, so a dozen concurrent
+// groups stop polling in lockstep (2026-10-04 quota storms, JOV-7743).
+const MAX_POLL_INTERVAL_MS = 60_000;
+const POLL_JITTER = 0.2;
+const RATE_LIMIT_PATTERN = /\b(?:secondary )?rate limit\b/i;
 const MAX_API_REQUEST_MS = 10_000;
 const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
   $owner:String!,
@@ -72,16 +80,81 @@ const REQUIRED_ENV_MESSAGE =
 export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v2';
 
 export class MergeGroupAdmissionError extends Error {
-  constructor(message, { path = null, status = null } = {}) {
+  /**
+   * @param {string} message
+   * @param {{ path?: string | null, status?: number | null, rateLimit?: boolean }} [options]
+   */
+  constructor(message, { path = null, status = null, rateLimit } = {}) {
     super(message);
     this.name = 'MergeGroupAdmissionError';
     this.path = path;
     this.status = status;
+    this.rateLimit = rateLimit;
+    /** @type {number | undefined} */
+    this.retryAtMs = undefined;
   }
 }
 
 function fail(message) {
   throw new MergeGroupAdmissionError(message);
+}
+
+function isGraphqlQuotaError(error) {
+  return (
+    error?.type === 'RATE_LIMITED' ||
+    (error?.type === undefined &&
+      typeof error?.message === 'string' &&
+      /^API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
+        error.message
+      ))
+  );
+}
+
+function unsignedHeader(value, multiplier = 1) {
+  if (value === null) return null;
+  if (!/^[0-9]+$/.test(value)) return Number.NaN;
+  const parsed = Number(value) * multiplier;
+  return Number.isSafeInteger(parsed) ? parsed : Number.NaN;
+}
+
+function httpDateHeader(value) {
+  if (value === null) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toUTCString() === value
+    ? parsed
+    : Number.NaN;
+}
+
+function quotaRetryAt(headers, receivedAtMs) {
+  const remaining = unsignedHeader(headers.get('x-ratelimit-remaining'));
+  const reset = unsignedHeader(headers.get('x-ratelimit-reset'), 1_000);
+  const date = httpDateHeader(headers.get('date'));
+  const rawRetry = headers.get('retry-after');
+  const seconds = rawRetry !== null && /^[0-9]+$/.test(rawRetry);
+  const retry = seconds
+    ? unsignedHeader(rawRetry, 1_000)
+    : httpDateHeader(rawRetry);
+  if ([remaining, reset, date, retry].some(Number.isNaN)) {
+    fail('GitHub rate-limit response has malformed retry metadata');
+  }
+  // Translate absolute server times using Date from this same response; start
+  // at body receipt so response latency cannot make us retry before the bound.
+  const serverNow = date ?? receivedAtMs;
+  const bounds = [];
+  if (remaining === 0 && reset !== null) {
+    bounds.push(receivedAtMs + reset - serverNow);
+  }
+  if (retry !== null) {
+    bounds.push(
+      seconds ? receivedAtMs + retry : receivedAtMs + retry - serverNow
+    );
+  }
+  if (bounds.length === 0) return null; // Preserve legacy 15s recovery.
+  const retryAt = Math.max(receivedAtMs, ...bounds) + 1_000;
+  if (!Number.isSafeInteger(retryAt)) {
+    fail('GitHub rate-limit retry bound is outside the supported range');
+  }
+  return retryAt;
 }
 
 function requireSha(value, field) {
@@ -117,6 +190,10 @@ export function parseQueueHeadPullRequestNumber(headRef) {
   );
 }
 
+/**
+ * @param {any} event
+ * @param {{ expectedHeadSha?: string, expectedRepository?: string }} [options]
+ */
 export function validateMergeGroupAdmissionEvent(
   event,
   { expectedHeadSha, expectedRepository } = {}
@@ -180,11 +257,15 @@ export function normalizeLiveQueueEntriesPage(
   payload,
   { branch = 'main' } = {}
 ) {
+  if (payload?.errors !== undefined && !Array.isArray(payload.errors)) {
+    fail('live merge queue GraphQL errors must be an array when present');
+  }
   if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-    fail(
+    throw new MergeGroupAdmissionError(
       `live merge queue GraphQL returned errors: ${payload.errors
         .map(error => error?.message ?? String(error))
-        .join('; ')}`
+        .join('; ')}`,
+      { rateLimit: payload.errors.every(isGraphqlQuotaError) }
     );
   }
 
@@ -424,6 +505,42 @@ function requireTimingBound(value, field, maximum) {
   }
 }
 
+// Quota exhaustion, a per-request timeout or a GitHub 5xx says nothing about
+// the combined head, so it waits within the admission budget instead of
+// failing a valid group.
+export function isTransientApiError(error) {
+  if (!(error instanceof MergeGroupAdmissionError)) return false;
+  if (error.rateLimit !== undefined) return error.rateLimit === true;
+  if (error.status === 403 || error.status === 429) {
+    return RATE_LIMIT_PATTERN.test(error.message);
+  }
+  if (error.status === 502 || error.status === 503 || error.status === 504) {
+    return true;
+  }
+  return (
+    error.status === null && isTransientAdmissionFailureMessage(error.message)
+  );
+}
+
+const TRANSIENT_ADMISSION_MESSAGES = [
+  /^live merge queue GraphQL returned errors: API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i,
+  /^GitHub API request failed for \S+: The operation was aborted due to timeout$/,
+];
+const TRANSIENT_ADMISSION_HTTP_MESSAGE =
+  /^GitHub API (?:(?:403|429) for \S+: .*\b(?:secondary )?rate limit\b|(?:502|503|504) for \S+: )/i;
+
+// The admission step's printed error when it gave up on a quota or gateway
+// failure, not on the combined head. The merge-group failure hold reads it from
+// the job's annotations so infrastructure never spends a source revision (JOV-7780).
+/** @param {unknown} message */
+export function isTransientAdmissionFailureMessage(message) {
+  const text = String(message ?? '').trim();
+  return (
+    TRANSIENT_ADMISSION_MESSAGES.some(pattern => pattern.test(text)) ||
+    TRANSIENT_ADMISSION_HTTP_MESSAGE.test(text)
+  );
+}
+
 function defaultSleep(delayMs) {
   return new Promise(resolve => setTimeout(resolve, delayMs));
 }
@@ -437,6 +554,7 @@ export async function waitForMergeGroupAdmission({
   now = Date.now,
   onStatus = message => console.log(message),
   pollIntervalMs = POLL_INTERVAL_MS,
+  random = Math.random,
   runContext = undefined,
   sleep = defaultSleep,
 }) {
@@ -454,6 +572,20 @@ export async function waitForMergeGroupAdmission({
   const deadlineMs = now() + maxWaitMs;
   let attempt = 0;
   let lastGateStatus = null;
+  let observedSourceHeadSha = null;
+  let recoverySourceHeadSha = null;
+  // Live membership and the exact queue ref are proved on the first poll and
+  // re-proved before admitting; pending polls only read the two check pages.
+  let provenQueue = null;
+  let pendingPolls = 0;
+  const pendingDelayMs = () => {
+    if (pendingPolls <= 1) return pollIntervalMs;
+    const backoff = Math.min(
+      Math.max(pollIntervalMs, MAX_POLL_INTERVAL_MS),
+      pollIntervalMs * 2 ** Math.min(pendingPolls - 1, 16)
+    );
+    return Math.round(backoff * (1 - POLL_JITTER + 2 * POLL_JITTER * random()));
+  };
   const failStillPending = () => {
     fail(
       `required merge-group checks did not pass within ${maxWaitMs}ms${
@@ -468,6 +600,13 @@ export async function waitForMergeGroupAdmission({
       evidence,
       runContext,
     });
+    const sourceHeadSha = receipt.liveEntry?.sourceHeadSha;
+    if (receipt.admitted && SHA_PATTERN.test(String(sourceHeadSha ?? ''))) {
+      if (recoverySourceHeadSha && sourceHeadSha !== recoverySourceHeadSha) {
+        fail('live merge queue source head changed during API recovery');
+      }
+      observedSourceHeadSha = sourceHeadSha;
+    }
     if (!receipt.admitted) {
       onStatus(
         `Merge-group admission neutralized obsolete synthetic head ${
@@ -503,12 +642,7 @@ export async function waitForMergeGroupAdmission({
     };
   };
 
-  while (true) {
-    attempt += 1;
-    if (attempt > 1 && now() >= deadlineMs) {
-      failStillPending();
-    }
-
+  const proveQueue = async () => {
     const liveReceipt = await readLiveReceipt();
     if (!liveReceipt.admitted) {
       return { ...evidence, admitted: false, receipt: liveReceipt };
@@ -524,6 +658,16 @@ export async function waitForMergeGroupAdmission({
     if (!SHA_PATTERN.test(String(sourceHeadSha ?? ''))) {
       fail('live merge queue entry omitted its exact source head');
     }
+    return { liveReceipt, sourceHeadSha };
+  };
+
+  const poll = async () => {
+    if (!provenQueue) {
+      const proven = await proveQueue();
+      if (!('sourceHeadSha' in proven)) return proven;
+      provenQueue = proven;
+    }
+    const { liveReceipt, sourceHeadSha } = provenQueue;
     const pages = await Promise.all(
       REQUIRED_CHECKS.map(checkName =>
         loadCheckRuns({ ...evidence, checkName, deadlineMs })
@@ -573,9 +717,43 @@ export async function waitForMergeGroupAdmission({
       };
     }
 
-    const gateStatus = REQUIRED_CHECKS.map(
+    return REQUIRED_CHECKS.map(
       (name, index) => `${name}=${states[index].detail}`
     ).join(', ');
+  };
+
+  while (true) {
+    attempt += 1;
+    if (attempt > 1 && now() >= deadlineMs) {
+      failStillPending();
+    }
+
+    let outcome;
+    let delayMs;
+    try {
+      outcome = await poll();
+      pendingPolls += 1;
+      delayMs = pendingDelayMs();
+    } catch (error) {
+      delayMs = pollIntervalMs;
+      if (!isTransientApiError(error)) throw error;
+      // Every proof repeats after an API recovery.
+      provenQueue = null;
+      recoverySourceHeadSha ??= observedSourceHeadSha;
+      if (error.retryAtMs !== undefined && error.retryAtMs !== null) {
+        delayMs = Math.max(pollIntervalMs, error.retryAtMs - now());
+        if (delayMs + MAX_API_REQUEST_MS > deadlineMs - now()) {
+          fail(
+            'GitHub rate-limit recovery does not fit within the admission budget'
+          );
+        }
+      }
+      outcome = `GitHub API unavailable (${
+        error instanceof Error ? error.message : String(error)
+      })`;
+    }
+    if (typeof outcome !== 'string') return outcome;
+    const gateStatus = outcome;
     lastGateStatus = gateStatus;
     const remainingMs = deadlineMs - now();
     if (remainingMs <= 0) {
@@ -584,7 +762,7 @@ export async function waitForMergeGroupAdmission({
     onStatus(
       `Merge-group admission pending (attempt ${attempt}): ${gateStatus}`
     );
-    await sleep(Math.min(pollIntervalMs, remainingMs));
+    await sleep(Math.min(delayMs, remainingMs));
   }
 }
 
@@ -642,12 +820,36 @@ async function githubRequest(
   } catch {
     fail(`GitHub API returned non-JSON for ${path}`);
   }
+  if (
+    path === '/graphql' &&
+    [200, 403, 429, 502, 503, 504].includes(response.status) &&
+    data?.errors !== undefined &&
+    (!Array.isArray(data.errors) || data.errors.length > 0)
+  ) {
+    // Classify the structured error array before its messages are flattened.
+    // Mixed permission/quota responses never enter the retry path.
+    try {
+      normalizeLiveQueueEntriesPage(data);
+    } catch (error) {
+      if (isTransientApiError(error)) {
+        error.retryAtMs = quotaRetryAt(response.headers, now());
+      }
+      throw error;
+    }
+  }
   if (!response.ok) {
     const message = data?.message ?? 'unknown error';
-    throw new MergeGroupAdmissionError(
+    const error = new MergeGroupAdmissionError(
       `GitHub API ${response.status} for ${path}: ${message}`,
       { path, status: response.status }
     );
+    if (
+      (response.status === 403 || response.status === 429) &&
+      isTransientApiError(error)
+    ) {
+      error.retryAtMs = quotaRetryAt(response.headers, now());
+    }
+    throw error;
   }
   return { data, link: response.headers.get('link') };
 }
@@ -665,6 +867,7 @@ function createGitHubAdmissionApi({
   env,
   fetchImpl,
   headRef,
+  now,
   repository,
   token,
 }) {
@@ -685,7 +888,7 @@ function createGitHubAdmissionApi({
             owner,
             pageSize: LIVE_QUEUE_PAGE_SIZE,
           },
-          { deadlineMs, env, fetchImpl, token }
+          { deadlineMs, env, fetchImpl, now, token }
         );
         const parsed = normalizeLiveQueueEntriesPage(payload);
         entries.push(...parsed.entries);
@@ -698,7 +901,7 @@ function createGitHubAdmissionApi({
       try {
         const result = await githubRequest(
           `/repos/${encodedRepository}/git/ref/${encodedHeadRef}`,
-          { deadlineMs, env, fetchImpl, token }
+          { deadlineMs, env, fetchImpl, now, token }
         );
         return result.data;
       } catch (error) {
@@ -720,7 +923,7 @@ function createGitHubAdmissionApi({
       });
       return githubRequest(
         `/repos/${encodedRepository}/commits/${headSha}/check-runs?${query}`,
-        { deadlineMs, env, fetchImpl, token }
+        { deadlineMs, env, fetchImpl, now, token }
       );
     },
   };
@@ -786,9 +989,18 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
   }
 }
 
+/**
+ * @param {Record<string, string | undefined>} [env]
+ * @param {{
+ *   fetchImpl?: typeof fetch,
+ *   now?: () => number,
+ *   sleep?: (delayMs: number) => Promise<any>,
+ *   onStatus?: (message: string) => void,
+ * }} [options]
+ */
 export async function runAdmissionFromEnv(
   env = process.env,
-  { fetchImpl = fetch } = {}
+  { fetchImpl = fetch, now = Date.now, sleep = defaultSleep, onStatus } = {}
 ) {
   const eventPath = env.GITHUB_EVENT_PATH;
   const token = env.GH_TOKEN || env.GITHUB_TOKEN;
@@ -807,11 +1019,15 @@ export async function runAdmissionFromEnv(
     ...evidence,
     env,
     fetchImpl,
+    now,
     token,
   });
   const result = await waitForMergeGroupAdmission({
     event,
     ...api,
+    now,
+    sleep,
+    onStatus,
     runContext: createRunContextFromEnv(env),
   });
   await writeAdmissionOutputs(result.receipt, env);

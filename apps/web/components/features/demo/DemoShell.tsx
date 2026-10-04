@@ -13,7 +13,6 @@ import {
   ListFilter,
   MoreHorizontal,
   Music2,
-  PanelRightOpen,
   Plus,
   Repeat,
   SlidersHorizontal,
@@ -23,6 +22,8 @@ import {
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { Icon } from '@/components/atoms/Icon';
+import { railIconName } from '@/components/atoms/rail-icons';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import {
   Sidebar,
@@ -354,9 +355,9 @@ export function DemoShell({
                           : 'Show details panel'
                       }
                       icon={
-                        <PanelRightOpen
+                        <Icon
+                          name={railIconName('right', isRightPanelOpen)}
                           className='size-3.5'
-                          aria-hidden='true'
                         />
                       }
                       iconOnly
