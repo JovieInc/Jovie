@@ -1,0 +1,8 @@
+Implemented and published [draft PR #19798](https://github.com/JovieInc/Jovie/pull/19798) at commit `73c82471c4`.
+
+- Recognized database timeouts now degrade to empty tipping stats without creating noisy Sentry issues; genuine failures remain captured in [dashboard-data.ts](</home/timwhite/.local/state/jovie-lanes/worktrees/20261001T080507Z-JOV-4458-codex-d488bc/apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts:1116>).
+- Added an exact SQL/PG `57014` regression case in [dashboard-data-tx-isolation.test.ts](</home/timwhite/.local/state/jovie-lanes/worktrees/20261001T080507Z-JOV-4458-codex-d488bc/apps/web/tests/unit/dashboard/dashboard-data-tx-isolation.test.ts:590>).
+- Verified Biome, 8 focused tests, monorepo typecheck across 17 packages, and all hosted checks including exact-head coverage, security, migration guard, and PR Ready.
+- JOV-4458 transitioned to `In Review`.
+- PR remains draft and unmerged as required. Merge, deployment, and exact-runtime dogfood remain for the independent gate.
+- GBrain was unavailable; Doppler lacked a token, so Linear coordination used the repository’s Symphony credential-file fallback.
