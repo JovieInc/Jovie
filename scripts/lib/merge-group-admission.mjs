@@ -514,13 +514,26 @@ export function isTransientApiError(error) {
     return true;
   }
   return (
-    error.status === null &&
-    (/^live merge queue GraphQL returned errors: API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
-      error.message
-    ) ||
-      /^GitHub API request failed for \S+: The operation was aborted due to timeout$/.test(
-        error.message
-      ))
+    error.status === null && isTransientAdmissionFailureMessage(error.message)
+  );
+}
+
+const TRANSIENT_ADMISSION_MESSAGES = [
+  /^live merge queue GraphQL returned errors: API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i,
+  /^GitHub API request failed for \S+: The operation was aborted due to timeout$/,
+];
+const TRANSIENT_ADMISSION_HTTP_MESSAGE =
+  /^GitHub API (?:(?:403|429) for \S+: .*\b(?:secondary )?rate limit\b|(?:502|503|504) for \S+: )/i;
+
+// The admission step's printed error when it gave up on a quota or gateway
+// failure, not on the combined head. The merge-group failure hold reads it from
+// the job's annotations so infrastructure never spends a source revision (JOV-7780).
+/** @param {unknown} message */
+export function isTransientAdmissionFailureMessage(message) {
+  const text = String(message ?? '').trim();
+  return (
+    TRANSIENT_ADMISSION_MESSAGES.some(pattern => pattern.test(text)) ||
+    TRANSIENT_ADMISSION_HTTP_MESSAGE.test(text)
   );
 }
 

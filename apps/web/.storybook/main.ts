@@ -252,6 +252,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dev-test-auth-identity-mock.ts'),
         },
         {
+          find: '@/app/app/(shell)/admin/actions',
+          replacement: require.resolve('./admin-actions-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },

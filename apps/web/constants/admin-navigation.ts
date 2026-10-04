@@ -13,6 +13,7 @@ export const adminPeopleViews = [
   'releases',
   'assets',
   'feedback',
+  'recovery',
 ] as const;
 
 export type AdminPeopleView = (typeof adminPeopleViews)[number];
@@ -247,6 +248,7 @@ export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
   releases: 'Releases',
   assets: 'Assets',
   feedback: 'Feedback',
+  recovery: 'Recovery',
 };
 
 export const ADMIN_GROWTH_VIEW_LABELS: Record<AdminGrowthView, string> = {
