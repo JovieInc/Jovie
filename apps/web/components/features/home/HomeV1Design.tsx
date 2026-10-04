@@ -8,6 +8,7 @@ import {
   buildHomepageStartHref,
   HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT,
 } from '@/data/homepageFrontDoorCta';
+import { permittedLogoAssetIds } from '@/data/product-truth/logo-permissions';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 const SUGGESTIONS = [
@@ -154,7 +155,9 @@ export function HomeV1Design() {
               one quiet operating surface.
             </p>
             <div className='flex flex-wrap items-center gap-x-6 gap-y-3 text-white/36'>
-              {TRUST_LOGOS.map(id => (
+              {TRUST_LOGOS.filter(id =>
+                permittedLogoAssetIds({ page: '/' }).includes(id)
+              ).map(id => (
                 <NormalizedTrustLogo key={id} id={id} className='opacity-70' />
               ))}
             </div>

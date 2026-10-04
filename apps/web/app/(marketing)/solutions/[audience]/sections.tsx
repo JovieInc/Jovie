@@ -465,6 +465,7 @@ const ARTIST_SOLUTIONS_SECTION_RENDERERS = {
       <ArtistProfileHeroAdaptiveIntro
         hero={copy.hero}
         adaptive={copy.adaptive}
+        logoPlacement={{ page: '/solutions/artists' }}
       />
     ),
   },

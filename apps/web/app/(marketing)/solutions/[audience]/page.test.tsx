@@ -148,7 +148,13 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
       renderToStaticMarkup(
         <SolutionsRecordBody record={solutionsArtistsPage} />
       )
-    ).toBe(renderToStaticMarkup(<ArtistProfileLandingRoute />));
+    ).toBe(
+      renderToStaticMarkup(
+        <ArtistProfileLandingRoute
+          logoPlacement={{ page: '/solutions/artists' }}
+        />
+      )
+    );
   });
 
   it('renders a factory-shaped record from instance-scoped copy and media', () => {
