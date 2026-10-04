@@ -63,6 +63,11 @@ const {
   };
 });
 
+const mockEligibility = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  getAcquisitionEligibility: mockEligibility,
+}));
+
 vi.mock('drizzle-orm', () => ({
   and: mockAnd,
   asc: mockAsc,
@@ -183,6 +188,11 @@ describe('GET /api/admin/outreach', () => {
     mockGetAppUrl.mockReset();
     mockParseJsonBody.mockReset();
     mockPushLeadToInstantly.mockReset();
+    mockEligibility.mockResolvedValue({
+      eligible: true,
+      verdict: 'ELIGIBLE',
+      firstBlocker: null,
+    });
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: true,
@@ -426,5 +436,31 @@ describe('GET /api/admin/outreach', () => {
       dismissed: 0,
       remainingPending: 1,
     });
+  });
+
+  it('refuses a manual send while ACQUISITION_ELIGIBLE is false', async () => {
+    mockEligibility.mockResolvedValue({
+      eligible: false,
+      verdict: 'BLOCKED',
+      firstBlocker: {
+        id: 'payment_entitlement',
+        label: 'Golden Path',
+        status: 'red',
+        owner: 'billing',
+        nextAction: 'Fix the Golden Path lane.',
+      },
+    });
+    const response = await POST(
+      new Request('http://localhost/api/admin/outreach', {
+        method: 'POST',
+        body: JSON.stringify({ limit: 1 }),
+      }) as never
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'ACQUISITION_NOT_ELIGIBLE',
+      firstBlocker: 'payment_entitlement',
+    });
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
   });
 });
