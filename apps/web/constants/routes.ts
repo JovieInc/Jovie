@@ -121,6 +121,8 @@ export const APP_ROUTES = {
   ADMIN_INVESTORS_LINKS: '/app/ov/investors/links',
   ADMIN_INVESTORS_SETTINGS: '/app/ov/investors/settings',
   ADMIN_LEADS: '/app/ov/leads',
+  /** Founder creator lists + smart views (Ovie only). */
+  ADMIN_LISTS: '/app/ov/lists',
   ADMIN_OUTREACH: '/app/ov/outreach',
   ADMIN_OUTREACH_EMAIL: '/app/ov/outreach/email',
   ADMIN_OUTREACH_DM: '/app/ov/outreach/dm',
