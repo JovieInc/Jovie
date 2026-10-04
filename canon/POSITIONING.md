@@ -179,12 +179,17 @@ with cross-model review on 2026-10-03.
    first, then wide."
 2. "I wouldn't even use the word launch."
 3. "You don't even have to have a thing yet to build the following. Jovie is
-   how you build your cult."
+   how you build your cult." Tim later clarified: "I didn't mean it literally,
+   you should test it." The word was tested (see "Headline test" below) and
+   lost.
 4. "Tasks aren't about the release, they're about the launch. A music release
    should be one template in the tasks list." (Read with input 2: the product
    term is Tasks.)
 5. Ovie is the company robot dog. Music is the strongest proof, not the
    boundary.
+6. The main pages (homepage, product, pricing, about) are ICP-agnostic. They
+   carry no music language and should feel like a frontier AI lab's homepage:
+   clean, confident, and universal. Music specifics live only on music pages.
 
 ### The problem it solves
 
@@ -210,51 +215,75 @@ catalog who is between releases.
 | --- | --- |
 | One-sentence positioning | Jovie is where your following starts: one profile that gathers the people who believe in you before your next thing exists, and keeps them close for everything after. |
 | Category noun | The profile. Jovie is the profile you start before the product. |
-| Lead headline | **Build your cult following.** |
+| Lead headline | **Gather your people first.** |
 | Three-line story | People follow a person long before they buy a thing. Most tools start once you have something to link, sell, or send. Jovie starts with you: gather your people now, and bring them the work when it is ready. |
-| Supporting line, no "cult" | Keep your people close. |
+| Alternate headline | Start with who believes in you. |
+| Supporting line | Keep your people close. |
 | Primary promise, unchanged | Jovie has your back. It sits beneath the headline on ICP pages. |
 | Product CTA, unchanged | Jovie. Just ask. The name-search CTA stays on the homepage (JOV-5085). |
-| Founder voice and merch only | Build your cult. |
 | Strategy rule, internal only | Deep before wide: win a small group completely before you reach for breadth. |
 
 The proposed one sentence replaces the 1.1 "always-on creative and business
 partner" sentence. That partner idea survives as the promise "Jovie has your
-back." The homepage stays the generic founder and investor page from 1.1. It
-leads with the throughline, and music becomes the strongest proof story
-instead of the boundary.
+back."
 
 Jovie does not use "launch" as the category or as a product term (founder
 input 2). The product noun is **Tasks**. A music release is one playbook
 template in Tasks, alongside others such as a video, a podcast, or a book.
 No qualifier goes in front of "Tasks".
 
-### Where "cult" may appear
+### Message hierarchy by surface
 
-The two reviewers split. One kept "cult following" for the web and allowed the
-bare word only in founder voice. The other would kill the word everywhere.
-This proposal takes the narrower path between them:
+| Surface | Audience | What it carries | What it never carries |
+| --- | --- | --- | --- |
+| Main pages: homepage, product, pricing, about | Founders, investors, first-time visitors of any kind | The throughline, lead headline, one sentence, and three-line story. Clean, confident, universal, in the register of a frontier AI lab homepage. | Music language or music proof (releases, streams, tours, listeners, "artist"), single-ICP examples, AI-first identity claims |
+| ICP pages: music, video, podcast, books, founders | People arriving from outreach and campaigns | The same throughline in that audience's nouns, its proof, and "Jovie has your back." beneath the headline | Claims about capabilities that ICP doesn't have yet |
+| Music pages only | Musicians | Release, listener, show, and catalog specifics. Music is the strongest proof story here, and only here. | Anything implying Jovie is only for music |
+| Product UI | Signed-in users | The task at hand, Tasks and its templates, "Jovie. Just ask." | Headlines or slogans |
 
-| Wording | Allowed on | Never on |
-| --- | --- | --- |
-| Build your cult following. | Homepage hero, ICP landing pages, editorial | Ads until a comprehension test clears it, product UI, transactional messages |
-| Build your cult. | `founder-tim` register, merch, a live investor conversation | Any Jovie register, Ovie persona copy, homepage, ads, decks sent cold |
-| Keep your people close. | Everywhere, including ads and product | |
+The customer menu routes from the main pages to the ICP pages. Outreach lands
+on ICP pages, never on the homepage.
 
-Risks, with mitigations:
+### Headline test (2026-10-03)
 
-- **Literal reading.** A cult means coercion and abuse. "Cult following"
-  describes devotion that people give freely. The bare imperative makes the
-  creator the controller, so it stays in Tim's own voice.
-- **AI plus persuasion.** The worst realistic headline is "AI startup wants to
-  help you build your cult." Keep the word away from AI mechanism copy, and
-  never pair it with money words ("fundraising list", "lifelong customer",
-  "Leverage your fans", "Capture every fan").
-- **Translation.** German "Kult" reads positive. French "culte" works only as
-  an adjective ("film culte"); the noun is "secte". Localized pages use the
-  supporting line instead.
-- **Consent posture.** People choose to follow. Copy never treats followers as
-  property or promises that an audience will appear.
+Tim asked for a test, not a decision on "cult". Five headlines were scored
+under one fixed subhead (the one sentence above). There were four personas:
+a founder who just left an AI lab, a seed investor, a video and podcast
+creator, and an independent artist. Each was scored by two judges, Opus 5.5 as
+primary and Fable 5.1 as second opinion, on two passes with rotated order, for
+16 scores per line. The rubric scored value, emotional pull, clarity, trust,
+and would-sign-up on a 0 to 10 scale; this is the funnel-judge rubric adapted
+to headlines. Three of the five lines were Fable's non-cult proposals.
+
+| Headline | Overall | Trust | Sign-up | Founder | Investor | Creator | Artist |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Gather your people first.** | **5.64** | 6.9 | 3.9 | 6.5 | 5.5 | 4.7 | 5.8 |
+| Start with who believes in you. | 5.34 | 6.4 | 3.5 | 5.7 | 5.6 | 4.8 | 5.3 |
+| Keep your people close. | 5.04 | 6.9 | 3.1 | 4.9 | 4.3 | 5.5 | 5.5 |
+| Before the next thing, the people. | 4.50 | 6.0 | 2.8 | 5.7 | 4.6 | 3.7 | 4.0 |
+| Build your cult following. | 4.16 | 2.9 | 2.6 | 3.3 | 4.8 | 4.6 | 4.0 |
+
+Persona columns are the mean of the five criteria for that persona across both judges and passes.
+
+What the scores say:
+
+- **"Gather your people first." leads.** It ranked first on both passes and
+  with both judges, and it scored highest with founders. Founders read "first"
+  as their situation: no product yet.
+- **"Build your cult following." finished last on trust.** It scored 2.9,
+  against roughly 6 to 7 for every other line. Every persona called it the
+  clearest promise and then said they would hesitate to be associated with it.
+  The investor persona named the press-quote risk. "Cult" is out of every
+  Jovie surface, and "Build your cult." is not canon in any register.
+- **No headline sells on its own.** The best sign-up score was 3.9 of 10, and
+  clarity was weak across the board. The subhead has to say what Jovie is (a
+  profile) and who it is for.
+- **Creators were the coldest audience.** They said "my people are already
+  here". Creator ICP pages should lead with "Keep your people close.", which
+  creators scored highest.
+
+This is a model-judged signal, not live traffic. A five-second comprehension
+test with real visitors comes before any paid use.
 
 ### Research basis
 
@@ -284,16 +313,16 @@ Risks, with mitigations:
 
 ### Proof required before external use
 
-Under the guardrails above, "Build your cult following" claims nothing on its
-own. The one sentence does claim something, and it holds only if:
+Under the guardrails above, the lead headline claims nothing on its own. The
+one sentence does claim something, and it holds only if:
 
 1. **Capability.** A profile with nothing released works as a complete page,
    not as an empty state. Today the profile and claim flows assume a catalog.
 2. **Loop.** Someone can follow before a release, receive something worth
    returning for, and come back. Capture and notifications exist; the
    pre-release reason to return does not yet.
-3. **Comprehension.** A five-second test shows visitors read "cult following"
-   as earned devotion and understand what Jovie is.
+3. **Comprehension.** A five-second test with real visitors shows they
+   understand what Jovie is and who it is for from the hero alone.
 
 ### North-star metric this implies
 
@@ -313,7 +342,8 @@ guardrails. A raw list size measures wide; this measures deep.
 | Go create | Parked since 2026-08-18. The throughline covers its empowerment idea. |
 | The link your music deserves. / One Link. Always In Sync. | Link-in-bio framing that starts after the thing exists |
 | Your living identity on the internet. / Your presence, resolved. / Control how the world sees you. | Identity framing with no people in it |
-| Leverage your fans. / Turn a $10 busking tip into a lifelong customer. | Treats fans as yield. Banned verb. Toxic next to "cult". |
+| Leverage your fans. / Turn a $10 busking tip into a lifelong customer. | Treats fans as yield. Banned verb. |
+| Build your cult following. / Build your cult. | Tested last on trust (2.9 of 10). Founder clarified it was not meant literally. |
 | What Jovie Handles for You. / Keep your work moving. | Leads with the tool, not the person |
 | Major-label marketing on an indie budget / 14 hours of marketing work in a click / Sell out every show, every time / Stop working, start rocking | Already prohibited as unproven or absolute; listed here so they stay dead |
 
