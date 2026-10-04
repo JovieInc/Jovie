@@ -25,10 +25,15 @@
     "bezel": 22,
     "deviceRadius": 150
   },
+  "contentCheck": {
+    "top": 0.15,
+    "bottom": 0.85,
+    "minDensity": 0.002
+  },
   "screens": [
     {
       "id": "chat",
-      "launchArgument": "-ui-testing-chat-all-components",
+      "launchArgument": "-ui-testing-storefront-chat",
       "headline": "Merch ideas, ready in one chat.",
       "accent": "ion"
     },
@@ -52,7 +57,7 @@
     },
     {
       "id": "identity",
-      "launchArgument": "-ui-testing-ready",
+      "launchArgument": "-ui-testing-venue-mode",
       "headline": "Share your profile with one scan.",
       "accent": "ultra"
     }

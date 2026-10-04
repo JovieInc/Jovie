@@ -189,3 +189,45 @@ enum MobileChatAllComponentsFixture {
     ),
   ]
 }
+
+/// Deterministic fixture for `.uiTestingStorefrontChat`, the App Store chat
+/// shot (JOV-4481). One finished exchange whose reply delivers merch option
+/// cards, so the graphic shows what its headline claims. Fictional designs
+/// only: no real artist, venue, or event names.
+enum MobileChatStorefrontFixture {
+  static let conversationID = "conv_ui_testing_storefront"
+
+  static let userProse = "Make merch for my summer tour."
+
+  static let merchOptionsJSON =
+    #"{"success":true,"generationId":"gen-storefront","options":[{"id":"opt-1","option_number":1,"design_name":"Night Drive Tee","product_type":"Tee","concept":"Chrome headline type on black.","mockup_urls":[],"price_recommendation":{"sale_price":"$38.00"}},{"id":"opt-2","option_number":2,"design_name":"Summer Run Hoodie","product_type":"Hoodie","concept":"Tour dates down the sleeve.","mockup_urls":[],"price_recommendation":{"sale_price":"$68.00"}},{"id":"opt-3","option_number":3,"design_name":"Afterglow Cap","product_type":"Cap","concept":"Embroidered sunset mark.","mockup_urls":[],"price_recommendation":{"sale_price":"$32.00"}}]}"#
+
+  static var assistantReply: String {
+    """
+    Here are three designs from your tour artwork. Pick one to save it to Work.
+    <tool_call><name>createMerch</name><parameters></parameters></tool_call>
+    <tool_result><name>createMerch</name><state>success</state><json>\(merchOptionsJSON)</json></tool_result>
+    """
+  }
+
+  static let `default`: [MobileChatTimelineItem] = [
+    MobileChatTimelineItem(
+      id: "msg_storefront_user",
+      role: .user,
+      content: userProse,
+      status: .completed,
+      clientTurnId: "turn_storefront",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+    MobileChatTimelineItem(
+      id: "msg_storefront_merch",
+      role: .assistant,
+      content: assistantReply,
+      status: .completed,
+      clientTurnId: "turn_storefront",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+  ]
+}

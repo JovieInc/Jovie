@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inflateSync } from 'node:zlib';
 
 export const REPO_ROOT = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -96,6 +97,16 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
   const ids = new Set();
   if (!spec.device?.width || !spec.device?.height)
     problems.push('device size is missing');
+  const check = spec.contentCheck;
+  if (
+    !check ||
+    !(check.top >= 0 && check.top < check.bottom && check.bottom <= 1) ||
+    !(check.minDensity > 0)
+  ) {
+    problems.push(
+      'contentCheck needs 0 <= top < bottom <= 1 and minDensity > 0'
+    );
+  }
   // Pen binding: `requested` until studio builds the section, then every
   // screen maps to its Pen frame id.
   if (!['requested', 'bound'].includes(spec.pen?.status)) {
@@ -174,6 +185,82 @@ export function pngInfo(buffer) {
   }
   const hasAlpha = colorType === 4 || colorType === 6 || hasTransparencyChunk;
   return { width, height, hasAlpha };
+}
+
+/** RGB(A) pixels of an 8-bit, non-interlaced truecolor PNG. */
+export function decodePng(buffer) {
+  const { width, height } = pngInfo(buffer);
+  const colorType = buffer[25];
+  if (buffer[24] !== 8 || buffer[28] !== 0 || ![2, 6].includes(colorType)) {
+    throw new Error('only 8-bit non-interlaced RGB or RGBA PNGs are supported');
+  }
+  const channels = colorType === 6 ? 4 : 3;
+  const data = [];
+  for (let offset = 8; offset + 8 <= buffer.length; ) {
+    const length = buffer.readUInt32BE(offset);
+    if (buffer.toString('ascii', offset + 4, offset + 8) === 'IDAT') {
+      data.push(buffer.subarray(offset + 8, offset + 8 + length));
+    }
+    offset += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(data));
+  const stride = width * channels;
+  const pixels = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    const src = y * (stride + 1) + 1;
+    const dst = y * stride;
+    for (let x = 0; x < stride; x++) {
+      const left = x >= channels ? pixels[dst + x - channels] : 0;
+      const up = y ? pixels[dst - stride + x] : 0;
+      const upLeft =
+        x >= channels && y ? pixels[dst - stride + x - channels] : 0;
+      let predictor = 0;
+      if (filter === 1) predictor = left;
+      else if (filter === 2) predictor = up;
+      else if (filter === 3) predictor = (left + up) >> 1;
+      else if (filter === 4) {
+        const estimate = left + up - upLeft;
+        const toLeft = Math.abs(estimate - left);
+        const toUp = Math.abs(estimate - up);
+        const toUpLeft = Math.abs(estimate - upLeft);
+        predictor =
+          toLeft <= toUp && toLeft <= toUpLeft
+            ? left
+            : toUp <= toUpLeft
+              ? up
+              : upLeft;
+      }
+      pixels[dst + x] = (raw[src + x] + predictor) & 255;
+    }
+  }
+  return { width, height, channels, pixels };
+}
+
+/**
+ * Share of sampled pixels in the screen body (between `top` and `bottom`
+ * fractions of the height) that sit on a hard luminance edge. Text, cards and
+ * artwork score around 1%; a blank thread, spinner or empty state scores ~0.
+ */
+export function contentDensity(buffer, { top, bottom }) {
+  const { width, height, channels, pixels } = decodePng(buffer);
+  const luma = (x, y) => {
+    const i = (y * width + x) * channels;
+    return (pixels[i] * 2 + pixels[i + 1] * 5 + pixels[i + 2]) >> 3;
+  };
+  let edges = 0;
+  let samples = 0;
+  for (
+    let y = Math.round(height * top);
+    y < Math.round(height * bottom);
+    y += 2
+  ) {
+    for (let x = 0; x < width - 1; x += 2) {
+      samples++;
+      if (Math.abs(luma(x, y) - luma(x + 1, y)) > 32) edges++;
+    }
+  }
+  return samples ? edges / samples : 0;
 }
 
 function escapeHtml(text) {
@@ -259,6 +346,36 @@ function simulatorUdid(name) {
   );
 }
 
+const sleep = ms => new Promise(done => setTimeout(done, ms));
+
+/**
+ * Screenshot until two consecutive frames match and the screen body has
+ * content. Fixtures seed asynchronously, and a cold CI simulator is much
+ * slower than a warm local one, so a fixed delay captured empty screens.
+ */
+async function captureSettled({ udid, file, spec, screen, settleMs }) {
+  const deadline = Date.now() + settleMs * 6;
+  await sleep(settleMs);
+  let previous;
+  let density = 0;
+  while (true) {
+    run('xcrun', ['simctl', 'io', udid, 'screenshot', '--type=png', file], {
+      stdio: 'ignore',
+    });
+    const buffer = readFileSync(file);
+    density = contentDensity(buffer, spec.contentCheck);
+    const settled = previous && sha256(previous) === sha256(buffer);
+    if (settled && density >= spec.contentCheck.minDensity) return buffer;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `${screen.id}: ${settled ? 'screen body is empty' : 'screen never settled'} (content density ${(density * 100).toFixed(2)}%)`
+      );
+    }
+    previous = buffer;
+    await sleep(2000);
+  }
+}
+
 async function capture({ appPath, out, settleMs }) {
   const spec = loadStorefront();
   if (!appPath) throw new Error('capture needs --app <path to Jovie.app>');
@@ -304,12 +421,9 @@ async function capture({ appPath, out, settleMs }) {
       screen.launchArgument,
       'UITest',
     ]);
-    await new Promise(done => setTimeout(done, settleMs));
     const file = join(rawDir, `${screen.id}.png`);
-    run('xcrun', ['simctl', 'io', udid, 'screenshot', '--type=png', file], {
-      stdio: 'ignore',
-    });
-    const info = pngInfo(readFileSync(file));
+    const buffer = await captureSettled({ udid, file, spec, screen, settleMs });
+    const info = pngInfo(buffer);
     if (
       info.width !== spec.device.width ||
       info.height !== spec.device.height
@@ -363,6 +477,7 @@ async function render({ out }) {
         file,
         sha256: sha256(png),
         captureSha256: sha256(raw),
+        contentDensity: contentDensity(raw, spec.contentCheck),
       });
       console.log(`rendered ${join(out, file)}`);
     }
@@ -432,6 +547,22 @@ export function verifyOutput({ out, spec, currentSourceHash, currentVersion }) {
       problems.push(`${file}: App Store screenshots cannot have alpha`);
     if (sha256(buffer) !== entry.sha256)
       problems.push(`${file}: does not match the receipt`);
+    let capture;
+    try {
+      capture = readFileSync(join(out, 'raw', `${screen.id}.png`));
+    } catch {
+      problems.push(`raw/${screen.id}.png: missing`);
+      return;
+    }
+    if (sha256(capture) !== entry.captureSha256) {
+      problems.push(`raw/${screen.id}.png: does not match the receipt`);
+    }
+    const density = contentDensity(capture, spec.contentCheck);
+    if (density < spec.contentCheck.minDensity) {
+      problems.push(
+        `${file}: capture is mostly empty (content density ${(density * 100).toFixed(2)}%), so it cannot show its headline`
+      );
+    }
   });
   if ((receipt.screens?.length ?? 0) !== spec.screens.length) {
     problems.push('receipt screen count does not match storefront.json');
@@ -467,7 +598,7 @@ async function main(argv) {
     await capture({
       appPath: option(args, '--app'),
       out,
-      settleMs: Number(option(args, '--settle-ms') ?? 8000),
+      settleMs: Number(option(args, '--settle-ms') ?? 5000),
     });
   } else if (command === 'render') {
     await render({ out });

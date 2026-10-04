@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { deflateSync } from 'node:zlib';
 import {
+  contentDensity,
+  decodePng,
   loadStorefront,
   marketingVersion,
   pngInfo,
@@ -47,6 +49,59 @@ function png(width, height, { colorType = 2, transparency = false } = {}) {
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
+
+/** Encode RGB pixels, cycling every PNG row filter so decoding is exercised. */
+function pixelPng(width, height, paint) {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 2;
+  const stride = width * 3;
+  const pixels = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) pixels.set(paint(x, y), y * stride + x * 3);
+  }
+  const rows = [];
+  for (let y = 0; y < height; y++) {
+    const filter = y % 5;
+    const row = Buffer.alloc(stride + 1);
+    row[0] = filter;
+    for (let x = 0; x < stride; x++) {
+      const at = y * stride + x;
+      const left = x >= 3 ? pixels[at - 3] : 0;
+      const up = y ? pixels[at - stride] : 0;
+      const upLeft = x >= 3 && y ? pixels[at - stride - 3] : 0;
+      const estimate = left + up - upLeft;
+      const paeth =
+        Math.abs(estimate - left) <= Math.abs(estimate - up) &&
+        Math.abs(estimate - left) <= Math.abs(estimate - upLeft)
+          ? left
+          : Math.abs(estimate - up) <= Math.abs(estimate - upLeft)
+            ? up
+            : upLeft;
+      const predictor = [0, left, up, (left + up) >> 1, paeth][filter];
+      row[x + 1] = (pixels[at] - predictor) & 255;
+    }
+    rows.push(row);
+  }
+  return {
+    pixels,
+    png: Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      chunk('IHDR', header),
+      chunk('IDAT', deflateSync(Buffer.concat(rows))),
+      chunk('IEND', Buffer.alloc(0)),
+    ]),
+  };
+}
+
+const CHECK = { top: 0.15, bottom: 0.85, minDensity: 0.002 };
+const blankCapture = pixelPng(40, 40, () => [7, 8, 10]).png;
+// Text-like rows: thin bright strokes on the dark shell.
+const contentCapture = pixelPng(40, 40, (x, y) =>
+  y % 6 === 0 && x % 4 === 0 ? [240, 240, 240] : [7, 8, 10]
+).png;
 
 function withScreens(screens) {
   return { ...loadStorefront(), screens };
@@ -111,6 +166,24 @@ test('storefront validation enforces the App Store screenshot count', async () =
   assert.deepEqual(problems, ['App Store listings take 3 to 10 screenshots']);
 });
 
+test('decodePng reverses every PNG row filter', () => {
+  const { png: encoded, pixels } = pixelPng(9, 11, (x, y) => [
+    (x * 37 + y * 11) & 255,
+    (x * y * 7) & 255,
+    (255 - x * 13) & 255,
+  ]);
+  const decoded = decodePng(encoded);
+  assert.equal(decoded.channels, 3);
+  assert.deepEqual(decoded.pixels, pixels);
+  assert.throws(() => decodePng(png(1, 1, { colorType: 0 })), /only 8-bit/);
+});
+
+test('contentDensity separates an empty screen from a screen with content', () => {
+  assert.equal(contentDensity(blankCapture, CHECK), 0);
+  assert.ok(contentDensity(contentCapture, CHECK) >= CHECK.minDensity);
+  assert.equal(contentDensity(contentCapture, { top: 0.5, bottom: 0.5 }), 0);
+});
+
 test('screen files are ordered for fastlane deliver', () => {
   const spec = loadStorefront();
   assert.equal(screenFile(spec, 0), `en-US/01-${spec.screens[0].id}.png`);
@@ -162,12 +235,16 @@ function writeSet(out, spec, mutate = {}) {
     const file = screenFile(spec, index);
     const buffer =
       mutate.png?.(index) ?? png(spec.device.width, spec.device.height);
+    const capture = mutate.capture?.(index) ?? contentCapture;
     mkdirSync(join(out, 'en-US'), { recursive: true });
+    mkdirSync(join(out, 'raw'), { recursive: true });
     writeFileSync(join(out, file), buffer);
+    writeFileSync(join(out, 'raw', `${screen.id}.png`), capture);
     return {
       id: screen.id,
       file,
       sha256: createHash('sha256').update(buffer).digest('hex'),
+      captureSha256: createHash('sha256').update(capture).digest('hex'),
     };
   });
   writeFileSync(
@@ -214,6 +291,14 @@ test('verifyOutput passes a fresh set and fails stale or malformed ones', () => 
   assert.match(text, /01-.*1290x2796, expected 1320x2868/);
   assert.match(text, /02-.*cannot have alpha/);
   assert.match(text, /03-.*does not match the receipt/);
+
+  const empty = mkdtempSync(join(tmpdir(), 'app-store-blank-capture-'));
+  writeSet(empty, spec, {
+    capture: index => (index === 0 ? blankCapture : undefined),
+  });
+  assert.deepEqual(verifyOutput({ out: empty, ...current }), [
+    `${screenFile(spec, 0)}: capture is mostly empty (content density 0.00%), so it cannot show its headline`,
+  ]);
 
   assert.deepEqual(
     verifyOutput({

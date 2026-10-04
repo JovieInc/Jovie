@@ -55,6 +55,41 @@ struct AppShellChatFirstTests {
     )
   }
 
+  @Test func uiTestingStorefrontChatSeedsAFinishedMerchExchange() {
+    #expect(LaunchMode.uiTestingStorefrontChat.defaultInitialTab == .chat)
+    #expect(LaunchMode.uiTestingStorefrontChat.opensChatOnLaunch)
+    #expect(LaunchMode.uiTestingStorefrontChat.usesLiveAuth == false)
+    #expect(LaunchMode.uiTestingStorefrontChat.needsChatRepository)
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-storefront-chat"], isXCTest: false)
+        == .uiTestingStorefrontChat
+    )
+    #expect(
+      LaunchMode.uiTestingStorefrontChat.chatFixtureConversationID
+        == MobileChatStorefrontFixture.conversationID
+    )
+    let timeline = MobileChatStorefrontFixture.default
+    #expect(LaunchMode.uiTestingStorefrontChat.chatEntityFixture == timeline)
+    #expect(timeline.map(\.role) == [.user, .assistant])
+    #expect(timeline.allSatisfy { $0.status == .completed && !$0.requiresWebHandoff })
+
+    let segments = MobileChatContentParser.segments(
+      from: MobileChatStorefrontFixture.assistantReply,
+      isStreaming: false
+    )
+    guard case let .merchArtifact(.productOptions(payload)) = segments.last else {
+      Issue.record("Expected merch product options in the storefront reply")
+      return
+    }
+    #expect(payload.options.map(\.designName) == [
+      "Night Drive Tee", "Summer Run Hoodie", "Afterglow Cap",
+    ])
+    // Store copy bans em and en dashes.
+    for item in timeline {
+      #expect(!item.content.contains("\u{2014}") && !item.content.contains("\u{2013}"))
+    }
+  }
+
   @Test func uiTestingAudienceYieldsChatDefault() {
     #expect(LaunchMode.uiTestingAudience.defaultInitialTab == .chat)
   }
