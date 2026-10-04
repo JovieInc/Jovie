@@ -100,6 +100,8 @@ describe('feature flag registry integrity', () => {
         ([name]) =>
           ![
             'INBOX_HOME',
+            'YOUTUBE_WORKSPACE_NAV',
+            'JOVIE_WORK_NAV',
             'PROFILES_WORKSPACE',
             'PROFILE_SEARCH_MONITORING',
             'PAID_WELCOME_EMAIL',
@@ -111,6 +113,9 @@ describe('feature flag registry integrity', () => {
       )
       .map(([, value]) => value);
     expect(defaultsExcludingRolloutGates.every(Boolean)).toBe(true);
+    // These Cmd-K workspace doors remain off pending navigation approval.
+    expect(APP_FLAG_DEFAULTS.YOUTUBE_WORKSPACE_NAV).toBe(false);
+    expect(APP_FLAG_DEFAULTS.JOVIE_WORK_NAV).toBe(false);
     expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
     expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
     expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);

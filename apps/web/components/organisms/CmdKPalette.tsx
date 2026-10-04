@@ -80,15 +80,18 @@ interface CmdKPaletteProps {
 }
 
 function useCmdkData(profileId: string, query: string, open: boolean) {
+  const youtubeWorkspaceNav = useAppFlag('YOUTUBE_WORKSPACE_NAV');
+  const jovieWorkNav = useAppFlag('JOVIE_WORK_NAV');
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const commands = useMemo<readonly Command[]>(
     () =>
-      commandsForSurface('cmdk').filter(command =>
-        isCommandVisible(command, {
-          PROFILES_WORKSPACE: profilesWorkspaceEnabled,
-        })
+      commandsForSurface('cmdk', { youtubeWorkspaceNav, jovieWorkNav }).filter(
+        command =>
+          isCommandVisible(command, {
+            PROFILES_WORKSPACE: profilesWorkspaceEnabled,
+          })
       ),
-    [profilesWorkspaceEnabled]
+    [youtubeWorkspaceNav, jovieWorkNav, profilesWorkspaceEnabled]
   );
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
     profileId,

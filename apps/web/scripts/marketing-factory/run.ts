@@ -30,6 +30,10 @@ import {
   type StageReceipt,
 } from '../../data/marketing/factory/spine';
 import {
+  findProofReadyPages,
+  type ProofCandidate,
+} from '../../data/product-truth/proof';
+import {
   type FactoryPageBrief,
   factoryPageId,
   loadFactoryBrief,
@@ -81,6 +85,42 @@ export interface RunFactoryOptions {
   readonly runners?: Partial<Record<FactoryStage, StageRunner>>;
   /** Development only: skip the preflight and stop at the first gap instead. */
   readonly allowPartial?: boolean;
+  /** Proof registry for the proof-landed trigger; defaults to PROOF_REGISTRY. */
+  readonly proofRegistry?: readonly ProofCandidate[];
+}
+
+/**
+ * JOV-7750: the claims whose proof has landed since this page's last run
+ * recorded a ProofRequest for them, or null. A landed proof reruns the page
+ * from the proof stage, re-renders and re-judges (a `proof-landed` rework).
+ */
+function landedProof(
+  runDir: string,
+  briefDigest: string,
+  pageId: string,
+  asOf: string,
+  registry?: readonly ProofCandidate[]
+): { claimIds: readonly string[]; renderDigest: string | null } | null {
+  const path = join(runDir, 'run.json');
+  if (!existsSync(path)) return null;
+  const parsed = FactoryRunManifestSchema.safeParse(readJson(path));
+  if (!parsed.success || parsed.data.briefDigest !== briefDigest) return null;
+  const link = parsed.data.chain.find(entry => entry.stage === 'proof');
+  if (!link) return null;
+  const requests = readJson<StageAttemptRecord>(join(runDir, link.file)).notes
+    .proofRequests;
+  if (!Array.isArray(requests) || requests.length === 0) return null;
+  const ready = findProofReadyPages(requests, asOf, registry).find(
+    entry => entry.pageId === pageId
+  );
+  return ready
+    ? {
+        claimIds: ready.claimIds,
+        renderDigest:
+          parsed.data.chain.find(entry => entry.stage === 'render')
+            ?.outputDigest ?? null,
+      }
+    : null;
 }
 
 async function runStage(
@@ -183,6 +223,17 @@ export async function runFactory(
   const runsDir = options.runsDir ?? FACTORY_RUNS_DIR;
   const runDir = join(runsDir, pageId);
   const briefDigest = digestOf(brief);
+  const landed = options.fromStage
+    ? null
+    : landedProof(
+        runDir,
+        briefDigest,
+        pageId,
+        (options.providers?.now() ?? new Date()).toISOString().slice(0, 10),
+        options.proofRegistry
+      );
+  const fromStage: FactoryStage | undefined =
+    options.fromStage ?? (landed ? 'proof' : undefined);
   if (options.paidBudget && (options.dry || options.providers)) {
     throw new Error('paid budget requires the standard live factory providers');
   }
@@ -191,8 +242,8 @@ export async function runFactory(
         .paidBudget
     : undefined;
   if (
-    options.fromStage &&
-    options.fromStage !== 'truth' &&
+    fromStage &&
+    fromStage !== 'truth' &&
     priorBudget?.id !== options.paidBudget?.id
   ) {
     throw new Error('--from-stage: paid budget binding changed');
@@ -204,7 +255,7 @@ export async function runFactory(
         binding: { pageId, briefDigest },
         requireExisting:
           priorBudget?.id === options.paidBudget.id ||
-          Boolean(options.fromStage && options.fromStage !== 'truth'),
+          Boolean(fromStage && fromStage !== 'truth'),
       })
     : undefined;
   const providers =
@@ -236,12 +287,12 @@ export async function runFactory(
     ...(paidBudget ? { paidBudget: paidBudget.reference } : {}),
   };
 
-  if (paidBudget?.snapshot().stages.includes(options.fromStage ?? 'truth')) {
+  if (paidBudget?.snapshot().stages.includes(fromStage ?? 'truth')) {
     // Refuse before deleting or overwriting earlier receipts on a fresh run.
     return {
       ...manifest,
       status: 'budget-blocked',
-      stoppedAt: options.fromStage ?? 'truth',
+      stoppedAt: fromStage ?? 'truth',
       reason: 'paid budget: cumulative stage attempt ceiling exceeded',
     };
   }
@@ -251,7 +302,7 @@ export async function runFactory(
       brief,
       providers,
       runners,
-      fromStage: options.fromStage ?? 'truth',
+      fromStage: fromStage ?? 'truth',
     });
     const [first] = issues;
     // Refuse before any model call, and leave any earlier run untouched.
@@ -268,8 +319,8 @@ export async function runFactory(
     }
   }
 
-  if (options.fromStage && options.fromStage !== 'truth') {
-    const prior = loadPriorChain(runDir, briefDigest, options.fromStage);
+  if (fromStage && fromStage !== 'truth') {
+    const prior = loadPriorChain(runDir, briefDigest, fromStage);
     manifest = {
       ...prior.manifest,
       mode: providers.mode,
@@ -279,6 +330,22 @@ export async function runFactory(
       const record = readJson<StageAttemptRecord>(join(runDir, link.file));
       artifacts[link.stage] = record.artifact;
       receipts[link.stage] = record.receipt;
+    }
+    if (landed) {
+      manifest = {
+        ...manifest,
+        reworks: [
+          ...(manifest.reworks ?? []),
+          {
+            iteration: (manifest.reworks?.length ?? 0) + 1,
+            trigger: 'proof-landed',
+            rejectedAt: 'proof',
+            reworkFrom: 'proof',
+            rejectedRenderDigest: landed.renderDigest,
+            findings: landed.claimIds.map(id => `proof landed for ${id}`),
+          },
+        ],
+      };
     }
   } else {
     rmSync(runDir, { recursive: true, force: true });
@@ -425,15 +492,20 @@ export async function runFactory(
             reason: `rework target ${result.rework.stage} is not upstream of ${stage}`,
           });
         }
-        if (rework >= FACTORY_MAX_REWORKS) {
+        // Only rejections count toward the cap; a landed proof is new input.
+        const rejections = (manifest.reworks ?? []).filter(
+          entry => entry.trigger !== 'proof-landed'
+        ).length;
+        if (rejections >= FACTORY_MAX_REWORKS) {
           return finish({
             status: 'failed',
             stoppedAt: stage,
-            reason: `still rejected after ${rework} rework(s): ${result.rework.findings.join('; ')}`,
+            reason: `still rejected after ${rejections} rework(s): ${result.rework.findings.join('; ')}`,
           });
         }
         const entry = {
           iteration: rework + 1,
+          trigger: 'visual-rejection' as const,
           rejectedAt: stage,
           reworkFrom: result.rework.stage,
           rejectedRenderDigest: renderDigest(),

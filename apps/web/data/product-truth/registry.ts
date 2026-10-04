@@ -691,6 +691,14 @@ export type FlagCapabilityBinding =
   | { readonly nonMarketing: string };
 
 export const PRODUCT_FLAG_CAPABILITIES = {
+  YOUTUBE_WORKSPACE_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
+  JOVIE_WORK_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
   BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
   SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },

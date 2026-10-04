@@ -75,7 +75,7 @@ The optional per-user Ovie privacy gate protects operator data and actions serve
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/agents/creator-lookup` | GET | None (durable IP rate limit) | Read-only extraction from YouTube, Instagram, TikTok, or Linktree (`@jovie/cli creator lookup`, MCP `lookup_creator`) |
+| `/api/agents/creator-lookup` | GET | None (durable IP rate limit) | Read-only creator resolution (`@jovie/cli creator lookup <url|platform:handle>`, MCP `lookup_creator`): `exists:true` with the Jovie profile when the channel is already known, otherwise extracted fields with `exists:false` |
 | `/api/agents/profiles` | POST | None (IP rate limit, `AGENT_PROFILE_CREATE` kill switch) | Create or find a claimable profile from a Spotify artist URL (`@jovie/cli profile create`) |
 | `/api/agents/feedback` | POST | None (IP rate limit) | Agent bug/feedback reports into `feedback_items` (source `agent_cli`) for Summer triage (`@jovie/cli report`, MCP `report_issue`) |
 
