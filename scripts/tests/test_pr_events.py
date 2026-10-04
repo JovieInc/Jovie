@@ -1205,14 +1205,34 @@ class GapTest(unittest.TestCase):
     def test_open_prs_are_read_page_by_page(self):
         pages = iter([
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"},
-                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]}}]}}}},
+                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]},
+                                                                 "files": {"totalCount": 1, "nodes": [
+                                                                     {"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}]}}]}}}},
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
                                                       "nodes": [{"number": 2}]}}}},
         ])
         shell = Shell({("gh", "api", "graphql"): lambda args: next(pages)})
         prs = events.open_prs_state(fake_lane(shell))
         self.assertEqual([(p["number"], p["labels"], p["rollup"]) for p in prs], [(1, [{"name": "hold"}], None), (2, [], None)])
+        self.assertEqual(prs[0]["files"], [{"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}])
+        self.assertTrue(prs[0]["filesComplete"])
+        self.assertIn("files(first:100)", next(arg for arg in shell.calls[0] if arg.startswith("query=")))
         self.assertIn("cursor=c1", shell.calls[1])
+
+    def test_unreadable_large_file_list_preserves_metadata_without_certifying_overlap_inventory(self):
+        page = {"data": {"repository": {"pullRequests": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [{"number": 1, "files": {"totalCount": 101, "nodes": []}},
+                      {"number": 2, "files": {"totalCount": 1, "nodes": [{"path": "README.md"}]}}]}}}}
+        shell = Shell({("gh", "api", "graphql"): page,
+                       ("gh", "api", "--paginate"): (1, "unavailable")})
+        prs = events.open_prs_state(fake_lane(shell))
+        self.assertEqual([row["number"] for row in prs], [1, 2])
+        self.assertFalse(prs[0]["filesComplete"])
+        self.assertTrue(prs[1]["filesComplete"])
+        with patch.object(runner, "open_prs_summary", return_value=prs), \
+                patch.dict(runner._SUMMARY, {"readable": True}):
+            self.assertIsNone(runner.overlap_prs_summary())
 
     def test_fix_prompt_carries_stale_and_queue_log_and_lockfile_recipe(self):
         prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "stale"], merge="DIRTY"), "title": "t",
@@ -1220,6 +1240,7 @@ class GapTest(unittest.TestCase):
         self.assertIn("boom", prompt)
         self.assertIn("no activity for 48 hours", prompt)
         self.assertIn("pnpm install --lockfile-only", prompt)
+        self.assertIn("Never hand-merge generated files", prompt)
 
 
 class RunnerHookTest(unittest.TestCase):

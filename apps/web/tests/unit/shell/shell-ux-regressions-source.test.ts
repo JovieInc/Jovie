@@ -90,10 +90,17 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(leftToggle).toContain("side='left'");
     expect(rightToggle).toContain('<RailToggleButton');
     expect(rightToggle).toContain("side='right'");
-    expect(sharedToggle).toContain('PanelLeftClose');
-    expect(sharedToggle).toContain('PanelLeftOpen');
-    expect(sharedToggle).toContain('PanelRightClose');
-    expect(sharedToggle).toContain('PanelRightOpen');
+    // JOV-7207 (2026-10-03): the arrow-bearing Lucide panel glyphs are banned;
+    // the toggle resolves its art from the Jovie-owned rail icon family.
+    for (const banned of [
+      'PanelLeftClose',
+      'PanelLeftOpen',
+      'PanelRightClose',
+      'PanelRightOpen',
+      'Chevron',
+    ])
+      expect(sharedToggle).not.toContain(banned);
+    expect(sharedToggle).toContain('railIconName(side, open)');
     expect(sharedToggle).toContain(
       "import { IconButton, TooltipShortcut } from '@jovie/ui'"
     );

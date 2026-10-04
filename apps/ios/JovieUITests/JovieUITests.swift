@@ -1996,6 +1996,7 @@ final class JovieUITests: XCTestCase {
 
     let callbackURL = try requiredEnvironmentValue("JOVIE_IOS_AUTH_CALLBACK_URL")
     let codeVerifier = try requiredEnvironmentValue("JOVIE_IOS_PENDING_CODE_VERIFIER")
+    let nativeAttempt = try requiredEnvironmentValue("JOVIE_IOS_PENDING_NATIVE_ATTEMPT")
     let apiBaseURL =
       testEnvironmentValue("JOVIE_IOS_API_BASE_URL") ??
       testEnvironmentValue("API_BASE_URL") ??
@@ -2016,6 +2017,7 @@ final class JovieUITests: XCTestCase {
     app.launchEnvironment["API_BASE_URL"] = apiBaseURL
     app.launchEnvironment["WEB_BASE_URL"] = webBaseURL
     app.launchEnvironment["JOVIE_IOS_PENDING_CODE_VERIFIER"] = codeVerifier
+    app.launchEnvironment["JOVIE_IOS_PENDING_NATIVE_ATTEMPT"] = nativeAttempt
     addTeardownBlock { [app] in
       self.endUITestSession(app)
     }
@@ -2143,7 +2145,7 @@ final class JovieUITests: XCTestCase {
   }
 
   func testAuthCallbackDeepLinkCompletesHarness() throws {
-    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123"
+    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123&native_attempt=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
       additionalLaunchArguments: ["-ui-testing-open-auth-callback", callbackURL],
@@ -2206,7 +2208,7 @@ final class JovieUITests: XCTestCase {
     }
 
     try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?error=access_denied&state=state_123&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth",
+      "ie.jov.jovie://auth/complete?error=access_denied&state=state_123&native_attempt=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth",
       targetApp: app
     )
 
