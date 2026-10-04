@@ -86,24 +86,29 @@ async function runJudge(args, cwd, timeoutMs) {
 }
 
 /**
- * @param {{ persona: any, judge: { id: string, model: string, focus: 'full' | 'emotional' }, steps: Array<any>, imageDir: string, timeoutMs?: number }} args
+ * @param {{ persona: any, judge: { id: string, model: string, focus: 'full' | 'emotional' }, steps: Array<any>, objections?: Array<{ objection: string }>, imageDir: string, timeoutMs?: number }} args
  */
 export async function judgePersona({
   persona,
   judge,
   steps,
+  objections = [],
   imageDir,
   timeoutMs = 600_000,
 }) {
   const stepIds = steps.map(step => step.id);
   const args = buildClaudeArgs({
     model: judge.model,
-    prompt: buildJudgePrompt(persona, steps, judge.focus),
-    schema: buildJudgeSchema(stepIds),
+    prompt: buildJudgePrompt(persona, steps, judge.focus, objections),
+    schema: buildJudgeSchema(stepIds, objections.length),
     imageDir,
   });
   const envelope = await runJudge(args, imageDir, timeoutMs);
-  const verdict = parseJudgeOutput(envelope.structured_output, stepIds);
+  const verdict = parseJudgeOutput(
+    envelope.structured_output,
+    stepIds,
+    objections.length
+  );
   return {
     personaId: persona.id,
     judge: judge.id,
