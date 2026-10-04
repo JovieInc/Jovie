@@ -9,6 +9,7 @@ the TypeScript geometry the React primitives render.
 Run from the repo root (needs fonttools, skia-pathops, brotli):
 
     python3 packages/brand/font/construction.py
+    python3 packages/brand/font/sheet.py
     pnpm exec biome format --write packages/brand/dist/geometry.json \
         packages/ui/brand/geometry.gen.ts
 
