@@ -94,6 +94,13 @@ class ClassifierFixtureTest(unittest.TestCase):
     def test_lockfile_only_and_main_red_and_events(self):
         lock = pr(mergeStateStatus="DIRTY", conflictFiles=["pnpm-lock.yaml"])
         self.assertEqual(remediation.classify_blocker(lock)["subtype"], "lockfile-only")
+        generated = pr(mergeStateStatus="DIRTY", conflictFiles=[".github/workflow-topology.gen.yml"])
+        self.assertEqual(remediation.classify_blocker(generated)["subtype"], "generated-only")
+        self.assertEqual(remediation.plan_ladder(remediation.classify_blocker(generated), {}, providers(), 0, "h")["action"],
+                         "resolve-lockfile")
+        mixed = pr(mergeStateStatus="DIRTY",
+                   conflictFiles=[".github/workflow-topology.gen.yml", "src/a.ts"])
+        self.assertEqual(remediation.classify_blocker(mixed)["subtype"], "semantic")
         overlap = pr(statusCheckRollup=[{"name": "CI", "status": "COMPLETED", "conclusion": "FAILURE"}])
         main = [{"name": "CI", "conclusion": "FAILURE"}]
         self.assertEqual(remediation.classify_blocker(overlap, main_rollup=main)["subtype"], "main-red")

@@ -55,6 +55,14 @@ SURFACE_MARKER = "symphony-surface"
 CLAIM_WINDOW_S = 30 * 60
 HOLD_NAG_S = 24 * 3600
 LOCKFILES = frozenset({"pnpm-lock.yaml"})
+# Conflicts confined to machine-derived files resolve without a model: take main's copy,
+# run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
+# extends the same deterministic rung to the generated workflow topology so Symphony PRs
+# stop hand-merging `.gen.` output.
+GENERATED_RESOLVERS = {
+    ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
+    "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+}
 DIFF_POLICY = frozenset({"secret-file", "diff-too-large", "lockfile-without-manifest"})
 STALE_LABELS = frozenset({"lane-fix-exhausted", "queue-poison", "lane-fix-escalating"})
 FLAKY_CONCLUSIONS = frozenset({"CANCELLED", "TIMED_OUT", "STARTUP_FAILURE", "CANCELED"})
@@ -287,7 +295,9 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
 
     if merge in {"DIRTY", "BEHIND"} or str(pr.get("mergeable") or "").upper() == "CONFLICTING":
         files = [str(path) for path in (pr.get("conflictFiles") or [])]
-        subtype = "lockfile-only" if files and set(files) <= LOCKFILES else "semantic"
+        subtype = ("lockfile-only" if set(files) <= LOCKFILES else
+                   "generated-only" if set(files) <= GENERATED_RESOLVERS.keys() else
+                   "semantic") if files else "semantic"
         if bot_threads:
             evidence.append("unresolved bot review: " + "; ".join(
                 f"{thread.get('severity') or 'note'} {(thread.get('body') or '')[:120]}"
@@ -295,7 +305,7 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
         if files:
             evidence.append("conflicts: " + ", ".join(files[:12]))
         evidence.append(f"mergeStateStatus={merge or 'CONFLICTING'}")
-        action = "resolve-lockfile" if subtype == "lockfile-only" else "update-branch"
+        action = "resolve-generated" if subtype in {"lockfile-only", "generated-only"} else "update-branch"
         return blocker("needs-rebase", subtype, evidence, action)
 
     overlap = _main_overlap(pr, main_rollup)
@@ -515,8 +525,8 @@ def plan_ladder(classified: dict, record: dict, providers: dict, now: float, hea
         if not deterministic_used(record, head, "rerun"):
             return {"action": "rerun", "reason": "flaky-infra", "kind": "deterministic", "cls": cls}
     if cls == "needs-rebase":
-        if subtype == "lockfile-only" and not deterministic_used(record, head, "lockfile"):
-            return {"action": "resolve-lockfile", "reason": "lockfile-only", "kind": "deterministic", "cls": cls}
+        if subtype in {"lockfile-only", "generated-only"} and not deterministic_used(record, head, "lockfile"):
+            return {"action": "resolve-lockfile", "reason": subtype, "kind": "deterministic", "cls": cls}
         if not deterministic_used(record, head, "update-branch"):
             return {"action": "update-branch", "reason": subtype or "needs-rebase", "kind": "deterministic", "cls": cls}
     if cls in {"fixable-by-model", "needs-rebase", "flaky-infra"}:
