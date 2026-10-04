@@ -180,7 +180,10 @@ with cross-model review on 2026-10-03.
 2. "I wouldn't even use the word launch."
 3. "You don't even have to have a thing yet to build the following. Jovie is
    how you build your cult."
-4. Ovie is the company robot dog. Music is the strongest proof, not the
+4. "Tasks aren't about the release, they're about the launch. A music release
+   should be one template in the tasks list." (Read with input 2: the product
+   term is Tasks.)
+5. Ovie is the company robot dog. Music is the strongest proof, not the
    boundary.
 
 ### The problem it solves
@@ -221,8 +224,10 @@ back." The homepage stays the generic founder and investor page from 1.1. It
 leads with the throughline, and music becomes the strongest proof story
 instead of the boundary.
 
-"Launch" stays a product noun for the steps of shipping a piece of work
-(launch tasks). It is not the category, which follows founder input 2.
+Jovie does not use "launch" as the category or as a product term (founder
+input 2). The product noun is **Tasks**. A music release is one playbook
+template in Tasks, alongside others such as a video, a podcast, or a book.
+No qualifier goes in front of "Tasks".
 
 ### Where "cult" may appear
 
@@ -303,7 +308,7 @@ guardrails. A raw list size measures wide; this measures deep.
 | Retired line | Why |
 | --- | --- |
 | Your AI Presence Manager. | AI-first, which already breaks this canon. It describes the machinery, not the person. |
-| The launch platform (as the category) | Withdrawn by founder input 2. "Launch tasks" stays as a product term. |
+| The launch platform (as the category), and "launch" or "release" in front of Tasks | Withdrawn by founder input 2. The product term is Tasks, with playbook templates. |
 | AI release OS / AI release management for artists | Machinery, music-only, and AI-first |
 | Go create | Parked since 2026-08-18. The throughline covers its empowerment idea. |
 | The link your music deserves. / One Link. Always In Sync. | Link-in-bio framing that starts after the thing exists |
