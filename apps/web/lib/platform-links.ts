@@ -49,7 +49,7 @@ function prettifySlug(slug: string): string {
 
 function hostnameOf(url: string): string | null {
   try {
-    const host = new URL(url).hostname.toLowerCase();
+    const host = new URL(url.trim()).hostname.toLowerCase();
     return host.startsWith('www.') ? host.slice(4) : host;
   } catch {
     return null;

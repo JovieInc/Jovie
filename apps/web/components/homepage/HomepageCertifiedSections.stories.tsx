@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
-import { HomepageCertifiedSections } from './HomepageCertifiedSections';
+import {
+  HomepageCertifiedSections,
+  HomepageEditorialFeatureSection,
+} from './HomepageCertifiedSections';
 
 // Same real public-profile exports the live homepage mounts (jov.ie/timwhite).
 const previews = {
@@ -29,5 +33,24 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     previews,
+  },
+};
+
+// The record-owned renderer factory /solutions pages bind to: one real export,
+// with the certified homepage copy standing in for a page record.
+export const EditorialFeatureSingleExport: Story = {
+  args: { previews },
+  render: () => {
+    const section = HOMEPAGE_LAUNCH_COPY.certified.sections[0];
+    return (
+      <HomepageEditorialFeatureSection
+        previews={[{ image: previews.subscribe }]}
+        section={{
+          id: section.id,
+          headline: section.headline,
+          body: section.body,
+        }}
+      />
+    );
   },
 };

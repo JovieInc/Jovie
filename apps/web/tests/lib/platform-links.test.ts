@@ -21,6 +21,24 @@ describe('toGenericPlatformLink', () => {
     expect(link?.name).toBe('Substack');
   });
 
+  it('keeps distinct hostname identities and labels after Unicode whitespace normalization', () => {
+    const links = [
+      '\u00a0https://www.substack.com/@creator\u00a0',
+      '\u2003https://discord.gg/creator\u2003',
+    ].map(url => toGenericPlatformLink(null, url));
+
+    expect(links.map(link => link?.key)).toEqual([
+      'link_substack',
+      'link_discord',
+    ]);
+    expect(new Set(links.map(link => link?.key)).size).toBe(2);
+    expect(links.map(link => link?.name)).toEqual(['Substack', 'Discord']);
+    expect(links.map(link => link?.url)).toEqual([
+      'https://www.substack.com/@creator',
+      'https://discord.gg/creator',
+    ]);
+  });
+
   it('returns null for invalid URLs', () => {
     expect(toGenericPlatformLink('discord', 'not-a-url')).toBeNull();
     expect(toGenericPlatformLink('discord', 'ftp://x.com')).toBeNull();

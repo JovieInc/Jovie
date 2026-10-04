@@ -18,6 +18,7 @@ import {
 } from '../../agent-context/check.mjs';
 import {
   applyMergeGroupFailure,
+  autoMergeWasNotArmed,
   classifyDequeueDenial,
   classifyMergeGroupFailure,
   enqueueWasRejected,
@@ -28,6 +29,7 @@ import {
   retrySpentDescription,
   revisionFailureDisposition,
   sourceHeadForRun,
+  supersededByLiveEntry,
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -356,10 +358,14 @@ if (args[1] === 'graphql') {
     process.stderr.write('gh: Resource not accessible by integration\\n');
     process.exit(1);
   }
+  if (query.includes('disablePullRequestAutoMerge')) {
+    process.stderr.write("gh: Can't disable auto-merge for this pull request.\\n");
+    process.exit(1);
+  }
   const pr = query.includes('timelineItems')
     ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
     : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
-        isInMergeQueue: true, mergeQueueEntry: { id: 'MQE_42' }, autoMergeRequest: null };
+        isInMergeQueue: true, mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: fixture.run.head_sha } }, autoMergeRequest: null };
   process.stdout.write(JSON.stringify({ data: { repository: { pullRequest: pr } } }));
 } else if (args.includes('POST')) {
   process.stdout.write('{}');
@@ -744,13 +750,102 @@ describe('failure classification and revision-scoped suppression', () => {
 });
 
 describe('terminal failure hold application', () => {
+  // Replays run 37167458268 (2026-10-04 01:15Z): admission ran out of the
+  // installation quota and PR Ready reported it. No source revision failed.
+  const ADMISSION_QUOTA_STEPS = [
+    'Require live queue membership and external admission checks',
+    'Evaluate combined-head checks',
+  ];
+  const ADMISSION_QUOTA_TEXT = [
+    'Process completed with exit code 1.',
+    'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.',
+  ].join('\n');
+
+  it('classifies an admission quota failure as transient admission, never a source failure', () => {
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText: ADMISSION_QUOTA_TEXT,
+      })
+    ).toBe('transient-admission');
+    for (const admissionText of [
+      'Process completed with exit code 1.\nGitHub API 503 for /graphql: Service Unavailable',
+      'GitHub API request failed for /graphql: The operation was aborted due to timeout',
+      'GitHub API 403 for /repos/x/y/commits/z/check-runs: API rate limit exceeded for installation',
+    ]) {
+      expect(
+        classifyMergeGroupFailure({
+          conclusion: 'failure',
+          failedSteps: ADMISSION_QUOTA_STEPS,
+          admissionText,
+        })
+      ).toBe('transient-admission');
+    }
+    // A real admission denial, missing evidence, or another failed step still
+    // counts against the revision.
+    for (const input of [
+      {
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText:
+          'Process completed with exit code 1.\nPR #42 is not a live member of this merge group',
+      },
+      { failedSteps: ADMISSION_QUOTA_STEPS, admissionText: '' },
+      {
+        failedSteps: [...ADMISSION_QUOTA_STEPS, 'Run unit tests'],
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+      {
+        failedSteps: ['Evaluate combined-head checks'],
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+    ]) {
+      expect(
+        classifyMergeGroupFailure({ conclusion: 'failure', ...input })
+      ).not.toBe('transient-admission');
+    }
+  });
+
+  it('spends no retry and keeps merge intent for an admission quota failure', async () => {
+    const writeStatus = vi.fn();
+    const dequeuePullRequest = vi.fn();
+    const disableAutoMerge = vi.fn();
+    const readPullRequest = vi.fn(async () => ({
+      id: 'PR_42',
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+      autoMergeRequest: { enabledAt: '2026-10-04T01:00:00Z' },
+    }));
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: ADMISSION_QUOTA_STEPS,
+        admissionText: ADMISSION_QUOTA_TEXT,
+      },
+      { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
+    );
+    expect(result).toMatchObject({
+      prNumber: 42,
+      classification: 'transient-admission',
+      skipped: true,
+      statusWritten: false,
+      dequeued: false,
+      autoMergeDisabled: false,
+    });
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(dequeuePullRequest).not.toHaveBeenCalled();
+    expect(disableAutoMerge).not.toHaveBeenCalled();
+  });
+
   it('persists before dequeueing and disabling the exact unchanged head', async () => {
     let state = {
       id: 'PR_42',
       state: 'OPEN',
       headRefOid: SOURCE,
       isInMergeQueue: true,
-      mergeQueueEntry: { id: 'MQE_42' },
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
       autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
     };
     const order = [];
@@ -844,6 +939,71 @@ describe('terminal failure hold application', () => {
     expect(disableAutoMerge).not.toHaveBeenCalled();
   });
 
+  it('ignores a superseded group failure while the exact source is still queued', async () => {
+    const LIVE_GROUP = 'f'.repeat(40);
+    for (const mergeQueueEntry of [
+      { id: 'MQE_42', headCommit: { oid: LIVE_GROUP } },
+      { id: 'MQE_42', headCommit: null },
+    ]) {
+      const writeStatus = vi.fn();
+      const dequeuePullRequest = vi.fn();
+      const disableAutoMerge = vi.fn();
+      const result = await applyMergeGroupFailure(failureInput, {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: true,
+          mergeQueueEntry,
+          autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+        })),
+        dequeuePullRequest,
+        disableAutoMerge,
+      });
+      expect(result).toMatchObject({
+        superseded: true,
+        mergeGroupHeadSha: GROUP,
+        liveMergeGroupHeadSha: mergeQueueEntry.headCommit?.oid ?? null,
+        statusWritten: false,
+        dequeued: false,
+        autoMergeDisabled: false,
+      });
+      // No retry is spent and the live entry keeps its place in the queue.
+      expect(writeStatus).not.toHaveBeenCalled();
+      expect(dequeuePullRequest).not.toHaveBeenCalled();
+      expect(disableAutoMerge).not.toHaveBeenCalled();
+    }
+  });
+
+  it('only treats a live queued exact source as superseded', () => {
+    const queued = {
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+    };
+    expect(supersededByLiveEntry(queued, SOURCE, GROUP)).toBe(false);
+    expect(supersededByLiveEntry(queued, SOURCE, 'f'.repeat(40))).toBe(true);
+    expect(
+      supersededByLiveEntry(
+        { ...queued, isInMergeQueue: false, mergeQueueEntry: null },
+        SOURCE,
+        'f'.repeat(40)
+      )
+    ).toBe(false);
+    expect(supersededByLiveEntry(queued, NEW_SOURCE, 'f'.repeat(40))).toBe(
+      false
+    );
+    expect(
+      supersededByLiveEntry(
+        { ...queued, state: 'CLOSED' },
+        SOURCE,
+        'f'.repeat(40)
+      )
+    ).toBe(false);
+  });
+
   it('classifies only the integration denial and an already-removed queue', () => {
     const denied = Object.assign(new Error('Command failed: gh api graphql'), {
       stderr: 'gh: Resource not accessible by integration\n',
@@ -867,7 +1027,7 @@ describe('terminal failure hold application', () => {
       state: 'OPEN',
       headRefOid: SOURCE,
       isInMergeQueue: true,
-      mergeQueueEntry: { id: 'MQE_42' },
+      mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
       autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
     };
     const order = [];
@@ -902,26 +1062,32 @@ describe('terminal failure hold application', () => {
 
   it('treats an already-removed pull request as a logged non-fatal dequeue', async () => {
     let reads = 0;
+    const disableAutoMerge = vi.fn(async () => {
+      throw new Error("Can't disable auto-merge for this pull request.");
+    });
     const result = await applyMergeGroupFailure(failureInput, {
       writeStatus: vi.fn(),
       readPullRequest: vi.fn(async () => {
         reads += 1;
-        const queued = reads < 3;
+        const queued = reads < 4;
         return {
           id: 'PR_42',
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: queued,
-          mergeQueueEntry: queued ? { id: 'MQE_42' } : null,
+          mergeQueueEntry: queued
+            ? { id: 'MQE_42', headCommit: { oid: GROUP } }
+            : null,
           autoMergeRequest: null,
         };
       }),
       dequeuePullRequest: vi.fn(async () => {
         throw new Error('The pull request is not in the merge queue');
       }),
-      disableAutoMerge: vi.fn(),
+      disableAutoMerge,
     });
 
+    expect(disableAutoMerge).toHaveBeenCalledOnce();
     expect(result).toMatchObject({
       dequeued: false,
       dequeueOutcome: 'not-in-queue',
@@ -939,7 +1105,7 @@ describe('terminal failure hold application', () => {
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: true,
-          mergeQueueEntry: { id: 'MQE_42' },
+          mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
           autoMergeRequest: null,
         })),
         dequeuePullRequest: vi.fn(async () => {
@@ -960,7 +1126,7 @@ describe('terminal failure hold application', () => {
           state: 'OPEN',
           headRefOid: SOURCE,
           isInMergeQueue: true,
-          mergeQueueEntry: { id: 'MQE_42' },
+          mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
           autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
         })),
         dequeuePullRequest: vi.fn(async () => {
@@ -969,5 +1135,132 @@ describe('terminal failure hold application', () => {
         disableAutoMerge: vi.fn(),
       })
     ).rejects.toThrow(/native queue intent/);
+  });
+});
+
+describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
+  // Replays #20354 on 2026-10-03: one unchanged head, an armed auto-merge
+  // that GitHub hides (autoMergeRequest null) while queued and just after the
+  // dequeue, and a queue that re-adds an armed CLEAN PR seconds later. Before
+  // the fix the hold never disabled auto-merge, so the head re-entered the
+  // queue 13 times and failed 8 holds.
+  const replay = async ({ failures }) => {
+    let armed = true;
+    let queued = true;
+    let enqueues = 1;
+    const statuses = [];
+    for (let attempt = 1; attempt <= failures && queued; attempt += 1) {
+      const runId = 1000 + attempt;
+      const receipt = await applyMergeGroupFailure(
+        {
+          ...failureInput,
+          failedSteps: ['Run structural ci-fast lane'],
+          run: {
+            ...failureInput.run,
+            id: runId,
+            html_url: `https://github.com/${REPOSITORY}/actions/runs/${runId}`,
+          },
+          statuses: structuredClone(statuses),
+        },
+        {
+          writeStatus: async written =>
+            statuses.unshift({
+              context: written.context,
+              state: written.state,
+              description: written.description,
+              creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+              target_url: written.targetUrl,
+            }),
+          readPullRequest: async () => ({
+            id: 'PR_20354',
+            state: 'OPEN',
+            headRefOid: SOURCE,
+            isInMergeQueue: queued,
+            // The failed group is the live entry: not a superseded run.
+            mergeQueueEntry: queued
+              ? { id: 'MQE', headCommit: { oid: GROUP } }
+              : null,
+            autoMergeRequest: null, // GitHub's lagging read
+          }),
+          dequeuePullRequest: async () => {
+            queued = false;
+          },
+          disableAutoMerge: async () => {
+            if (!armed) {
+              throw new Error(
+                "Can't disable auto-merge for this pull request."
+              );
+            }
+            armed = false;
+          },
+        }
+      );
+      expect(receipt.sourceHeadSha).toBe(SOURCE);
+      // GitHub re-adds an armed, CLEAN pull request on its own.
+      if (armed) {
+        queued = true;
+        enqueues += 1;
+      }
+    }
+    return { enqueues, armed, statuses };
+  };
+
+  it('disables the hidden auto-merge so the same head never re-enters on its own', async () => {
+    const { enqueues, armed, statuses } = await replay({ failures: 13 });
+    expect(armed).toBe(false);
+    expect(enqueues).toBe(1);
+    // One failure, one hold: the loop never reaches a second merge group.
+    expect(statuses).toHaveLength(1);
+  });
+
+  it('never disables auto-merge for a superseded run, even when the read hides it', async () => {
+    const disableAutoMerge = vi.fn();
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: true,
+        mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: 'f'.repeat(40) } },
+        autoMergeRequest: null,
+      })),
+      dequeuePullRequest: vi.fn(),
+      disableAutoMerge,
+    });
+    expect(result).toMatchObject({
+      superseded: true,
+      autoMergeDisabled: false,
+    });
+    expect(disableAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('still fails closed when disabling auto-merge hits a genuine error', async () => {
+    await expect(
+      applyMergeGroupFailure(failureInput, {
+        writeStatus: vi.fn(),
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(async () => {
+          throw new Error('Something went wrong while executing your query.');
+        }),
+      })
+    ).rejects.toThrow('Something went wrong');
+  });
+
+  it('recognizes only the not-armed answer as benign', () => {
+    expect(
+      autoMergeWasNotArmed(
+        new Error("Can't disable auto-merge for this pull request.")
+      )
+    ).toBe(true);
+    expect(autoMergeWasNotArmed(new Error('Bad credentials'))).toBe(false);
   });
 });

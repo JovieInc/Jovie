@@ -172,6 +172,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up pinned Node and test dependencies
+        uses: ./.github/actions/setup-node-pnpm
+
       - name: Run unit tests for triage script
         run: node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/auto-merge-stuck-triage.test.js .github/scripts/customer-notes-ready.test.js
 
@@ -214,6 +217,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up pinned Node and test dependencies
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Run unit tests for triage script
         run: node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/auto-merge-stuck-triage.test.js .github/scripts/customer-notes-ready.test.js

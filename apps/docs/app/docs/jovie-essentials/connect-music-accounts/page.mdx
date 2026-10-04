@@ -1,16 +1,16 @@
 ---
 id: connect-music-accounts
 title: Connect your music accounts
-description: Review detected music identities in Presence, add only the right artist, and import supported music in Library.
+description: Review detected music identities in Identity, add only the right artist, and import supported music in Work.
 documentType: guide
 category: jovie-essentials
 productBacked: true
 featureId: auto-dsp-detection-linking
 additionalFeatureIds:
   - auto-sync-from-spotify
-productRoute: /app/profiles
+productRoute: /app/presence
 status: certified
-lastVerifiedAt: 2026-09-27
+lastVerifiedAt: 2026-10-04
 verifiedBy: human
 keywords:
   - connect spotify
@@ -23,14 +23,15 @@ visualProofRefs:
   - proof/connect-music-accounts.png
   - proof/connect-spotify-artist.png
 uiLabels:
-  - Presence
+  - Identity
   - Suggested
   - Add
   - Not me
   - Pick the exact Spotify artist
-  - Library
+  - Work
   - Sync from Spotify
   - Import YouTube
+  - Connect YouTube
 productSourceRefs:
   - apps/web/app/app/(shell)/profiles/ProfilesWorkspace.tsx
   - apps/web/app/app/(shell)/library/LibraryPageClient.tsx
@@ -44,20 +45,20 @@ launchPath: true
 
 # Connect your music accounts
 
-<HelpOutcome>Confirm the correct Spotify, Apple Music, or YouTube Music public identity, then import from the providers Jovie currently supports in Library.</HelpOutcome>
+<HelpOutcome>Confirm the correct Spotify, Apple Music, or YouTube Music public identity, then import from the providers Jovie currently supports in Work.</HelpOutcome>
 
 <HelpPrerequisites>
 
-- A claimed artist profile. Music identity review is in **Presence**; imports are in **Library**. **Settings → Connections** authorizes Google services, not music providers.
+- A claimed artist profile. Music identity review is in **Identity**; imports are in **Work**. **Settings → Connections** authorizes Google services, not music providers.
 
 </HelpPrerequisites>
 
 <HelpSteps>
 
-<HelpStep title="Open Presence">
-From your artist navigation, open [Presence](https://jov.ie/app/profiles), then choose **Suggested**. Jovie groups detected public identities for review.
+<HelpStep title="Open Identity">
+From your artist navigation, open [Identity](https://jov.ie/app/presence), then choose **Suggested**. Jovie groups detected public identities for review.
 
-<HelpScreenshot src="/proof/connect-music-accounts.png" alt="Presence workspace on the Suggested tab with Add and Not me actions for detected music identities" caption="Review detected identities before adding them." />
+<HelpScreenshot src="/proof/connect-music-accounts.png" alt="Identity workspace on the Suggested tab with Add and Not me actions for detected music identities" caption="Review detected identities before adding them." />
 </HelpStep>
 
 <HelpStep title="Confirm the exact artist identity">
@@ -71,18 +72,18 @@ Spotify is connected during profile claim or initial setup. At **Pick the exact 
 </HelpStep>
 
 <HelpStep title="Start a supported import">
-Open [Library](https://jov.ie/app/library). Use **Sync from Spotify** when it is available for the connected profile, or **Import YouTube** to authorize and import from your YouTube channel. Spotify, Apple Music, and YouTube Music can appear as detected public identities; Apple Music has no standalone authorization control in the current workspace.
+Open [Work](https://jov.ie/app/library) and choose **Add** in the toolbar. Use **Sync from Spotify** when it is available for the connected profile, or **Import YouTube** (shown as **Connect YouTube** until the channel is authorized) to authorize and import from your YouTube channel. Spotify, Apple Music, and YouTube Music can appear as detected public identities; Apple Music has no standalone authorization control in the current workspace.
 </HelpStep>
 
 <HelpStep title="Let processing finish">
-Keep the selected identity unchanged while Jovie shows its import or processing state. Review Library when processing completes; Jovie does not promise a fixed completion time.
+Keep the selected identity unchanged while Jovie shows its import or processing state. Review Work when processing completes; Jovie does not promise a fixed completion time.
 </HelpStep>
 
 </HelpSteps>
 
 ## What happens next
 
-Accepted identities appear in Presence, and supported imported items appear in Library after processing.
+Accepted identities appear in Identity, and supported imported items appear in Work after processing.
 
 <HelpTroubleshooting>
 

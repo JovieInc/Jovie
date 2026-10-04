@@ -1,17 +1,24 @@
 /**
- * Factory content stages (JOV-7276): truth, outcomes, narrative, copy, then
- * the deterministic layout, hero, proof and gap decisions. Each is a thin
+ * Factory content stages (JOV-7276): truth, outcomes, narrative, then
+ * validated layout, hero, proof and gap decisions before copy. Each is a thin
  * adapter over the module that already owns the job.
  */
 
 import { gateCopy, modelFamily, RUBRIC_VERSION } from '@jovie/copy';
 import { resolveComposition } from '../../data/marketing/composition';
-import { selectHeroDecision } from '../../data/marketing/factory/heroDecision';
+import {
+  HERO_CODE_BINDING_BY_VARIANT,
+  selectHeroDecision,
+} from '../../data/marketing/factory/heroDecision';
+import { solutionsFactoryVariantIssue } from '../../data/marketing/factory/pageRecord';
 import {
   buildPersuasionPlan,
   persuasionJobToken,
 } from '../../data/marketing/factory/persuasionBrief';
-import { detectSectionGaps } from '../../data/marketing/factory/sectionRequest';
+import {
+  dedupeSectionRequests,
+  detectSectionGaps,
+} from '../../data/marketing/factory/sectionRequest';
 import {
   FACTORY_HERO_VARIANT_IDS,
   type FactoryStage,
@@ -20,6 +27,7 @@ import {
 import { auditMarketingNarrativePlan } from '../../data/marketing/generation';
 import { listProductTruthClaims } from '../../data/product-truth/claims';
 import {
+  admissibleProofRegistry,
   createProofPageContext,
   type ProofKind,
   selectProof,
@@ -253,15 +261,30 @@ function narrativeStage(ctx: StageContext): Promise<StageResult> {
   );
 }
 
+/**
+ * Copy directions written and judged per attempt (JOV-7765). Copy is the
+ * stage a visual rejection reworks, so it is where competing directions pay.
+ */
+export const FACTORY_COPY_DIRECTIONS = 3;
+
 function copyStage(ctx: StageContext): Promise<StageResult> {
   const truth = artifactOf(ctx, 'truth');
   const narrative = artifactOf(ctx, 'narrative');
+  const layout = artifactOf(ctx, 'layout');
+  const proof = artifactOf(ctx, 'proof');
+  const gaps = artifactOf(ctx, 'gap-detection');
   return modelStage(
     ctx,
     'copy',
     'copy-compiler',
     'Write {slots:[{sectionInstanceId,slot,text,claimIds,nonClaim}]}; hero needs headline and subhead slots; tag every claim sentence with claim ids.',
-    { sections: narrative.sections, claims: truth.claims },
+    {
+      sections: narrative.sections,
+      layout: layout.sections,
+      proof,
+      sectionRequests: gaps.sectionRequests,
+      claims: truth.claims,
+    },
     async (value, checks, model) => {
       const slots = (Array.isArray(value.slots) ? value.slots : []) as {
         sectionInstanceId?: string;
@@ -325,20 +348,61 @@ function copyStage(ctx: StageContext): Promise<StageResult> {
           rubricVersion: RUBRIC_VERSION,
         })),
       };
-    }
+    },
+    { directions: FACTORY_COPY_DIRECTIONS }
   );
 }
 
 async function layoutStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
+  const persuasion = artifactOf(ctx, 'persuasion');
+  const narrative = artifactOf(ctx, 'narrative');
+  const hero = narrative.sections.find(section => section.sectionId === 'hero');
+  const heroDecision = selectHeroDecision(ctx.brief.hero);
+  const heroVariant =
+    HERO_CODE_BINDING_BY_VARIANT[heroDecision.variant].sectionVariantId;
+  checks.check(
+    'hero-code-binding',
+    Boolean(hero && heroVariant),
+    'the chosen hero needs a canonical code binding before copy'
+  );
+  const explicitHero =
+    hero && ctx.brief.sectionVariants?.[hero.sectionInstanceId];
+  checks.check(
+    'hero-layout-consistent',
+    !explicitHero || explicitHero === heroVariant,
+    'the narrative hero variant conflicts with the locked hero decision'
+  );
   const composition = resolveComposition(ctx.brief.brief, {
     sectionJobs: ctx.brief.sectionJobs,
+    existingSectionRequests: persuasion.sectionRequests,
+    narrativePlan: narrative,
+    sectionVariants: {
+      ...ctx.brief.sectionVariants,
+      ...(hero && heroVariant ? { [hero.sectionInstanceId]: heroVariant } : {}),
+    },
   });
   checks.check(
     'composition-has-hero',
     composition.sections.some(section => section.sectionId === 'hero'),
     'the resolver dropped the hero'
   );
+  checks.check(
+    'composition-essential-jobs',
+    !composition.shadowRequired,
+    'an essential story job has no certified section; resolve its section request before copy'
+  );
+  for (const section of composition.sections) {
+    const issue =
+      ctx.brief.family === 'solutions'
+        ? solutionsFactoryVariantIssue(section.sectionId, section.variantId)
+        : `factory has no renderer contract for family ${ctx.brief.family}`;
+    checks.check(
+      `family-renderer:${section.sectionInstanceId}`,
+      issue === null,
+      issue ?? 'selected variant has a concrete family renderer'
+    );
+  }
   return result(checks, composition, {
     notes: { shadowRequired: composition.shadowRequired ?? false },
   });
@@ -390,6 +454,14 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
     requests: [],
   };
   const proofRequests: unknown[] = [];
+  // A measured Jovie outcome is never backed by a market fact (JOV-7750):
+  // without dogfood or pilot evidence it becomes a ProofRequest instead.
+  const measuredClaimIds = new Set(
+    listProductTruthClaims()
+      .filter(claim => claim.source === 'measured')
+      .map(claim => claim.id)
+  );
+  const admissibleProof = admissibleProofRegistry(measuredClaimIds);
   for (const need of ctx.brief.proof) {
     checks.check(
       `proof-claim:${need.claimId}`,
@@ -405,14 +477,17 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
     const sectionId = narrative.find(
       section => section.sectionInstanceId === need.sectionInstanceId
     )?.sectionId;
-    const selected = selectProof({
-      id: sectionId ?? need.sectionInstanceId,
-      claimId: need.claimId,
-      page,
-      kind: need.kind,
-      fallbackKinds: need.fallbackKinds,
-      audience: ctx.brief.brief.targetAudience,
-    });
+    const selected = selectProof(
+      {
+        id: sectionId ?? need.sectionInstanceId,
+        claimId: need.claimId,
+        page,
+        kind: need.kind,
+        fallbackKinds: need.fallbackKinds,
+        audience: ctx.brief.brief.targetAudience,
+      },
+      admissibleProof
+    );
     const kind = SPINE_PROOF_KIND[selected.kind];
     if (
       !checks.check(
@@ -429,7 +504,7 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
       artifact.requests.push({
         sectionInstanceId: need.sectionInstanceId,
         kind,
-        reason: `${selected.suggestedLane}: no valid ${selected.kind} proof for ${selected.claimId}`,
+        reason: `${selected.suggestedLane} (${selected.generator} generator): no valid ${selected.kind} proof for ${selected.claimId}`,
       });
     } else {
       artifact.items.push({
@@ -460,15 +535,25 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
 
 async function gapStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
+  const persuasion = artifactOf(ctx, 'persuasion');
   const report = detectSectionGaps(ctx.brief.sectionJobs);
+  const sectionRequests = dedupeSectionRequests([
+    ...report.requests,
+    ...persuasion.sectionRequests,
+  ]);
   checks.check('gap-report', true);
+  checks.check(
+    'no-essential-section-gaps',
+    !sectionRequests.some(request => request.essential),
+    'essential section requests must be resolved before copy'
+  );
   return result(
     checks,
-    { pageId: ctx.pageId, sectionRequests: report.requests },
+    { pageId: ctx.pageId, sectionRequests },
     {
       notes: {
         registryGaps: report.registryGaps,
-        shadowRequired: report.requests.some(request => request.essential),
+        shadowRequired: sectionRequests.some(request => request.essential),
       },
     }
   );

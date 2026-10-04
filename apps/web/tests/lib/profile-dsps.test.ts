@@ -68,6 +68,19 @@ describe('getCanonicalProfileDSPs', () => {
     expect(result[0].platformKey).toBeNull();
   });
 
+  it('retains both unnamed social links when pasted URLs have Unicode whitespace', () => {
+    const result = getCanonicalProfileDSPs({}, [
+      { platform: null, url: '\u00a0https://substack.com/@creator\u00a0' },
+      { platform: null, url: '\u2003https://discord.gg/creator\u2003' },
+    ]);
+
+    expect(result.map(link => link.url)).toEqual([
+      'https://substack.com/@creator',
+      'https://discord.gg/creator',
+    ]);
+    expect(result.map(link => link.name)).toEqual(['Substack', 'Discord']);
+  });
+
   it('still drops social links with invalid URLs on non-DSP platforms', () => {
     const result = getCanonicalProfileDSPs({}, [
       { platform: 'discord', url: 'not-a-url' },

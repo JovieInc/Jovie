@@ -5,7 +5,7 @@
  * Handles single-user processing and batch fetching.
  */
 
-import { and, sql as drizzleSql, isNotNull } from 'drizzle-orm';
+import { sql as drizzleSql, isNotNull } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -60,10 +60,8 @@ export interface ReconciliationStats {
 /**
  * Fetch a batch of users with subscriptions using cursor-based pagination.
  *
- * Filters out rows with a null `clerk_id` (migration 0073): the
- * reconciliation pipeline still keys Stripe updates on Clerk identity, and
- * post-cutover rows (linked via `better_auth_user_id`) are skipped here
- * until a later commit swaps the reconciler to the Better Auth identity.
+ * Identity is `clerkId` when the row still has one, otherwise the app
+ * `users.id`. `updateUserBillingStatus` resolves either form.
  */
 export async function fetchUserBatch(
   db: DbOrTransaction,
@@ -80,8 +78,8 @@ export async function fetchUserBatch(
     .from(users)
     .where(
       lastUserId
-        ? drizzleSql`${users.stripeSubscriptionId} IS NOT NULL AND ${users.clerkId} IS NOT NULL AND ${users.id} > ${lastUserId}`
-        : and(isNotNull(users.stripeSubscriptionId), isNotNull(users.clerkId))
+        ? drizzleSql`${users.stripeSubscriptionId} IS NOT NULL AND ${users.id} > ${lastUserId}`
+        : isNotNull(users.stripeSubscriptionId)
     )
     .orderBy(users.id)
     .limit(BATCH_SIZE);
