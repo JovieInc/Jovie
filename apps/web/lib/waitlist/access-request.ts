@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { createHash } from 'node:crypto';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import {
@@ -35,6 +34,10 @@ import {
   type QualificationDecision,
 } from '@/lib/waitlist/qualification';
 import { getWaitlistSettings } from '@/lib/waitlist/settings';
+import {
+  hashEmailForWaitlist,
+  isUnqualifiedSignupEntry,
+} from '@/lib/waitlist/signup-entry';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -96,10 +99,6 @@ function normalizeSpotifyUrl(url: string): string {
   } catch {
     return url;
   }
-}
-
-function hashEmailForWaitlist(email: string): string {
-  return createHash('sha256').update(email).digest('hex');
 }
 
 function buildQualificationInputs(data: WaitlistRequestPayload) {
@@ -168,6 +167,7 @@ async function findLatestEntryByEmail(
     .select({
       id: waitlistEntries.id,
       status: waitlistEntries.status,
+      source: waitlistEntries.source,
       waitlistedAt: waitlistEntries.waitlistedAt,
     })
     .from(waitlistEntries)
@@ -461,7 +461,7 @@ export async function submitWaitlistAccessRequest(
           source: input.source ?? 'waitlist_form',
         });
 
-        if (existing) {
+        if (existing && !isUnqualifiedSignupEntry(existing)) {
           return handleExistingEntryResubmission({
             tx,
             existing,
@@ -472,19 +472,31 @@ export async function submitWaitlistAccessRequest(
           });
         }
 
-        const [entry] = await tx
-          .insert(waitlistEntries)
-          .values({
-            ...entryValues,
-            status: 'chat_started',
-            statusReason: 'chat_started',
-            createdAt: new Date(),
-          })
-          .onConflictDoNothing({
-            target: waitlistEntries.emailNormalized,
-            where: drizzleSql`${waitlistEntries.canonical} = true`,
-          })
-          .returning({ id: waitlistEntries.id });
+        // A sign-up entry the chat has not qualified yet is this request's
+        // entry: qualify it now instead of treating it as a resubmission.
+        const [entry] = existing
+          ? await tx
+              .update(waitlistEntries)
+              .set({
+                ...entryValues,
+                status: 'chat_started',
+                statusReason: 'chat_started',
+              })
+              .where(eq(waitlistEntries.id, existing.id))
+              .returning({ id: waitlistEntries.id })
+          : await tx
+              .insert(waitlistEntries)
+              .values({
+                ...entryValues,
+                status: 'chat_started',
+                statusReason: 'chat_started',
+                createdAt: new Date(),
+              })
+              .onConflictDoNothing({
+                target: waitlistEntries.emailNormalized,
+                where: drizzleSql`${waitlistEntries.canonical} = true`,
+              })
+              .returning({ id: waitlistEntries.id });
 
         if (!entry) {
           const concurrentExisting = await findLatestEntryByEmail(

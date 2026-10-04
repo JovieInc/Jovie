@@ -10,6 +10,10 @@ const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockStripeList = vi.hoisted(() => vi.fn());
 const mockReplayUnprocessedStripeWebhooks = vi.hoisted(() => vi.fn());
 
+vi.mock('@/lib/billing/webhook-replay', () => ({
+  replayUnprocessedStripeWebhooks: mockReplayUnprocessedStripeWebhooks,
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
@@ -56,10 +60,6 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
   captureWarning: mockCaptureWarning,
-}));
-
-vi.mock('@/lib/billing/webhook-replay', () => ({
-  replayUnprocessedStripeWebhooks: mockReplayUnprocessedStripeWebhooks,
 }));
 
 describe('GET /api/cron/billing-reconciliation', () => {
@@ -144,13 +144,19 @@ describe('GET /api/cron/billing-reconciliation', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBeDefined();
     expect(data.stats).toBeDefined();
-    expect(mockReplayUnprocessedStripeWebhooks).toHaveBeenCalledOnce();
     expect(mockDbInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
-        userId: null,
         eventType: 'reconciliation_run',
         source: 'reconciliation',
-        metadata: expect.objectContaining({ heartbeat: true }),
+        metadata: expect.objectContaining({
+          action: 'reconciliation_run',
+          success: true,
+          webhookReplay: {
+            processed: 0,
+            blocked: [],
+            failed: [],
+          },
+        }),
       })
     );
   });
@@ -309,17 +315,13 @@ describe('GET /api/cron/billing-reconciliation', () => {
         stats: expect.objectContaining({ errors: 1 }),
       })
     );
-    expect(mockDbInsertValues).not.toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'reconciliation_run' })
-    );
   });
 
-  it('continues reconciliation when audit log insert fails', async () => {
+  it('fails closed when the reconciliation run receipt cannot be written', async () => {
     vi.stubEnv('NODE_ENV', 'production');
 
-    // The per-user audit insert fails once. The run itself succeeded, so the
-    // heartbeat insert still records that reconciliation ran.
-    mockDbInsertValues.mockRejectedValueOnce(new Error('Audit insert failed'));
+    // Audit log insert fails
+    mockDbInsertValues.mockRejectedValue(new Error('Audit insert failed'));
 
     mockStripeList.mockResolvedValueOnce({
       data: [
@@ -378,50 +380,21 @@ describe('GET /api/cron/billing-reconciliation', () => {
     const response = await GET(request);
     const data = await response.json();
 
-    // User update should still succeed
-    expect(response.status).toBe(200);
-    expect(data.stats.fixed).toBe(1);
-    // Audit failure should be captured as critical error
+    // The user repair still happens, but the cron cannot claim success without
+    // its durable reconciliation_run receipt.
+    expect(response.status).toBe(500);
+    expect(data.success).toBe(false);
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Billing audit log insert failed after user update',
       expect.any(Error),
       expect.objectContaining({ userId: 'user_1' })
     );
-    expect(mockCaptureWarning).not.toHaveBeenCalled();
-    expect(mockDbInsertValues).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        userId: null,
-        eventType: 'reconciliation_run',
-        source: 'reconciliation',
-      })
-    );
-  });
-
-  it('fails the run when stored-event replay throws', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    mockReplayUnprocessedStripeWebhooks.mockRejectedValue(
-      new Error('database unavailable')
-    );
-
-    const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
-    const request = new Request(
-      'http://localhost/api/cron/billing-reconciliation',
-      {
-        headers: { Authorization: 'Bearer test-secret' },
-      }
-    );
-
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data.success).toBe(false);
-    expect(mockDbInsertValues).not.toHaveBeenCalled();
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Billing reconciliation failed',
       expect.any(Error),
       {}
     );
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
   it('handles reconciliation errors gracefully', async () => {
@@ -445,5 +418,16 @@ describe('GET /api/cron/billing-reconciliation', () => {
 
     expect(response.status).toBe(500);
     expect(data.success).toBe(false);
+    expect(mockDbInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'reconciliation_run',
+        source: 'reconciliation',
+        metadata: expect.objectContaining({
+          action: 'reconciliation_run',
+          success: false,
+          failure: { name: 'Error', message: 'Database error' },
+        }),
+      })
+    );
   });
 });

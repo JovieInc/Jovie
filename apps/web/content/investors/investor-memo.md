@@ -2,7 +2,7 @@
 
 **Company:** Jovie
 
-**Stage:** MVP built; incorporated; $25K angel committed
+**Stage:** MVP built; incorporated
 
 **Mission:** Turn creator traffic into compounding fan relationships and revenue.
 
@@ -49,10 +49,6 @@ Jovie runs an always-on decision loop on every profile view:
 ## Why now
 
 Attention, conversion, and monetization are now the bottlenecks in music.
-
-- The supply of new music is exploding. Spotify itself has cited 60,000+ new tracks uploaded per day (~22M/year).
-- Across streaming, the flood is even larger. Industry reporting based on Luminate data indicates ~99,000 tracks per day were uploaded to streaming services in 2024, with massive long-tail content that never finds an audience.
-- Generative AI is accelerating the firehose. Deezer reports receiving 50,000+ fully AI-generated tracks per day, representing ~34% of total daily deliveries.
 
 As content volume rises, a static link page and occasional broadcast messages stop working. Jovie sits at the universal traffic choke point (link in bio) and turns each visit into a personalized, measurable funnel that compounds identity capture and downstream value.
 
@@ -116,14 +112,12 @@ Creators provide initial offers; Jovie makes them actionable:
 
 Tim is a creator + operator:
 
-- Drove 90M+ streams to his own music
 - Signed to Armada and Universal
 - Spent 3 years at Bravo building marketing experiences for major artists and brands
 
 ## Funding
 
 - **Raising:** Angel round
-- **Committed:** $25K angel check
 - **Use of funds:** ship MVP decisioning + instrumentation, run pilot cohort, build retargeting + messaging loops, and validate repeatable GTM.
 
 ## Near-term milestones (60 to 90 days)

@@ -23,6 +23,16 @@ function input(
   };
 }
 describe('evaluateBillingSyncRemediation', () => {
+  it('keeps a fresh failed canonical run actionable', () => {
+    expect(
+      evaluateBillingSyncRemediation(
+        input({ lastReconciliationSuccess: false })
+      )
+    ).toEqual([
+      expect.objectContaining({ fingerprint: BILLING_SYNC_STALE_FINGERPRINT }),
+    ]);
+  });
+
   it('stays quiet inside 48 hours and throttles a recent filing', () => {
     expect(evaluateBillingSyncRemediation(input())).toEqual([]);
     expect(

@@ -28,9 +28,11 @@ function limitChain(rows: unknown[]) {
     }),
   };
 }
-function snapshot(lastRun: Date | null, stuck: unknown[] = []) {
+function snapshot(lastRun: Date | null, stuck: unknown[] = [], metadata = {}) {
   mockSelect
-    .mockReturnValueOnce(limitChain(lastRun ? [{ createdAt: lastRun }] : []))
+    .mockReturnValueOnce(
+      limitChain(lastRun ? [{ createdAt: lastRun, metadata }] : [])
+    )
     .mockReturnValueOnce(limitChain(stuck))
     .mockReturnValueOnce({
       from: () => ({ where: () => Promise.resolve([]) }),
@@ -64,6 +66,14 @@ describe('runBillingSyncRemediation', () => {
       filed: [],
       skipped: false,
     });
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+  it('does not treat a fresh failed receipt as recovery', async () => {
+    envState.LINEAR_API_KEY = undefined;
+    snapshot(new Date('2026-10-02T22:00:00.000Z'), [], { success: false });
+    await expect(runBillingSyncRemediation(now)).rejects.toThrow(
+      'LINEAR_API_KEY is not configured'
+    );
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
   it('fails closed without LINEAR_API_KEY when a finding exists', async () => {

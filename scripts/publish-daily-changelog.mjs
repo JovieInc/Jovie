@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
 import {
   checkPublicationBinding,
+  isTrustedControllerRun,
   planDailyPublication,
 } from './lib/daily-changelog-publication.mjs';
 import { isStampAllowedBranch } from './version-fanout-guard.mjs';
@@ -50,11 +51,16 @@ const run = gh([
   'api',
   `repos/JovieInc/Jovie/actions/runs/${marker.controllerRun}/attempts/${marker.controllerAttempt}`,
 ]);
-if (
-  run.path !== '.github/workflows/production-controller.yml' ||
-  run.head_branch !== 'main' ||
+const headCompare =
+  /^[0-9a-f]{40}$/.test(run.head_sha ?? '') &&
+  /^[0-9a-f]{40}$/.test(marker.sha ?? '') &&
   run.head_sha !== marker.sha
-)
+    ? gh([
+        'api',
+        `repos/JovieInc/Jovie/compare/${marker.sha}...${run.head_sha}`,
+      ])
+    : null;
+if (!isTrustedControllerRun(run, marker, headCompare))
   throw new Error('Untrusted controller run');
 const jobs = gh([
   'api',

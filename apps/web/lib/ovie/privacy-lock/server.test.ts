@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   writes: [] as unknown[],
   conflictChanged: true,
+  syntheticCapture: false,
+  bypassSession: null as { dbUserId: string } | null,
 }));
 vi.mock('@/lib/db', () => ({
   db: {
@@ -19,6 +21,12 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/lib/auth/cached', () => ({
   getFreshAuth: vi.fn(async () => ({ userId: 'u1', sessionId: 's1' })),
+}));
+vi.mock('@/lib/e2e/runtime', () => ({
+  isVisualCaptureSyntheticAuthEnabled: () => mocks.syntheticCapture,
+}));
+vi.mock('@/lib/auth/dev-test-auth.server', () => ({
+  getCachedDevTestAuthSession: vi.fn(async () => mocks.bypassSession),
 }));
 
 import {
@@ -48,6 +56,8 @@ beforeEach(() => {
   mocks.results = [];
   mocks.writes = [];
   mocks.conflictChanged = true;
+  mocks.syntheticCapture = false;
+  mocks.bypassSession = null;
   vi.clearAllMocks();
   mocks.select.mockImplementation(() => {
     const q: any = {
@@ -95,6 +105,23 @@ describe('session-bound Ovie privacy persistence', () => {
       throw Error('DB down');
     });
     await expect(assertOviePrivacyUnlocked(auth)).rejects.toThrow('DB down');
+  });
+  it('skips the Postgres policy read for the synthetic capture session', async () => {
+    mocks.syntheticCapture = true;
+    mocks.bypassSession = { dbUserId: 'u1' };
+    mocks.select.mockImplementation(() => {
+      throw Error('DB down');
+    });
+    await expect(assertOviePrivacyUnlocked(auth)).resolves.toBeUndefined();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+  it('still checks the policy for real sessions while capture is enabled', async () => {
+    mocks.syntheticCapture = true;
+    mocks.results = [[enabled], []];
+    await expect(assertOviePrivacyUnlocked(auth)).rejects.toMatchObject({
+      code: 'PRIVACY_UNLOCK_REQUIRED',
+    });
+    expect(mocks.select).toHaveBeenCalled();
   });
   it('rejects access to opted-in locked data', async () => {
     mocks.results = [[enabled], []];

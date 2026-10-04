@@ -254,9 +254,12 @@ describe('DashboardMobileTabs', () => {
     ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('promotes Audience into the tab row inside its Contacts context', () => {
-    mockPathname.mockReturnValue(APP_ROUTES.CONTACTS);
-    mockSearchParams.mockReturnValue(new URLSearchParams('tab=audience'));
+  it.each([
+    [APP_ROUTES.CONTACTS, 'tab=audience'],
+    [APP_ROUTES.INSIGHTS, ''],
+  ])('promotes Audience into the tab row for %s', (pathname, search) => {
+    mockPathname.mockReturnValue(pathname);
+    mockSearchParams.mockReturnValue(new URLSearchParams(search));
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });

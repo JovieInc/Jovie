@@ -1,2 +1,0 @@
-ALTER TABLE "billing_audit_log" ALTER COLUMN "user_id" DROP NOT NULL;--> statement-breakpoint
-ALTER TABLE "billing_audit_log" ADD CONSTRAINT "billing_audit_log_user_id_check" CHECK ("billing_audit_log"."user_id" IS NOT NULL OR "billing_audit_log"."event_type" IN ('reconciliation_run', 'billing_sync_remediation_filed'));

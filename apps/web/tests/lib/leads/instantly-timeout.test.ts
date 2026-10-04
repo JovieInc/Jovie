@@ -32,26 +32,46 @@ describe('Instantly push timeout', () => {
 
     const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
 
-    // Need to mock env for API key
+    vi.stubEnv('INSTANTLY_API_KEY', 'test-key');
+    vi.stubEnv('INSTANTLY_CAMPAIGN_ID', 'campaign-1');
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+
+    await pushLeadToInstantly({
+      email: 'test@example.com',
+      firstName: 'Test',
+      claimLink: 'https://app/claim/tok',
+      artistName: 'Test',
+      priorityScore: 50,
+    });
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const fetchOptions = mockFetch.mock.calls[0]?.[1];
+    expect(fetchOptions).toHaveProperty('signal');
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('does not call fetch when Instantly outbound is disabled', async () => {
+    const mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+    vi.resetModules();
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', '');
     vi.stubEnv('INSTANTLY_API_KEY', 'test-key');
     vi.stubEnv('INSTANTLY_CAMPAIGN_ID', 'campaign-1');
 
-    try {
-      await pushLeadToInstantly({
+    const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
+
+    await expect(
+      pushLeadToInstantly({
         email: 'test@example.com',
         firstName: 'Test',
         claimLink: 'https://app/claim/tok',
         artistName: 'Test',
         priorityScore: 50,
-      });
-    } catch {
-      // May fail due to missing env in test — that's ok
-    }
-
-    if (mockFetch.mock.calls.length > 0) {
-      const fetchOptions = mockFetch.mock.calls[0][1];
-      expect(fetchOptions).toHaveProperty('signal');
-    }
+      })
+    ).rejects.toThrow(/disabled/i);
+    expect(mockFetch).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

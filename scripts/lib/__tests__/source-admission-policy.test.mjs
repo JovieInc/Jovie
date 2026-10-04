@@ -56,6 +56,7 @@ test('source admission loads the actual changelog guard from trusted base when a
   try {
     for (const file of [
       'scripts/changelog-source-guard.mjs',
+      'scripts/lib/gh-retry.sh',
       'scripts/lib/daily-changelog-publication.mjs',
       'scripts/lib/daily-changelog.mjs',
       'scripts/lib/changelog-filter-rules.mjs',
@@ -139,7 +140,7 @@ test('source admission loads the actual changelog guard from trusted base when a
   }
 });
 
-test('source validation rejects script and web-test type errors before queue admission', () => {
+test('source validation rejects type errors and locked UI contract failures before queue admission', () => {
   const workflow = load(
     readFileSync('.github/workflows/source-validation.yml', 'utf8')
   );
@@ -156,14 +157,18 @@ test('source validation rejects script and web-test type errors before queue adm
     writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     writeFileSync(
       join(bin, 'pnpm'),
-      '#!/bin/sh\nif [ "$*" = "$FAIL_TYPECHECK" ]; then exit 17; fi\nexit 0\n',
+      '#!/bin/sh\nprintf "%s\\n" "$*" >> "$COMMAND_LOG"\nif [ "$*" = "$FAIL_TYPECHECK" ]; then exit 17; fi\nexit 0\n',
       { mode: 0o755 }
     );
     for (const command of [
       'typecheck',
       'run typecheck:scripts',
       '--filter @jovie/web run typecheck:tests',
+      'screen-registration-gate',
+      '--filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
     ]) {
+      const commandLog = join(bin, 'commands.log');
+      rmSync(commandLog, { force: true });
       const result = spawnSync('bash', ['-eo', 'pipefail', '-c', script], {
         encoding: 'utf8',
         env: {
@@ -171,12 +176,18 @@ test('source validation rejects script and web-test type errors before queue adm
           PATH: `${bin}:${process.env.PATH}`,
           EXPECTED_HEAD: 'a'.repeat(40),
           FAIL_TYPECHECK: command,
+          COMMAND_LOG: commandLog,
         },
       });
       assert.equal(
         result.status,
         17,
         `${command} must reject source admission: ${result.stderr}`
+      );
+      assert.ok(
+        !readFileSync(commandLog, 'utf8')
+          .split('\n')
+          .includes('ci:control:test')
       );
     }
   } finally {
@@ -426,6 +437,39 @@ test('fork approval must be current human collaborator latest opinionated state'
   input.reviews = [review('APPROVED'), review('DISMISSED', 2)];
   assert.equal(evaluateSourceAdmission(input).allowed, false);
 });
+test('generic admission preserves base holds and their provenance after main moves', () => {
+  const input = fixture();
+  const recorded = 'a'.repeat(40);
+  input.statuses = [tombstone('jovie-queue-failure-hold/v1')];
+  input.statuses[0].description = `class=base-branch;n=1;run=123;try=1;main=${recorded}`;
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone:jovie-queue-failure-hold/v1'
+    )
+  );
+  input.currentMainSha = recorded;
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  input.currentMainSha = 'b'.repeat(40);
+  assert.equal(evaluateSourceAdmission(input).allowed, false);
+  for (const currentMainSha of ['', 'invalid', 'b'.repeat(40)]) {
+    input.currentMainSha = currentMainSha;
+    assert.equal(evaluateSourceAdmission(input).allowed, false);
+  }
+  input.statuses[0].creator = null;
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone-provenance-unavailable'
+    )
+  );
+  input.statuses[0].creator = { type: 'Bot', login: 'jovie-bot[bot]' };
+  input.statuses[0].target_url =
+    'https://github.com/JovieInc/Jovie/actions/runs/999';
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.includes(
+      'tombstone-provenance-unavailable'
+    )
+  );
+});
 test('pre-land changelog collision preserves existing release branch exception', () => {
   const input = fixture();
   input.files = [{ filename: 'CHANGELOG.md' }];
@@ -644,5 +688,77 @@ test('authoring CLI validates a body file and title without credentials or publi
     assert.equal(invoke(null, true).status, 1);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('trusted context guard works for old heads and still rejects oversized merged context', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const script = workflow.jobs.deterministic.steps
+    .find(
+      step => step.name === 'Check agent-context size after merge onto base'
+    )
+    .run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-context-bootstrap-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const runner = join(root, 'runner');
+  for (const dir of [
+    repo,
+    bin,
+    runner,
+    join(repo, 'scripts/agent-context'),
+    join(repo, 'docs/agent-context'),
+  ])
+    mkdirSync(dir, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    for (const name of ['check.mjs', 'merge-budget.mjs'])
+      writeFileSync(
+        join(repo, 'scripts/agent-context', name),
+        readFileSync(`scripts/agent-context/${name}`)
+      );
+    writeFileSync(join(repo, 'CLAUDE.md'), 'small context\n');
+    writeFileSync(join(repo, 'DESIGN.md'), 'small design\n');
+    writeFileSync(join(repo, 'docs/agent-context/README.md'), 'small index\n');
+    git('init', '--quiet');
+    git('config', 'user.name', 'Context guard test');
+    git('config', 'user.email', 'context@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'trusted guard');
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    rmSync(join(repo, 'scripts'), { recursive: true });
+    writeFileSync(join(repo, 'notes.txt'), 'older source head\n');
+    git('add', '--all');
+    git('commit', '--quiet', '-m', 'old head without guard');
+    writeFileSync(
+      join(bin, 'git'),
+      '#!/bin/sh\nif [ "$1" = fetch ]; then exit 0; fi\nexec /usr/bin/git "$@"\n',
+      { mode: 0o755 }
+    );
+    const invoke = () =>
+      spawnSync('bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          RUNNER_TEMP: runner,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+        },
+      });
+    const oldHead = invoke();
+    assert.equal(oldHead.status, 0, oldHead.stderr);
+    assert.match(oldHead.stdout, /post-merge size check skipped/);
+    writeFileSync(join(repo, 'CLAUDE.md'), 'x'.repeat(6001));
+    git('add', 'CLAUDE.md');
+    git('commit', '--quiet', '-m', 'oversized context');
+    const oversized = invoke();
+    assert.equal(oversized.status, 1);
+    assert.match(oversized.stderr, /CLAUDE\.md: 6001 bytes exceeds 6000/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

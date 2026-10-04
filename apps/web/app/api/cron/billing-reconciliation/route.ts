@@ -1,6 +1,15 @@
 /**
- * Daily billing reconciliation (also callable with the cron secret).
- * Replays unprocessed stored events, then fixes DB/Stripe status drift.
+ * Billing Reconciliation Cron Job
+ *
+ * Runs daily to reconcile database subscription status with Stripe.
+ *
+ * What it does:
+ * 1. Re-drives stored Stripe events that have remained unprocessed
+ * 2. Fetches all users with stripeSubscriptionId from DB
+ * 3. Compares DB isPro status with Stripe subscription status
+ * 4. Fixes any mismatches and logs to audit table
+ *
+ * Schedule: Daily via the consolidated daily-maintenance cron.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
@@ -12,8 +21,10 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
-import { RECONCILIATION_RUN_EVENT } from '@/lib/billing/sync-remediation-policy';
-import { replayUnprocessedStripeWebhooks } from '@/lib/billing/webhook-replay';
+import {
+  replayUnprocessedStripeWebhooks,
+  type WebhookReplaySummary,
+} from '@/lib/billing/webhook-replay';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -42,6 +53,7 @@ interface ReconciliationResult {
   stats: ReconciliationStats;
   errors: string[];
   duration: number;
+  webhookReplay: WebhookReplaySummary;
 }
 
 /**
@@ -60,77 +72,105 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
     staleCustomers: 0,
   };
   const errors: string[] = [];
-
-  // Replay is idempotent and does not call Stripe write APIs. A throw fails
-  // the job so a pass that never saw the stuck rows does not look fresh.
-  const replay = await replayUnprocessedStripeWebhooks();
-  if (replay.blocked.length > 0 || replay.failed.length > 0) {
-    logger.info('[billing-reconciliation] stored webhook replay left rows', {
-      processed: replay.processed,
-      blocked: replay.blocked.length,
-      failed: replay.failed.length,
-    });
-  }
-
-  await reconcileUsersWithSubscriptions(stats, errors);
-  await reconcileProUsersWithoutSubscription(stats, errors);
-  await checkStaleCustomers(stats);
-
-  const duration = Date.now() - startTime;
-
-  if (stats.errors === 0) {
-    await db.insert(billingAuditLog).values({
-      userId: null,
-      eventType: RECONCILIATION_RUN_EVENT,
-      previousState: {},
-      newState: {
-        usersChecked: stats.usersChecked,
-        mismatches: stats.mismatches,
-        fixed: stats.fixed,
-        errors: stats.errors,
-      },
-      source: 'reconciliation',
-      metadata: {
-        heartbeat: true,
-        durationMs: duration,
-        replay: {
-          processed: replay.processed,
-          blocked: replay.blocked.length,
-          failed: replay.failed.length,
-        },
-      },
-    });
-  }
-
-  const result: ReconciliationResult = {
-    success: stats.errors === 0,
-    stats,
-    errors,
-    duration,
+  let webhookReplay: WebhookReplaySummary = {
+    processed: 0,
+    blocked: [],
+    failed: [],
   };
+  let result: ReconciliationResult | undefined;
+  let failure: unknown;
 
-  logger.info('[billing-reconciliation] Completed:', result);
+  try {
+    webhookReplay = await replayUnprocessedStripeWebhooks();
+    errors.push(
+      ...webhookReplay.blocked.map(
+        issue => `Webhook ${issue.stripeEventId} blocked: ${issue.reason}`
+      ),
+      ...webhookReplay.failed.map(
+        issue => `Webhook ${issue.stripeEventId} failed: ${issue.reason}`
+      )
+    );
 
-  const unfixedMismatches = stats.mismatches - stats.fixed;
-  if (stats.fixed > 0) {
-    logger.info('[billing-reconciliation] Auto-fixed billing mismatches', {
-      fixed: stats.fixed,
-      mismatches: stats.mismatches,
-      orphanedSubscriptions: stats.orphanedSubscriptions,
-    });
-  }
+    await reconcileUsersWithSubscriptions(stats, errors);
+    await reconcileProUsersWithoutSubscription(stats, errors);
+    await checkStaleCustomers(stats);
 
-  // Only alert on actionable failures. Successfully repaired mismatches are
-  // expected self-healing behavior and should not page Sentry.
-  if (stats.errors > 0 || unfixedMismatches > 0) {
-    await captureWarning('Billing reconciliation found issues', undefined, {
+    const duration = Date.now() - startTime;
+    result = {
+      success:
+        stats.errors === 0 &&
+        webhookReplay.blocked.length === 0 &&
+        webhookReplay.failed.length === 0,
       stats,
-      unfixedMismatches,
-      errors: errors.slice(0, 5),
+      errors,
+      duration,
+      webhookReplay,
+    };
+
+    logger.info('[billing-reconciliation] Completed:', result);
+
+    const unfixedMismatches = stats.mismatches - stats.fixed;
+    if (stats.fixed > 0) {
+      logger.info('[billing-reconciliation] Auto-fixed billing mismatches', {
+        fixed: stats.fixed,
+        mismatches: stats.mismatches,
+        orphanedSubscriptions: stats.orphanedSubscriptions,
+      });
+    }
+
+    // Only alert on actionable failures. Successfully repaired mismatches are
+    // expected self-healing behavior and should not page Sentry.
+    if (!result.success || unfixedMismatches > 0) {
+      await captureWarning('Billing reconciliation found issues', undefined, {
+        stats,
+        unfixedMismatches,
+        errors: errors.slice(0, 5),
+        webhookReplay,
+      });
+    }
+
+    return result;
+  } catch (error) {
+    failure = error;
+    throw error;
+  } finally {
+    await recordReconciliationRun({
+      success: failure === undefined && (result?.success ?? false),
+      duration: Date.now() - startTime,
+      stats,
+      errorCount: errors.length,
+      webhookReplay,
+      failure,
     });
   }
+}
 
-  return result;
+async function recordReconciliationRun(input: {
+  success: boolean;
+  duration: number;
+  stats: ReconciliationStats;
+  errorCount: number;
+  webhookReplay: WebhookReplaySummary;
+  failure: unknown;
+}): Promise<void> {
+  await db.insert(billingAuditLog).values({
+    eventType: 'reconciliation_run',
+    source: 'reconciliation',
+    metadata: {
+      action: 'reconciliation_run',
+      success: input.success,
+      durationMs: input.duration,
+      errorCount: input.errorCount,
+      stats: input.stats,
+      webhookReplay: input.webhookReplay,
+      failure:
+        input.failure instanceof Error
+          ? { name: input.failure.name, message: input.failure.message }
+          : input.failure === undefined
+            ? null
+            : { name: 'UnknownError' },
+    },
+  });
 }
 
 /**

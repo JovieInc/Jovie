@@ -24,12 +24,14 @@ export interface BillingSyncFinding {
 export function evaluateBillingSyncRemediation(input: {
   now: Date;
   lastReconciliationAt: Date | null;
+  lastReconciliationSuccess?: boolean | null;
   stuckWebhooks: readonly StuckWebhookSnapshot[];
   lastFiledAtByFingerprint: Readonly<Record<string, Date | null>>;
 }): BillingSyncFinding[] {
   const findings: BillingSyncFinding[] = [];
   const lastRun = input.lastReconciliationAt;
   const stale =
+    input.lastReconciliationSuccess === false ||
     !lastRun ||
     input.now.getTime() - lastRun.getTime() > RECONCILIATION_STALE_AFTER_MS;
   if (stale && shouldFile(input, BILLING_SYNC_STALE_FINGERPRINT)) {
@@ -39,7 +41,9 @@ export function evaluateBillingSyncRemediation(input: {
     findings.push(
       finding(
         BILLING_SYNC_STALE_FINGERPRINT,
-        `JOV-7558. No successful billing reconciliation inside 48 hours (last run: ${lastRun ? lastRun.toISOString() : 'none'}, age ${age}).`
+        input.lastReconciliationSuccess === false
+          ? `JOV-7558. The latest canonical billing reconciliation failed (last run: ${lastRun ? lastRun.toISOString() : 'none'}). A fresh failed receipt is not recovery.`
+          : `JOV-7558. No successful billing reconciliation inside 48 hours (last run: ${lastRun ? lastRun.toISOString() : 'none'}, age ${age}).`
       )
     );
   }

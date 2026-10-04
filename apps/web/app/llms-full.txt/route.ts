@@ -60,12 +60,12 @@ ${COMPANY_IDENTITY.definition}
 - Audience capture is included with the free public-profile offer
 
 ### 2. Release Smart Links
-- Release smart links with remembered fan platform choice
+- Release smart links with remembered audience platform choice
 - Pre-save access is part of the canonical smart-links capability
 
-### 3. Enrolled Artist Workflows
-- Opt-in fan notifications require enrolled access
-- Advanced analytics and fan CRM capabilities require enrolled access
+### 3. Enrolled music workflows
+- Opt-in audience notifications require enrolled access
+- Advanced analytics and audience CRM capabilities require enrolled access
 - Release planning and its task workspace require enrolled access
 - AI-assistant capabilities are in limited testing with enrolled access
 
@@ -108,8 +108,8 @@ Tim White is the founder of ${APP_NAME}. Current founder biography is published 
 
 - [OpenAPI 3.1](${BASE_URL}/openapi.json)
 - [Canonical contract](${BASE_URL}/api/v1/openapi.json)
-- [Public artist profile](${BASE_URL}/api/v1/{username})
-- Public artist API and anonymous per-artist MCP access are read-only
+- [Public profile](${BASE_URL}/api/v1/{username})
+- Public profile API and anonymous per-profile MCP access are read-only
 
 ## Contact
 

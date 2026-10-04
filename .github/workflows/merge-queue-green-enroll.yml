@@ -3,6 +3,7 @@
 # capability-gap: GitHub merge queue has no native auto-enroll for green PRs; GITHUB_TOKEN-created merge groups start no CI, so a hosted hop with the Jovie Bot app token must enqueue.
 # removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Summer's own enqueue tool proves 30 consecutive days of queue admission.
 name: Merge Queue Green Enroll
+# clock-class: temporal-resource
 
 # Tim 2026-09-26: production holds never stall merging. A held production
 # promote and a red main are separate issues from source admission, so green
@@ -10,11 +11,14 @@ name: Merge Queue Green Enroll
 #
 # Enqueues open, non-draft, same-repo PRs into main whose mergeStateStatus is
 # CLEAN (required checks green, no conflicts), that carry no hold/gated/incident
-# label. Event-driven, no timer: it runs when a required-check workflow finishes
-# on a PR, or a PR loses a hold label.
+# label. It runs when a required-check workflow finishes on a PR, or a PR loses
+# a hold label, plus a 15-minute reconciliation sweep: a queue ejection while
+# checks are already green produces no new check completion, so without the
+# sweep a dequeued green head is never re-armed (JOV-7589).
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# Automatic wakes inspect only the signaled PR. Manual dispatch scans the complete roster.
+# Automatic wakes inspect only the signaled PR. The sweep and manual dispatch
+# scan the complete roster.
 
 on:
   workflow_run:
@@ -22,6 +26,11 @@ on:
     types: [completed]
   pull_request_target:
     types: [unlabeled, reopened]
+  # Reconciliation sweep (JOV-7589): re-enrolls green PRs whose dequeue left no
+  # event-driven wake. Bounded by the shared concurrency group; 15 minutes caps
+  # how long a green dequeued head can sit unarmed.
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -32,7 +41,9 @@ on:
 permissions: {}
 
 concurrency:
-  group: merge-queue-green-enroll
+  # A global pending slot loses another PR's final wake. Coalesce only wakes
+  # attributed to the same PR; association-free receipts retain their run ID.
+  group: merge-queue-green-enroll-${{ github.event_name == 'workflow_dispatch' && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -62,6 +73,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
@@ -72,6 +84,14 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # This job's only credential is the Jovie Bot installation token below.
+      # It is minted with actions, contents, pull-requests, and statuses — not
+      # merge_queues. dequeuePullRequest then returns "Resource not accessible by integration".
+      # GitHub already removes a PR when its merge_group run fails, so the hold
+      # script treats that denial and a "not in queue" response as a logged
+      # non-fatal outcome and still writes the hold. Do not add
+      # permission-merge-queues unless the installation already has it: an
+      # ungranted permission fails token mint before the hold is written.
       - name: Generate Jovie Bot failure-hold token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -79,7 +99,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-actions: read
-          permission-contents: read
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
 
@@ -112,6 +132,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
@@ -123,7 +144,7 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: read
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
 
@@ -143,12 +164,15 @@ jobs:
             // the lanes remove it with their fix.
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
+            const currentMainSha = (await github.rest.git.getRef({
+              owner, repo, ref: 'heads/main',
+            })).data.object.sha;
             // Use the triggering PR for automatic wakes. Scanning every eligible PR
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
             let prs;
-            if (context.eventName === 'workflow_dispatch') {
-              // Explicit reconciliation retains a complete paginated inventory.
+            if (context.eventName === 'workflow_dispatch' || context.eventName === 'schedule') {
+              // Explicit and scheduled reconciliation retain a complete paginated inventory.
               prs = await github.paginate(github.rest.pulls.list, {
                 owner, repo, state: 'open', base: 'main', per_page: 100,
               });
@@ -165,13 +189,20 @@ jobs:
                 }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
+                // GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls is
+                // repos.listPullRequestsAssociatedWithCommit. github.rest.commits
+                // does not exist, so calling it throws before any enqueue.
                 if (numbers.length === 0 && /^[a-f0-9]{40}$/.test(run.head_sha || '') && run.head_branch) {
-                  const associated = await github.paginate(github.rest.commits.listPullRequestsAssociatedWithCommit, {
+                  const pages = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
                     owner, repo, commit_sha: run.head_sha, per_page: 100,
                   });
-                  numbers = associated.filter(pr => pr.state === 'open' && pr.base.ref === 'main' &&
-                    pr.head.sha === run.head_sha && pr.head.ref === run.head_branch &&
-                    pr.head.repo?.full_name === `${owner}/${repo}`).map(pr => pr.number).filter(validNumber);
+                  const associated = Array.isArray(pages) ? pages : [];
+                  numbers = associated.flatMap(pr => {
+                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') return [];
+                    if (pr.head?.sha !== run.head_sha || pr.head?.ref !== run.head_branch) return [];
+                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) return [];
+                    return validNumber(pr.number) ? [pr.number] : [];
+                  });
                 }
               }
               prs = [];
@@ -221,6 +252,7 @@ jobs:
               const failure = failurePolicy.revisionFailureDisposition({
                 statuses,
                 repository: `${owner}/${repo}`,
+                currentMainSha,
               });
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);
@@ -265,3 +297,53 @@ jobs:
               }
             }
             core.info(`enqueued=${enqueued}`);
+
+  # Runs only after the hold has dropped merge intent. A green PR dequeued by
+  # another member of the group, or by the base branch, gets squash auto-merge
+  # back on that same SHA. Two rearms per SHA; the enroll job is not involved.
+  rearm-green-victims:
+    name: Rearm green merge-group victims
+    needs: [hold-failed-revision]
+    if: >-
+      always() &&
+      needs.hold-failed-revision.result == 'success' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Checkout trusted rearm policy
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/merge-group-victim-rearm.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate Jovie Bot rearm token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+          permission-pull-requests: write
+          permission-statuses: write
+
+      - name: Rearm green victims of this merge group
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/merge-group-victim-rearm.mjs --event-path "$GITHUB_EVENT_PATH"

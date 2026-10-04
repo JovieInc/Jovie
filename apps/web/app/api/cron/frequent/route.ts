@@ -19,6 +19,8 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
+import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { runBillingSyncRemediation } from '@/lib/billing/sync-remediation';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
@@ -39,6 +41,7 @@ import {
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { runAutoApprove } from '@/lib/leads/auto-approve';
 import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
+import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
 import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
@@ -265,6 +268,21 @@ export async function GET(request: Request) {
     const batchSize = getOutreachBatchSize(startTime);
     if (batchSize === 0) {
       return { skipped: true, reason: 'insufficient_budget' };
+    }
+
+    // JOV-7696: autonomous cold outreach is deliberate acquisition, so it
+    // waits for ACQUISITION_ELIGIBLE. Probe only when sends are switched on.
+    if (isInstantlyOutboundEnabled()) {
+      const eligibility = await getAcquisitionEligibility();
+      if (!eligibility.eligible) {
+        return {
+          skipped: true,
+          reason: 'acquisition_not_eligible',
+          verdict: eligibility.verdict,
+          firstBlocker: eligibility.firstBlocker?.id ?? null,
+          detail: describeAcquisitionBlock(eligibility),
+        };
+      }
     }
 
     const outreachResult = await processOutreachBatch(batchSize);

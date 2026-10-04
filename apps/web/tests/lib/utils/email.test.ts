@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getAccountMetricCohort,
   getEmailDomain,
   getEmailSendBlockReason,
   INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN,
@@ -55,6 +56,8 @@ describe('isInternalOrTestAccountEmail', () => {
     ['money-referrer-123@test.jovie.com', 'e2e dogfood email'],
     ['anyone@staging.test.jovie.com', 'dogfood subdomain'],
     ['dogfood-tim@gmail.com', 'dogfood local part on external domain'],
+    ['canary+synthetic-grokbot@mail.example', 'synthetic principal tag'],
+    ['ops+synthetic-muse-run7@gmail.com', 'synthetic tag on external domain'],
   ])('excludes %s (%s)', email => {
     expect(isInternalOrTestAccountEmail(email)).toBe(true);
   });
@@ -63,6 +66,8 @@ describe('isInternalOrTestAccountEmail', () => {
     ['artist@band.com'],
     ['fan.name@gmail.com'],
     ['latest.music@outlook.com'],
+    ['synthetic-fan@gmail.com'],
+    ['fan+synthetic@gmail.com'],
     ['contestant@exampled.com'],
     [' publicist@label.co '],
     [null],
@@ -86,14 +91,29 @@ describe('isInternalOrTestAccountEmail', () => {
     ['dogfood-tim@gmail.com'],
     ['dualipa-public@jov.ie'],
     ['seeded@data.test'],
+    ['canary+synthetic-grokbot@mail.example'],
+    ['ops+synthetic-muse-run7@gmail.com'],
   ])('SQL pattern excludes %s', email => {
     expect(sqlPattern.test(email.toLowerCase())).toBe(true);
   });
 
-  it.each([['artist@band.com'], ['fan.name@gmail.com'], ['quality@band.com']])(
-    'SQL pattern keeps %s external',
-    email => {
-      expect(sqlPattern.test(email.toLowerCase())).toBe(false);
-    }
-  );
+  it.each([
+    ['artist@band.com'],
+    ['fan.name@gmail.com'],
+    ['quality@band.com'],
+    ['synthetic-fan@gmail.com'],
+    ['fan+synthetic@gmail.com'],
+  ])('SQL pattern keeps %s external', email => {
+    expect(sqlPattern.test(email.toLowerCase())).toBe(false);
+  });
+});
+
+describe('getAccountMetricCohort', () => {
+  it('separates customers, synthetic principals, and unknown traffic', () => {
+    expect(getAccountMetricCohort('artist@band.com')).toBe('customer');
+    expect(getAccountMetricCohort('auth-surface-qa@test.jovie.com')).toBe(
+      'synthetic'
+    );
+    expect(getAccountMetricCohort(null)).toBe('unattributed');
+  });
 });

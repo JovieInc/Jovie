@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -14,6 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("reason_lane", ROOT / "scripts/lanes/reason_lane.py")
@@ -59,6 +61,21 @@ class Runner:
 
     def made(self, name):
         return [args for args, _ in self.calls if args[0] == name]
+
+
+class StoringGbrain:
+    """A gbrain that stores `put` stdin and returns it on `get`; `hang` mimics a CLI that
+    times out after the write lands."""
+    def __init__(self, hang=False):
+        self.pages, self.hang = {}, hang
+
+    def __call__(self, args, kw):
+        if args[1] == "put":
+            self.pages[args[2]] = kw["input"]
+            if self.hang:
+                raise subprocess.TimeoutExpired(args, 120)
+            return done("ok")
+        return done(self.pages.get(args[2], ""), 0 if args[2] in self.pages else 1)
 
 
 class FakeLinear:
@@ -438,7 +455,7 @@ class OneJobTest(unittest.TestCase):
 
     def test_success_comments_the_block_writes_gbrain_and_closes(self):
         linear = FakeLinear()
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=done("ok"))
+        run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=StoringGbrain())
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, {**self.issue, "description": description({**JOB_BLOCK, "contextRefs": []})},
                                     CONFIG, Path(tmp), run=run)
@@ -447,9 +464,32 @@ class OneJobTest(unittest.TestCase):
         block = result_block(linear.comments[-1][1])
         self.assertEqual((block["schema"], block["confidence"], block["job"]), (reason.RESULT_SCHEMA, "high", "JOV-9"))
         self.assertEqual(block, record)
-        put = run.made("gbrain")[0]
-        self.assertEqual(put[:3], ["gbrain", "put", record["gbrainSlug"]])
-        self.assertNotIn(reason.RESULT_MARKER, put[4])
+        put, get = run.made("gbrain")
+        self.assertEqual(put, ["gbrain", "put", record["gbrainSlug"]])
+        self.assertEqual(get, ["gbrain", "get", record["gbrainSlug"]])
+        self.assertNotIn(reason.RESULT_MARKER, run.calls[-2][1]["input"])
+
+    def test_gbrain_exit_zero_without_a_stored_body_is_not_stored(self):
+        # JOV-7715: Gem's wrapper exited 0 and kept a frontmatter-only page; the receipt said stored.
+        empty = '---\ntype: concept\ntitle: 2026 10 03 Jov 7709\n---\n\n'
+        for stored in (done(empty), done("", 1), OSError("x")):
+            def gbrain(args, kw, stored=stored):
+                if args[1] == "get" and args[2].startswith("ops/summer/decisions/"):
+                    if isinstance(stored, BaseException):
+                        raise stored
+                    return stored
+                return done("ok")
+            linear = FakeLinear()
+            run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=gbrain)
+            with tempfile.TemporaryDirectory() as tmp:
+                record = reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=run)
+            self.assertIsNone(record["gbrainSlug"])
+            self.assertIsNone(result_block(linear.comments[-1][1])["gbrainSlug"])
+
+    def test_gbrain_hanging_after_a_real_write_is_verified_by_read_back(self):
+        store = StoringGbrain(hang=True)
+        self.assertTrue(reason.write_gbrain("s", "t", "# t\n\nmemo body", run=Runner(gbrain=store)))
+        self.assertFalse(reason.write_gbrain("s", "t", "  \n", run=Runner(gbrain=store)))
 
     def test_gbrain_failure_drops_the_slug(self):
         linear = FakeLinear()
@@ -489,7 +529,7 @@ class OneJobTest(unittest.TestCase):
                     "newLearningNeeded": [],
                     "ranking": [{**item, "evidence": ["knowledge/external/yc/playbook/hiring-team", "JOV-12"]}
                                 for item in PROPOSAL["ranking"]]}
-        run = Runner(gbrain=[done("0 results"), done(hit), done(hit), done(page), done("ok")],
+        run = Runner(gbrain=[done("0 results"), done(hit), done(hit), done(page), done("ok"), done("", 1)],
                      claude=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, issue, CONFIG, Path(tmp), run=run)
@@ -531,7 +571,8 @@ class FakeLock:
 
 class DrainAndTickTest(unittest.TestCase):
     def lane(self, linear):
-        return SimpleNamespace(Locked=FakeLock, Linear=lambda env: linear)
+        import lane_runner as lane
+        return SimpleNamespace(Locked=FakeLock, Linear=lambda env: linear, LinearRateLimited=lane.LinearRateLimited)
 
     def setUp(self):
         FakeLock.held_paths = set()
@@ -558,6 +599,33 @@ class DrainAndTickTest(unittest.TestCase):
         self.assertEqual(out, {"status": "idle", "done": [{"job": "JOV-1", "confidence": "high"}]})
         self.assertIn(("i-1", "In Progress"), linear.moves)
         self.assertEqual(linear.moves[-1], ("i-1", "Done"))
+
+    def test_rate_limited_queue_claim_and_tick_exit_without_a_crash_or_duplicate_job(self):
+        sys.path.insert(0, str(ROOT / "scripts/lanes"))
+        import lane_runner as lane
+        job = {"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "1"}
+        for phase in ("queue", "claim", "tick"):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as tmp:
+                linear = FakeLinear(jobs=[job])
+                error = lane.LinearRateLimited(1234567890)
+                host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
+                if phase == "claim":
+                    linear.state_of = lambda _id: (_ for _ in ()).throw(error)
+                with patch.object(linear, "gql", side_effect=error if phase != "claim" else None,
+                                  wraps=linear.gql), patch.object(FakeLock, "release", autospec=True) as release, \
+                        patch.object(lane, "SHARED_CACHE_DIR", Path(tmp) / "shared"), \
+                        patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": ""}):
+                    if phase == "tick":
+                        result = reason.tick(host, self.lane(linear), lambda: linear, CONFIG,
+                                             spawn=lambda *a, **k: self.fail("cooldown must not spawn"))
+                    else:
+                        result = reason.drain(host, self.lane(linear), CONFIG,
+                                              run=Runner(claude=done('"loggedIn": true'), grok=done("logged in")))
+                    self.assertEqual(result["status"], "linear-rate-limited")
+                    self.assertEqual(result["resetAt"], error.reset_at)
+                    self.assertTrue(release.called, "cooldown must release the lane/claim locks")
+                self.assertEqual(linear.moves, [])
+                self.assertEqual(linear.comments, [])
 
     def test_drain_guards(self):
         with tempfile.TemporaryDirectory() as tmp:

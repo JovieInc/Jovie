@@ -316,12 +316,50 @@ export async function writeUntilPass(
 /** Families the Vercel AI Gateway allowlist permits (founder rule, 2026-09-17). */
 export const GATEWAY_FAMILIES: readonly string[] = ['zai'];
 
+/** Optional per-request admission for metered Gateway calls, never subscription CLIs. */
+export interface GatewayRequestPolicy {
+  /** Exact model admission; must be side-effect free for availability checks. */
+  readonly allowed: (model: string) => boolean;
+  /** Reserve before dispatch. Callers own durable/concurrent budget accounting. */
+  readonly authorize: (request: Parameters<JudgeTransport>[0]) => Promise<{
+    readonly maxTokens: number;
+    readonly provider: string;
+  }>;
+}
+
 /** AI Gateway transport (OpenAI-compatible endpoint, existing AI_GATEWAY_API_KEY). */
 export function gatewayTransport(
   apiKey: string,
-  baseUrl = 'https://ai-gateway.vercel.sh/v1'
+  baseUrl = 'https://ai-gateway.vercel.sh/v1',
+  policy?: GatewayRequestPolicy
 ): JudgeTransport {
+  const allowed = (model: string) =>
+    GATEWAY_FAMILIES.includes(family(model)) &&
+    (policy ? policy.allowed(model) === true : true);
   const send: JudgeTransport = async ({ model, system, prompt }) => {
+    if (!allowed(model)) throw new Error(`gateway model not allowed: ${model}`);
+    const authorization = policy
+      ? await policy.authorize({ model, system, prompt })
+      : undefined;
+    if (policy) {
+      if (
+        !Number.isSafeInteger(authorization?.maxTokens) ||
+        (authorization?.maxTokens ?? 0) <= 0
+      ) {
+        throw new Error(
+          'gateway policy maxTokens must be a positive safe integer'
+        );
+      }
+      if (
+        typeof authorization?.provider !== 'string' ||
+        authorization.provider.length === 0 ||
+        authorization.provider.trim() !== authorization.provider
+      ) {
+        throw new Error(
+          'gateway policy provider must be a nonempty trimmed identifier'
+        );
+      }
+    }
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -331,6 +369,12 @@ export function gatewayTransport(
       body: JSON.stringify({
         model,
         temperature: 0,
+        ...(authorization
+          ? {
+              max_tokens: authorization.maxTokens,
+              providerOptions: { gateway: { only: [authorization.provider] } },
+            }
+          : {}),
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: prompt },
@@ -340,10 +384,17 @@ export function gatewayTransport(
     });
     if (!response.ok) throw new Error(`gateway ${response.status}`);
     const body = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
+      choices?: { finish_reason?: string; message?: { content?: string } }[];
+      error?: unknown;
     };
+    if (policy && body.error != null) {
+      throw new Error('gateway returned an error payload');
+    }
+    if (policy && body.choices?.[0]?.finish_reason === 'length') {
+      throw new Error('gateway response truncated at the output token limit');
+    }
     return body.choices?.[0]?.message?.content ?? '';
   };
-  send.available = model => GATEWAY_FAMILIES.includes(family(model));
+  send.available = allowed;
   return send;
 }

@@ -7,11 +7,15 @@
  * attempt's failed invariants and judge critique. Only this harness sets
  * `passed`, through applyStagePassedBit. An unreachable model, render or
  * media provider stops the run as `credentials-unavailable`, never a pass.
+ * A stage that reports a `rework` (a visual rejection) is not retried on the
+ * same screenshots: the run rewinds to the owning stage, re-renders and
+ * re-judges, up to FACTORY_MAX_REWORKS times, and each rewind is recorded in
+ * run.json `reworks`. A rework that renders the same page again fails.
  * Receipts land in runs/factory/<pageId>/ (gitignored); publish is always
  * `shadow` until the ramp ships.
  */
 
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { routedTransport } from '@jovie/copy/transport';
@@ -30,6 +34,11 @@ import {
   factoryPageId,
   loadFactoryBrief,
 } from './brief';
+import {
+  type FactoryPaidBudgetConfig,
+  FactoryPaidBudgetConfigSchema,
+  openFactoryPaidBudget,
+} from './budget';
 import { preflightFactoryRun } from './preflight';
 import {
   dryProviders,
@@ -43,6 +52,7 @@ import {
   FACTORY_RUNS_DIR,
   type FactoryRunManifest,
   FactoryRunManifestSchema,
+  factoryStageSourceDigest,
   readJson,
   type StageAttemptRecord,
   stageInputDigest,
@@ -54,6 +64,9 @@ import { FACTORY_STAGE_RUNNERS } from './stages';
 
 const MODEL_JUDGED = new Set(['llm', 'vision']);
 
+/** Rewinds per run after a rejection, on top of the per-stage attempts. */
+export const FACTORY_MAX_REWORKS = 2;
+
 export interface RunFactoryOptions {
   readonly family: string;
   readonly slug: string;
@@ -62,6 +75,8 @@ export interface RunFactoryOptions {
   readonly brief?: FactoryPageBrief;
   readonly providers?: FactoryProviders;
   readonly runsDir?: string;
+  /** Explicit reviewed allowance for one canary; credentials alone enable no paid calls. */
+  readonly paidBudget?: FactoryPaidBudgetConfig;
   /** Stage runners; defaults to FACTORY_STAGE_RUNNERS. Missing = incomplete. */
   readonly runners?: Partial<Record<FactoryStage, StageRunner>>;
   /** Development only: skip the preflight and stop at the first gap instead. */
@@ -144,6 +159,11 @@ function loadPriorChain(
       `--from-stage ${fromStage}: earlier stages have not passed`
     );
   }
+  if (chain.some((link, index) => link.stage !== FACTORY_STAGES[index])) {
+    throw new Error(
+      '--from-stage: prior stage identities do not match the current spine order; rerun from truth'
+    );
+  }
   const issues = verifyFactoryRun(runDir).filter(issue =>
     chain.some(link => issue.startsWith(`${link.stage}#`))
   );
@@ -160,14 +180,44 @@ export async function runFactory(
 ): Promise<FactoryRunManifest> {
   const brief = options.brief ?? loadFactoryBrief(options.family, options.slug);
   const pageId = factoryPageId(brief.family, brief.slug);
-  const runDir = join(options.runsDir ?? FACTORY_RUNS_DIR, pageId);
+  const runsDir = options.runsDir ?? FACTORY_RUNS_DIR;
+  const runDir = join(runsDir, pageId);
+  const briefDigest = digestOf(brief);
+  if (options.paidBudget && (options.dry || options.providers)) {
+    throw new Error('paid budget requires the standard live factory providers');
+  }
+  const priorBudget = existsSync(join(runDir, 'run.json'))
+    ? FactoryRunManifestSchema.parse(readJson(join(runDir, 'run.json')))
+        .paidBudget
+    : undefined;
+  if (
+    options.fromStage &&
+    options.fromStage !== 'truth' &&
+    priorBudget?.id !== options.paidBudget?.id
+  ) {
+    throw new Error('--from-stage: paid budget binding changed');
+  }
+  const paidBudget = options.paidBudget
+    ? openFactoryPaidBudget({
+        runsDir,
+        config: options.paidBudget,
+        binding: { pageId, briefDigest },
+        requireExisting:
+          priorBudget?.id === options.paidBudget.id ||
+          Boolean(options.fromStage && options.fromStage !== 'truth'),
+      })
+    : undefined;
   const providers =
     options.providers ??
     (options.dry
       ? dryProviders(brief)
-      : liveProviders(routedTransport(process.env.AI_GATEWAY_API_KEY)));
+      : liveProviders(
+          routedTransport(
+            paidBudget ? process.env.AI_GATEWAY_API_KEY : undefined,
+            paidBudget?.policy
+          )
+        ));
   const runners = options.runners ?? FACTORY_STAGE_RUNNERS;
-  const briefDigest = digestOf(brief);
 
   const artifacts: Partial<Record<FactoryStage, unknown>> = {};
   const receipts: Partial<Record<FactoryStage, StageReceipt>> = {};
@@ -183,7 +233,18 @@ export async function runFactory(
     reason: null,
     chain: [],
     attempts: [],
+    ...(paidBudget ? { paidBudget: paidBudget.reference } : {}),
   };
+
+  if (paidBudget?.snapshot().stages.includes(options.fromStage ?? 'truth')) {
+    // Refuse before deleting or overwriting earlier receipts on a fresh run.
+    return {
+      ...manifest,
+      status: 'budget-blocked',
+      stoppedAt: options.fromStage ?? 'truth',
+      reason: 'paid budget: cumulative stage attempt ceiling exceeded',
+    };
+  }
 
   if (!options.allowPartial) {
     const issues = preflightFactoryRun({
@@ -209,7 +270,11 @@ export async function runFactory(
 
   if (options.fromStage && options.fromStage !== 'truth') {
     const prior = loadPriorChain(runDir, briefDigest, options.fromStage);
-    manifest = { ...prior.manifest, mode: providers.mode };
+    manifest = {
+      ...prior.manifest,
+      mode: providers.mode,
+      ...(paidBudget ? { paidBudget: paidBudget.reference } : {}),
+    };
     for (const link of prior.chain) {
       const record = readJson<StageAttemptRecord>(join(runDir, link.file));
       artifacts[link.stage] = record.artifact;
@@ -226,7 +291,13 @@ export async function runFactory(
     return manifest;
   };
 
-  for (const stage of FACTORY_STAGES.slice(manifest.chain.length)) {
+  const reworkFeedback = new Map<FactoryStage, readonly string[]>();
+  const renderDigest = () =>
+    manifest.chain.find(link => link.stage === 'render')?.outputDigest ?? null;
+
+  stages: while (manifest.chain.length < FACTORY_STAGES.length) {
+    const stage = FACTORY_STAGES[manifest.chain.length] as FactoryStage;
+    const rework = manifest.reworks?.length ?? 0;
     const runner = runners[stage];
     if (!runner) {
       return finish({
@@ -237,11 +308,23 @@ export async function runFactory(
     }
     const inputDigest = stageInputDigest(
       briefDigest,
-      manifest.chain.map(link => link.outputDigest)
+      manifest.chain.map(link => link.outputDigest),
+      factoryStageSourceDigest(stage, brief)
     );
-    let feedback: readonly string[] = [];
+    let feedback: readonly string[] = reworkFeedback.get(stage) ?? [];
+    reworkFeedback.delete(stage);
     let passed = false;
-    for (let attempt = 1; attempt <= FACTORY_STAGE_MAX_ATTEMPTS; attempt++) {
+    const maxAttempts = paidBudget ? 1 : FACTORY_STAGE_MAX_ATTEMPTS;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        paidBudget?.beginStage(stage);
+      } catch (error) {
+        return finish({
+          status: 'budget-blocked',
+          stoppedAt: stage,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
       const result = await runStage(runner, {
         pageId,
         brief,
@@ -269,7 +352,7 @@ export async function runFactory(
         },
         { certifier: FACTORY_CERTIFIER_HARNESS }
       );
-      const file = attemptFileName(stage, attempt);
+      const file = attemptFileName(stage, attempt, rework);
       const record: StageAttemptRecord = {
         receipt,
         artifact: result.artifact,
@@ -280,11 +363,32 @@ export async function runFactory(
       writeJson(join(runDir, file), record);
       manifest = { ...manifest, attempts: [...manifest.attempts, file] };
 
+      if (paidBudget?.blockedReason) {
+        return finish({
+          status: 'budget-blocked',
+          stoppedAt: stage,
+          reason: paidBudget.blockedReason,
+        });
+      }
       if (result.unavailable) {
         return finish({
           status: 'credentials-unavailable',
           stoppedAt: stage,
           reason: result.unavailable,
+        });
+      }
+      if (
+        receipt.passed &&
+        stage === 'render' &&
+        manifest.reworks?.some(
+          entry => entry.rejectedRenderDigest === receipt.outputDigest
+        )
+      ) {
+        return finish({
+          status: 'failed',
+          stoppedAt: stage,
+          reason:
+            'rework produced no new render: the rejected screenshots would be re-judged',
         });
       }
       if (receipt.passed) {
@@ -312,12 +416,49 @@ export async function runFactory(
           ? ['judges: at least one evaluator did not pass']
           : []),
       ];
+      if (result.rework) {
+        const from = FACTORY_STAGES.indexOf(result.rework.stage);
+        if (from < 0 || from >= FACTORY_STAGES.indexOf(stage)) {
+          return finish({
+            status: 'failed',
+            stoppedAt: stage,
+            reason: `rework target ${result.rework.stage} is not upstream of ${stage}`,
+          });
+        }
+        if (rework >= FACTORY_MAX_REWORKS) {
+          return finish({
+            status: 'failed',
+            stoppedAt: stage,
+            reason: `still rejected after ${rework} rework(s): ${result.rework.findings.join('; ')}`,
+          });
+        }
+        const entry = {
+          iteration: rework + 1,
+          rejectedAt: stage,
+          reworkFrom: result.rework.stage,
+          rejectedRenderDigest: renderDigest(),
+          findings: [...result.rework.findings],
+        };
+        for (const later of FACTORY_STAGES.slice(from)) {
+          delete artifacts[later];
+          delete receipts[later];
+        }
+        reworkFeedback.set(result.rework.stage, [
+          `rework ${entry.iteration} after ${stage} rejected the render:`,
+          ...entry.findings,
+        ]);
+        finish({
+          chain: manifest.chain.slice(0, from),
+          reworks: [...(manifest.reworks ?? []), entry],
+        });
+        continue stages;
+      }
     }
     if (!passed) {
       return finish({
         status: 'failed',
         stoppedAt: stage,
-        reason: `failed ${FACTORY_STAGE_MAX_ATTEMPTS} attempts: ${feedback.join('; ')}`,
+        reason: `failed ${maxAttempts} attempts: ${feedback.join('; ')}`,
       });
     }
   }
@@ -329,6 +470,7 @@ const EXIT_CODES: Readonly<Record<FactoryRunManifest['status'], number>> = {
   failed: 1,
   'credentials-unavailable': 3,
   incomplete: 4,
+  'budget-blocked': 5,
 };
 
 async function main(): Promise<void> {
@@ -339,12 +481,13 @@ async function main(): Promise<void> {
       dry: { type: 'boolean', default: false },
       'from-stage': { type: 'string' },
       'allow-partial': { type: 'boolean', default: false },
+      'paid-budget': { type: 'string' },
     },
   });
   const fromStage = values['from-stage'];
   if (!values.family || !values.slug) {
     throw new Error(
-      'usage: factory:run --family <f> --slug <s> [--dry] [--from-stage <stage>] [--allow-partial]'
+      'usage: factory:run --family <f> --slug <s> [--dry] [--from-stage <stage>] [--allow-partial] [--paid-budget <reviewed-json>]'
     );
   }
   if (fromStage && !(FACTORY_STAGES as readonly string[]).includes(fromStage)) {
@@ -356,6 +499,9 @@ async function main(): Promise<void> {
     dry: values.dry,
     fromStage: fromStage as FactoryStage | undefined,
     allowPartial: values['allow-partial'],
+    paidBudget: values['paid-budget']
+      ? FactoryPaidBudgetConfigSchema.parse(readJson(values['paid-budget']))
+      : undefined,
   });
   console.log(
     `factory:run ${manifest.pageId} [${manifest.mode}] ${manifest.status}: ${manifest.chain.length}/${FACTORY_STAGES.length} stages passed`

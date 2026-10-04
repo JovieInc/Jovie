@@ -111,8 +111,10 @@ export function validateTopology({ policy: rules, nodes, edges }) {
   const cycle = findCycle(nodes.filter(node => node.active).map(node => node.name), runEdges);
   if (cycle) errors.push(`workflow_run cycle: ${cycle.join(' -> ')}`);
   const count = (from, to) => runEdges.filter(edge => edge.from === from && (!to || edge.to === to)).length;
-  if (count('CI', 'Production Controller') !== 1)
-    errors.push('CI must create exactly one Production Controller opportunity');
+  if (count('CI', 'Staging Controller') !== 1 || count('Staging Controller', 'Production Controller') !== 1 ||
+      runEdges.filter(edge => edge.to === 'Staging Controller').length !== 1 ||
+      runEdges.filter(edge => edge.to === 'Production Controller').length !== 1)
+    errors.push('CI must create exactly one Production Controller opportunity through completed staging');
   const telemetry = runEdges.filter(edge => edge.from === 'Production Controller' && byName.get(edge.to)?.category === 'telemetry-aggregation');
   if (telemetry.length !== 1)
     errors.push(`release lineage has ${telemetry.length} telemetry paths`);

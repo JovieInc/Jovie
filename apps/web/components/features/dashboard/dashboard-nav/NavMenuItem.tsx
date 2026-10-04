@@ -18,6 +18,7 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
 import { SidebarMenuItem } from '@/components/organisms/sidebar';
+import { SHELL_RAIL_LABEL_OVERLAY } from '@/components/shell/rail-motion';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
@@ -331,7 +332,10 @@ export function NavMenuItem({
           item.tone !== 'primary' && item.tone !== 'secondary'
             ? '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]'
             : null,
-          'group-data-[collapsible=icon]:hidden'
+          // Staged rail-motion exit (JOV-4522): absolute positioning lifts the
+          // label out of the collapsed single-column grid so it fades/drifts
+          // instead of snapping to display:none or wrapping a phantom row.
+          SHELL_RAIL_LABEL_OVERLAY
         )}
       >
         {item.name}

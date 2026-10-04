@@ -17,10 +17,12 @@ The harness, not the model, owns:
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
+| Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
-| Fresh worktree from `origin/main`, shared-store hardlink install, removal after | `run_issue()` |
+| Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards a proven clean, published checkout is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`), else removed | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
 | Independent verification: diff rules, then the repo's own `pre-push-gate.sh affected` | `gate_pr()` |
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
@@ -29,18 +31,19 @@ The harness, not the model, owns:
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
 | Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
-| Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), reconciles live state before checkout/install/push, 2 attempts per head, then one Triage issue | `fix_candidates()`, `reconcile_fix_target()`, `red_pr()`, `escalate_exhausted()` |
+| Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), reconciles live state before checkout/install/push, 2 attempts per head, then the escalation ladder | `fix_candidates()`, `reconcile_fix_target()`, `red_pr()`, `escalate_exhausted()`, `remediation.py` |
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
 | Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
 | Ready on green: a CLEAN lane draft gets `gh pr ready` plus its merge intent in one writer action | `pr_events.ready_green()` |
 | Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
+| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `backup/<host>/<name>-<date>` first, else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
-| Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash) hands the same worktree to the next enabled, healthy, uncooled lane, up to 2 handoffs; the receipt records `handoffs` and `finishedBy` | `run_issue()`, `next_provider()` |
+| Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries, including Hyperagent, are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
@@ -59,6 +62,17 @@ HUD labels this count as new issues; it is not total company demand or a claim o
 available worker capacity. Slot occupancy, account leases and PR work remain
 separate facts. Empty-demand alerts require known zero eligibility and no open
 PR maintenance; unknown evidence and backpressure reset the empty timer.
+
+The file-overlap guard is on by default. `SYMPHONY_FILE_OVERLAP_GUARD=flag` keeps
+classification, ledger, doctor, and HUD visibility without holds; `=0` disables it
+and releases automation-owned holds. Existing non-draft PR overlaps are ordered by
+an explicit stack/dependency first, then foundational/shared work, smaller diffs,
+creation time, and PR number. The later PR receives `hold`; after the earlier PR
+lands, Symphony removes only the hold it applied and queues `lane-fix-dequeued` for
+the existing rebase lane. A stacked child is retargeted to `main`, never merged into
+its parent branch. Generated workflow topology and migration journals are regenerated
+after rebasing rather than hand-merged. `doctor.json.fileOverlap` publishes active
+pairs, files, actions, and the prevention/flag/rebase counters.
 
 Account attribution uses the existing status rows without changing account
 admission. Lease occupancy and cooldown are independent; an account can be both
@@ -85,6 +99,30 @@ existing dispositions without being converted into certification. A changed or
 unreadable remote/local head cannot publish proof; enqueue requests bind the expected
 head with `--match-head-commit`. A reused terminal result is reported as
 `gate-already-completed`, not another landing.
+
+Every existing publisher (`gate_pr`, event `ready_green`, `requeue_verified` and
+repair completion) now converges on `publish_verified`. A successful completed
+proof is required before ready or enqueue. Repair completion records exact-head
+intent and ended-owner provenance for the existing adopter; it does not enqueue
+directly or replenish the repair budget. A final successful self-push can receive
+its first gate after the owner ends, including the gap before its final ledger
+append. Manual branches must already be in the adopter's repair inventory.
+
+The publisher consumes the canonical source-admission policy from its immutable
+release through the existing `gh` identity. Revision failure holds, incomplete
+reads and queue ejection history remain authoritative. Before readiness, only a
+strict draft-only policy refusal permits that transition; after readiness, full
+admission is required. Ownership, revocation and exact-head proof are rechecked
+after the policy reads. Failed publication retains its intent for governed retry.
+
+Release identity includes the unchanged canonical policy dependency closure as
+well as lane source and tests. `.tree` remains the Git tree for `scripts/lanes`;
+`.bundle` identifies all packaged objects and `.release.json` records their
+pinned source commit. A policy-only change activates a new tested bundle. An old
+updater cannot package the new dependencies, so its self-test must refuse without
+moving `current`. The first deployment requires a reviewed handoff that excludes
+the old updater while the new source's existing update command runs, restores the
+prior timer state and retains all running worker releases.
 
 This reservation is host-local. It does not replace the cross-host claim policy or
 JOV-5257 admission serialization. During a drain-safe release update, old workers
@@ -151,7 +189,14 @@ Gaps closed after the first week (no PR may sit unowned):
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
   drafts receive `repair`, or `hold:dependency` while a named dependency is open.
   A landed dependency releases repair; it never grants authority to discard the branch.
-  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement. Every
+  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
+  exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
+  carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
+  latest `labeled` event) sends its issue to Todo + `agent-ready` with a rebuild-from-main note,
+  unless the issue is done or another open PR carries it. The PR stays open and gets
+  `lane-rebuild` (once), which stops it holding the issue in `in_flight_issues()`; label it
+  `duplicate` once the rebuild lands. Holds, the merge queue and live repair claims skip it;
+  `LANES_PARKED_REQUEUE=0` turns it off (`requeue_parked()`). Every
   close path re-reads the live source head, state, complete labels, fork and queue status;
   revoked authority, holds, head movement and unreadable evidence preserve the PR.
 - Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
@@ -269,6 +314,26 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
+## Worktree pool and shared caches (JOV-7705)
+
+`worktree_pool.py` (CLI: `scripts/agent/worktree-new`) keeps `JOVIE_WORKTREE_POOL_SIZE`
+(default 2) detached worktrees per repository, each installed and with a warm web
+`tsbuildinfo`, under `$JOVIE_CACHE_ROOT/worktree-pool/<hash of git common dir>/`
+(default `~/.cache/jovie`). Taking a slot is `git worktree move` + checkout of the new
+branch + an incremental install. A fill is one detached process per pool (flock), runs
+after every take, rebuilds slots older than 3 days, and never builds below
+`JOVIE_WORKTREE_POOL_MIN_FREE_GB` (default 30). `disk_guard` drains idle slots once free
+space is under that same floor, so a sweep and a refill never fight. Disk-cleanup agents
+must leave `~/.cache/jovie` and the pnpm store (`pnpm store path`) alone; use
+`scripts/agent/worktree-new --drain` to reclaim pool space. Tests and
+`JOVIE_WORKTREE_POOL=0` never touch the pool.
+
+Finished worktrees go back instead of being deleted (JOV-7723): `remove_worktree()` keeps
+its idle, clean and published checks, then `worktree_pool.recycle()` detaches HEAD at
+`origin/main`, runs `git clean -ffdx` except `node_modules` and `.cache`, and moves the
+checkout into the pool while there is room and disk. Deleting one installed worktree
+took 3 to 32 minutes under load; recycling takes seconds.
+
 ## Preserved repairs (JOV-7347)
 
 Repair retries reuse a registered preserved checkout only after its ended run,
@@ -312,12 +377,131 @@ Repository documents remain on-demand references; the receipt does not claim the
 and retrieved text remain in the existing local prompt, not the checked-in
 contract or hash-only sidecar.
 
+## Remediation (JOV-7540)
+
+Stuck PRs, red main, scheduled CI (Golden Path Nightly; Production Synthetic Monitoring
+and Production Continuity Guard are telemetry observers and cannot `workflow_run` into
+the relay), deploy
+failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
+`jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
+`ready`, `needs-rebase` (`lockfile-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
+`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+
+The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
+the existing lockfile resolver, one `gh run rerun --failed` per head. Those spend no model
+attempt. The next model rung is the lowest enabled healthy `tier` strictly above every lane
+that already attempted the head (`select_escalation_lane`). Host-local lanes participate by
+tier. When nothing is stronger, one top-rung retry runs on the strongest enabled healthy lane.
+Caps, overridable by env: 2 model escalations per head (`LANES_ESCALATION_PER_HEAD`), 4 per PR
+(`LANES_ESCALATION_PER_PR`), 30 minutes between model escalations (`LANES_ESCALATION_COOLDOWN_S`).
+Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared dependency, or
+main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
+
+Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
+`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
+Needs-human, obsolete and ladder-exhausted share one PR comment marked
+`<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
+Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
+via `lane-fix-escalating` / `lane-fix-exhausted`.
+
+Non-PR intake from the relay is still a GitHub issue labeled `symphony-remediation` with a
+fingerprint marker (no new Actions secret). After a 30-minute claim window the tick converts
+it to one Linear issue labeled `remediation`, `agent-ready` and `ws:ci` /
+`ws:release-deploy` / `ws:reliability`. `ws:ci` is the first workstream rank, so those
+issues drain first.
+
+### Label contract (`remediation:<fingerprint>`)
+
+Any detector — CI, Sentry, a synthetic monitor, a cron — files or reopens **one Linear
+issue** on team **JOV** or **LYB** and adds a label whose name is `remediation:<fingerprint>`.
+That label is the event. No new controller, workflow, or service is required, and nobody
+has to file the event by hand beyond creating or reopening that issue.
+
+Examples: `remediation:asc-agreements`, `remediation:billing-health-public`,
+`remediation:stripe-reconcile`, `remediation:e2e-login-timeout`,
+`remediation:synthetic-monitoring`, `remediation:golden-path-nightly`,
+`remediation:flaky-test-filing`, `remediation:codeowners-drift`.
+
+The bare label `remediation` (no colon) is the relay intake label, not an event.
+
+### Precedence over `no-symphony`
+
+An issue that carries any `remediation:*` label is never skipped because it also
+carries `no-symphony`. JOV-7540 and JOV-7551 carry `no-symphony`. The bare
+`remediation` label does not override that exclusion. `type:epic`,
+`codex-blocked`, and `reasoning-job` still exclude the issue. The exception
+follows `LANES_ESCALATION` (default on). When that flag is off, `no-symphony`
+excludes the issue again.
+
+### Dedupe is the label, and closed issues are history
+
+Events dedupe by the `remediation:<fingerprint>` label across JOV and LYB.
+Titles are not a match key. A title such as `vercel-deploy-failed:jovie-docs`
+(JOV-7544) does not join an event unless that issue carries the same label.
+A second **open** issue with the same label is a comment, not a second claim.
+A **closed** or **Done** issue that carries the label is history: it increments
+`recurrence` and its recorded attempts stay on `attemptCount`. It is not an
+active duplicate, and the router does not reopen it to absorb a newer open
+issue. The open issue is the active event. This history rule follows
+`LANES_ESCALATION`. When the flag is off, a recurrence reopens the canonical
+issue instead.
+
+### Doctor alert labels
+
+While `LANES_ESCALATION` is on, `scripts/lanes/doctor.py` Tracker applies
+`remediation:<alert-key-slug>` next to `symphony` when it opens, reopens, or
+closes the issue for that alert key. The slug matches
+`^[a-z0-9]+(-[a-z0-9]+)*$`: colons and other separators collapse to single
+hyphens (`provider-idle:codex` → `remediation:provider-idle-codex`). The label
+is created on the JOV team when it is missing, color `#E5484D`.
+
+### Stuck PRs stay on the sweep
+
+Stuck-PR detection lives in remediation-sweep. It files ordinary labeled
+issues: `remediation:pr-<n>-hold` and `remediation:pr-<n>-conflict` for a PR
+whose `lane-fix-exhausted` label has aged out. The router consumes those as
+normal remediation events. It does not run its own stuck-PR escalation unless
+`LANES_ESCALATION_STUCK_PRS=1` (and `LANES_ESCALATION` is on). That flag
+defaults off.
+
+On the next dispatch tick the router:
+
+1. Reads events with **one** label-filtered Linear query (`labels.name startsWith "remediation:"`,
+   teams JOV and LYB, first 100, no per-issue follow-up read). The read goes through the
+   cached claim scan (`shared`, key `remediation-events`) so workers do not repeat it.
+2. Dedupes by the `remediation:<fingerprint>` label across JOV and LYB, never by
+   title. One open event per fingerprint. A second open issue is a comment, not a
+   second claim. A closed or Done issue with the label counts as history
+   (`recurrence`, `attemptCount`), not as an active duplicate.
+3. Classifies the event as `fixable-by-agent` or `human-only`. Human-only means Tim has
+   to act: spend, billing actions, env/DNS/secrets, store submissions (including
+   `asc-agreements`), outside humans, manual deploys.
+4. Dispatches fixable events up the existing lane ladder: the first model is a stronger
+   enabled lane than the weakest, then failover across lanes and accounts, then one
+   top-rung retry. The assigned lane claims the issue on its existing worker pass.
+5. For human-only or ladder-exhausted events, records the state always. The `needs-human`
+   label and one comment with the exact ask are posted only when
+   `LANES_ESCALATION_NOTIFY_TIM` is on (default off).
+
+`remediation:musicfetch-*` is not a renewal. It routes to the in-house resolver cutover
+(**JOV-7323**). The dossier tells the lane not to renew, purchase, extend, or restore
+MusicFetch.
+
+`doctor.json` always carries `escalation` (`by_class`, `escalating`, `ladder_exhausted`,
+`surfaced`, `attempts24h`, `landed_after_escalation24h`) and `remediation` (`by_source`,
+`by_class`, `routed_by_lane`, `failovers24h`, `escalations24h`, `ladder_exhausted`,
+`surfaced`, plus the event counters). The same event counters are top-level:
+`eventsOpen`, `eventsClaimed`, `eventsHuman`, `eventsExhausted`, and `byFingerprint`
+(state, issue, class, lane, and the exact ask). A non-empty `surfaced` list raises
+alert `escalation-needs-human`.
+
 ## Tests
 
 ```sh
 python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
   scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py \
-  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py
+  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py scripts/tests/test_worktree_sweep.py \
+  scripts/tests/test_remediation.py
 ```
 
 The same files run inside `update()` before a release is installed anywhere.
@@ -375,19 +559,64 @@ checked-in projection of `apps/web/data/product-truth/registry.ts`:
 publication `public`, `marketing.proofAuthorized` true, maturity not
 `proposed`, access not `unavailable`.
 
-`design_gate.py` is pure stdlib, no I/O at import. An issue is gated on
-`ws:ui-ia`, `ws:profiles-marketing`, or `ws:design-gate`, or when title or
-description names a `GATED_PATH_PREFIXES` path or clearly targets a
-homepage, landing, or marketing page. `worker()` calls
-`design_gate.pick_build_issue(...)`, passing the existing `pick_issue`; a
-gated issue with an incomplete brief is not claimed, and the runner writes
-`needs-design-brief` plus the matching Linear label at most once. The label
-routes a design pass — it does not itself block — and the next claim admits
-the issue once steps 1–9 are complete.
+`design_gate.py` is pure stdlib, with no I/O at import.
 
-`doctor.py` adds `designGate` to the admission census (`gated`, `admitted`,
-`needsBrief`, `missingSteps`), deduped; incomplete briefs also increment
-`rejectedByProvider["needs-design-brief"]`.
+**What is gated.** Only visible-UI work. An issue is gated when it has
+`ws:ui-ia`, `ws:profiles-marketing` or `ws:design-gate`, when its description
+names a `GATED_PATH_PREFIXES` path, or when its title targets a homepage,
+landing or marketing page. A homepage mentioned only in passing in the
+description does not gate. Neither does a plumbing title: a redirect, alias,
+orphan, route handler, endpoint, webhook, cron, migration or backend.
+
+**Which template.** Marketing and landing issues use
+`docs/design/design-brief-template.md`. App-surface issues use
+`docs/design/app-ui-brief-template.md`. Its steps 5–7 are screens and states
+(JOV-7713 class 6), canonical primitives, and viewports. Primitives are
+checked against `app-ui-primitives.gen.json`, a projection of
+`DESIGN_SYSTEM_COMPONENT_IDS` and `AppScreenComponentId` that a test keeps
+in sync with those registries.
+
+**What happens to a held issue (JOV-7717: a brief must never block forever).**
+`worker()` calls `design_gate.pick_build_issue(...)` with the existing
+`pick_issue`. That call does five things:
+
+1. **First claim.** A held issue goes ahead of build work: among issues whose
+   brief run is due, `pick_issue` order and eligibility choose one. The gate
+   adds `needs-design-brief` and a `held-at` marker once.
+2. **Brief run.** `run_brief` runs the same provider with a brief-only prompt.
+   The prompt says to write `.design-brief.md` and not to invent artifacts.
+   The runner appends the result inline under
+   `<!-- design-gate:brief-lane -->`, even if the run produced nothing, and
+   opens no PR. The issue returns to Todo.
+3. **Frontier retry.** If steps are still missing, the next claim runs one
+   retry on the `codex` lane (if healthy, otherwise the same lane). It fills
+   the steps from canon (DESIGN.md and the registries) and replaces the draft
+   under `<!-- design-gate:brief-retry -->`.
+4. **Auto-admission.** After the retry, or 24h after `held-at`, an incomplete
+   brief is admitted as `brief-auto`. The gate labels it, comments a warning,
+   and appends one founder `jovie.work-order/v1` block for the taste call.
+   Summer's founder path (JOV-7739) posts that block to Ovie with no model
+   turn.
+5. **Linked briefs.** A linked `Design brief:` doc is never overwritten. It
+   gets no brief run and follows the 24h rule.
+
+`doctor.py` adds `designGate` to the admission census, deduped:
+
+- `gated`, `admitted`, `autoAdmitted`, `needsBrief` and `missingSteps`;
+- `ageHistogram`: time since `held-at` for issues still held or labeled;
+- `stale`: issues held past 25h. Any entry raises the `design-brief-stale`
+  alert.
+
+Incomplete briefs also increment `rejectedByProvider["needs-design-brief"]`.
+
+Design loop (JOV-7759): a gated issue's build prompt carries
+`DESIGN_LOOP_CONTRACT`. The lane plans from the brief, builds, and iterates
+privately until `pnpm design:conformance:gate`, `pnpm invariants:check` and the
+copy gate are green; `scripts/funnel-judge` also runs on funnel surfaces. The
+conformance gate includes `scripts/design-frontend-skill-check.mjs`, the
+deterministic subset of the frontend-skill contract, applied to added UI lines
+only. `scripts/automation-verify.sh affected` runs it as well, so the lane's
+own gate fails before CI does.
 
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`

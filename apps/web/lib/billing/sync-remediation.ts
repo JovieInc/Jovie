@@ -9,6 +9,7 @@ import {
   type BillingSyncFinding,
   dashboardActionForStoredEvent,
   evaluateBillingSyncRemediation,
+  RECONCILIATION_RUN_EVENT,
   REMEDIATION_FILED_EVENT,
   REMEDIATION_REFIRING_MS,
   STUCK_WEBHOOK_AFTER_MS,
@@ -55,6 +56,7 @@ export async function runBillingSyncRemediation(
 export async function loadBillingSyncSnapshot(now: Date): Promise<{
   now: Date;
   lastReconciliationAt: Date | null;
+  lastReconciliationSuccess: boolean | null;
   stuckWebhooks: StuckWebhookSnapshot[];
   lastFiledAtByFingerprint: Record<string, Date | null>;
 }> {
@@ -62,9 +64,17 @@ export async function loadBillingSyncSnapshot(now: Date): Promise<{
   const filedSince = new Date(now.getTime() - REMEDIATION_REFIRING_MS);
   const [lastRunRows, stuckRows, filedRows] = await Promise.all([
     db
-      .select({ createdAt: billingAuditLog.createdAt })
+      .select({
+        createdAt: billingAuditLog.createdAt,
+        metadata: billingAuditLog.metadata,
+      })
       .from(billingAuditLog)
-      .where(eq(billingAuditLog.source, 'reconciliation'))
+      .where(
+        and(
+          eq(billingAuditLog.source, 'reconciliation'),
+          eq(billingAuditLog.eventType, RECONCILIATION_RUN_EVENT)
+        )
+      )
       .orderBy(desc(billingAuditLog.createdAt))
       .limit(1),
     db
@@ -111,6 +121,10 @@ export async function loadBillingSyncSnapshot(now: Date): Promise<{
   return {
     now,
     lastReconciliationAt: lastRunRows[0]?.createdAt ?? null,
+    lastReconciliationSuccess:
+      typeof lastRunRows[0]?.metadata?.success === 'boolean'
+        ? lastRunRows[0].metadata.success
+        : null,
     stuckWebhooks: stuckRows.map(row => ({
       stripeEventId: row.stripeEventId,
       type: row.type,

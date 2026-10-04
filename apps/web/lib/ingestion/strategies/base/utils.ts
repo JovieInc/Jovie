@@ -34,14 +34,29 @@ export function decodeHtmlEntities(str: string): string {
   }
 
   // Decode specific entities first, then ampersand last
-  return str
-    .replaceAll(/&lt;/gi, '<')
-    .replaceAll(/&gt;/gi, '>')
-    .replaceAll(/&quot;/gi, '"')
-    .replaceAll(/&#39;/gi, "'")
-    .replaceAll(/&#x27;/gi, "'")
-    .replaceAll(/&nbsp;/gi, ' ')
-    .replaceAll(/&amp;/gi, '&'); // Must be last to avoid double-unescaping
+  return (
+    str
+      .replaceAll(/&lt;/gi, '<')
+      .replaceAll(/&gt;/gi, '>')
+      .replaceAll(/&quot;/gi, '"')
+      .replaceAll(/&#39;/gi, "'")
+      .replaceAll(/&#x27;/gi, "'")
+      .replaceAll(/&nbsp;/gi, ' ')
+      // Numeric references, e.g. Instagram's "&#064;handle &#x2022; ...".
+      .replaceAll(/&#(\d{1,7});/g, (match, code: string) =>
+        codePoint(Number(code), match)
+      )
+      .replaceAll(/&#x([0-9a-f]{1,6});/gi, (match, code: string) =>
+        codePoint(Number.parseInt(code, 16), match)
+      )
+      .replaceAll(/&amp;/gi, '&')
+  ); // Must be last to avoid double-unescaping
+}
+
+function codePoint(value: number, original: string): string {
+  return value > 0 && value <= 0x10ffff && !(value >= 0xd800 && value <= 0xdfff)
+    ? String.fromCodePoint(value)
+    : original;
 }
 
 /**

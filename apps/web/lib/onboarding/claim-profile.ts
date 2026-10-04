@@ -1,8 +1,10 @@
 import 'server-only';
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
-import { db } from '@/lib/db';
+import { withDbSessionTx } from '@/lib/auth/session';
+import { type DbOrTransaction, db } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
 import {
   chatAuditLog,
@@ -16,6 +18,7 @@ import {
 } from '@/lib/dsp-enrichment/providers/musicfetch';
 import { captureError } from '@/lib/error-tracking';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
+import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
@@ -26,7 +29,16 @@ import {
   requireVerifiedOwnerForReservation,
 } from '@/lib/onboarding/ownership-gate';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
+import {
+  assertSpotifyProfileIdentityAvailable,
+  lockSpotifyProfileIdentity,
+  SpotifyProfileIdentityConflictError,
+} from '@/lib/profile/spotify-profile-identity';
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
+import {
+  type AccountMetricCohort,
+  getAccountMetricCohort,
+} from '@/lib/utils/email';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
@@ -66,9 +78,10 @@ function cleanProposedHandle(handle: string | null): string | null {
 }
 
 async function fetchExistingProfile(
-  userId: string
+  userId: string,
+  database: DbOrTransaction
 ): Promise<CreatorProfile | null> {
-  const [profile] = await db
+  const [profile] = await database
     .select()
     .from(creatorProfiles)
     .where(eq(creatorProfiles.userId, userId))
@@ -77,7 +90,8 @@ async function fetchExistingProfile(
       desc(creatorProfiles.onboardingCompletedAt),
       desc(creatorProfiles.updatedAt)
     )
-    .limit(1);
+    .limit(1)
+    .for('update');
 
   return profile ?? null;
 }
@@ -163,6 +177,9 @@ async function fetchMusicFetchProfile(
   try {
     return await fetchArtistBySpotifyUrl(state.artist.url);
   } catch (error) {
+    if (isMusicfetchVendorUnavailable(error)) {
+      return null;
+    }
     await captureError(
       'MusicFetch profile import failed during chat claim',
       error,
@@ -175,16 +192,17 @@ async function fetchMusicFetchProfile(
   }
 }
 
-async function buildImportedProfileFields({
+function buildImportedProfileFields({
   existingProfile,
   state,
+  musicFetch,
 }: {
+  readonly musicFetch: MusicFetchArtistResult | null;
   readonly existingProfile: CreatorProfile | null;
   readonly state: ClaimedOnboardingState;
-}): Promise<Record<string, unknown>> {
+}): Record<string, unknown> {
   if (!state.artist) return {};
 
-  const musicFetch = await fetchMusicFetchProfile(state);
   const importedBio = cleanImportedBio(musicFetch?.bio);
   const importedAvatarUrl =
     cleanSpotifyAvatarUrl(state.artist.imageUrl) ??
@@ -205,6 +223,7 @@ async function buildImportedProfileFields({
 }
 
 interface PersistClaimedProfileInput {
+  readonly tx: DbOrTransaction;
   readonly userId: string;
   readonly handle: string;
   readonly existingProfile: CreatorProfile | null;
@@ -217,6 +236,7 @@ interface PersistClaimedProfileInput {
 }
 
 async function persistClaimedProfileRow({
+  tx,
   userId,
   handle,
   existingProfile,
@@ -231,7 +251,7 @@ async function persistClaimedProfileRow({
   status: 'created' | 'updated';
 }> {
   if (existingProfile) {
-    const [updated] = await db
+    const [updated] = await tx
       .update(creatorProfiles)
       .set({
         username: handle,
@@ -256,16 +276,22 @@ async function persistClaimedProfileRow({
         updatedAt: now,
         ...spotifyFields,
       })
-      .where(eq(creatorProfiles.id, existingProfile.id))
+      .where(
+        and(
+          eq(creatorProfiles.id, existingProfile.id),
+          eq(creatorProfiles.userId, userId)
+        )
+      )
       .returning({ id: creatorProfiles.id });
 
+    if (!updated) throw new Error('Profile ownership changed during claim');
     return {
-      profileId: updated?.id ?? existingProfile.id,
+      profileId: updated.id,
       status: 'updated',
     };
   }
 
-  const [created] = await db
+  const [created] = await tx
     .insert(creatorProfiles)
     .values({
       userId,
@@ -294,22 +320,18 @@ async function persistClaimedProfileRow({
 
 async function persistClaimedProfileWithHandleRetry({
   userId,
-  existingProfile,
   state,
-  proposedHandle,
-  settings,
+  conversationId,
   now,
-  spotifyFields,
+  musicFetch,
   reserved,
   waitlistEntryId,
 }: {
   readonly userId: string;
-  readonly existingProfile: CreatorProfile | null;
   readonly state: ClaimedOnboardingState;
-  readonly proposedHandle: string | null;
-  readonly settings: Record<string, unknown>;
+  readonly conversationId: string;
   readonly now: Date;
-  readonly spotifyFields: Record<string, unknown>;
+  readonly musicFetch: MusicFetchArtistResult | null;
   readonly reserved: boolean;
   readonly waitlistEntryId: string | null;
 }): Promise<{
@@ -317,46 +339,88 @@ async function persistClaimedProfileWithHandleRetry({
   handle: string;
   status: 'created' | 'updated';
 }> {
-  const cleanedProposedHandle = pickInitialProfileHandle(proposedHandle);
+  const cleanedProposedHandle = pickInitialProfileHandle(state.handle);
   let handle =
     cleanedProposedHandle ??
     (await reserveFallbackProfileHandle(state, cleanedProposedHandle, userId));
 
   for (let attempt = 0; attempt < HANDLE_CLAIM_MAX_ATTEMPTS; attempt++) {
-    // Existing profiles may only be claimed/updated by their verified owner.
-    // New profiles are created for this authenticated user (owner-to-be).
-    if (existingProfile) {
-      assertOnboardingProfileOwner({
-        authenticatedUserId: userId,
-        profileOwnerUserId: existingProfile.userId,
-      });
-    }
-
-    const displayName =
-      state.artist?.name ?? existingProfile?.displayName ?? handle;
-
     try {
-      const result = await persistClaimedProfileRow({
-        userId,
-        handle,
-        existingProfile,
-        displayName,
-        settings,
-        now,
-        spotifyFields,
-        reserved,
-        waitlistEntryId,
-      });
-
+      // Serialize this user's materialization even before a profile exists.
+      // Avoid a users row lock: direct claims update profile -> users, and an
+      // inverse users -> profile order would deadlock. External I/O stays out.
+      const result = await withDbSessionTx(
+        async tx => {
+          // Match direct Spotify claims: identity lock before user/profile rows.
+          if (state.artist)
+            await lockSpotifyProfileIdentity(tx, state.artist.id);
+          await tx.execute(
+            drizzleSql`SELECT pg_advisory_xact_lock(hashtext('jovie:onboarding-profile-owner'), hashtext(${userId}))`
+          );
+          const [owner] = await tx
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+          if (!owner) throw new Error('Profile owner not found');
+          const existingProfile = await fetchExistingProfile(userId, tx);
+          if (existingProfile) {
+            assertOnboardingProfileOwner({
+              authenticatedUserId: userId,
+              profileOwnerUserId: existingProfile.userId,
+            });
+          }
+          if (state.artist) {
+            // A stale transcript must not replace an already bound identity.
+            if (
+              existingProfile?.spotifyId &&
+              existingProfile.spotifyId !== state.artist.id
+            ) {
+              throw new SpotifyProfileIdentityConflictError();
+            }
+            await assertSpotifyProfileIdentityAvailable(
+              tx,
+              state.artist.id,
+              existingProfile?.id ?? null
+            );
+          }
+          return persistClaimedProfileRow({
+            tx,
+            userId,
+            handle,
+            existingProfile,
+            displayName:
+              state.artist?.name ?? existingProfile?.displayName ?? handle,
+            settings: buildOnboardingSettings(
+              existingProfile?.settings,
+              state,
+              conversationId,
+              now
+            ),
+            now,
+            spotifyFields: buildImportedProfileFields({
+              existingProfile,
+              state,
+              musicFetch,
+            }),
+            reserved,
+            waitlistEntryId,
+          });
+        },
+        { clerkUserId: userId }
+      );
       return { ...result, handle };
     } catch (error) {
+      // Keep the unique constraint as a backstop for writers outside this lock.
+      if (isUniqueViolation(error, 'creator_profiles_spotify_id_unique')) {
+        throw new SpotifyProfileIdentityConflictError();
+      }
       if (
         !isHandleUniqueViolation(error) ||
         attempt === HANDLE_CLAIM_MAX_ATTEMPTS - 1
-      ) {
+      )
         throw error;
-      }
-
+      // A failed transaction is rolled back before a handle retry starts.
       handle = await reserveFallbackProfileHandle(
         state,
         cleanedProposedHandle,
@@ -364,7 +428,6 @@ async function persistClaimedProfileWithHandleRetry({
       );
     }
   }
-
   throw new Error('Failed to claim onboarding profile handle after retries');
 }
 
@@ -410,35 +473,15 @@ export async function materializeClaimedOnboardingProfile({
     return { profileId: null, handle: null, status: 'skipped' };
   }
 
-  const existingProfile = await fetchExistingProfile(verifiedUserId);
-  if (existingProfile) {
-    assertOnboardingProfileOwner({
-      authenticatedUserId: verifiedUserId,
-      profileOwnerUserId: existingProfile.userId,
-    });
-  }
-
   const now = new Date();
-  const settings = buildOnboardingSettings(
-    existingProfile?.settings,
-    state,
-    conversationId,
-    now
-  );
-  const spotifyFields = await buildImportedProfileFields({
-    existingProfile,
-    state,
-  });
-
+  const musicFetch = await fetchMusicFetchProfile(state);
   const { profileId, handle, status } =
     await persistClaimedProfileWithHandleRetry({
       userId: verifiedUserId,
-      existingProfile,
       state,
-      proposedHandle: state.handle,
-      settings,
+      conversationId,
       now,
-      spotifyFields,
+      musicFetch,
       reserved,
       waitlistEntryId,
     });
@@ -446,11 +489,14 @@ export async function materializeClaimedOnboardingProfile({
   // A reserved (waitlist-pending) profile only holds the handle. Publishing
   // ownership signals — activeProfileId and the owner claim row — happens on
   // the admitted claim path so nothing treats the reservation as admission.
+  let claimCohort: AccountMetricCohort = 'unattributed';
   if (!reserved) {
-    await db
+    const [owner] = await db
       .update(users)
       .set({ activeProfileId: profileId, updatedAt: now })
-      .where(eq(users.id, verifiedUserId));
+      .where(eq(users.id, verifiedUserId))
+      .returning({ email: users.email });
+    claimCohort = getAccountMetricCohort(owner?.email);
 
     // "Manage as owner" claim row — only after verified ownership above.
     await db
@@ -518,7 +564,11 @@ export async function materializeClaimedOnboardingProfile({
   });
 
   if (!reserved) {
-    await recordFunnelStep({ funnel: 'artist_signup', step: 'claim_complete' });
+    await recordFunnelStep({
+      funnel: 'artist_signup',
+      step: 'claim_complete',
+      cohort: claimCohort,
+    });
   }
 
   return { profileId, handle, status };

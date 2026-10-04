@@ -19,7 +19,7 @@ describe('production-blocked debug routes', () => {
 
   it('keeps the page inventory explicit', () => {
     expect(PRODUCTION_BLOCKED_PAGE_PREFIXES).toEqual(
-      expect.arrayContaining(['/dev/', '/exp/', '/ui/'])
+      expect.arrayContaining(['/demo/', '/dev/', '/exp/', '/ui/'])
     );
   });
 
@@ -33,6 +33,12 @@ describe('production-blocked debug routes', () => {
     '/api/test/onboarding-toggle',
     '/api/sentry-example-api',
     '/dev/smart-links',
+    '/demo',
+    '/demo/audience',
+    '/demo/onboarding',
+    '/demo/dropdowns',
+    '/demo/founder-video',
+    '/demo/showcase/public-profile',
     '/exp/shell-v1',
     '/ui/buttons',
     '/sandbox',
@@ -62,8 +68,8 @@ describe('production-blocked debug routes', () => {
 
   it.each([
     '/',
-    '/demo',
-    '/demo/audience',
+    '/demo/video',
+    '/demovideo',
     '/hud',
     '/hud-tv',
     '/sidebar-demo',
