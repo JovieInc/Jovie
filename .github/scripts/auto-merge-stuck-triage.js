@@ -31,6 +31,8 @@ const TRACKING_ISSUE_TITLE = 'Auto-merge stuck PRs — diagnostic tracker';
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 const FAILURE_DESCRIPTION =
   /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*$/;
+const BASE_BRANCH_DESCRIPTION =
+  /^class=base-branch;n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*;main=([0-9a-f]{40})$/;
 
 const GH_MAX_ATTEMPTS = 4;
 const TRANSIENT_GH_ERROR =
@@ -185,6 +187,11 @@ function hasRevisionFailureHold(statuses, repo) {
       status.creator?.login !== 'jovie-bot[bot]'
     ) {
       return false;
+    }
+    const base = BASE_BRANCH_DESCRIPTION.exec(status.description ?? '');
+    if (base && status.target_url === `${prefix}${base[1]}`) {
+      // Only queue enrollment may reserve the bounded retry after main moves.
+      return true;
     }
     const match = FAILURE_DESCRIPTION.exec(status.description ?? '');
     return Boolean(match && status.target_url === `${prefix}${match[2]}`);

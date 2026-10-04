@@ -46,6 +46,9 @@ test('subscription execution strips API keys, provider routes and code-loading h
     HOME: '/home/scanner',
     CODEX_HOME: '/home/scanner/.codex',
     LC_ALL: 'C',
+    HTTPS_PROXY: 'http://proxy:8080',
+    NODE_EXTRA_CA_CERTS: '/trusted/runtime-ca.pem',
+    CODEX_EXEC_SERVER_PROXY_PRIVATE_IPS_VIA_UPSTREAM: '1',
     OPENAI_API_KEY: 'blocked',
     AI_GATEWAY_API_KEY: 'blocked',
     ANTHROPIC_AUTH_TOKEN: 'blocked',
@@ -62,6 +65,9 @@ test('subscription execution strips API keys, provider routes and code-loading h
     HOME: '/home/scanner',
     CODEX_HOME: '/home/scanner/.codex',
     LC_ALL: 'C',
+    HTTPS_PROXY: 'http://proxy:8080',
+    NODE_EXTRA_CA_CERTS: '/trusted/runtime-ca.pem',
+    CODEX_EXEC_SERVER_PROXY_PRIVATE_IPS_VIA_UPSTREAM: '1',
   });
 });
 
@@ -125,6 +131,7 @@ test('current-head clean, no-candidate and nullable-issue findings receipts are 
   );
   assert.equal(receipt().headSha, sha);
   assert.equal(receipt().route, 'native-subscription');
+  assert.equal(receipt().nativeRunId, 'native-1');
 });
 
 test('ambiguous native output, quota failure and incomplete exported findings are not a clean scan', () => {
@@ -151,6 +158,21 @@ test('ambiguous native output, quota failure and incomplete exported findings ar
       },
     },
     { result: result(0, 2) },
+    {
+      result: {
+        ...result(),
+        stdout: result().stdout.replace(
+          '  Analyses:',
+          'Processing complete. Run: native-2\n  Analyses:'
+        ),
+      },
+    },
+    {
+      result: {
+        ...result(),
+        stdout: result().stdout.replace('Run: native-1', 'Run: invalid/run'),
+      },
+    },
     {
       result: {
         ...result(),

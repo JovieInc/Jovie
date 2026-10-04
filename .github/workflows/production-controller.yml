@@ -686,8 +686,18 @@ jobs:
               [[ "$staging_compare" =~ ^(ahead|identical)$ ]] || { echo "::error::Canonical staging SHA $staging_receipt_sha is not on the production lineage to $EXPECTED_SHA."; exit 1; }
               staging_artifact_name="staging-deployment-${staging_receipt_sha}"
               if [ "$staging_receipt_sha" = "$EXPECTED_SHA" ]; then
-                # Completion binds this artifact to the staging producer and CI attempt.
-                staging_artifact_id="$EXACT_STAGING_ARTIFACT_ID"
+                if [ -n "$EXACT_STAGING_ARTIFACT_ID" ]; then
+                  # Completion binds this artifact to the staging producer and CI attempt.
+                  staging_artifact_id="$EXACT_STAGING_ARTIFACT_ID"
+                else
+                  # A same-SHA CI rerun can select no Web lane. Authenticate the
+                  # existing canonical deployment rather than using an empty ID.
+                  canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+                  staging_deployment_id="$(jq -er '.deploymentId | select(type == "string" and test("^dpl_[A-Za-z0-9]+$"))' <<<"$canonical_staging_identity")"
+                  staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
+                    REPOSITORY="$REPOSITORY" EXPECTED_SHA="$EXPECTED_SHA" \
+                    node .github/scripts/canonical-staging-receipt.mjs)"
+                fi
               else
                 # Preserve cumulative-range historical Web evidence, without polling.
                 staging_artifact_id="$(gh api \
@@ -896,6 +906,7 @@ jobs:
     outputs:
       credentials_configured: ${{ steps.check-creds.outputs.credentials_configured }}
       auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
+      login_timeout: ${{ steps.auth-result.outputs.login_timeout }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -957,6 +968,8 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
+          log="$RUNNER_TEMP/auth-smoke.log"
+          set +e
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
@@ -966,8 +979,17 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
-          echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
+                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line \
+            >"$log" 2>&1
+          status=$?
+          set -e
+          cat "$log"
+          login="$(node "$GITHUB_WORKSPACE/scripts/remediation-signal-intake.mjs" --detect-login "$log" || true)"
+          echo "login_timeout=${login:-false}" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 0 ]; then
+            echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
@@ -1406,6 +1428,55 @@ jobs:
             -d "$payload"; then
             echo "::warning::Production is verified, but the bounded Slack notification failed."
           fi
+
+  remediation-post-deploy-smoke:
+    name: File post-deploy smoke remediation
+    needs: [ci-public-profile-smoke]
+    if: ${{ always() && needs.ci-public-profile-smoke.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve production-monitor-post-deploy-smoke
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-post-deploy-smoke
+          REMEDIATION_SOURCE: production-controller.yml
+          REMEDIATION_CONCLUSION: ${{ needs.ci-public-profile-smoke.result }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
+  remediation-auth-smoke:
+    name: File post-deploy auth remediation
+    needs: [ci-post-deploy-auth-smoke]
+    if: ${{ always() && needs.ci-post-deploy-auth-smoke.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve auth smoke remediation
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: auth-smoke
+          REMEDIATION_SOURCE: production-controller.yml:auth-smoke
+          REMEDIATION_JOB_RESULT: ${{ needs.ci-post-deploy-auth-smoke.result }}
+          REMEDIATION_AUTH_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
+          REMEDIATION_LOGIN_TIMEOUT: ${{ needs.ci-post-deploy-auth-smoke.outputs.login_timeout }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
 
   publish-customer-changelog:
     name: Publish verified customer changelog

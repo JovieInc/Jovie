@@ -106,3 +106,11 @@ Mechanical green is not model-quality green. Unsupported models, missing auth,
 and failed transport are blocked, never passing or silently substituted.
 
 Latest measured outcome: [evaluation receipt](RESULTS.md).
+
+## Routes beside the entry point
+
+The entry-point table is byte-capped. These routes stay in force:
+
+| Task | Read |
+|---|---|
+| Release channels / update IA | [RELEASE_CHANNELS.md](../../canon/RELEASE_CHANNELS.md) |

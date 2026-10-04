@@ -18,6 +18,7 @@ import {
   musicfetchNetworkAllowed,
   noteMusicfetchHttpStatus,
 } from '@/lib/music-resolver/musicfetch-gate';
+import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import {
   MusicfetchRequestError,
   musicfetchRequest,
@@ -350,6 +351,11 @@ function factsFromMetadata(
   };
 }
 
+interface MusicfetchFactsLookup {
+  readonly facts: ReleaseFacts | null;
+  readonly unavailable: boolean;
+}
+
 function inHouseQuery(input: PrepareReleaseLaunchInput): InHouseQuery | null {
   if (input.release_url) {
     const parsed = new URL(input.release_url);
@@ -422,26 +428,48 @@ async function resolveAgentReleaseInHouse(
     : { facts: null, outcome: 'miss' };
 }
 
+function musicfetchVendorDown(error: unknown): boolean {
+  if (isMusicfetchVendorUnavailable(error)) return true;
+  return (
+    error instanceof MusicfetchRequestError &&
+    (error.statusCode === 401 || error.statusCode === 403)
+  );
+}
+
 async function musicfetchFacts(
   endpoint: '/url' | '/upc',
   field: 'url' | 'upc',
   value: string
-): Promise<ReleaseFacts | null> {
-  const response = await musicfetchRequest<{ result?: MusicfetchRelease }>(
-    endpoint,
-    new URLSearchParams({ [field]: value, services: RELEASE_SERVICES }),
-    { timeoutMs: REQUEST_TIMEOUT_MS }
-  );
-  const facts = response.result
-    ? factsFromMusicfetch(
-        response.result,
-        field === 'url' ? 'release_url' : 'upc',
-        field === 'url' ? value : undefined
-      )
-    : null;
-  return facts && field === 'upc' && !facts.upc
-    ? { ...facts, upc: value }
-    : facts;
+): Promise<MusicfetchFactsLookup> {
+  try {
+    const response = await musicfetchRequest<{ result?: MusicfetchRelease }>(
+      endpoint,
+      new URLSearchParams({ [field]: value, services: RELEASE_SERVICES }),
+      { timeoutMs: REQUEST_TIMEOUT_MS }
+    );
+    const facts = response.result
+      ? factsFromMusicfetch(
+          response.result,
+          field === 'url' ? 'release_url' : 'upc',
+          field === 'url' ? value : undefined
+        )
+      : null;
+    return {
+      facts:
+        facts && field === 'upc' && !facts.upc
+          ? { ...facts, upc: value }
+          : facts,
+      unavailable: false,
+    };
+  } catch (error) {
+    if (error instanceof MusicfetchRequestError) {
+      noteMusicfetchHttpStatus(error.statusCode ?? 0, error.message);
+    }
+    if (musicfetchVendorDown(error)) {
+      return { facts: null, unavailable: true };
+    }
+    throw error;
+  }
 }
 
 /** Resolve public release facts without importing, publishing or querying owners. */
@@ -456,8 +484,10 @@ export async function resolveAgentRelease(
     ) {
       return { status: 'error', code: 'UNSUPPORTED_RELEASE', retryable: false };
     }
+    let inHouseAttempted = false;
     if (input.release_url || input.upc) {
       if (isCodeFlagEnabled('IN_HOUSE_RESOLVER')) {
+        inHouseAttempted = true;
         const house = await resolveAgentReleaseInHouse(input);
         if (house.facts) {
           const facts = [house.facts];
@@ -492,25 +522,39 @@ export async function resolveAgentRelease(
         };
       }
     }
-    const lookups: Array<Promise<ReleaseFacts | null>> = [];
+    const lookups: Array<Promise<MusicfetchFactsLookup>> = [];
     if (input.release_url)
       lookups.push(musicfetchFacts('/url', 'url', input.release_url));
     if (input.upc) lookups.push(musicfetchFacts('/upc', 'upc', input.upc));
-    const facts = (await Promise.all(lookups)).filter(
-      (value): value is ReleaseFacts => value !== null
-    );
-    if (lookups.length > 0 && facts.length !== lookups.length) {
+    const lookupResults = await Promise.all(lookups);
+    if (
+      lookupResults.some(result => !result.unavailable && result.facts === null)
+    ) {
       return { status: 'error', code: 'RELEASE_NOT_FOUND', retryable: false };
     }
-    if (input.release_metadata) {
+    const facts = lookupResults.flatMap(result =>
+      result.facts ? [result.facts] : []
+    );
+    const vendorUnavailable = lookupResults.some(result => result.unavailable);
+    let resolvedInHouse = false;
+    if (vendorUnavailable && facts.length === 0 && !inHouseAttempted) {
+      const house = await resolveAgentReleaseInHouse(input);
+      if (house.facts) {
+        facts.push(house.facts);
+        resolvedInHouse = true;
+      }
+    }
+    if (!resolvedInHouse && input.release_metadata) {
       const supplied = factsFromMetadata(input.release_metadata);
       if (!supplied)
         return { status: 'error', code: 'INVALID_INPUT', retryable: false };
       facts.push(supplied);
     }
-    return facts.length > 0
-      ? { status: 'resolved', facts }
-      : { status: 'error', code: 'RELEASE_NOT_FOUND', retryable: false };
+    if (facts.length > 0) return { status: 'resolved', facts };
+    if (vendorUnavailable) {
+      return { status: 'error', code: 'UPSTREAM_FAILURE', retryable: false };
+    }
+    return { status: 'error', code: 'RELEASE_NOT_FOUND', retryable: false };
   } catch (error) {
     // Only a catalog miss says anything about the supplied release. Auth,
     // subscription and request-contract failures belong to the provider path.

@@ -328,6 +328,28 @@ async function getPrimaryPreviewUrlsForReleases(
       urlsByRelease.set(row.releaseId, row.primaryPreviewUrl);
     }
   }
+
+  // Unmigrated releases can still store previews only in discog_tracks.
+  // Preserve new-model previews and bound the fallback to missing releases.
+  const missingIds = releaseIds.filter(id => !urlsByRelease.has(id));
+  if (missingIds.length > 0) {
+    const legacyRows = await db
+      .select({
+        releaseId: discogTracks.releaseId,
+        primaryPreviewUrl:
+          drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogTracks.previewUrl}), '') ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogTracks.previewUrl}), '') IS NOT NULL))[1]`.as(
+            'primary_preview_url'
+          ),
+      })
+      .from(discogTracks)
+      .where(inArray(discogTracks.releaseId, missingIds))
+      .groupBy(discogTracks.releaseId);
+    for (const row of legacyRows) {
+      if (row.primaryPreviewUrl) {
+        urlsByRelease.set(row.releaseId, row.primaryPreviewUrl);
+      }
+    }
+  }
   return urlsByRelease;
 }
 

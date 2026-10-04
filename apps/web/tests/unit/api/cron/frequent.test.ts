@@ -21,6 +21,7 @@ const {
   mockReconcileOrphanedAcceptedActions,
   mockProbeRedisOperability,
   mockCaptureError,
+  mockGetAcquisitionEligibility,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -42,6 +43,11 @@ const {
   mockReconcileOrphanedAcceptedActions: vi.fn(),
   mockProbeRedisOperability: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockGetAcquisitionEligibility: vi.fn(),
+}));
+
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  getAcquisitionEligibility: mockGetAcquisitionEligibility,
 }));
 
 vi.mock(
@@ -233,6 +239,8 @@ describe('GET /api/cron/frequent', () => {
 
     expect(response.status).toBe(200);
     expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
+    // Instantly sends are off by default, so the cone is never probed.
+    expect(mockGetAcquisitionEligibility).not.toHaveBeenCalled();
     expect(mockScheduleReleaseNotifications).toHaveBeenCalledTimes(1);
     expect(mockSendPendingNotifications).toHaveBeenCalledTimes(1);
     expect(mockReconcileOrphanedAcceptedActions).toHaveBeenCalledWith(20);
@@ -257,6 +265,56 @@ describe('GET /api/cron/frequent', () => {
       skipped: true,
     });
     expect(mockProbeRedisOperability).not.toHaveBeenCalled();
+  });
+
+  it('skips autonomous outreach while ACQUISITION_ELIGIBLE is false', async () => {
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+    mockGetAcquisitionEligibility.mockResolvedValue({
+      eligible: false,
+      verdict: 'BLOCKED',
+      firstBlocker: {
+        id: 'payment_entitlement',
+        status: 'red',
+        nextAction: 'Fix the Golden Path lane.',
+      },
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(mockProcessOutreachBatch).not.toHaveBeenCalled();
+    expect(data.results.outreach).toMatchObject({
+      success: true,
+      data: {
+        skipped: true,
+        reason: 'acquisition_not_eligible',
+        verdict: 'BLOCKED',
+        firstBlocker: 'payment_entitlement',
+      },
+    });
+  });
+
+  it('dispatches outreach once the cone is eligible', async () => {
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+    mockGetAcquisitionEligibility.mockResolvedValue({
+      eligible: true,
+      verdict: 'ELIGIBLE',
+      firstBlocker: null,
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+
+    expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
   });
 
   it('returns 207 and classifies an exhausted Redis quota as a failed canary', async () => {

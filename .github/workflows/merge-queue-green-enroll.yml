@@ -98,7 +98,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-actions: read
-          permission-contents: read
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
 
@@ -142,7 +142,7 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: read
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
 
@@ -162,6 +162,9 @@ jobs:
             // the lanes remove it with their fix.
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
+            const currentMainSha = (await github.rest.git.getRef({
+              owner, repo, ref: 'heads/main',
+            })).data.object.sha;
             // Use the triggering PR for automatic wakes. Scanning every eligible PR
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
@@ -184,13 +187,20 @@ jobs:
                 }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
+                // GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls is
+                // repos.listPullRequestsAssociatedWithCommit. github.rest.commits
+                // does not exist, so calling it throws before any enqueue.
                 if (numbers.length === 0 && /^[a-f0-9]{40}$/.test(run.head_sha || '') && run.head_branch) {
-                  const associated = await github.paginate(github.rest.commits.listPullRequestsAssociatedWithCommit, {
+                  const pages = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
                     owner, repo, commit_sha: run.head_sha, per_page: 100,
                   });
-                  numbers = associated.filter(pr => pr.state === 'open' && pr.base.ref === 'main' &&
-                    pr.head.sha === run.head_sha && pr.head.ref === run.head_branch &&
-                    pr.head.repo?.full_name === `${owner}/${repo}`).map(pr => pr.number).filter(validNumber);
+                  const associated = Array.isArray(pages) ? pages : [];
+                  numbers = associated.flatMap(pr => {
+                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') return [];
+                    if (pr.head?.sha !== run.head_sha || pr.head?.ref !== run.head_branch) return [];
+                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) return [];
+                    return validNumber(pr.number) ? [pr.number] : [];
+                  });
                 }
               }
               prs = [];
@@ -240,6 +250,7 @@ jobs:
               const failure = failurePolicy.revisionFailureDisposition({
                 statuses,
                 repository: `${owner}/${repo}`,
+                currentMainSha,
               });
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);

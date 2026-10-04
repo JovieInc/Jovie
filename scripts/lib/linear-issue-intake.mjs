@@ -240,6 +240,40 @@ export async function ensureLinearLabel({
   return { ok: true, id };
 }
 
+/** Existing team label id by exact name, or null when Linear has none. */
+export async function findLinearLabelId({
+  name,
+  apiKey,
+  fetchImpl,
+  teamId = JOVIE_TEAM_ID,
+}) {
+  const cacheKey = `${teamId}:${name}`;
+  if (labelCache.has(cacheKey)) {
+    return { ok: true, id: labelCache.get(cacheKey) };
+  }
+  const found = await linearGraphql(
+    {
+      query: `
+        query FindTeamLabel($teamId: String!, $name: String!) {
+          team(id: $teamId) {
+            labels(filter: { name: { eq: $name } }) { nodes { id name } }
+          }
+        }
+      `,
+      variables: { teamId, name },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_lookup'
+  );
+  if (!found.ok) return found;
+  const id =
+    (found.data?.team?.labels?.nodes ?? []).find(label => label?.name === name)
+      ?.id ?? null;
+  if (id) labelCache.set(cacheKey, id);
+  return { ok: true, id };
+}
+
 // Dedup by fingerprint in the title or the remediation:<fingerprint> label.
 export async function upsertLinearIssueByTitleFingerprint({
   fingerprint,
@@ -251,6 +285,8 @@ export async function upsertLinearIssueByTitleFingerprint({
   createStateName = null,
   // Optional label ids applied only when a new issue is created.
   createLabelIds = [],
+  // Optional label ids kept on create and on every update or reopen.
+  keepLabelIds = [],
   // undefined distinguishes "omitted" from an explicit false. A stable
   // labelKey reopens unless the caller opts out.
   reopenTerminal = undefined,
@@ -377,9 +413,9 @@ export async function upsertLinearIssueByTitleFingerprint({
     if (createStateName && !createStateId) {
       return { ok: false, reason: 'linear_create_state_missing' };
     }
-    const createIds = labelId
-      ? [...new Set([...createLabelIds, labelId])]
-      : createLabelIds;
+    const createIds = [
+      ...new Set([...createLabelIds, ...keepLabelIds, labelId].filter(Boolean)),
+    ];
     const created = await linearGraphql(
       {
         query: `
@@ -453,13 +489,17 @@ export async function upsertLinearIssueByTitleFingerprint({
               : backlogState.id,
         }
       : {}),
-    ...(labelId && Array.isArray(existingLabelNodes)
+    ...((labelId || keepLabelIds.length > 0) &&
+    Array.isArray(existingLabelNodes)
       ? {
           labelIds: [
-            ...new Set([
-              ...existingLabelNodes.map(label => label?.id).filter(Boolean),
-              labelId,
-            ]),
+            ...new Set(
+              [
+                ...existingLabelNodes.map(label => label?.id),
+                ...keepLabelIds,
+                labelId,
+              ].filter(Boolean)
+            ),
           ],
         }
       : {}),
@@ -659,5 +699,105 @@ export async function closeLinearIssueByFingerprint({
     identifier: match.identifier ?? updated.data.issueUpdate.issue?.identifier,
     url: match.url ?? updated.data.issueUpdate.issue?.url,
     commented: !already,
+  };
+}
+/** Resolve the open issue when its description names this source workflow. */
+export async function noteFingerprintedIssueGreen({
+  fingerprint,
+  source,
+  comment,
+  commentMarker = '<!-- remediation-green -->',
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (typeof fingerprint !== 'string' || fingerprint.trim().length === 0) {
+    return { ok: false, reason: 'missing_fingerprint' };
+  }
+  const labelName = remediationKey(fingerprint);
+  const found = await linearGraphql(
+    {
+      query: `
+        query FindRemediationForGreen($teamId: String!, $teamFilterId: ID!, $labelName: String!) {
+          team(id: $teamId) { states { nodes { id name type } } }
+          issues(
+            filter: {
+              team: { id: { eq: $teamFilterId } }
+              labels: { some: { name: { eq: $labelName } } }
+            }
+            first: 25
+          ) { nodes { ${ISSUE_FIELDS} } }
+        }
+      `,
+      variables: {
+        teamId: JOVIE_TEAM_ID,
+        teamFilterId: JOVIE_TEAM_ID,
+        labelName,
+      },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_search'
+  );
+  if (!found.ok) return found;
+  const match = resolveLinearIssueByFingerprint(
+    found.data?.issues?.nodes,
+    fingerprint
+  );
+  if (!match) return { ok: true, action: 'none' };
+  if (['completed', 'canceled'].includes(match.state?.type)) {
+    return { ok: true, action: 'already_closed', id: match.id };
+  }
+  const sourceLine = source ? `Source-workflow: ${source}` : '';
+  if (sourceLine && !String(match.description ?? '').includes(sourceLine)) {
+    return {
+      ok: true,
+      action: 'source_mismatch',
+      id: match.id,
+      identifier: match.identifier ?? null,
+    };
+  }
+  const posted = await addLinearIssueComment({
+    issueId: match.id,
+    body: comment || `${commentMarker}\n${sourceLine} is green.`,
+    apiKey,
+    fetchImpl,
+  });
+  if (!posted.ok) return posted;
+  const states = found.data?.team?.states?.nodes ?? [];
+  const done =
+    states.find(state => state?.name === 'Done') ??
+    states.find(state => state?.type === 'completed');
+  if (!done?.id) return { ok: false, reason: 'linear_done_state_missing' };
+  const updated = await linearGraphql(
+    {
+      query: `
+        mutation ResolveRemediation($id: String!, $stateId: String!) {
+          issueUpdate(id: $id, input: { stateId: $stateId }) {
+            success
+            issue { id identifier url }
+          }
+        }
+      `,
+      variables: { id: match.id, stateId: done.id },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_update'
+  );
+  if (!updated.ok) return updated;
+  if (!updated.data?.issueUpdate?.success) {
+    return {
+      ok: false,
+      reason: 'linear_update_unsuccessful',
+      body: updated.raw,
+    };
+  }
+  return {
+    ok: true,
+    action: 'resolved',
+    id: match.id,
+    identifier: updated.data.issueUpdate.issue?.identifier ?? match.identifier,
+    url: updated.data.issueUpdate.issue?.url ?? match.url,
   };
 }

@@ -32,6 +32,22 @@ beforeEach(() => {
 });
 
 describe('shell alias redirects', () => {
+  it('redirects the legacy appearance alias to Account without a page stub', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as RedirectRule[];
+
+    expect(
+      redirects.find(
+        redirect => redirect.source === APP_ROUTES.SETTINGS_APPEARANCE
+      )
+    ).toEqual({
+      source: APP_ROUTES.SETTINGS_APPEARANCE,
+      destination: APP_ROUTES.SETTINGS_ACCOUNT,
+      permanent: false,
+    });
+  });
+
   it('redirects the releases alias before rendering the authenticated shell', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;

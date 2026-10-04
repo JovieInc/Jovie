@@ -1,9 +1,11 @@
 import '../../styles/system-b-app.css';
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import SettingsLayout from '@/app/app/(shell)/settings/layout';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
+import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
 import { AppShellFrame } from './AppShellFrame';
-import { SidebarProvider } from './sidebar/context';
-import { Sidebar } from './sidebar/sidebar';
+import { Sidebar, SidebarProvider } from './sidebar';
 
 const meta: Meta<typeof AppShellFrame> = {
   title: 'Organisms/AppShellFrame',
@@ -44,10 +46,43 @@ export const HeaderAlignment: Story = {
         header={
           <DashboardHeader
             breadcrumbs={[{ label: 'New Chat' }]}
-            action={<button type='button'>Help</button>}
+            action={<Button type='button'>Help</Button>}
           />
         }
         main={<div className='p-4'>Main content</div>}
+      />
+    </SidebarProvider>
+  ),
+};
+
+export const RouteOwnedHeader: Story = {
+  render: () => (
+    <SidebarProvider>
+      <AppShellFrame
+        sidebar={<Sidebar collapsible='offcanvas'>Jovie</Sidebar>}
+        main={<Button type='button'>Route header action</Button>}
+      />
+    </SidebarProvider>
+  ),
+};
+
+export const SettingsHeaderAlignment: Story = {
+  render: () => (
+    <SidebarProvider>
+      <AppShellFrame
+        sidebar={<Sidebar collapsible='offcanvas'>Jovie</Sidebar>}
+        main={
+          <SettingsLayout>
+            <SettingsSection
+              id='account'
+              title='Account'
+              description='Security, theme, and notifications.'
+              headerAction={<Button type='button'>Save</Button>}
+            >
+              <p>Account settings</p>
+            </SettingsSection>
+          </SettingsLayout>
+        }
       />
     </SidebarProvider>
   ),

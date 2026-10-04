@@ -365,6 +365,7 @@ export function validateAssuranceMatrix(matrix, { repoRoot = REPO_ROOT } = {}) {
   }
   for (const id of uncoveredObjects(matrix))
     errors.push(`coverage:uncovered-object:${id}`);
+  validateUiAssurance(matrix, repoRoot, errors);
   return errors;
 }
 
@@ -435,5 +436,280 @@ export function assuranceMatrixReceipt(matrix, { repoRoot = REPO_ROOT } = {}) {
     findings: matrixFindings(matrix, asOfMs),
     blindSpots: blindSpotsByFailureClass(matrix, asOfMs),
     uncoveredObjects: uncoveredObjects(matrix),
+    ui: uiAssuranceReport(matrix),
   };
+}
+
+// JOV-7713: UI assurance. The ten UI failure classes are ordinary matrix rows
+// whose `ui` block records judgment, detectors with their real enforcement
+// point, required exact-build evidence and blind spots. The denominator is the
+// `ui-inventory` objects, each bound to an existing registry export; the
+// escape corpus replays founder-caught UI escapes. A missing class is UNKNOWN,
+// never green, and a detector that is scheduled, manual, advisory or not wired
+// is reported as false-green risk rather than counted as protection.
+
+export const UI_FAILURE_CLASSES = Object.freeze([
+  'ui-primitive-integrity',
+  'ui-layout-geometry',
+  'ui-surface-elevation',
+  'ui-motion',
+  'ui-interaction-state-machine',
+  'ui-state-completeness',
+  'ui-accessibility',
+  'ui-responsive-platform-parity',
+  'ui-content-robustness',
+  'ui-visual-taste',
+]);
+export const UI_BLOCKING_ENFORCEMENT = Object.freeze([
+  'pr-blocking',
+  'merge-group-blocking',
+  'path-selected-blocking',
+]);
+const UI_ENFORCEMENT = new Set([
+  ...UI_BLOCKING_ENFORCEMENT,
+  'scheduled',
+  'manual',
+  'advisory',
+  'not-wired',
+]);
+const UI_JUDGMENTS = new Set(['deterministic', 'mixed', 'taste']);
+const UI_SEVERITIES = new Set(['high', 'medium', 'low']);
+const UI_EVIDENCE_TARGETS = new Set([
+  'web-desktop',
+  'web-mobile',
+  'macos-electron',
+  'ios',
+]);
+const UI_LIVE_STATUSES = new Set(['green', 'red', 'unknown']);
+const UI_ESCAPE_ID = /^ESC-UI-[0-9]{3}$/;
+const UI_SOURCE = /^([^#]+)#([A-Za-z_$][\w$]*)$/;
+
+const isUiRow = row => UI_FAILURE_CLASSES.includes(row?.failureClass);
+const repoPathExists = (repoRoot, ref) =>
+  hasText(ref) && existsSync(resolve(repoRoot, ref));
+
+function validateUiInventory(matrix, repoRoot, errors) {
+  for (const item of matrix?.scope?.requiredObjects ?? []) {
+    if (item?.kind !== 'ui-inventory') continue;
+    const match = UI_SOURCE.exec(item.source ?? '');
+    if (!match) {
+      errors.push(`ui-inventory:${item.id}:source-required`);
+      continue;
+    }
+    const [, path, exportName] = match;
+    if (!repoPathExists(repoRoot, path)) {
+      errors.push(`ui-inventory:${item.id}:source-missing:${path}`);
+      continue;
+    }
+    const exported = new RegExp(`export const ${exportName}\\b`);
+    if (!exported.test(readFileSync(resolve(repoRoot, path), 'utf8')))
+      errors.push(`ui-inventory:${item.id}:export-missing:${exportName}`);
+  }
+}
+
+function validateUiRow(row, uiObjects, repoRoot, errors) {
+  const where = `ui:${row.id}`;
+  const ui = row.ui;
+  if (!isObject(ui)) {
+    errors.push(`${where}:block-required`);
+    return;
+  }
+  if (UI_FAILURE_CLASSES[ui.class - 1] !== row.failureClass)
+    errors.push(`${where}:class-mismatch`);
+  if (!UI_JUDGMENTS.has(ui.judgment)) errors.push(`${where}:judgment`);
+  if (!UI_SEVERITIES.has(ui.severity)) errors.push(`${where}:severity`);
+  if (!hasText(ui.remediationOwner))
+    errors.push(`${where}:remediationOwner-required`);
+  for (const id of row.covers ?? [])
+    if (!uiObjects.has(id)) errors.push(`${where}:covers-non-ui-object:${id}`);
+  for (const ref of ui.authority ?? [])
+    if (!repoPathExists(repoRoot, ref))
+      errors.push(`${where}:authority-missing:${ref}`);
+  const targets = ui.requiredEvidence;
+  if (!Array.isArray(targets) || targets.length === 0)
+    errors.push(`${where}:requiredEvidence-required`);
+  else
+    for (const target of targets)
+      if (!UI_EVIDENCE_TARGETS.has(target))
+        errors.push(`${where}:requiredEvidence-unknown:${target}`);
+  for (const evidence of ui.exactBuildEvidence ?? []) {
+    if (!UI_EVIDENCE_TARGETS.has(evidence?.target) || !hasText(evidence.ref))
+      errors.push(`${where}:exactBuildEvidence-incomplete`);
+    if (!Number.isFinite(Date.parse(evidence?.observedAt ?? '')))
+      errors.push(`${where}:exactBuildEvidence-observedAt`);
+  }
+  if (!Array.isArray(ui.detectors)) errors.push(`${where}:detectors-required`);
+  for (const detector of ui.detectors ?? []) {
+    const id = `${where}:detector:${detector?.ref}`;
+    if (!repoPathExists(repoRoot, detector?.ref))
+      errors.push(`${id}:ref-missing`);
+    if (!UI_ENFORCEMENT.has(detector?.enforcement))
+      errors.push(`${id}:enforcement`);
+    if (
+      detector?.deliberateRed !== undefined &&
+      !repoPathExists(repoRoot, detector.deliberateRed)
+    )
+      errors.push(`${id}:deliberateRed-missing`);
+    if (
+      detector?.liveStatus !== undefined &&
+      !UI_LIVE_STATUSES.has(detector.liveStatus)
+    )
+      errors.push(`${id}:liveStatus`);
+    for (const inventory of detector?.inventory ?? [])
+      if (!uiObjects.has(inventory))
+        errors.push(`${id}:inventory-unknown:${inventory}`);
+  }
+}
+
+function validateUiAssurance(matrix, repoRoot, errors) {
+  validateUiInventory(matrix, repoRoot, errors);
+  const uiObjects = new Set(
+    (matrix?.scope?.requiredObjects ?? [])
+      .filter(item => item?.kind === 'ui-inventory')
+      .map(item => item.id)
+  );
+  const uiRows = (matrix?.rows ?? []).filter(isUiRow);
+  // Every class needs exactly one owning row: a missing class would only
+  // report UNKNOWN, and two rows would split ownership.
+  for (const failureClass of UI_FAILURE_CLASSES) {
+    const count = uiRows.filter(
+      row => row.failureClass === failureClass
+    ).length;
+    if (count === 0) errors.push(`ui:class:${failureClass}:missing-row`);
+    if (count > 1) errors.push(`ui:class:${failureClass}:duplicate-row`);
+  }
+  for (const row of uiRows) validateUiRow(row, uiObjects, repoRoot, errors);
+  const rowIds = new Set(uiRows.map(row => row.id));
+  const seen = new Set();
+  for (const entry of matrix?.uiEscapeCorpus ?? []) {
+    const where = `ui-escape:${entry?.id}`;
+    if (!UI_ESCAPE_ID.test(entry?.id ?? '') || seen.has(entry.id))
+      errors.push(`${where}:id`);
+    seen.add(entry?.id);
+    if (!hasText(entry?.summary) || !hasText(entry?.issue))
+      errors.push(`${where}:incomplete`);
+    if (!rowIds.has(entry?.row)) errors.push(`${where}:row-unknown`);
+    if (typeof entry?.caught !== 'boolean') errors.push(`${where}:caught`);
+    if (
+      entry?.fixture !== undefined &&
+      !repoPathExists(repoRoot, entry.fixture)
+    )
+      errors.push(`${where}:fixture-missing`);
+    if (entry?.caught === true && entry?.fixture === undefined)
+      errors.push(`${where}:caught-requires-fixture`);
+  }
+}
+
+function freshExactBuildTargets(ui, asOfMs, maxAgeMs) {
+  const fresh = new Set();
+  for (const evidence of ui?.exactBuildEvidence ?? []) {
+    const observed = Date.parse(evidence?.observedAt ?? '');
+    if (
+      Number.isFinite(observed) &&
+      observed <= asOfMs &&
+      asOfMs - observed <= maxAgeMs
+    )
+      fresh.add(evidence.target);
+  }
+  return fresh;
+}
+
+/**
+ * Per-class UI verdict. GREEN needs a certifiable row, at least one blocking
+ * detector, deliberate red on every blocking detector, no red live lane, every
+ * escape caught and fresh exact-build evidence for every required target.
+ * UNKNOWN covers missing rows and rows whose only gaps are unknown layers.
+ */
+export function uiAssuranceReport(matrix) {
+  const asOfMs = Date.parse(matrix?.asOf ?? '');
+  const maxAgeMs = matrix?.evidenceMaxAgeMs;
+  const escapes = matrix?.uiEscapeCorpus ?? [];
+  const classes = UI_FAILURE_CLASSES.map(failureClass => {
+    const row = (matrix?.rows ?? []).find(
+      item => item.failureClass === failureClass
+    );
+    if (!row)
+      return {
+        failureClass,
+        row: null,
+        status: 'UNKNOWN',
+        reasons: ['no-row'],
+      };
+    const reasons = [...rowCertification(row, asOfMs).reasons];
+    const detectors = row.ui?.detectors ?? [];
+    const falseGreenRisks = [];
+    for (const detector of detectors) {
+      const blocking = UI_BLOCKING_ENFORCEMENT.includes(detector.enforcement);
+      if (!blocking)
+        falseGreenRisks.push(`${detector.ref}:${detector.enforcement}`);
+      else if (!detector.deliberateRed)
+        falseGreenRisks.push(`${detector.ref}:blocking-without-deliberate-red`);
+      if (detector.liveStatus === 'red')
+        falseGreenRisks.push(`${detector.ref}:live-red`);
+    }
+    if (!detectors.some(d => UI_BLOCKING_ENFORCEMENT.includes(d.enforcement)))
+      reasons.push('no-blocking-detector');
+    if (falseGreenRisks.length > 0) reasons.push('false-green-risk');
+    const uncaught = escapes
+      .filter(entry => entry.row === row.id && entry.caught !== true)
+      .map(entry => entry.id);
+    if (uncaught.length > 0) reasons.push('uncaught-escapes');
+    const fresh = freshExactBuildTargets(row.ui, asOfMs, maxAgeMs);
+    const missingEvidence = (row.ui?.requiredEvidence ?? []).filter(
+      target => !fresh.has(target)
+    );
+    if (missingEvidence.length > 0) reasons.push('exact-build-evidence-stale');
+    const onlyUnknown = reasons.every(reason => reason.endsWith(':unknown'));
+    return {
+      failureClass,
+      row: row.id,
+      judgment: row.ui?.judgment ?? null,
+      status: reasons.length === 0 ? 'GREEN' : onlyUnknown ? 'UNKNOWN' : 'RED',
+      reasons,
+      falseGreenRisks,
+      uncaughtEscapes: uncaught,
+      missingEvidence,
+      remediationOwner: row.ui?.remediationOwner ?? null,
+    };
+  });
+  const count = status => classes.filter(item => item.status === status).length;
+  return {
+    totals: {
+      green: count('GREEN'),
+      red: count('RED'),
+      unknown: count('UNKNOWN'),
+    },
+    escapes: {
+      total: escapes.length,
+      caught: escapes.filter(entry => entry.caught === true).length,
+    },
+    classes,
+  };
+}
+
+/**
+ * Exact-build UI evidence a merged change owes before Done (JOV-7694 hook):
+ * every UI row the changed paths invalidate, with its required targets.
+ */
+export function uiEvidenceRequirements(matrix, changedPaths = []) {
+  const hits = new Set(invalidatedRows(matrix, changedPaths));
+  return (matrix?.rows ?? [])
+    .filter(row => isUiRow(row) && hits.has(row.id))
+    .map(row => {
+      const targets = [...(row.ui?.requiredEvidence ?? [])];
+      return {
+        row: row.id,
+        failureClass: row.failureClass,
+        targets,
+        reason: `${row.failureClass} invalidated; exact-build evidence required on ${targets.join(', ')}`,
+      };
+    });
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const matrix = readAssuranceMatrix();
+  const report = process.argv.includes('--ui')
+    ? uiAssuranceReport(matrix)
+    : assuranceMatrixReceipt(matrix);
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }

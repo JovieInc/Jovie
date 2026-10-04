@@ -32,7 +32,7 @@ const GATE_RECEIPTS = {
   },
   'cross-product': {
     tests:
-      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test',
+      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test',
     artifact: 'cross-product shared-contract gate receipt',
   },
 };
@@ -86,6 +86,12 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'shared-contract',
     PRODUCT_LANES,
     /^packages\/auth-routing\//,
+  ],
+  [
+    'shared-release-channel',
+    'shared-contract',
+    PRODUCT_LANES,
+    /^packages\/release-channel-contracts\//,
   ],
   [
     // Lockfile-only churn (every dependabot group) changes the JS install

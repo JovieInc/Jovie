@@ -27,6 +27,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/lib/linear-sync-on-merge.mjs
+            scripts/lib/escaped-defect-closure.mjs
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
