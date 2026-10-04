@@ -99,6 +99,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
+                  "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -729,6 +730,23 @@ def provider_may_run(provider: str, kind: str) -> bool:
     return not (provider in IMPLEMENTATION_ONLY_PROVIDERS and kind in REVIEW_ONLY_KINDS)
 
 
+# JOV-7759: the design loop for UI issues. The brief is in the issue (design gate);
+# the lane plans, builds, then iterates privately on the machine gate stack. Tim
+# sees only the finished design, as an Ovie taste card filed after landing.
+DESIGN_LOOP_CONTRACT = [
+    "- Design loop (UI issue). Plan from the design brief in the issue (steps 1-9), then",
+    "  build the real thing with canonical tokens and components only. Before the PR,",
+    "  iterate privately until every applicable gate is green on your final diff:",
+    "  `pnpm design:conformance:gate` (includes the frontend-skill machine checks),",
+    "  `pnpm invariants:check`, and `pnpm copy:check --diff-base origin/main <changed files>`.",
+    "  If `scripts/funnel-judge` exists and you touched a funnel surface, run it and",
+    "  keep iterating until it passes.",
+    "- Do not ask for human review or post screenshots for approval: the harness files",
+    "  the founder taste card after landing. List each changed screen and state in the",
+    "  handoff so the card shows the right surfaces.",
+]
+
+
 def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | None = None) -> str:
     sensitive_contract = []
     if provider in IMPLEMENTATION_ONLY_PROVIDERS:
@@ -737,6 +755,8 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
             "  (`gh pr review`, `gh api .../reviews`, inline review threads). Reviewers are",
             "  CI, sentry and sonar; fix what they report instead of reviewing others' PRs.",
         ]
+    if design_gate.is_design_gated(issue):
+        sensitive_contract += DESIGN_LOOP_CONTRACT
     if issue_is_sensitive(issue):
         sensitive_contract += [
             "- Guarded sensitive-surface run: keep the reviewable diff at or below 500 lines and",
@@ -4672,8 +4692,12 @@ def remove_worktree(host: Host, worktree: Path) -> None:
         record_worktree_disposition(host, worktree, "preserved", "unpublished-work")
         preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-unpublished-work"]})
         return
-    record_worktree_disposition(host, worktree, "removed")
-    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+    # Proven clean and published: hand it to the next run installed, instead of spending
+    # minutes deleting ~230k node_modules files (JOV-7723).
+    slot = worktree_pool.recycle(host.repo, worktree)
+    record_worktree_disposition(host, worktree, "recycled" if slot else "removed", slot)
+    if not slot:
+        sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
 
 
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:

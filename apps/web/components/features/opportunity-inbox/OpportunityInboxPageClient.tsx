@@ -1,6 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -522,6 +524,11 @@ export function OpportunityInboxPageClient({
           className='system-b-opportunity-inbox-page'
           data-testid='opportunity-inbox-content'
         >
+          <div className='flex min-h-7 justify-end'>
+            <Button asChild size='sm' variant='tertiary'>
+              <Link href={APP_ROUTES.JOVIE_WORK}>Jovie Did This</Link>
+            </Button>
+          </div>
           <InboxRuntimeNotification />
           {pendingTourDates.length > 0 ? (
             <section

@@ -1,3 +1,10 @@
+/**
+ * Consensus over juror verdicts that real reviewers supplied. This module
+ * never invents verdicts: the old fixed-findings juror (JOV-7759) returned
+ * the same two findings for every surface and was deleted as fake signal.
+ * Factory pages get real cross-family vision review in
+ * scripts/marketing-factory/visual-review.ts.
+ */
 import type {
   DesignTasteConsensusFinding,
   DesignTasteJurorFinding,
@@ -5,24 +12,6 @@ import type {
   DesignTasteJuryConsensus,
   DesignTasteJuryDisposition,
 } from './types';
-
-export const DESIGN_TASTE_JUROR_PROFILES = [
-  {
-    id: 'system-b-lead',
-    modelLabel: 'System B lead',
-    weight: 1.2,
-  },
-  {
-    id: 'product-density',
-    modelLabel: 'Product density reviewer',
-    weight: 1,
-  },
-  {
-    id: 'marketing-restraint',
-    modelLabel: 'Marketing restraint reviewer',
-    weight: 1,
-  },
-] as const;
 
 interface AggregatedFinding {
   readonly id: string;
@@ -125,30 +114,4 @@ export function classifyFindingDisposition(
   }
 
   return finding.disposition === 'ship' ? 'ship' : 'taste';
-}
-
-export function buildDeterministicJurorVerdicts(params: {
-  readonly surfaceId: string;
-}): readonly DesignTasteJurorVerdict[] {
-  const objectiveFinding: DesignTasteJurorFinding = {
-    id: `${params.surfaceId}-contrast-hierarchy`,
-    summary: 'Heading/body contrast fails WCAG on muted helper copy.',
-    disposition: 'ship',
-    rank: 1,
-    objective: true,
-  };
-
-  const tasteFinding: DesignTasteJurorFinding = {
-    id: `${params.surfaceId}-consumer-tone`,
-    summary: 'Accent rotation feels consumer-facing; prefer Raycast depth.',
-    disposition: 'taste',
-    rank: 2,
-    objective: false,
-  };
-
-  return DESIGN_TASTE_JUROR_PROFILES.map(profile => ({
-    jurorId: profile.id,
-    modelLabel: profile.modelLabel,
-    findings: [objectiveFinding, tasteFinding],
-  }));
 }
