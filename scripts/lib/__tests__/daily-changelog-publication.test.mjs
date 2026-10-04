@@ -522,13 +522,17 @@ describe('publication transport', () => {
         )
       );
     const job = workflow.jobs['publish-customer-changelog'];
+    const publishStep = job.steps.find(
+      step => step.name === 'Prepare the one customer-notes release PR'
+    );
     expect(job.needs).toEqual(['authorize-production', 'production-verified']);
     expect(job.if).toContain("outputs.verified == 'true'");
-    expect(
-      job.steps.find(
-        step => step.name === 'Prepare the one customer-notes release PR'
-      ).run
-    ).not.toContain('gh pr merge');
+    expect(publishStep.run).not.toContain('gh pr merge');
+    expect(publishStep.run).not.toContain('gh pr list');
+    expect(publishStep.run).toContain('gh api --paginate --slurp');
+    expect(publishStep.run).toContain(
+      'repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100'
+    );
     expect(workflow.jobs['coalesce-production'].steps.at(-1).run).toContain(
       'exact SHA stayed current through the bounded coalescing window'
     );

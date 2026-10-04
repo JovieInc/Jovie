@@ -48,12 +48,12 @@ Tim's product default is **22:00–07:00 America/Los_Angeles**. This is a fallba
       category: 'product',
       subject: 'New feature available',
       text: 'Try the new dashboard filters.',
-      channels: ['email', 'sms', 'in_app'],
+      channels: ['email', 'sms', 'push'],
     },
     { creatorProfileId, email, phone }
   );
 
-  // When user dismisses the in-app notification:
+  // When user dismisses the notification:
   await dismissNotification(`dashboard-alert-${userId}`, { creatorProfileId });
   ```
 
@@ -64,13 +64,13 @@ Two channel types live in `apps/web/types/notifications.ts`. They look similar b
 | Type | Values | Purpose | Where it lives |
 | --- | --- | --- | --- |
 | `NotificationChannel` | `'sms' \| 'email'` | Fan-facing subscription enum. What a fan picks on a public profile and what's persisted in the DB (`notification_subscriptions.channel`, `notification_contacts.*Status`). | Subscribe/unsubscribe API, fan preference UI, validation schemas |
-| `NotificationDeliveryChannel` | `'email' \| 'sms' \| 'push' \| 'in_app'` | App-wide outbound dispatch enum. The transports `sendNotification()` can target. Superset of `NotificationChannel`. | `service.ts`, notification preferences, dispatch results |
+| `NotificationDeliveryChannel` | `'email' \| 'sms' \| 'push'` | App-wide outbound dispatch enum. The transports `sendNotification()` can target. Superset of `NotificationChannel`. | `service.ts`, notification preferences, dispatch results |
 
 Rules:
 
 - `sendNotification()` only accepts `NotificationDeliveryChannel`. SMS dispatch goes through it directly — there is no shadow type or bypass path.
-- DB-facing fan subscription code (subscribe API, fan UI) uses `NotificationChannel` because fans cannot pick `push` or `in_app`.
-- When converting between the two, the safe direction is `NotificationChannel → NotificationDeliveryChannel` (widening). Do not narrow `NotificationDeliveryChannel` to `NotificationChannel` without explicitly handling `push`/`in_app`.
+- DB-facing fan subscription code (subscribe API, fan UI) uses `NotificationChannel` because fans cannot pick `push`.
+- When converting between the two, the safe direction is `NotificationChannel → NotificationDeliveryChannel` (widening). Do not narrow `NotificationDeliveryChannel` to `NotificationChannel` without explicitly handling `push`.
 
 ## When to Use Toasts vs Console Logging
 

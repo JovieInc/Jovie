@@ -212,7 +212,10 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
     numbers = sorted({int(target.split("-")[1]) for target in in_flight if target.startswith("JOV-")})
     try:
         client = lane.Linear(env_file)
-        data = client.gql(
+        token = lane._cache_token("-".join(str(number) for number in numbers) or "idle")
+
+        def fetch():
+            return client.gql(
             'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
             'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier priority labels{nodes{name}}}}'
@@ -220,6 +223,8 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
                '{nodes{identifier title state{name}}}' if numbers else '')
             + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
+
+        data = lane.shared(f"claim-hud-linear-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
     pool = Counter()

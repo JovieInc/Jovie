@@ -26,6 +26,7 @@
       "!apps/web/typecheck-stories-baseline.json",
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
+      "!scripts/public-benchmark/receipts",
       "!docs/design-system/drift-ledger.json",
       "!packages/action-contracts/generated/**",
       "!**/*.a11y-red.tsx",
