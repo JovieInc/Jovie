@@ -27,6 +27,7 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopReleaseIdentity } from '@/components/organisms/DesktopTitlebar';
+import { SHELL_RAIL_STAGE } from '@/components/shell/rail-motion';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
@@ -650,7 +651,7 @@ export function UserButton({
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         <div
           data-user-button-loading-copy
-          className='flex-1 group-data-[collapsible=icon]:hidden'
+          className={cn('flex-1', SHELL_RAIL_STAGE)}
         >
           <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         </div>
@@ -712,7 +713,7 @@ export function UserButton({
         />
         <div
           data-user-button-display-name
-          className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'
+          className={cn('min-w-0 flex-1', SHELL_RAIL_STAGE)}
         >
           <p
             title={displayName}

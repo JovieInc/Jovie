@@ -36,6 +36,54 @@
       "rule": "arbitrary-value",
       "value": "fnv1a-[0-9a-f]",
       "reason": "JOV-5905: zod regex for the documented FNV-1a query-hash fallback, not a Tailwind arbitrary value. No canonical design token applies."
+    },
+    {
+      "file": "apps/web/components/shell/rail-motion.ts",
+      "rule": "arbitrary-value",
+      "value": "group-data-[collapsible=icon]",
+      "reason": "JOV-4522: shared rail-collapse state variant for the sidebar's collapsible=icon data attribute; the same selector was already used inline across shell components. No canonical design token applies."
+    },
+    {
+      "file": "apps/web/components/shell/rail-motion.ts",
+      "rule": "arbitrary-value",
+      "value": "transition-[flex-basis,width,opacity,transform]",
+      "reason": "JOV-4522: canonical rail allocation transition property set, consolidated verbatim from inline classes in AppShellFrame/UnifiedSidebar; duration and easing stay on duration-cinematic/ease-cinematic tokens. No canonical design token covers the property list."
+    },
+    {
+      "file": "apps/web/components/shell/rail-motion.ts",
+      "rule": "arbitrary-value",
+      "value": "transition-[flex-basis,width]",
+      "reason": "JOV-4522: canonical main-plane transition property set, consolidated verbatim from inline classes in AppShellFrame; duration and easing stay on duration-cinematic/ease-cinematic tokens. No canonical design token covers the property list."
+    },
+    {
+      "file": "apps/web/components/shell/rail-motion.ts",
+      "rule": "arbitrary-value",
+      "value": "transition-[gap,padding]",
+      "reason": "JOV-4522: canonical frame gap transition property set, consolidated verbatim from the inline class in AppShellFrame; duration and easing stay on duration-cinematic/ease-cinematic tokens. No canonical design token covers the property list."
+    },
+    {
+      "file": "apps/web/components/shell/rail-motion.ts",
+      "rule": "arbitrary-value",
+      "value": "transition-[max-height,margin,opacity,transform]",
+      "reason": "JOV-4522: staged exit for block-level rail labels (height + margin + fade + travel). New shared primitive; no canonical design token covers the property list."
+    },
+    {
+      "file": "apps/web/components/shell/rail-motion.ts",
+      "rule": "arbitrary-value",
+      "value": "transition-[max-width,opacity,transform]",
+      "reason": "JOV-4522: staged exit for rail labels and chrome (max-width collapse + fade + travel). New shared primitive; no canonical design token covers the property list."
+    },
+    {
+      "file": "apps/web/components/shell/rail-motion.ts",
+      "rule": "arbitrary-value",
+      "value": "transition-[opacity,transform]",
+      "reason": "JOV-4522: staged exit for labels lifted out of collapsed single-column grids. New shared primitive; no canonical design token covers the property list."
+    },
+    {
+      "file": "apps/web/components/organisms/sidebar/menu.tsx",
+      "rule": "arbitrary-value",
+      "value": "transition-[max-width,opacity,transform]",
+      "reason": "JOV-4522: menu-button label variant stages the last span on the same max-width/opacity/travel contract as SHELL_RAIL_LABEL; the descendant selector must live in the cva variant, so the shared constant cannot be composed here. No canonical design token covers the property list."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."

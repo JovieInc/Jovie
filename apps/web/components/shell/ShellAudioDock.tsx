@@ -48,6 +48,7 @@ export function ShellAudioDock({
     <div
       data-testid='shell-audio-dock'
       data-shell-audio-dock='true'
+      data-shell-rail-motion='dock'
       data-state={open ? 'open' : 'closed'}
       aria-hidden={!open}
       inert={!open || undefined}

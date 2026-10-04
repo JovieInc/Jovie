@@ -395,8 +395,11 @@ describe('DashboardNav', () => {
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
+    // JOV-4522: the search/inbox pill stages out (max-height + opacity +
+    // travel) rather than popping to display:none at frame one.
     expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
-      'group-data-[collapsible=icon]:hidden'
+      'group-data-[collapsible=icon]:max-h-0',
+      'group-data-[collapsible=icon]:opacity-0'
     );
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,

@@ -11,7 +11,7 @@
  * additional wiring.
  */
 
-import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
+import { APP_ROUTES } from '@/constants/routes';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
 import type { AppFlagName } from '@/lib/flags/contracts';
@@ -241,7 +241,7 @@ export const COMMANDS: readonly Command[] = [
     'generateReleasePitch',
     'Generate pitch',
     'Draft a destination-aware release pitch in chat.',
-    'Music',
+    'Megaphone',
     [{ kind: 'release', required: true }]
   ),
   skill(
@@ -277,9 +277,9 @@ export const COMMANDS: readonly Command[] = [
   ),
   nav(
     'go-presence',
-    'Presence',
-    'Monitor public pages and search visibility.',
-    'Waypoints',
+    'Identity',
+    'Monitor your identity, public pages, and search presence.',
+    'User',
     APP_ROUTES.PRESENCE,
     'PROFILES_WORKSPACE'
   ),
@@ -300,9 +300,9 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-releases',
     'Releases',
-    'Open your work catalog.',
-    'Music',
-    buildLibraryViewRoute('releases')
+    'Manage your release catalog and smart links.',
+    'Layers',
+    APP_ROUTES.RELEASES
   ),
   nav(
     'go-youtube',
