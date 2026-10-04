@@ -279,7 +279,13 @@ function expectArtistProfileSectionOrder(flags: ArtistProfileSectionFlags) {
 async function renderArtistProfileLandingPage(
   flags: ArtistProfileSectionFlags
 ) {
-  render(<ArtistProfileLandingPage copy={ARTIST_PROFILE_COPY} flags={flags} />);
+  render(
+    <ArtistProfileLandingPage
+      copy={ARTIST_PROFILE_COPY}
+      flags={flags}
+      logoPlacement={{ page: '/artist-profiles' }}
+    />
+  );
 }
 
 describe('ArtistProfilesPage', () => {

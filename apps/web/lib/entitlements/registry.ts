@@ -300,9 +300,6 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'AI assistant (250 messages/week)',
         'Unlimited AI pitch generation',
         'Stripe Connect payouts',
-        'Email campaigns',
-        'API access',
-        'Webhooks',
         'AI merch creation',
         'Unlimited chat file uploads',
       ],
@@ -500,7 +497,6 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       },
       { name: 'Contact export', free: false, pro: true, max: true },
       { name: 'Fan CRM', free: false, pro: true, max: true },
-      { name: 'Email campaigns', free: false, pro: false, max: true },
       {
         name: 'Automated follow-ups',
         free: false,
@@ -549,8 +545,6 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
     features: [
       { name: 'Email support', free: true, pro: true, max: true },
       { name: 'Priority support', free: false, pro: true, max: true },
-      { name: 'API access', free: false, pro: false, max: true },
-      { name: 'Webhooks', free: false, pro: false, max: true },
     ],
   },
 ] as const;
