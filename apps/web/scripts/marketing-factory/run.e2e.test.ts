@@ -271,7 +271,7 @@ describe('factory:run copy directions', () => {
 
     expect(manifest.status).toBe('complete');
     expect(seen).toEqual([1, 2, 3]);
-    const copy = record('05-copy.attempt-1.json');
+    const copy = record('09-copy.attempt-1.json');
     const directions = copy.notes.directions as {
       direction: number;
       passed: boolean;
@@ -317,7 +317,7 @@ describe('factory:run visual rework', () => {
       },
     ]);
     // The owning stage reran with the judge's findings as its feedback.
-    expect(record('05-copy.rework-1.attempt-1.json').feedbackIn).toContain(
+    expect(record('09-copy.rework-1.attempt-1.json').feedbackIn).toContain(
       REJECTION
     );
     const first = record('13-render.attempt-1.json').receipt.outputDigest;
