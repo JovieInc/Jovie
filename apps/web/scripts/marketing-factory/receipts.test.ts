@@ -237,7 +237,9 @@ describe('verifyFactoryRun', () => {
     )!;
     const source = factoryStageSourceDigest('proof', brief);
     const revisedProofs = PROOF_REGISTRY.map(item =>
-      item.id === proof.id
+      item.id === proof.id &&
+      item.kind === 'product-proof' &&
+      item.artifact.kind === 'screenshot-scenario'
         ? {
             ...item,
             artifact: { ...item.artifact, capturedAt: '2026-10-01' },
