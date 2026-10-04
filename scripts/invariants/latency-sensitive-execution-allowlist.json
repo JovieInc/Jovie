@@ -10,9 +10,6 @@
     "apps/desktop/src/tray.ts": {
       "deflateSync": 1
     },
-    "apps/web/app/api/health/build-info/route.ts": {
-      "readFileSync": 1
-    },
     "apps/web/components/features/home/RecentlyShippedSection.tsx": {
       "existsSync": 1,
       "readFileSync": 1

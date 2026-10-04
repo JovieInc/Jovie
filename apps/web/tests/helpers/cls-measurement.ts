@@ -37,6 +37,81 @@ export function shouldSkipClsInDevMode(): boolean {
   return !process.env.CI;
 }
 
+/** One buffered layout shift with the elements that moved. */
+export interface LayoutShiftRecord {
+  readonly startTime: number;
+  readonly value: number;
+  readonly sources: readonly string[];
+}
+
+export interface BufferedLayoutShifts {
+  readonly cls: number;
+  readonly shifts: readonly LayoutShiftRecord[];
+}
+
+/**
+ * Measure buffered CLS after navigation settles, keeping per-shift source
+ * attribution so a budget failure names the elements that moved.
+ * Give pending shifts time to report before disconnecting the observer.
+ */
+export async function measureBufferedLayoutShifts(
+  page: Page,
+  settleMs = 1000
+): Promise<BufferedLayoutShifts> {
+  return page.evaluate(async (timeoutMs: number) => {
+    interface ShiftSource {
+      readonly node?: Node | null;
+      readonly previousRect: DOMRectReadOnly;
+      readonly currentRect: DOMRectReadOnly;
+    }
+    interface ShiftEntry extends PerformanceEntry {
+      readonly value: number;
+      readonly hadRecentInput?: boolean;
+      readonly sources?: readonly ShiftSource[];
+    }
+    const describeNode = (node: Node | null | undefined): string => {
+      if (!(node instanceof Element)) return node?.nodeName ?? '(removed)';
+      const testId = node.getAttribute('data-testid');
+      const className = (node.getAttribute('class') ?? '').trim().slice(0, 60);
+      return [
+        node.tagName.toLowerCase(),
+        node.id ? `#${node.id}` : '',
+        testId ? `[data-testid=${testId}]` : '',
+        className ? `.${className.replaceAll(/\s+/g, '.')}` : '',
+      ].join('');
+    };
+    const describeRect = (rect: DOMRectReadOnly): string =>
+      `${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}x${Math.round(rect.height)}`;
+
+    return new Promise(resolve => {
+      const shifts: LayoutShiftRecord[] = [];
+      const observer = new PerformanceObserver(list => {
+        for (const entry of list.getEntries() as ShiftEntry[]) {
+          if (typeof entry.value !== 'number' || entry.hadRecentInput) {
+            continue;
+          }
+          shifts.push({
+            startTime: Math.round(entry.startTime),
+            value: entry.value,
+            sources: (entry.sources ?? []).map(
+              source =>
+                `${describeNode(source.node)} ${describeRect(source.previousRect)} -> ${describeRect(source.currentRect)}`
+            ),
+          });
+        }
+      });
+      observer.observe({ type: 'layout-shift', buffered: true });
+      globalThis.setTimeout(() => {
+        observer.disconnect();
+        resolve({
+          cls: shifts.reduce((sum, shift) => sum + shift.value, 0),
+          shifts,
+        });
+      }, timeoutMs);
+    });
+  }, settleMs);
+}
+
 /**
  * Measure buffered CLS after navigation settles.
  * Give pending shifts time to report before disconnecting the observer.
@@ -45,27 +120,27 @@ export async function measureBufferedCls(
   page: Page,
   settleMs = 1000
 ): Promise<number> {
-  return page.evaluate(async (timeoutMs: number) => {
-    return new Promise<number>(resolve => {
-      let cls = 0;
-      const observer = new PerformanceObserver(list => {
-        cls += list
-          .getEntries()
-          .filter(
-            (entry): entry is LayoutShiftEntry =>
-              'value' in entry &&
-              typeof (entry as LayoutShiftEntry).value === 'number' &&
-              !(entry as LayoutShiftEntry).hadRecentInput
-          )
-          .reduce((sum, entry) => sum + entry.value, 0);
-      });
-      observer.observe({ type: 'layout-shift', buffered: true });
-      globalThis.setTimeout(() => {
-        observer.disconnect();
-        resolve(cls);
-      }, timeoutMs);
-    });
-  }, settleMs);
+  return (await measureBufferedLayoutShifts(page, settleMs)).cls;
+}
+
+/** Largest shifts first, for a CLS budget failure message. */
+export function formatLayoutShiftAttribution(
+  shifts: readonly LayoutShiftRecord[],
+  limit = 5
+): string {
+  if (shifts.length === 0) return 'no layout-shift entries';
+  return [...shifts]
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit)
+    .map(
+      shift =>
+        `${shift.value.toFixed(4)} @${shift.startTime}ms: ${
+          shift.sources.length > 0
+            ? shift.sources.join('; ')
+            : '(no source attribution)'
+        }`
+    )
+    .join('\n');
 }
 
 /** Install a fresh non-buffered CLS observer for an upcoming interaction. */

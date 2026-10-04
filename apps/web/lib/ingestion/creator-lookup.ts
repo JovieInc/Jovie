@@ -68,13 +68,33 @@ const STRATEGIES: readonly CreatorLookupStrategy[] = [
   },
 ];
 
+export interface ValidatedCreatorSource {
+  readonly platform: CreatorLookupPlatform;
+  /** Canonical source URL the extraction strategy reads. */
+  readonly sourceUrl: string;
+}
+
+/** Canonical source for a supported creator URL, or null when unsupported. */
+export function validateCreatorUrl(
+  inputUrl: string
+): ValidatedCreatorSource | null {
+  for (const strategy of STRATEGIES) {
+    const sourceUrl = strategy.validate(inputUrl);
+    if (sourceUrl) return { platform: strategy.platform, sourceUrl };
+  }
+  return null;
+}
+
 /** Read public creator fields without creating or modifying a Jovie profile. */
 export async function lookupCreator(
   inputUrl: string
 ): Promise<CreatorLookupResult | null> {
+  const validated = validateCreatorUrl(inputUrl);
+  if (!validated) return null;
+
   for (const strategy of STRATEGIES) {
-    const sourceUrl = strategy.validate(inputUrl);
-    if (!sourceUrl) continue;
+    if (strategy.platform !== validated.platform) continue;
+    const sourceUrl = validated.sourceUrl;
 
     const extracted = await strategy.extract(sourceUrl);
     if (

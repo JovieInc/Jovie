@@ -183,6 +183,21 @@ describe('library data', () => {
     expect(assets[0]?.approvalStatus).toBe('approved');
   });
 
+  it('credits an uncredited release to the profile owner, not Unknown Artist', () => {
+    const [owned] = buildLibraryReleaseAssets(
+      [buildRelease({ artistNames: [] })],
+      undefined,
+      undefined,
+      'Tim White'
+    );
+    const [orphan] = buildLibraryReleaseAssets([
+      buildRelease({ artistNames: [] }),
+    ]);
+
+    expect(owned?.artist).toBe('Tim White');
+    expect(orphan?.artist).toBe('Unknown Artist');
+  });
+
   it('applies profile visibility independently from approval status', () => {
     const assets = buildLibraryReleaseAssets(
       [buildRelease()],
