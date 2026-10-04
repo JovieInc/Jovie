@@ -702,4 +702,51 @@ describe('MusicBrainz Provider', () => {
       barcode: '123456789012',
     });
   });
+
+  it('rejects a null artist ID even when redirect validation also returns no identity', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      Object.defineProperties(
+        Response.json({ id: null, name: 'Untrusted artist' }),
+        {
+          redirected: { value: true },
+          url: { value: 'https://example.com/untrusted' },
+        }
+      )
+    );
+    await expect(getMusicBrainzArtist(TIM_ID)).rejects.toMatchObject({
+      errorCode: 'INVALID_RESPONSE',
+    });
+  });
+
+  it('rejects a null release ID even when redirect validation also returns no identity', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({
+          releases: [
+            {
+              id: TIM_ID,
+              barcode: '123456789012',
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        Object.defineProperties(
+          Response.json({
+            id: null,
+            title: 'Untrusted release',
+            barcode: '123456789012',
+          }),
+          {
+            redirected: { value: true },
+            url: { value: 'https://example.com/untrusted' },
+          }
+        )
+      );
+    await expect(
+      lookupMusicBrainzReleaseByBarcode('123456789012')
+    ).rejects.toMatchObject({
+      errorCode: 'INVALID_RESPONSE',
+    });
+  });
 });

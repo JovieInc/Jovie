@@ -210,10 +210,8 @@ export async function getMusicBrainzArtist(
         }
       );
     });
-    if (
-      artist.id !== musicBrainzResponseId(response, normalizedId, 'artist') ||
-      !artist.name?.trim()
-    ) {
+    const responseId = musicBrainzResponseId(response, normalizedId, 'artist');
+    if (!responseId || artist.id !== responseId || !artist.name?.trim()) {
       throw new MusicBrainzError(
         'Mismatched artist response',
         502,
@@ -460,9 +458,14 @@ export async function lookupMusicBrainzReleaseByBarcode(
       }
     )
   );
+  const responseId = musicBrainzResponseId(
+    detailResponse,
+    releaseId,
+    'release'
+  );
   if (
-    release.id !==
-      musicBrainzResponseId(detailResponse, releaseId, 'release') ||
+    !responseId ||
+    release.id !== responseId ||
     release.barcode?.replace(/\D/g, '') !== digits
   ) {
     throw new MusicBrainzError(
