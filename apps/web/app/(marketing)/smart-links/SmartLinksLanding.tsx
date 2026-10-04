@@ -105,7 +105,7 @@ export function SmartLinksLanding({
           <MarketingContainer width='page'>
             <h2
               id='make-jovie-link'
-              className='text-balance text-3xl font-semibold tracking-tight sm:text-4xl'
+              className='text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
             >
               {SMART_LINK_MAKER_COPY.heading}
             </h2>
