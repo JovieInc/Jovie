@@ -257,6 +257,21 @@ test('qualified source remains eligible with unavailable Symphony, unbound produ
   ].map(context => ({ context, state: 'failure' }));
   assert.equal(evaluateSourceAdmission(input).allowed, true);
 });
+test('source admission rejects unmapped product paths before native queue intake', () => {
+  for (const filename of [
+    'packages/undeclared/index.ts',
+    'packages/branding/index.ts',
+  ]) {
+    const input = fixture();
+    input.files = [{ filename }];
+    assert.deepEqual(evaluateSourceAdmission(input).blockers, [
+      'unmapped-product-paths',
+    ]);
+  }
+  const input = fixture();
+  input.files = [{ filename: 'packages/brand/dist/geometry.json' }];
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+});
 test('native closing instructions in conditional or negated prose block admission', () => {
   for (const body of [
     'Related to JOV-7300.\n\nVerify runtime before closing JOV-7300.',

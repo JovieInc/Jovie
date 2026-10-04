@@ -136,6 +136,21 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('selects the web product lane for brand construction sources', () => {
+    const receipt = classifyProductLanes([
+      'packages/brand/font/construction.py',
+      'packages/brand/dist/geometry.json',
+      'packages/brand/svg/jovie-mark-ink.svg',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    expect(() => classifyProductLanes(['packages/branding/index.ts'])).toThrow(
+      ProductLaneClassificationError
+    );
+  });
+
   it('selects the web contract lane for release communications extraction', () => {
     const receipt = classifyProductLanes([
       'packages/release-communications/index.ts',
