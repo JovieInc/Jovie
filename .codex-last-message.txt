@@ -1,0 +1,12 @@
+JOV-4398 is already fixed; no code change or PR was created.
+
+- Root cause: `profile_edit_version` existed in a branch schema but not its target database.
+- Fix landed in [migration 0083](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T112836Z-JOV-4398-codex-827e86/apps/web/drizzle/migrations/0083_first_molly_hayes.sql:1) with a [regression test](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T112836Z-JOV-4398-codex-827e86/apps/web/tests/unit/db/creator-profile-edit-version-index.test.ts:20) through [PR #14851](https://github.com/JovieInc/Jovie/pull/14851).
+- Test passed: 2/2.
+- PR checks passed, including Migration Guard, `ci-fast`, PR Ready, and SonarCloud.
+- Exact fix commit `8efb611b…` passed landed-production smoke, authenticated smoke, and Lighthouse.
+- Current deployed descendant `b645e20c…` passed production migration/schema verification, Sentry gating, public smoke, and authenticated smoke.
+- Direct production SQL was unavailable because this lane lacked a Doppler token; hosted production DB verification supplied the schema evidence instead.
+- Worktree remains clean. No Biome run, commit, push, or draft PR was appropriate because there are no changed files.
+
+NOT-SHIPPABLE: already fixed and deployed by PR #14851; a new PR would duplicate the existing migration and regression coverage.
