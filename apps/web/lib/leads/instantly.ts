@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { OutboundCopy } from '@/lib/outbound/approval';
+import type { OutboundCopy } from '@/lib/outbound/types';
 import { isInstantlyOutboundEnabled } from './outbound-gates';
 import { pipelineError, pipelineLog } from './pipeline-logger';
 
