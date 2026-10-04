@@ -1,4 +1,5 @@
 import type { ExtractionResult } from '@/lib/ingestion/types';
+import { ExtractionError } from './strategies/base';
 import {
   extractInstagram,
   fetchInstagramDocument,
@@ -76,6 +77,18 @@ export async function lookupCreator(
     if (!sourceUrl) continue;
 
     const extracted = await strategy.extract(sourceUrl);
+    if (
+      !extracted.displayName &&
+      !extracted.bio &&
+      !extracted.avatarUrl &&
+      extracted.links.length === 0
+    ) {
+      // Agents trust a 200; an empty one would read as a real, blank creator.
+      throw new ExtractionError(
+        `${strategy.platform} served no public profile data`,
+        'EMPTY_RESPONSE'
+      );
+    }
     return {
       platform: strategy.platform,
       sourceUrl,

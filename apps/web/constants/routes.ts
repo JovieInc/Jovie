@@ -47,6 +47,8 @@ export const APP_ROUTES = {
   CALENDAR: '/app/calendar',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
+  /** Private Money overview — individual financial owner only (JOV-4618). */
+  MONEY: '/app/money',
   LIBRARY: '/app/library',
   /** Canonical user-facing smart-link workspace (JOV-7160). */
   LINKS: '/app/links',

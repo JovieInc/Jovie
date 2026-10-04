@@ -268,6 +268,18 @@ verify presence, not the price's actual Stripe amount, currency, or active statu
 Verify those in Stripe and exercise checkout on the deployed build separately;
 a passing unit test or startup check is not live billing proof.
 
+### `VISIBILITY_AUDIT_PAYMENT_LINK_URL`
+
+Optional public Stripe Payment Link (`https://buy.stripe.com/...`) for the
+one-off Digital Footprint & Visibility Audit. The price is $199 and is credited
+toward the first month of Artist Visibility Pro. This is not a secret and it is
+not a Stripe price or product ID — do not create Stripe objects for it in app
+code.
+
+The pricing-page CTA stays hidden unless this value is a `buy.stripe.com`
+Payment Link **and** the `VISIBILITY_AUDIT_OFFER` flag is on. The flag defaults
+off. Leave the variable unset until the Payment Link exists.
+
 ### Legacy Pro price IDs
 
 `STRIPE_PRICE_PRO_MONTHLY` retains the old $39 monthly subscription mapping.

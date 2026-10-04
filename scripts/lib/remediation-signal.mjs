@@ -1,10 +1,13 @@
 import {
+  findLinearLabelId,
   noteFingerprintedIssueGreen,
   remediationKey,
   upsertLinearIssueByTitleFingerprint,
 } from './linear-issue-intake.mjs';
 
 export const GREEN_MARKER = '<!-- remediation-green -->';
+/** Lanes claim only this label, so a red signal must carry it to get worked. */
+export const AGENT_READY_LABEL = 'agent-ready';
 
 const LOGIN_RE = /auth\.setup|authenticate|sign-?in|login/i;
 const TIMEOUT_RE = /timedout|timed\s*out|timeout/i;
@@ -55,7 +58,12 @@ export function loginTimeoutHits(report) {
 }
 
 export function textHasLoginTimeout(text) {
-  const lines = String(text ?? '').split('\n');
+  // Dev-server route logs (`[WebServer] GET /signin 200`) are not login
+  // evidence but interleave with unrelated test timeouts; drop them so the
+  // sliding window can't pair a route hit with a stray `Timeout:` line.
+  const lines = String(text ?? '')
+    .split('\n')
+    .filter(line => !line.includes('[WebServer]'));
   for (let i = 0; i < lines.length; i += 1) {
     const window = lines.slice(i, i + 12).join('\n');
     if (LOGIN_RE.test(window) && TIMEOUT_RE.test(window)) return true;
@@ -76,8 +84,10 @@ export function decideLoginSignal({
   if (conclusion === 'success') {
     return { action: 'green', fingerprints: ['e2e-login-timeout'] };
   }
+  // Cancelled runs are superseded by the concurrency group's newer run, which
+  // files its own signal; shutdown-induced timeouts are not login evidence.
   if (
-    (conclusion === 'failure' || conclusion === 'cancelled') &&
+    conclusion === 'failure' &&
     isLoginTimeout({ text: evidenceText, report })
   ) {
     const hits = loginTimeoutHits(report);
@@ -157,12 +167,17 @@ export async function fileRemediationSignal({
   apiKey,
   fetchImpl,
 }) {
+  // A missing ready label must not drop the P0 itself.
+  const ready = apiKey
+    ? await findLinearLabelId({ name: AGENT_READY_LABEL, apiKey, fetchImpl })
+    : { ok: false };
   return upsertLinearIssueByTitleFingerprint({
     fingerprint,
     title: remediationTitle(fingerprint),
     description: describeRemediation({ fingerprint, source, runUrl, detail }),
     priority: 1,
     createStateName: 'Todo',
+    keepLabelIds: ready.ok && ready.id ? [ready.id] : [],
     reopenTerminal: true,
     apiKey,
     fetchImpl,

@@ -1,0 +1,44 @@
+{
+  "objectClassName": "domain",
+  "ldhName": "jovie.dev",
+  "status": ["client transfer prohibited"],
+  "events": [
+    {
+      "eventAction": "registration",
+      "eventActor": "name",
+      "eventDate": "2026-03-18T23:45:37.622Z"
+    },
+    {
+      "eventAction": "expiration",
+      "eventDate": "2027-03-18T23:45:37.622Z"
+    },
+    {
+      "eventAction": "last update of RDAP database",
+      "eventDate": "2026-10-04T01:12:54.351Z"
+    },
+    {
+      "eventAction": "last changed",
+      "eventDate": "2026-04-24T23:16:33.479Z"
+    }
+  ],
+  "nameservers": [
+    {
+      "objectClassName": "nameserver",
+      "ldhName": "ns1.vercel-dns.com"
+    },
+    {
+      "objectClassName": "nameserver",
+      "ldhName": "ns2.vercel-dns.com"
+    }
+  ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "roles": ["registrar"],
+      "vcardArray": [
+        "vcard",
+        [["version", {}, "text", "4.0"], ["fn", {}, "text", "Name.com, Inc."]]
+      ]
+    }
+  ]
+}

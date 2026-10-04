@@ -335,11 +335,22 @@ def robots_allowed(url: str, cache: dict, fetch=fetch_url) -> bool:
 
 
 def gbrain_put(slug: str, title: str, body: str, run=subprocess.run) -> tuple[bool, str | None]:
+    """Same contract as reason_lane.write_gbrain (JOV-7715): page on stdin (Gem's wrapper
+    ignores `--content`), and stored only when a read-back contains the page's last line."""
+    tail = next((" ".join(line.split()) for line in reversed(body.splitlines()) if line.strip()), "")
     try:
-        result = run(["gbrain", "put", slug, "--content", body], capture_output=True, text=True, timeout=120)
-    except (OSError, subprocess.SubprocessError) as error:
+        run(["gbrain", "put", slug], input=body, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        pass
+    except OSError as error:
         return False, f"{type(error).__name__}: {error}"
-    return (True, None) if result.returncode == 0 else (False, (result.stderr or result.stdout or "gbrain put failed")[-300:])
+    try:
+        stored = run(["gbrain", "get", slug], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as error:
+        return False, f"read-back {type(error).__name__}: {error}"
+    if stored.returncode == 0 and tail and tail in " ".join((stored.stdout or "").split()):
+        return True, None
+    return False, "gbrain read-back missing page body"
 
 
 def read_state(path: Path) -> dict:

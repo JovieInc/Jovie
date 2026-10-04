@@ -108,6 +108,12 @@ final class AppState {
     case completed(NativeSessionOwnership)
   }
   private var reconciliation: Reconciliation?
+  var reconciliationTask: Task<Void, Never>? {
+    switch reconciliation {
+    case let .profile(_, task), let .terminal(_, _, _, task): task
+    case .completed(_), nil: nil
+    }
+  }
   private struct AcceptedPresentation {
     let owner: NativeSessionOwnership
     let userID: String
@@ -450,6 +456,57 @@ final class AppState {
     case .waitlistPending:
       route = .waitlistPending
       dashboardState = .loaded(response)
+    }
+  }
+
+  /// The form supplies the identity it displayed, never a replacement login.
+  /// nil means no current form error, not proof that a profile became ready.
+  func completeProfile(
+    displayName: String, username: String, for userID: String,
+    ifOwnedBy owner: NativeSessionOwnership, using client: any ProfileCompleting
+  ) async -> String? {
+    func acceptsCompletion() -> Bool {
+      guard !Task.isCancelled else { return false }
+      var accepted = false
+      NativeSessionTokenStore.performProfileMutation(ownedBy: owner) {
+        accepted = activeUserID == userID && activeSessionOwnership == owner && !isTerminalOwner(owner)
+      }
+      return accepted
+    }
+    guard route == .needsOnboarding, acceptsCompletion() else { return nil }
+    do {
+      try await client.completeProfile(
+        displayName: displayName, username: username, for: userID, ifOwnedBy: owner
+      )
+      guard acceptsCompletion() else { return nil }
+      let context = ProfileLoadContext(ownership: owner, canContinue: {
+        NativeSessionTokenStore.canContinueProfileLoad(ownedBy: owner)
+      }, performMutation: { NativeSessionTokenStore.performProfileMutation(ownedBy: owner, $0) })
+      let attempt = ProfileLoadAttempt(userID: userID, context: context)
+      var work: (task: Task<Void, Never>, retired: Task<Void, Never>?)?
+      _ = context.mutate {
+        guard activeUserID == userID, activeSessionOwnership == owner, !isTerminalOwner(owner) else { return }
+        // Force a new post-POST /me; a preexisting load may contain the old profile.
+        work = installProfileLoad(attempt)
+      }
+      work?.retired?.cancel()
+      guard let work else { return nil }
+      await work.task.value
+      guard acceptsCompletion() else { return nil }
+      if case let .loaded(response) = dashboardState, !isOffline,
+         response.state == .ready || response.state == .waitlistPending {
+        return nil
+      }
+      return "Your profile was saved, but the app couldn't refresh it. Try again."
+    } catch let NativeSessionRequestError.expired(receipt) {
+      // An issued receipt remains deliverable after caller cancellation.
+      await handleExpiredSession(receipt)
+      return nil
+    } catch {
+      guard !(error is CancellationError),
+            (error as? NativeSessionRequestError) != .superseded,
+            acceptsCompletion() else { return nil }
+      return error.localizedDescription
     }
   }
 
