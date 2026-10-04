@@ -18,6 +18,92 @@ import {
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
+test('trusted UI admission rejects hover-only affordances even when the head lacks the checker', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const step = workflow.jobs.deterministic.steps.find(
+    step => step.name === 'Validate UI interaction source from trusted base'
+  );
+  assert.ok(step, 'UI source rules must run before queue admission');
+  assert.equal(
+    step.if,
+    undefined,
+    'metadata reuse must not skip current UI policy'
+  );
+  const root = mkdtempSync(join(tmpdir(), 'source-ui-bootstrap-'));
+  const repo = join(root, 'repo');
+  const runner = join(root, 'runner');
+  mkdirSync(join(repo, 'scripts'), { recursive: true });
+  mkdirSync(join(repo, 'apps/web/components'), { recursive: true });
+  mkdirSync(runner);
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const component = join(repo, 'apps/web/components/EvidenceLink.tsx');
+  try {
+    writeFileSync(
+      join(repo, 'scripts/design-frontend-skill-check.mjs'),
+      readFileSync('scripts/design-frontend-skill-check.mjs')
+    );
+    writeFileSync(component, 'export const EvidenceLink = () => <span />;\n');
+    git('init', '--quiet', '--initial-branch=source-head');
+    git('config', 'user.name', 'Source UI guard test');
+    git('config', 'user.email', 'source-ui-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'trusted UI policy');
+    git('branch', 'main');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    rmSync(join(repo, 'scripts'), { recursive: true });
+    writeFileSync(
+      component,
+      "export const EvidenceLink = () => <span className='opacity-0 group-hover:opacity-100' />;\n"
+    );
+    git('add', '--all');
+    git('commit', '--quiet', '-m', 'old head with hover-only evidence');
+    const invoke = () =>
+      spawnSync('/bin/bash', ['-c', step.run], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          BASE_BRANCH: 'main',
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          RUNNER_TEMP: runner,
+        },
+      });
+    const rejected = invoke();
+    assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
+    assert.match(rejected.stdout + rejected.stderr, /FS-006/);
+    writeFileSync(
+      component,
+      "export const EvidenceLink = () => <span className='opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100' />;\n"
+    );
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'make evidence keyboard discoverable');
+    const accepted = invoke();
+    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+    assert.match(accepted.stdout, /0 error\(s\)/);
+    const stale = spawnSync('/bin/bash', ['-c', step.run], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        BASE_BRANCH: 'main',
+        EXPECTED_HEAD: '0'.repeat(40),
+        RUNNER_TEMP: runner,
+      },
+    });
+    assert.notEqual(
+      stale.status,
+      0,
+      'a head mismatch must fail before policy execution'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('source and size checks wake when the PR base or contract text is edited', () => {
   for (const file of ['source-validation.yml', 'pr-size-guard.yml']) {
     const workflow = load(readFileSync(`.github/workflows/${file}`, 'utf8'));

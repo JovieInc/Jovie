@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ColumnDef, RowSelectionState } from '@/lib/tanstack-table';
@@ -19,8 +19,10 @@ const columns: ColumnDef<Row, unknown>[] = [
 
 function ConsumerOwnedSelection({
   onSelection,
+  provideSelectionState = true,
 }: {
   readonly onSelection: (ids: string[]) => void;
+  readonly provideSelectionState?: boolean;
 }) {
   const [selected, setSelected] = useState<RowSelectionState>({});
   return (
@@ -32,7 +34,7 @@ function ConsumerOwnedSelection({
       enableKeyboardNavigation
       getRowId={row => row.id}
       getRowTestId={row => `row-${row.id}`}
-      rowSelection={selected}
+      rowSelection={provideSelectionState ? selected : undefined}
       onToggleRowSelection={row =>
         setSelected(prev => {
           const next = { ...prev };
@@ -67,26 +69,60 @@ describe('UnifiedTable keyboard selection', () => {
     expect(onSelection).toHaveBeenLastCalledWith([]);
   });
 
-  it('extends a contiguous range with Shift+J and Shift+ArrowUp', () => {
+  it('extends from the focused selected row and preserves selection when reversing', () => {
     const onSelection = vi.fn();
     render(<ConsumerOwnedSelection onSelection={onSelection} />);
 
-    fireEvent.keyDown(screen.getByTestId('row-a'), {
+    act(() => screen.getByTestId('row-a').focus());
+    fireEvent.keyDown(document.activeElement as HTMLElement, {
       key: 'J',
       shiftKey: true,
     });
-    fireEvent.keyDown(screen.getByTestId('row-b'), {
+    expect(screen.getByTestId('row-b')).toHaveFocus();
+    fireEvent.keyDown(document.activeElement as HTMLElement, {
       key: 'J',
       shiftKey: true,
     });
     expect(onSelection).toHaveBeenLastCalledWith(['a', 'b', 'c']);
     expect(screen.getByTestId('row-c')).toHaveFocus();
 
-    fireEvent.keyDown(screen.getByTestId('row-d'), {
+    fireEvent.keyDown(document.activeElement as HTMLElement, {
+      key: 'ArrowDown',
+      shiftKey: true,
+    });
+    expect(screen.getByTestId('row-d')).toHaveFocus();
+    expect(onSelection).toHaveBeenLastCalledWith(['a', 'b', 'c', 'd']);
+    const selectionCalls = onSelection.mock.calls.length;
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, {
       key: 'ArrowUp',
       shiftKey: true,
     });
     expect(onSelection).toHaveBeenLastCalledWith(['a', 'b', 'c', 'd']);
+    expect(onSelection).toHaveBeenCalledTimes(selectionCalls);
+    expect(screen.getByTestId('row-c')).toHaveFocus();
+  });
+
+  it('requires controlled state before extending consumer-owned selection', () => {
+    const onSelection = vi.fn();
+    render(
+      <ConsumerOwnedSelection
+        onSelection={onSelection}
+        provideSelectionState={false}
+      />
+    );
+
+    act(() => screen.getByTestId('row-a').focus());
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'x' });
+    expect(onSelection).toHaveBeenLastCalledWith(['a']);
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, {
+      key: 'J',
+      shiftKey: true,
+    });
+    expect(onSelection).toHaveBeenCalledTimes(1);
+    expect(onSelection).toHaveBeenLastCalledWith(['a']);
+    expect(screen.getByTestId('row-b')).toHaveFocus();
   });
 
   it('toggles TanStack selection when the table owns it', () => {
