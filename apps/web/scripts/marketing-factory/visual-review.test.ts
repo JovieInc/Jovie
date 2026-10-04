@@ -178,7 +178,7 @@ describe('runVisualReview', () => {
       {
         image: captures[0].screenshot.path,
         referenceId: 'raycast-com',
-        window: { left: 0, top: 0, width: 1440, height: 900 },
+        region: { left: 0, top: 0, width: 1440, height: 900 },
         distance: 12,
       },
     ]);

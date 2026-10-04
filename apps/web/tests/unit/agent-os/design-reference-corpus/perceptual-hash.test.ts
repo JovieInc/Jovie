@@ -8,7 +8,7 @@ import {
   computeDHash,
   DEFAULT_MAX_COPY_DISTANCE,
   findRefCopies,
-  foldWindows,
+  foldRegions,
   hammingDistance,
 } from '@/lib/agent-os/design-reference-corpus/perceptual-hash';
 import type { CorpusReferenceRecord } from '@/lib/agent-os/design-reference-corpus/types';
@@ -106,16 +106,16 @@ describe('hammingDistance', () => {
   });
 });
 
-describe('foldWindows', () => {
+describe('foldRegions', () => {
   it('covers a tall page with half-overlapping folds that reach the bottom', () => {
-    const windows = foldWindows(1440, 2000);
-    expect(windows[0]).toEqual({ left: 0, top: 0, width: 1440, height: 900 });
-    expect(windows.at(-1)?.top).toBe(1100);
-    expect(windows.every(window => window.height === 900)).toBe(true);
+    const regions = foldRegions(1440, 2000);
+    expect(regions[0]).toEqual({ left: 0, top: 0, width: 1440, height: 900 });
+    expect(regions.at(-1)?.top).toBe(1100);
+    expect(regions.every(region => region.height === 900)).toBe(true);
   });
 
   it('uses the whole image when it is shorter than a fold', () => {
-    expect(foldWindows(1440, 400)).toEqual([
+    expect(foldRegions(1440, 400)).toEqual([
       { left: 0, top: 0, width: 1440, height: 400 },
     ]);
   });
@@ -145,7 +145,7 @@ describe('findRefCopies', () => {
     });
     expect(matches[0]).toMatchObject({
       referenceId: 'streak-ref',
-      window: { top: 1350 },
+      region: { top: 1350 },
     });
   });
 

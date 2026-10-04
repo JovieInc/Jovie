@@ -4,7 +4,7 @@
  * References are inspiration: generated or hand-built Jovie work may move
  * toward a reference's principles but must never reproduce its pixels. Each
  * reference stores a 256-bit difference hash (dHash) of its captured fold;
- * a candidate is checked fold by fold and fails when any window sits within
+ * a candidate is checked fold by fold and fails when any region sits within
  * `maxDistance` bits of a reference.
  */
 
@@ -78,40 +78,40 @@ export function hammingDistance(left: string, right: string): number {
 }
 
 /**
- * Fold-shaped windows down a full-page capture, overlapping by half a fold,
+ * Fold-shaped regions down a full-page capture, overlapping by half a fold,
  * so a copied hero is caught wherever it sits on the page.
  */
-export function foldWindows(width: number, height: number): ImageRegion[] {
+export function foldRegions(width: number, height: number): ImageRegion[] {
   const foldHeight = Math.min(
     height,
     Math.round(width * REFERENCE_FOLD_ASPECT)
   );
   const step = Math.max(1, Math.round(foldHeight / 2));
-  const windows: ImageRegion[] = [];
+  const regions: ImageRegion[] = [];
   for (let top = 0; top + foldHeight <= height; top += step) {
-    windows.push({ left: 0, top, width, height: foldHeight });
+    regions.push({ left: 0, top, width, height: foldHeight });
   }
-  const last = windows.at(-1);
+  const last = regions.at(-1);
   if (!last || last.top + foldHeight < height) {
-    windows.push({
+    regions.push({
       left: 0,
       top: height - foldHeight,
       width,
       height: foldHeight,
     });
   }
-  return windows;
+  return regions;
 }
 
 export interface RefCopyMatch {
   readonly image: string;
   readonly referenceId: string;
-  readonly window: ImageRegion;
+  readonly region: ImageRegion;
   readonly distance: number;
 }
 
 /**
- * Every (image window, reference) pair closer than `maxDistance`. Rejected
+ * Every (image region, reference) pair closer than `maxDistance`. Rejected
  * and decertified references are still checked: copying a reference Tim
  * rejected is no better than copying one he approved.
  */
@@ -131,12 +131,12 @@ export async function findRefCopies(input: {
   for (const image of input.images) {
     const { width, height } = await sharp(image).metadata();
     if (!width || !height) continue;
-    for (const window of foldWindows(width, height)) {
-      const hash = await computeDHash(image, window);
+    for (const region of foldRegions(width, height)) {
+      const hash = await computeDHash(image, region);
       for (const reference of hashed) {
         const distance = hammingDistance(hash, reference.dhash);
         if (distance <= maxDistance) {
-          matches.push({ image, referenceId: reference.id, window, distance });
+          matches.push({ image, referenceId: reference.id, region, distance });
         }
       }
     }

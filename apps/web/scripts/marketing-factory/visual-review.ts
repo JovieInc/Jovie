@@ -198,7 +198,7 @@ export async function runVisualReview(
         score: 0,
         findings: copies.map(
           copy =>
-            `ref-copy: ${copy.image} at y=${copy.window.top} is ${copy.distance} bits from reference ${copy.referenceId}`
+            `ref-copy: ${copy.image} at y=${copy.region.top} is ${copy.distance} bits from reference ${copy.referenceId}`
         ),
         judges: [],
       };
