@@ -75,6 +75,23 @@ describe('GET /api/agents/creator-lookup', () => {
     expect((await response.json()).error.code).toBe('UNSUPPORTED_URL');
   });
 
+  it.each([
+    ['LOGIN_REQUIRED', 502, 'SOURCE_LOGIN_WALL'],
+    ['EMPTY_RESPONSE', 502, 'SOURCE_EMPTY'],
+    ['SOCIAL_HTML_DISABLED', 422, 'SOURCE_UNSUPPORTED'],
+  ] as const)(
+    'maps %s to a stable %i %s error without paging Sentry',
+    async (code, status, apiCode) => {
+      hoisted.lookup.mockRejectedValue(new ExtractionError('blocked', code));
+      const response = await get('https://www.instagram.com/creator');
+      expect(response.status).toBe(status);
+      const body = await response.json();
+      expect(body.error.code).toBe(apiCode);
+      expect(body.error.message).toContain('YouTube channel URL');
+      expect(hoisted.captureError).not.toHaveBeenCalled();
+    }
+  );
+
   it('fails closed when the durable limiter denies or is unavailable', async () => {
     hoisted.limit.mockResolvedValueOnce({ success: false });
     const limited = await get('https://youtube.com/@creator');

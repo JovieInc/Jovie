@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "5185704c5856833e67430de606dcb0eba86b1a05f7ac655a984cc363c9d54597"
+    "bodySha256": "7f3b0dba3ee3214064fe9d7d78c2374d1de1193497df38338aba883fece617b2"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -39,7 +39,7 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "9b131030c0af79bf2f897eb8c577d868c93b493220a9e9a030f97ecb208c9d1e"
+    "bodySha256": "e2e36de64b575a72b809b2581fa6bde2ed0e92f53b3a9af4851383228b4b70bd"
   },
   {
     "file": ".claude/rules/hermes-air.md",
@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "a6e588e35c0e19a55114b83bbf5284eac0a77958b96d85c5b96cd3082e8fad6d"
+    "bodySha256": "0ff52c7e350e9a503ca57dc606abf864827facfaa55a8fadd1376d3a0ee7190e"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -132,7 +132,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "d245600f007db0c988105dbd46a78564d41af5b842b73ab62215e7fb3c1311e7"
+    "bodySha256": "a157147142eb239b02e83595ee04895dcae9bf6767612fa02b64651d87236c3e"
   },
   {
     "file": ".claude/rules/testing.md",
