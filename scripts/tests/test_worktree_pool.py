@@ -227,6 +227,51 @@ class PoolTest(unittest.TestCase):
         self.assertEqual(marker.read_text(), '{"unpublished": true}')
         self.assertIn("feat/preserved", git(self.repo, "branch", "--list", "feat/preserved"))
 
+    def test_failed_ready_marker_restores_the_finished_checkout(self):
+        path = self.finished("marker-failure")
+        original_touch = Path.touch
+        def fail_ready(marker, *args, **kwargs):
+            if marker.suffix == pool_mod.READY:
+                raise OSError("ready marker unavailable")
+            return original_touch(marker, *args, **kwargs)
+        log = io.StringIO()
+        with patch.object(Path, "touch", fail_ready):
+            self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root, log=log))
+        self.assertEqual((path / "node_modules/dep.js").read_text(), "installed")
+        self.assertTrue(pool_mod.is_clean(path))
+        self.assertIn(str(path), git(self.repo, "worktree", "list", "--porcelain"))
+        self.assertEqual(list(self.pool().glob("slot-*")), [])
+        self.assertIn("feat/marker-failure", git(self.repo, "branch", "--list", "feat/marker-failure"))
+        self.assertIn("not recycled", log.getvalue())
+
+    def test_cli_missing_recycle_path_refuses_without_mutation(self):
+        missing = self.out / "missing"
+        before = git(self.repo, "worktree", "list", "--porcelain")
+        with patch.object(pool_mod, "CACHE_ROOT", self.root), redirect_stdout(io.StringIO()), \
+                patch("sys.stderr", new_callable=io.StringIO) as errors:
+            code = pool_mod.main(["--recycle", str(missing), "--repo", str(self.repo), "--base", "main"])
+        self.assertEqual(code, 1)
+        self.assertIn("missing", errors.getvalue())
+        self.assertFalse(missing.exists())
+        self.assertEqual(git(self.repo, "worktree", "list", "--porcelain"), before)
+        self.assertFalse(self.pool().exists())
+        self.assertFalse(pool_mod.is_clean(missing))
+
+    def test_marker_and_rollback_failures_leave_no_orphan_and_keep_branch(self):
+        path = self.finished("rollback-failure")
+        original_run = pool_mod.run
+        def fail_rollback(args, **kwargs):
+            if args[:3] == ["git", "worktree", "move"] and args[-1] == str(path):
+                raise subprocess.CalledProcessError(1, args)
+            return original_run(args, **kwargs)
+        with patch.object(Path, "touch", side_effect=OSError("marker unavailable")), \
+                patch.object(pool_mod, "run", side_effect=fail_rollback):
+            self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        self.assertEqual(list(self.pool().glob("slot-*")), [])
+        self.assertNotIn(str(path), git(self.repo, "worktree", "list", "--porcelain"))
+        self.assertNotIn(str(self.pool()), git(self.repo, "worktree", "list", "--porcelain"))
+        self.assertIn("feat/rollback-failure", git(self.repo, "branch", "--list", "feat/rollback-failure"))
+
     def test_cli_recycles_removes_or_refuses(self):
         clean, full, dirty = self.finished("clean"), self.finished("full"), self.finished("dirty")
         (dirty / "a.txt").write_text("uncommitted\n")

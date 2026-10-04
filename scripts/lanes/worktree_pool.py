@@ -145,7 +145,10 @@ def branch_exists(repo: Path, branch: str) -> bool:
 
 
 def is_clean(path: Path) -> bool:
-    result = subprocess.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True)
+    try:
+        result = subprocess.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True)
+    except OSError:
+        return False
     return result.returncode == 0 and not result.stdout.strip()
 
 
@@ -206,6 +209,8 @@ def recycle(repo: Path, path: Path, base: str = "origin/main", size: int = POOL_
     volume, a preserved repair, or any uncommitted change. The caller decides whether its
     commits are published; the branch ref itself survives in the repository either way."""
     repo, path = Path(repo), Path(path)
+    moved = False
+    marker = None
     try:
         if not enabled() or not path.is_dir() or (path / PRESERVED_REPAIR).exists() or not is_clean(path):
             return None
@@ -218,11 +223,25 @@ def recycle(repo: Path, path: Path, base: str = "origin/main", size: int = POOL_
             cwd=path, log=log, timeout=900)
         pool.mkdir(parents=True, exist_ok=True)
         run(["git", "worktree", "move", str(path), str(slot)], cwd=repo, log=log, timeout=120)
+        moved = True
+        marker = pool / f"{slot.name}{READY}"
+        marker.touch()
     except (subprocess.SubprocessError, OSError) as error:
+        if moved:
+            try:
+                run(["git", "worktree", "move", str(slot), str(path)], cwd=repo, log=log, timeout=120)
+            except (subprocess.SubprocessError, OSError):
+                # The finished, clean checkout is eligible for normal removal; branch
+                # refs survive. A failed rollback must not leave an unusable pool slot.
+                remove_worktree(repo, slot, log)
+        if marker is not None:
+            try:
+                marker.unlink(missing_ok=True)
+            except OSError:
+                pass  # without a slot directory this marker cannot be consumed
         if log is not None:
             log.write(f"worktree-pool: not recycled: {error}\n")
         return None
-    (pool / f"{slot.name}{READY}").touch()
     return slot.name
 
 
@@ -350,6 +369,9 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(drain(repo)) or "pool empty")
         return 0
     if args.recycle:
+        if not args.recycle.is_dir():
+            print(f"worktree-new: {args.recycle} is missing or not a directory", file=sys.stderr)
+            return 1
         if (args.recycle / PRESERVED_REPAIR).exists():
             print(f"worktree-new: {args.recycle} contains a preserved repair; left in place", file=sys.stderr)
             return 1
@@ -357,6 +379,9 @@ def main(argv: list[str] | None = None) -> int:
         if slot:
             print(f"worktree-new: {args.recycle} recycled into the pool as {slot}")
             return 0
+        if not args.recycle.is_dir():
+            print(f"worktree-new: {args.recycle} is no longer available after recycling failed", file=sys.stderr)
+            return 1
         if not is_clean(args.recycle):
             print(f"worktree-new: {args.recycle} has uncommitted changes; left in place", file=sys.stderr)
             return 1
