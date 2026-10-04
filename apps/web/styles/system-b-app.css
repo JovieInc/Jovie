@@ -3431,17 +3431,20 @@
   color: var(--color-error);
 }
 
-/* Fade scrolled-away thread content under a floating header row instead of
-   hard-clipping at the panel edge (JOV-7192). */
+/* Hide scrolled-away thread content under a floating header row (JOV-7192).
+   The clearance band above the first resting message stays fully clear and
+   only its last --space-4 ramps in, so a half-scrolled bubble dissolves
+   instead of reading as a clipped control. Resting content starts at
+   --space-16 (the scroll region's pt-16) and is never masked. */
 :where(.system-b-chat-thread-top-fade) {
   mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-6),
+    transparent var(--space-12),
     black var(--space-16)
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-6),
+    transparent var(--space-12),
     black var(--space-16)
   );
 }

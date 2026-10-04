@@ -56,7 +56,13 @@ export function useTableKeyboardNav<TData>({
     (event: React.KeyboardEvent, rowIndex: number, rowData: TData) => {
       if (!enabled) return;
 
-      const action = resolveTableNavAction(event.key, event.target);
+      // Shifted letter selection belongs to these rows. Other consumers of
+      // the shared mapper retain their ordinary j/k bindings.
+      const key =
+        event.shiftKey && (event.key === 'J' || event.key === 'K')
+          ? event.key.toLowerCase()
+          : event.key;
+      const action = resolveTableNavAction(key, event.target);
       if (!action) return;
 
       const extend = event.shiftKey ? onExtendSelection : undefined;

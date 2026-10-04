@@ -1,5 +1,6 @@
 import { type AvailableDSP, DSP_CONFIGS, isValidDspUrl } from '@/lib/dsp';
 import { PLATFORM_TO_DSP_MAPPINGS } from '@/lib/dsp-registry';
+import { toGenericPlatformLink } from '@/lib/platform-links';
 
 interface ProfileDspSource {
   readonly spotify_url?: string | null;
@@ -41,7 +42,7 @@ function addDsp(
   const config = DSP_CONFIGS[key];
   if (!config) return;
 
-  dsps.set(key, { key, name: config.name, url, config });
+  dsps.set(key, { key, name: config.name, url, config, platformKey: key });
 }
 
 function mapPlatformToDSPKey(
@@ -159,8 +160,18 @@ export function getCanonicalProfileDSPs(
   );
 
   for (const link of socialLinks) {
+    const url = readString(link.url);
     const key = mapPlatformToDSPKey(link.platform);
-    addDsp(dsps, key ?? '', readString(link.url));
+    if (key) {
+      addDsp(dsps, key, url);
+      continue;
+    }
+    // Not a known DSP — keep the link as a generic platform link
+    // (URL + label) instead of dropping it.
+    const generic = toGenericPlatformLink(link.platform, url);
+    if (generic && !dsps.has(generic.key)) {
+      dsps.set(generic.key, generic);
+    }
   }
 
   return Array.from(dsps.values());

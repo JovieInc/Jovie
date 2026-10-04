@@ -143,7 +143,9 @@ export interface UnifiedTableProps<TData extends RowData> {
   /**
    * Toggles one row's selection from the keyboard (`x`; Shift+J/K extends).
    * Use when selection is consumer-owned (for example `useRowSelection`).
-   * Without it, tables with `onRowSelectionChange` toggle TanStack selection.
+   * Pass that selection back through `rowSelection` so range extension can
+   * preserve selected rows. Without it, only single-row toggling is enabled.
+   * Without this callback, `onRowSelectionChange` uses TanStack selection.
    */
   readonly onToggleRowSelection?: (row: TData, rowIndex: number) => void;
 
@@ -670,6 +672,9 @@ function UnifiedTableContent<TData extends RowData>({
   // Initialize keyboard navigation
   const hasKeyboardSelection =
     Boolean(onToggleRowSelection) || Boolean(onRowSelectionChange);
+  const canExtendKeyboardSelection =
+    hasKeyboardSelection &&
+    (!onToggleRowSelection || rowSelection !== undefined);
   const toggleRowSelection = useCallback(
     (rowIndex: number) => {
       const row = rows[rowIndex];
@@ -702,7 +707,9 @@ function UnifiedTableContent<TData extends RowData>({
     setFocusedIndex,
     onRowClick,
     onToggleSelection: hasKeyboardSelection ? toggleRowSelection : undefined,
-    onExtendSelection: hasKeyboardSelection ? extendRowSelection : undefined,
+    onExtendSelection: canExtendKeyboardSelection
+      ? extendRowSelection
+      : undefined,
   });
 
   // Row lookup map for grouped table mode — rebuilt when rows change

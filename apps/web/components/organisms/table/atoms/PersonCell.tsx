@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React from 'react';
 import { Avatar } from '@/components/molecules/Avatar';
 import { cn } from '../table.styles';
@@ -7,6 +8,7 @@ import { cn } from '../table.styles';
 export interface PersonCellProps {
   /** Name shown in the row; also seeds the fallback initials. */
   readonly name: string;
+  readonly nameHref?: string;
   /** One quiet fact after the name (handle, email, company, role). */
   readonly secondary?: React.ReactNode;
   /** Photo URL. Missing or broken photos fall back to initials. */
@@ -26,6 +28,7 @@ export interface PersonCellProps {
  */
 export const PersonCell = React.memo(function PersonCell({
   name,
+  nameHref,
   secondary,
   avatarUrl,
   verified = false,
@@ -46,7 +49,15 @@ export const PersonCell = React.memo(function PersonCell({
         verified={verified}
       />
       <span className='min-w-0 truncate'>
-        <span className='font-medium text-primary-token'>{name}</span>
+        <span className='font-medium text-primary-token'>
+          {nameHref ? (
+            <Link href={nameHref} onClick={event => event.stopPropagation()}>
+              {name}
+            </Link>
+          ) : (
+            name
+          )}
+        </span>
         {secondary ? (
           <span className='ml-1.5 text-tertiary-token'>{secondary}</span>
         ) : null}

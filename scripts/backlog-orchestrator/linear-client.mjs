@@ -5,11 +5,14 @@
  * No SDK — bare fetch with the team's API key env var.
  */
 
-import { createHash, randomUUID } from 'node:crypto';
 import { setDefaultResultOrder } from 'node:dns';
-import * as fs from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+
+import {
+  canonicalCooldownRoot,
+  credentialBackoff,
+  isRateLimitedBody,
+  legacyCooldownRoots,
+} from '../lib/linear-cooldown.mjs';
 
 // Gem hosts may have an unreachable IPv6 route while IPv4 reaches Linear.
 // Prefer IPv4 so the bounded fetch/retry policy handles application failures,
@@ -371,19 +374,6 @@ const RATE_LIMIT_RESET_HEADERS = [
  * embedded). HTTP 429 is handled before body parsing in the transport.
  * @param {number} status @param {any} data
  */
-function isRateLimitedBody(status, data) {
-  if (status !== 400 && status !== 429) return false;
-  const errors = Array.isArray(data?.errors) ? data.errors : [];
-  return (
-    String(data?.code ?? '').toUpperCase() === 'RATELIMITED' ||
-    errors.some(
-      error =>
-        String(error?.extensions?.code ?? '').toUpperCase() === 'RATELIMITED' ||
-        error?.extensions?.statusCode === 429
-    )
-  );
-}
-
 /** @param {any} raw @param {number} nowMs */
 function parseRetryAfterMs(raw, nowMs) {
   if (typeof raw !== 'string' || raw.trim() === '') return null;
@@ -443,115 +433,27 @@ export function classifyGraphQLErrors(errors) {
   return 'API';
 }
 
-/**
- * Immutable cooldown records compose by maximum deadline. Separate writers never
- * overwrite (or shorten) another writer's reset, and a process restart retains
- * the credential budget. Only hashes and timestamps reach this private store.
- * A fixed runner should retain this directory; it is not an inventory cache.
- * @param {string} key @param {string} root
- */
-function credentialBackoff(key, root) {
-  const scope = createHash('sha256').update(`${API_URL}\0${key}`).digest('hex');
-  const directory = join(root, scope);
-  const stateError = () =>
-    new LinearTransportError(
-      'Linear credential backoff state is unavailable or malformed',
-      {
-        code: 'BACKOFF_STATE_INVALID',
-        attempts: 0,
-        metadata: { retryable: false },
-      }
-    );
-  /** @param {string} path */
-  function privateDirectory(path) {
-    fs.mkdirSync(path, { recursive: true, mode: 0o700 });
-    const stat = fs.lstatSync(path);
-    if (
-      !stat.isDirectory() ||
-      (stat.mode & 0o077) !== 0 ||
-      (process.getuid && stat.uid !== process.getuid())
-    )
-      throw stateError();
-  }
-  /** @param {number} nowMs */
-  function read(nowMs) {
-    try {
-      privateDirectory(root);
-      privateDirectory(directory);
-      const names = fs.readdirSync(directory);
-      if (names.length > 1000) throw stateError();
-      let resetAt = 0;
-      for (const name of names) {
-        // A crashed/in-progress publication is unknown budget state: fail closed.
-        if (name.startsWith('.pending-')) throw stateError();
-        if (!/^\d+-[0-9a-f-]+\.json$/.test(name)) throw stateError();
-        const path = join(directory, name);
-        let record;
-        try {
-          const stat = fs.lstatSync(path);
-          if (
-            !stat.isFile() ||
-            stat.size > 256 ||
-            (stat.mode & 0o077) !== 0 ||
-            (process.getuid && stat.uid !== process.getuid())
-          )
-            throw stateError();
-          record = JSON.parse(fs.readFileSync(path, 'utf8'));
-        } catch (error) {
-          if (/** @type {any} */ (error)?.code === 'ENOENT') continue; // Another reader expired it.
-          throw error;
-        }
-        if (
-          record?.schema !== 1 ||
-          !Number.isSafeInteger(record.resetAt) ||
-          record.resetAt <= 0 ||
-          !name.startsWith(`${record.resetAt}-`)
-        )
-          throw stateError();
-        if (record.resetAt > nowMs) resetAt = Math.max(resetAt, record.resetAt);
-        else {
-          try {
-            fs.unlinkSync(path);
-          } catch (error) {
-            if (/** @type {any} */ (error)?.code !== 'ENOENT') throw error;
-          }
-        }
-      }
-      return resetAt;
-    } catch {
-      throw stateError();
+function backoffFailure(error) {
+  if (error instanceof LinearTransportError) return error;
+  if (error?.code !== 'BACKOFF_STATE_INVALID') throw error;
+  return new LinearTransportError(
+    'Linear credential backoff state is unavailable or malformed',
+    {
+      code: 'BACKOFF_STATE_INVALID',
+      attempts: 0,
+      metadata: { retryable: false },
     }
-  }
-  /** @param {number} resetAt */
-  function publish(resetAt) {
-    const id = randomUUID();
-    const staging = join(directory, `.pending-${id}`);
-    try {
-      if (!Number.isSafeInteger(resetAt) || resetAt <= 0) throw stateError();
-      const fd = fs.openSync(staging, 'wx', 0o600);
-      try {
-        fs.writeFileSync(fd, JSON.stringify({ schema: 1, resetAt }));
-        fs.fsyncSync(fd);
-      } finally {
-        fs.closeSync(fd);
-      }
-      fs.renameSync(staging, join(directory, `${resetAt}-${id}.json`));
-      const dir = fs.openSync(directory, 'r');
-      try {
-        fs.fsyncSync(dir);
-      } finally {
-        fs.closeSync(dir);
-      }
-    } catch {
-      throw stateError();
-    }
-  }
-  return { read, publish };
+  );
 }
 
 /** @param {ReturnType<typeof credentialBackoff>} store @param {number} nowMs */
-function enforceBackoff(store, nowMs) {
-  const resetAt = store.read(nowMs);
+async function enforceBackoff(store, nowMs) {
+  let resetAt = 0;
+  try {
+    resetAt = await store.read(nowMs);
+  } catch (error) {
+    throw backoffFailure(error);
+  }
   if (resetAt > nowMs)
     throw new LinearTransportError('Linear credential budget is cooling down', {
       code: 'RATE_LIMITED',
@@ -583,17 +485,19 @@ export async function graphql(
     rateLimitMaxTotalWaitMs = LINEAR_RATE_LIMIT_MAX_TOTAL_WAIT_MS,
     randomImpl = Math.random,
     nowImpl = Date.now,
-    backoffStateDir = process.env.LINEAR_BACKOFF_STATE_DIR ||
-      join(homedir(), '.local', 'state', 'jovie-linear-backoff'),
+    backoffStateDir = canonicalCooldownRoot(),
   } = {}
 ) {
   const key = requireKey();
-  const backoff = credentialBackoff(key, backoffStateDir);
+  const backoff = credentialBackoff(key, backoffStateDir, {
+    legacyRoots: legacyCooldownRoots(backoffStateDir),
+    strict: true,
+  });
   let lastError;
   let rateLimitAttempts = 0;
   let rateLimitWaitedMs = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    enforceBackoff(backoff, nowImpl());
+    await enforceBackoff(backoff, nowImpl());
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -662,6 +566,15 @@ export async function graphql(
         throw Object.assign(error, { metadata, body: rawBody });
       }
       if (data.errors) {
+        if (isRateLimitedBody(resp?.status ?? 200, data)) {
+          const error = /** @type {any} */ (
+            new Error('Linear API error: rate limited')
+          );
+          error.code = 'RATE_LIMITED';
+          error.rateLimited = true;
+          error.metadata = metadata;
+          throw Object.assign(error, rateLimitHints(resp, nowImpl()));
+        }
         const error = /** @type {any} */ (
           new Error(
             `Linear API error: ${data.errors.map(e => e.message).join('; ')}`
@@ -694,7 +607,11 @@ export async function graphql(
           exponentialMs + jitterMs
         );
         err.resetAt = Math.ceil(nowImpl() + delayMs);
-        backoff.publish(err.resetAt);
+        try {
+          await backoff.publish(err.resetAt);
+        } catch (error) {
+          throw backoffFailure(error);
+        }
         if (
           rateLimitAttempts >= rateLimitMaxAttempts ||
           delayMs > rateLimitMaxTotalWaitMs - rateLimitWaitedMs

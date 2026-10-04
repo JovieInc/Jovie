@@ -4,6 +4,34 @@ import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { AvatarCell } from './AvatarCell';
 
 describe('AvatarCell', () => {
+  it.each([null, ''])(
+    'keeps the profile link without a display name: %s',
+    displayName => {
+      const rowClick = vi.fn();
+      render(
+        <table>
+          <tbody>
+            <tr onClick={rowClick}>
+              <td>
+                <AvatarCell
+                  profileId='creator'
+                  username='artist'
+                  displayName={displayName}
+                  avatarUrl={null}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      );
+      const link = screen.getByRole('link', { name: '@artist' });
+      expect(link).toHaveAttribute('href', '/artist');
+      expect(screen.getAllByText('@artist')).toHaveLength(1);
+      fireEvent.click(link);
+      expect(rowClick).not.toHaveBeenCalled();
+    }
+  );
+
   it('renders the creator name, profile link, and a read-only face on one line', () => {
     const { container } = render(
       <AvatarCell

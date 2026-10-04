@@ -2,7 +2,7 @@ import '@/styles/system-b-app.css';
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import type { ColumnDef } from '@/lib/tanstack-table';
+import type { ColumnDef, RowSelectionState } from '@/lib/tanstack-table';
 import { PersonCell } from '../atoms/PersonCell';
 import { UnifiedTable } from './UnifiedTable';
 
@@ -155,7 +155,7 @@ const peopleColumns: ColumnDef<PersonRow, unknown>[] = [
 ];
 
 function DensePeopleExample() {
-  const [selected, setSelected] = useState<Record<string, boolean>>({
+  const [selected, setSelected] = useState<RowSelectionState>({
     'person-1': true,
   });
   return (
@@ -168,7 +168,12 @@ function DensePeopleExample() {
       getRowId={row => row.id}
       rowSelection={selected}
       onToggleRowSelection={row =>
-        setSelected(previous => ({ ...previous, [row.id]: !previous[row.id] }))
+        setSelected(previous => {
+          const next = { ...previous };
+          if (next[row.id]) delete next[row.id];
+          else next[row.id] = true;
+          return next;
+        })
       }
       onRowClick={() => undefined}
     />

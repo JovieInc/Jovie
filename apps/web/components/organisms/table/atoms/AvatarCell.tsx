@@ -85,6 +85,9 @@ export const AvatarCell = React.memo(function AvatarCell({
   return (
     <PersonCell
       name={displayName || `@${username}`}
+      nameHref={
+        !displayName && !disableUsernameLink ? `/${username}` : undefined
+      }
       secondary={displayName ? handle : null}
       avatarUrl={avatarUrl}
       verified={verified}
