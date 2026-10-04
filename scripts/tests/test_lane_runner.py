@@ -237,6 +237,13 @@ class SelectionTest(unittest.TestCase):
         self.assertIsNone(lane.LANE_BRANCH.match("tim/jov-6544-fix"))
         self.assertIsNone(lane.LANE_BRANCH.match("devin/other-work"))
 
+    def test_every_provider_command_formats_with_the_keys_each_runner_passes(self):
+        # run_issue, run_brief, fix_red_pr and the handoff all pass these keys (claude needs model).
+        values = {"prompt": "p", "prompt_file": "f", "cwd": "c", "provider_receipt": "r", "model": "m"}
+        for name, spec in json.loads((lane.HERE / "providers.json").read_text()).items():
+            if "cmd" in spec:
+                self.assertTrue(lane.template(spec["cmd"], values), name)
+
     def test_recent_failures_back_off_before_retry(self):
         failures = {"JOV-1": {"count": 1, "at": 1000.0}}
         self.assertIsNone(lane.pick_issue([issue("JOV-1")], failures, now=1000.0 + 60))

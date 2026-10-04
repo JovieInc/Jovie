@@ -1814,7 +1814,8 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
         api = runpy.run_path(executable) if executable else None
     except Exception:  # a broken transport is a hold, never a crashed worker
         api = None
-    refresh = (lambda current, now: hyperagent_lane.refresh_proof(current, api["mcp_call"], now)) if api else None
+    mcp_call = api.get("mcp_call") if api else None
+    refresh = (lambda current, now: hyperagent_lane.refresh_proof(current, mcp_call, now)) if callable(mcp_call) else None
     if refresh and not hyperagent_lane.verified(spec, time.time()):
         proof, reason = refresh(spec, time.time())
         spec = {**spec, "verifiedRemote": proof} if proof else spec
@@ -1840,7 +1841,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
             if not claimed["admitted"]:
                 receipt.update(hold(claimed["reason"]))
             else:
-                if api is None:
+                if not callable(mcp_call):
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent")
                 (runs / f"{run_id}.prompt.md").write_text(prompt)
@@ -1860,7 +1861,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                     return adopt_pr(host, "hyperagent", pr)
                 receipt["offer"]["accepted"] = True
                 receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
-                    evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
+                    evidence, mcp_call, find_pr, gate, timeout=host.agent_timeout,
                     before_dispatch=lambda: boundary(1, 1), refresh=refresh))
                 if receipt["verdict"] != "remote-held":
                     result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
@@ -2108,7 +2109,8 @@ def run_brief(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                  "gbrain": brain_context, "branch": "design-brief"})]
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                        "cwd": str(worktree),
-                                                       "provider_receipt": str(runs / f"{run_id}.provider.jsonl")}),
+                                                       "provider_receipt": str(runs / f"{run_id}.provider.jsonl"),
+                                                       "model": str(spec.get("model"))}),
                               worktree, log, host.agent_timeout, guard=lambda: require_disk(host, "brief-running"))
             brief = worktree / design_gate.BRIEF_FILE
             receipt.update(agentExit=agent.returncode, **design_gate.publish_brief(

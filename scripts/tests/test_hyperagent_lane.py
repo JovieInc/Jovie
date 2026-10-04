@@ -417,6 +417,13 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.assertEqual(result["verdict"], "verified-not-queued")
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
+    def test_actual_entry_without_an_mcp_call_holds_instead_of_crashing(self):
+        from unittest.mock import patch
+        with patch("runpy.run_path", return_value={}):
+            result = self.run_entry()
+        self.assertEqual(result["verdict"], "remote-held")
+        self.assertFalse(self.calls)
+
     def test_actual_entry_without_attestation_holds_before_any_remote_call(self):
         self.spec = {"model": self.model, "agentId": "agent-1", "agentName": "GLM 5.3 Developer"}
         result = self.run_entry()
