@@ -11,7 +11,7 @@ import {
 import { ArrowLeft, Copy, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type PropsWithChildren, useCallback, useMemo } from 'react';
+import { Fragment, type PropsWithChildren, useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -144,25 +144,30 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
       className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       {OPERATOR_NAV_SECTIONS.map(section => (
-        <div key={section.label}>
-          <span
-            className={cn(
-              'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-              SHELL_RAIL_BLOCK_LABEL
-            )}
-          >
-            {section.label}
-          </span>
-          <SettingsNavGroup
-            items={section.items}
-            pathname={pathname}
-            isItemActive={item =>
-              isOperatorNavigationHrefActive(pathname, item.href)
-            }
-          />
-        </div>
+        <Fragment key={section.label}>
+          <div>
+            <span
+              className={cn(
+                'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+                SHELL_RAIL_BLOCK_LABEL
+              )}
+            >
+              {section.label}
+            </span>
+            <SettingsNavGroup
+              items={section.items}
+              pathname={pathname}
+              isItemActive={item =>
+                isOperatorNavigationHrefActive(pathname, item.href)
+              }
+            />
+          </div>
+          {/* Founder lists sit between Workspaces and Utilities (Pen Neq0A). */}
+          {section.label === 'Workspaces' ? (
+            <OperatorListsNav pathname={pathname} />
+          ) : null}
+        </Fragment>
       ))}
-      <OperatorListsNav pathname={pathname} />
     </nav>
   );
 }

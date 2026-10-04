@@ -58,6 +58,9 @@ describe('OperatorListsNav', () => {
       'href',
       '/app/ov/lists/views/favorites'
     );
+    expect(screen.getByRole('list', { name: 'Smart Views' })).toContainElement(
+      screen.getByRole('link', { name: 'Favorites' })
+    );
     expect(screen.getByLabelText('12 creators')).toHaveTextContent('12');
     expect(screen.getByLabelText('4 creators')).toHaveTextContent('4');
   });
@@ -80,6 +83,8 @@ describe('OperatorListsNav', () => {
     mocks.data = undefined;
     renderNav();
     expect(screen.queryAllByRole('link')).toHaveLength(0);
+    // No matching smart views: the whole group hides, not just its rows.
+    expect(screen.queryByText('Smart Views')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'New List' })
     ).toBeInTheDocument();

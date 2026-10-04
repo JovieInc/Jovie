@@ -61,6 +61,19 @@ function NavRow({
   );
 }
 
+function GroupLabel({ children }: { readonly children: string }) {
+  return (
+    <span
+      className={cn(
+        'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+        SHELL_RAIL_BLOCK_LABEL
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 function NewListRow() {
   const router = useRouter();
   const create = useCreateOvieListMutation();
@@ -136,38 +149,40 @@ export function OperatorListsNav({ pathname }: { readonly pathname: string }) {
   const smartViews = query.data?.smartViews ?? [];
 
   return (
-    <div data-testid='operator-lists-nav'>
-      <span
-        className={cn(
-          'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-          SHELL_RAIL_BLOCK_LABEL
-        )}
-      >
-        Lists
-      </span>
-      <SidebarMenu aria-label='Lists'>
-        {lists.map(list => (
-          <NavRow
-            key={list.id}
-            href={listHref(list.id)}
-            label={list.name}
-            count={list.count}
-            icon={List}
-            active={pathname === listHref(list.id)}
-          />
-        ))}
-        {smartViews.map(view => (
-          <NavRow
-            key={view.id}
-            href={smartViewHref(view.id)}
-            label={view.name}
-            count={view.count}
-            icon={ListFilter}
-            active={pathname === smartViewHref(view.id)}
-          />
-        ))}
-        <NewListRow />
-      </SidebarMenu>
+    <div data-testid='operator-lists-nav' className='flex flex-col gap-4'>
+      <div>
+        <GroupLabel>Lists</GroupLabel>
+        <SidebarMenu aria-label='Lists'>
+          {lists.map(list => (
+            <NavRow
+              key={list.id}
+              href={listHref(list.id)}
+              label={list.name}
+              count={list.count}
+              icon={List}
+              active={pathname === listHref(list.id)}
+            />
+          ))}
+          <NewListRow />
+        </SidebarMenu>
+      </div>
+      {smartViews.length > 0 ? (
+        <div>
+          <GroupLabel>Smart Views</GroupLabel>
+          <SidebarMenu aria-label='Smart Views'>
+            {smartViews.map(view => (
+              <NavRow
+                key={view.id}
+                href={smartViewHref(view.id)}
+                label={view.name}
+                count={view.count}
+                icon={ListFilter}
+                active={pathname === smartViewHref(view.id)}
+              />
+            ))}
+          </SidebarMenu>
+        </div>
+      ) : null}
     </div>
   );
 }

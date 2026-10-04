@@ -578,9 +578,13 @@ describe('UnifiedSidebar library route', () => {
     const operatorNavigation = screen.getByRole('navigation', {
       name: 'OV Navigation',
     });
-    expect(
-      within(operatorNavigation).getByTestId('operator-lists-nav')
-    ).toBeInTheDocument();
+    const lists = within(operatorNavigation).getByTestId('operator-lists-nav');
+    // Between Workspaces and Utilities, matching Pen STAGING Neq0A.
+    const labels = within(operatorNavigation)
+      .getAllByText(/^(Workspaces|Lists|Utilities)$/)
+      .map(node => node.textContent);
+    expect(labels).toEqual(['Workspaces', 'Lists', 'Utilities']);
+    expect(lists).toBeInTheDocument();
 
     renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });
     expect(screen.getAllByTestId('operator-lists-nav')).toHaveLength(1);
