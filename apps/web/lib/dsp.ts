@@ -1,13 +1,12 @@
 import { geoAwarePopularityIndex } from '@/constants/app';
-import {
-  DSP_CONFIGS,
-  type DSPConfig,
-  PROVIDER_DOMAINS,
-} from '@/lib/dsp-registry';
+import { DSP_CONFIGS, PROVIDER_DOMAINS } from '@/lib/dsp-registry';
+import type { PlatformLink } from '@/lib/platform-links';
+import { toGenericPlatformLink } from '@/lib/platform-links';
 import { Artist, Release } from '@/types/db';
 
 export type { DSPConfig } from '@/lib/dsp-registry';
 export { DSP_CONFIGS } from '@/lib/dsp-registry';
+export type { PlatformLink } from '@/lib/platform-links';
 
 export type DevicePlatform = 'ios' | 'android' | 'desktop';
 
@@ -15,12 +14,8 @@ function buildSpotifyArtistUrl(artistId: string): string {
   return `https://open.spotify.com/artist/${artistId}`;
 }
 
-export interface AvailableDSP {
-  key: string;
-  name: string;
-  url: string;
-  config: DSPConfig;
-}
+/** Kept for existing callers; the link model is the generic `PlatformLink`. */
+export type AvailableDSP = PlatformLink;
 
 /**
  * Validate a DSP URL for a given provider key.
@@ -97,6 +92,12 @@ function addDSP(
 
   const config = DSP_CONFIGS[key];
   if (!config) {
+    // Not a known provider — fall back to a generic platform link
+    // (URL + label) rather than dropping the link entirely.
+    const generic = toGenericPlatformLink(key, url);
+    if (generic && !dsps.some(d => d.key === generic.key)) {
+      dsps.push(generic);
+    }
     return;
   }
 
@@ -105,6 +106,7 @@ function addDSP(
     name: config.name,
     url,
     config,
+    platformKey: key,
   });
 }
 
