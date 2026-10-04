@@ -14,12 +14,12 @@ const meta = {
         <section className='grid h-screen place-items-center'>
           <h2 className='text-4xl font-semibold'>Scroll to reveal</h2>
         </section>
-        <section className='grid h-[60vh] place-items-center'>
+        <section className='grid h-screen place-items-center'>
           <p className='reveal-on-scroll text-3xl font-semibold'>
             First revealed block
           </p>
         </section>
-        <section className='grid h-[60vh] place-items-center'>
+        <section className='grid h-screen place-items-center'>
           <p
             className='reveal-on-scroll text-3xl font-semibold'
             data-delay='160'

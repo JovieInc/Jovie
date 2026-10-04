@@ -13,7 +13,7 @@ const meta: Meta<typeof MarketingAmbientField> = {
   },
   decorators: [
     Story => (
-      <section className='relative grid h-[640px] place-items-center overflow-hidden bg-base text-center text-primary-token'>
+      <section className='relative grid h-screen place-items-center overflow-hidden bg-base text-center text-primary-token'>
         <Story />
         <h2 className='relative text-5xl font-semibold'>
           Be found. Be understood.
