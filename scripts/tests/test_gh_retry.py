@@ -2378,6 +2378,45 @@ class TestExactHeadQueueReceipt:
 
 
 class TestGhRetryHelper:
+    def test_retries_transient_500_then_succeeds(self, tmp_path: Path) -> None:
+        counter = tmp_path / "calls"
+        counter.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                count_file="${GH_RETRY_TEST_COUNTER:?}"
+                count=$(<"$count_file")
+                count=$((count + 1))
+                echo "$count" >"$count_file"
+                if [[ "$count" -lt 2 ]]; then
+                  echo "HTTP 500: Failed to run workflow dispatch" >&2
+                  exit 1
+                fi
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        script = textwrap.dedent(
+            f"""\
+            set -euo pipefail
+            source "{_GH_RETRY}"
+            export PATH="{tmp_path}:$PATH"
+            export GH_RETRY_ATTEMPTS=3
+            export GH_RETRY_BASE_DELAY=0
+            export GH_RETRY_TEST_COUNTER="{counter}"
+            gh_retry workflow run ci.yml --repo JovieInc/Jovie --ref main
+            """
+        )
+        result = _run_bash(script)
+        assert result.returncode == 0, result.stderr
+        assert "gh-retry" in result.stderr
+        assert counter.read_text(encoding="utf-8").strip() == "2"
+
     def test_retries_transient_504_then_succeeds(self, tmp_path: Path) -> None:
         counter = tmp_path / "calls"
         counter.write_text("0", encoding="utf-8")
