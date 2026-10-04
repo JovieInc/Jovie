@@ -16,8 +16,9 @@ claims it by opening the claim URL and verifying ownership.
 npx -y @jovie/cli creator lookup https://www.youtube.com/@creator --json
 \`\`\`
 
-YouTube channel, Instagram profile, TikTok profile, and Linktree URLs are
-supported. The result contains the public display name, bio, avatar URL, and
+YouTube channel URLs are supported. Instagram, TikTok, and Linktree URLs fail
+with \`SOURCE_UNSUPPORTED\` because Jovie does not read those pages from its
+servers; ask for the creator's YouTube channel instead. The result contains the public display name, bio, avatar URL, and
 links the source exposes. This command is read-only and never creates a Jovie
 profile.
 

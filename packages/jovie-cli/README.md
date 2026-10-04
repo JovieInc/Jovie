@@ -25,7 +25,7 @@ automated install. A repository build is not proof that npm has the package.
 
 | Command | Request |
 | --- | --- |
-| `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels, Instagram profiles, TikTok profiles, and Linktree |
+| `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels; Instagram, TikTok, and Linktree return `SOURCE_UNSUPPORTED` |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
