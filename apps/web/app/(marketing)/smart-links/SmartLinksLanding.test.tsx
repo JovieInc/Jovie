@@ -21,7 +21,7 @@ describe('SmartLinksLanding', () => {
       screen.getByRole('link', { name: 'Open the live example' })
     ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');
     expect(
-      screen.getByRole('heading', { name: 'Choose once' })
+      screen.getByRole('heading', { name: 'Choose an app once' })
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
