@@ -204,6 +204,22 @@ jobs:
             --retries=0 \
             -g 'deliberate-red|certifies every marketing route'
 
+      # JOV-7713: per-PR screen audit manifest for the Validating lifecycle
+      # (changed inventory screens, their producer, invalidated UI matrix
+      # rows) plus the audit ledger over this run's route DOM receipts.
+      # Blocking stays with the detectors above; this records what changed.
+      - name: Record screen audit manifest
+        if: always() && steps.route.outcome == 'success'
+        run: |
+          set -euo pipefail
+          node scripts/invariants/screen-audit.mjs --changed "$RUNNER_TEMP/changed-files.txt" \
+            > pr-visual-artifacts/screen-audit-manifest.json
+          if [ -d pr-visual-artifacts/route-dom-certification ]; then
+            node scripts/invariants/screen-audit.mjs --artifacts pr-visual-artifacts/route-dom-certification \
+              --out pr-visual-artifacts/screen-audit.json
+          fi
+          node -e "const m=require('./pr-visual-artifacts/screen-audit-manifest.json');console.log('changed screens:',m.screens.map(s=>s.screenId+' ('+s.producer+')').join(', ')||'none');for(const s of m.screens.filter(s=>s.producer==='none'))console.log('::warning::'+s.screenId+' changed but has no rendered producer; Validating needs a runtime receipt.')"
+
       - name: Stop server
         if: always()
         run: kill "$(cat "$RUNNER_TEMP/pr-visual-server.pid" 2>/dev/null)" 2>/dev/null || true
