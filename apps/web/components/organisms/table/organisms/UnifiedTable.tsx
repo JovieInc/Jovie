@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.column-priority.test.tsx
+// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.sort-provenance.test.tsx
 
 import { Spinner as LoadingSpinner } from '@jovie/ui';
 import React, {
