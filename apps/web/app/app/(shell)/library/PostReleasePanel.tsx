@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
-import { DisclosureRow, InfoPopover } from '@/components/molecules/inspector';
+import { InfoPopover } from '@/components/molecules/inspector';
 import { buildReleaseDownloadsRoute } from '@/constants/routes';
 import { selectFindingsForLibraryAsset } from '@/lib/library/inspector-scope';
 import type {
@@ -22,6 +22,17 @@ const EVIDENCE_LABELS: Record<
   attested: 'Attested',
   observed: 'Observed',
   claimed: 'Claimed',
+};
+
+const EVIDENCE_SOURCE_LABELS: Record<
+  LibraryRightsholderEvidenceView['source'],
+  string
+> = {
+  artist_attestation: 'Artist attestation',
+  songview: 'Songview',
+  mlc: 'MLC',
+  catalog: 'Catalog',
+  other: 'Other source',
 };
 
 function subjectIdsForAsset(asset: LibraryReleaseAsset): ReadonlySet<string> {
@@ -49,6 +60,7 @@ function rightsholdersForAsset(
 
 function releaseIdForAsset(asset: LibraryReleaseAsset): string | null {
   if (asset.linkedReleaseId) return asset.linkedReleaseId;
+  if (asset.itemKind == null || asset.itemKind === 'release') return asset.id;
   return asset.source?.provider === 'discography'
     ? asset.source.canonicalId
     : null;
@@ -148,7 +160,7 @@ function PresenceFindingRow({
         ) : null}
       </div>
       {finding.draftRequest && finding.status === 'drafted' ? (
-        <p className='mt-2 border border-subtle bg-surface-1 p-2 text-xs leading-5 text-secondary-token'>
+        <p className='mt-2 border-l-2 border-subtle pl-2 text-xs leading-5 text-secondary-token'>
           {finding.draftRequest}
         </p>
       ) : null}
@@ -183,10 +195,12 @@ export function PostReleasePanel({
   creatorProfileId,
   bundle,
   disabled,
+  onFindingChange,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly creatorProfileId: string | null;
   readonly bundle: LibraryPostReleaseBundle;
+  readonly onFindingChange?: (finding: LibraryPresenceFindingView) => void;
   readonly disabled: boolean;
 }) {
   const [findings, setFindings] = useState(bundle.findings);
@@ -203,9 +217,10 @@ export function PostReleasePanel({
         : [],
     [bundle.downloads, releaseId]
   );
+  const activeFindings = onFindingChange ? bundle.findings : findings;
   const relevantFindings = useMemo(
-    () => findingsForAsset(asset, findings),
-    [asset, findings]
+    () => findingsForAsset(asset, activeFindings),
+    [asset, activeFindings]
   );
   const openFindingCount = relevantFindings.filter(
     finding => finding.status === 'open'
@@ -223,7 +238,19 @@ export function PostReleasePanel({
       ? `${downloads.length} attested ${downloadFileLabel} live`
       : 'No attested download is live';
 
+  if (
+    downloads.length === 0 &&
+    relevantFindings.length === 0 &&
+    relevantRightsholders.length === 0
+  ) {
+    return null;
+  }
+
   const updateFinding = (next: LibraryPresenceFindingView) => {
+    if (onFindingChange) {
+      onFindingChange(next);
+      return;
+    }
     setFindings(current =>
       current.map(finding => (finding.id === next.id ? next : finding))
     );
@@ -231,106 +258,110 @@ export function PostReleasePanel({
 
   return (
     <div className='space-y-4' data-testid='library-post-release-panel'>
-      <section aria-labelledby='library-downloads-heading'>
-        <div className='flex min-h-8 items-center justify-between gap-3'>
-          <div className='min-w-0'>
-            <div className='flex items-center gap-1'>
-              <h3
-                id='library-downloads-heading'
-                className='text-xs font-semibold text-primary-token'
-              >
-                Downloads
-              </h3>
-              <InfoPopover label='About downloads'>
-                Email gate to file to this content card. Only recordings with
-                explicit full-control attestation can go live.
-              </InfoPopover>
-            </div>
-            <p className='mt-0.5 text-2xs text-tertiary-token'>
-              {downloadsSummary}
-            </p>
-          </div>
-          {releaseId ? (
-            <Button asChild size='sm' variant='secondary'>
-              <Link
-                href={buildReleaseDownloadsRoute(releaseId)}
-                tabIndex={disabled ? -1 : undefined}
-              >
-                {downloads.length > 0 ? 'Manage' : 'Add download'}
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </section>
-
-      <section className='border-t border-subtle pt-3' aria-label='Stats'>
-        <h3 className='text-xs font-semibold text-primary-token'>Stats</h3>
-        <div className='mt-2 grid min-h-14 grid-cols-2 gap-2'>
-          {['DSP', 'Social'].map(label => (
-            <div key={label} className='border border-subtle bg-surface-1 p-2'>
-              <p className='text-2xs text-tertiary-token'>{label}</p>
-              <p className='mt-1 text-xs font-medium text-secondary-token'>
-                Not connected
+      {downloads.length > 0 ? (
+        <section aria-labelledby='library-downloads-heading'>
+          <div className='flex min-h-8 items-center justify-between gap-3'>
+            <div className='min-w-0'>
+              <div className='flex items-center gap-1'>
+                <h3
+                  id='library-downloads-heading'
+                  className='text-xs font-semibold text-primary-token'
+                >
+                  Downloads
+                </h3>
+                <InfoPopover label='About Downloads'>
+                  Email gate to file to this content card. Only recordings with
+                  explicit full-control attestation can go live.
+                </InfoPopover>
+              </div>
+              <p className='mt-0.5 text-2xs text-tertiary-token'>
+                {downloadsSummary}
               </p>
             </div>
-          ))}
-        </div>
-      </section>
+            {releaseId ? (
+              <Button asChild size='sm' variant='secondary'>
+                <Link
+                  href={buildReleaseDownloadsRoute(releaseId)}
+                  tabIndex={disabled ? -1 : undefined}
+                >
+                  Manage
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
-      <section
-        className='border-t border-subtle pt-3'
-        aria-labelledby='library-rightsholders-heading'
-      >
-        <div className='flex items-center gap-1'>
-          <h3
-            id='library-rightsholders-heading'
-            className='text-xs font-semibold text-primary-token'
-          >
-            Rightsholders
-          </h3>
-          <InfoPopover label='About rightsholders'>
-            Songview and MLC are public composition observations, not proof of
-            master ownership. A file or email does not grant rights.
-          </InfoPopover>
-        </div>
-        {relevantRightsholders.length > 0 ? (
-          <div className='mt-2 space-y-1'>
+      {relevantRightsholders.length > 0 ? (
+        <section
+          className='border-t border-subtle pt-3'
+          aria-labelledby='library-rightsholders-heading'
+        >
+          <div className='flex items-center gap-1'>
+            <h3
+              id='library-rightsholders-heading'
+              className='text-xs font-semibold text-primary-token'
+            >
+              Rightsholders
+            </h3>
+            <InfoPopover label='About Rightsholders'>
+              Songview and MLC are public composition observations, not proof of
+              master ownership. A file or email does not grant rights.
+            </InfoPopover>
+          </div>
+          <div className='mt-2 divide-y divide-subtle'>
             {relevantRightsholders.map(evidence => (
-              <DisclosureRow
-                key={evidence.id}
-                label={evidence.partyName}
-                summary={EVIDENCE_LABELS[evidence.evidenceClass]}
-              >
-                <p className='truncate text-2xs text-tertiary-token'>
-                  {evidence.role} · {evidence.domain} · {evidence.source}
+              <div key={evidence.id} className='py-2 first:pt-0 last:pb-0'>
+                <div className='flex items-start justify-between gap-3 text-xs'>
+                  <span className='min-w-0 truncate font-medium text-primary-token'>
+                    {evidence.partyName}
+                  </span>
+                  <span className='shrink-0 text-tertiary-token'>
+                    {EVIDENCE_LABELS[evidence.evidenceClass]}
+                  </span>
+                </div>
+                <p className='mt-0.5 truncate text-2xs text-tertiary-token'>
+                  {evidence.role} · {evidence.domain} ·{' '}
+                  {evidence.sourceUrl &&
+                  /^https?:\/\//i.test(evidence.sourceUrl) ? (
+                    <a
+                      href={evidence.sourceUrl}
+                      target='_blank'
+                      rel='noreferrer'
+                      className='text-link hover:underline'
+                    >
+                      {EVIDENCE_SOURCE_LABELS[evidence.source]}
+                    </a>
+                  ) : (
+                    EVIDENCE_SOURCE_LABELS[evidence.source]
+                  )}
+                  {evidence.sourceWorkId ? ` · ${evidence.sourceWorkId}` : ''}
                 </p>
-              </DisclosureRow>
+              </div>
             ))}
           </div>
-        ) : (
-          <p className='mt-2 text-xs text-tertiary-token'>
-            No rightsholder evidence recorded.
-          </p>
-        )}
-      </section>
+        </section>
+      ) : null}
 
-      <section
-        className='border-t border-subtle pt-3'
-        aria-labelledby='library-presence-heading'
-      >
-        <div className='flex items-center justify-between gap-3'>
-          <h3
-            id='library-presence-heading'
-            className='text-xs font-semibold text-primary-token'
-          >
-            Presence
-          </h3>
-          <span className='text-2xs tabular-nums text-tertiary-token'>
-            {openFindingCount} open
-            {draftedFindingCount > 0 ? ` · ${draftedFindingCount} drafted` : ''}
-          </span>
-        </div>
-        {relevantFindings.length > 0 ? (
+      {relevantFindings.length > 0 ? (
+        <section
+          className='border-t border-subtle pt-3'
+          aria-labelledby='library-presence-heading'
+        >
+          <div className='flex items-center justify-between gap-3'>
+            <h3
+              id='library-presence-heading'
+              className='text-xs font-semibold text-primary-token'
+            >
+              Presence
+            </h3>
+            <span className='text-2xs tabular-nums text-tertiary-token'>
+              {openFindingCount} open
+              {draftedFindingCount > 0
+                ? ` · ${draftedFindingCount} drafted`
+                : ''}
+            </span>
+          </div>
           <div className='mt-2'>
             {relevantFindings.map(finding => (
               <PresenceFindingRow
@@ -342,12 +373,8 @@ export function PostReleasePanel({
               />
             ))}
           </div>
-        ) : (
-          <p className='mt-2 text-xs text-tertiary-token'>
-            No open repairs, collisions, or placement opportunities.
-          </p>
-        )}
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -721,7 +721,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   PROFILE_SEARCH_MONITORING: { capabilityId: 'profile-monitoring' },
   ONBOARDING_WOW_TASK_QUEUE: { nonMarketing: 'onboarding orchestration' },
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
-  MERCH_QA_GATE: { capabilityId: 'instant-merch' },
   AGENT_PROFILE_CREATE: { capabilityId: 'cli' },
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
