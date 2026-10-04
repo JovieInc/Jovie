@@ -41,7 +41,6 @@ sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
 import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
-import autoscale  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
@@ -4956,13 +4955,6 @@ def dispatch(host: Host) -> int:
             tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
-        if autoscale.mode() != "off":
-            try:
-                bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
-                         for name, spec in load_providers().items()}
-                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases)
-            except Exception as error:  # a bad sample never blocks the spawn loop
-                tick["autoscaleError"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)

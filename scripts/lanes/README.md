@@ -374,9 +374,8 @@ its idle, clean and published checks, then `worktree_pool.recycle()` detaches HE
 checkout into the pool while there is room and disk. Deleting one installed worktree
 took 3 to 32 minutes under load; recycling takes seconds.
 
-`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. Scale-up
-above today's base is held until the JOV-7587 merge-queue brake lands; scale-down
-still drops one slot after 30 idle ticks, floor `ceil(base/2)`.
+`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick.
+Scale-down drops one slot after 30 idle ticks, floor `ceil(base/2)`.
 `SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
 divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
 disk or memory emergencies cut immediately and ignore that cooldown. Tim set
