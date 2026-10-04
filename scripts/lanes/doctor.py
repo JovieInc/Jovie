@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
+import file_overlap  # noqa: E402
 import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
@@ -142,7 +143,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     try:
         qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
         design_census = design_gate.apply_to_pool(
-            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo))
+            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
         eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
         budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
@@ -207,6 +208,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
         "designGate": design_census,
+        "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -401,6 +403,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+    stale_briefs = (obs.get("designGate") or {}).get("stale") or []
+    if stale_briefs:
+        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
+                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -762,7 +768,12 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                              "outcomes": {key: 0 for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")},
                              "incidents": [], "topBlocker": "capacity projector unavailable",
                              "founderJudgmentRequired": False, "controls": "show-only"}
+    overlap = obs.get("fileOverlap")
+    if not overlap:
+        overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
+                   {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
+            "fileOverlap": overlap,
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
@@ -892,6 +903,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
     result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    result["fileOverlap"] = obs.get("fileOverlap") or file_overlap.doctor_view(host.state)
     for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
         result[key] = result["remediation"].get(key, 0)
     result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}

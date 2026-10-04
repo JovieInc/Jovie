@@ -281,7 +281,6 @@ html[data-desktop-runtime="electron"]
   [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
-  grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
 }
 
 /* Public pages use document scrolling rather than app-shell scroll panes.

@@ -15,6 +15,7 @@ import {
   useSidebar,
 } from '@/components/organisms/sidebar';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
+import { SHELL_RAIL_BLOCK_LABEL } from '@/components/shell/rail-motion';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -445,7 +446,13 @@ export function DashboardNav({
           <SidebarGroup className='p-0'>
             <div
               data-sidebar-search-slot='true'
-              className='mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5 group-data-[collapsible=icon]:hidden'
+              className={cn(
+                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5',
+                // Rail-motion staged exit (JOV-4522): the pill collapses
+                // vertically with a fade instead of snapping to display:none.
+                SHELL_RAIL_BLOCK_LABEL,
+                'max-h-9'
+              )}
             >
               {searchSurface}
               {searchSurface ? (
