@@ -22,6 +22,7 @@ import { activateReferral } from '@/lib/referrals/service';
 import { extractCheckoutCorrelation } from '@/lib/stripe/checkout-correlation';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
+import { admitPaidUser } from '@/lib/waitlist/paid-admission';
 
 import { BaseSubscriptionHandler } from '../base-handler';
 import type {
@@ -143,6 +144,13 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
+
+      // Paying admits: a verified active subscription moves a still-pending
+      // buyer past the waitlist gate (entitlement is already written above).
+      await admitPaidUser({
+        appUserId: result.appUserId,
+        cacheKeys: [userId],
+      });
 
       // Secondary revenue attribution always uses the canonical app UUID.
       await tryActivateReferral(result.appUserId);
