@@ -1,0 +1,8 @@
+PR #20020 is on `codex/jov-7474-20261002t162117`. The required gstack workflow detected an upgrade from v0.14.5.0 to v1.91.13.0 and requires a choice before continuing.
+
+A) Upgrade now  
+B) Always auto-upgrade  
+C) Not now and continue fixing the PR  
+D) Never ask again
+
+Recommendation: C, to keep this PR repair focused.
