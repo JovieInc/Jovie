@@ -51,4 +51,18 @@ describe('marketing motion budgets', () => {
     expect(staticImports).toBeNull();
     expect(island).toContain("import('./ambient-field-gl')");
   });
+
+  it('keeps the hero entrance its consumers rely on, LCP-safe and motion-aware', () => {
+    const css = readFileSync(
+      join(MOTION_DIR, '../../../app/globals.css'),
+      'utf8'
+    );
+    const keyframes = css.match(/@keyframes hero-fade-up \{[^@]*?\n\}/)?.[0];
+
+    expect(css).toMatch(/\.hero-stagger > \* \{\s*animation: hero-fade-up /);
+    expect(keyframes).toContain('opacity: 0.01');
+    expect(css).toMatch(
+      /prefers-reduced-motion: reduce\)\s*\{\s*\.hero-stagger > \* \{\s*animation: none;/
+    );
+  });
 });

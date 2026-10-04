@@ -1482,6 +1482,30 @@ body {
     text-transform: uppercase;
     color: var(--linear-text-quaternary);
   }
+
+  /* Hero entrance: children rise in sequence on load. Starts at 0.01 so the
+     hero headline stays LCP-eligible (JOV-7286). */
+  .hero-stagger > * {
+    animation: hero-fade-up var(--duration-cinematic) var(--ease-out) both;
+  }
+  .hero-stagger > *:nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .hero-stagger > *:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .hero-stagger > *:nth-child(4) {
+    animation-delay: 180ms;
+  }
+  .hero-stagger > *:nth-child(5) {
+    animation-delay: 240ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-stagger > * {
+      animation: none;
+    }
+  }
 }
 
 /* ============================================
@@ -2372,6 +2396,13 @@ body {
   }
   to {
     width: 100%;
+  }
+}
+
+@keyframes hero-fade-up {
+  from {
+    opacity: 0.01;
+    transform: translateY(16px);
   }
 }
 
