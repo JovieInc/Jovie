@@ -117,6 +117,29 @@ describe('validation manifest', () => {
     expect(manifest.required.map(entry => entry.kind)).toContain('outcome');
   });
 
+  it('needs an outcome for an open acceptance or completion section (JOV-7510 false Done)', () => {
+    for (const description of [
+      '## Acceptance evidence\n\n1. An exact source/build inventory distinguishes available behavior.',
+      '## Evaluation / completion\n\n1. At least one real authorized request reaches Tim.',
+      '## Acceptance checks\n* Verify focus and keyboard activation at 390px.',
+      '**Acceptance:** one real UI issue goes from agent-ready to Done through lanes alone.',
+      '**Done when**\n\n- the nightly run is green',
+      '## Acceptance\n- [x] Copy updated\n- [ ] Live on jov.ie',
+    ]) {
+      expect(outcomeAcceptanceReasons({ description })).toContain(
+        'acceptance section names evidence a deploy cannot prove'
+      );
+    }
+    for (const description of [
+      '## Acceptance\n- [x] Done\n- [X] Shipped\n\n## Notes\nfree text',
+      '## Completion evidence\n\n## Next\nlater',
+      '## Goal\nShip the card.\n## Scope\nOne component.',
+      'Mentions acceptance testing in prose only.',
+    ]) {
+      expect(outcomeAcceptanceReasons({ description })).toEqual([]);
+    }
+  });
+
   it('keeps checked acceptance and plain bodies closeable', () => {
     expect(
       outcomeAcceptanceReasons({ description: '## Acceptance\n- [x] Done' })

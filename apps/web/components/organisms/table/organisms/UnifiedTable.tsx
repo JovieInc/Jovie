@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.column-priority.test.tsx
+// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.sort-provenance.test.tsx
 
 import { Spinner as LoadingSpinner } from '@jovie/ui';
 import React, {
@@ -371,7 +371,7 @@ function HiddenHeaderSortStatus({
       className={cn(
         'sticky top-0',
         zIndex.toolbar,
-        'flex items-center gap-1.5 border-b border-subtle bg-surface-1 px-3 py-1 text-2xs text-tertiary-token'
+        'flex items-center gap-1.5 border-b border-subtle bg-(--app-shell-content-surface) px-3 py-1 text-2xs text-tertiary-token'
       )}
     >
       <Icon
