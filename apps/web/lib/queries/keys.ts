@@ -311,6 +311,16 @@ export const queryKeys = {
       settings: () => [...queryKeys.admin.leads.all(), 'settings'] as const,
       keywords: () => [...queryKeys.admin.leads.all(), 'keywords'] as const,
     },
+    lists: {
+      all: () => [...queryKeys.admin.all, 'ov-lists'] as const,
+      sidebar: () => [...queryKeys.admin.lists.all(), 'sidebar'] as const,
+      detail: (id: string) =>
+        [...queryKeys.admin.lists.all(), 'detail', id] as const,
+      view: (viewId: string) =>
+        [...queryKeys.admin.lists.all(), 'view', viewId] as const,
+      creatorSearch: (query: string) =>
+        [...queryKeys.admin.lists.all(), 'creator-search', query] as const,
+    },
   },
 
   // HUD ops surfaces (admin shell + kiosk). Keys carry only the access

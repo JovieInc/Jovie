@@ -49,6 +49,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
+import { OperatorListsNav } from './OperatorListsNav';
 import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_SECTIONS,
@@ -115,6 +116,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
           />
         </div>
       ))}
+      <OperatorListsNav pathname={pathname} />
     </nav>
   );
 }
