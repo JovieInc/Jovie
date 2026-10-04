@@ -216,8 +216,8 @@ describe('CmdKPalette', () => {
     expect(
       screen.getByRole('option', {
         name: segmentedAccessibleName(
-          'Presence',
-          'Monitor artist profiles, public pages, and search visibility.',
+          'Connections',
+          'Manage account integrations and authorized services.',
           '⌘2'
         ),
       })

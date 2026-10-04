@@ -182,7 +182,8 @@ def relay_targets(event: str, payload: dict) -> list[tuple[int, str, str | None]
 def disabled_lanes(providers: dict | None = None) -> set[str]:
     if providers is None:
         providers = json.loads((HERE / "providers.json").read_text())
-    return {name for name, spec in providers.items() if not spec.get("enabled", True)}
+    # Same set as `providers - cost_order`: remote-only lanes' drafts are maintained locally.
+    return set(providers) - set(cost_order(providers))
 
 
 def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
@@ -756,8 +757,11 @@ def iso_ts(stamp: str | None) -> float | None:
 
 
 def cost_order(providers: dict) -> list[str]:
-    """Enabled lanes, cheapest first: providers.json lists them in cost order."""
-    return [name for name, spec in providers.items() if spec.get("enabled", True)]
+    """Enabled lanes that repair locally, cheapest first: providers.json lists them in cost order.
+    A remote-only lane (`repairs: false`) is left out, so its drafts are maintained like a
+    disabled lane's."""
+    return [name for name, spec in providers.items()
+            if spec.get("enabled", True) and spec.get("repairs") is not False]
 
 
 def may_take(name: str, pr: dict, record: dict, order: list[str], now: float) -> bool:
@@ -1324,16 +1328,21 @@ def ledger(host, receipt: dict) -> None:
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
-pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title url isDraft
-headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt labels(first:30){nodes{name}}
+pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
+baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
+isCrossRepository createdAt updatedAt
+labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
-def open_prs_state(lane) -> list[dict] | None:
+def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
     """Every open PR's merge state, queue membership, labels and rollup state (not per-check
-    contexts), a few GraphQL pages. None when GitHub is unreadable."""
+    contexts), a few GraphQL pages. None when GitHub is unreadable. `report["complete"]` is
+    false when the page cap is hit, so a hold prune must not treat missing numbers as closed."""
     owner, name = lane.REPO_SLUG.split("/")
     prs, cursor = [], None
+    if report is not None:
+        report["complete"] = False
     for _ in range(10):
         args = ["gh", "api", "graphql", "-f", f"query={OPEN_PRS_QUERY}", "-F", f"owner={owner}", "-F", f"name={name}"]
         if cursor:
@@ -1349,8 +1358,25 @@ def open_prs_state(lane) -> list[dict] | None:
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
             node["labels"] = node.get("labels", {}).get("nodes", [])
+            files = node.pop("files", {}) or {}
+            node["files"] = files.get("nodes") or []
+            total = files.get("totalCount")
+            node["filesComplete"] = isinstance(total, int) and total == len(node["files"])
+            if isinstance(total, int) and not node["filesComplete"]:
+                listed = lane.sh(["gh", "api", "--paginate", "--slurp",
+                                  f"repos/{lane.REPO_SLUG}/pulls/{node['number']}/files?per_page=100"], timeout=120)
+                try:
+                    pages = json.loads(listed.stdout) if listed.returncode == 0 else None
+                    node["files"] = [{"path": row["filename"], "additions": row.get("additions", 0),
+                                      "deletions": row.get("deletions", 0), "changeType": row.get("status", "")}
+                                     for page_rows in pages for row in page_rows]
+                    node["filesComplete"] = total == len(node["files"])
+                except (ValueError, KeyError, TypeError):
+                    node["filesComplete"] = False
             prs.append(node)
         if not page["pageInfo"]["hasNextPage"]:
+            if report is not None:
+                report["complete"] = True
             return prs
         cursor = page["pageInfo"]["endCursor"]
     return prs
@@ -1453,9 +1479,13 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     previous = read_state(host, "reconcile.json")
     if not force and now - float(previous.get("atEpoch") or 0) < RECONCILE_S:
         return None
-    prs = open_prs_state(lane)
+    report: dict = {}
+    prs = open_prs_state(lane, report)
     if prs is None:
         return None
+    prune_held = getattr(lane, "prune_held", None)
+    if prune_held is not None:
+        prune_held(host, prs, now, complete=bool(report.get("complete")))
     providers = lane.load_providers()
     disabled = set(providers) - set(cost_order(providers))
     deps = open_dependencies(prs, now, lane.sh)
@@ -1562,6 +1592,12 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     swept = reconcile(host, lane, linear_factory, now)
     prs = queued_prs(lane, TICK_KINDS + ("dequeued",))
     outcomes = {"reconciled": swept["counts"]} if swept else {}
+    overlap = getattr(lane, "file_overlap", None)
+    inventory = getattr(lane, "overlap_prs_summary", None)
+    if overlap is not None and callable(inventory):
+        overlap_prs = inventory()
+        outcomes["fileOverlap"] = (overlap.reconcile_open_prs(host, lane, overlap_prs)
+                                   if overlap_prs is not None else {"status": "inventory-unavailable"})
     intake = convert_intake(lane, linear_factory, lane.sh, now)
     if intake:
         outcomes["intake"] = intake

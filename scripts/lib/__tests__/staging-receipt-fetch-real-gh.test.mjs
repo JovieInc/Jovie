@@ -168,7 +168,7 @@ esac
         FAKE_ZIP: zip,
       }),
       route,
-      gh,
+      gh: join(bin, 'gh'),
     });
     expect(run.code).toBe(0);
     expect(run.requests).toEqual([]);

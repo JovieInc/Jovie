@@ -110,7 +110,7 @@ describe('FounderReviewRecorderControls', () => {
       transcript: 'Approve this one before the weekend drop.',
     });
 
-    expect(screen.getByText(/Recording this card/)).toBeVisible();
+    expect(screen.getByText(/^Recording ·/)).toBeVisible();
     expect(
       screen.getByText(/Approve this one before the weekend drop/)
     ).toBeVisible();
@@ -123,7 +123,7 @@ describe('FounderReviewRecorderControls', () => {
     const { onTypedTextChange, onKeepAudioChange, onAllowContentUseChange } =
       renderControls();
 
-    await user.type(screen.getByLabelText('Typed fallback or refinement'), 'x');
+    await user.type(screen.getByLabelText('Notes'), 'x');
     expect(onTypedTextChange).toHaveBeenCalledWith('x');
 
     await user.click(
@@ -139,6 +139,52 @@ describe('FounderReviewRecorderControls', () => {
       })
     );
     expect(onAllowContentUseChange).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps both consent choices off and supports keyboard opt-in', async () => {
+    const user = userEvent.setup();
+    const { onKeepAudioChange, onAllowContentUseChange } = renderControls();
+    const choices = screen.getAllByRole('checkbox');
+    for (const choice of choices) expect(choice).not.toBeChecked();
+
+    choices[0].focus();
+    await user.keyboard(' ');
+    expect(onKeepAudioChange).toHaveBeenCalledExactlyOnceWith(true);
+    await user.tab();
+    expect(choices[1]).toHaveFocus();
+    await user.keyboard(' ');
+    expect(onAllowContentUseChange).toHaveBeenCalledExactlyOnceWith(true);
+    expect(screen.getByText(/never authorizes publishing/)).toBeVisible();
+  });
+
+  it('disables recording, notes, consent and decisions while saving', async () => {
+    const user = userEvent.setup();
+    const handlers = renderControls({ saving: true });
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toBeDisabled();
+    for (const checkbox of screen.getAllByRole('checkbox')) {
+      expect(checkbox).toBeDisabled();
+      await user.click(checkbox);
+    }
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toBeDisabled();
+      await user.click(button);
+    }
+    for (const handler of Object.values(handlers)) {
+      expect(handler).not.toHaveBeenCalled();
+    }
+  });
+
+  it('offers audio deletion only for a retained recording', async () => {
+    const user = userEvent.setup();
+    const { onDeleteAudio } = renderControls({
+      latestReceipt: {
+        ...RECEIPT,
+        recording: { ...RECEIPT.recording, mediaAvailable: true },
+      },
+    });
+    await user.click(screen.getByRole('button', { name: /Delete Audio/ }));
+    expect(onDeleteAudio).toHaveBeenCalledOnce();
+    expect(screen.getByText(/private audio retained/)).toBeVisible();
   });
 
   it('fires approve and reject when active', async () => {
