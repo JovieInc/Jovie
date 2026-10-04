@@ -59,6 +59,10 @@ describe('OnboardingChatEmptyIntro', () => {
     expect(screen.getByText('Mega Ran')).toBeTruthy();
     expect(screen.getByText('jov.ie/megaran')).toBeTruthy();
     expect(screen.getByText('8 links')).toBeTruthy();
+    // Desktop shows this page in the rail preview instead.
+    expect(screen.getByTestId('onboarding-entry-profile')).toHaveClass(
+      'lg:hidden'
+    );
     expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
   });
 

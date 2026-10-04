@@ -13,6 +13,7 @@ import {
   ONBOARDING_ENTRY_TITLE,
 } from '@/lib/onboarding/empty-state';
 import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
+import { cn } from '@/lib/utils';
 
 export type OnboardingEntryMode =
   | 'blank'
@@ -55,8 +56,9 @@ function getHandleEntryCopy(entry: StartEntryProfile): {
 
 /**
  * Compact identity row for `/start?handle=` (JOV-7753): the visitor's real
- * photo, name, and the links we found. Desktop shows the full page preview in
- * the side rail instead, so this row is mobile-only there.
+ * photo, name, and the links we found. For a prebuilt page, desktop shows the
+ * full preview in the side rail instead, so the row is mobile-only there. A
+ * taken handle has no rail preview, so its identity row shows everywhere.
  */
 function EntryProfileCard({
   entry,
@@ -70,7 +72,10 @@ function EntryProfileCard({
 
   return (
     <div
-      className='mb-6 flex w-full max-w-88 items-center gap-3 rounded-2xl border border-subtle bg-surface-1 p-3 text-left lg:hidden'
+      className={cn(
+        'mb-6 flex w-full max-w-88 items-center gap-3 rounded-2xl border border-subtle bg-surface-1 p-3 text-left',
+        entry.status === 'claimable' && 'lg:hidden'
+      )}
       data-testid='onboarding-entry-profile'
       data-entry-status={entry.status}
     >
