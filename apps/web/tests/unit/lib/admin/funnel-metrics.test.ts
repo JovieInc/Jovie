@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
   const whereMock = vi.fn();
-  const fromMock = vi.fn(() => ({ where: whereMock }));
+  const queryBuilder = {
+    where: whereMock,
+    innerJoin: vi.fn(),
+    leftJoin: vi.fn(),
+  };
+  queryBuilder.innerJoin.mockReturnValue(queryBuilder);
+  queryBuilder.leftJoin.mockReturnValue(queryBuilder);
+  const fromMock = vi.fn(() => queryBuilder);
   const selectMock = vi.fn(() => ({ from: fromMock }));
   const doesTableExist = vi.fn();
   const captureError = vi.fn();
@@ -75,6 +82,7 @@ describe('getAdminFunnelMetrics outreach query', () => {
     expect(
       whereSql.some(sql => sql.includes("::text IN ('queued', 'dm_sent')"))
     ).toBe(true);
+    expect(whereSql.some(sql => sql.includes('!~*'))).toBe(true);
     expect(hoisted.captureError).not.toHaveBeenCalledWith(
       'Error fetching outreach sent count',
       expect.anything()

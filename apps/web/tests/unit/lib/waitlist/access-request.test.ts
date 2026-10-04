@@ -48,9 +48,13 @@ vi.mock('@/lib/utils/social-platform', () => ({
   }),
 }));
 
-vi.mock('@/lib/utils/email', () => ({
-  normalizeEmail: (e: string) => e.toLowerCase().trim(),
-}));
+vi.mock('@/lib/utils/email', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utils/email')>();
+  return {
+    ...actual,
+    normalizeEmail: (e: string) => e.toLowerCase().trim(),
+  };
+});
 
 // Mock the ingestion session wrapper to invoke the operation with a tx
 // stub that the test can shape.

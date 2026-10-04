@@ -99,6 +99,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_remediation.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
+                  "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -4672,8 +4673,12 @@ def remove_worktree(host: Host, worktree: Path) -> None:
         record_worktree_disposition(host, worktree, "preserved", "unpublished-work")
         preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-unpublished-work"]})
         return
-    record_worktree_disposition(host, worktree, "removed")
-    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+    # Proven clean and published: hand it to the next run installed, instead of spending
+    # minutes deleting ~230k node_modules files (JOV-7723).
+    slot = worktree_pool.recycle(host.repo, worktree)
+    record_worktree_disposition(host, worktree, "recycled" if slot else "removed", slot)
+    if not slot:
+        sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
 
 
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
