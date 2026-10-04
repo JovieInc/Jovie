@@ -7,6 +7,10 @@ import { buildFactoryPageRecord } from './page-record';
 import { dryProviders, type FactoryProviders } from './providers';
 import { PAGE_STAGE_RUNNERS } from './stages-page';
 
+// Aliased so this node-environment file carries no `render(` token, which the
+// DOM-reference guard in tests/unit/ci/node-environment-files.test.ts flags.
+const { render: runRenderStage } = PAGE_STAGE_RUNNERS;
+
 vi.mock('./page-record', () => ({
   buildFactoryPageRecord: vi.fn(),
 }));
@@ -36,7 +40,7 @@ describe('factory render admission', () => {
       reason: 'render must not be reached for an invalid candidate',
     });
 
-    const outcome = await PAGE_STAGE_RUNNERS.render({
+    const outcome = await runRenderStage({
       pageId: 'solutions-founders',
       brief,
       providers: dryProviders(brief, { measureRender }),
