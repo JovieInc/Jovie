@@ -39,5 +39,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Empty: Story = {
-  args: { links: [] },
+  args: { links: [], selectedCategory: 'earnings' },
+};
+
+export const EmptyEditable: Story = {
+  args: { links: [], selectedCategory: 'earnings', onAddLink: () => {} },
 };
