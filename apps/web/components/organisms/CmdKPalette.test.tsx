@@ -7,6 +7,10 @@ import {
   CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
 } from '@/components/jovie/chat-composer-copy';
 import type { PickerActionItem } from '@/components/jovie/components/picker-rows';
+import { APP_ROUTES } from '@/constants/routes';
+import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
+import { AppFlagProvider } from '@/lib/flags/client';
+import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { CmdKPalette } from './CmdKPalette';
 
@@ -136,6 +140,77 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('keeps Identity gated when workspace discoverability flags are hydrated', () => {
+    pushMock.mockClear();
+    const view = (enabled: boolean) => (
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, PROFILES_WORKSPACE: enabled }}
+      >
+        <MainPlaneHarness />
+      </AppFlagProvider>
+    );
+    const { rerender } = render(view(false));
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'Identity' } });
+    expect(
+      screen.queryByRole('option', { name: /^Identity/ })
+    ).not.toBeInTheDocument();
+    rerender(view(true));
+    expect(
+      screen.getByRole('option', { name: /^Identity/ })
+    ).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
+    fireEvent.change(input, { target: { value: 'YouTube' } });
+    expect(
+      screen.queryByRole('option', { name: /YouTube/ })
+    ).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'Identity' } });
+    rerender(view(false));
+    expect(
+      screen.queryByRole('option', { name: /^Identity/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('updates workspace doors from the hydrated flag provider', () => {
+    pushMock.mockClear();
+    const view = (enabled: boolean) => (
+      <AppFlagProvider
+        initialFlags={{
+          ...APP_FLAG_DEFAULTS,
+          YOUTUBE_WORKSPACE_NAV: enabled,
+          JOVIE_WORK_NAV: enabled,
+        }}
+      >
+        <MainPlaneHarness />
+      </AppFlagProvider>
+    );
+    const { rerender } = render(view(false));
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'YouTube' } });
+    expect(
+      screen.queryByRole('option', { name: /YouTube/ })
+    ).not.toBeInTheDocument();
+    rerender(view(true));
+    expect(screen.getByRole('option', { name: /YouTube/ })).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledWith('/app/youtube');
+    fireEvent.change(input, { target: { value: 'Jovie Did This' } });
+    expect(
+      screen.getByRole('option', { name: /Jovie Did This/ })
+    ).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledWith('/app/jovie-work');
+    rerender(view(false));
+    expect(
+      screen.queryByRole('option', { name: /Jovie Did This/ })
+    ).not.toBeInTheDocument();
+  });
+
   it('commits the currently filtered main-plane result with Enter', () => {
     pushMock.mockClear();
     render(<MainPlaneHarness />);
@@ -216,8 +291,8 @@ describe('CmdKPalette', () => {
     expect(
       screen.getByRole('option', {
         name: segmentedAccessibleName(
-          'Connections',
-          'Manage account integrations and authorized services.',
+          PRODUCT_ONTOLOGY.work.label,
+          PRODUCT_ONTOLOGY.work.definition,
           '⌘2'
         ),
       })

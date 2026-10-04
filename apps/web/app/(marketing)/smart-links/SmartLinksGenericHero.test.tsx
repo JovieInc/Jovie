@@ -21,6 +21,9 @@ describe('SmartLinksLanding generic hero', () => {
         name: 'One Link. Their Music App.',
       })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Make Every Link Sing.' })
+    ).toBeInTheDocument();
   });
 
   it('uses the generic headline and a release example when the flag is on', () => {
@@ -38,6 +41,18 @@ describe('SmartLinksLanding generic hero', () => {
         level: 1,
         name: 'One Link. Their Music App.',
       })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: 'One link, three beats.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Create a smart link.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Make Every Link Sing.' })
     ).not.toBeInTheDocument();
   });
 });

@@ -133,10 +133,11 @@ export const COMMANDS: readonly CommandSpec[] = [
     path: ['creator', 'lookup'],
     tool: 'lookup_creator',
     summary:
-      'Extract public creator fields from a YouTube channel URL without creating a profile.',
+      'Resolve a creator to their existing Jovie profile or extract public fields. Accepts a profile URL or platform:handle (youtube, instagram, tiktok, linktree). Never creates a profile.',
     arg: {
-      name: 'url',
-      description: 'Supported creator profile URL',
+      name: 'url-or-handle',
+      description:
+        'Creator profile URL or platform:handle, e.g. youtube:@creator',
     },
     readOnly: true,
     run: (input, options) => lookupCreator(required(input), options),
