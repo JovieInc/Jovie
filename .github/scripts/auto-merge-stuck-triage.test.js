@@ -380,3 +380,31 @@ test('isTransientGhError only matches transient shapes', () => {
     false
   );
 });
+
+for (const jobName of ['triage', 'self-test']) {
+  test(`${jobName} installs workflow-test dependencies before running tests`, () => {
+    const workflow = load(
+      readFileSync('.github/workflows/auto-merge-default.yml', 'utf8')
+    );
+    const steps = workflow.jobs[jobName].steps;
+    const checkoutIndex = steps.findIndex(step =>
+      step.uses?.startsWith('actions/checkout@')
+    );
+    const setupIndex = steps.findIndex(
+      step => step.uses === './.github/actions/setup-node-pnpm'
+    );
+    const testIndex = steps.findIndex(step =>
+      step.run?.includes('.github/scripts/auto-merge-stuck-triage.test.js')
+    );
+    assert.ok(
+      checkoutIndex >= 0,
+      `${jobName} checks out its dependency inputs`
+    );
+    assert.ok(setupIndex > checkoutIndex, `${jobName} installs after checkout`);
+    assert.ok(
+      testIndex > setupIndex,
+      `${jobName} installs before the test command`
+    );
+    assert.equal(steps[setupIndex].if, undefined);
+  });
+}

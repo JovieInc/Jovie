@@ -4,7 +4,7 @@ import { UsageMeter } from '@/components/molecules/UsageMeter';
 import { createUsageMeterModel } from '@/lib/usage/model';
 
 describe('UsageMeter', () => {
-  it('renders remaining capacity, one warning threshold, and accessible status', () => {
+  it('renders remaining capacity, no unexplained warning tick, and accessible status', () => {
     const model = createUsageMeterModel({ used: 40, limit: 100 });
     expect(model).not.toBeNull();
 
@@ -23,16 +23,14 @@ describe('UsageMeter', () => {
     expect(bar).toHaveAttribute('max', '100');
     expect(bar).toHaveAttribute(
       'aria-valuetext',
-      '60 of 100 remaining. On pace.'
+      '60 of 100 remaining. Available.'
     );
     const track = screen.getByTestId('usage-meter-track');
     expect(screen.getByTestId('usage-meter-fill')).toHaveStyle({
       width: '60%',
     });
-    expect(track.querySelectorAll('[data-threshold]')).toHaveLength(1);
-    expect(track.querySelector('[data-threshold="warning"]')).toHaveStyle({
-      left: '20%',
-    });
+    expect(track.querySelectorAll('[data-threshold]')).toHaveLength(0);
+    expect(screen.getByText('40 of 100 used')).toBeInTheDocument();
   });
 
   it('does not rely on color alone for critical state', () => {

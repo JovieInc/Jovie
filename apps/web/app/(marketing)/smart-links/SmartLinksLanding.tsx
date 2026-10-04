@@ -7,6 +7,8 @@ import {
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
+import { getSmartLinksHeroCopy } from '@/data/smartLinksHeroCopy';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SmartLinksDemo } from './SmartLinksDemo';
 
 const SMART_LINKS_HERO_PHOTO = {
@@ -15,25 +17,19 @@ const SMART_LINKS_HERO_PHOTO = {
   height: 686,
 } as const;
 
-const steps = [
-  [
-    '01',
-    'Land on the release',
-    'Artwork and artist come first. Every available music app lives in one dial.',
-  ],
-  [
-    '02',
-    'Choose once',
-    'Slide, tap, or use the arrow keys. Stream Now follows the selected service.',
-  ],
-  [
-    '03',
-    'Come back already set',
-    'Your choice follows the next release. You can always switch.',
-  ],
+const STEP_BODIES = [
+  'Artwork and artist come first. Every available music app lives in one dial.',
+  'Slide, tap, or use the arrow keys. Stream Now follows the selected service.',
+  'Your choice follows the next release. You can always switch.',
 ] as const;
 
+const STEP_NUMBERS = ['01', '02', '03'] as const;
+
 export function SmartLinksLanding() {
+  const hero = getSmartLinksHeroCopy(
+    isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')
+  );
+
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
       <section
@@ -49,11 +45,10 @@ export function SmartLinksLanding() {
                 id='smart-links-title'
                 className='marketing-h1-linear mt-5 max-w-3xl text-balance line-clamp-2'
               >
-                One Link. Their Music App.
+                {hero.title}
               </h1>
               <p className='mt-6 max-w-xl text-base leading-7 text-secondary-token sm:text-lg'>
-                Let visitors choose where to listen. The action stays put while
-                the service moves, and their choice follows the next song.
+                {hero.intro}
               </p>
               <div className='mt-8 flex flex-wrap gap-3'>
                 <Button asChild variant='primary' size='md'>
@@ -94,17 +89,20 @@ export function SmartLinksLanding() {
             id='smart-links-how'
             className='mt-4 text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
           >
-            Choose Your Sound. Once.
+            {hero.howTitle}
           </h2>
           <div className='mt-10 grid gap-6 md:grid-cols-3'>
-            {steps.map(([number, title, body]) => (
-              <article key={number} className='border-t border-subtle pt-5'>
+            {hero.stepTitles.map((title, index) => (
+              <article
+                key={STEP_NUMBERS[index]}
+                className='border-t border-subtle pt-5'
+              >
                 <p className='font-mono text-xs text-tertiary-token'>
-                  {number}
+                  {STEP_NUMBERS[index]}
                 </p>
                 <h3 className='mt-4 text-lg font-semibold'>{title}</h3>
                 <p className='mt-3 text-sm leading-6 text-secondary-token'>
-                  {body}
+                  {STEP_BODIES[index]}
                 </p>
               </article>
             ))}
@@ -121,11 +119,10 @@ export function SmartLinksLanding() {
             id='smart-links-cta'
             className='text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
           >
-            Make Every Link Sing.
+            {hero.ctaTitle}
           </h2>
           <p className='mx-auto mt-4 max-w-xl text-base leading-7 text-secondary-token'>
-            Give every release a home that takes visitors to their chosen music
-            app.
+            {hero.ctaBody}
           </p>
           <div className='mt-8'>
             <Button asChild variant='secondary' size='md'>

@@ -99,6 +99,53 @@ describe('ToolPartsRenderer work opportunities', () => {
   });
 });
 
+describe('ToolPartsRenderer link check', () => {
+  it('renders sourced link-drift findings in the presence artifact card', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          toolEventToMessagePart(
+            buildSucceededToolEvent('check_link_drift', {
+              title: 'Link check',
+              summary: 'Found 1 thing on your link-in-bio page to fix.',
+              facts: [
+                {
+                  label: 'Bio link',
+                  value:
+                    'Points to “Old Single” (Mar 2025). Your latest, “New Single”, came out Sep 2026.',
+                  source:
+                    'https://bio.example/a vs https://open.spotify.com/artist/x',
+                  observedAt: '2026-10-04T00:00:00.000Z',
+                },
+              ],
+            })
+          ),
+        ]}
+      />
+    );
+
+    const success = screen.getByTestId('chat-presence-artifact-success');
+    expect(screen.getByText('Link check')).toBeInTheDocument();
+    expect(screen.getByText('Bio link')).toBeInTheDocument();
+    expect(success).toHaveTextContent('Your latest, “New Single”');
+  });
+
+  it('shows the link check loading state in the same reserved slot', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          toolEventToMessagePart(buildRunningToolEvent('check_link_drift')),
+        ]}
+      />
+    );
+    expect(screen.getByTestId('chat-presence-artifact-loading')).toHaveClass(
+      'min-h-16'
+    );
+  });
+});
+
 describe('ToolPartsRenderer ops data cards', () => {
   it('renders a summer.ops-card.v1 payload as an ops data card', () => {
     render(

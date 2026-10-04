@@ -99,7 +99,7 @@ describe('dashboard metadata generation', () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Inbox');
+    expect(metadata.title).toBe('Home');
   });
 
   it('uses the visible New Chat title for the chat home route', async () => {
