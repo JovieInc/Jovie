@@ -64,6 +64,7 @@ async function requireAdmin(purpose?: 'read') {
 /**
  * GET /api/admin/outbound — the ranked outbound queue.
  * GET /api/admin/outbound?lead=<id> — per-fact certification for one row.
+ * GET /api/admin/outbound?summary=1 — view counts only, for the sidebar.
  */
 export async function GET(request: Request) {
   const gate = await requireAdmin('read');
@@ -79,9 +80,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ certification }, { headers: NO_STORE_HEADERS });
   }
 
-  return NextResponse.json(await getOutboundQueue(), {
-    headers: NO_STORE_HEADERS,
-  });
+  const queue = await getOutboundQueue();
+  // The Ovie sidebar badge reads only the counts on every page.
+  if (new URL(request.url).searchParams.get('summary') === '1')
+    return NextResponse.json(
+      { generatedAt: queue.generatedAt, counts: queue.counts },
+      { headers: NO_STORE_HEADERS }
+    );
+  return NextResponse.json(queue, { headers: NO_STORE_HEADERS });
 }
 
 /** POST /api/admin/outbound — Tim's approve / save copy / hold / reject. */

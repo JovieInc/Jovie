@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ContactCertificationInspection } from '@/lib/contacts/certification';
+import type { OutboundReadiness } from '@/lib/outbound/readiness';
 import type {
   OutboundCopy,
   OutboundQueue,
@@ -20,6 +21,19 @@ export function useOutboundQueueQuery() {
       fetchWithTimeout<OutboundQueue>(OUTBOUND_ENDPOINT, {
         signal,
         timeout: 20_000,
+      }),
+    ...FREQUENT_CACHE,
+    retry: 1,
+  });
+}
+
+export function useOutboundReadinessQuery() {
+  return useQuery({
+    queryKey: queryKeys.admin.outboundReadiness(),
+    queryFn: ({ signal }) =>
+      fetchWithTimeout<OutboundReadiness>(`${OUTBOUND_ENDPOINT}/readiness`, {
+        signal,
+        timeout: 30_000,
       }),
     ...FREQUENT_CACHE,
     retry: 1,

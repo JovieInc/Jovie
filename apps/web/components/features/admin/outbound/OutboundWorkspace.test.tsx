@@ -16,6 +16,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/queries/useOutboundQuery', () => ({
   useOutboundQueueQuery: mocks.query,
   useOutboundCertificationQuery: () => ({ data: undefined, isLoading: false }),
+  useOutboundReadinessQuery: () => ({
+    data: { generatedAt: '', ready: 1, total: 6, items: [] },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
   useOutboundDecisionMutation: () => ({ mutateAsync: mocks.decide }),
   useOutboundFactReviewMutation: () => ({ mutateAsync: vi.fn() }),
   useOutboundRefreshEvidenceMutation: () => ({ mutateAsync: vi.fn() }),
