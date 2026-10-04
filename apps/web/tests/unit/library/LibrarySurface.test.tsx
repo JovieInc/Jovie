@@ -26,7 +26,10 @@ import {
   ShellSidebarOverrideProvider,
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
-import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
+import {
+  type LibraryPostReleaseBundle,
+  withInspectorScope,
+} from '@/lib/library/post-release-types';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -1227,10 +1230,13 @@ describe('LibrarySurface', () => {
     });
   });
 
-  it('renders merch assets with prices and the shared detail drawer', () => {
+  it('renders merch without private source metadata or share requests', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
     renderLibrary([
       buildAsset({
         id: 'merch-card-1',
+        source: { provider: 'merch', canonicalId: 'internal-card-123' },
         title: 'Never Say A Word Hoodie',
         artworkUrl: 'https://cdn.example.com/hoodie.png',
         smartLinkPath: '/app/library?view=merch',
@@ -1274,6 +1280,12 @@ describe('LibrarySurface', () => {
       drawer.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.queryByTestId('library-asset-share-merch-card-1')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
+    expect(drawer.queryByText('Source')).toBeNull();
+    expect(drawer.queryByText(/internal-card-123/)).toBeNull();
   });
 
   it('renders the library right rail with the shared compact entity anatomy', () => {
@@ -1343,6 +1355,66 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     expect(about.queryByText('68/100')).not.toBeInTheDocument();
   });
+
+  it.each([false, true])(
+    'updates Activity after dismissing the last finding (downloads=%s)',
+    async hasDownload => {
+      const collision = withInspectorScope({
+        id: 'collision-1',
+        kind: 'collision',
+        title: 'Wrong artist match',
+        subjectType: 'release',
+        subjectId: 'release-1',
+        issueType: 'wrong_artist',
+        platform: 'Spotify',
+        currentUrl: null,
+        expectedUrl: null,
+        actionMode: 'direct_update',
+        status: 'open',
+        collisionDisposition: null,
+        draftRequest: null,
+      });
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ finding: { ...collision, status: 'dismissed' } }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      renderLibrary([buildAsset()], {
+        profileId: 'profile-1',
+        postReleaseBundle: {
+          findings: [collision],
+          rightsholders: [],
+          stats: [],
+          downloads: hasDownload
+            ? [
+                {
+                  id: 'download-1',
+                  releaseId: 'release-1',
+                  title: 'Radio edit',
+                  fileName: 'radio-edit.wav',
+                },
+              ]
+            : [],
+        },
+      });
+      fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+      const drawer = within(screen.getByTestId('library-asset-drawer'));
+      expect(drawer.getByText('Activity')).toBeInTheDocument();
+      fireEvent.click(drawer.getByRole('button', { name: 'Not This Artist' }));
+      await waitFor(() =>
+        expect(drawer.queryByText('Wrong artist match')).toBeNull()
+      );
+      expect(Boolean(drawer.queryByText('Activity'))).toBe(hasDownload);
+      fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+      fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
+      expect(drawer.queryByText('Wrong artist match')).toBeNull();
+      expect(Boolean(drawer.queryByText('Activity'))).toBe(hasDownload);
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/library/post-release',
+        expect.objectContaining({ method: 'PATCH' })
+      );
+    }
+  );
 
   it('resets to scoped Overview data synchronously when selection changes', () => {
     const postReleaseBundle: LibraryPostReleaseBundle = {

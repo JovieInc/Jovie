@@ -260,6 +260,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dev-test-auth-identity-mock.ts'),
         },
         {
+          find: '@/app/app/(shell)/admin/actions',
+          replacement: require.resolve('./admin-actions-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
@@ -392,6 +396,8 @@ const config: StorybookConfig = {
           'react/jsx-runtime',
           'react/jsx-dev-runtime',
           'react-dom/client',
+          // Sentry's browser entry imports this CommonJS module by name.
+          'next/constants.js',
         ]),
       ],
       esbuildOptions: {

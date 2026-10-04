@@ -142,7 +142,7 @@ describe('AdminPeoplePage assets view', () => {
     expect(tree.type).toBe(mockAdminPage);
     expect(tree.props.tabs).toEqual(
       expect.objectContaining({
-        clearOnPrimaryChange: ['type', 'issues', 'verified'],
+        clearOnPrimaryChange: ['type', 'issues', 'verified', 'key'],
         value: 'assets',
       })
     );

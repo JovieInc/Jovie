@@ -195,10 +195,12 @@ export function PostReleasePanel({
   creatorProfileId,
   bundle,
   disabled,
+  onFindingChange,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly creatorProfileId: string | null;
   readonly bundle: LibraryPostReleaseBundle;
+  readonly onFindingChange?: (finding: LibraryPresenceFindingView) => void;
   readonly disabled: boolean;
 }) {
   const [findings, setFindings] = useState(bundle.findings);
@@ -215,9 +217,10 @@ export function PostReleasePanel({
         : [],
     [bundle.downloads, releaseId]
   );
+  const activeFindings = onFindingChange ? bundle.findings : findings;
   const relevantFindings = useMemo(
-    () => findingsForAsset(asset, findings),
-    [asset, findings]
+    () => findingsForAsset(asset, activeFindings),
+    [asset, activeFindings]
   );
   const openFindingCount = relevantFindings.filter(
     finding => finding.status === 'open'
@@ -244,6 +247,10 @@ export function PostReleasePanel({
   }
 
   const updateFinding = (next: LibraryPresenceFindingView) => {
+    if (onFindingChange) {
+      onFindingChange(next);
+      return;
+    }
     setFindings(current =>
       current.map(finding => (finding.id === next.id ? next : finding))
     );

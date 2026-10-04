@@ -151,6 +151,7 @@ import {
 import {
   EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
   type LibraryPostReleaseBundle,
+  type LibraryPresenceFindingView,
 } from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
@@ -2240,12 +2241,32 @@ function AssetDrawer({
     },
     [currentId]
   );
+  const [findingState, setFindingState] = useState({
+    source: postReleaseBundle.findings,
+    findings: postReleaseBundle.findings,
+  });
+  const findings =
+    findingState.source === postReleaseBundle.findings
+      ? findingState.findings
+      : postReleaseBundle.findings;
+  const handleFindingChange = useCallback(
+    (next: LibraryPresenceFindingView) => {
+      setFindingState(previous => ({
+        source: postReleaseBundle.findings,
+        findings: (previous.source === postReleaseBundle.findings
+          ? previous.findings
+          : postReleaseBundle.findings
+        ).map(finding => (finding.id === next.id ? next : finding)),
+      }));
+    },
+    [postReleaseBundle.findings]
+  );
   const inspectorBundle = useMemo(
     () =>
       current
-        ? scopeWorkInspectorBundle(current, postReleaseBundle)
+        ? scopeWorkInspectorBundle(current, { ...postReleaseBundle, findings })
         : EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
-    [current, postReleaseBundle]
+    [current, postReleaseBundle, findings]
   );
   const presentation = useMemo(
     () => (current ? deriveWorkInspectorPresentation(current) : null),
@@ -2592,7 +2613,7 @@ function AssetDrawer({
                         ) : null}
                       </>
                     )}
-                    {current.source ? (
+                    {!isMerch && current.source ? (
                       <MetadataRow
                         label='Source'
                         value={`${capitalizeFirst(current.source.provider)} · ${current.source.canonicalId}`}
@@ -2662,6 +2683,7 @@ function AssetDrawer({
                       asset={current}
                       creatorProfileId={profileId}
                       bundle={inspectorBundle}
+                      onFindingChange={handleFindingChange}
                       disabled={!open}
                     />
                   </InspectorSection>

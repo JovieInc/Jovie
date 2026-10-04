@@ -3522,7 +3522,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     const paths = [
       'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
-      'apps/web/app/not-found.tsx',
+      'apps/web/app/billing/success/not-found.tsx',
       'apps/desktop/src/renderer/App.tsx',
       'apps/ios/Jovie/Features/New/NewScreen.swift',
       'apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift',
