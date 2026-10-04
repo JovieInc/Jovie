@@ -92,11 +92,23 @@ jobs:
           }
 
           # The source attempt must be an exact Production Controller attempt
-          # for this generation on main.
+          # for this generation on main. A workflow_run controller carries
+          # main's head when it started, which can be a descendant of the
+          # generation it deployed. Bind that head only with the same strict
+          # ancestry proof production-marker-state uses (JOV-7724).
           run_json="$(gh api \
             "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT")"
+          bound_head="$EXPECTED_SHA"
+          run_head="$(jq -r '.head_sha // empty' <<<"$run_json")"
+          if [ "$run_head" != "$EXPECTED_SHA" ] && [[ "$run_head" =~ ^[0-9a-f]{40}$ ]]; then
+            if gh api "repos/$REPO/compare/$EXPECTED_SHA...$run_head" |
+              jq -e '.status == "ahead" and .behind_by == 0' >/dev/null; then
+              bound_head="$run_head"
+              echo "::notice::Source controller head $run_head descends from $EXPECTED_SHA."
+            fi
+          fi
           jq -e \
-            --arg sha "$EXPECTED_SHA" \
+            --arg sha "$bound_head" \
             --arg repo "$REPO" \
             --argjson run_id "$SOURCE_CONTROLLER_RUN" \
             --argjson run_attempt "$SOURCE_CONTROLLER_ATTEMPT" '
@@ -120,7 +132,7 @@ jobs:
           jobs_json="$(gh api \
             "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT/jobs?per_page=100")"
           recoverable_jobs=false
-          if jq -e --arg sha "$EXPECTED_SHA" '
+          if jq -e --arg sha "$bound_head" '
             type == "object" and
             (.total_count | type == "number") and
             (.jobs | type == "array") and

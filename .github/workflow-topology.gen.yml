@@ -681,6 +681,9 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
+      - schedule
+      - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:sync_done
     jobCount: 1
   - name: M2 Revenue-Path Canary
@@ -1013,11 +1016,12 @@ nodes:
       - desktop-release
       - iOS TestFlight
       - Lane Fix Relay
+      - Linear Sync on Merge
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:publish-customer-changelog
-    jobCount: 12
+    terminalReceipt: job:remediation-customer-changelog
+    jobCount: 13
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1491,6 +1495,9 @@ edges:
     type: workflow_run
   - from: Changed-Evidence Test Suites
     to: Lane Fix Relay
+    type: workflow_run
+  - from: Production Controller
+    to: Linear Sync on Merge
     type: workflow_run
   - from: Source Validation
     to: Merge Queue Green Enroll

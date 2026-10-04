@@ -34,15 +34,50 @@ export function resumeOnboardingTranscript(input: {
   const latestClient = [...clientMessages]
     .reverse()
     .find(message => message.role === 'user');
-  const prior = persisted
-    .filter(message => message.clientMessageId !== latestClientMessageId)
-    .filter(message => message.content.trim().length > 0)
-    .map(
-      (message): UIMessage => ({
-        id: message.id,
-        role: message.role,
-        parts: [{ type: 'text', text: message.content }],
-      })
-    );
-  return latestClient ? [...prior, latestClient] : prior;
+  // Dropping an empty row (an assistant turn that was only a tool call) can
+  // leave two same-role turns side by side. Fold them together so the model
+  // always sees alternating roles.
+  const prior: UIMessage[] = [];
+  for (const message of persisted) {
+    if (message.clientMessageId === latestClientMessageId) continue;
+    const text = message.content.trim();
+    if (!text) continue;
+    const previous = prior.at(-1);
+    if (previous?.role === message.role) {
+      prior[prior.length - 1] = {
+        ...previous,
+        parts: [{ type: 'text', text: `${textOf(previous)}\n\n${text}` }],
+      };
+      continue;
+    }
+    prior.push({
+      id: message.id,
+      role: message.role,
+      parts: [{ type: 'text', text: message.content }],
+    });
+  }
+  if (!latestClient) return prior;
+
+  const previous = prior.at(-1);
+  if (previous?.role === 'user') {
+    // Keep the client's message (id, metadata, widget parts) and lead it with
+    // the unanswered earlier text.
+    return [
+      ...prior.slice(0, -1),
+      {
+        ...latestClient,
+        parts: [
+          { type: 'text', text: textOf(previous) },
+          ...latestClient.parts,
+        ],
+      },
+    ];
+  }
+  return [...prior, latestClient];
+}
+
+function textOf(message: UIMessage): string {
+  return message.parts
+    .map(part => (part.type === 'text' ? part.text : ''))
+    .join('');
 }
