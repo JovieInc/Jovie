@@ -253,6 +253,12 @@ function narrativeStage(ctx: StageContext): Promise<StageResult> {
   );
 }
 
+/**
+ * Copy directions written and judged per attempt (JOV-7765). Copy is the
+ * stage a visual rejection reworks, so it is where competing directions pay.
+ */
+export const FACTORY_COPY_DIRECTIONS = 3;
+
 function copyStage(ctx: StageContext): Promise<StageResult> {
   const truth = artifactOf(ctx, 'truth');
   const narrative = artifactOf(ctx, 'narrative');
@@ -325,7 +331,8 @@ function copyStage(ctx: StageContext): Promise<StageResult> {
           rubricVersion: RUBRIC_VERSION,
         })),
       };
-    }
+    },
+    { directions: FACTORY_COPY_DIRECTIONS }
   );
 }
 

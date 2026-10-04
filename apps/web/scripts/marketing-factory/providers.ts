@@ -38,6 +38,8 @@ export interface GenerateRequest {
   /** Failures from the previous attempt; empty on attempt 1. */
   readonly feedback: readonly string[];
   readonly attempt: number;
+  /** Set when the stage asks for several distinct directions. */
+  readonly direction?: { readonly index: number; readonly of: number };
 }
 
 export type Unavailable = {

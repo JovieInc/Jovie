@@ -244,6 +244,60 @@ function reworkProviders(input: {
   return { providers, reviewed };
 }
 
+describe('factory:run copy directions', () => {
+  it('judges every copy direction and records the winner with its rationale', async () => {
+    const seen: number[] = [];
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        async generate(request) {
+          if (request.stage !== 'copy') {
+            return { status: 'ok', value: brief.dry?.[request.stage] };
+          }
+          const index = request.direction?.index ?? 0;
+          seen.push(index);
+          // Direction 1 breaks a hard check; 2 and 3 are distinct and valid.
+          const slots = dryCopy.slots.map((slot, i) =>
+            i !== 0
+              ? slot
+              : index === 1
+                ? { ...slot, text: `${slot.text} — now` }
+                : index === 3
+                  ? { ...slot, text: 'Claim your public profile page' }
+                  : slot
+          );
+          return { status: 'ok', value: { slots } };
+        },
+      }),
+    });
+
+    expect(manifest.status).toBe('complete');
+    expect(seen).toEqual([1, 2, 3]);
+    const copy = record('05-copy.attempt-1.json');
+    const directions = copy.notes.directions as {
+      direction: number;
+      passed: boolean;
+      outputDigest: string;
+      invariantsFailed: string[];
+    }[];
+    expect(directions.map(d => [d.direction, d.passed])).toEqual([
+      [1, false],
+      [2, true],
+      [3, true],
+    ]);
+    expect(directions[0]?.invariantsFailed).toContain('copy-no-em-dash');
+    expect(new Set(directions.map(d => d.outputDigest)).size).toBe(3);
+    const winner = copy.notes.winner as {
+      direction: number;
+      rationale: string;
+    };
+    expect(winner.direction).toBe(2);
+    expect(winner.rationale).toMatch(/highest of 2 passing/);
+    // The chain carries the winning direction's artifact.
+    expect(copy.receipt.outputDigest).toBe(directions[1]?.outputDigest);
+    expect(copy.receipt.passed).toBe(true);
+  });
+});
+
 describe('factory:run visual rework', () => {
   it('routes a visual rejection back to copy, re-renders and re-judges a new page', async () => {
     const { providers, reviewed } = reworkProviders({
