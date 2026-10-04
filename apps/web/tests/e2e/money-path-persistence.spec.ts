@@ -167,6 +167,22 @@ test('persists verified checkout entitlement for a fresh and returning session',
       stripeSubscriptionId: null,
     });
 
+    if (gateEnabled) {
+      // Non-artist stranger journey: a visitor with no artist identity is
+      // waitlisted for review, and the receipt offers the $199 offer anyway
+      // (EVENT 2026-10-03, JOV-7701). Payment below is what admits them.
+      const waitlistResponse = await page.request.post('/api/waitlist', {
+        data: { primarySocialUrl: `https://www.instagram.com/money${runId}` },
+      });
+      expect(waitlistResponse.ok()).toBeTruthy();
+      expect(await readUserStatus()).toBe('waitlist_pending');
+      await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('waitlist-start-pro-checkout')).toHaveText(
+        'Start Pro ($199)',
+        { timeout: 30_000 }
+      );
+    }
+
     const referrerEmail = `money-referrer-${runId}@test.jovie.com`;
     const referrerClerkId = `user_e2e_referrer_${runId.replaceAll('-', '_')}`;
     const referralCode = `e2e${runId.replaceAll('-', '')}`;
