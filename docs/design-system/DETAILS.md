@@ -313,7 +313,9 @@ Three input variables generate the entire palette:
 
 Text secondary/tertiary/quaternary follow the **cinematic depth** ramp
 (founder-locked, Tim, 2026-09-25): one big step down from primary, then a
-compressed ordered tail. Each light value is ≥4.5:1 against white; secondary
+compressed ordered tail. Each light value is ≥4.5:1 against white, and the
+tail also clears 4.5:1 on the table row hover/selected tints in both themes
+(JOV-7861, `tests/unit/design-system/table-row-state-contrast.test.ts`); secondary
 and tertiary are also gated at 4.5:1 against `--color-bg-base`/`surface-1` by
 `contrast-pairs.config.json` (dark values follow the same ramp via the
 Noir Ion anchors below).
@@ -329,8 +331,8 @@ Noir Ion anchors below).
 | `--color-bg-secondary` | `lch(95.94% 0.5 282)` | `#f3f3f5` | Secondary surfaces, sidebar |
 | Text primary | `lch(9.894% 0 282)` | `#0c0c0c` | Headings, primary text |
 | Text secondary | `#5A606A` | `#5a606a` | Body text, labels |
-| Text tertiary | `#666C76` | `#666c76` | Descriptions, meta |
-| Text quaternary | `#6A7078` | `#6A7078` | Placeholders |
+| Text tertiary | `#626872` | `#626872` | Descriptions, meta |
+| Text quaternary | `#646A72` | `#646a72` | Placeholders |
 | Border subtle | `oklch(0% 0 0 / 6%)` | — | Dividers |
 | Border default | `oklch(0% 0 0 / 10%)` | — | Borders |
 | Border strong | `oklch(0% 0 0 / 18%)` | — | Emphasis |
@@ -355,7 +357,7 @@ prior anchors without a second theme provider).
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
 | Text secondary | `#A0A5AF` | `--color-text-secondary-token` | Labels |
 | Text muted | `#8F95A0` | `--color-text-tertiary-token` | Meta |
-| Text tertiary | `#858B96` | `--color-text-quaternary-token` | Placeholders |
+| Text tertiary | `#8C939E` | `--color-text-quaternary-token` | Placeholders |
 | Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
 | Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
 | Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |
