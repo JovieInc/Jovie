@@ -40,7 +40,7 @@ describe('Node runtime contract', () => {
       'apps/web/package.json',
     ];
     // The published CLI runs on users' Node, so it sets a floor, not a major
-    // ceiling: an upper bound makes yarn refuse to install on current Node.
+    // ceiling: an upper bound makes yarn refuse to install on newer runtimes.
     const minimumOnlyPackagePaths = [
       'packages/jovie-cli/package.json',
       'apps/docs/package.json',
