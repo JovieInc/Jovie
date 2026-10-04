@@ -852,3 +852,159 @@ test('trusted context guard works for old heads and still rejects oversized merg
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// Metadata-only edits reuse the newest exact-head proof (ci-eff, 2026-10-04):
+// 262 of 303 same-head Source Validation reruns in 24h were PR body edits.
+function sourceValidationWorkflow() {
+  return load(readFileSync('.github/workflows/source-validation.yml', 'utf8'));
+}
+
+function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
+  const step = sourceValidationWorkflow().jobs.deterministic.steps.find(
+    candidate => candidate.id === 'reuse'
+  );
+  const root = mkdtempSync(join(tmpdir(), 'source-proof-reuse-'));
+  try {
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      join(root, 'runs.json'),
+      JSON.stringify({ workflow_runs: runs })
+    );
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n${ghFails ? 'exit 1' : `cat "${root}/runs.json"`}\n`,
+      { mode: 0o755 }
+    );
+    const output = join(root, 'output');
+    writeFileSync(output, '');
+    const result = spawnSync('bash', ['-c', step.run], {
+      encoding: 'utf8',
+      env: {
+        PATH: `${bin}:${process.env.PATH}`,
+        GITHUB_OUTPUT: output,
+        GH_TOKEN: 'test',
+        HEAD_SHA: sha,
+        HEAD_REF: 'agent/jov-1',
+        REPOSITORY: 'JovieInc/Jovie',
+        RUN_ID: '500',
+      },
+    });
+    let ghLog = '';
+    try {
+      ghLog = readFileSync(join(root, 'gh.log'), 'utf8');
+    } catch {}
+    return {
+      status: result.status,
+      stderr: result.stderr,
+      output: readFileSync(output, 'utf8'),
+      ghLog,
+    };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const proofRun = (id, conclusion, overrides = {}) => ({
+  id,
+  conclusion,
+  head_sha: 'a'.repeat(40),
+  head_branch: 'agent/jov-1',
+  path: '.github/workflows/source-validation.yml',
+  ...overrides,
+});
+
+test('a metadata-only edit reuses the newest green exact-head proof', () => {
+  const result = runProofReuse({
+    runs: [
+      proofRun(300, 'success'),
+      proofRun(400, 'success'),
+      proofRun(900, 'success'),
+    ],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.output, 'reuse=true\nproof_run=400\n');
+  assert.match(
+    result.ghLog,
+    /head_sha=a{40}&event=pull_request&status=completed/
+  );
+});
+
+test('a red, foreign, or unreadable predecessor runs the full source contract', () => {
+  /** @type {[string, { runs: object[], ghFails?: boolean, sha?: string }][]} */
+  const cases = [
+    [
+      'newest predecessor failed',
+      { runs: [proofRun(300, 'success'), proofRun(400, 'failure')] },
+    ],
+    [
+      'newest predecessor cancelled',
+      { runs: [proofRun(300, 'success'), proofRun(400, 'cancelled')] },
+    ],
+    [
+      'other branch',
+      { runs: [proofRun(400, 'success', { head_branch: 'other' })] },
+    ],
+    [
+      'other workflow',
+      {
+        runs: [proofRun(400, 'success', { path: '.github/workflows/ci.yml' })],
+      },
+    ],
+    ['no predecessor', { runs: [] }],
+    [
+      'run list unreadable',
+      { runs: [proofRun(400, 'success')], ghFails: true },
+    ],
+    ['malformed head', { runs: [proofRun(400, 'success')], sha: 'short' }],
+  ];
+  for (const [name, input] of cases) {
+    const result = runProofReuse(input);
+    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
+    assert.match(result.output, /^reuse=false\n/, name);
+  }
+});
+
+test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
+  const workflow = sourceValidationWorkflow();
+  const gate = "steps.reuse.outputs.reuse != 'true'";
+  const reuseStep = workflow.jobs.deterministic.steps[0];
+  assert.equal(reuseStep.id, 'reuse');
+  // Base retargets change the compared tree, so they never reuse a proof.
+  assert.equal(
+    reuseStep.if,
+    "${{ github.event.action == 'edited' && !github.event.changes.base }}"
+  );
+  for (const job of ['security', 'migration', 'coverage']) {
+    const [first, ...rest] = workflow.jobs[job].steps;
+    assert.equal(first.id, 'reuse', job);
+    assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
+    for (const step of rest)
+      assert.equal(step.if, gate, `${job}: ${step.name ?? step.uses}`);
+  }
+  const always = [
+    'Validate customer changelog decision from trusted base',
+    'Measure actual installed source dependency graph',
+    'Preserve exact source dependency evidence',
+  ];
+  const deterministic = workflow.jobs.deterministic.steps;
+  for (const name of always) {
+    const step = deterministic.find(candidate => candidate.name === name);
+    assert.ok(step, name);
+    assert.equal(
+      step.if,
+      undefined,
+      `${name} must run on a metadata-only edit`
+    );
+  }
+  assert.equal(
+    deterministic.find(
+      step => step.name === 'Run deterministic source contract'
+    ).if,
+    gate
+  );
+  assert.equal(
+    workflow.jobs.ready.steps[0].run,
+    'test "$RESULTS" = \'success,success,success,success\''
+  );
+});

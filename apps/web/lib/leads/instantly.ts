@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { OutboundCopy } from '@/lib/outbound/approval';
 import { isInstantlyOutboundEnabled } from './outbound-gates';
 import { pipelineError, pipelineLog } from './pipeline-logger';
 
@@ -11,6 +12,11 @@ interface PushLeadParams {
   claimLink: string;
   artistName: string;
   priorityScore: number;
+  /**
+   * The exact copy Tim approved. The campaign template renders these
+   * variables, so what sends is the revision he approved.
+   */
+  approvedCopy: OutboundCopy & { readonly revision: string };
 }
 
 function isRateLimitRetry(status: number, attempt: number): boolean {
@@ -110,6 +116,9 @@ export async function pushLeadToInstantly(
       claim_link: params.claimLink,
       artist_name: params.artistName,
       priority_score: String(params.priorityScore),
+      approved_subject: params.approvedCopy.subject ?? '',
+      approved_body: params.approvedCopy.body,
+      approved_copy_revision: params.approvedCopy.revision,
     },
   };
 

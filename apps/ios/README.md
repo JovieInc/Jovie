@@ -68,6 +68,20 @@ Native iOS foundation for Jovie. The app is dark-only, simulator-tested, and wir
    pnpm run ios:screenshots
    ```
 
+   App Store graphics (6.9-inch, framed with headlines) come from
+   `apps/ios/app-store/storefront.json`, the code side of the Pen
+   "App Store / iOS screenshots (STAGING)" section. With a simulator build:
+
+   ```bash
+   node apps/ios/scripts/app-store-graphics.mjs capture --app <path/to/Jovie.app>
+   node apps/ios/scripts/app-store-graphics.mjs render
+   node apps/ios/scripts/app-store-graphics.mjs verify
+   ```
+
+   The `iOS App Store Graphics` workflow reruns this on every iOS source change
+   on main and every TestFlight release, and fails when the receipt does not
+   match the committed app source.
+
 7. Capture launch-performance evidence:
 
    ```bash
