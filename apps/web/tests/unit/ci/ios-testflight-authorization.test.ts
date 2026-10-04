@@ -81,6 +81,11 @@ const CONTROLLER_WORKFLOW_ID = 101;
 const TESTFLIGHT_WORKFLOW_ID = 202;
 const CONTROLLER_RUN = 5000;
 const roots: string[] = [];
+// Fixture git must never inherit a hook's GIT_DIR (it would hit the real repo).
+const fixtureEnv = () =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_'))
+  ) as NodeJS.ProcessEnv;
 
 afterEach(() => {
   for (const root of roots.splice(0))
@@ -461,7 +466,10 @@ describe('iOS TestFlight release selection', () => {
   function gitRepo() {
     const root = tempRoot('jovie-testflight-select-');
     const git = (...args: string[]) =>
-      execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
+      execFileSync('git', ['-C', root, ...args], {
+        encoding: 'utf8',
+        env: fixtureEnv(),
+      }).trim();
     git('init', '-q');
     git('config', 'user.email', 'select@example.test');
     git('config', 'user.name', 'select');
@@ -480,7 +488,7 @@ describe('iOS TestFlight release selection', () => {
     execFileSync('bash', ['-c', String(selectStep?.run)], {
       cwd,
       env: {
-        ...process.env,
+        ...fixtureEnv(),
         GITHUB_OUTPUT: output,
         AUTHORIZED: 'true',
         ALREADY_RELEASED: 'false',
