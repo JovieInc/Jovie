@@ -250,7 +250,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 62
+    jobCount: 63
   - name: Claude Review (gbrain-aware)
     path: .github/workflows/claude-review.yml
     active: true
