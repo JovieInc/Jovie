@@ -211,7 +211,8 @@
     "uncertified-capability": 0,
     "invented-number": 0,
     "unbacked-offer": 0,
-    "checkable-positioning": 0
+    "checkable-positioning": 0,
+    "weak-proof-rendered": 0
   },
   "prooflessPaywallSteps": ["pricing"],
   "proofRequests": [
@@ -254,6 +255,14 @@
       "pagesBlocked": ["/app/settings/billing", "/pricing", "/signup"],
       "suggestedLane": "third-party-research",
       "generator": "research"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "metric",
+      "claimId": "wanted.dogfood.launch-loop",
+      "pagesBlocked": ["/", "/pricing"],
+      "suggestedLane": "measurement",
+      "generator": "dogfood"
     },
     {
       "recordType": "proof-request",
@@ -300,6 +309,15 @@
       "kind": "third-party",
       "generator": "research",
       "owner": "JOV-7807"
+    },
+    {
+      "id": "dogfood.launch-loop",
+      "statement": "Each Jovie launch grows the audience for the next one, measured send over send.",
+      "answers": "Tim: each launch grows the audience for the next",
+      "unlocks": ["homepage", "pricing"],
+      "kind": "metric",
+      "generator": "dogfood",
+      "owner": "JOV-7834"
     },
     {
       "id": "computed.link-drift-finding",
