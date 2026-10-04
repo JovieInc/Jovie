@@ -35,18 +35,9 @@ export async function handleOrphanedSubscription(
     stripeSubscriptionId: string;
   }
 ): Promise<OrphanedSubscriptionResult> {
-  if (!user.clerkId) {
-    return {
-      success: false,
-      action: 'skipped',
-      error:
-        'user has no clerk_id (post-cutover row; reconciler skips until better-auth identity swap)',
-    };
-  }
   if (user.isPro) {
-    // User is marked as Pro but subscription is gone - downgrade
     const result = await updateUserBillingStatus({
-      clerkUserId: user.clerkId,
+      clerkUserId: user.clerkId ?? user.id,
       isPro: false,
       stripeSubscriptionId: null,
       eventType: 'reconciliation_fix',

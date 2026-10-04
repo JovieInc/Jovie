@@ -11,17 +11,26 @@ import { DashboardShellPrivacyBoundary } from '@/app/app/(shell)/DashboardShellP
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
 import { AuthShellWrapper } from './AuthShellWrapper';
 
-const { route, lifecycle, routeEscape, privacyState, routeConfig, railScope } =
-  vi.hoisted(() => ({
-    route: { pathname: '/app/tasks' },
-    lifecycle: vi.fn(),
-    routeEscape: vi.fn(),
-    privacyState: vi.fn(),
-    routeConfig: { isChatRoute: false, isProfileSettings: false },
-    railScope: { current: undefined as string | undefined },
-  }));
+const {
+  route,
+  lifecycle,
+  routeEscape,
+  privacyState,
+  routeConfig,
+  railScope,
+  shortcutsRender,
+} = vi.hoisted(() => ({
+  route: { pathname: '/app/tasks' },
+  lifecycle: vi.fn(),
+  routeEscape: vi.fn(),
+  privacyState: vi.fn(),
+  routeConfig: { isChatRoute: false, isProfileSettings: false },
+  railScope: { current: undefined as string | undefined },
+  shortcutsRender: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -45,9 +54,22 @@ vi.mock('@/hooks/useGlobalShortcutActions', () => ({
 vi.mock('@/hooks/RightRailKeyboardHandler', () => ({
   RightRailKeyboardHandler: () => null,
 }));
-vi.mock('@/components/organisms/keyboard-shortcuts-sheet', () => ({
-  KeyboardShortcutsSheet: () => null,
-}));
+vi.mock('@/components/organisms/keyboard-shortcuts-sheet', async () => {
+  const { useKeyboardShortcuts: useShortcuts } = await import(
+    '@/contexts/KeyboardShortcutsContext'
+  );
+  return {
+    KeyboardShortcutsSheet: function MockKeyboardShortcutsSheet() {
+      shortcutsRender();
+      const { close } = useShortcuts();
+      return (
+        <button type='button' onClick={close}>
+          Close shortcut help
+        </button>
+      );
+    },
+  };
+});
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   PreviewPanelProvider: ({
     children,
@@ -219,12 +241,22 @@ function closeSearch() {
   );
 }
 
+function OpenShortcutHelp() {
+  const { open } = useKeyboardShortcuts();
+  return (
+    <button type='button' onClick={open}>
+      Open shortcut help
+    </button>
+  );
+}
+
 beforeEach(() => {
   route.pathname = '/app/tasks';
   routeConfig.isChatRoute = false;
   routeConfig.isProfileSettings = false;
   railScope.current = undefined;
   lifecycle.mockClear();
+  shortcutsRender.mockClear();
   routeEscape.mockClear();
   privacyState.mockReset();
 });
@@ -233,6 +265,35 @@ afterEach(() => {
 });
 
 describe('main-plane Search route recovery', () => {
+  it('mounts shortcut help only on demand and can reopen it after closing', async () => {
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <OpenShortcutHelp />
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    expect(shortcutsRender).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('button', { name: 'Close shortcut help' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open shortcut help' }));
+    const close = await screen.findByRole('button', {
+      name: 'Close shortcut help',
+    });
+    expect(shortcutsRender).toHaveBeenCalled();
+    fireEvent.click(close);
+    expect(
+      screen.queryByRole('button', { name: 'Close shortcut help' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('No selection')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Open shortcut help' }));
+    expect(
+      await screen.findByRole('button', { name: 'Close shortcut help' })
+    ).toBeVisible();
+  });
+
   it('preserves the ordinary Jovie route independently of the optional Ovie boundary', async () => {
     render(
       <DashboardDataProvider value={dashboard}>
