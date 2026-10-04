@@ -1530,14 +1530,16 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(row["count"], 1)
         self.assertAlmostEqual(row["until"] - time.time(), lane.HANDOFF_BACKOFF_S, delta=30)
         spans = []
-        for _ in range(5):  # each cooldown expiry admits exactly one more claim
-            data = json.loads(cooldowns.read_text()); before = data["JOV-3"]["count"]
-            data["JOV-3"]["until"] = 0; cooldowns.write_text(json.dumps(data))
-            start = time.time()
-            lane.worker(self.host, "devin"); lane.worker(self.host, "devin")
-            row = json.loads(cooldowns.read_text())["JOV-3"]
-            self.assertEqual(row["count"], before + 1)
-            spans.append(round(row["until"] - start, -1))
+        # Freeze the clock: the span is the backoff the note wrote, not worker wall time.
+        with patch("time.time", return_value=1_000_000_000.0):
+            for _ in range(5):  # each cooldown expiry admits exactly one more claim
+                data = json.loads(cooldowns.read_text()); before = data["JOV-3"]["count"]
+                data["JOV-3"]["until"] = 0; cooldowns.write_text(json.dumps(data))
+                start = time.time()
+                lane.worker(self.host, "devin"); lane.worker(self.host, "devin")
+                row = json.loads(cooldowns.read_text())["JOV-3"]
+                self.assertEqual(row["count"], before + 1)
+                spans.append(round(row["until"] - start, -1))
         self.assertEqual(len(runs), 6)
         self.assertEqual(spans, [600, 1200, 2400, 4800, 9600])
         self.assertEqual(lane.HANDOFF_BACKOFF_CAP_S, 21600)
@@ -3432,7 +3434,7 @@ class UpdateTest(unittest.TestCase):
 
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
-            tmp = Path(tmp)
+            tmp = Path(tmp).resolve()  # macOS /var -> /private/var must match .resolve() below
             origin, clone = tmp / "origin.git", tmp / "clone"
             self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
             self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
