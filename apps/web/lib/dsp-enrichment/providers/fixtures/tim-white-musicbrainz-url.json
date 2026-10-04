@@ -1,0 +1,29 @@
+{
+  "id": "2cbe619f-1322-41fb-a930-52fb3011c24b",
+  "resource": "https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm",
+  "relations": [
+    {
+      "source-credit": "",
+      "type": "free streaming",
+      "artist": {
+        "type": "Person",
+        "disambiguation": "Singer",
+        "country": "US",
+        "sort-name": "White, Tim",
+        "name": "Tim White",
+        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+        "id": "51972833-bb04-46b7-9401-45a5ab449ebd"
+      },
+      "type-id": "769085a1-c2f7-4c24-a532-2375a77693bd",
+      "attribute-values": {},
+      "target-type": "artist",
+      "end": null,
+      "attributes": [],
+      "direction": "backward",
+      "target-credit": "",
+      "begin": null,
+      "ended": false,
+      "attribute-ids": {}
+    }
+  ]
+}

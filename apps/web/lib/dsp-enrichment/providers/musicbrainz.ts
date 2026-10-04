@@ -31,6 +31,7 @@ const DEFAULT_BASE_DELAY_MS = 1500;
 function isNonRetryableError(error: unknown): boolean {
   if (error instanceof MusicBrainzError) {
     return (
+      error.errorCode === 'CANCELLED' ||
       error.statusCode === 404 ||
       error.statusCode === 400 ||
       error.statusCode === 429
@@ -67,9 +68,28 @@ async function withRetry<T>(
   throw lastError ?? new Error('Unknown retry failure');
 }
 
-async function musicBrainzRequest<T>(endpoint: string): Promise<T> {
-  const limitResult =
-    await musicBrainzLookupLimiter.limit('musicbrainz:global');
+async function musicBrainzRequest<T>(
+  endpoint: string,
+  waitForQuota = false,
+  signal?: AbortSignal
+): Promise<T> {
+  if (signal?.aborted)
+    throw new MusicBrainzError('Request cancelled', undefined, 'CANCELLED');
+  let limitResult = await musicBrainzLookupLimiter.limit('musicbrainz:global');
+  const waitMs = limitResult.reset.getTime() - Date.now() + 25;
+  // Chained identity reads may wait one quota window, then ask the same
+  // distributed limiter again. Outages and upstream 429s still fail closed.
+  if (
+    waitForQuota &&
+    !limitResult.success &&
+    !limitResult.unavailable &&
+    limitResult.backend !== 'unavailable' &&
+    waitMs > 0 &&
+    waitMs <= 1100
+  ) {
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+    limitResult = await musicBrainzLookupLimiter.limit('musicbrainz:global');
+  }
   if (!limitResult.success) {
     throw new MusicBrainzError(
       limitResult.reason ?? 'Rate limit exceeded',
@@ -77,6 +97,8 @@ async function musicBrainzRequest<T>(endpoint: string): Promise<T> {
       'RATE_LIMITED'
     );
   }
+  if (signal?.aborted)
+    throw new MusicBrainzError('Request cancelled', undefined, 'CANCELLED');
 
   const url = `${MUSICBRAINZ_API_BASE}${endpoint}${endpoint.includes('?') ? '&' : '?'}fmt=json`;
   const controller = new AbortController();
@@ -84,9 +106,10 @@ async function musicBrainzRequest<T>(endpoint: string): Promise<T> {
   try {
     const response = await fetch(url, {
       headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
-      signal: controller.signal,
+      signal: signal
+        ? AbortSignal.any([controller.signal, signal])
+        : controller.signal,
     });
-    clearTimeout(timeoutId);
     if (response.status === 503 || response.status === 429) {
       throw new MusicBrainzError(
         'Rate limit exceeded',
@@ -102,14 +125,17 @@ async function musicBrainzRequest<T>(endpoint: string): Promise<T> {
     }
     return (await response.json()) as T;
   } catch (error) {
-    clearTimeout(timeoutId);
     if (error instanceof MusicBrainzError) throw error;
+    if (signal?.aborted)
+      throw new MusicBrainzError('Request cancelled', undefined, 'CANCELLED');
     if (error instanceof Error && error.name === 'AbortError') {
       throw new MusicBrainzError('Request timeout', undefined, 'TIMEOUT');
     }
     throw new MusicBrainzError(
       `MusicBrainz request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -159,14 +185,30 @@ export async function bulkLookupMusicBrainzByIsrc(
 }
 
 export async function getMusicBrainzArtist(
-  mbid: string
+  mbid: string,
+  options: {
+    includeReleaseGroups?: boolean;
+    waitForQuota?: boolean;
+    signal?: AbortSignal;
+  } = {}
 ): Promise<MusicBrainzArtist | null> {
+  if (!isMusicBrainzId(mbid)) return null;
+  const normalizedId = mbid.toLowerCase();
   try {
     const artist = await executeWithCircuitBreaker(async () => {
       return musicBrainzRequest<MusicBrainzArtist>(
-        `/artist/${encodeURIComponent(mbid)}?inc=aliases+tags+genres+url-rels`
+        `/artist/${normalizedId}?inc=aliases+tags+genres+url-rels${options.includeReleaseGroups ? '+release-groups' : ''}`,
+        options.waitForQuota,
+        options.signal
       );
     });
+    if (artist.id !== normalizedId || !artist.name?.trim()) {
+      throw new MusicBrainzError(
+        'Mismatched artist response',
+        502,
+        'INVALID_RESPONSE'
+      );
+    }
     return artist;
   } catch (error) {
     if (error instanceof MusicBrainzError && error.statusCode === 404) {
@@ -174,6 +216,98 @@ export async function getMusicBrainzArtist(
     }
     throw error;
   }
+}
+
+export function isMusicBrainzId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
+/** Exact indexed URL relations, never a display-name or SERP guess. */
+export async function lookupMusicBrainzArtistsByUrl(
+  resource: string,
+  signal?: AbortSignal
+): Promise<MusicBrainzArtist[]> {
+  let url: URL;
+  try {
+    url = new URL(resource);
+  } catch {
+    return [];
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port)
+    return [];
+  const resources = musicBrainzArtistResources(url);
+  interface UrlRelations {
+    resource?: string;
+    relations?: MusicBrainzArtist['relations'];
+  }
+  let response: UrlRelations & { urls?: UrlRelations[] };
+  try {
+    response = await executeWithCircuitBreaker(() =>
+      musicBrainzRequest(
+        `/url?${resources.map(value => `resource=${encodeURIComponent(value)}`).join('&')}&inc=artist-rels`,
+        false,
+        signal
+      )
+    );
+  } catch (error) {
+    if (error instanceof MusicBrainzError && error.statusCode === 404)
+      return [];
+    throw error;
+  }
+  const hits = response.urls ?? [response];
+  if (hits.some(hit => !hit.resource || !resources.includes(hit.resource))) {
+    throw new MusicBrainzError(
+      'Mismatched URL response',
+      502,
+      'INVALID_RESPONSE'
+    );
+  }
+  return [
+    ...new Map(
+      hits
+        .flatMap(hit => hit.relations ?? [])
+        .flatMap(relation => {
+          const artist = relation.artist;
+          return !relation.ended &&
+            artist &&
+            isMusicBrainzId(artist.id) &&
+            artist.name?.trim()
+            ? [
+                [
+                  artist.id.toLowerCase(),
+                  { ...artist, id: artist.id.toLowerCase() },
+                ] as const,
+              ]
+            : [];
+        })
+    ).values(),
+  ];
+}
+
+/** Provider IDs survive share parameters, Spotify locales and Apple URL aliases. */
+function musicBrainzArtistResources(url: URL): string[] {
+  if (url.hostname === 'open.spotify.com') {
+    const id = /^\/(?:intl-[a-z]{2}\/)?artist\/([A-Za-z0-9]{22})\/?$/.exec(
+      url.pathname
+    )?.[1];
+    if (id) return [`https://open.spotify.com/artist/${id}`];
+  }
+  if (['music.apple.com', 'itunes.apple.com'].includes(url.hostname)) {
+    const artist = /^\/([a-z]{2})\/artist\/(?:[^/]+\/)?(?:id)?(\d+)\/?$/.exec(
+      url.pathname
+    );
+    if (artist)
+      return [
+        ...new Set([
+          `${url.origin}${url.pathname.replace(/\/$/, '')}`,
+          `https://music.apple.com/${artist[1]}/artist/${artist[2]}`,
+          `https://itunes.apple.com/${artist[1]}/artist/id${artist[2]}`,
+        ]),
+      ];
+  }
+  return [url.href];
 }
 
 interface MusicBrainzNamedSearchHit {
@@ -201,26 +335,48 @@ function exactName(left: string, right: string): boolean {
  * Several exact names stay unresolved here so the caller can ask for a choice.
  */
 export async function matchMusicBrainzArtistByName(
-  name: string
+  name: string,
+  signal?: AbortSignal
 ): Promise<
   | { status: 'found'; artist: MusicBrainzArtist }
-  | { status: 'ambiguous'; count: number }
+  | { status: 'ambiguous'; count: number; artists: MusicBrainzArtist[] }
   | { status: 'none' }
 > {
   const trimmed = name.trim();
   if (!trimmed) return { status: 'none' };
   const response = await executeWithCircuitBreaker(() =>
     musicBrainzRequest<{ artists?: MusicBrainzNamedSearchHit[] }>(
-      `/artist?query=${encodeURIComponent(`artist:"${trimmed.replace(/["\\]/g, ' ')}"`)}&limit=5`
+      `/artist?query=${encodeURIComponent(`artist:"${trimmed.replace(/["\\]/g, ' ')}"`)}&limit=5`,
+      false,
+      signal
     )
   );
   const exact = (response.artists ?? []).filter(
-    hit => hit.id && hit.name && exactName(hit.name, trimmed)
+    hit =>
+      hit.id &&
+      isMusicBrainzId(hit.id) &&
+      hit.name &&
+      exactName(hit.name, trimmed)
   );
-  if (exact.length > 1) return { status: 'ambiguous', count: exact.length };
-  const only = exact[0];
+  const unique = [
+    ...new Map(exact.map(hit => [hit.id!.toLowerCase(), hit])).values(),
+  ];
+  if (unique.length > 1)
+    return {
+      status: 'ambiguous',
+      count: unique.length,
+      artists: unique.map(hit => ({
+        id: hit.id!.toLowerCase(),
+        name: hit.name!,
+      })),
+    };
+  const only = unique[0];
   if (!only?.id) return { status: 'none' };
-  const artist = await getMusicBrainzArtist(only.id);
+  const artist = await getMusicBrainzArtist(only.id, {
+    waitForQuota: true,
+    includeReleaseGroups: true,
+    signal,
+  });
   if (!artist) return { status: 'none' };
   return { status: 'found', artist };
 }
