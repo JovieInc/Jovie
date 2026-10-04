@@ -401,7 +401,10 @@ const sleep = ms => new Promise(done => setTimeout(done, ms));
  * slower than a warm local one, so a fixed delay captured empty screens.
  */
 async function captureSettled({ udid, file, spec, screen, settleMs }) {
-  const deadline = Date.now() + settleMs * 6;
+  // A cold hosted simulator can spend 30s+ on one screenshot, so the budget
+  // is generous and a capture always gets at least three frames to compare.
+  const deadline = Date.now() + settleMs * 18;
+  let frames = 0;
   await sleep(settleMs);
   let previous;
   let density = 0;
@@ -411,11 +414,12 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
       stdio: 'ignore',
     });
     const buffer = readFileSync(file);
+    frames++;
     density = contentDensity(buffer, spec.contentCheck);
     difference = previous ? frameDifference(previous, buffer) : 1;
     const settled = difference < 0.001;
     if (settled && density >= spec.contentCheck.minDensity) return buffer;
-    if (Date.now() > deadline) {
+    if (Date.now() > deadline && frames >= 3) {
       throw new Error(
         `${screen.id}: ${settled ? 'screen body is empty' : 'screen never settled'} (content density ${(density * 100).toFixed(2)}%, last frame change ${(difference * 100).toFixed(2)}%)`
       );
