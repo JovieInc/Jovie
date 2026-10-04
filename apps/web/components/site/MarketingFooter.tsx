@@ -7,12 +7,12 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
+  getMarketingFooterColumns,
+  getPublicCommercialFooterColumn,
   MARKETING_CLI_LINK,
   MARKETING_DEVELOPER_LINK,
-  MARKETING_FOOTER_COLUMNS,
   MARKETING_LEGAL_LINKS,
   type MarketingFooterLink,
-  PUBLIC_COMMERCIAL_FOOTER_COLUMN,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
@@ -67,6 +67,8 @@ interface MarketingFooterProps {
   readonly variant?: 'auto' | 'expanded' | 'minimal';
   readonly className?: string;
   readonly showCta?: boolean;
+  /** JOV-7580. Server passes the code flag. Default keeps the Music column. */
+  readonly genericCreatorNav?: boolean;
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -142,6 +144,7 @@ export function MarketingFooter({
   variant = 'auto',
   className,
   showCta = true,
+  genericCreatorNav = false,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
@@ -152,8 +155,8 @@ export function MarketingFooter({
       isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
   const footerColumns = FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH
-    ? [PUBLIC_COMMERCIAL_FOOTER_COLUMN]
-    : MARKETING_FOOTER_COLUMNS;
+    ? [getPublicCommercialFooterColumn(genericCreatorNav)]
+    : getMarketingFooterColumns(genericCreatorNav);
 
   return (
     <footer

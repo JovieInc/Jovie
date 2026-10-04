@@ -75,7 +75,7 @@ describe('MCP server', () => {
     expect(create?.inputSchema.required).toEqual(['url']);
     expect(create?.annotations.readOnlyHint).toBe(false);
     const lookup = tools.find(tool => tool.name === 'lookup_creator');
-    expect(lookup?.inputSchema.required).toEqual(['url']);
+    expect(lookup?.inputSchema.required).toEqual(['url-or-handle']);
     expect(lookup?.annotations.readOnlyHint).toBe(true);
     expect(
       tools.find(tool => tool.name === 'get_artist')?.annotations
@@ -96,7 +96,7 @@ describe('MCP server', () => {
         method: 'tools/call',
         params: {
           name: 'lookup_creator',
-          arguments: { url: 'https://youtube.com/@creator' },
+          arguments: { 'url-or-handle': 'https://youtube.com/@creator' },
         },
       },
       context(fetchImpl)

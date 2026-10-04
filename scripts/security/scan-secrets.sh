@@ -112,9 +112,41 @@ trufflehog_exclude_args() {
   fi
 }
 
+run_gitleaks_checked() {
+  local scope="$1" log status
+  shift
+  log="$(mktemp)"
+  status=0
+  "$GITLEAKS_BIN" "$@" --no-color >"$log" 2>&1 || status=$?
+  # Gitleaks 8.21.2 can swallow Git reader failures and exit 0 with
+  # "no leaks found". Repair only missing-history failures, once, using
+  # the same exact remote coordinates as the TruffleHog repair path.
+  if [[ "$scope" == history ]] \
+    && grep -qE '(^|[[:space:]])(ERR|FTL)([[:space:]]|$)' "$log" \
+    && grep -qiE 'unable to read tree|bad object|object not found' "$log"; then
+    echo "::warning title=Secret scan checkout corruption::Gitleaks could not read Git history; repairing the checkout and retrying once." >&2
+    repair_partial_clone || {
+      status=$?
+      cat "$log"
+      rm -f "$log"
+      echo "::error title=Secret scan checkout repair failed::Gitleaks could not complete its history scan." >&2
+      return "$status"
+    }
+    status=0
+    "$GITLEAKS_BIN" "$@" --no-color >"$log" 2>&1 || status=$?
+  fi
+  cat "$log"
+  if [[ $status -eq 0 ]] && grep -qE '(^|[[:space:]])(ERR|FTL)([[:space:]]|$)' "$log"; then
+    echo "::error title=Secret scan incomplete::Gitleaks reported a scanner error despite exiting successfully; refusing an empty success." >&2
+    status=1
+  fi
+  rm -f "$log"
+  return "$status"
+}
+
 run_gitleaks_pre_commit() {
   echo "Running gitleaks protect on staged changes..."
-  "$GITLEAKS_BIN" protect \
+  run_gitleaks_checked staged protect \
     --staged \
     --config "$REPO_ROOT/.gitleaks.toml" \
     --verbose
@@ -122,7 +154,7 @@ run_gitleaks_pre_commit() {
 
 run_gitleaks_ci_pr() {
   echo "Running gitleaks detect on ${BASE_REF}..HEAD..."
-  "$GITLEAKS_BIN" detect \
+  run_gitleaks_checked history detect \
     --source "$REPO_ROOT" \
     --config "$REPO_ROOT/.gitleaks.toml" \
     --log-opts="${BASE_REF}..HEAD" \
@@ -131,7 +163,7 @@ run_gitleaks_ci_pr() {
 
 run_gitleaks_full() {
   echo "Running gitleaks detect on full git history..."
-  "$GITLEAKS_BIN" detect \
+  run_gitleaks_checked history detect \
     --source "$REPO_ROOT" \
     --config "$REPO_ROOT/.gitleaks.toml" \
     --verbose

@@ -27,6 +27,7 @@ export interface McpContext {
   readonly workerToken?: string;
   readonly baseUrl: string;
   readonly fetchImpl?: FetchImplementation;
+  readonly timeoutMs?: number;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -145,6 +146,7 @@ async function callTool(
         baseUrl: context.baseUrl,
         workerToken: context.workerToken,
         fetchImpl: context.fetchImpl,
+        timeoutMs: context.timeoutMs,
         userAgent: `jovie-cli/${context.version} mcp`,
       }
     );

@@ -1,0 +1,9 @@
+{
+  "platforms": [
+    {
+      "id": "jovie",
+      "label": "Jovie",
+      "profiles": [{ "id": "tim", "url": "https://jov.ie/tim" }]
+    }
+  ]
+}

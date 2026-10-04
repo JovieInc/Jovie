@@ -7,6 +7,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { PageShell } from '@/components/organisms/PageShell';
@@ -329,7 +330,11 @@ export function OvieCertificationsWorkspace() {
     useState<CertificationStateFilter>('all');
   const [domainFilter, setDomainFilter] =
     useState<CertificationDomainFilter>('all');
+  // Needs You judgment cards deep-link here with ?row=<rowId> so the founder
+  // lands on the exact evidence rail, not a re-search.
+  const linkedRowId = useSearchParams().get('row');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => setSelectedId(linkedRowId), [linkedRowId]);
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'state', desc: false },
   ]);

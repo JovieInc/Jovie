@@ -13,6 +13,10 @@
     "apps/web/app/api/health/build-info/route.ts": {
       "readFileSync": 1
     },
+    "apps/web/components/features/home/RecentlyShippedSection.tsx": {
+      "existsSync": 1,
+      "readFileSync": 1
+    },
     "apps/web/lib/a11y-gates/contrast-engine.ts": {
       "readFileSync": 2
     },

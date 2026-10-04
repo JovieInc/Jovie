@@ -211,6 +211,14 @@ const config: StorybookConfig = {
           replacement: require.resolve('./leads-reporting-mock.ts'),
         },
         {
+          find: '@/app/app/(shell)/dashboard/releases/actions',
+          replacement: require.resolve('./library-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/library/actions',
+          replacement: require.resolve('./library-actions-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions/dashboard-data',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
@@ -262,6 +270,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dev-test-auth-identity-mock.ts'),
         },
         {
+          find: '@/app/app/(shell)/admin/actions',
+          replacement: require.resolve('./admin-actions-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
@@ -304,6 +316,12 @@ const config: StorybookConfig = {
           // crash Storybook's browser Vite build. Product stories never call it.
           find: /^@anthropic-ai\/sdk(\/.*)?$/,
           replacement: require.resolve('./anthropic-sdk-mock.ts'),
+        },
+        {
+          // Statsig's server SDK loads native Node bindings. Stories exercise
+          // deterministic UI states and must never initialize that SDK.
+          find: '@statsig/statsig-node-core',
+          replacement: require.resolve('./statsig-node-core-mock.ts'),
         },
         {
           find: 'server-only',
@@ -388,6 +406,8 @@ const config: StorybookConfig = {
           'react/jsx-runtime',
           'react/jsx-dev-runtime',
           'react-dom/client',
+          // Sentry's browser entry imports this CommonJS module by name.
+          'next/constants.js',
         ]),
       ],
       esbuildOptions: {
