@@ -466,7 +466,7 @@ describe('macOS keychain adapter', () => {
     expect(file).toBe('security');
     expect(args).toEqual(['-i']);
     expect(fake.written()).toBe(
-      `add-generic-password -s jovie.mesh.muse -a ${SENDER_ID} -w abc_DEF-123\nquit\n`
+      `add-generic-password -s jovie.mesh.muse -a ${SENDER_ID} -w abc_DEF-123\n`
     );
     child.spawn.mockReturnValue(fakeChild(0, 'already exists').proc);
     await expect(

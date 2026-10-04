@@ -114,7 +114,7 @@ export const macKeychain: MeshKeychain = {
             )
       );
       child.stdin.end(
-        `add-generic-password -s ${service} -a ${account} -w ${secret}\nquit\n`
+        `add-generic-password -s ${service} -a ${account} -w ${secret}\n`
       );
     });
   },
