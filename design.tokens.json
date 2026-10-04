@@ -65,7 +65,7 @@
       "$type": "color"
     },
     "text.quaternary": {
-      "$value": "#858b96",
+      "$value": "#8c939e",
       "$type": "color"
     },
     "text.disabled": {

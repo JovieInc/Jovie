@@ -143,6 +143,7 @@ Environment:
 
 Examples:
   jovie creator lookup https://www.youtube.com/@creator --json
+  jovie creator lookup youtube:@creator --json
   jovie profile create https://open.spotify.com/artist/<id> --json
   jovie artist get <username> --json
   npx -y @jovie/cli mcp

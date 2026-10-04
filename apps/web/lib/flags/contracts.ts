@@ -29,6 +29,8 @@ export interface StatsigFeatureFlagsBootstrap {
 }
 
 export const APP_FLAG_DEFAULTS = {
+  YOUTUBE_WORKSPACE_NAV: false,
+  JOVIE_WORK_NAV: false,
   BILLING_UPGRADE_DIRECT: true,
   SMARTLINK_PRE_SAVE: true,
   IOS_APPLE_MUSIC_PRIORITY: true,
@@ -95,6 +97,8 @@ export type AppFlagSnapshot = Record<AppFlagName, boolean>;
 export type PartialAppFlagSnapshot = Partial<Record<AppFlagName, boolean>>;
 
 export const APP_FLAG_KEYS = {
+  YOUTUBE_WORKSPACE_NAV: 'youtube_workspace_nav',
+  JOVIE_WORK_NAV: 'jovie_work_nav',
   BILLING_UPGRADE_DIRECT: LEGACY_STATSIG_GATE_KEYS.BILLING_UPGRADE_DIRECT,
   SMARTLINK_PRE_SAVE: LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
   IOS_APPLE_MUSIC_PRIORITY: LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY,
@@ -122,6 +126,8 @@ export const APP_FLAG_KEYS = {
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
+  YOUTUBE_WORKSPACE_NAV: 'code:YOUTUBE_WORKSPACE_NAV',
+  JOVIE_WORK_NAV: 'code:JOVIE_WORK_NAV',
   BILLING_UPGRADE_DIRECT: 'code:BILLING_UPGRADE_DIRECT',
   SMARTLINK_PRE_SAVE: 'code:SMARTLINK_PRE_SAVE',
   IOS_APPLE_MUSIC_PRIORITY: 'code:IOS_APPLE_MUSIC_PRIORITY',
@@ -165,6 +171,8 @@ export const APP_FLAG_TO_STATSIG_GATE = {
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
 
 export const APP_FLAG_DESCRIPTIONS = {
+  YOUTUBE_WORKSPACE_NAV: 'Cmd-K discovery of the YouTube workspace',
+  JOVIE_WORK_NAV: 'Cmd-K discovery of autonomous work on your profile',
   BILLING_UPGRADE_DIRECT: 'Direct billing upgrade (skip pricing page)',
   SMARTLINK_PRE_SAVE: 'Spotify pre-save campaigns',
   IOS_APPLE_MUSIC_PRIORITY: 'Prefer Apple Music on iOS',
@@ -211,6 +219,10 @@ export const APP_FLAG_DESCRIPTIONS = {
  * flag without an exit condition is an indefinite second product state.
  */
 export const APP_FLAG_REMOVAL_CONDITIONS = {
+  YOUTUBE_WORKSPACE_NAV:
+    'Remove when the YouTube navigation door is approved or retired.',
+  JOVIE_WORK_NAV:
+    'Remove when the autonomous work navigation door is approved or retired.',
   BILLING_UPGRADE_DIRECT:
     'Remove after direct checkout is the only supported upgrade path.',
   SMARTLINK_PRE_SAVE:
@@ -312,6 +324,8 @@ export const APP_FLAG_AUDIT_REGISTRY = Object.fromEntries(
  * justification, or the flag-registration-guardrail test will fail.
  */
 export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
+  'YOUTUBE_WORKSPACE_NAV', // unapproved navigation door; local default off, audited override only
+  'JOVIE_WORK_NAV', // unapproved navigation door; local default off, audited override only
   'PLAYLIST_ENGINE', // internal v1 default-on feature; no remote gate
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
   'RELEASE_PLAN_DEMO', // mock EP planner; default off in production, on in dev/preview, no remote gate

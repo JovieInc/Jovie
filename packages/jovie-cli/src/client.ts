@@ -615,12 +615,39 @@ export function createProfile(
   return requestJson('/api/agents/profiles', options, { url: url.toString() });
 }
 
+const CREATOR_HANDLE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})$/;
+
+/** `platform:handle` expands to the canonical profile URL for that platform. */
+const HANDLE_SOURCES: Readonly<Record<string, (handle: string) => string>> = {
+  instagram: handle => `https://www.instagram.com/${handle}`,
+  linktree: handle => `https://linktr.ee/${handle}`,
+  tiktok: handle => `https://www.tiktok.com/@${handle}`,
+  youtube: handle =>
+    /^UC[\w-]{22}$/.test(handle)
+      ? `https://www.youtube.com/channel/${handle}`
+      : `https://www.youtube.com/@${handle}`,
+};
+
+function expandCreatorInput(input: string): string {
+  const match = /^([a-z]+):([^:]+)$/.exec(input);
+  if (!match) return input;
+  const build = HANDLE_SOURCES[match[1] as string];
+  if (!build) return input;
+  const handle = (match[2] as string).replace(/^@+/, '');
+  if (!CREATOR_HANDLE.test(handle)) {
+    throw new JovieInputError(
+      `Invalid handle in ${displayValue(input)}. Expected <platform>:<handle> using letters, numbers, dots, underscores, or hyphens.`
+    );
+  }
+  return build(handle);
+}
+
 /** Extract public creator fields without creating or modifying a profile. */
 export function lookupCreator(
   creatorUrl: string,
   options: ResourceOptions = {}
 ): Promise<unknown> {
-  const candidate = creatorUrl.trim();
+  const candidate = expandCreatorInput(creatorUrl.trim());
   let url: URL;
   try {
     url = new URL(candidate);

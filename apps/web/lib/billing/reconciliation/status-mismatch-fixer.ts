@@ -34,17 +34,10 @@ export async function fixStatusMismatch(
   subscription: Stripe.Subscription,
   expectedIsPro: boolean
 ): Promise<StatusMismatchFixResult> {
-  if (!user.clerkId) {
-    return {
-      success: false,
-      error:
-        'user has no clerk_id (post-cutover row; reconciler skips until better-auth identity swap)',
-    };
-  }
   const customerId = extractCustomerId(subscription.customer);
 
   const result = await updateUserBillingStatus({
-    clerkUserId: user.clerkId,
+    clerkUserId: user.clerkId ?? user.id,
     isPro: expectedIsPro,
     stripeSubscriptionId: expectedIsPro ? subscription.id : null,
     stripeCustomerId: customerId ?? undefined,
