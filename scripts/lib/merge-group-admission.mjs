@@ -76,12 +76,18 @@ const REQUIRED_ENV_MESSAGE =
 export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v2';
 
 export class MergeGroupAdmissionError extends Error {
+  /**
+   * @param {string} message
+   * @param {{ path?: string | null, status?: number | null, rateLimit?: boolean }} [options]
+   */
   constructor(message, { path = null, status = null, rateLimit } = {}) {
     super(message);
     this.name = 'MergeGroupAdmissionError';
     this.path = path;
     this.status = status;
     this.rateLimit = rateLimit;
+    /** @type {number | undefined} */
+    this.retryAtMs = undefined;
   }
 }
 
@@ -180,6 +186,10 @@ export function parseQueueHeadPullRequestNumber(headRef) {
   );
 }
 
+/**
+ * @param {any} event
+ * @param {{ expectedHeadSha?: string, expectedRepository?: string }} [options]
+ */
 export function validateMergeGroupAdmissionEvent(
   event,
   { expectedHeadSha, expectedRepository } = {}
@@ -934,6 +944,15 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
   }
 }
 
+/**
+ * @param {Record<string, string | undefined>} [env]
+ * @param {{
+ *   fetchImpl?: typeof fetch,
+ *   now?: () => number,
+ *   sleep?: (delayMs: number) => Promise<any>,
+ *   onStatus?: (message: string) => void,
+ * }} [options]
+ */
 export async function runAdmissionFromEnv(
   env = process.env,
   { fetchImpl = fetch, now = Date.now, sleep = defaultSleep, onStatus } = {}

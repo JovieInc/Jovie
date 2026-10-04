@@ -959,6 +959,10 @@ const resetHeaders = (delayMs, skewMs = 0) => ({
   'x-ratelimit-remaining': '0',
   'x-ratelimit-reset': String((QUOTA_RESPONSE_NOW + skewMs + delayMs) / 1_000),
 });
+/**
+ * @param {Record<string, string>} [headers]
+ * @param {Array<{ type?: any, message?: string }>} [errors]
+ */
 const graphqlQuotaResponse = (headers = {}, errors = [STRUCTURED_QUOTA]) =>
   Response.json({ ...liveQueuePayload([null]), errors }, { headers });
 const completeProofKinds = [
@@ -1002,17 +1006,18 @@ async function withQuotaResponses(respond, verify) {
       },
       fetchImpl: (url, init) => {
         const task = (async () => {
-          const kind = url.endsWith('/graphql')
+          const href = String(url);
+          const kind = href.endsWith('/graphql')
             ? 'graphql'
-            : url.includes('/git/ref/')
+            : href.includes('/git/ref/')
               ? 'ref'
-              : new URL(url).searchParams.get('check_name');
+              : new URL(href).searchParams.get('check_name');
           const request = {
             kind,
             at: state.elapsed,
             cursor:
               kind === 'graphql'
-                ? JSON.parse(init.body).variables.cursor
+                ? JSON.parse(String(init.body)).variables.cursor
                 : null,
           };
           // Record before asynchronous file reads to preserve concurrent call order.
@@ -1050,11 +1055,14 @@ async function withQuotaResponses(respond, verify) {
     cleanupError = error;
   }
   if (verificationFailed) throw verificationError;
-  const rejected = settled.find(
-    result =>
-      result.status === 'rejected' && !expectedFetchErrors.has(result.reason)
-  );
-  if (rejected) throw rejected.reason;
+  for (const result of settled) {
+    if (
+      result.status === 'rejected' &&
+      !expectedFetchErrors.has(result.reason)
+    ) {
+      throw result.reason;
+    }
+  }
   if (cleanupError) throw cleanupError;
 }
 
@@ -1153,28 +1161,30 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
     }
   );
 
-  it.each([
-    [
-      'mixed',
+  it.each(
+    /** @type {Array<[string, any[]]>} */ ([
       [
-        { type: 'FORBIDDEN', message: 'denied' },
-        { type: 'RATE_LIMITED', message: INSTALLATION_QUOTA },
+        'mixed',
+        [
+          { type: 'FORBIDDEN', message: 'denied' },
+          { type: 'RATE_LIMITED', message: INSTALLATION_QUOTA },
+        ],
       ],
-    ],
-    [
-      'reversed mixed',
       [
-        { type: 'RATE_LIMITED', message: INSTALLATION_QUOTA },
-        { message: 'not found' },
+        'reversed mixed',
+        [
+          { type: 'RATE_LIMITED', message: INSTALLATION_QUOTA },
+          { message: 'not found' },
+        ],
       ],
-    ],
-    ...['FORBIDDEN', null, {}, ''].map(type => [
-      `explicit type ${JSON.stringify(type)}`,
-      [{ type, message: INSTALLATION_QUOTA }],
-    ]),
-  ])(
+      ...['FORBIDDEN', null, {}, ''].map(type => [
+        `explicit type ${JSON.stringify(type)}`,
+        [{ type, message: INSTALLATION_QUOTA }],
+      ]),
+    ])
+  )(
     'fails immediately on %s despite valid quota headers',
-    async (_, errors) => {
+    async (/** @type {any} */ _, /** @type {any[]} */ errors) => {
       for (const status of [200, 403, 429, 502, 503, 504]) {
         await withQuotaResponses(
           () =>
