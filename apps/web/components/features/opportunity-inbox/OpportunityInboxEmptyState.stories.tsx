@@ -1,3 +1,5 @@
+import '@/app/globals.css';
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { buildSpotifyCatalogConnectionRoute } from '@/constants/routes';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
@@ -33,4 +35,18 @@ export const Desktop: Story = {
 export const Narrow: Story = {
   args: {},
   parameters: { viewport: { defaultViewport: 'mobile1' } },
+};
+
+export const FounderBrainDump: Story = {
+  args: { founderMode: true },
+  render: args => (
+    <div className='min-h-screen bg-(--app-shell-content-surface) p-4 sm:p-6'>
+      <OpportunityInboxEmptyState {...args} />
+    </div>
+  ),
+};
+
+export const FounderBrainDumpLight: Story = {
+  ...FounderBrainDump,
+  parameters: { themes: { themeOverride: 'light' } },
 };
