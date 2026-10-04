@@ -118,6 +118,7 @@ const readOutputs = (path: string) =>
 function render(
   script: string,
   context: {
+    github?: { run_id: string; run_attempt: string };
     needs?: Record<
       string,
       { result?: string; outputs?: Record<string, string> }
@@ -144,6 +145,9 @@ function render(
       const input = expression.match(/^inputs\.(\w+)$/);
       if (input?.[1]) return context.inputs?.[input[1]] ?? '';
       if (expression === 'github.repository') return 'JovieInc/Jovie';
+      if (expression === 'github.run_id') return context.github?.run_id ?? '';
+      if (expression === 'github.run_attempt')
+        return context.github?.run_attempt ?? '';
       return '';
     }
   );
@@ -361,7 +365,7 @@ describe.skipIf(!gh)(
             String(
               step(receiptJob, 'Write typed staging deployment receipt').run
             ),
-            {}
+            { github: { run_id: '1234', run_attempt: '2' } }
           ),
           env: {
             PATH: `${bin}:${process.env.PATH ?? ''}`,
@@ -393,6 +397,9 @@ describe.skipIf(!gh)(
           alias: 'staging.jov.ie',
           environment: 'preview',
           sourceCiRunId: '77',
+          sourceCiRunAttempt: '1',
+          controllerRunId: '1234',
+          controllerRunAttempt: '2',
           latencySeconds: latency,
           sloState,
           exactIdentity: 'passed',
