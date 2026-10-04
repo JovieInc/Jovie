@@ -44,6 +44,7 @@ function mockTurnstile(
 describe('OnboardingTurnstile (minimal presentation)', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     delete document.documentElement.dataset.e2eMode;
     delete window.turnstile;
   });
@@ -95,6 +96,33 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(
       screen.getByTestId('onboarding-turnstile-widget-frame')
     ).toHaveAttribute('data-turnstile-mount', 'silent');
+  });
+
+  it('mounts the Cloudflare test sitekey only in server-resolved test mode (JOV-7697)', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    // jsdom runs on localhost, which always gets dummy keys; pose as jov.ie.
+    vi.stubGlobal('location', { ...window.location, hostname: 'jov.ie' });
+    const { render: renderMock } = mockTurnstile();
+
+    const { unmount } = render(
+      <OnboardingTurnstile onToken={vi.fn()} onStateChange={vi.fn()} />
+    );
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    expect(renderMock.mock.calls[0]?.[1]).toMatchObject({
+      sitekey: 'site-key',
+    });
+    unmount();
+
+    renderMock.mockClear();
+    render(
+      <OnboardingTurnstile onToken={vi.fn()} onStateChange={vi.fn()} testMode />
+    );
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    expect(renderMock.mock.calls[0]?.[1]).toMatchObject({
+      sitekey: '1x00000000000000000000AA',
+    });
+    vi.unstubAllGlobals();
   });
 
   it('reveals the bare widget only for a genuine interactive challenge', async () => {

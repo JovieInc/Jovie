@@ -25,6 +25,19 @@ vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }));
 
+// JOV-7697: signed-in renders check synthetic passage for the test sitekey.
+vi.mock('next/headers', () => ({
+  headers: async () => new Headers(),
+}));
+
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: { api: { getSession: vi.fn().mockResolvedValue(null) } },
+}));
+
+vi.mock('@/lib/synthetic/passage.server', () => ({
+  resolveSyntheticPassage: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
   OnboardingShell: ({
     sessionLabel,
