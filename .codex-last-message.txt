@@ -1,0 +1,18 @@
+Implemented JOV-5037 as one scoped slice; no split required.
+
+- Added stable claim IDs, publish-safe evidence, ownership, `verifiedAt`, and `reviewAfter` lifecycle metadata in [published-claims.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T080446Z-JOV-5037-codex-34fa8f/apps/web/content/published-claims.ts).
+- Bound comparison, alternative, `/llms.txt`, and `/llms-full.txt` claims to receipts.
+- Replaced unsupported competitor claims and corrected Clerk to self-hosted Better Auth.
+- Added expiry/missing-evidence validation and exact-output drift protection in [published-claims.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261001T080446Z-JOV-5037-codex-34fa8f/apps/web/content/published-claims.test.ts).
+- Reviewable diff: 1,427 lines across 19 files.
+
+Verification:
+
+- 48 scoped tests across 11 files passed.
+- Web typecheck, Biome, `git diff --check`, and secret scans passed.
+- All hosted CI checks passed, including Exact-head Coverage, Source Validation, Security Evidence, and UI capture.
+- Working tree is clean; remote head matches `b2ea2bb626`.
+
+Draft PR: [JovieInc/Jovie#19802](https://github.com/JovieInc/Jovie/pull/19802)
+
+The PR remains draft and JOV-5037 is In Review. Merge, deployment, and deployed-route certification were intentionally not performed. GBrain was unavailable, so repository and current first-party evidence were used.
