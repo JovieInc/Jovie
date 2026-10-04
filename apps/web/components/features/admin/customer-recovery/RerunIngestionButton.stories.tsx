@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, userEvent, within } from 'storybook/test';
 import { RerunIngestionButton } from './RerunIngestionButton';
 
 const meta = {
@@ -13,15 +12,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-
-export const Requested: Story = {
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Re-run Artist Ingestion' })
-    );
-    await expect(
-      await canvas.findByText(/Recovery requested/)
-    ).toBeInTheDocument();
-  },
-};

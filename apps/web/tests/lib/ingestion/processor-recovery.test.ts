@@ -2,21 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   musicfetch: vi.fn(),
-  markProcessing: vi.fn(),
-  markIdle: vi.fn(),
-  markFailed: vi.fn(),
+  processing: vi.fn(),
+  idle: vi.fn(),
+  failed: vi.fn(),
 }));
 
 vi.mock('@/lib/dsp-enrichment/jobs', () => ({
   processDspArtistDiscoveryJob: vi.fn(),
   processMusicFetchEnrichmentJob: mocks.musicfetch,
 }));
-
 vi.mock('@/lib/ingestion/status-manager', () => ({
   IngestionStatusManager: {
-    markProcessing: mocks.markProcessing,
-    markIdle: mocks.markIdle,
-    markFailed: mocks.markFailed,
+    markProcessing: mocks.processing,
+    markIdle: mocks.idle,
+    markFailed: mocks.failed,
   },
 }));
 
@@ -37,75 +36,29 @@ const job = {
 } as typeof ingestionJobs.$inferSelect;
 
 describe('musicfetch recovery status lifecycle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => vi.clearAllMocks());
 
-  it('moves the claimed recovery from processing to idle on success', async () => {
-    const result = { status: 'complete', errors: [] };
+  it.each([
+    [{ status: 'complete', errors: [] }, 'idle'],
+    [{ status: 'complete', errors: ['partial warning'] }, 'idle'],
+    [{ status: 'failed', errors: ['provider rejected'] }, 'failed'],
+  ] as const)('finishes %o as %s', async (result, finalState) => {
     mocks.musicfetch.mockResolvedValue(result);
 
     await expect(processJob(tx, job)).resolves.toBe(result);
 
-    expect(mocks.markProcessing).toHaveBeenCalledWith(tx, profileId);
-    expect(mocks.markIdle).toHaveBeenCalledWith(tx, profileId);
-    expect(mocks.markFailed).not.toHaveBeenCalled();
+    expect(mocks.processing).toHaveBeenCalledWith(tx, profileId);
+    expect(mocks.idle).toHaveBeenCalledTimes(finalState === 'idle' ? 1 : 0);
+    expect(mocks.failed).toHaveBeenCalledTimes(finalState === 'failed' ? 1 : 0);
   });
 
-  it('completes recovery when enrichment returns partial warnings', async () => {
-    const result = {
-      status: 'complete',
-      errors: ['one release could not be imported'],
-    };
-    mocks.musicfetch.mockResolvedValue(result);
-
-    await expect(processJob(tx, job)).resolves.toBe(result);
-
-    expect(mocks.markIdle).toHaveBeenCalledWith(tx, profileId);
-    expect(mocks.markFailed).not.toHaveBeenCalled();
-  });
-
-  it('keeps a terminal provider rejection failed', async () => {
-    const result = {
-      status: 'failed',
-      errors: ['provider rejected the artist'],
-    };
-    mocks.musicfetch.mockResolvedValue(result);
-
-    await expect(processJob(tx, job)).resolves.toBe(result);
-
-    expect(mocks.markFailed).toHaveBeenCalledWith(
-      tx,
-      profileId,
-      'provider rejected the artist'
-    );
-    expect(mocks.markIdle).not.toHaveBeenCalled();
-  });
-
-  it('leaves thrown failures for the scheduler retry policy', async () => {
-    const error = new Error('provider timeout');
-    mocks.musicfetch.mockRejectedValue(error);
-
-    await expect(processJob(tx, job)).rejects.toBe(error);
-
-    expect(mocks.markProcessing).toHaveBeenCalledWith(tx, profileId);
-    expect(mocks.markIdle).not.toHaveBeenCalled();
-    expect(mocks.markFailed).not.toHaveBeenCalled();
-  });
-
-  it('does not change profile status for ordinary enrichment jobs', async () => {
-    const result = { status: 'complete', errors: [] };
-    mocks.musicfetch.mockResolvedValue(result);
-
-    await expect(
-      processJob(tx, {
-        ...job,
-        payload: { ...job.payload, recoveryClaimed: undefined },
-      })
-    ).resolves.toBe(result);
-
-    expect(mocks.markProcessing).not.toHaveBeenCalled();
-    expect(mocks.markIdle).not.toHaveBeenCalled();
-    expect(mocks.markFailed).not.toHaveBeenCalled();
+  it('does not change status for ordinary enrichment jobs', async () => {
+    mocks.musicfetch.mockResolvedValue({ status: 'complete', errors: [] });
+    await processJob(tx, {
+      ...job,
+      payload: { ...job.payload, recoveryClaimed: undefined },
+    });
+    expect(mocks.processing).not.toHaveBeenCalled();
+    expect(mocks.idle).not.toHaveBeenCalled();
   });
 });

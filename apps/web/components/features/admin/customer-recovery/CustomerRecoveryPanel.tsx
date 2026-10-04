@@ -1,4 +1,4 @@
-import { Badge, Input } from '@jovie/ui';
+import { Input } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -21,6 +21,16 @@ function Fact({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function Facts({ rows }: { rows: readonly (readonly [string, ReactNode])[] }) {
+  return (
+    <dl className='grid grid-cols-2 gap-3'>
+      {rows.map(([label, value]) => (
+        <Fact key={label} label={label} value={value} />
+      ))}
+    </dl>
+  );
+}
+
 function DossierSection({
   title,
   children,
@@ -40,88 +50,64 @@ function DossierSection({
 
 function DossierView({ dossier }: { dossier: CustomerRecoveryDossier }) {
   const { identity, account, authority, admission, blocker } = dossier;
+  const yesNo = (value: boolean | undefined) =>
+    value === undefined ? '—' : value ? 'yes' : 'no';
+  const sections: readonly [
+    string,
+    readonly (readonly [string, ReactNode])[],
+  ][] = [
+    [
+      'Identity',
+      [
+        ['Name', identity.displayName],
+        ['Email', identity.email],
+        ['Handle', identity.handle],
+        ['Stage', identity.stage],
+        ['User', identity.userId],
+        ['Creator Profile', identity.creatorProfileId],
+        ['Sources', identity.sources.join(', ')],
+      ],
+    ],
+    [
+      'Account and admission',
+      [
+        [
+          'Plan',
+          account
+            ? `${account.plan ?? 'free'}${account.isPro ? ' (pro flag)' : ''}`
+            : 'no account',
+        ],
+        ['Paying', yesNo(account?.isPaying)],
+        ['Admission', admission?.status ?? 'not on waitlist'],
+      ],
+    ],
+    [
+      'Authority and connections',
+      [
+        ['Artist-managed', yesNo(authority?.profileClaimed)],
+        ['Verified', yesNo(authority?.isVerified)],
+        ['Social Links', String(dossier.connections.activeSocialLinks)],
+        ['Releases', dossier.launch?.releaseCount.toString()],
+      ],
+    ],
+  ];
   return (
-    <div
-      className='grid gap-3 lg:grid-cols-2'
-      data-testid='customer-recovery-dossier'
-    >
-      <DossierSection title='Identity'>
-        <dl className='grid grid-cols-2 gap-3'>
-          <Fact label='Name' value={identity.displayName} />
-          <Fact label='Email' value={identity.email} />
-          <Fact label='Handle' value={identity.handle} />
-          <Fact label='Stage' value={identity.stage} />
-          <Fact label='User' value={identity.userId} />
-          <Fact label='Creator Profile' value={identity.creatorProfileId} />
-          <Fact label='Lead' value={identity.leadId} />
-          <Fact label='Waitlist Entry' value={identity.waitlistEntryId} />
-        </dl>
-        <div className='flex flex-wrap gap-1'>
-          {identity.sources.map(source => (
-            <Badge key={source} variant='secondary'>
-              {source}
-            </Badge>
-          ))}
-        </div>
-      </DossierSection>
-
-      <DossierSection title='Account and admission'>
-        <dl className='grid grid-cols-2 gap-3'>
-          <Fact
-            label='Plan'
-            value={
-              account
-                ? `${account.plan ?? 'free'}${account.isPro ? ' (pro flag)' : ''}`
-                : 'no account'
-            }
-          />
-          <Fact
-            label='Paying'
-            value={account ? (account.isPaying ? 'yes' : 'no') : '—'}
-          />
-          <Fact label='User Status' value={account?.userStatus} />
-          <Fact
-            label='Admission'
-            value={admission ? admission.status : 'not on waitlist'}
-          />
-          <Fact label='Approved' value={admission?.approvedAt} />
-          <Fact label='Signed Up' value={admission?.signedUpAt} />
-        </dl>
-      </DossierSection>
-
-      <DossierSection title='Authority and connections'>
-        <dl className='grid grid-cols-2 gap-3'>
-          <Fact
-            label='Artist-managed'
-            value={authority ? (authority.profileClaimed ? 'yes' : 'no') : '—'}
-          />
-          <Fact label='Claimed At' value={authority?.claimedAt} />
-          <Fact
-            label='Verified'
-            value={authority ? (authority.isVerified ? 'yes' : 'no') : '—'}
-          />
-          <Fact
-            label='Social Links'
-            value={String(dossier.connections.activeSocialLinks)}
-          />
-          <Fact
-            label='Releases'
-            value={dossier.launch ? String(dossier.launch.releaseCount) : '—'}
-          />
-          <Fact
-            label='Latest Release'
-            value={dossier.launch?.latestReleaseTitle}
-          />
-        </dl>
-      </DossierSection>
+    <div className='grid gap-3 lg:grid-cols-2'>
+      {sections.map(([title, rows]) => (
+        <DossierSection key={title} title={title}>
+          <Facts rows={rows} />
+        </DossierSection>
+      ))}
 
       <DossierSection title='Blocker and next action'>
         <p className='text-app text-primary-token'>{blocker.summary}</p>
         {authority && (
-          <dl className='grid grid-cols-2 gap-3'>
-            <Fact label='Ingestion Status' value={authority.ingestionStatus} />
-            <Fact label='Last Error' value={authority.lastIngestionError} />
-          </dl>
+          <Facts
+            rows={[
+              ['Ingestion Status', authority.ingestionStatus],
+              ['Last Error', authority.lastIngestionError],
+            ]}
+          />
         )}
         {blocker.operation === 'rerun-ingestion' &&
           identity.creatorProfileId && (
@@ -142,19 +128,11 @@ function DossierView({ dossier }: { dossier: CustomerRecoveryDossier }) {
             No ingest operations recorded for this customer.
           </p>
         ) : (
-          <ul className='space-y-1'>
+          <ul className='space-y-1 text-app text-secondary-token'>
             {dossier.recentOperations.map(op => (
-              <li
-                key={`${op.type}-${op.createdAt}`}
-                className='text-app flex items-center justify-between gap-2 text-secondary-token'
-              >
-                <span className='truncate'>
-                  {op.type}
-                  {op.failureReason ? ` — ${op.failureReason}` : ''}
-                </span>
-                <span className='shrink-0 tabular-nums'>
-                  {op.result ?? '—'} · {op.createdAt.slice(0, 10)}
-                </span>
+              <li key={`${op.type}-${op.createdAt}`}>
+                {op.type}: {op.result ?? '—'} · {op.createdAt.slice(0, 10)}
+                {op.failureReason ? ` — ${op.failureReason}` : ''}
               </li>
             ))}
           </ul>
@@ -164,23 +142,14 @@ function DossierView({ dossier }: { dossier: CustomerRecoveryDossier }) {
   );
 }
 
-/**
- * Evidence-backed customer recovery inspector (JOV-7482). Search resolves
- * the canonical contact; the dossier shows independently observed facts and
- * the one supported safe repair. `generatedAt` keeps source freshness visible.
- */
 export function CustomerRecoveryPanel({
   result,
 }: {
   result: CustomerRecoveryResult;
 }) {
   return (
-    <div className='space-y-4' data-testid='customer-recovery-panel'>
-      <form
-        method='get'
-        className='flex items-center gap-2'
-        data-testid='customer-recovery-search'
-      >
+    <div className='space-y-4'>
+      <form method='get' className='flex items-center gap-2'>
         <input type='hidden' name='view' value='recovery' />
         <Input
           name='q'
@@ -199,7 +168,7 @@ export function CustomerRecoveryPanel({
       </form>
 
       {result.matches.length > 1 && (
-        <div className='space-y-1' data-testid='customer-recovery-matches'>
+        <div className='space-y-1'>
           <p className='text-app text-tertiary-token'>
             Select the linked customer:
           </p>
@@ -232,28 +201,26 @@ export function CustomerRecoveryPanel({
       )}
 
       {result.error === 'unavailable' && (
-        <p
-          className='text-app text-secondary-token'
-          role='status'
-          data-testid='customer-recovery-error'
-        >
+        <p className='text-app text-secondary-token' role='status'>
           Customer recovery evidence is temporarily unavailable. Try the search
           again.
         </p>
       )}
 
-      {!result.error && result.search && result.matches.length === 0 && (
-        <p className='text-app text-secondary-token'>
-          No canonical customer matches “{result.search}”.
-        </p>
-      )}
+      {!result.error &&
+        !result.dossier &&
+        result.search &&
+        result.matches.length === 0 && (
+          <p className='text-app text-secondary-token'>
+            No canonical customer matches “{result.search}”.
+          </p>
+        )}
 
       {result.dossier && <DossierView dossier={result.dossier} />}
 
       <p className='text-app text-tertiary-token'>
-        Evidence snapshot generated {result.generatedAt}. Recovery state is
-        confirmed by reading this dossier back after an action — the button
-        receipt marks “requested”, not recovered.
+        Evidence snapshot generated {result.generatedAt}. “Requested” recovery
+        is confirmed by this dossier after refresh.
       </p>
     </div>
   );

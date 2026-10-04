@@ -3,19 +3,10 @@ import 'server-only';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from './index';
 
-interface ClaimCustomerRecoveryParams {
-  readonly creatorProfileId: string;
-  readonly spotifyUrl: string;
-}
-
-/**
- * Claims a failed profile and creates its primary recovery job in one SQL
- * statement. If another request wins the conditional update, no job is
- * inserted and the caller receives null.
- */
-export async function claimAndEnqueueCustomerRecovery(
-  params: ClaimCustomerRecoveryParams
-): Promise<string | null> {
+export async function claimAndEnqueueCustomerRecovery(params: {
+  creatorProfileId: string;
+  spotifyUrl: string;
+}): Promise<string | null> {
   const dedupKey = `musicfetch_enrichment:${params.creatorProfileId}:${crypto.randomUUID()}`;
   const payload = {
     creatorProfileId: params.creatorProfileId,

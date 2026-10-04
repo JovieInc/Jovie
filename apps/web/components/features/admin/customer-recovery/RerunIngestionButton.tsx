@@ -4,10 +4,7 @@ import { Button } from '@jovie/ui';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import {
-  type CustomerIngestionRecoveryReceipt,
-  rerunCustomerIngestionAction,
-} from '@/app/app/(shell)/admin/actions';
+import { rerunCustomerIngestionAction } from '@/app/app/(shell)/admin/actions';
 
 const RECEIPT_LABELS: Record<string, string> = {
   requested: 'Recovery requested — ingestion jobs queued.',
@@ -18,38 +15,26 @@ const RECEIPT_LABELS: Record<string, string> = {
   'not-found': 'No change: creator profile no longer exists.',
 };
 
-interface RerunIngestionButtonProps {
-  readonly creatorProfileId: string;
-}
-
-/**
- * One supported recovery: re-run failed artist ingestion. The receipt states
- * "requested" — recovery is confirmed by reading the dossier back after a
- * refresh, not by the toast alone.
- */
 export function RerunIngestionButton({
   creatorProfileId,
-}: RerunIngestionButtonProps) {
+}: {
+  creatorProfileId: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [receipt, setReceipt] =
-    useState<CustomerIngestionRecoveryReceipt | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const run = () => {
     startTransition(async () => {
-      setError(null);
-      setReceipt(null);
+      setMessage(null);
       const fd = new FormData();
       fd.set('profileId', creatorProfileId);
       try {
         const result = await rerunCustomerIngestionAction(fd);
-        setReceipt(result);
-        // Read back the same dossier so the operator sees fresh evidence
-        // (ingestion status, recent operations), not just a toast.
+        setMessage(RECEIPT_LABELS[result.state] ?? result.state);
         router.refresh();
       } catch {
-        setError(
+        setMessage(
           'Recovery could not be requested. The profile was left unchanged; try again.'
         );
       }
@@ -72,25 +57,9 @@ export function RerunIngestionButton({
         )}
         Re-run Artist Ingestion
       </Button>
-      <div className='min-h-5' aria-live='polite'>
-        {receipt && (
-          <p
-            className='text-app text-secondary-token'
-            data-testid='rerun-ingestion-receipt'
-          >
-            {RECEIPT_LABELS[receipt.state] ?? receipt.state} Queued:{' '}
-            {receipt.queuedCount}. Checked {receipt.checkedAt}
-          </p>
-        )}
-        {error && (
-          <p
-            className='text-app text-secondary-token'
-            data-testid='rerun-ingestion-error'
-          >
-            {error}
-          </p>
-        )}
-      </div>
+      <p className='min-h-5 text-app text-secondary-token' aria-live='polite'>
+        {message}
+      </p>
     </div>
   );
 }

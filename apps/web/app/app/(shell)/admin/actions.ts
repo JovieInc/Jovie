@@ -689,29 +689,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
   revalidatePath(APP_ROUTES.ADMIN);
 }
 
-export type CustomerIngestionRecoveryState =
-  | 'requested'
-  | 'already-running'
-  | 'missing-source'
-  | 'not-failed'
-  | 'not-found';
-
-export interface CustomerIngestionRecoveryReceipt {
-  readonly state: CustomerIngestionRecoveryState;
-  readonly queuedCount: number;
-  readonly checkedAt: string;
-}
-
-/**
- * Customer recovery (JOV-7482): re-run failed artist ingestion for one
- * creator profile through the same enrichment jobs as the Creators bulk
- * action. Read-only refusal when the run is already in flight or the profile
- * has no Spotify source — a duplicate retry could duplicate downstream
- * enrichment work, so only a 'failed' profile with a source is eligible.
- */
-export async function rerunCustomerIngestionAction(
-  formData: FormData
-): Promise<CustomerIngestionRecoveryReceipt> {
+export async function rerunCustomerIngestionAction(formData: FormData) {
   await requireAdmin();
 
   const profileId = formData.get('profileId');
@@ -730,36 +708,18 @@ export async function rerunCustomerIngestionAction(
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
-  if (!profile) {
-    return {
-      state: 'not-found',
-      queuedCount: 0,
-      checkedAt: new Date().toISOString(),
-    };
-  }
+  if (!profile) return { state: 'not-found' as const };
   if (
     profile.ingestionStatus === 'pending' ||
     profile.ingestionStatus === 'processing'
   ) {
-    return {
-      state: 'already-running',
-      queuedCount: 0,
-      checkedAt: new Date().toISOString(),
-    };
+    return { state: 'already-running' as const };
   }
   if (profile.ingestionStatus !== 'failed') {
-    return {
-      state: 'not-failed',
-      queuedCount: 0,
-      checkedAt: new Date().toISOString(),
-    };
+    return { state: 'not-failed' as const };
   }
   if (!profile.spotifyId?.trim() && !profile.spotifyUrl?.trim()) {
-    return {
-      state: 'missing-source',
-      queuedCount: 0,
-      checkedAt: new Date().toISOString(),
-    };
+    return { state: 'missing-source' as const };
   }
 
   const spotifyUrl =
@@ -779,13 +739,7 @@ export async function rerunCustomerIngestionAction(
     throw error;
   }
 
-  if (!jobId) {
-    return {
-      state: 'already-running',
-      queuedCount: 0,
-      checkedAt: new Date().toISOString(),
-    };
-  }
+  if (!jobId) return { state: 'already-running' as const };
 
   const spotifyArtistId =
     (profile.spotifyId?.trim() || null) ??
@@ -803,9 +757,5 @@ export async function rerunCustomerIngestionAction(
 
   revalidatePath(APP_ROUTES.ADMIN_PEOPLE);
 
-  return {
-    state: 'requested',
-    queuedCount: 1,
-    checkedAt: new Date().toISOString(),
-  };
+  return { state: 'requested' as const };
 }

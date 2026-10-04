@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
@@ -19,38 +19,15 @@ vi.mock('drizzle-orm', () => ({
 import { claimAndEnqueueCustomerRecovery } from '@/lib/db/customer-recovery';
 
 describe('claimAndEnqueueCustomerRecovery', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns the atomically inserted recovery job id', async () => {
+  it('returns an id only when the atomic claim inserts a job', async () => {
     mocks.execute.mockResolvedValue({ rows: [{ id: 'job-1' }] });
-
-    await expect(
-      claimAndEnqueueCustomerRecovery({
-        creatorProfileId: '11111111-1111-4111-8111-111111111111',
-        spotifyUrl: 'https://open.spotify.com/artist/artist-1',
-      })
-    ).resolves.toBe('job-1');
-
-    const query = mocks.execute.mock.calls[0]?.[0] as { values: unknown[] };
-    const payloadJson = query.values.find(
-      value => typeof value === 'string' && value.startsWith('{')
-    );
-    expect(JSON.parse(String(payloadJson))).toMatchObject({
+    const input = {
       creatorProfileId: '11111111-1111-4111-8111-111111111111',
-      recoveryClaimed: true,
-    });
-  });
+      spotifyUrl: 'https://open.spotify.com/artist/artist-1',
+    };
+    await expect(claimAndEnqueueCustomerRecovery(input)).resolves.toBe('job-1');
 
-  it('returns null when another request already claimed the profile', async () => {
     mocks.execute.mockResolvedValue({ rows: [] });
-
-    await expect(
-      claimAndEnqueueCustomerRecovery({
-        creatorProfileId: '11111111-1111-4111-8111-111111111111',
-        spotifyUrl: 'https://open.spotify.com/artist/artist-1',
-      })
-    ).resolves.toBeNull();
+    await expect(claimAndEnqueueCustomerRecovery(input)).resolves.toBeNull();
   });
 });

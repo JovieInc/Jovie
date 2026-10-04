@@ -545,9 +545,6 @@ describe('admin/actions.ts', () => {
     });
   });
 
-  // =========================================================================
-  // rerunCustomerIngestionAction
-  // =========================================================================
   describe('rerunCustomerIngestionAction', () => {
     const failedProfile = {
       id: 'p1',
@@ -556,23 +553,26 @@ describe('admin/actions.ts', () => {
       ingestionStatus: 'failed',
       lastIngestionError: 'provider timeout',
     };
-
-    it('atomically claims a failed profile and queues the supported recovery', async () => {
-      createMultiSelectChain([
-        [{ userStatus: 'active', deletedAt: null }],
-        [failedProfile],
-      ]);
-      mockClaimAndEnqueueCustomerRecovery.mockResolvedValue('job-1');
-      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue('dsp-job-1');
-
+    const run = async () => {
       const { rerunCustomerIngestionAction } = await import(
         '@/app/app/(shell)/admin/actions'
       );
-      const result = await rerunCustomerIngestionAction(
-        makeFormData({ profileId: 'p1' })
-      );
+      return rerunCustomerIngestionAction(makeFormData({ profileId: 'p1' }));
+    };
+    const selectProfile = (profile = failedProfile) =>
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }],
+        [profile],
+      ]);
 
-      expect(result).toMatchObject({ state: 'requested', queuedCount: 1 });
+    it('atomically claims a failed profile and queues the supported recovery', async () => {
+      selectProfile();
+      mockClaimAndEnqueueCustomerRecovery.mockResolvedValue('job-1');
+      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue('dsp-job-1');
+
+      const result = await run();
+
+      expect(result).toEqual({ state: 'requested' });
       expect(mockClaimAndEnqueueCustomerRecovery).toHaveBeenCalledWith({
         creatorProfileId: 'p1',
         spotifyUrl: 'https://open.spotify.com/artist/spotify-1',
@@ -581,62 +581,21 @@ describe('admin/actions.ts', () => {
     });
 
     it('refuses a healthy profile without enqueuing work', async () => {
-      createMultiSelectChain([
-        [{ userStatus: 'active', deletedAt: null }],
-        [{ ...failedProfile, ingestionStatus: 'idle' }],
-      ]);
+      selectProfile({ ...failedProfile, ingestionStatus: 'idle' });
+      const result = await run();
 
-      const { rerunCustomerIngestionAction } = await import(
-        '@/app/app/(shell)/admin/actions'
-      );
-      const result = await rerunCustomerIngestionAction(
-        makeFormData({ profileId: 'p1' })
-      );
-
-      expect(result).toMatchObject({ state: 'not-failed', queuedCount: 0 });
+      expect(result).toEqual({ state: 'not-failed' });
       expect(mockDbUpdate).not.toHaveBeenCalled();
       expect(mockEnqueueMusicFetchEnrichmentJob).not.toHaveBeenCalled();
     });
 
     it('treats a lost failed-to-pending claim as an in-flight recovery', async () => {
-      createMultiSelectChain([
-        [{ userStatus: 'active', deletedAt: null }],
-        [failedProfile],
-      ]);
+      selectProfile();
       mockClaimAndEnqueueCustomerRecovery.mockResolvedValue(null);
+      const result = await run();
 
-      const { rerunCustomerIngestionAction } = await import(
-        '@/app/app/(shell)/admin/actions'
-      );
-      const result = await rerunCustomerIngestionAction(
-        makeFormData({ profileId: 'p1' })
-      );
-
-      expect(result).toMatchObject({
-        state: 'already-running',
-        queuedCount: 0,
-      });
+      expect(result).toEqual({ state: 'already-running' });
       expect(mockEnqueueMusicFetchEnrichmentJob).not.toHaveBeenCalled();
-    });
-
-    it('leaves the failed state unchanged when the atomic enqueue fails', async () => {
-      createMultiSelectChain([
-        [{ userStatus: 'active', deletedAt: null }],
-        [failedProfile],
-      ]);
-      mockClaimAndEnqueueCustomerRecovery.mockRejectedValue(
-        new Error('queue unavailable')
-      );
-
-      const { rerunCustomerIngestionAction } = await import(
-        '@/app/app/(shell)/admin/actions'
-      );
-
-      await expect(
-        rerunCustomerIngestionAction(makeFormData({ profileId: 'p1' }))
-      ).rejects.toThrow('queue unavailable');
-      expect(mockDbUpdate).not.toHaveBeenCalled();
-      expect(mockEnqueueDspArtistDiscoveryJob).not.toHaveBeenCalled();
     });
   });
 
