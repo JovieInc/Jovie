@@ -8,7 +8,6 @@
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { FileAudio2, Paperclip } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
@@ -44,41 +43,6 @@ vi.mock('next/image', () => ({
   default: ({ alt, src }: { alt: string; src: string }) => (
     <span data-testid='img' data-src={src} data-alt={alt} />
   ),
-}));
-
-vi.mock('@jovie/ui', () => ({
-  Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
-    open ? <div role='dialog'>{children}</div> : null,
-  DialogContent: ({
-    children,
-    className,
-    testId,
-  }: {
-    children: ReactNode;
-    className?: string;
-    testId?: string;
-  }) => (
-    <div data-testid={testId ?? 'dialog-content'} className={className}>
-      {children}
-    </div>
-  ),
-}));
-
-vi.mock('@radix-ui/react-dialog', () => ({
-  Title: ({
-    children,
-    className,
-  }: {
-    children: ReactNode;
-    className?: string;
-  }) => <div className={className}>{children}</div>,
-  Description: ({
-    children,
-    className,
-  }: {
-    children: ReactNode;
-    className?: string;
-  }) => <div className={className}>{children}</div>,
 }));
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
@@ -357,14 +321,12 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
   });
 
   it('shows five ranked defaults per bounded group and searches the full groups', () => {
-    const { container } = render(
-      <CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />
-    );
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
 
     for (const sectionId of ['nav', 'skills', 'releases']) {
-      const section = container.querySelector(
-        `[data-palette-section="${sectionId}"]`
-      );
+      const section = screen
+        .getByTestId('cmdk-full-page')
+        .querySelector(`[data-palette-section="${sectionId}"]`);
       expect(section).not.toBeNull();
       expect(
         within(section as HTMLElement).getAllByRole('option')
@@ -478,13 +440,19 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
   it('navigates to the nav href when a nav item is committed', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
-    // Click the Releases nav row.
+    // Releases sits beyond the five-row empty-state cap; search to reveal it.
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'releases' } }
+    );
     const releasesNav = screen
       .getAllByRole('option')
-      .find(el => el.textContent?.includes('Manage your release catalog'));
+      .find(el =>
+        el.textContent?.includes('Open the releases view of your work')
+      );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
-    expect(pushMock).toHaveBeenCalledWith('/app/releases');
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
   });
 
   it('does not duplicate Audience as a separate command', () => {

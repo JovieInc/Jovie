@@ -292,12 +292,17 @@ describe('visual taste admission', () => {
 });
 
 describe('liveVisualJudges', () => {
+  const loader = async () => ({
+    evaluateArt: vi.fn(),
+    subscriptionVisionTransport: () => vi.fn(),
+  });
+
   it('seats no judge when nothing is reachable', async () => {
-    const loader = vi.fn();
-    const pair = await liveVisualJudges(null, PRODUCER, loader);
+    const unused = vi.fn();
+    const pair = await liveVisualJudges(null, PRODUCER, new Set(), unused);
 
     expect(pair.cheap.id).toBeNull();
-    expect(loader).not.toHaveBeenCalled();
+    expect(unused).not.toHaveBeenCalled();
     await expect(pair.cheap.run({} as never)).rejects.toThrow(/no reachable/);
   });
 
@@ -310,6 +315,7 @@ describe('liveVisualJudges', () => {
       const pair = await liveVisualJudges(
         fixtureTransport(),
         producer,
+        new Set(),
         async () => ({
           evaluateArt: vi.fn(),
           subscriptionVisionTransport: () => vi.fn(),
@@ -335,6 +341,18 @@ describe('liveVisualJudges', () => {
       ).resolves.toMatchObject({ status: 'reviewed', verdict: 'pass' });
     }
   );
+
+  it('never seats a judge that failed calibration', async () => {
+    const pair = await liveVisualJudges(
+      fixtureTransport(),
+      PRODUCER,
+      new Set(['openai/gpt-5.6-luna']),
+      loader
+    );
+
+    expect(pair.cheap.id).not.toBe('openai/gpt-5.6-luna');
+    expect(pair.flagship.id).not.toBe('openai/gpt-5.6-luna');
+  });
 });
 
 describe('providers.reviewVisual', () => {

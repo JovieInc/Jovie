@@ -367,9 +367,10 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_worktree_pool.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_claude_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_worktree_pool.py -q',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/claude_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_sweep.py" --fail-under=85',
 
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/execution_attempt.py" --fail-under=85',
@@ -388,6 +389,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/agent-context/check.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
+  'scripts/api-route-pruning.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-disposition.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-receipt.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-hygiene.test.mjs',
@@ -413,6 +415,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/evals/summer-ops-card-copy.test.mjs',
+  'scripts/funnel-judge/preview-gate.test.mjs',
+  'scripts/funnel-judge/proof-gate.test.mjs',
   'scripts/funnel-judge/rubric.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
@@ -422,6 +426,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
   'scripts/invariants/quality-saturation.test.mjs',
+  'scripts/invariants/screen-audit.test.mjs',
   'scripts/invariants/ui-escape-holdout.test.mjs',
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
@@ -460,6 +465,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/verify-workflow-references.test.mjs',
   'scripts/vision/art-evaluator.test.mjs',
   'scripts/visual-baseline-adopt.test.mjs',
+  'scripts/voc/voc-mine.test.mjs',
   'scripts/web-ai-health-intake.test.mjs',
   'scripts/weekly-agent-readiness.test.mjs',
 ]);

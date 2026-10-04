@@ -68,7 +68,7 @@ export interface VisualReview {
 
 export type VisualReviewOutcome = VisualReview | Unavailable;
 
-const VISUAL_REVIEW_ROW: RoutedInvariantRow = {
+export const VISUAL_REVIEW_ROW: RoutedInvariantRow = {
   rowId: 'factory-visual-review',
   invariantId: 'factory-visual-review',
   ruleId: null,
@@ -124,7 +124,7 @@ function reviewRow(direction: ArtDirection | null): RoutedInvariantRow {
   };
 }
 
-function unitFor(pageId: string): CertifiableUnit {
+export function visualReviewUnit(pageId: string): CertifiableUnit {
   return {
     id: `factory:${pageId}`,
     kind: 'screen',
@@ -205,7 +205,7 @@ export async function runVisualReview(
     }
   }
   const row = reviewRow(refs?.direction ?? null);
-  const unit = unitFor(request.pageId);
+  const unit = visualReviewUnit(request.pageId);
   const decisions = [];
   for (const capture of request.captures) {
     const decision = await runClassifierFirst(
@@ -331,21 +331,47 @@ export function auditVisualAdmission(input: {
  * both judges exclude the producer family, and the flagship also excludes
  * the cheap judge's family. An unavailable escalation stays undecided.
  */
+type LoadArtEvaluator = () => Promise<
+  ArtEvaluatorModule & { subscriptionVisionTransport(): VisionTransport }
+>;
+
+const loadLiveArtEvaluator: LoadArtEvaluator = async () =>
+  (await import(
+    '../../../../scripts/vision/art-evaluator.mjs'
+  )) as unknown as ArtEvaluatorModule & {
+    subscriptionVisionTransport(): VisionTransport;
+  };
+
+/** One named live vision judge, for judge-calibration.ts. */
+export async function liveVisionJudge(
+  transport: JudgeTransport | null,
+  model: string,
+  loadArtEvaluator: LoadArtEvaluator = loadLiveArtEvaluator
+) {
+  const reachable = transport?.available?.(model) ?? false;
+  const art = await loadArtEvaluator();
+  return visionJudge({
+    module: art,
+    transport: art.subscriptionVisionTransport(),
+    model: reachable ? model : null,
+  });
+}
+
+/**
+ * `failedCalibration`: judges the latest judge-calibration receipt failed;
+ * they are never seated.
+ */
 export async function liveVisualJudges(
   transport: JudgeTransport | null,
   producerModel: string,
-  loadArtEvaluator: () => Promise<
-    ArtEvaluatorModule & { subscriptionVisionTransport(): VisionTransport }
-  > = async () =>
-    (await import(
-      '../../../../scripts/vision/art-evaluator.mjs'
-    )) as unknown as ArtEvaluatorModule & {
-      subscriptionVisionTransport(): VisionTransport;
-    }
+  failedCalibration: ReadonlySet<string> = new Set(),
+  loadArtEvaluator: LoadArtEvaluator = loadLiveArtEvaluator
 ): Promise<RouteJudges> {
   const reachable = visionAvailability(transport?.available ?? (() => false));
   const available = (model: string) =>
-    reachable(model) && sameFamilyFinding(model, producerModel) === null;
+    !failedCalibration.has(model) &&
+    reachable(model) &&
+    sameFamilyFinding(model, producerModel) === null;
   const cheap = pickRoleModel('vision-judge', {
     available,
     modality: 'vision',

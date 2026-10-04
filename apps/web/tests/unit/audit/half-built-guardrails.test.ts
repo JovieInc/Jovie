@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
@@ -37,11 +37,18 @@ describe('half-built product surfaces stay dark', () => {
     expect(route).toContain("jsonError(404, 'Not found')");
   });
 
-  it('keeps merch visual QA off while the reviewer is a stub', () => {
-    expect(APP_FLAG_DEFAULTS.MERCH_QA_GATE).toBe(false);
-    expect(source('lib/merch/qa-gate.ts')).toContain(
-      'Visual review is not implemented yet'
-    );
+  it('keeps the money page unreachable while creator finance is off', () => {
+    const layout = source('app/app/money/layout.tsx');
+    expect(layout).toContain('isCreatorFinanceEnabled');
+    expect(layout).toContain('notFound()');
+    const overview = source('lib/finance/overview.ts');
+    expect(overview).toContain('assertCreatorFinanceEnabled');
+  });
+
+  it('does not expose a merch visual QA control without a real reviewer', () => {
+    expect(APP_FLAG_DEFAULTS).not.toHaveProperty('MERCH_QA_GATE');
+    expect(existsSync(resolve(webRoot, 'lib/merch/qa-gate.ts'))).toBe(false);
+    expect(source('lib/merch/service.ts')).not.toContain("from './qa-gate'");
   });
 
   it('keeps proposed capabilities internal and unavailable', () => {

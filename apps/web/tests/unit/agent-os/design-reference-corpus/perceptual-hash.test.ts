@@ -122,6 +122,26 @@ describe('foldRegions', () => {
 });
 
 describe('findRefCopies', () => {
+  it('detects a copy using the dimensions after EXIF rotation', async () => {
+    const page = join(dir, 'rotated-copy.jpg');
+    writeFileSync(
+      page,
+      await sharp(hero(STREAK))
+        .rotate(-90)
+        .withMetadata({ orientation: 6 })
+        .jpeg({ quality: 90 })
+        .toBuffer()
+    );
+    const matches = await findRefCopies({
+      images: [page],
+      references: [record('streak-ref', refHash)],
+    });
+    expect(matches[0]).toMatchObject({
+      referenceId: 'streak-ref',
+      region: { top: 0, width: 1440, height: 900 },
+    });
+  });
+
   it('finds a reference pasted below the fold of a full-page capture, rejected refs included', async () => {
     const page = join(dir, 'page.png');
     const fold = await sharp(hero(STREAK)).png().toBuffer();

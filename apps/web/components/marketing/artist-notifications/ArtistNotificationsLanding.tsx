@@ -4,6 +4,7 @@ import type { ArtistNotificationsLandingCopy } from '@/data/artistNotificationsC
 import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_NOTIFICATIONS_SECTION_TEST_IDS } from '@/data/artistNotificationsPageOrder';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import type { LogoPlacement } from '@/data/product-truth/logo-permissions';
 import { HomeTrustSection } from '@/features/home/HomeTrustSection';
 import { ArtistProfileCaptureSection } from '../artist-profile/ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from '../artist-profile/ArtistProfileFaq';
@@ -12,6 +13,8 @@ import { ArtistProfileReactivationSection } from '../artist-profile/ArtistProfil
 import { ArtistProfileSpecWall } from '../artist-profile/ArtistProfileSpecWall';
 import { ArtistNotificationsBenefitsSection } from './ArtistNotificationsBenefitsSection';
 import { ArtistNotificationsHero } from './ArtistNotificationsHero';
+
+const TRUST_PLACEMENT: LogoPlacement = { page: '/artist-notifications' };
 
 interface ArtistNotificationsLandingProps {
   readonly copy: ArtistNotificationsLandingCopy;
@@ -30,7 +33,8 @@ export function ArtistNotificationsLanding({
         </div>
 
         <div data-testid={ARTIST_NOTIFICATIONS_SECTION_TEST_IDS.trust}>
-          <HomeTrustSection />
+          {/* Renders only logos with a permission for this page (JOV-7795). */}
+          <HomeTrustSection placement={TRUST_PLACEMENT} />
         </div>
 
         <div data-testid={ARTIST_NOTIFICATIONS_SECTION_TEST_IDS.capture}>
