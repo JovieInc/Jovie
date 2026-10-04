@@ -121,6 +121,7 @@ describe('DashboardNav', () => {
   it('hides Identity when PROFILES_WORKSPACE is off so the rail cannot 404', () => {
     const { container, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: false },
     });
 
     expect(
