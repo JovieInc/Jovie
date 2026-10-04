@@ -3026,7 +3026,21 @@ export function LibrarySurface({
       target === null ||
       target === document.body ||
       target === document.documentElement;
-    if (!onPage && !(target instanceof Node && region.contains(target))) {
+    const inCatalog = target instanceof Node && region.contains(target);
+    // From the toolbar (after clicking a view or stage control) only the
+    // letter keys move; arrows, Space and Enter stay with that control.
+    const inChrome =
+      !inCatalog &&
+      target instanceof Element &&
+      Boolean(target.closest('[data-testid="library-surface"]')) &&
+      Boolean(
+        target.closest('button, input[type="radio"], input[type="checkbox"]')
+      );
+    if (
+      !onPage &&
+      !inCatalog &&
+      !(inChrome && (event.key === 'j' || event.key === 'k'))
+    ) {
       return;
     }
     const grid = region.querySelector<HTMLElement>('[data-library-grid]');
@@ -3037,7 +3051,9 @@ export function LibrarySurface({
             .split(' ')
             .filter(Boolean).length || 1
         : null;
-    const step = resolveLibraryReviewStep(event.key, target, gridColumns);
+    const step: LibraryReviewStep | null = inChrome
+      ? { kind: 'move', delta: event.key === 'j' ? 1 : -1 }
+      : resolveLibraryReviewStep(event.key, target, gridColumns);
     if (!step || visibleAssets.length === 0) return;
 
     const index = visibleAssets.findIndex(asset => asset.id === selectedId);

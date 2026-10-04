@@ -1725,6 +1725,27 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('keeps J/K working after a toolbar click without stealing its arrows', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Song' }),
+    ]);
+    clickGridView();
+    const gridToggle = screen.getByRole('radio', { name: 'Grid View' });
+    gridToggle.focus();
+
+    // Arrows stay with the view toggle's own radio group.
+    fireEvent.keyDown(gridToggle, { key: 'ArrowLeft' });
+    expect(document.activeElement).toHaveAttribute('type', 'radio');
+
+    clickGridView();
+    gridToggle.focus();
+    fireEvent.keyDown(gridToggle, { key: 'j' });
+    expect(
+      screen.getByRole('button', { name: 'View Take Me Over' })
+    ).toHaveFocus();
+  });
+
   it('leaves typing, menus and sliders alone', () => {
     renderLibrary([buildAsset()]);
     clickGridView();
