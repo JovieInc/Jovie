@@ -1291,6 +1291,20 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
     /authHandoffWindow\.on\('closed'[\s\S]*?registerMainWindowPermissionHandlers\(mainWindow\.webContents\.session\)/
   );
 
+  // Wiring only: permission policy must precede Electron's native picker.
+  // Actual native selection still requires an installed Mac receipt.
+  const permissionBlock = mainSource.slice(
+    mainSource.indexOf('function registerMainWindowPermissionHandlers('),
+    mainSource.indexOf('function buildAuthCompletionUrl(')
+  );
+  assert.match(
+    permissionBlock,
+    /setPermissionRequestHandler[\s\S]*setPermissionCheckHandler[\s\S]*setDisplayMediaRequestHandler/
+  );
+  assert.match(permissionBlock, /useSystemPicker: true/);
+  assert.match(permissionBlock, /try \{\s*callback\(\{\}\);\s*\} catch/);
+  assert.doesNotMatch(permissionBlock, /getSources|sources\[0\]/);
+
   // Fix: the crash-reload budget resets only on a confirmed app-booted ping,
   // never on did-finish-load (crash-after-load must reach the failure page).
   assert.match(
