@@ -2678,6 +2678,17 @@ ${selectedGateScript}`,
     expect(enableScript).toContain('exit 0');
   });
 
+  it('requests workflow write for every app token that enables auto-merge', () => {
+    const enable = getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable');
+    const triage = getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'triage');
+
+    for (const job of [enable, triage]) {
+      const tokenStep = getStepBlock(job, 'Generate Jovie Bot token');
+      expect(tokenStep).toContain('permission-pull-requests: write');
+      expect(tokenStep).toContain('permission-workflows: write');
+    }
+  });
+
   it.each([
     ['fork', FORK_GATE_WORKFLOW, 'merge-group-gate'],
     ['size', SIZE_GUARD_WORKFLOW, 'merge-group-size'],

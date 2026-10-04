@@ -13,13 +13,13 @@
 #
 # MECHANISM:
 # 1. `enable` job — fires on opened/reopened/ready_for_review and runs
-#    `gh pr merge --auto --squash` with GITHUB_TOKEN (GraphQL
-#    enablePullRequestAutoMerge; GITHUB_TOKEN is sufficient — the PAT workflow-
-#    scope gap that blocks pushing workflow-file changes does NOT apply to
-#    enabling auto-merge). Drafts are skipped here (`draft == false`). This
-#    workflow is the sole `ready_for_review` subscriber (trigger-hygiene rule 3
-#    / JOV-INV-029): leaving draft enables auto-merge and does not restart CI.
-#    The hourly triage sweep still covers missed enable events.
+#    `gh pr merge --auto --squash` with a Jovie Bot token (GraphQL
+#    enablePullRequestAutoMerge). The token requests workflow write because
+#    GitHub rejects the mutation without it when the PR changes a workflow
+#    file. Drafts are skipped here (`draft == false`). This workflow is the sole
+#    `ready_for_review` subscriber (trigger-hygiene rule 3 / JOV-INV-029):
+#    leaving draft enables auto-merge and does not restart CI. The hourly
+#    triage sweep still covers missed enable events.
 # 2. `triage` job — hourly sweep + manual dispatch. First enables auto-merge
 #    on any open, non-draft, same-repo PR that lacks it (backstop for a missed
 #    opened, reopened, or ready_for_review event). Then PRs with auto-merge
@@ -112,6 +112,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: read
+          permission-workflows: write
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -188,6 +189,7 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
           permission-statuses: read
+          permission-workflows: write
       - name: Triage stuck PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
