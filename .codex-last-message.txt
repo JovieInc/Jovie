@@ -1,0 +1,12 @@
+STATUS: NEEDS_CONTEXT
+
+On `codex/jov-7744-admission-diagnostics`, the required workflow detected gstack 1.91.18.0 is available, replacing 0.14.5.0.
+
+RECOMMENDATION: Choose C so the unrelated upgrade does not delay PR #20612.
+
+- A) Upgrade now
+- B) Enable automatic upgrades and upgrade now
+- C) Not now
+- D) Disable update checks
+
+If upgraded, I’ll first verify via GraphQL that PR #20612 is OPEN and `isInMergeQueue=false`, as required.
