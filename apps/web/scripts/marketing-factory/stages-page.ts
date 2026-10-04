@@ -5,7 +5,7 @@
  */
 
 import { existsSync, statSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { extname, join, relative } from 'node:path';
 import { modelFamily } from '@jovie/copy';
 import {
   decideMedium,
@@ -26,6 +26,7 @@ import {
   isRegisteredMarketingCapture,
   resolveCapture,
 } from '../marketing-media/capture-adapter';
+import { generateMarketingImage } from '../marketing-media/generate-image';
 import { buildFactoryPageRecord } from './page-record';
 import { digestOf, writeJson } from './receipts';
 import { evaluateRenderCaptures } from './render-measurer';
@@ -136,9 +137,13 @@ const MIME: Readonly<Record<string, string>> = {
   '.avif': 'image/avif',
 };
 
+/** File-safe id for a generated asset (`generate:hero-1` -> `generate-hero-1`). */
+const assetIdFor = (refId: string) => refId.replaceAll(/[^\w-]/g, '-');
+
 async function assetStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
   const assets: FactoryStageArtifact<'asset'>['assets'] = [];
+  const provenance: Record<string, string> = {};
   for (const ref of artifactOf(ctx, 'ref-sourcing').refs) {
     if (ref.id.startsWith('capture:')) {
       const scenarioId = ref.id.slice('capture:'.length);
@@ -181,36 +186,92 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
       );
       continue;
     }
-    const outcome = await ctx.providers.generateAsset({
-      prompt: `${ctx.brief.icp}: ${ref.sectionInstanceId}`,
-      recipeId: ref.source as never,
-      characterId: null,
-      width: 1600,
-      height: 1000,
-      brief: ctx.brief.brief.businessObjective,
+    const generated = await generateMarketingImage({
+      request: {
+        prompt: [
+          `${ctx.brief.icp}: ${ref.sectionInstanceId}`,
+          ...ctx.feedback.filter(line =>
+            line.startsWith(`asset-art:${ref.id}`)
+          ),
+        ].join('\n'),
+        recipeId: ref.source as never,
+        characterId: null,
+        width: 1600,
+        height: 1000,
+        brief: ctx.brief.brief.businessObjective,
+      },
+      adapter: {
+        provider: 'factory',
+        model: 'factory',
+        family: ctx.providers.imageFamily,
+        generate: request => ctx.providers.generateAsset(request),
+      },
+      assetId: assetIdFor(ref.id),
+      outDir: join(ctx.runDir, 'assets'),
+      artGate: ctx.providers.artGate,
+      now: () => ctx.providers.now(),
     });
-    if (outcome.status === 'credentials-unavailable') {
-      return result(
-        checks,
-        { pageId: ctx.pageId, assets },
-        { unavailable: outcome.reason }
-      );
+    if (!('assetPath' in generated)) {
+      if (generated.status === 'credentials-unavailable') {
+        return result(
+          checks,
+          { pageId: ctx.pageId, assets },
+          { unavailable: generated.reason }
+        );
+      }
+      checks.check(`asset-generation:${ref.id}`, false, generated.reason);
+      continue;
     }
-    // Generated assets ship only with a provenance sidecar and an
-    // art-evaluator record, which factory:run does not produce yet.
-    checks.check(
-      `asset-provenance:${ref.id}`,
-      false,
-      'provenance + art-evaluator path is not wired'
-    );
+    provenance[ref.id] = relative(ctx.runDir, generated.sidecarPath);
+    // Provenance (sidecar, C2PA when c2patool exists) is always written; the
+    // asset ships only when a cross-family art judge passes it.
+    if (
+      !checks.check(
+        `asset-art:${ref.id}`,
+        generated.status === 'generated',
+        generated.sidecar.artEvaluation?.notes.join('; ') ?? 'art judge failed'
+      )
+    ) {
+      continue;
+    }
+    assets.push({
+      id: ref.id,
+      refIds: [ref.id],
+      path: relative(ctx.runDir, generated.assetPath),
+      mime: generated.mime,
+      bytes: statSync(generated.assetPath).size,
+      width: generated.width,
+      height: generated.height,
+      c2paManifestDigest:
+        generated.sidecar.c2pa.status === 'embedded'
+          ? `sha256:${generated.sidecar.sha256}`
+          : null,
+    });
   }
-  return result(checks, { pageId: ctx.pageId, assets });
+  return result(
+    checks,
+    { pageId: ctx.pageId, assets },
+    { notes: { provenance } }
+  );
 }
 
 async function renderStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
   const { record, issues } = buildFactoryPageRecord(ctx, null);
   checks.check('page-record-schema', issues.length === 0, issues.join('; '));
+  // No asset passes unrendered: each must reach the record the page renders.
+  const carried = new Set(
+    Object.values(
+      (record as { media?: Record<string, { id: string }> }).media ?? {}
+    ).map(media => `capture:${media.id}`)
+  );
+  for (const asset of artifactOf(ctx, 'asset').assets) {
+    checks.check(
+      `render-asset:${asset.id}`,
+      carried.has(asset.id),
+      'the page record has no media field for this asset, so the page cannot render it'
+    );
+  }
   // The candidate the local build previews (FACTORY_PREVIEW_RECORD).
   const previewDir = join(ctx.runDir, 'render', 'preview-records');
   const recordId = `${ctx.brief.family}.${ctx.brief.slug}`;

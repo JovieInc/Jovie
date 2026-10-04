@@ -244,6 +244,83 @@ function reworkProviders(input: {
   return { providers, reviewed };
 }
 
+describe('factory:run generated assets', () => {
+  // cta-1 as an abstract section resolves to a generation recipe.
+  const media = brief.media.map(entry =>
+    entry.sectionInstanceId === 'cta-1'
+      ? { ...entry, input: { ...entry.input, sectionJob: 'abstract' as const } }
+      : entry
+  );
+
+  it('generates with provenance and an art verdict, then refuses to pass it unrendered', async () => {
+    const manifest = await run({ brief: { ...brief, media } });
+
+    const asset = record('12-asset.attempt-1.json');
+    expect(asset.receipt.passed).toBe(true);
+    expect(asset.receipt.invariantsPassed).toContain(
+      'asset-art:generate:cta-1'
+    );
+    expect(asset.artifact).toMatchObject({
+      assets: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'generate:cta-1',
+          path: 'assets/generate-cta-1.png',
+        }),
+      ]),
+    });
+    const sidecar = readJson<{
+      aiGenerated: boolean;
+      artEvaluation: { ok: boolean };
+    }>(
+      join(
+        runDir(),
+        (asset.notes.provenance as Record<string, string>)['generate:cta-1'] ??
+          ''
+      )
+    );
+    expect(sidecar).toMatchObject({
+      aiGenerated: true,
+      artEvaluation: { ok: true },
+    });
+    // The page record cannot carry generated media yet, so render fails closed.
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
+    expect(
+      record('13-render.attempt-1.json').receipt.invariantsFailed
+    ).toContain('render-asset:generate:cta-1');
+  });
+
+  it('retries an art rejection with the judge notes and never ships the rejected asset', async () => {
+    const prompts: string[] = [];
+    let verdicts = 0;
+    const manifest = await run({
+      brief: { ...brief, media },
+      providers: dryProviders(brief, {
+        async generateAsset(request) {
+          prompts.push(request.prompt);
+          return dryProviders(brief).generateAsset(request);
+        },
+        artGate: async () => ({
+          ok: ++verdicts > 1,
+          modes: ['focal'],
+          judgeModel: 'fixture:openai/gpt-5.5',
+          notes: ['focal: two competing focal points'],
+        }),
+      }),
+    });
+
+    const first = record('12-asset.attempt-1.json');
+    expect(first.receipt.invariantsFailed).toEqual([
+      'asset-art:generate:cta-1',
+    ]);
+    expect(
+      (first.artifact as { assets: { id: string }[] }).assets.map(a => a.id)
+    ).not.toContain('generate:cta-1');
+    expect(prompts[1]).toContain('two competing focal points');
+    expect(record('12-asset.attempt-2.json').receipt.passed).toBe(true);
+    expect(manifest.stoppedAt).toBe('render');
+  });
+});
+
 describe('factory:run copy directions', () => {
   it('judges every copy direction and records the winner with its rationale', async () => {
     const seen: number[] = [];

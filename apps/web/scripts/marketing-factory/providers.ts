@@ -8,6 +8,10 @@
 import { join } from 'node:path';
 import { type CopyTier, type JudgeTransport, selectJudges } from '@jovie/copy';
 import { pickRoleModel, visionAvailability } from '../design-ci-judge-dispatch';
+import {
+  type ArtGate,
+  createArtEvaluatorGate,
+} from '../marketing-media/generate-image';
 import type {
   ImageGenerationOutcome,
   ImageGenerationRequest,
@@ -76,6 +80,10 @@ export interface FactoryProviders {
   generateAsset(
     request: ImageGenerationRequest
   ): Promise<ImageGenerationOutcome>;
+  /** Model family of generateAsset, so the art judge can refuse to share it. */
+  readonly imageFamily: string;
+  /** Art evaluator every generated asset must pass (generate-image.ts). */
+  readonly artGate: ArtGate;
   /** Judge panel. Defaults to @jovie/copy selectJudges (producer family excluded). */
   selectJudges(
     tier: CopyTier,
@@ -173,6 +181,13 @@ export function dryProviders(
         height: request.height,
       };
     },
+    imageFamily: 'fixture',
+    artGate: async () => ({
+      ok: true,
+      modes: ['focal'],
+      judgeModel: 'fixture:openai/gpt-5.5',
+      notes: ['focal: fixture pass'],
+    }),
     selectJudges,
     label: model => `fixture:${model}`,
     now: () => new Date(`${brief.asOf}T00:00:00.000Z`),
@@ -250,6 +265,8 @@ export function liveProviders(
         reason: 'no image adapter wired for factory:run',
       };
     },
+    imageFamily: 'none',
+    artGate: createArtEvaluatorGate(),
     selectJudges,
     label: model => model,
     now: () => new Date(),
