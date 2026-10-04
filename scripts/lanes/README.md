@@ -20,7 +20,7 @@ The harness, not the model, owns:
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
-| Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
+| Generated-file conflicts: merge main, take its copy, run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`), push; no model, no force-push | `resolve_generated_conflict()`, `remediation.GENERATED_RESOLVERS` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards a proven clean, published checkout is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`), else removed | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -387,11 +387,11 @@ and Production Continuity Guard are telemetry observers and cannot `workflow_run
 the relay), deploy
 failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
 `jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
-`ready`, `needs-rebase` (`lockfile-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
+`ready`, `needs-rebase` (`lockfile-only`, `generated-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
 `needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
 
 The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
-the existing lockfile resolver, one `gh run rerun --failed` per head. Those spend no model
+the existing generated-file resolver, one `gh run rerun --failed` per head. Those spend no model
 attempt. The next model rung is the lowest enabled healthy `tier` strictly above every lane
 that already attempted the head (`select_escalation_lane`). Host-local lanes participate by
 tier. When nothing is stronger, one top-rung retry runs on the strongest enabled healthy lane.

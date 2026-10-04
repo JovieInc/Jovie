@@ -3292,26 +3292,31 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
-LOCKFILES = frozenset({"pnpm-lock.yaml"})
-
-
-def resolve_lockfile_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """JOV-6837: a PR that conflicts with main only in pnpm-lock.yaml needs no model. Merge
-    main, take its lockfile, regenerate it from the merged manifests, push (no force). Any
-    other conflict, or a failed regeneration, aborts and leaves the PR to the agent."""
+def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
+    no model. Merge main, take its copy of each conflicted generated file, run each file's
+    canonical regenerator (remediation.GENERATED_RESOLVERS: `pnpm install --lockfile-only`
+    for pnpm-lock.yaml, `pnpm ci:topology:write` for workflow-topology.gen.yml), push (no
+    force). Any other conflict, or a failed regeneration, aborts and leaves the PR to the
+    agent."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= LOCKFILES:
+        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
         guard()
-        regenerated = sh(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], cwd=worktree, timeout=900, log=log)
-        if regenerated.returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
+        commands = []
+        for path in sorted(conflicted):
+            command = list(remediation.GENERATED_RESOLVERS[path])
+            if command not in commands:
+                commands.append(command)
+        for command in commands:
+            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
         sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
@@ -3813,14 +3818,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
-            lockfile_only = False
+            resolved_generated = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 0, "mutations": 1}, coordination=coordination)
-                lockfile_only = resolve_lockfile_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
-            if lockfile_only:
-                receipt.update(resolution="lockfile-regenerated")
+            if resolved_generated:
+                receipt.update(resolution="generated-regenerated")
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
