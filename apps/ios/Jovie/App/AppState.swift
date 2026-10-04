@@ -199,7 +199,7 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
-    case .uiTestingChatEntityFixture, .uiTestingChatAllComponents:
+    case .uiTestingChatEntityFixture, .uiTestingChatAllComponents, .uiTestingStorefrontChat:
       // Unlike the other `.ready` UI-testing modes, fixture chat modes need a
       // real `ChatRepository` instance so `RootView` can seed the timeline --
       // that seeding only happens inside the `.task(id: appState.activeUserID)`
@@ -210,9 +210,14 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
-      activeUserID = launchMode == .uiTestingChatAllComponents
-        ? "user_ui_testing_chat_all_components"
-        : "user_ui_testing_chat_entity_fixture"
+      switch launchMode {
+      case .uiTestingChatAllComponents:
+        activeUserID = "user_ui_testing_chat_all_components"
+      case .uiTestingStorefrontChat:
+        activeUserID = "user_ui_testing_storefront_chat"
+      default:
+        activeUserID = "user_ui_testing_chat_entity_fixture"
+      }
     case .uiTestingQRUnavailable:
       route = .ready
       dashboardState = .loaded(.previewReadyWithoutQR)

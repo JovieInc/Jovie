@@ -86,18 +86,44 @@ describe('YouTube Strategy', () => {
   });
 
   describe('validateYouTubeChannelUrl', () => {
-    it('returns normalized URL for valid channel inputs', () => {
-      const result = validateYouTubeChannelUrl('https://youtube.com/@artist');
-      // validatePlatformUrl strips @ prefix and normalizes handle (without /about)
-      expect(result).toBe('https://www.youtube.com/artist');
+    it('returns the canonical about URL and keeps the channel identity', () => {
+      expect(validateYouTubeChannelUrl('https://youtube.com/@artist')).toBe(
+        'https://www.youtube.com/@artist/about'
+      );
+      expect(
+        validateYouTubeChannelUrl('https://www.youtube.com/channel/UC123abc')
+      ).toBe('https://www.youtube.com/channel/UC123abc/about');
+      expect(
+        validateYouTubeChannelUrl('http://youtube.com/c/Name/videos?x=1')
+      ).toBe('https://www.youtube.com/c/Name/about');
     });
 
-    it('handles existing /about suffix', () => {
-      const result = validateYouTubeChannelUrl(
-        'https://youtube.com/@artist/about'
-      );
-      // validatePlatformUrl normalizes the handle (about is stripped and re-added internally)
-      expect(result).toBe('https://www.youtube.com/artist');
+    it('is idempotent, so a validated URL can be fetched (JOV-7725)', () => {
+      // Regression: the about URL used to come back as /artist or /channel,
+      // which failed re-validation inside fetchYouTubeAboutDocument and made
+      // every creator lookup and YouTube ingestion job fail.
+      for (const input of [
+        'https://youtube.com/@artist',
+        'https://youtube.com/@artist/about',
+        'https://www.youtube.com/channel/UC123abc',
+      ]) {
+        const once = validateYouTubeChannelUrl(input);
+        expect(once).not.toBeNull();
+        expect(validateYouTubeChannelUrl(once as string)).toBe(once);
+        expect(isYouTubeChannelUrl(once as string)).toBe(true);
+      }
+    });
+
+    it('rejects credentials and look-alike hosts', () => {
+      expect(
+        validateYouTubeChannelUrl('https://u:p@youtube.com/@a')
+      ).toBeNull();
+      expect(
+        validateYouTubeChannelUrl('https://youtube.com.evil.com/@a')
+      ).toBeNull();
+      expect(
+        validateYouTubeChannelUrl('https://youtube.com/watch?v=1')
+      ).toBeNull();
     });
 
     it('returns null for non-YouTube hosts', () => {
@@ -339,6 +365,80 @@ describe('YouTube Strategy', () => {
         'https://youtube.com/@artist'
       );
       expect(result).toBe(mockHtml);
+    });
+  });
+
+  describe('current YouTube page shape (JOV-7725)', () => {
+    const data = {
+      metadata: {
+        channelMetadataRenderer: {
+          title: 'Live Artist',
+          description: 'Metadata description',
+        },
+      },
+      microformat: {
+        microformatDataRenderer: {
+          title: 'Live Artist',
+          thumbnail: { thumbnails: [{ url: 'https://yt3.ggpht.com/a.jpg' }] },
+        },
+      },
+      onResponseReceivedEndpoints: [
+        {
+          aboutChannelViewModel: {
+            description: 'About panel bio',
+            links: [
+              {
+                channelExternalLinkViewModel: {
+                  link: {
+                    content: 'twitter.com/liveartist',
+                    commandRuns: [
+                      {
+                        onTap: {
+                          innertubeCommand: {
+                            urlEndpoint: {
+                              url: 'https://www.youtube.com/redirect?event=channel_description&q=https%3A%2F%2Finstagram.com%2Fliveartist',
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+              {
+                channelExternalLinkViewModel: {
+                  link: { content: 'open.spotify.com/artist/abc123' },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const html = `<html><script nonce="x">var ytInitialData = ${JSON.stringify(
+      data
+    )};</script><script>var other = {"a":"}"};</script></html>`;
+
+    it('reads ytInitialData from the inline assignment YouTube ships', () => {
+      const result = extractYouTube(html);
+      expect(result.displayName).toBe('Live Artist');
+      expect(result.avatarUrl).toBe('https://yt3.ggpht.com/a.jpg');
+      expect(result.bio).toBe('About panel bio');
+      expect(result.links.map(link => link.platformId)).toEqual(
+        expect.arrayContaining(['instagram', 'spotify'])
+      );
+      // The youtube.com/redirect wrapper is unwrapped to the real target.
+      expect(
+        result.links.some(link => link.url.includes('youtube.com/redirect'))
+      ).toBe(false);
+    });
+
+    it('returns empty fields instead of throwing on malformed JSON', () => {
+      const result = extractYouTube(
+        '<script>var ytInitialData = {"a": </script>'
+      );
+      expect(result.displayName).toBeNull();
+      expect(result.links).toEqual([]);
     });
   });
 });

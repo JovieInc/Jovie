@@ -39,7 +39,7 @@ describe('GET /api/internal/ovie/summer-company/funnel', () => {
 
   it('returns the aggregate uncached', async () => {
     const body = {
-      contractVersion: 'summer-funnel/v1',
+      contractVersion: 'summer-funnel/v2',
       observedAt: '2026-09-26T12:00:00.000Z',
       windows: {},
     };
