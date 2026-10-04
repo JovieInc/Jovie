@@ -323,6 +323,21 @@ describe('linear sync on merge', () => {
     );
   });
 
+  it('fails a sweep on a scan error and keeps per-issue failures in the message', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    world.issues['JOV-1'].attachments = [`https://github.com/${REPO}/pull/999`];
+    const failing = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=open')
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : null
+    );
+    await expect(sweep(failing)).rejects.toThrow(
+      /open pull request scan failed, so issues were left in place; JOV-1: GitHub HTTP 404/
+    );
+    expect(world.updates).toEqual([]);
+  });
+
   it('surfaces Linear HTTP and GraphQL errors, and skips unknown issues', async () => {
     for (const [response, error] of [
       [{ ok: false, status: 500, json: async () => ({}) }, /Linear HTTP 500/],
