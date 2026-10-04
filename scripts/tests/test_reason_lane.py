@@ -14,6 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("reason_lane", ROOT / "scripts/lanes/reason_lane.py")
@@ -531,7 +532,8 @@ class FakeLock:
 
 class DrainAndTickTest(unittest.TestCase):
     def lane(self, linear):
-        return SimpleNamespace(Locked=FakeLock, Linear=lambda env: linear)
+        import lane_runner as lane
+        return SimpleNamespace(Locked=FakeLock, Linear=lambda env: linear, LinearRateLimited=lane.LinearRateLimited)
 
     def setUp(self):
         FakeLock.held_paths = set()
@@ -558,6 +560,30 @@ class DrainAndTickTest(unittest.TestCase):
         self.assertEqual(out, {"status": "idle", "done": [{"job": "JOV-1", "confidence": "high"}]})
         self.assertIn(("i-1", "In Progress"), linear.moves)
         self.assertEqual(linear.moves[-1], ("i-1", "Done"))
+
+    def test_rate_limited_queue_claim_and_tick_exit_without_a_crash_or_duplicate_job(self):
+        import lane_runner as lane
+        job = {"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "1"}
+        for phase in ("queue", "claim", "tick"):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as tmp:
+                linear = FakeLinear(jobs=[job])
+                error = lane.LinearRateLimited(1234567890)
+                host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
+                if phase == "claim":
+                    linear.state_of = lambda _id: (_ for _ in ()).throw(error)
+                with patch.object(reason, "queued_jobs", side_effect=error if phase != "claim" else None,
+                                  return_value=[job]), patch.object(FakeLock, "release", autospec=True) as release:
+                    if phase == "tick":
+                        result = reason.tick(host, self.lane(linear), lambda: linear, CONFIG,
+                                             spawn=lambda *a, **k: self.fail("cooldown must not spawn"))
+                    else:
+                        result = reason.drain(host, self.lane(linear), CONFIG,
+                                              run=Runner(claude=done('"loggedIn": true'), grok=done("logged in")))
+                    self.assertEqual(result["status"], "linear-rate-limited")
+                    self.assertEqual(result["resetAt"], error.reset_at)
+                    self.assertTrue(release.called, "cooldown must release the lane/claim locks")
+                self.assertEqual(linear.moves, [])
+                self.assertEqual(linear.comments, [])
 
     def test_drain_guards(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -816,6 +816,8 @@ def drain(host, lane, config: dict | None = None, run=subprocess.run) -> dict:
             attempted.add(issue["identifier"])  # a retried job waits for the next drain
             record = one_job(linear, issue, config, host.state, run=run)
             done.append({"job": issue["identifier"], "confidence": record["confidence"]})
+    except lane.LinearRateLimited as error:
+        return {"status": "linear-rate-limited", "resetAt": error.reset_at, "done": done}
     finally:
         lock.release()
 
@@ -827,7 +829,10 @@ def tick(host, lane, linear_factory, config: dict | None = None, spawn=subproces
     if not probe.held:
         return {"status": "running"}
     probe.release()
-    jobs = queued_jobs(linear_factory(), config["label"])
+    try:
+        jobs = queued_jobs(linear_factory(), config["label"])
+    except lane.LinearRateLimited as error:
+        return {"status": "linear-rate-limited", "resetAt": error.reset_at}
     if not jobs:
         return {"status": "idle"}
     spawn([sys.executable, str(HERE / "reason_lane.py"), "drain"], stdin=subprocess.DEVNULL,

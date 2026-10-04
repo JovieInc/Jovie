@@ -320,6 +320,7 @@ def promotion_line(metrics: dict) -> str:
     back = metrics["reenqueueMinutes"]
     intake = metrics["intake"]
     occupancy = metrics["occupancy"]
+    queue_per_merge = metrics.get("queueEntriesPerMerge")
     rate_color = GREEN if first is not None and first >= 0.9 else ORANGE
     return (rgb(FG, "PROMOTION 8h  ", bold=True)
             + rgb(rate_color, f"first-pass {'n/a' if first is None else f'{round(first * 100)}%'}")
@@ -327,7 +328,24 @@ def promotion_line(metrics: dict) -> str:
                        f" · open→enqueue p75 {metrics['openToFirstEnqueueMinutes']['p75']}m"
                        f" · opens/h {intake['opensPerHour']} vs merges/h {intake['mergesPerHour']}"
                        f" · CLEAN not queued {occupancy['cleanNotQueued']}"
-                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"))
+                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"
+                       f" · queue entries/merge {queue_per_merge if queue_per_merge is not None else 'n/a'}"))
+
+
+def file_overlap_line(summary: dict) -> str:
+    summary = summary or {}
+    pairs = summary.get("pairs") or []
+    metrics = summary.get("metrics") or {}
+    text = (rgb(FG, "FILE OVERLAP  ", bold=True)
+            + rgb(DIM, f"{summary.get('mode', 'enforce')} · active {len(pairs)}"
+                       f" · prevented {metrics.get('conflicts_prevented', 0)}"
+                       f" · flags {metrics.get('overlap_flags', 0)}"
+                       f" · rebases {metrics.get('rebases_caused_by_overlap', 0)}"))
+    if pairs:
+        pair = pairs[0]
+        files = ", ".join(pair.get("files") or [])
+        text += rgb(ORANGE, f" · {pair.get('first')} → {pair.get('later')} {pair.get('actionTaken')} {files}"[:100])
+    return text
 
 
 def system_model() -> dict:
@@ -594,6 +612,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                          f"{rgb(DIM, label + ' · ' + age(m['mergedAt'], now))}", width))
 
     lines.append(promotion_line(github.get("promotion")))
+    lines.append(file_overlap_line(local.get("doctor", {}).get("fileOverlap") or {}))
 
     # needs attention
     ledger = local["ledger24h"]
@@ -608,6 +627,11 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         attention.append(rgb(RED, f"failed runs 24h {ledger['failed']}"))
     if ledger.get("gate-timeout"):
         attention.append(rgb(ORANGE, f"gate timeouts 24h {ledger['gate-timeout']}"))
+    escalation = local.get("doctor", {}).get("escalation") or {}
+    if escalation.get("escalating") or escalation.get("ladder_exhausted") or escalation.get("surfaced"):
+        attention.append(rgb(ORANGE, f"escalation {escalation.get('escalating', 0)} "
+                                     f"exhausted {escalation.get('ladder_exhausted', 0)} "
+                                     f"surfaced {len(escalation.get('surfaced') or [])}"))
     if not attention:
         attention.append(rgb(GREEN, "✓ nothing needs a human"))
     lines.append(rgb(FG, "NEEDS ATTENTION  ", bold=True) + rgb(DIM, f"held {len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))

@@ -226,6 +226,36 @@ describe('public artist OpenAPI contract', () => {
     const indexSchema =
       ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex;
     expect(indexSchema.properties).toHaveProperty('rateLimit');
+
+    const artistSchema = ARTIST_OPENAPI_DOCUMENT.components.schemas.Artist;
+    expect(artistSchema.required).toEqual(
+      expect.arrayContaining(['creatorType', 'links', 'platformIds'])
+    );
+    expect(artistSchema.properties).toMatchObject({
+      creatorType: {
+        type: 'string',
+        enum: ['artist', 'podcaster', 'influencer', 'creator'],
+      },
+      audience: {
+        $ref: '#/components/schemas/Audience',
+        nullable: true,
+      },
+      links: {
+        type: 'array',
+        items: { $ref: '#/components/schemas/ArtistLink' },
+      },
+      platformIds: { $ref: '#/components/schemas/PlatformIds' },
+    });
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.Audience.required
+    ).toEqual(['platform', 'count', 'countText', 'observedAt']);
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.Audience.properties?.observedAt
+        ?.nullable
+    ).toBe(true);
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.PlatformIds.properties
+    ).toHaveProperty('youtube');
   });
 });
 

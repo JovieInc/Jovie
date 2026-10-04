@@ -25,7 +25,8 @@ export const LINEAR_API_URL = 'https://api.linear.app/graphql';
 export const COOLDOWN_FLOOR_MS = 60_000;
 export const COOLDOWN_JITTER = 0.25;
 
-const STATE_ERROR = 'Linear credential backoff state is unavailable or malformed';
+const STATE_ERROR =
+  'Linear credential backoff state is unavailable or malformed';
 
 export function credentialHash(key, apiUrl = LINEAR_API_URL) {
   return createHash('sha256').update(`${apiUrl}\0${key}`).digest('hex');
@@ -42,14 +43,20 @@ export function canonicalCooldownRoot(env = process.env, home = homedir()) {
   return join(home, '.local', 'state', 'jovie-lanes', 'linear-cooldown');
 }
 
-export function legacyCooldownRoots(canonical, env = process.env, home = homedir()) {
+export function legacyCooldownRoots(
+  canonical,
+  env = process.env,
+  home = homedir()
+) {
   const roots = [join(home, '.local', 'state', 'jovie-linear-backoff')];
   if (env.LINEAR_BACKOFF_STATE_DIR) roots.push(env.LINEAR_BACKOFF_STATE_DIR);
   return [...new Set(roots)].filter(root => root && root !== canonical);
 }
 
 function stateError() {
-  return Object.assign(new Error(STATE_ERROR), { code: 'BACKOFF_STATE_INVALID' });
+  return Object.assign(new Error(STATE_ERROR), {
+    code: 'BACKOFF_STATE_INVALID',
+  });
 }
 
 function privateDirectory(path, repair = false) {
@@ -57,7 +64,8 @@ function privateDirectory(path, repair = false) {
   if (repair) {
     try {
       const current = fs.lstatSync(path);
-      if (current.isDirectory() && (current.mode & 0o077) !== 0) fs.chmodSync(path, 0o700);
+      if (current.isDirectory() && (current.mode & 0o077) !== 0)
+        fs.chmodSync(path, 0o700);
     } catch {
       // the stat check below reports a directory this process cannot make private
     }
@@ -144,8 +152,14 @@ function readScope(directory, nowMs, strict) {
 /** Lane-runner single file: `<root>/<sha256(key)>.json`. Malformed files are ignored. */
 function readLegacyFile(root, keyHash, nowMs) {
   try {
-    const record = JSON.parse(fs.readFileSync(join(root, `${keyHash}.json`), 'utf8'));
-    if (record?.schema !== 1 || !Number.isSafeInteger(record.resetAt) || record.resetAt <= 0)
+    const record = JSON.parse(
+      fs.readFileSync(join(root, `${keyHash}.json`), 'utf8')
+    );
+    if (
+      record?.schema !== 1 ||
+      !Number.isSafeInteger(record.resetAt) ||
+      record.resetAt <= 0
+    )
       return 0;
     return record.resetAt > nowMs ? record.resetAt : 0;
   } catch {
@@ -158,7 +172,11 @@ function readLegacyFile(root, keyHash, nowMs) {
  * @param {string} root
  * @param {{ legacyRoots?: string[], strict?: boolean }} [options]
  */
-export function credentialBackoff(key, root, { legacyRoots = [], strict = true } = {}) {
+export function credentialBackoff(
+  key,
+  root,
+  { legacyRoots = [], strict = true } = {}
+) {
   const scope = credentialHash(key);
   const keyHash = legacyKeyHash(key);
   const directory = join(root, scope);
@@ -249,7 +267,11 @@ function headerGet(headers, name) {
 }
 
 /** Lane deadline: at least 60s plus jitter, extended by Retry-After and reset headers. */
-export function laneDeadlineMs(headers, nowMs = Date.now(), random = Math.random) {
+export function laneDeadlineMs(
+  headers,
+  nowMs = Date.now(),
+  random = Math.random
+) {
   const spread = Math.floor(COOLDOWN_FLOOR_MS * COOLDOWN_JITTER * random());
   let resetAt = nowMs + COOLDOWN_FLOOR_MS + spread;
   const retry = headerGet(headers, 'retry-after');
@@ -257,7 +279,10 @@ export function laneDeadlineMs(headers, nowMs = Date.now(), random = Math.random
     const hinted = nowMs + Number(retry) * 1000;
     if (hinted > resetAt) resetAt = hinted;
   }
-  for (const name of ['x-ratelimit-requests-reset', 'x-ratelimit-complexity-reset']) {
+  for (const name of [
+    'x-ratelimit-requests-reset',
+    'x-ratelimit-complexity-reset',
+  ]) {
     const value = Number(headerGet(headers, name));
     if (!Number.isFinite(value) || value <= 0) continue;
     const epochMs = value < 1e11 ? value * 1000 : value;
@@ -276,7 +301,13 @@ export function activeResetAt(key, nowMs = Date.now(), env = process.env) {
   return resetAt > nowMs ? resetAt : null;
 }
 
-export function publishLaneCooldown(key, headers, nowMs = Date.now(), random = Math.random, env = process.env) {
+export function publishLaneCooldown(
+  key,
+  headers,
+  nowMs = Date.now(),
+  random = Math.random,
+  env = process.env
+) {
   const requested = laneDeadlineMs(headers, nowMs, random);
   const root = canonicalCooldownRoot(env);
   const store = credentialBackoff(key, root, {
@@ -316,7 +347,12 @@ export async function linearRequest({
   if (!key) return { ok: false, reason: 'missing_linear_api_key' };
   const cooling = activeResetAt(key, nowMs, env);
   if (cooling)
-    return { ok: false, rateLimited: true, reason: 'linear_rate_limited', resetAt: cooling };
+    return {
+      ok: false,
+      rateLimited: true,
+      reason: 'linear_rate_limited',
+      resetAt: cooling,
+    };
   let response;
   try {
     response = await fetchImpl(LINEAR_API_URL, {
@@ -335,7 +371,8 @@ export async function linearRequest({
       error: error instanceof Error ? error.message : String(error),
     };
   }
-  const text = typeof response?.text === 'function' ? await response.text() : '';
+  const text =
+    typeof response?.text === 'function' ? await response.text() : '';
   let data = null;
   try {
     data = text ? JSON.parse(text) : null;
@@ -344,7 +381,13 @@ export async function linearRequest({
   }
   const status = Number(response?.status ?? 0);
   if (status === 429 || isRateLimitedBody(status, data)) {
-    const resetAt = publishLaneCooldown(key, response?.headers, nowMs, random, env);
+    const resetAt = publishLaneCooldown(
+      key,
+      response?.headers,
+      nowMs,
+      random,
+      env
+    );
     return {
       ok: false,
       rateLimited: true,

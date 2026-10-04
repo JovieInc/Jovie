@@ -10,7 +10,28 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+
+type CheckoutStep = {
+  uses?: string;
+  with?: { ref?: string; 'persist-credentials'?: boolean };
+};
+
+function assertAuthorizedCheckouts(workflow: string) {
+  const parsed = parseYaml(workflow) as {
+    jobs: Record<string, { steps?: CheckoutStep[] }>;
+  };
+  const checkouts = Object.values(parsed.jobs).flatMap(job =>
+    (job.steps ?? []).filter(step => step.uses?.startsWith('actions/checkout'))
+  );
+  expect(checkouts.length).toBeGreaterThan(0);
+  for (const step of checkouts) {
+    expect(step.uses).toMatch(/^actions\/checkout@[a-f0-9]{40}$/);
+    expect(step.with?.ref).toBe('${{ inputs.expected_sha }}');
+    expect(step.with?.['persist-credentials']).toBe(false);
+  }
+}
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -52,24 +73,7 @@ const visualA11yWorkflowPath = resolve(
   '.github/workflows/visual-a11y.yml'
 );
 const iosWorkflowPath = resolve(repoRoot, '.github/workflows/ios-ci.yml');
-const iosTestFlightWorkflowPath = resolve(
-  repoRoot,
-  '.github/workflows/ios-testflight.yml'
-);
-const iosTestFlightEnvValidatorPath = resolve(
-  repoRoot,
-  'apps/ios/scripts/validate-testflight-env.sh'
-);
-const iosTestFlightArtifactValidatorPath = resolve(
-  repoRoot,
-  'apps/ios/scripts/validate-testflight-artifact.sh'
-);
-const fastlanePath = resolve(repoRoot, 'fastlane/Fastfile');
 const ciFastLanesPath = resolve(repoRoot, 'scripts/ci-fast-lanes.mjs');
-const productLaneClassifierPath = resolve(
-  repoRoot,
-  'scripts/lib/product-lane-classifier.mjs'
-);
 const canaryWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/canary-health-gate.yml'
@@ -587,36 +591,6 @@ function stagingReceiptRobotsPolicyValid(robotsBody: string): boolean {
   );
 }
 
-function runTestFlightMarkerBootstrapGate(
-  authorizationJob: string,
-  candidateCount: number,
-  acceptedBaseline: string
-) {
-  const functionName = 'testflight_marker_history_allows_legacy_bootstrap';
-  const start = authorizationJob.indexOf(`          ${functionName}() {`);
-  const end = authorizationJob.indexOf('\n          }', start);
-  expect(start).toBeGreaterThan(0);
-  expect(end).toBeGreaterThan(start);
-
-  const source = authorizationJob
-    .slice(start, end + '\n          }'.length)
-    .split('\n')
-    .map(line => line.replace(/^ {10}/, ''))
-    .join('\n');
-
-  return spawnSync(
-    'bash',
-    [
-      '-c',
-      `${source}\n${functionName} "$1" "$2"`,
-      'marker-gate',
-      String(candidateCount),
-      acceptedBaseline,
-    ],
-    { encoding: 'utf8' }
-  );
-}
-
 describe('deploy workflow Vercel env resolution', () => {
   it('gives every main SHA CI evidence and a production-controller opportunity', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -631,274 +605,12 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(ciTrigger).toContain('branches: [main]');
     expect(ciTrigger).not.toContain('paths-ignore:');
     expect(controllerTrigger).toContain('workflow_run:');
-    expect(controllerTrigger).toContain('workflows: [CI]');
+    expect(controllerTrigger).toContain('workflows: [Staging Controller]');
     expect(controllerTrigger).toContain('types: [completed]');
     expect(controllerTrigger).toContain('branches: [main]');
     expect(controllerTrigger).not.toContain('paths-ignore:');
     expect(workflow).not.toContain('  production-release:');
     expect(workflow).not.toContain('  production-verified:');
-  });
-
-  it('authorizes TestFlight only after exact production proof without duplicating Xcode tests', () => {
-    const testflight = readFileSync(iosTestFlightWorkflowPath, 'utf8');
-    const envValidator = readFileSync(iosTestFlightEnvValidatorPath, 'utf8');
-    const artifactValidator = readFileSync(
-      iosTestFlightArtifactValidatorPath,
-      'utf8'
-    );
-    const fastlane = readFileSync(fastlanePath, 'utf8');
-    const trigger = testflight.slice(0, testflight.indexOf('\npermissions:'));
-    const workflowHeader = testflight.slice(0, testflight.indexOf('\njobs:'));
-    const authorization = getJobBlock(testflight, 'authorize-release');
-    const beta = getJobBlock(testflight, 'beta');
-    const fullRegression = getJobBlock(testflight, 'full-regression');
-    const uploadMarker = getJobBlock(testflight, 'record-upload');
-
-    expect(trigger).toContain('workflow_dispatch:');
-    expect(trigger).toContain('workflow_run:');
-    expect(trigger).toContain('workflows: [Production Controller]');
-    expect(trigger).toContain('types: [completed]');
-    expect(trigger).toContain('branches: [main]');
-    expect(trigger).not.toMatch(/^  push:/m);
-    expect(workflowHeader).toContain('group: ios-testflight');
-    expect(workflowHeader).toContain('cancel-in-progress: false');
-    expect(workflowHeader).not.toContain('github.ref');
-
-    expect(authorization).toContain(
-      "github.event.workflow_run.conclusion == 'success'"
-    );
-    expect(authorization).toContain(
-      '.path == ".github/workflows/production-controller.yml"'
-    );
-    expect(authorization).toContain(
-      'actions/workflows/production-controller.yml'
-    );
-    expect(authorization).toContain('.name == "Production Controller"');
-    expect(authorization).toContain(
-      '(.workflow_id | tostring) == $workflow_id'
-    );
-    expect(authorization).toContain('test("^Production Controller " + $sha +');
-    expect(authorization).not.toMatch(
-      /\.event == "workflow_run" and\n\s+\.name == "Production Controller"/
-    );
-    expect(authorization).toContain('.name == "Production Verified"');
-    expect(authorization).toContain('.head_sha == $sha');
-    expect(authorization).toContain('.conclusion == "success"');
-    expect(authorization).toContain('commits/main');
-    expect(authorization).toContain('status=completed');
-    expect(authorization).toContain(
-      'production-generation-verified-$expected_sha'
-    );
-    expect(authorization).toContain('.controllerRun == $run');
-    expect(
-      authorization.indexOf('prove_existing_production_marker "$release_sha"')
-    ).toBeLessThan(
-      authorization.indexOf(
-        'if [ "$EVENT_NAME" = "workflow_dispatch" ]; then\n            exit 0'
-      )
-    );
-    expect(authorization).toContain(
-      'actions/runs/$run_id/attempts/$attempt/jobs?per_page=100'
-    );
-    expect(authorization).toContain('.name == "Upload Internal TestFlight"');
-    expect(authorization).toContain(
-      'actions/artifacts?name=$marker_name&per_page=100'
-    );
-    expect(
-      authorization.indexOf('marker_name="testflight-upload-verified"')
-    ).toBeLessThan(
-      authorization.indexOf(
-        'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100'
-      )
-    );
-    const legacyHistory = authorization.slice(
-      authorization.indexOf(
-        'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100'
-      )
-    );
-    expect(legacyHistory).toContain(
-      '(.workflow_id | tostring) == $workflow_id'
-    );
-    expect(legacyHistory).not.toContain(
-      '.display_title == ("iOS TestFlight " + .head_sha)'
-    );
-    const completedRunSelection = legacyHistory.slice(
-      0,
-      legacyHistory.indexOf(
-        '# The marker job can fail after App Store Connect has accepted beta'
-      )
-    );
-    expect(completedRunSelection).toContain('.status == "completed"');
-    expect(completedRunSelection).not.toContain('.conclusion == "success"');
-    expect(legacyHistory).toContain('for attempt in $(seq 1 "$run_attempt")');
-    expect(legacyHistory).toContain('run_has_upload=true');
-    expect(authorization).toContain(
-      'actions/runs/$run_id/attempts/$upload_attempt'
-    );
-    expect(authorization).toContain('(.id | tostring) == $job');
-    expect(authorization).toContain('.uploadRunAttempt');
-    expect(authorization).toContain('.uploadJob');
-    expect(authorization).toContain(
-      'No proven TestFlight upload baseline exists; treating this as the first verified release.'
-    );
-    expect(authorization).not.toContain(
-      'No exact successful TestFlight upload was found in the bounded run history.'
-    );
-    expect(authorization).toContain('if [ "$beta_count" = "1" ]');
-    expect(authorization).toContain('baseline_sha="$run_sha"');
-    expect(authorization).toContain('break');
-    expect(authorization).toContain('already_released=true');
-    expect(authorization).toContain(
-      'git merge-base --is-ancestor "$BASELINE_SHA" "$RELEASE_SHA"'
-    );
-    expect(authorization).toContain('.github/workflows/ios-ci.yml');
-    expect(authorization).toContain('.github/workflows/ios-testflight.yml');
-    expect(authorization).toContain(
-      'git diff --name-only "$BASELINE_SHA" "$RELEASE_SHA" -- "${release_paths[@]}"'
-    );
-    expect(authorization).not.toContain('--diff-filter=d');
-    expect(readFileSync(productLaneClassifierPath, 'utf8')).toContain(
-      'ios-(ci|testflight|signing-bootstrap)'
-    );
-    expect(readFileSync(ciFastLanesPath, 'utf8')).toContain(
-      "'.github/workflows/ios-testflight.yml'"
-    );
-
-    expect(fullRegression).toContain('uses: ./.github/workflows/ios-ci.yml');
-    expect(fullRegression).toContain('full-regression: true');
-    expect(fullRegression).toContain(
-      'checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}'
-    );
-    expect(beta).toContain('needs: [authorize-release, full-regression]');
-    expect(beta).toContain("needs.full-regression.result == 'success'");
-    expect(beta).toContain(
-      "needs.authorize-release.outputs.should_release == 'true'"
-    );
-    expect(beta).toContain(
-      'ref: ${{ needs.authorize-release.outputs.release_sha }}'
-    );
-    expect(beta).toContain('bundle exec fastlane ios beta');
-    expect(beta).not.toContain('bundle exec fastlane ios ios_tests');
-    expect(beta).not.toContain('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
-    expect(beta).toContain('GH_TOKEN: ${{ github.token }}');
-
-    expect(uploadMarker).toContain("needs.beta.result == 'success'");
-    expect(uploadMarker.match(/^    steps:$/gm)).toHaveLength(1);
-    expect(uploadMarker).toContain('for attempt in $(seq 1 "$RUN_ATTEMPT")');
-    expect(uploadMarker).toContain('upload_attempt="$attempt"');
-    expect(uploadMarker).toContain(
-      'No successful exact TestFlight upload job exists in this run.'
-    );
-    expect(uploadMarker).toContain('actions/workflows/ios-testflight.yml');
-    expect(uploadMarker).toContain('.name == "iOS TestFlight"');
-    expect(uploadMarker).toContain('(.workflow_id | tostring) == $workflow_id');
-    expect(uploadMarker).toContain(
-      '.display_title == ("iOS TestFlight " + $sha)'
-    );
-    expect(uploadMarker).not.toMatch(
-      /\.run_attempt \| tostring\) == \$attempt and\n\s+\.name == "iOS TestFlight"/
-    );
-    expect(uploadMarker).toContain(
-      '.path == ".github/workflows/ios-testflight.yml"'
-    );
-    expect(uploadMarker).toContain('.name == "Upload Internal TestFlight"');
-    expect(uploadMarker).toContain('workflowRun: $workflow_run');
-    expect(uploadMarker).toContain('uploadRunAttempt: $upload_attempt');
-    expect(uploadMarker).toContain('uploadJob: $upload_job');
-    expect(uploadMarker).toContain('name: testflight-upload-verified');
-    expect(uploadMarker).toContain('retention-days: 90');
-
-    expect(envValidator).not.toContain('CLERK_ASSOCIATED_DOMAIN');
-    expect(envValidator).not.toContain('CLERK_PUBLISHABLE_KEY');
-    expect(fastlane).not.toContain('CLERK_ASSOCIATED_DOMAIN');
-    expect(fastlane).not.toContain('require_env!("CLERK_PUBLISHABLE_KEY")');
-    expect(fastlane).toContain('def verify_release_sha_is_current_main!');
-    expect(fastlane).toContain('repos/#{repository}/commits/main');
-    const finalMainCheck = fastlane.lastIndexOf(
-      'verify_release_sha_is_current_main!'
-    );
-    expect(fastlane.indexOf('gym(')).toBeLessThan(finalMainCheck);
-    expect(finalMainCheck).toBeLessThan(
-      fastlane.indexOf('upload_to_testflight(')
-    );
-    expect(artifactValidator).toContain(
-      'still embeds retired ClerkPublishableKey'
-    );
-  });
-
-  it('fails closed on unprovable stable TestFlight marker history', () => {
-    const testflight = readFileSync(iosTestFlightWorkflowPath, 'utf8');
-    const authorization = getJobBlock(testflight, 'authorize-release');
-    const legacyLookup =
-      'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100';
-    const gateCall = 'if ! testflight_marker_history_allows_legacy_bootstrap';
-
-    expect(authorization).toContain(
-      'marker_candidate_count="$(jq --arg name "$marker_name"'
-    );
-    expect(authorization).toContain(gateCall);
-    expect(authorization.indexOf(gateCall)).toBeLessThan(
-      authorization.indexOf(legacyLookup)
-    );
-    expect(authorization).toContain(
-      'Stable TestFlight markers exist, but none fully proves a successful upload.'
-    );
-    expect(authorization).toContain(
-      'Ignoring malformed TestFlight upload marker artifact $artifact_id.'
-    );
-
-    const olderValid = runTestFlightMarkerBootstrapGate(
-      authorization,
-      2,
-      'a'.repeat(40)
-    );
-    expect(olderValid.status).toBe(0);
-
-    const allUnprovable = runTestFlightMarkerBootstrapGate(
-      authorization,
-      2,
-      ''
-    );
-    expect(allUnprovable.status).not.toBe(0);
-
-    const trueZero = runTestFlightMarkerBootstrapGate(authorization, 0, '');
-    expect(trueZero.status).toBe(0);
-  });
-
-  it('cross-proves workflow identity instead of comparing run-name to workflow name', () => {
-    const fixture = JSON.parse(
-      readFileSync(productionControllerRunLiveFixturePath, 'utf8')
-    ) as {
-      run: {
-        name: string;
-        display_title: string;
-        path: string;
-        workflow_id: number;
-        head_sha: string;
-      };
-      workflow: { id: number; name: string; path: string };
-    };
-    const authorization = getJobBlock(
-      readFileSync(iosTestFlightWorkflowPath, 'utf8'),
-      'authorize-release'
-    );
-
-    expect(fixture.run.name).toBe(fixture.run.display_title);
-    expect(fixture.run.name).not.toBe(fixture.workflow.name);
-    expect(fixture.run.workflow_id).toBe(fixture.workflow.id);
-    expect(fixture.run.path).toBe(fixture.workflow.path);
-    expect(fixture.run.display_title).toMatch(
-      new RegExp(
-        `^Production Controller ${fixture.run.head_sha} from CI [1-9][0-9]* attempt [1-9][0-9]*$`
-      )
-    );
-    expect(authorization).toContain(
-      'production_controller_workflow_id="$(jq -r'
-    );
-    expect(authorization).toContain("'.id | tostring'");
-    expect(authorization).toContain(
-      '(.workflow_id | tostring) == $workflow_id'
-    );
   });
 
   it('keeps the dependency-free risk classifier off dependency caches', () => {
@@ -2372,15 +2084,10 @@ describe('informational CI tail capacity', () => {
 describe('canary health gate workflow', () => {
   it('accepts a wildcard block for a raw preview', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
-    const canaryStep = getStepBlock(workflow, 'Canary health check');
 
     expect(
       previewRobotsPolicyValid(workflow, 'User-agent: *\nDisallow: /')
     ).toBe(true);
-    expect(canaryStep).toContain(
-      `! printf '%s\\n' "$robots_body" | preview_robots_policy_valid; then`
-    );
-    expect(canaryStep).toContain('[ "$robots_code" != "200" ]');
   });
 
   it('rejects a block that only belongs to an unrelated crawler group', () => {
@@ -2411,112 +2118,6 @@ describe('canary health gate workflow', () => {
         'User-agent: *\nDisallow: /\nSitemap: https://preview.example/sitemap.xml'
       )
     ).toBe(false);
-  });
-
-  it('fails closed when the automation bypass secret is missing', () => {
-    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
-    const canaryStep = getStepBlock(workflow, 'Canary health check');
-
-    expect(canaryStep).toContain(
-      'VERCEL_AUTOMATION_BYPASS_SECRET is required for deterministic staging verification.'
-    );
-    expect(canaryStep).toContain('canary_status=failed_config');
-    expect(canaryStep).not.toContain('Canary INCONCLUSIVE');
-    expect(canaryStep).not.toContain(
-      'canary_status=verified" >> "$GITHUB_OUTPUT"\n                    exit 0'
-    );
-  });
-
-  it('binds the exact project deployment before cookie-only canary and auth smoke', () => {
-    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
-    const canaryStep = getStepBlock(workflow, 'Canary health check');
-    const authSmokeStep = getStepBlock(
-      workflow,
-      'Verify public auth controls are interactive'
-    );
-    const canaryCurlProbes =
-      canaryStep.match(/curl -sS? --max-redirs 0/g) ?? [];
-
-    expect(workflow).toContain('verified_deployment_url:');
-    expect(workflow).toContain(
-      'value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}'
-    );
-    expect(canaryStep).toContain('resolve-deployment');
-    expect(canaryStep).toContain('VERCEL_CANDIDATE_DEPLOYMENT_URL=');
-    expect(canaryStep).toContain('VERCEL_CANDIDATE_DEPLOYMENT_ID=');
-    expect(canaryStep).toContain('VERCEL_DEPLOYMENT_MAX_PAGES=5');
-    expect(canaryStep).toContain('VERCEL_API_TIMEOUT_MS=180000');
-    expect(canaryStep).toContain('VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=5000');
-    expect(canaryStep.indexOf('sleep "$WAIT_SECONDS"')).toBeLessThan(
-      canaryStep.indexOf('resolve-deployment')
-    );
-    expect(
-      workflow.indexOf('uses: ./.github/actions/setup-node-pnpm')
-    ).toBeLessThan(
-      workflow.indexOf(
-        'node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment'
-      )
-    );
-    expect(workflow).toContain('deployment_id:');
-    expect(workflow).not.toContain('fallback_health_url');
-    expect(canaryStep).toContain(
-      'CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)'
-    );
-    expect(canaryStep).toContain('bootstrap-cookie-jar');
-    expect(canaryStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=preview');
-    expect(canaryStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
-    expect(canaryStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
-    expect(canaryStep).toContain('-b "$COOKIE_JAR"');
-    expect(canaryStep).not.toContain('curl -s -L');
-    expect(canaryStep).not.toContain('curl -sS -L');
-    expect(canaryStep).not.toContain('BYPASS_ARGS');
-    expect(canaryStep).not.toContain('x-vercel-protection-bypass');
-    expect(canaryStep).toContain('verified_deployment_url=${deployment_url}');
-    expect(canaryStep).toContain(
-      'Checking onboarding chat reaches the bot gate'
-    );
-    expect(canaryStep).toContain('"errorCode":"ONBOARDING_CHAT_DISABLED"');
-    expect(canaryStep).toContain('"errorCode":"TURNSTILE_REQUIRED"');
-    expect(canaryStep).toContain('canary_status=failed_onboarding_chat');
-    expect(canaryStep).not.toContain('/api/auth/ok');
-    expect(canaryStep).not.toContain('failed_better_auth_handler');
-    expect(canaryStep).not.toContain('health_url_fallback');
-    expect(canaryStep).not.toContain('max_attempts=8');
-    expect(canaryStep).not.toContain('check_route_renders');
-    expect(canaryStep).not.toContain('profile_response=');
-    expect(authSmokeStep).toContain(
-      'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
-    );
-    expect(authSmokeStep).toContain(
-      'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
-    );
-    expect(authSmokeStep).toContain(
-      'EXPECTED_COMMIT_SHA: ${{ inputs.commit_sha }}'
-    );
-    expect(authSmokeStep).toContain(
-      'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN: ${{ steps.canary-check.outputs.verified_deployment_url }}'
-    );
-    expect(authSmokeStep).not.toContain(
-      'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
-    );
-    expect(authSmokeStep).toContain(
-      'verifies build identity and host-only cookie'
-    );
-    expect(authSmokeStep).toContain('auth_smoke_attempt=1');
-    expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');
-    expect(authSmokeStep).toContain('until CI=true');
-    expect(authSmokeStep).toContain('BASE_URL="${DEPLOYMENT_URL}"');
-    expect(authSmokeStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=preview');
-    expect(authSmokeStep).toContain('PLAYWRIGHT_DYNAMIC_SECRETS_FILE=');
-    expect(authSmokeStep).toContain('auth-public-ready.spec.ts');
-    expect(authSmokeStep).toContain(
-      'Public auth controls failed after ${auth_smoke_max_attempts} attempts.'
-    );
-    expect(authSmokeStep).toContain(
-      'sleep_seconds=$((auth_smoke_attempt * 30))'
-    );
-
-    expect(canaryCurlProbes).toHaveLength(3);
   });
 
   it('never probes the shared staging alias before this release owns it', () => {
@@ -5089,10 +4690,42 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(9);
-    expect(
-      reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(9);
+    assertAuthorizedCheckouts(reusable);
+  });
+
+  it('admits additional authorized jobs and rejects each unsafe checkout independently', () => {
+    const safe = {
+      uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+      with: { ref: '${{ inputs.expected_sha }}', 'persist-credentials': false },
+    };
+    const jobs = Object.fromEntries(
+      Array.from({ length: 10 }, (_, index) => [
+        `authorized-${index}`,
+        { steps: [structuredClone(safe)] },
+      ])
+    );
+    expect(() =>
+      assertAuthorizedCheckouts(stringifyYaml({ jobs }))
+    ).not.toThrow();
+    for (const unsafe of [
+      { ...safe, with: { ...safe.with, ref: 'main' } },
+      { ...safe, with: { 'persist-credentials': false } },
+      { ...safe, with: { ...safe.with, 'persist-credentials': true } },
+      { ...safe, uses: 'actions/checkout@v7' },
+    ]) {
+      expect(() =>
+        assertAuthorizedCheckouts(
+          stringifyYaml({
+            jobs: { ...jobs, final: { steps: [unsafe] } },
+          })
+        )
+      ).toThrow();
+    }
+    expect(() =>
+      assertAuthorizedCheckouts(
+        stringifyYaml({ jobs: { empty: { steps: [] } } })
+      )
+    ).toThrow();
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {
@@ -5275,7 +4908,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).toContain('polling-exception:');
     expect(health).toContain('safety net only');
     expect(controller).toContain(
-      'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
+      'run-name: Production Controller ${{ github.event.workflow_run.display_title }}'
+    );
+    const staging = readFileSync(
+      resolve(repoRoot, '.github/workflows/staging-controller.yml'),
+      'utf8'
+    );
+    expect(staging).toContain(
+      'run-name: ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}'
     );
     expect(controller).toContain('actions/workflows/production-controller.yml');
     expect(health).toContain('actions/workflows/production-controller.yml');

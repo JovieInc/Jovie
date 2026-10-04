@@ -11,7 +11,9 @@ import {
 import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import {
   inspectRouteDom,
+  installLayoutShiftObserver,
   MARKETING_TASTE_FINDING_KINDS,
+  measureLayoutShift,
   ROUTE_DOM_CERTIFICATION_SCHEMA,
   type RouteDomFindingKind,
 } from '../e2e/utils/route-dom-detector';
@@ -274,6 +276,68 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
   });
 
+  test('rejects a one-word last line in a headline', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1 style="font:20px/1.2 monospace;width:12ch">aa bb cc dd ee</h1></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'orphaned-line');
+  });
+
+  test('passes a balanced headline', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1 style="font:20px/1.2 monospace;width:12ch;text-wrap:balance">aa bb cc dd ee</h1></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
+      'orphaned-line'
+    );
+  });
+
+  test('rejects missing layout-shift observation instead of certifying zero', async ({
+    page,
+  }) => {
+    await page.setContent('<main><h1>Stable content</h1></main>');
+    await expect(measureLayoutShift(page)).rejects.toThrow(
+      'Layout-shift observation is unavailable'
+    );
+  });
+
+  test('certifies an observed stable document', async ({ page }, testInfo) => {
+    const fixtureUrl = new URL(
+      '/__route-dom-fixture__/stable',
+      exactBaseUrl(testInfo)
+    ).href;
+    await page.route(fixtureUrl, route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<main><h1>Stable content</h1></main>',
+      })
+    );
+    await installLayoutShiftObserver(page);
+    await page.goto(fixtureUrl);
+    expect(await measureLayoutShift(page)).toBeNull();
+  });
+
+  test('rejects cumulative layout shift over budget', async ({
+    page,
+  }, testInfo) => {
+    const fixtureUrl = new URL(
+      '/__route-dom-fixture__/shift',
+      exactBaseUrl(testInfo)
+    ).href;
+    await page.route(fixtureUrl, route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<main><div id="late"></div><section style="height:600px"><h1>Hero</h1><p>Body copy that moves.</p></section></main><script>setTimeout(()=>{document.getElementById("late").style.height="400px"},300)</script>',
+      })
+    );
+    await installLayoutShiftObserver(page);
+    await page.goto(fixtureUrl);
+    await page.waitForTimeout(600);
+    const finding = await measureLayoutShift(page);
+    expect(finding?.kind).toBe('layout-shift');
+  });
+
   test('passes a composed, centered terminal CTA', async ({ page }) => {
     await page.setContent(
       '<main><section><h1 style="font-size:56px">Hero</h1><p>Lede copy for the hero.</p></section><section style="width:1200px"><div style="display:flex;flex-direction:column;align-items:center;text-align:center"><h2 style="font-size:48px">See what shows up.</h2><p>Claim your Jovie profile free.</p><div><a href="/start">Claim your Jovie</a></div></div></section></main>'
@@ -433,68 +497,84 @@ test('certifies every marketing route and public-profile open state', async ({
   const nextTasteBaseline: Record<string, number> = {};
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await installLayoutShiftObserver(page);
   for (const target of certificationScope === 'public-profile'
     ? []
     : MARKETING_EXACT_PUBLIC_ROUTE_TARGETS) {
     for (const viewport of target.viewports) {
-      await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
-      const response = await page.goto(target.fixturePath, {
-        waitUntil: 'domcontentloaded',
-        timeout: 90_000,
-      });
-      expect.soft(response?.status(), target.url).toBeLessThan(400);
-      await expect(
-        page.locator(target.expectedRuntimeSelector).first()
-      ).toBeVisible({ timeout: 20_000 });
-      await page.waitForTimeout(250);
+      // Release requests and renderer state after every viewport receipt.
+      const page = await context.newPage();
+      try {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await installLayoutShiftObserver(page);
+        await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
+        const response = await page.goto(target.fixturePath, {
+          waitUntil: 'domcontentloaded',
+          timeout: 90_000,
+        });
+        expect.soft(response?.status(), target.url).toBeLessThan(400);
+        await expect(
+          page.locator(target.expectedRuntimeSelector).first()
+        ).toBeVisible({ timeout: 20_000 });
+        await page.waitForTimeout(250);
 
-      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
-      const imageContrast = await inspectImageContrast(page);
-      const findings = [...snapshot.findings, ...imageContrast.findings];
-      const snapshotPath = path.join(
-        'marketing',
-        `${safeName(target.url)}-${viewport}.json`
-      );
-      await writeSnapshot(snapshotPath, {
-        schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
-        sourceGitSha,
-        deploymentId,
-        deploymentUrl: baseUrl,
-        route: target.url,
-        fixturePath: target.fixturePath,
-        viewport,
-        state: 'default',
-        ...snapshot,
-        findings,
-        imageContrast,
-      });
-      receipts.push({
-        route: target.url,
-        viewport,
-        state: 'default',
-        snapshotPath,
-        findingCount: findings.length,
-      });
-      const tasteCounts = new Map<string, number>();
-      for (const finding of findings) {
-        if (!isTasteKind(finding.kind)) continue;
-        const key = `${target.url}|${viewport}|${finding.kind}`;
-        tasteCounts.set(key, (tasteCounts.get(key) ?? 0) + 1);
-      }
-      for (const [key, count] of tasteCounts) nextTasteBaseline[key] = count;
-      const overBaseline = [...tasteCounts]
-        .filter(([key, count]) => count > (tasteBaseline[key] ?? 0))
-        .map(([key, count]) => `${key}: ${count} > ${tasteBaseline[key] ?? 0}`);
-      expect
-        .soft(
-          findings.filter(finding => !isTasteKind(finding.kind)),
-          `${target.url} ${viewport}`
-        )
-        .toEqual([]);
-      if (!updateTasteBaseline) {
+        const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+        const imageContrast = await inspectImageContrast(page);
+        const layoutShift = await measureLayoutShift(page);
+        const findings = [
+          ...snapshot.findings,
+          ...imageContrast.findings,
+          ...(layoutShift ? [layoutShift] : []),
+        ];
+        const snapshotPath = path.join(
+          'marketing',
+          `${safeName(target.url)}-${viewport}.json`
+        );
+        await writeSnapshot(snapshotPath, {
+          schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+          sourceGitSha,
+          deploymentId,
+          deploymentUrl: baseUrl,
+          route: target.url,
+          fixturePath: target.fixturePath,
+          viewport,
+          state: 'default',
+          ...snapshot,
+          findings,
+          imageContrast,
+        });
+        receipts.push({
+          route: target.url,
+          viewport,
+          state: 'default',
+          snapshotPath,
+          findingCount: findings.length,
+        });
+        const tasteCounts = new Map<string, number>();
+        for (const finding of findings) {
+          if (!isTasteKind(finding.kind)) continue;
+          const key = `${target.url}|${viewport}|${finding.kind}`;
+          tasteCounts.set(key, (tasteCounts.get(key) ?? 0) + 1);
+        }
+        for (const [key, count] of tasteCounts) nextTasteBaseline[key] = count;
+        const overBaseline = [...tasteCounts]
+          .filter(([key, count]) => count > (tasteBaseline[key] ?? 0))
+          .map(
+            ([key, count]) => `${key}: ${count} > ${tasteBaseline[key] ?? 0}`
+          );
         expect
-          .soft(overBaseline, `${target.url} ${viewport} taste ratchet`)
+          .soft(
+            findings.filter(finding => !isTasteKind(finding.kind)),
+            `${target.url} ${viewport}`
+          )
           .toEqual([]);
+        if (!updateTasteBaseline) {
+          expect
+            .soft(overBaseline, `${target.url} ${viewport} taste ratchet`)
+            .toEqual([]);
+        }
+      } finally {
+        await page.close();
       }
     }
   }

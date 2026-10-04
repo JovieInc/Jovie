@@ -8,16 +8,16 @@ import { afterEach, describe, it } from 'node:test';
 
 import { resolveLabelId } from '../../deprecation-intake.mjs';
 import { fileLinearIssue } from '../../qa-swarm/linear.mjs';
-import { upsertLinearIssueByTitleFingerprint } from '../linear-issue-intake.mjs';
 import {
-  LINEAR_API_URL,
   activeResetAt,
   credentialBackoff,
   credentialHash,
+  LINEAR_API_URL,
   legacyKeyHash,
   linearRequest,
   publishLaneCooldown,
 } from '../linear-cooldown.mjs';
+import { upsertLinearIssueByTitleFingerprint } from '../linear-issue-intake.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'linear-cooldown-'));
 const previous = {
@@ -52,8 +52,21 @@ describe('shared linear cooldown', () => {
     const key = 'shared-secret';
     const bodies = [
       { status: 429, data: {} },
-      { status: 400, data: { errors: [{ extensions: { code: 'RATELIMITED' } }] } },
-      { status: 200, data: { errors: [{ message: 'slow', extensions: { code: 'RATELIMITED', statusCode: 429 } }] } },
+      {
+        status: 400,
+        data: { errors: [{ extensions: { code: 'RATELIMITED' } }] },
+      },
+      {
+        status: 200,
+        data: {
+          errors: [
+            {
+              message: 'slow',
+              extensions: { code: 'RATELIMITED', statusCode: 429 },
+            },
+          ],
+        },
+      },
     ];
     for (const body of bodies) {
       fs.rmSync(root, { recursive: true, force: true });
@@ -65,7 +78,9 @@ describe('shared linear cooldown', () => {
         variables: {},
         fetchImpl: async () => {
           calls += 1;
-          return new Response(JSON.stringify(body.data), { status: body.status });
+          return new Response(JSON.stringify(body.data), {
+            status: body.status,
+          });
         },
         random: () => 0,
       });
@@ -85,7 +100,10 @@ describe('shared linear cooldown', () => {
       const scope = join(root, credentialHash(key));
       const names = fs.readdirSync(scope);
       assert.equal(names.length, 1);
-      assert.equal(fs.readFileSync(join(scope, names[0]), 'utf8').includes(key), false);
+      assert.equal(
+        fs.readFileSync(join(scope, names[0]), 'utf8').includes(key),
+        false
+      );
     }
   });
 
@@ -107,7 +125,10 @@ describe('shared linear cooldown', () => {
         JSON.stringify({ schema: 1, resetAt }),
         { mode: 0o600 }
       );
-      const store = credentialBackoff(key, root, { legacyRoots: [legacyRoot], strict: false });
+      const store = credentialBackoff(key, root, {
+        legacyRoots: [legacyRoot],
+        strict: false,
+      });
       assert.equal(store.read(now), resetAt);
     } finally {
       rmSync(legacyRoot, { recursive: true, force: true });
@@ -121,7 +142,12 @@ describe('shared linear cooldown', () => {
     const previousDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
     process.env.LINEAR_COOLDOWN_STATE_DIR = blocker;
     try {
-      const resetAt = publishLaneCooldown(key, { get: () => undefined }, Date.now(), () => 0);
+      const resetAt = publishLaneCooldown(
+        key,
+        { get: () => undefined },
+        Date.now(),
+        () => 0
+      );
       assert.ok(resetAt > Date.now());
     } finally {
       process.env.LINEAR_COOLDOWN_STATE_DIR = previousDir;
@@ -142,7 +168,10 @@ describe('callers honor the cooldown', () => {
     const filed = await fileLinearIssue({ title: 't', description: 'd' });
     assert.equal(filed.success, false);
     assert.match(filed.error, /linear rate limited/);
-    await assert.rejects(resolveLabelId('devin', key, fetchImpl), /linear rate limited/);
+    await assert.rejects(
+      resolveLabelId('devin', key, fetchImpl),
+      /linear rate limited/
+    );
     const intake = await upsertLinearIssueByTitleFingerprint({
       fingerprint: 'synthetic-monitoring:abc',
       title: 'P0 synthetic',
@@ -161,7 +190,8 @@ process.on('exit', () => {
   else process.env.LINEAR_COOLDOWN_STATE_DIR = previous.dir;
   if (previous.lanes === undefined) delete process.env.LANES_STATE;
   else process.env.LANES_STATE = previous.lanes;
-  if (previous.backoff === undefined) delete process.env.LINEAR_BACKOFF_STATE_DIR;
+  if (previous.backoff === undefined)
+    delete process.env.LINEAR_BACKOFF_STATE_DIR;
   else process.env.LINEAR_BACKOFF_STATE_DIR = previous.backoff;
   if (previous.key === undefined) delete process.env.LINEAR_API_KEY;
   else process.env.LINEAR_API_KEY = previous.key;

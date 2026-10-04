@@ -12,6 +12,7 @@ import {
   vi,
 } from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
@@ -138,8 +139,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       reject: vi.fn(),
       isActioning: false,
     }),
-    useJovieChat: () => ({
-      input: '',
+    useJovieChatController: () => ({
+      draft: createComposerDraft(''),
       setInput: vi.fn(),
       messages: mockChatState.messages,
       chatError: null,
@@ -469,7 +470,7 @@ describe('JovieChat styling regressions', () => {
     expect(jovieChatSource).not.toContain('<SuggestedPrompts');
   });
 
-  it('marks an empty conversation-load shell as busy for assistive technology', () => {
+  it('keeps loading accessibility and composer readiness live across mounted history transitions', () => {
     mockChatState.isLoadingConversation = true;
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
@@ -477,7 +478,7 @@ describe('JovieChat styling regressions', () => {
     mockChatState.status = 'ready';
     mockChatState.messages = [];
 
-    const { container } = renderWithQueryClient(
+    const { container, rerender } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
@@ -487,6 +488,36 @@ describe('JovieChat styling regressions', () => {
 
     expect(loadingShell?.getAttribute('aria-busy')).toBe('true');
     expect(loadingShell?.getAttribute('aria-live')).toBe('polite');
+    expect(container.querySelector('[data-testid="chat-input"]')).toBeNull();
+
+    mockChatState.isLoadingConversation = false;
+    rerender(<JovieChat profileId='profile-1' />);
+    const composer = container.querySelector('[data-testid="chat-input"]');
+    expect(composer?.getAttribute('data-desktop-conversation-ready')).toBe(
+      'true'
+    );
+    expect(
+      container.querySelector(
+        '[data-testid="chat-loading-conversation-skeleton"]'
+      )
+    ).toBeNull();
+
+    mockChatState.isLoadingConversation = true;
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(container.querySelector('[data-testid="chat-input"]')).toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="chat-loading-conversation-skeleton"]')
+        ?.getAttribute('aria-busy')
+    ).toBe('true');
+
+    mockChatState.isLoadingConversation = false;
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(
+      container
+        .querySelector('[data-testid="chat-input"]')
+        ?.getAttribute('data-desktop-conversation-ready')
+    ).toBe('true');
   });
 
   it('re-measures and re-anchors a pinned transcript when a hidden viewport gains layout (JOV-6702)', () => {

@@ -101,6 +101,28 @@ describe('exclusive customer vs OV navigation', () => {
     );
   });
 
+  it('gives every operator review workspace a canonical navigation door', () => {
+    const reviewWorkspaces = [
+      { id: 'interviews', href: APP_ROUTES.ADMIN_INTERVIEWS },
+      { id: 'playlists', href: APP_ROUTES.ADMIN_PLAYLISTS },
+      { id: 'presence', href: APP_ROUTES.ADMIN_PRESENCE },
+    ];
+
+    expect(
+      ADMIN_NAV_REGISTRY.filter(item =>
+        reviewWorkspaces.some(workspace => workspace.id === item.id)
+      ).map(({ id, href, section }) => ({ id, href, section }))
+    ).toEqual(
+      reviewWorkspaces.map(workspace => ({
+        ...workspace,
+        section: 'utilities',
+      }))
+    );
+    expect(ADMIN_SETTINGS_TOOL_IDS).toEqual(
+      expect.arrayContaining(reviewWorkspaces.map(workspace => workspace.id))
+    );
+  });
+
   it.each([
     ['screenshots', APP_ROUTES.ADMIN_SCREENSHOTS],
     ['system_map', APP_ROUTES.ADMIN_SYSTEM],

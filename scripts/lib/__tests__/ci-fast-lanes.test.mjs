@@ -42,6 +42,36 @@ import {
   structuralLocks,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+describe('Shared fenced-attempt coverage contract', () => {
+  it('runs existing fenced-attempt and lane regressions in the real structural selector', () => {
+    const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
+    expect(command).toContain('scripts/tests/test_execution_attempt.py');
+    expect(command).toContain('scripts/tests/test_lane_runner.py');
+    expect(command).toContain('scripts/tests/test_disk_guard.py');
+    expect(command).toContain('scripts/tests/test_worktree_sweep.py');
+    expect(command).toContain(
+      '*/scripts/lanes/worktree_sweep.py" --fail-under=85'
+    );
+    expect(command).toContain('scripts/tests/test_continuity_clock.py');
+    expect(command).toContain('scripts/tests/test_worktree_pool.py');
+    expect(command).toContain(
+      '*/scripts/lanes/worktree_pool.py" --fail-under=85'
+    );
+    expect(command).toContain('coverage run --branch -m pytest');
+  });
+  it('preserves the existing lane floor and enforces fenced-attempt coverage', () => {
+    const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
+    expect(command).toContain(
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
+    );
+    expect(command).toContain(
+      '*/scripts/lanes/execution_attempt.py\" --fail-under=85'
+    );
+    expect(command).toContain(' && ');
+  });
+});
+
 import {
   ALLOWLIST_PATH as LATENCY_ALLOWLIST_PATH,
   RUNTIME_ROOTS as LATENCY_RUNTIME_ROOTS,
@@ -64,7 +94,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   )
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -900,6 +930,9 @@ exit 0
                 scenario === 'other-lane' ? 'false' : 'true',
               CI_FAST_LANE_GROUP:
                 scenario === 'other-lane' ? 'typecheck' : 'remaining',
+              // Exercise the hosted Python job without unrelated mocked suites.
+              CI_FAST_STRUCTURAL_PYTEST:
+                scenario === 'other-lane' ? '' : 'only',
               CI_FAST_LANES_OUT: output,
               GITHUB_STEP_SUMMARY: summary,
               JOVIE_FAILURE_FIXTURE: fixture,
@@ -930,6 +963,34 @@ exit 0
           expect(annotation).toContain('tail-line');
           expect(annotation).not.toContain('Structural command');
         } else {
+          // Both shards start with invariants in the existing three-slot pool.
+          // Fail-fast may leave the fourth command (control) unstarted.
+          expect(diagnostic).toContain(
+            'Structural command 3/4 failed (exit 23)'
+          );
+          const timings = [
+            ...result.stdout.matchAll(
+              /^\| \d+ \| [\d.]+s \| (pass|exit \d+) \| `([^`]+)` \|$/gmu
+            ),
+          ];
+          expect(timings.length).toBeGreaterThanOrEqual(3);
+          expect(timings.length).toBeLessThanOrEqual(4);
+          expect(timings.filter(row => row[1] === 'exit 23')).toHaveLength(2);
+          expect(timings.map(row => [row[1], row[2]])).toContainEqual([
+            'pass',
+            'pnpm invariants:check',
+          ]);
+          expect(
+            timings.every(
+              row =>
+                (row[1] === 'exit 23' && row[2].startsWith('if python3 -c ')) ||
+                (row[1] === 'pass' &&
+                  ['pnpm invariants:check', 'pnpm ci:control:test'].includes(
+                    row[2]
+                  ))
+            )
+          ).toBe(true);
+          expect(diagnostic).not.toContain('preceding successful command');
           expect(diagnostic).toContain('failed (exit 23)');
           expect(diagnostic).toContain('later unittest stderr passed');
           const expectedNode =

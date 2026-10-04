@@ -4,7 +4,9 @@
 An alert is a stable key plus a one-line cause. New keys open a Linear issue in Triage
 (label `symphony`, title "Symphony doctor: <key>") so Summer routes it; a key that clears
 moves its issue to Done with a comment; a key that fires again within the cool-off reopens
-the same issue instead of spamming a new one. `doctor.json` is what the HUD renders.
+the same issue instead of spamming a new one. While `LANES_ESCALATION` is on, open, reopen,
+and close also apply `remediation:<alert-key-slug>` (created on the JOV team when missing,
+color `#E5484D`). `doctor.json` is what the HUD renders.
 """
 from __future__ import annotations
 
@@ -21,6 +23,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
+import design_gate  # noqa: E402  (design-brief admission census)
+import file_overlap  # noqa: E402
+import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -132,6 +137,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     account_observed_at = sample_clock()
     capacity_by_provider = host_capacity(host, lane)
+    design_census = None
     linear_skipped = None
     try:
         client = lane.Linear(host.linear_env)
@@ -147,6 +153,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     else:
         try:
             qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
+            design_census = design_gate.apply_to_pool(
+                qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
             eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
             eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
             budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
@@ -161,6 +169,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
                     len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
             linear_error = None
         except Exception as error:
+            design_census = None
             pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
             candidate_counts, rejected = {}, {}
             eligible_pool, eligible_by_provider, budgets = None, {}, {}
@@ -209,6 +218,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "codexAttribution": codex_attribution(accounts, account_observed_at),
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
+        "designGate": design_census,
+        "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -216,6 +227,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
         "failedByReason": failed_by_reason(failures),
+        "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
+        "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "_receipts24h": receipts, "_allReceipts": all_receipts,
     }
 
@@ -401,6 +414,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+    stale_briefs = (obs.get("designGate") or {}).get("stale") or []
+    if stale_briefs:
+        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
+                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -408,6 +425,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    escalation_line = remediation.alert_reason(obs.get("escalation") or {})
+    if escalation_line:
+        alerts["escalation-needs-human"] = escalation_line
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
@@ -504,9 +524,51 @@ class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
     def __init__(self, linear, host_name: str):
         self.linear, self.host = linear, host_name
+        self._team_node = None
 
     def title(self, key: str) -> str:
         return f"Symphony doctor: {key} ({self.host})"
+
+    def _team(self) -> dict:
+        if self._team_node is None:
+            self._team_node = self.linear.gql(
+                'query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                {})["teams"]["nodes"][0]
+        return self._team_node
+
+    def _remediation_label_id(self, key: str) -> str | None:
+        """`remediation:<slug>` on the JOV team. Created when missing, color #E5484D."""
+        if not remediation.escalation_enabled():
+            return None
+        name = remediation.remediation_label_for_alert(key)
+        if not name:
+            return None
+        team = self._team()
+        for label in team["labels"]["nodes"]:
+            if label.get("name") == name and label.get("id"):
+                return label["id"]
+        created = self.linear.gql(
+            'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
+            {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        label = ((created or {}).get("issueLabelCreate") or {}).get("issueLabel") or {}
+        if not label.get("id"):
+            return None
+        team["labels"]["nodes"].append({"id": label["id"], "name": label.get("name") or name})
+        return label["id"]
+
+    def apply_alert_label(self, issue_id: str | None, key: str) -> None:
+        """Attach the alert's remediation label. No-op when the router flag is off."""
+        if not issue_id:
+            return
+        try:
+            label_id = self._remediation_label_id(key)
+            if not label_id:
+                return
+            self.linear.gql(
+                'mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                {"id": issue_id, "l": label_id})
+        except Exception:
+            return
 
     def existing(self, key: str) -> str | None:
         """An open issue for this key and host, if a previous tick (or a lost doctor.json)
@@ -523,13 +585,17 @@ class Tracker:
     def open(self, key: str, text: str) -> str | None:
         found = self.existing(key)
         if found:
+            self.apply_alert_label(found, key)
             return found
         try:
             priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:")) or key in (
                 "linear-down", "spawn-exit", "tick-error") else 2
-            team = self.linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}', {})["teams"]["nodes"][0]
+            team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
+            remediation_label = self._remediation_label_id(key)
+            if remediation_label:
+                labels.append(remediation_label)
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
                 {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
@@ -560,17 +626,21 @@ class Tracker:
         except Exception:
             pass
 
-    def reopen(self, issue_id: str, text: str) -> None:
+    def reopen(self, issue_id: str, text: str, key: str | None = None) -> None:
         try:
             self.linear.move(issue_id, "Triage")
             self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
-    def close(self, issue_id: str) -> None:
+    def close(self, issue_id: str, key: str | None = None) -> None:
         try:
             self.linear.comment(issue_id, f"🤖 doctor: cleared on `{self.host}` at {now_iso()}.")
             self.linear.move(issue_id, "Done")
+            if key:
+                self.apply_alert_label(issue_id, key)
         except Exception:
             pass
 
@@ -592,7 +662,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             continue
         if entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
             if tracker:
-                tracker.reopen(entry["id"], text)
+                tracker.reopen(entry["id"], text, key)
                 contradict = getattr(tracker, "contradict_invariant", None)
                 if contradict and conditions and key in conditions:
                     contradict(conditions[key])
@@ -607,7 +677,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
     for key, entry in issues.items():
         if key not in alerts and entry.get("closedAt") is None:
             if tracker and entry.get("id"):
-                tracker.close(entry["id"])
+                tracker.close(entry["id"], key)
             entry["closedAt"] = now
     receipts = {}
     for key, event in (conditions or {}).items():
@@ -709,7 +779,12 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                              "outcomes": {key: 0 for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")},
                              "incidents": [], "topBlocker": "capacity projector unavailable",
                              "founderJudgmentRequired": False, "controls": "show-only"}
+    overlap = obs.get("fileOverlap")
+    if not overlap:
+        overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
+                   {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
+            "fileOverlap": overlap,
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
@@ -722,6 +797,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                           "poolByProvider": obs.get("poolByProvider") or {},
                           "candidatePoolByProvider": obs.get("candidatePoolByProvider") or {},
                           "rejectedByProvider": obs.get("rejectedByProvider") or {},
+                          "designGate": obs.get("designGate"),
                           "error": obs.get("linearError")},
             "gateWaits24h": obs.get("gateWaits24h"),
             "gateWaitMedianS24h": obs.get("gateWaitMedianS24h"),
@@ -737,7 +813,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
             "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
             "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
-            "slo": obs.get("slo")}
+            "slo": obs.get("slo"),
+            "escalation": obs.get("escalation") or remediation.empty_escalation(),
+            "remediation": obs.get("remediation") or remediation.empty_remediation()}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
@@ -799,6 +877,10 @@ def locked_doctor_write(state: Path, write) -> None:
         handle = open(state / "doctor.lock", "a")
         fcntl.flock(handle, fcntl.LOCK_EX)
     except OSError:
+        # flock can fail after open. Dropping the handle without closing it leaks an fd
+        # on every doctor tick.
+        if handle is not None:
+            handle.close()
         handle = None
     try:
         write()
@@ -832,6 +914,12 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
+    result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
+    result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    result["fileOverlap"] = obs.get("fileOverlap") or file_overlap.doctor_view(host.state)
+    for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
+        result[key] = result["remediation"].get(key, 0)
+    result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
     if obs.get("linearSkipped"):
         result["linearSkipped"] = obs["linearSkipped"]

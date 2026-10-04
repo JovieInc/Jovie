@@ -49,7 +49,8 @@ export async function resolveLabelId(name, apiKey, fetchImpl = fetch) {
     fetchImpl,
   });
   if (result.rateLimited) throw new Error('linear rate limited');
-  if (!result.ok) throw new Error(result.reason || 'linear label lookup failed');
+  if (!result.ok)
+    throw new Error(result.reason || 'linear label lookup failed');
   return result.data?.data?.team?.labels?.nodes?.[0]?.id ?? null;
 }
 
@@ -84,6 +85,7 @@ async function main() {
       ].join('\n'),
       priority: 4,
       createStateName: 'Todo',
+      reopenTerminal: true,
       createLabelIds: [devinLabel],
       apiKey,
     });

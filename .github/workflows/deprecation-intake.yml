@@ -54,7 +54,7 @@ jobs:
           for run_id in $run_ids; do
             # Skipped jobs have no log blob — the logs endpoint 404s on them.
             for job in $(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | select((.name | test("^Build")) and (.conclusion == "success")) | .id'); do
-              if chunk="$(gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs")"; then
+              if chunk="$(gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs")"; then
                 printf '%s\n' "$chunk" >> build.log
               else
                 echo "::warning::Could not fetch log for job $job (run $run_id); skipping."

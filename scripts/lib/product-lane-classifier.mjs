@@ -32,7 +32,7 @@ const GATE_RECEIPTS = {
   },
   'cross-product': {
     tests:
-      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test',
+      'pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test',
     artifact: 'cross-product shared-contract gate receipt',
   },
 };
@@ -88,6 +88,12 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^packages\/auth-routing\//,
   ],
   [
+    'shared-release-channel',
+    'shared-contract',
+    PRODUCT_LANES,
+    /^packages\/release-channel-contracts\//,
+  ],
+  [
     // Lockfile-only churn (every dependabot group) changes the JS install
     // graph. The iOS lane is native xcodebuild with no causal path from it —
     // unlike the desktop lane, which bundles web output. Dropping ios here
@@ -133,7 +139,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'web-product',
     'web',
     ['web'],
-    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
     'operations-tooling',

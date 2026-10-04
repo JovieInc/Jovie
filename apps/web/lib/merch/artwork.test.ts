@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { renderMockup } from './artwork';
+import { buildPrintSvg, renderMockup } from './artwork';
+import type { MerchDesignLane } from './types';
 
 async function buildPrintFile(): Promise<Buffer> {
   return sharp(
@@ -39,6 +40,34 @@ async function sampleHood(mockup: Buffer): Promise<{
     .toBuffer({ resolveWithObject: true });
   return { r: data[0] ?? 0, g: data[1] ?? 0, b: data[2] ?? 0 };
 }
+
+describe('buildPrintSvg lane copy', () => {
+  it.each([
+    ['band_tour_uniform', 'SIGNATURE UNIFORM', 'JOVIE MERCH SERIES'],
+    ['fashion_graphic_item', 'LIMITED OBJECT', 'WEAR THE WORLD'],
+    ['artist_world_artifact', 'CREATOR WORLD', 'ARCHIVE PIECE'],
+  ] as const)(
+    'renders creator-agnostic copy for %s',
+    (lane: MerchDesignLane, eyebrow: string, footer: string) => {
+      const svg = buildPrintSvg({
+        artistName: 'Example Creator',
+        designName: 'Example Design',
+        lane,
+        concept: 'A concept.',
+      }).toString();
+
+      expect(svg).toContain(eyebrow);
+      expect(svg).toContain(footer);
+      for (const musicOnly of [
+        'LIVE SIGNAL',
+        'WEAR THE SOUND',
+        'ARTIST WORLD',
+      ]) {
+        expect(svg).not.toContain(musicOnly);
+      }
+    }
+  );
+});
 
 describe('renderMockup', () => {
   it('renders distinct product-aware fallback mockups', async () => {

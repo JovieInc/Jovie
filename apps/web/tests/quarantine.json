@@ -6,7 +6,7 @@
     "e2eDefaultRetries": 0,
     "quarantineE2eRetries": 2,
     "maxRetryAttemptsPerCiRun": 160,
-    "unitShardCount": 6
+    "unitShardCount": 14
   },
   "entries": [
     {

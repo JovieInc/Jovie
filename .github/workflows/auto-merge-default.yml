@@ -139,8 +139,13 @@ jobs:
               any(.[][]?;
                 .context == $context and .state == "success"
                 and .creator.type == "Bot" and .creator.login == "jovie-bot[bot]"
-                and ((.description | capture("^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=(?<run>[1-9][0-9]*);try=[1-9][0-9]*$")) as $receipt
-                  | .target_url == ($prefix + $receipt.run)))
+                and (
+                  ((.description | capture("^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=(?<run>[1-9][0-9]*);try=[1-9][0-9]*$") // null) as $receipt
+                    | $receipt != null and .target_url == ($prefix + $receipt.run))
+                  or
+                  ((.description | capture("^class=base-branch;n=[1-9][0-9]*;run=(?<run>[1-9][0-9]*);try=[1-9][0-9]*;main=[0-9a-f]{40}$") // null) as $base
+                    | $base != null and .target_url == ($prefix + $base.run))
+                ))
             ' <<<"$STATUS_PAGES" >/dev/null; then
             echo "Exact source head $PR_HEAD carries a merge-group failure hold; auto-merge remains disabled."
             exit 0

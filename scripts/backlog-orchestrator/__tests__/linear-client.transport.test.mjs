@@ -649,7 +649,13 @@ describe('durable credential budget', () => {
         );
         assert.equal(child.status, 0, child.stderr);
         assert.equal(child.stdout.trim(), '1');
-        const root = join(home, '.local', 'state', 'jovie-lanes', 'linear-cooldown');
+        const root = join(
+          home,
+          '.local',
+          'state',
+          'jovie-lanes',
+          'linear-cooldown'
+        );
         assert.equal(fs.statSync(root).mode & 0o777, 0o700);
         assert.equal(fs.readdirSync(root).length, 1);
       } finally {

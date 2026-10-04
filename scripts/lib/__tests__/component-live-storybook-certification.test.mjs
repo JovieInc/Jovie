@@ -12,7 +12,15 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { extractSwitchContrastPairs } from '../../component-live-storybook-browser.mjs';
 import {
   CANONICAL_LIVE_STORIES,
@@ -28,6 +36,7 @@ import {
   validateCanonicalStoryInventory,
 } from '../../component-live-storybook-certification.mjs';
 import {
+  createStorybookVitestLease,
   findOwnedPlaywrightBrowsers,
   isProcessGone,
   killProcessGroup,
@@ -179,7 +188,11 @@ async function spawnLifecycleHarness(
       throw error;
     });
     browser.unref();
-    while (!existsSync(${JSON.stringify(helperPidFile)})) {
+    // The pid file exists (empty) before its write lands; wait for the pid.
+    while (
+      !existsSync(${JSON.stringify(helperPidFile)}) ||
+      !(Number(readFileSync(${JSON.stringify(helperPidFile)}, 'utf8')) > 0)
+    ) {
       await new Promise(resolve => setTimeout(resolve, 25));
     }
     while (!existsSync(${JSON.stringify(helperSignalFile)})) {
@@ -752,6 +765,58 @@ describe('live Storybook component certification', () => {
 });
 
 describe('live Storybook lifecycle', () => {
+  it('omits invalid controller receipts so repeated owner setup can read its lease', () => {
+    const tempRoot = mkdtempSync(
+      join(tmpdir(), 'jovie-storybook-vitest-receipt-')
+    );
+    const leaseDir = mkdtempSync(
+      join(tmpdir(), 'storybook-controller-receipts-')
+    );
+    temps.push(tempRoot, leaseDir);
+    const valid = {
+      pid: 120,
+      pgid: 120,
+      startedAt: 'Sat Oct  3 19:24:08 2026',
+      commandHash: 'a'.repeat(64),
+    };
+    const options = {
+      token: randomUUID(),
+      tempRoot,
+      leaseDir,
+      ownerPid: 121,
+      ownerPgid: 120,
+      ownerStartedAt: valid.startedAt,
+      ownerCommandHash: 'b'.repeat(64),
+      deadlineAt: null,
+      controllers: [valid, { ...valid, pid: 517, pgid: 0 }],
+    };
+
+    const first = createStorybookVitestLease(options);
+    expect(first.controllers).toEqual([valid]);
+    expect(createStorybookVitestLease(options)).toMatchObject({
+      created: false,
+      leasePath: first.leasePath,
+      controllers: [valid],
+    });
+  });
+
+  it('never signals the caller process group for a missing or zero pid', () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    try {
+      for (const pid of [0, -0, -1, Number(''), Number.NaN, undefined])
+        killProcessGroup({ pid }, 'SIGKILL');
+      killProcessGroup(null, 'SIGKILL');
+      expect(kill).not.toHaveBeenCalled();
+      killProcessGroup({ pid: 4242 }, 'SIGKILL');
+      expect(kill.mock.calls).toEqual([
+        [-4242, 'SIGKILL'],
+        [4242, 'SIGKILL'],
+      ]);
+    } finally {
+      kill.mockRestore();
+    }
+  });
+
   it('selects only the exact owned Playwright profile and never normal Chrome', () => {
     const token = randomUUID();
     const tempRoot = mkdtempSync(

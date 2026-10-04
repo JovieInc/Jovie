@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-10-03T00:04:14.751Z",
+  "generatedAt": "2026-10-04T01:44:26.808Z",
   "totalErrors": 112,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
