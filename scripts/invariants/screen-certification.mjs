@@ -277,6 +277,7 @@ web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.settings-referral|web|screen.settings.referral|apps/web/app/app/(shell)/settings/referral/page.tsx|desktop,mobile
 web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile

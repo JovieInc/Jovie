@@ -440,6 +440,30 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('registers Referral at its canonical Settings route while requiring real certification proof', () => {
+    const path = 'apps/web/app/app/(shell)/settings/referral/page.tsx';
+    const headSha = 'a'.repeat(40);
+    const changedFiles = [{ path, status: 'A' }];
+    const registered = evaluateChangedScreens({ changedFiles, headSha });
+    assert.deepEqual(registered.issues, []);
+    assert.equal(registered.changedScreens.length, 1);
+    assert.equal(registered.changedScreens[0].id, 'web.settings-referral');
+    const classified = classifyScreenPath(path);
+    assert.equal(classified.kind, 'registered');
+    assert.equal(classified.entry.owner, 'screen.settings.referral');
+    assert.deepEqual(classified.entry.viewports, ['desktop', 'mobile']);
+    const certified = evaluateChangedScreens({
+      changedFiles,
+      headSha,
+      requireExternalEvidence: true,
+    });
+    assert.ok(
+      certified.issues.includes(
+        'missing exact-head proof for web.settings-referral'
+      )
+    );
+  });
+
   it('keeps a separately named registration-only audit distinct from certification', () => {
     const result = runScreenCertification({
       headSha: HEAD,
