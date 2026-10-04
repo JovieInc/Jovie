@@ -96,17 +96,20 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
   },
 ] as const satisfies readonly MarketingNavFlyoutLink[]);
 
+/** JOV-7580. Literal so the nav label/destination invariant can read it. */
+const GENERIC_SMART_LINKS_FLYOUT_LINK = {
+  href: APP_ROUTES.SMART_LINKS,
+  label: 'Smart Links',
+  description: 'Share your work with one link. Example: a release.',
+} as const satisfies MarketingNavFlyoutLink;
+
 export function getMarketingToolsFlyoutLinks(
   genericCreatorNav = false
 ): readonly MarketingNavFlyoutLink[] {
   if (!genericCreatorNav) return MARKETING_TOOLS_FLYOUT_LINKS;
   return MARKETING_TOOLS_FLYOUT_LINKS.map(link =>
     link.href === APP_ROUTES.SMART_LINKS
-      ? {
-          ...link,
-          label: 'Smart Links',
-          description: 'Share your work with one link. Example: a release.',
-        }
+      ? GENERIC_SMART_LINKS_FLYOUT_LINK
       : link
   );
 }
@@ -179,18 +182,27 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
     links: eligibleLinks(column.links),
   }));
 
-function genericFooterLabel(label: string): string {
-  switch (label) {
-    case 'Music Smart Links':
-      return 'Smart Links';
-    case 'Fan Capture':
-      return 'Audience Capture';
-    case 'Fan Reactivation':
-      return 'Audience Reactivation';
-    default:
-      return label;
-  }
-}
+/**
+ * JOV-7580. The generic Customers column: Artists first, then the Music column
+ * hrefs with audience wording. Kept literal so every label is validated.
+ */
+const RAW_GENERIC_CREATOR_FOOTER_LINKS = [
+  { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
+  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+  { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
+  { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
+  { href: APP_ROUTES.PAY, label: 'Pay' },
+  {
+    href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
+    label: 'Audience Capture',
+  },
+  {
+    href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
+    label: 'Audience Reactivation',
+  },
+  { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
+  { href: APP_ROUTES.LAUNCH, label: 'Release System' },
+] as const satisfies readonly MarketingFooterLink[];
 
 /**
  * JOV-7580. Flag off returns the current Music column. Flag on renames that
@@ -201,19 +213,14 @@ export function getMarketingFooterColumns(
   genericCreatorNav = false
 ): readonly MarketingFooterColumn[] {
   if (!genericCreatorNav) return MARKETING_FOOTER_COLUMNS;
-  return MARKETING_FOOTER_COLUMNS.map(column => {
-    if (column.title !== 'Music') return column;
-    return {
-      title: 'Customers',
-      links: eligibleLinks([
-        { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
-        ...column.links.map(link => ({
-          ...link,
-          label: genericFooterLabel(link.label),
-        })),
-      ]),
-    };
-  });
+  return MARKETING_FOOTER_COLUMNS.map(column =>
+    column.title === 'Music'
+      ? {
+          title: 'Customers',
+          links: eligibleLinks(RAW_GENERIC_CREATOR_FOOTER_LINKS),
+        }
+      : column
+  );
 }
 
 /**
@@ -236,13 +243,18 @@ export const PUBLIC_COMMERCIAL_FOOTER_COLUMN: MarketingFooterColumn = {
   links: PUBLIC_COMMERCIAL_FOOTER_LINKS,
 };
 
+const GENERIC_SMART_LINKS_FOOTER_LINK = {
+  href: APP_ROUTES.SMART_LINKS,
+  label: 'Smart Links',
+} as const satisfies MarketingFooterLink;
+
 export function getPublicCommercialFooterLinks(
   genericCreatorNav = false
 ): readonly MarketingFooterLink[] {
   if (!genericCreatorNav) return PUBLIC_COMMERCIAL_FOOTER_LINKS;
   return PUBLIC_COMMERCIAL_FOOTER_LINKS.map(link =>
-    link.label === 'Music Smart Links'
-      ? { ...link, label: 'Smart Links' }
+    link.href === APP_ROUTES.SMART_LINKS
+      ? GENERIC_SMART_LINKS_FOOTER_LINK
       : link
   );
 }
