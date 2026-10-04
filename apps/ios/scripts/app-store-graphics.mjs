@@ -34,6 +34,9 @@ const BUNDLE_ID = 'ie.jov.Jovie';
 // Accent rotation rule (2026-09-26): blue, purple, pink, orange in visual
 // order, so neighbours never match. Green and red read as status; never here.
 const ACCENT_ROTATION = ['ion', 'ultra', 'pulse', 'orange'];
+// Status bar glyphs (clock, signal, battery) sit in this band of a capture.
+const STATUS_BAR_BAND = { top: 0.02, bottom: 0.05 };
+const STATUS_BAR_MIN_DENSITY = 0.005;
 
 /** Everything that changes what the store graphics show. */
 export const SOURCE_INPUTS = [
@@ -98,6 +101,10 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
   const ids = new Set();
   if (!spec.device?.width || !spec.device?.height)
     problems.push('device size is missing');
+  const pinned = spec.layout?.pinnedHeader;
+  if (!(pinned > 0 && pinned < 0.2)) {
+    problems.push('layout.pinnedHeader must be between 0 and 0.2');
+  }
   const check = spec.contentCheck;
   if (
     !check ||
@@ -349,6 +356,8 @@ export function renderHtml({
   const accent = colorSot.accents.hex[screen.accent];
   const screenWidth = layout.deviceWidth - layout.bezel * 2;
   const screenHeight = Math.round((screenWidth * height) / width);
+  // The status bar and app header stay put; only the content below scrolls.
+  const pinned = Math.round(layout.pinnedHeader * screenHeight);
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:Satoshi;src:url(${fontDataUri}) format("woff2");font-weight:300 900}
 *{box-sizing:border-box;margin:0}
@@ -370,13 +379,18 @@ border-radius:${layout.deviceRadius}px;
 background:linear-gradient(${card},${card}) padding-box,
 linear-gradient(135deg,rgb(255 255 255 / .34),${floating} 32%,${floating} 70%,rgb(0 0 0 / .4)) border-box;
 box-shadow:40px 72px 160px rgb(0 0 0 / .62),12px 20px 48px rgb(0 0 0 / .4)}
-.screen{width:${screenWidth}px;height:${screenHeight}px;overflow:hidden;
+.screen{position:relative;width:${screenWidth}px;height:${screenHeight}px;overflow:hidden;
 background:${screenFill};border-radius:${layout.deviceRadius - layout.bezel}px}
-.screen img{display:block;width:${screenWidth}px;height:${screenHeight}px;
-margin-top:${-Math.round((screen.scroll ?? 0) * screenHeight)}px}
+.screen img{display:block;width:${screenWidth}px;height:${screenHeight}px}
+.pinned{position:absolute;inset:0 0 auto;height:${pinned}px;overflow:hidden}
+.content{position:absolute;inset:${pinned}px 0 0;overflow:hidden}
+.content img{margin-top:${-pinned - Math.round((screen.scroll ?? 0) * screenHeight)}px}
 </style></head><body><div class="stage" data-screen="${screen.id}">
 <h1>${escapeHtml(screen.headline)}</h1>
-<div class="device"><div class="screen"><img alt="" src="${captureDataUri}"></div></div>
+<div class="device"><div class="screen">
+<div class="pinned"><img alt="" src="${captureDataUri}"></div>
+<div class="content"><img alt="" src="${captureDataUri}"></div>
+</div></div>
 </div></body></html>`;
 }
 
@@ -638,6 +652,10 @@ export function verifyOutput({ out, spec, currentSourceHash, currentVersion }) {
     }
     if (sha256(capture) !== entry.captureSha256) {
       problems.push(`raw/${screen.id}.png: does not match the receipt`);
+    }
+    // The 9:41 status bar band must be present so every panel reads as a phone.
+    if (contentDensity(capture, STATUS_BAR_BAND) < STATUS_BAR_MIN_DENSITY) {
+      problems.push(`raw/${screen.id}.png: status bar (9:41) is missing`);
     }
     const density = contentDensity(capture, spec.contentCheck);
     if (density < spec.contentCheck.minDensity) {
