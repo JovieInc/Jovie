@@ -37,6 +37,14 @@ describe('half-built product surfaces stay dark', () => {
     expect(route).toContain("jsonError(404, 'Not found')");
   });
 
+  it('keeps the money page unreachable while creator finance is off', () => {
+    const layout = source('app/app/money/layout.tsx');
+    expect(layout).toContain('isCreatorFinanceEnabled');
+    expect(layout).toContain('notFound()');
+    const overview = source('lib/finance/overview.ts');
+    expect(overview).toContain('assertCreatorFinanceEnabled');
+  });
+
   it('keeps merch visual QA off while the reviewer is a stub', () => {
     expect(APP_FLAG_DEFAULTS.MERCH_QA_GATE).toBe(false);
     expect(source('lib/merch/qa-gate.ts')).toContain(
@@ -67,10 +75,12 @@ describe('iOS does not navigate to web-only workspaces', () => {
 
     expect(ids.length).toBeGreaterThan(10);
     expect(
-      ids.filter(id =>
-        /youtube|insights|jovie-work|joviework|release-plan|releaseplan/i.test(
-          id ?? ''
-        )
+      ids.filter(
+        id =>
+          !id.startsWith('webOnly.') &&
+          /youtube|insights|jovie-work|joviework|release-plan|releaseplan/i.test(
+            id ?? ''
+          )
       )
     ).toEqual([]);
   });

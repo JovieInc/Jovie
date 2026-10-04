@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { captureFunnel } from './capture.mjs';
-import { JUDGES, judgePersona } from './judge.mjs';
+import { JUDGES, judgeCoherence, judgePersona } from './judge.mjs';
 import {
   calibrationHolds,
   evaluatePassBar,
@@ -40,6 +40,7 @@ const { values } = parseArgs({
     personas: { type: 'string' },
     'skip-judge': { type: 'boolean', default: false },
     'no-emotional': { type: 'boolean', default: false },
+    'no-coherence': { type: 'boolean', default: false },
     'no-throttle': { type: 'boolean', default: false },
     calibrate: { type: 'boolean', default: false },
     label: { type: 'string', default: '' },
@@ -86,6 +87,7 @@ async function main() {
     steps: FUNNEL_STEPS,
     outDir,
     throttleMobile: !values['no-throttle'],
+    bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET || undefined,
   });
 
   const displayName = displayNameFrom(captures, handle);
@@ -110,6 +112,7 @@ async function main() {
 
   /** @type {Array<any>} */
   let verdicts = [];
+  let coherence = null;
   const judgeErrors = [];
   if (!values['skip-judge']) {
     const personaIds = values.personas?.split(',');
@@ -125,6 +128,17 @@ async function main() {
     console.log(
       `[funnel-judge] judging ${judgeSteps.length} steps × ${jobs.length} persona runs`
     );
+    const coherenceRun =
+      values['no-coherence'] || judgeSteps.length < 2
+        ? Promise.resolve(null)
+        : judgeCoherence({ steps: judgeSteps, imageDir: outDir }).catch(
+            error => {
+              judgeErrors.push(
+                `${JUDGES.coherence.id}: ${error instanceof Error ? error.message : error}`
+              );
+              return null;
+            }
+          );
     const results = await mapLimit(
       jobs,
       Number(values.concurrency),
@@ -155,6 +169,14 @@ async function main() {
       }
     );
     verdicts = results.filter(Boolean);
+    coherence = await coherenceRun;
+    if (coherence) {
+      console.log(
+        `[funnel-judge] coherence: ${coherence.transitions
+          .map(row => `${row.fromStepId}→${row.toStepId}:${row.score}`)
+          .join(' ')}`
+      );
+    }
   }
 
   const result = evaluatePassBar({
@@ -162,6 +184,7 @@ async function main() {
     verdicts,
     primaryJudge: JUDGES.primary.id,
     metrics: /** @type {any} */ (captures),
+    coherence,
   });
   if (judgeErrors.length > 0) {
     result.pass = false;
@@ -181,6 +204,7 @@ async function main() {
     outDir,
     captures,
     verdicts,
+    coherence,
     result,
     worst: worstStep(result.aggregates),
     calibration: values.calibrate

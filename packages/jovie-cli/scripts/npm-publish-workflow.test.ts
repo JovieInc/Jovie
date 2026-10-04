@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -99,6 +100,17 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('"$installed_cli" --version');
   expect(source).toContain('"$installed_cli" api openapi');
   expect(source).toContain("contract.info?.title !== 'Jovie Artist API'");
+  // JOV-7714: publish only bytes that passed the black-box chaos matrix.
+  expect(source).toContain('needs: [chaos-tarball, chaos-matrix]');
+  expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
+  expect(source).toMatch(/node: \[[^\]]*'24\.21\.0'[^\]]*'26'\]/);
+  expect(source).toContain('fail-fast: false');
+  expect(source).toContain('node "$PACK_DIR/chaos-blackbox.mjs"');
+  expect(source).toContain('--profile release');
+  expect(source).toContain('npm install --prefix "$CLEAN_DIR"');
+  expect(source).toContain(
+    'if (!process.env.TESTED_INTEGRITY || pack.integrity !== process.env.TESTED_INTEGRITY) {'
+  );
 }
 
 describe('manual npm provenance workflow', () => {
@@ -149,6 +161,27 @@ describe('manual npm provenance workflow', () => {
       workflow.replace(
         "['dist.attestations.url', typeof metadata.dist?.attestations?.url === 'string']",
         "['dist.attestations.url', true]"
+      ),
+    ],
+    [
+      'chaos gate dependency',
+      workflow.replace(
+        'needs: [chaos-tarball, chaos-matrix]',
+        'needs: [chaos-tarball]'
+      ),
+    ],
+    [
+      'Windows chaos runner',
+      workflow.replace(
+        'os: [ubuntu-latest, macos-latest, windows-latest]',
+        'os: [ubuntu-latest]'
+      ),
+    ],
+    [
+      'tested-bytes identity check',
+      workflow.replace(
+        'if (!process.env.TESTED_INTEGRITY || pack.integrity !== process.env.TESTED_INTEGRITY) {',
+        'if (false) {'
       ),
     ],
     [
@@ -232,7 +265,7 @@ describe('canonical source validation discovers CLI publication changes', () => 
   );
   function runSourceGate(changed: string, failure: string = '') {
     const step = source.match(
-      /- name: Verify changed CLI publication behavior\n        shell: bash\n        run: \|\n([\s\S]*?)(?=^  security:)/m
+      /- name: Verify changed CLI publication behavior\n(?:        if: [^\n]+\n)?        shell: bash\n        run: \|\n([\s\S]*?)(?=^  security:)/m
     );
     expect(
       step,
@@ -293,10 +326,9 @@ describe('canonical source validation discovers CLI publication changes', () => 
       );
       return {
         status: result.status,
-        calls:
-          result.status === 0 && !changed
-            ? []
-            : readFileSync(calls, 'utf8').trim().split('\n'),
+        calls: existsSync(calls)
+          ? readFileSync(calls, 'utf8').trim().split('\n')
+          : [],
       };
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -305,26 +337,47 @@ describe('canonical source validation discovers CLI publication changes', () => 
   it.each([
     'packages/jovie-cli/src/mcp.ts',
     '.github/workflows/npm-publish.yml',
+    '.github/workflows/cli-chaos-nightly.yml',
     '.github/workflows/source-validation.yml',
-  ])('runs real enforced coverage and package checks for %s', changed => {
-    const result = runSourceGate(changed);
-    expect(result.status).toBe(0);
-    expect(result.calls).toEqual(
-      ['test:coverage', 'typecheck', 'build', 'pack:dry'].map(
-        command => `--filter @jovie/cli run ${command}`
-      )
-    );
-    for (const path of [
-      'packages/jovie-cli',
-      '.github/workflows/npm-publish.yml',
-      '.github/workflows/source-validation.yml',
-    ])
-      expect(source).toContain(path);
-  });
+    // Public API routes the CLI calls run the CLI chaos gate too.
+    'apps/web/app/api/v1/[username]/route.ts',
+    'apps/web/app/api/v1/openapi.json/route.ts',
+    'apps/web/app/api/v1/actions/[actionId]/invoke/route.ts',
+    'apps/web/app/api/agents/creator-lookup/route.ts',
+    'apps/web/app/llms.txt/route.ts',
+    'apps/web/app/llms-full.txt/route.ts',
+    'apps/web/app/[username]/llms.txt/route.ts',
+    'apps/web/lib/api/v1/contract.ts',
+  ])(
+    'runs real enforced coverage, package, and chaos checks for %s',
+    changed => {
+      const result = runSourceGate(changed);
+      expect(result.status).toBe(0);
+      expect(result.calls).toEqual(
+        ['test:coverage', 'typecheck', 'build', 'pack:dry', 'chaos:gate'].map(
+          command => `--filter @jovie/cli run ${command}`
+        )
+      );
+      for (const path of [
+        'packages/jovie-cli',
+        '.github/workflows/npm-publish.yml',
+        '.github/workflows/source-validation.yml',
+      ])
+        expect(source).toContain(path);
+    }
+  );
   it('does not add unrelated package work when no publication surface changed', () => {
     expect(runSourceGate('')).toEqual({ status: 0, calls: [] });
   });
-  it.each(['test:coverage', 'typecheck', 'build', 'pack:dry'])(
+  it.each(['apps/web/app/page.tsx', 'apps/web/app/x/llms.txt/route.ts'])(
+    'skips the CLI gate for unrelated web path %s',
+    changed => {
+      const result = runSourceGate(changed);
+      expect(result.status).toBe(0);
+      expect(result.calls).toEqual([]);
+    }
+  );
+  it.each(['test:coverage', 'typecheck', 'build', 'pack:dry', 'chaos:gate'])(
     'fails closed immediately when %s fails',
     failure => {
       const result = runSourceGate('packages/jovie-cli/src/mcp.ts', failure);

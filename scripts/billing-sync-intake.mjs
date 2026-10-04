@@ -8,11 +8,12 @@ import {
 } from './lib/linear-issue-intake.mjs';
 
 export const BILLING_SYNC_STALE_KEY = 'billing-sync-stale';
-const STALE_MS = 26 * 60 * 60 * 1000;
-const STUCK_MS = 60 * 60 * 1000;
+const STALE_MS = 36 * 60 * 60 * 1000;
+const STUCK_MS = 2 * 60 * 60 * 1000;
 
 export function planBillingSyncIntake({
   lastReconciliationAt = null,
+  lastReconciliationSuccess = null,
   oldestUnprocessedAt = null,
   unprocessedWebhooks = 0,
   now = Date.now(),
@@ -20,15 +21,17 @@ export function planBillingSyncIntake({
   const last = lastReconciliationAt ? Date.parse(lastReconciliationAt) : NaN;
   const oldest = oldestUnprocessedAt ? Date.parse(oldestUnprocessedAt) : NaN;
   const reconciliationStale = !Number.isFinite(last) || now - last > STALE_MS;
+  const reconciliationFailed = lastReconciliationSuccess === false;
   const webhooksStuck =
     Number(unprocessedWebhooks) > 0 &&
     Number.isFinite(oldest) &&
     now - oldest > STUCK_MS;
-  if (reconciliationStale || webhooksStuck) {
+  if (reconciliationStale || reconciliationFailed || webhooksStuck) {
     return {
       action: 'upsert',
       key: BILLING_SYNC_STALE_KEY,
       reconciliationStale,
+      reconciliationFailed,
       webhooksStuck,
       unprocessedWebhooks: Number(unprocessedWebhooks) || 0,
     };
@@ -37,13 +40,14 @@ export function planBillingSyncIntake({
     action: 'resolve',
     key: BILLING_SYNC_STALE_KEY,
     reconciliationStale: false,
+    reconciliationFailed: false,
     webhooksStuck: false,
     unprocessedWebhooks: Number(unprocessedWebhooks) || 0,
   };
 }
 
 /**
- * @param {{ action: string, key: string, reconciliationStale?: boolean, webhooksStuck?: boolean, unprocessedWebhooks?: number }} plan
+ * @param {{ action: string, key: string, reconciliationStale?: boolean, reconciliationFailed?: boolean, webhooksStuck?: boolean, unprocessedWebhooks?: number }} plan
  * @param {{ runId?: string, fetchImpl?: typeof fetch }} [options]
  */
 export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
@@ -53,6 +57,7 @@ export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
       key: plan.key,
       fingerprint: plan.key,
       reconciliationStale: plan.reconciliationStale,
+      reconciliationFailed: plan.reconciliationFailed,
       webhooksStuck: plan.webhooksStuck,
       unprocessedWebhooks: plan.unprocessedWebhooks,
     });
@@ -62,7 +67,7 @@ export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
       fingerprint: plan.key,
       labelKey: plan.key,
       comment:
-        'Billing reconciliation is fresh and stuck webhooks are under an hour.',
+        'Billing reconciliation is under 36 hours old, its latest receipt is not a failed run, and no webhook has been unprocessed for more than 2 hours.',
       runId,
       fetchImpl,
     });
@@ -72,9 +77,10 @@ export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
     labelKey: plan.key,
     title: `P1: billing sync is stale (${plan.key})`,
     description: [
-      'Billing reconciliation heartbeat is older than 26 hours, or unprocessed webhooks have been waiting more than an hour.',
+      'Billing reconciliation heartbeat is older than 36 hours, the latest run failed, or unprocessed webhooks have been waiting more than 2 hours.',
       '',
       `- reconciliation stale: ${plan.reconciliationStale}`,
+      `- reconciliation failed: ${plan.reconciliationFailed}`,
       `- webhooks stuck: ${plan.webhooksStuck}`,
       `- unprocessed webhooks: ${plan.unprocessedWebhooks}`,
     ].join('\n'),
@@ -90,6 +96,7 @@ async function main() {
   const metrics = health.metrics ?? health;
   const plan = planBillingSyncIntake({
     lastReconciliationAt: metrics.lastReconciliationAt ?? null,
+    lastReconciliationSuccess: metrics.lastReconciliationSuccess ?? null,
     oldestUnprocessedAt: metrics.oldestUnprocessedWebhookAt ?? null,
     unprocessedWebhooks: metrics.unprocessedWebhookCount ?? 0,
   });

@@ -42,6 +42,8 @@ vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: vi.fn().mockResolvedValue('user_admin'),
 }));
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
@@ -57,7 +59,7 @@ describe('AdminCostsPage', () => {
     mockGetLastRefreshed.mockResolvedValue(null);
   });
 
-  it('renders the costs table with empty fallback data when optional loaders fail', async () => {
+  it('shows unknown spend without rendering a zero total when cost loading fails', async () => {
     mockGetAdminCosts.mockRejectedValueOnce(new Error('cost loader failed'));
 
     const { default: AdminCostsPage } = await import(
@@ -75,10 +77,37 @@ describe('AdminCostsPage', () => {
       screen.queryByRole('heading', { name: 'Costs' })
     ).not.toBeInTheDocument();
     expect(mockCaptureError).toHaveBeenCalledWith(
-      'Admin costs page failed to load optional data',
+      'Admin costs page failed to load cost items',
       expect.any(Error),
       expect.objectContaining({ route: 'admin/costs' })
     );
+    expect(mockCostsTable).not.toHaveBeenCalled();
+    expect(screen.getByText(/Spend is unknown, not zero/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+  it('retains successfully read items when only refresh metadata fails', async () => {
+    const items = [{ label: 'Hosting', observed30dUsd: '12' }];
+    mockGetAdminCosts.mockResolvedValue(items);
+    mockGetLastRefreshed.mockRejectedValue(new Error('timeout'));
+    const { default: Page } = await import(
+      '@/app/app/(shell)/admin/costs/page'
+    );
+    render(await Page());
+    expect(mockCostsTable).toHaveBeenCalledWith(
+      expect.objectContaining({ items, lastRefreshedLabel: 'Unavailable' }),
+      undefined
+    );
+    expect(
+      screen.getByText(/source refresh time could not be read/)
+    ).toBeInTheDocument();
+  });
+
+  it('keeps a successful empty read distinct from an unavailable source', async () => {
+    mockGetLastRefreshed.mockResolvedValue(null);
+    const { default: Page } = await import(
+      '@/app/app/(shell)/admin/costs/page'
+    );
+    render(await Page());
     expect(mockCostsTable).toHaveBeenCalledWith(
       expect.objectContaining({
         items: [],
@@ -86,5 +115,8 @@ describe('AdminCostsPage', () => {
       }),
       undefined
     );
+    expect(
+      screen.queryByRole('button', { name: 'Retry' })
+    ).not.toBeInTheDocument();
   });
 });

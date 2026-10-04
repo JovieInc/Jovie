@@ -29,6 +29,7 @@ import { listProductTruthClaims } from '../../data/product-truth/claims';
 import {
   createProofPageContext,
   type ProofKind,
+  proofEvidenceClass,
   selectProof,
 } from '../../data/product-truth/proof';
 import { getProductCapability } from '../../data/product-truth/registry';
@@ -260,6 +261,12 @@ function narrativeStage(ctx: StageContext): Promise<StageResult> {
   );
 }
 
+/**
+ * Copy directions written and judged per attempt (JOV-7765). Copy is the
+ * stage a visual rejection reworks, so it is where competing directions pay.
+ */
+export const FACTORY_COPY_DIRECTIONS = 3;
+
 function copyStage(ctx: StageContext): Promise<StageResult> {
   const truth = artifactOf(ctx, 'truth');
   const narrative = artifactOf(ctx, 'narrative');
@@ -341,7 +348,8 @@ function copyStage(ctx: StageContext): Promise<StageResult> {
           rubricVersion: RUBRIC_VERSION,
         })),
       };
-    }
+    },
+    { directions: FACTORY_COPY_DIRECTIONS }
   );
 }
 
@@ -446,6 +454,11 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
     requests: [],
   };
   const proofRequests: unknown[] = [];
+  const measuredClaimIds = new Set(
+    listProductTruthClaims()
+      .filter(claim => claim.source === 'measured')
+      .map(claim => claim.id)
+  );
   for (const need of ctx.brief.proof) {
     checks.check(
       `proof-claim:${need.claimId}`,
@@ -485,8 +498,18 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
       artifact.requests.push({
         sectionInstanceId: need.sectionInstanceId,
         kind,
-        reason: `${selected.suggestedLane}: no valid ${selected.kind} proof for ${selected.claimId}`,
+        reason: `${selected.suggestedLane} (${selected.generator} generator): no valid ${selected.kind} proof for ${selected.claimId}`,
       });
+    } else if (
+      !checks.check(
+        `proof-evidence:${selected.id}`,
+        measuredClaimIds.has(selected.claimId)
+          ? proofEvidenceClass(selected) !== 'none'
+          : true,
+        'a measured Jovie outcome needs computed, dogfood or pilot evidence, not a market fact (JOV-7750)'
+      )
+    ) {
+      continue;
     } else {
       artifact.items.push({
         sectionInstanceId: need.sectionInstanceId,
