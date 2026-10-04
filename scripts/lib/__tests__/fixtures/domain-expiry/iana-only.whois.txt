@@ -1,0 +1,6 @@
+% IANA WHOIS server
+refer:        whois.nic.google
+domain:       DEV
+nserver:      NS-TLD1.CHARLESTONROADREGISTRY.COM 216.239.32.105
+status:       ACTIVE
+created:      2014-12-18

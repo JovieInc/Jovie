@@ -133,6 +133,25 @@ class PredictionAndAdmissionTest(unittest.TestCase):
 
 
 class SequencingTest(unittest.TestCase):
+    def test_queue_ownership_does_not_release_duplicate_migration_blocks(self):
+        for ownership in (
+                {"isInMergeQueue": True},
+                {"autoMergeRequest": {"enabledAt": "2026-10-04T01:00:00Z"}}):
+            with self.subTest(ownership=ownership), tempfile.TemporaryDirectory() as tmp, \
+                    patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+                calls = []
+                lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",
+                    sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
+                    ledger=lambda *_args: None)
+                first = pr(1, [changed("apps/web/drizzle/migrations/0131_billing.sql", "ADDED")])
+                later = pr(2, [changed("apps/web/drizzle/migrations/0131_profiles.sql", "ADDED")])
+                later.update(ownership)
+                result = overlap.reconcile_open_prs(SimpleNamespace(state=Path(tmp)), lane, [first, later])
+                self.assertEqual(result["pairs"][0]["actionTaken"], "block")
+                self.assertTrue(any("repos/JovieInc/Jovie/issues/2/labels" in args
+                                    and "labels[]=hold" in args for args in calls))
+                self.assertEqual(result["metrics"]["conflicts_prevented"], 1)
+
     def test_child_targets_main_then_rebases_after_parent_lands(self):
         calls, ledger = [], []
         lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",

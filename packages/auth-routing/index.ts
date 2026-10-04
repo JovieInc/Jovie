@@ -44,6 +44,7 @@ export interface AuthStartUrlInput {
   readonly intent: AuthIntent;
   readonly returnTo: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
 }
 
 export interface AuthStateRecord {
@@ -52,6 +53,7 @@ export interface AuthStateRecord {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge: string | null;
+  readonly nativeAttempt?: string;
   readonly desktopFlow: string | null;
   /**
    * The Mac app can redeem a typed return code when its deep link cannot
@@ -78,6 +80,7 @@ export interface NativeExchangeCodeRecord {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge: string | null;
+  readonly nativeAttempt?: string;
   /**
    * One-time token minted at the auth callback from the completing browser
    * session (Clerk → Better Auth migration, plan decision 9). The native
@@ -223,6 +226,25 @@ export function isAuthIntent(value: unknown): value is AuthIntent {
   );
 }
 
+/** Optional iOS correlation only; state, PKCE and one-time codes remain authority. */
+export function isValidNativeAttempt(
+  client: unknown,
+  value: unknown
+): value is string | undefined {
+  return (
+    value === undefined ||
+    (client === 'ios' &&
+      typeof value === 'string' &&
+      value.length === 43 &&
+      /^[A-Za-z0-9_-]{43}$/.test(value))
+  );
+}
+
+function requireNativeAttempt(client: AuthClient, value: unknown): void {
+  if (!isValidNativeAttempt(client, value))
+    throw new Error('Invalid native_attempt');
+}
+
 function matchesPathPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
@@ -302,6 +324,7 @@ export function sanitizeReturnTo(
 }
 
 export function buildAuthStartUrl(input: AuthStartUrlInput): string {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const sanitizedReturnTo = sanitizeReturnTo(input.client, input.returnTo);
   if (!sanitizedReturnTo) {
     throw new Error('Invalid return_to for auth start URL');
@@ -317,6 +340,9 @@ export function buildAuthStartUrl(input: AuthStartUrlInput): string {
     url.searchParams.set('code_challenge_method', 'S256');
   }
 
+  if (input.nativeAttempt !== undefined) {
+    url.searchParams.set('native_attempt', input.nativeAttempt);
+  }
   return url.toString();
 }
 
@@ -332,11 +358,13 @@ export function createAuthStateRecord(input: {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
   readonly desktopFlow?: string | null;
   readonly desktopReturnCode?: boolean;
   readonly desktopLoopbackPort?: number | null;
   readonly now: number;
 }): AuthStateRecord {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
   if (!returnTo) {
     throw new Error('Invalid return_to for auth state');
@@ -358,6 +386,9 @@ export function createAuthStateRecord(input: {
     returnTo,
     state: input.state,
     codeChallenge: input.codeChallenge ?? null,
+    ...(input.nativeAttempt !== undefined
+      ? { nativeAttempt: input.nativeAttempt }
+      : {}),
     desktopFlow: input.desktopFlow ?? null,
     desktopReturnCode:
       input.client === 'electron' &&
@@ -376,9 +407,14 @@ function buildUrlWithCodeAndState(
     readonly code: string;
     readonly state: string;
     readonly desktopFlow?: string | null;
+    readonly nativeAttempt?: string;
   }
 ): string {
+  requireNativeAttempt('ios', input.nativeAttempt);
   const url = new URL(baseUrl);
+  if (input.nativeAttempt !== undefined) {
+    url.searchParams.set('native_attempt', input.nativeAttempt);
+  }
   url.searchParams.set('code', input.code);
   url.searchParams.set('state', input.state);
   if (input.desktopFlow) {
@@ -388,6 +424,7 @@ function buildUrlWithCodeAndState(
 }
 
 export function buildIosAuthCompleteUrl(input: {
+  readonly nativeAttempt?: string;
   readonly code: string;
   readonly state: string;
 }): string {
@@ -395,6 +432,7 @@ export function buildIosAuthCompleteUrl(input: {
 }
 
 export function buildIosUniversalAuthCompleteUrl(input: {
+  readonly nativeAttempt?: string;
   readonly origin: string;
   readonly code: string;
   readonly state: string;
@@ -406,6 +444,7 @@ export function buildIosUniversalAuthCompleteUrl(input: {
 }
 
 export function buildNativeHandbackBouncePath(input: {
+  readonly nativeAttempt?: string;
   readonly client: NativeAuthClient;
   readonly code: string;
   readonly state: string;
@@ -415,6 +454,7 @@ export function buildNativeHandbackBouncePath(input: {
   /** Electron only: the app's pending-flow loopback listener port. */
   readonly desktopLoopbackPort?: number | null;
 }): string {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const url = new URL(
     buildUrlWithCodeAndState(
       `https://jov.ie${NATIVE_HANDBACK_BOUNCE_PATHS[input.client]}`,
@@ -422,6 +462,7 @@ export function buildNativeHandbackBouncePath(input: {
         code: input.code,
         state: input.state,
         desktopFlow: input.client === 'electron' ? input.desktopFlow : null,
+        nativeAttempt: input.nativeAttempt,
       }
     )
   );
@@ -565,6 +606,7 @@ export function resolveAuthCallback(input: {
   readonly redirectUrl: string;
 } {
   const { stateRecord } = input;
+  requireNativeAttempt(stateRecord.client, stateRecord.nativeAttempt);
 
   if (input.requestedClient && input.requestedClient !== stateRecord.client) {
     throw new Error('Auth wrong surface prevented');
@@ -587,6 +629,7 @@ export function resolveAuthCallback(input: {
       redirectUrl: buildIosAuthCompleteUrl({
         code: input.exchangeCode,
         state: stateRecord.state,
+        nativeAttempt: stateRecord.nativeAttempt,
       }),
     };
   }
@@ -608,9 +651,11 @@ export function buildNativeExchangeCodeRecord(input: {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
   readonly ott?: string | null;
   readonly now: number;
 }): NativeExchangeCodeRecord {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
   if (!returnTo) {
     throw new Error('Invalid return_to for native exchange code');
@@ -623,6 +668,9 @@ export function buildNativeExchangeCodeRecord(input: {
     userId: input.userId,
     returnTo,
     codeChallenge: input.codeChallenge ?? null,
+    ...(input.nativeAttempt !== undefined
+      ? { nativeAttempt: input.nativeAttempt }
+      : {}),
     ott: input.ott ?? null,
     createdAt: input.now,
     expiresAt: input.now + NATIVE_EXCHANGE_TTL_MS,
@@ -636,6 +684,7 @@ export type NativeExchangeFailureReason =
   | 'wrong_client'
   | 'wrong_state'
   | 'wrong_verifier'
+  | 'wrong_attempt'
   | 'expired'
   | 'replayed';
 
@@ -657,6 +706,7 @@ export function validateNativeExchange(input: {
   readonly code: string;
   readonly state: string;
   readonly codeVerifier?: string | null;
+  readonly nativeAttempt?: string;
   readonly now: number;
   readonly createCodeChallenge: (verifier: string) => string;
 }): NativeExchangeValidationResult {
@@ -672,6 +722,14 @@ export function validateNativeExchange(input: {
   if (input.record.consumedAt) return { ok: false, reason: 'replayed' };
   if (input.now > input.record.expiresAt)
     return { ok: false, reason: 'expired' };
+
+  if (
+    !isValidNativeAttempt(input.client, input.nativeAttempt) ||
+    !isValidNativeAttempt(input.record.client, input.record.nativeAttempt) ||
+    input.record.nativeAttempt !== input.nativeAttempt
+  ) {
+    return { ok: false, reason: 'wrong_attempt' };
+  }
 
   if (input.record.codeChallenge) {
     if (!input.codeVerifier) return { ok: false, reason: 'wrong_verifier' };
