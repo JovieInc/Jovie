@@ -397,9 +397,17 @@ export function mergedUiEvidence(files, assuranceMatrix) {
   if (!files || !assuranceMatrix || typeof assuranceMatrix !== 'object') {
     return null;
   }
+  const rows =
+    /** @type {{ rows?: { id?: string, ui?: { judgment?: string } }[] }} */ (
+      assuranceMatrix
+    ).rows;
   return uiEvidenceRequirements(assuranceMatrix, [...files]).map(entry => ({
     row: String(entry.row),
     failureClass: String(entry.failureClass),
+    // A row without a judgment is machine-checked; taste is never assumed.
+    judgment: String(
+      rows?.find(row => row.id === entry.row)?.ui?.judgment ?? 'deterministic'
+    ),
     targets: entry.targets.map(String),
   }));
 }
@@ -663,7 +671,9 @@ async function fileTasteOrder(ctx, manifest, deploymentSha) {
     bindingPull: manifest.bindingPull,
     deploymentSha,
     productionUrl: 'https://jov.ie',
-    uiEvidence: manifest.uiEvidence ?? [],
+    uiEvidence: (manifest.uiEvidence ?? []).filter(
+      entry => entry.judgment === 'taste' || entry.judgment === 'mixed'
+    ),
     reason:
       manifest.required.find(entry => entry.kind === 'founder-taste')?.reason ??
       'a founder taste receipt is required',

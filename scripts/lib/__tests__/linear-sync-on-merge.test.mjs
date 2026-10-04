@@ -382,7 +382,7 @@ describe('linear sync on merge', () => {
         repoRoot,
         ['apps/web/components/atoms/RailToggleButton.tsx'],
         'Validating',
-        'founder-taste',
+        'screen-audit',
       ],
       [
         '/nonexistent-workspace',

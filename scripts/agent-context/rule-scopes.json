@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "99f7aeda9a2efb9a2afd74cde787dc28df4a065158273bb45b5d32eba3844938"
+    "bodySha256": "236b84e3b2ed38cb4fdf1723abff6bd04165cbc5fc669f21940f4c9759c89714"
   },
   {
     "file": ".claude/rules/macos.md",

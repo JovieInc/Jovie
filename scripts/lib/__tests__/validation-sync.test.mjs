@@ -37,6 +37,7 @@ import {
   REPO,
   receiptComment,
   snapshotFor,
+  TASTE_MATRIX,
   UI_MATRIX,
   validClosure,
 } from './fixtures/validation-world.mjs';
@@ -298,31 +299,57 @@ describe('validation sync: founder taste (JOV-7759)', () => {
       createdAt
     );
 
-  it('holds a UI change in Validating until the founder accepts the exact production build', async () => {
+  it('needs machine evidence, not Tim, for a deterministic UI row', async () => {
     const { world, fetchImpl } = createWorld();
     await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX });
     expect(world.issues['JOV-1'].state).toBe('Validating');
     const held = world.issues['JOV-1'].comments.at(-1).body;
+    expect(held).toContain('Next missing receipt: screen-audit.');
+    expect(held).toContain(
+      'AM-020 ui-state-completeness on web-desktop, web-mobile'
+    );
+    expect(held).not.toContain('founder-taste');
+    expect(world.descriptions).toEqual([]);
+    world.issues['JOV-1'].comments.push(
+      receiptComment(
+        'JOV-1',
+        {
+          kind: 'screen-audit',
+          evidence: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+        },
+        '2026-10-03T13:00:00Z'
+      )
+    );
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('holds a UI change in Validating until the founder accepts the exact production build', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    const held = world.issues['JOV-1'].comments.at(-1).body;
     expect(held).toContain('Next missing receipt: founder-taste.');
-    expect(held).toContain('AM-020 ui-interaction-state-machine');
-    expect(held).toContain('web-chromium, macos-electron');
-    expect(held).toContain('"uiEvidence":[{"row":"AM-020"');
+    expect(held).toContain(
+      'AM-024 ui-visual-taste on web-desktop, macos-electron'
+    );
+    expect(held).toContain('"uiEvidence":[{"row":"AM-024"');
 
     world.issues['JOV-1'].comments.push(taste({}, '2026-10-03T13:00:00Z'));
-    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX });
     expect(world.issues['JOV-1'].state).toBe('Done');
   });
 
   it('routes a founder rejection to Rework with the note, and needs a fresh decision after the fix', async () => {
     const { world, fetchImpl } = createWorld();
-    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX });
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX });
     world.issues['JOV-1'].comments.push(
       taste(
         { status: 'fail', note: 'The rail toggle still jumps 2px on open.' },
         '2026-10-03T13:00:00Z'
       )
     );
-    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX });
     expect(world.issues['JOV-1'].state).toBe('Rework');
     expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
       'Note: The rail toggle still jumps 2px on open.'
@@ -330,12 +357,12 @@ describe('validation sync: founder taste (JOV-7759)', () => {
 
     addMerge(world, 103, MAIN[3], '2026-10-03T14:00:00Z');
     world.served = MAIN[4].slice(0, 7);
-    await merge(world, fetchImpl, 103, { assuranceMatrix: UI_MATRIX });
+    await merge(world, fetchImpl, 103, { assuranceMatrix: TASTE_MATRIX });
     expect(world.issues['JOV-1'].state).toBe('Validating');
     world.issues['JOV-1'].comments.push(
       taste({ sha: MAIN[4] }, '2026-10-03T15:00:00Z')
     );
-    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX });
     expect(world.issues['JOV-1'].state).toBe('Done');
   });
 
@@ -371,8 +398,8 @@ describe('validation sync: founder taste (JOV-7759)', () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].description = 'Mirror the rail toggle.';
     const now = () => new Date('2026-10-04T01:00:00Z');
-    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX, now });
-    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX, now });
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX, now });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
     expect(world.issues['JOV-1'].state).toBe('Validating');
     expect(world.descriptions).toEqual(['JOV-1']);
     const body = world.issues['JOV-1'].description;
@@ -385,16 +412,16 @@ describe('validation sync: founder taste (JOV-7759)', () => {
     });
 
     summerTick(world, 'approved');
-    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX, now });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
     expect(world.issues['JOV-1'].state).toBe('Done');
   });
 
   it('routes an Ovie rejection to Rework with the note, then asks again for the fix build', async () => {
     const { world, fetchImpl } = createWorld();
     const now = () => new Date('2026-10-04T01:00:00Z');
-    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX, now });
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX, now });
     summerTick(world, 'rejected', 'Too much chrome around the player.');
-    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX, now });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
     expect(world.issues['JOV-1'].state).toBe('Rework');
     expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
       'Note: Too much chrome around the player.'
@@ -402,7 +429,7 @@ describe('validation sync: founder taste (JOV-7759)', () => {
 
     addMerge(world, 103, MAIN[3], '2026-10-03T14:00:00Z');
     world.served = MAIN[4].slice(0, 7);
-    await merge(world, fetchImpl, 103, { assuranceMatrix: UI_MATRIX, now });
+    await merge(world, fetchImpl, 103, { assuranceMatrix: TASTE_MATRIX, now });
     expect(world.issues['JOV-1'].state).toBe('Validating');
     expect(world.descriptions).toEqual(['JOV-1', 'JOV-1']);
     expect(
@@ -414,7 +441,7 @@ describe('validation sync: founder taste (JOV-7759)', () => {
     const { world, fetchImpl } = createWorld();
     world.refuseDescription = true;
     await expect(
-      merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX })
+      merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX })
     ).rejects.toThrow(/refused the founder taste order/);
   });
 
@@ -423,16 +450,22 @@ describe('validation sync: founder taste (JOV-7759)', () => {
     await merge(world, fetchImpl, 101, { assuranceMatrix: null });
     expect(world.issues['JOV-1'].state).toBe('Validating');
     expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
-      'Next missing receipt: founder-taste.'
+      'Next missing receipt: screen-audit.'
     );
-    expect(mergedUiEvidence(null, UI_MATRIX)).toBeNull();
-    expect(mergedUiEvidence(['docs/README.md'], UI_MATRIX)).toEqual([]);
+    expect(world.descriptions).toEqual([]);
+    expect(mergedUiEvidence(null, TASTE_MATRIX)).toBeNull();
+    expect(mergedUiEvidence(['docs/README.md'], TASTE_MATRIX)).toEqual([]);
+    expect(
+      mergedUiEvidence(['apps/web/components/Card.tsx'], {
+        rows: [{ ...UI_MATRIX.rows[0], ui: { requiredEvidence: [] } }],
+      })?.[0]?.judgment
+    ).toBe('deterministic');
   });
 
   it('does not ask for taste when the change touches no UI row', async () => {
     const { world, fetchImpl } = createWorld();
     world.pulls[101].files = ['scripts/lib/thing.mjs'];
-    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX });
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX });
     expect(world.issues['JOV-1'].state).toBe('Done');
   });
 });

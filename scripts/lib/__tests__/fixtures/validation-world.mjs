@@ -18,14 +18,31 @@ export const HARNESS_MANIFEST = JSON.parse(
 );
 /** A matrix with no UI rows: changes owe no founder taste receipt. */
 export const NO_UI_MATRIX = Object.freeze({ rows: [] });
-/** One JOV-7713 UI row that `apps/web/components/` changes invalidate. */
+/** A deterministic JOV-7713 UI row that `apps/web/components/` invalidates. */
 export const UI_MATRIX = Object.freeze({
   rows: [
     {
       id: 'AM-020',
-      failureClass: 'ui-interaction-state-machine',
+      failureClass: 'ui-state-completeness',
       invalidatesOn: ['apps/web/components/'],
-      ui: { requiredEvidence: ['web-chromium', 'macos-electron'] },
+      ui: {
+        judgment: 'deterministic',
+        requiredEvidence: ['web-desktop', 'web-mobile'],
+      },
+    },
+  ],
+});
+/** The taste row: only this owes the founder (JOV-7759). */
+export const TASTE_MATRIX = Object.freeze({
+  rows: [
+    {
+      id: 'AM-024',
+      failureClass: 'ui-visual-taste',
+      invalidatesOn: ['apps/web/components/'],
+      ui: {
+        judgment: 'taste',
+        requiredEvidence: ['web-desktop', 'macos-electron'],
+      },
     },
   ],
 });

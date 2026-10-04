@@ -158,28 +158,42 @@ describe('validation manifest', () => {
     expect(declaredRequirements('validation-required: deployment')).toEqual([]);
   });
 
-  it('owes one founder taste receipt for the UI rows a change invalidates (JOV-7759)', () => {
-    const uiEvidence = [
-      {
-        row: 'AM-020',
-        failureClass: 'ui-interaction-state-machine',
-        targets: ['web-chromium', 'macos-electron'],
-      },
-      {
-        row: 'AM-021',
-        failureClass: 'ui-layout-stability',
-        targets: ['web-chromium'],
-      },
-    ];
-    const ui = manifestFor({}, { uiEvidence });
-    expect(ui.required.map(entry => entry.kind)).toEqual([
+  it('keys UI receipts on the row judgment: machines for correctness, the founder for taste (JOV-7759)', () => {
+    const deterministic = {
+      row: 'AM-020',
+      failureClass: 'ui-state-completeness',
+      judgment: 'deterministic',
+      targets: ['web-desktop', 'web-mobile'],
+    };
+    const mixed = {
+      row: 'AM-018',
+      failureClass: 'ui-motion',
+      judgment: 'mixed',
+      targets: ['macos-electron'],
+    };
+    const taste = {
+      row: 'AM-024',
+      failureClass: 'ui-visual-taste',
+      judgment: 'taste',
+      targets: ['web-desktop'],
+    };
+    const kinds = rows =>
+      manifestFor({}, { uiEvidence: rows }).required.map(entry => entry.kind);
+    expect(kinds([deterministic])).toEqual(['deployment', 'screen-audit']);
+    expect(kinds([taste])).toEqual(['deployment', 'founder-taste']);
+    expect(kinds([deterministic, mixed])).toEqual([
       'deployment',
+      'screen-audit',
       'founder-taste',
     ]);
+    const uiEvidence = [deterministic, mixed, taste];
+    const ui = manifestFor({}, { uiEvidence });
     expect(ui.required[1].reason).toContain(
-      'AM-020 ui-interaction-state-machine, AM-021 ui-layout-stability'
+      'AM-020 ui-state-completeness, AM-018 ui-motion on web-desktop, web-mobile, macos-electron'
     );
-    expect(ui.required[1].reason).toContain('web-chromium, macos-electron');
+    expect(ui.required[2].reason).toContain(
+      'AM-018 ui-motion, AM-024 ui-visual-taste on macos-electron, web-desktop'
+    );
     expect(ui.uiEvidence).toEqual(uiEvidence);
     expect(manifestFor({}, { uiEvidence: [] })).not.toHaveProperty(
       'uiEvidence'
@@ -187,9 +201,9 @@ describe('validation manifest', () => {
     expect(manifestFor({}).required.map(entry => entry.kind)).toEqual([
       'deployment',
     ]);
-    expect(
-      manifestFor({}, { uiEvidence: null }).required.at(-1)?.reason
-    ).toContain('UI evidence is unknown');
+    const unknown = manifestFor({}, { uiEvidence: null }).required.at(-1);
+    expect(unknown?.kind).toBe('screen-audit');
+    expect(unknown?.reason).toContain('UI evidence is unknown');
     const declared = manifestFor(
       { description: 'validation-required: founder-taste' },
       { uiEvidence }
@@ -265,7 +279,14 @@ describe('validation receipts', () => {
       manifest: manifestFor(
         {},
         {
-          uiEvidence: [{ row: 'AM-020', failureClass: 'x', targets: [] }],
+          uiEvidence: [
+            {
+              row: 'AM-024',
+              failureClass: 'x',
+              judgment: 'taste',
+              targets: [],
+            },
+          ],
         }
       ),
       holds: [],

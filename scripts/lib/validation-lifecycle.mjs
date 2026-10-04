@@ -30,15 +30,21 @@ export const COMPUTED_RECEIPT_KINDS = Object.freeze([
   'escaped-defect-dual-closure',
 ]);
 /**
- * Kinds an owner records with a receipt comment. `founder-taste` is the
- * founder's decision on the exact production build of a UI change (JOV-7759);
- * the Ovie taste card (JOV-7739) records it, and a rejection carries a note.
+ * Kinds an owner records with a receipt comment. For UI changes (JOV-7759)
+ * machines review correctness and the founder reviews taste:
+ * `screen-audit` is the JOV-7713 screen-audit ledger showing every changed
+ * screen green on the exact production build; `founder-taste` is the
+ * founder's decision on that build, recorded from the Ovie taste card
+ * (JOV-7739), and a rejection carries a note.
  */
 export const RECORDED_RECEIPT_KINDS = Object.freeze([
   'outcome',
   'human-certification',
+  'screen-audit',
   'founder-taste',
 ]);
+/** Matrix judgments that owe the founder; every other judgment owes machines. */
+const TASTE_JUDGMENTS = new Set(['taste', 'mixed']);
 const MAX_NOTE_LENGTH = 2000;
 
 const RECEIPT_MARKER = /<!--\s*validation-receipt:v1\s*\n?([\s\S]*?)\n?\s*-->/g;
@@ -148,6 +154,7 @@ export function outcomeAcceptanceReasons(issue, parentReason = '') {
  * @typedef {{
  *   row: string,
  *   failureClass: string,
+ *   judgment: string,
  *   targets: readonly string[],
  * }} UiEvidence
  * @typedef {{
@@ -245,20 +252,36 @@ export function deriveValidationManifest(input) {
       reason: 'the issue declares validation-required: human-certification',
     });
   }
-  // JOV-7713 names the UI rows a change invalidates. Each one owes the
-  // founder's taste decision on the exact production build. `null` means the
-  // merged files or the matrix could not be read, which is never "no UI".
+  // JOV-7713 names the UI rows a change invalidates, each with a judgment.
+  // Deterministic rows owe machine evidence, taste rows owe the founder, and
+  // mixed rows owe both, so ordinary UI work never waits on Tim. `null` means
+  // the merged files or the matrix could not be read: unknown machine
+  // evidence, never "no UI".
   const uiEvidence = input.uiEvidence === undefined ? [] : input.uiEvidence;
+  /** @param {(judgment: string) => boolean} owes */
+  const owing = owes =>
+    (uiEvidence ?? []).filter(entry => owes(String(entry.judgment)));
+  /** @param {readonly UiEvidence[]} rows */
+  const describe = rows =>
+    `${rows.map(entry => `${entry.row} ${entry.failureClass}`).join(', ')} on ${[...new Set(rows.flatMap(entry => entry.targets))].join(', ')}`;
+  const machine = owing(judgment => judgment !== 'taste');
+  const taste = owing(judgment => TASTE_JUDGMENTS.has(judgment));
   if (uiEvidence === null) {
     required.push({
-      kind: 'founder-taste',
+      kind: 'screen-audit',
       reason:
-        'UI evidence is unknown (merged files or the assurance matrix were unreadable); a founder taste receipt is required',
+        'UI evidence is unknown (merged files or the assurance matrix were unreadable); the screen-audit ledger must show the exact build green',
     });
-  } else if (uiEvidence.length > 0) {
+  } else if (machine.length > 0) {
+    required.push({
+      kind: 'screen-audit',
+      reason: `UI change invalidates ${describe(machine)}; the screen-audit ledger (JOV-7713) must show every changed screen green on the exact production build`,
+    });
+  }
+  if (taste.length > 0) {
     required.push({
       kind: 'founder-taste',
-      reason: `UI change invalidates ${uiEvidence.map(entry => `${entry.row} ${entry.failureClass}`).join(', ')}; the founder accepts the exact production build on ${[...new Set(uiEvidence.flatMap(entry => entry.targets))].join(', ')} (Ovie taste card, JOV-7739)`,
+      reason: `UI change invalidates ${describe(taste)}; the founder accepts the exact production build (Ovie taste card, JOV-7739)`,
     });
   }
   if (
@@ -287,6 +310,7 @@ export function deriveValidationManifest(input) {
           uiEvidence: uiEvidence.map(entry => ({
             row: entry.row,
             failureClass: entry.failureClass,
+            judgment: entry.judgment,
             targets: [...entry.targets],
           })),
         }
