@@ -13,6 +13,9 @@ import {
 export const FAILURE_HOLD_SCHEMA = 'jovie-merge-group-failure-hold/v1';
 export const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 export const FAILURE_RETRY_CONTEXT = 'jovie-queue-failure-retry/v1';
+export const ADMISSION_RECOVERY_CONTEXT = 'jovie-queue-admission-recovery/v1';
+export const ADMISSION_RECOVERY_SCHEMA =
+  'jovie-merge-group-admission-recovery/v1';
 export const CI_WORKFLOW_ID = 178737329;
 export const FAILURE_CLASSES = Object.freeze([
   'deterministic-source',
@@ -310,6 +313,129 @@ export function parseTrustedRetryStatus(status, repository) {
   };
 }
 
+function admissionRecoveryDescription(receipt) {
+  return `pr=${receipt.prNumber};run=${receipt.workflowRunId};try=${receipt.workflowRunAttempt};at=${receipt.completedAt}`;
+}
+
+export function admissionRecoveryReceiptStatus(
+  raw,
+  { repository, prNumber, headSha }
+) {
+  if (raw === undefined || raw === '') return null;
+  if (typeof raw !== 'string')
+    fail('trusted admission recovery receipt is malformed');
+  const receipt = JSON.parse(raw);
+  if (
+    !receipt ||
+    receipt.schema !== ADMISSION_RECOVERY_SCHEMA ||
+    receipt.repository !== repository ||
+    !SHA.test(receipt.sourceHeadSha ?? '') ||
+    !SHA.test(receipt.mergeGroupHeadSha ?? '') ||
+    ![
+      receipt.prNumber,
+      receipt.workflowRunId,
+      receipt.workflowRunAttempt,
+      receipt.completedAt,
+    ].every(value => Number.isSafeInteger(value) && value > 0)
+  ) {
+    fail('trusted admission recovery receipt is malformed');
+  }
+  if (receipt.prNumber !== prNumber || receipt.sourceHeadSha !== headSha)
+    return null;
+  return {
+    context: ADMISSION_RECOVERY_CONTEXT,
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: admissionRecoveryDescription(receipt),
+    target_url: `https://github.com/${repository}/actions/runs/${receipt.workflowRunId}`,
+  };
+}
+
+function parseTrustedAdmissionRecoveryStatus(status, repository) {
+  if (
+    status?.context !== ADMISSION_RECOVERY_CONTEXT ||
+    String(status?.state ?? '').toLowerCase() !== 'success'
+  )
+    return null;
+  const creator = statusCreator(status);
+  if (
+    creator.type !== 'Bot' ||
+    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+  )
+    return null;
+  const match =
+    /^pr=([1-9][0-9]*);run=([1-9][0-9]*);try=([1-9][0-9]*);at=([1-9][0-9]*)$/.exec(
+      String(status.description ?? '')
+    );
+  if (!match) return null;
+  const [prNumber, runId, runAttempt, completedAt] = match.slice(1).map(Number);
+  if (
+    ![prNumber, runId, runAttempt, completedAt].every(
+      value => Number.isSafeInteger(value) && value > 0
+    ) ||
+    actionsRunId(status.target_url ?? status.targetUrl, repository) !== runId
+  )
+    return null;
+  return {
+    prNumber,
+    runId,
+    runAttempt,
+    completedAt,
+    targetUrl: status.target_url ?? status.targetUrl,
+  };
+}
+
+/** Recovery never replaces a source failure or revives cleared merge intent. */
+export function reenrollmentDisposition({
+  failure,
+  statuses,
+  repository,
+  prNumber,
+  lastRemoval,
+  headCommittedAt,
+  autoMergeEnabled,
+}) {
+  const removedAt = Date.parse(lastRemoval);
+  const committedAt = Date.parse(headCommittedAt);
+  if (
+    !lastRemoval ||
+    (Number.isFinite(committedAt) && committedAt > removedAt) ||
+    failure.action !== 'allow'
+  )
+    return failure;
+  const blocked = reason => ({ ...failure, action: 'block', reason });
+  if (!autoMergeEnabled || !Number.isFinite(removedAt))
+    return blocked('removed-without-recovery-intent');
+  const recoveries = statuses
+    .map(status => parseTrustedAdmissionRecoveryStatus(status, repository))
+    .filter(record => record?.prNumber === prNumber);
+  const latest = recoveries.reduce(
+    (current, candidate) =>
+      !current || candidate.completedAt > current.completedAt
+        ? candidate
+        : current,
+    null
+  );
+  if (!latest || latest.completedAt < removedAt)
+    return blocked('no-current-admission-recovery');
+  const retry = statuses
+    .map(status => parseTrustedRetryStatus(status, repository))
+    .find(
+      item =>
+        item &&
+        item.runId === latest.runId &&
+        item.runAttempt === latest.runAttempt
+    );
+  return retry && !retry.released
+    ? blocked('admission-retry-spent')
+    : {
+        ...failure,
+        action: 'retry-once',
+        reason: 'bounded-admission-recovery',
+        latest,
+      };
+}
+
 // The exact commit endpoint scopes failures: deterministic blocks immediately;
 // other failures receive one queue-authority retry.
 /** @param {{ statuses?: unknown[], repository?: string, currentMainSha?: string }} input */
@@ -555,9 +681,40 @@ export async function applyMergeGroupFailure(
     admissionText,
   });
   const groupHeadSha = String(run.head_sha).toLowerCase();
-  // Quota or gateway trouble in admission spends no retry and removes no merge
+  // Quota or gateway trouble spends no source-failure retry and removes no merge
   // intent; GitHub already ejected the group and enrollment re-arms it.
   if (classification === TRANSIENT_ADMISSION_CLASS) {
+    let admissionRecoveryReceipt;
+    const completedAt = Date.parse(run.updated_at);
+    if (
+      Number.isSafeInteger(completedAt) &&
+      completedAt >= Date.parse(run.created_at)
+    ) {
+      const current = await readPullRequest(front.prNumber);
+      if (
+        current?.state === 'OPEN' &&
+        String(current.headRefOid ?? '').toLowerCase() === sourceHeadSha &&
+        !supersededByLiveEntry(current, sourceHeadSha, groupHeadSha)
+      ) {
+        admissionRecoveryReceipt = {
+          schema: ADMISSION_RECOVERY_SCHEMA,
+          repository,
+          prNumber: front.prNumber,
+          sourceHeadSha,
+          mergeGroupHeadSha: groupHeadSha,
+          workflowRunId: run.id,
+          workflowRunAttempt: run.run_attempt,
+          completedAt,
+        };
+        await writeStatus({
+          sha: sourceHeadSha,
+          context: ADMISSION_RECOVERY_CONTEXT,
+          state: 'success',
+          description: admissionRecoveryDescription(admissionRecoveryReceipt),
+          targetUrl: run.html_url,
+        });
+      }
+    }
     return {
       schema: FAILURE_HOLD_SCHEMA,
       repository,
@@ -572,6 +729,7 @@ export async function applyMergeGroupFailure(
       dequeued: false,
       dequeueOutcome: 'not-attempted',
       autoMergeDisabled: false,
+      admissionRecoveryReceipt,
     };
   }
   const recordedMainSha = String(mainSha ?? '').toLowerCase();
@@ -977,12 +1135,17 @@ async function main(argv) {
     }
   );
   const serialized = JSON.stringify(result);
-  // A superseded or transient-admission run holds nothing, so enrollment
-  // receives no receipt.
+  // Failure holds and admission recovery have separate trusted receipts.
   if (process.env.GITHUB_OUTPUT && !result.superseded && !result.skipped) {
     appendFileSync(
       process.env.GITHUB_OUTPUT,
       `failure_receipt=${serialized}\n`
+    );
+  }
+  if (process.env.GITHUB_OUTPUT && result.admissionRecoveryReceipt) {
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `admission_recovery_receipt=${JSON.stringify(result.admissionRecoveryReceipt)}\n`
     );
   }
   process.stdout.write(`${serialized}\n`);

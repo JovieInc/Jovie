@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
+import {
+  ADMISSION_STEP,
+  applyMergeGroupFailure,
+} from './merge-group-failure-hold.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const workflow = load(
@@ -61,6 +65,7 @@ async function fixture(
     statuses = [],
     mutationError = undefined,
     failureReceipt = '',
+    admissionRecoveryReceipt = '',
     currentMainSha = mainSha,
     eventName = 'workflow_dispatch',
     payload = {},
@@ -162,6 +167,7 @@ async function fixture(
         DRY_RUN: String(dry),
         GITHUB_WORKSPACE: process.cwd(),
         FAILURE_HOLD_RECEIPT: failureReceipt,
+        ADMISSION_RECOVERY_RECEIPT: admissionRecoveryReceipt,
       },
     },
     createRequire(import.meta.url)
@@ -180,6 +186,170 @@ test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue hea
     result.mutations,
     [111, 112, 113].map(n => ({ id: `PR_${n}`, oid: sha }))
   );
+});
+
+test('a proven admission-quota ejection authorizes one unchanged-head retry without a source hold', async () => {
+  const statuses = [];
+  const runId = 789;
+  const failedRun = {
+    id: runId,
+    workflow_id: 178737329,
+    run_attempt: 1,
+    event: 'merge_group',
+    status: 'completed',
+    conclusion: 'failure',
+    path: '.github/workflows/ci.yml',
+    head_branch: `gh-readonly-queue/main/pr-1-${mainSha}`,
+    head_sha: 'd'.repeat(40),
+    created_at: '2026-10-02T12:55:00Z',
+    updated_at: '2026-10-02T13:00:01Z',
+    html_url: `https://github.com/JovieInc/Jovie/actions/runs/${runId}`,
+    repository: { full_name: 'JovieInc/Jovie' },
+    head_repository: { full_name: 'JovieInc/Jovie' },
+  };
+  const policy = await applyMergeGroupFailure(
+    {
+      repository: 'JovieInc/Jovie',
+      run: failedRun,
+      timeline: [
+        { __typename: 'PullRequestCommit', commit: { oid: sha } },
+        {
+          __typename: 'AddedToMergeQueueEvent',
+          createdAt: '2026-10-02T12:54:00Z',
+        },
+        {
+          __typename: 'RemovedFromMergeQueueEvent',
+          createdAt: '2026-10-02T13:00:00Z',
+        },
+      ],
+      failedSteps: [ADMISSION_STEP, 'Evaluate combined-head checks'],
+      admissionText:
+        'live merge queue GraphQL returned errors: API rate limit already exceeded for site ID installation.',
+      statuses: [],
+    },
+    {
+      writeStatus: async status =>
+        statuses.push({
+          ...status,
+          creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+        }),
+      readPullRequest: async () => current(1),
+      dequeuePullRequest: async () => assert.fail('quota must not dequeue'),
+      disableAutoMerge: async () =>
+        assert.fail('quota must not clear merge intent'),
+    }
+  );
+  const overrides = {
+    1: {
+      autoMergeRequest: { enabledAt: '2026-10-02T12:50:00Z' },
+      timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z' }] },
+    },
+  };
+  const recovered = await fixture({
+    statuses,
+    overrides,
+    eventName: 'schedule',
+  });
+  assert.deepEqual(recovered.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.equal(
+    statuses.some(status => status.context === 'jovie-queue-failure-hold/v1'),
+    false
+  );
+  assert.deepEqual(
+    recovered.statusWrites.map(status => status.description),
+    ['spent:run=789;try=1']
+  );
+  const spent = {
+    ...recovered.statusWrites[0],
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+  };
+  assert.deepEqual(
+    (await fixture({ statuses: [spent, ...statuses], overrides })).mutations,
+    []
+  );
+  assert.deepEqual(
+    (
+      await fixture({
+        statuses,
+        overrides: { 1: { ...overrides[1], autoMergeRequest: null } },
+      })
+    ).mutations,
+    []
+  );
+  assert.deepEqual(
+    (
+      await fixture({
+        statuses,
+        overrides: {
+          1: {
+            ...overrides[1],
+            timelineItems: { nodes: [{ createdAt: '2026-10-02T13:01:00Z' }] },
+          },
+        },
+      })
+    ).mutations,
+    []
+  );
+  const forged = statuses.map(status => ({
+    ...status,
+    creator: { type: 'User', login: 'jovie-bot[bot]' },
+  }));
+  assert.deepEqual(
+    (await fixture({ statuses: forged, overrides })).mutations,
+    []
+  );
+  const foreign = statuses.map(status => ({
+    ...status,
+    targetUrl: 'https://github.com/other/repo/actions/runs/789',
+  }));
+  assert.deepEqual(
+    (await fixture({ statuses: foreign, overrides })).mutations,
+    []
+  );
+  const sourceFailure = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: 'class=deterministic-source;n=1;run=456;try=1',
+    target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+  };
+  assert.deepEqual(
+    (await fixture({ statuses: [sourceFailure, ...statuses], overrides }))
+      .mutations,
+    []
+  );
+  const rejected = await fixture({
+    statuses,
+    overrides,
+    mutationError: Object.assign(new Error('rejected'), {
+      data: { enqueuePullRequest: null },
+      errors: [{ type: 'UNPROCESSABLE', path: ['enqueuePullRequest'] }],
+    }),
+  });
+  assert.deepEqual(
+    rejected.statusWrites.map(status => status.description),
+    ['spent:run=789;try=1', 'released:run=789;try=1']
+  );
+  const uncertain = await fixture({ statuses, overrides, failMutation: true });
+  assert.deepEqual(
+    uncertain.statusWrites.map(status => status.description),
+    ['spent:run=789;try=1']
+  );
+  const direct = await fixture({
+    overrides,
+    admissionRecoveryReceipt: JSON.stringify(policy.admissionRecoveryReceipt),
+    eventName: 'workflow_run',
+    payload: { workflow_run: failedRun },
+    associatedPages: [],
+  });
+  assert.deepEqual(direct.gets, [1]);
+  assert.deepEqual(direct.mutations, recovered.mutations);
+  const otherPr = await fixture({
+    statuses,
+    roster: [candidate(2)],
+    overrides: { 2: overrides[1] },
+  });
+  assert.deepEqual(otherPr.mutations, []);
 });
 
 test('preserves live holds, rejected heads, conflicts, drafts, queue membership and source leases', async () => {

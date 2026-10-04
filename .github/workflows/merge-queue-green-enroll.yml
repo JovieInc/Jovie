@@ -51,6 +51,7 @@ jobs:
     name: Hold failed source revision
     outputs:
       failure_receipt: ${{ steps.failure-hold.outputs.failure_receipt }}
+      admission_recovery_receipt: ${{ steps.failure-hold.outputs.admission_recovery_receipt }}
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.workflow_id == 178737329 &&
@@ -153,6 +154,7 @@ jobs:
         env:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
+          ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -186,6 +188,14 @@ jobs:
                 const receipt = process.env.FAILURE_HOLD_RECEIPT;
                 if (run.event === 'merge_group' && receipt) {
                   numbers = [failurePolicy.readFailureReceipt(receipt, `${owner}/${repo}`).prNumber];
+                }
+                const recovery = process.env.ADMISSION_RECOVERY_RECEIPT;
+                if (run.event === 'merge_group' && recovery) {
+                  const parsed = JSON.parse(recovery);
+                  failurePolicy.admissionRecoveryReceiptStatus(recovery, {
+                    repository: `${owner}/${repo}`, prNumber: parsed.prNumber, headSha: parsed.sourceHeadSha,
+                  });
+                  numbers = [parsed.prNumber];
                 }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
@@ -223,6 +233,7 @@ jobs:
                     pullRequest(number: $number) {
                       id number state isDraft baseRefName headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
+                      autoMergeRequest { enabledAt }
                       labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
@@ -249,7 +260,12 @@ jobs:
                 { repository: `${owner}/${repo}`, prNumber: pr.number, headSha: pr.headRefOid }
               );
               if (directHold) statuses.unshift(directHold);
-              const failure = failurePolicy.revisionFailureDisposition({
+              const directRecovery = failurePolicy.admissionRecoveryReceiptStatus(
+                process.env.ADMISSION_RECOVERY_RECEIPT,
+                { repository: `${owner}/${repo}`, prNumber: pr.number, headSha: pr.headRefOid }
+              );
+              if (directRecovery) statuses.unshift(directRecovery);
+              let failure = failurePolicy.revisionFailureDisposition({
                 statuses,
                 repository: `${owner}/${repo}`,
                 currentMainSha,
@@ -263,6 +279,11 @@ jobs:
               // consume the one typed non-deterministic retry.
               const lastRemoval = pr.timelineItems.nodes[0]?.createdAt;
               const headCommittedAt = pr.commits.nodes[0]?.commit.committedDate;
+              failure = failurePolicy.reenrollmentDisposition({
+                failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
+                autoMergeEnabled: Number.isFinite(Date.parse(pr.autoMergeRequest?.enabledAt)),
+              });
+              if (failure.action === 'block') continue;
               const removedUnchangedHead = lastRemoval &&
                 (!headCommittedAt || headCommittedAt <= lastRemoval);
               if (removedUnchangedHead && failure.action !== 'retry-once') continue;
