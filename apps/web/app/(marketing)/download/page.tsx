@@ -283,7 +283,7 @@ export default function DownloadPage() {
                         {platform.label}
                       </span>
                     </div>
-                    <h2 className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+                    <h2 className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'>
                       {platform.title}
                     </h2>
                     <p
@@ -324,7 +324,7 @@ export default function DownloadPage() {
           <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
             <div>
               <p className='homepage-section-eyebrow'>Release workflow</p>
-              <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+              <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'>
                 Everything In Jovie, Closer.
               </h2>
             </div>
@@ -351,7 +351,7 @@ export default function DownloadPage() {
             <div className='grid gap-12 lg:grid-cols-2 lg:items-start'>
               <div>
                 <p className='homepage-section-eyebrow'>Install details</p>
-                <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+                <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'>
                   Built To Stay Out Of The Way.
                 </h2>
               </div>
