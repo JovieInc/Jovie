@@ -40,6 +40,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
+import autoscale  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
@@ -96,7 +97,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py"]
+              "scripts/tests/test_remediation.py",
+              "scripts/tests/test_autoscale.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
@@ -462,8 +464,11 @@ class Host:
     # once only makes all of them time out.
     gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
 
-    def slots(self, provider: str, default: int) -> int:
+    def base_slots(self, provider: str, default: int) -> int:
         return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+
+    def slots(self, provider: str, default: int) -> int:
+        return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
 
 
 def load_providers(path: Path = HERE / "providers.json") -> dict:
@@ -4364,7 +4369,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         labeled = None if red or adopt else claim_labeled_event(host, name, linear)
         issue = labeled
         sweep_lane_prs(host, name, linear)
-        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
+        # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
+        # autoscaled count would admit more parked PRs as capacity rises.
+        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
         overlap_blocked = False
@@ -4552,6 +4559,13 @@ def dispatch(host: Host) -> int:
             tick["worktreeSweep"] = worktree_sweep.maybe_spawn(host.state, host.repo, tick["disk"].get("freePct"))
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
+        if autoscale.mode() != "off":
+            try:
+                bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
+                         for name, spec in load_providers().items()}
+                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases)
+            except Exception as error:  # a bad sample never blocks the spawn loop
+                tick["autoscaleError"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)

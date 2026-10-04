@@ -40,6 +40,7 @@ The harness, not the model, owns:
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `backup/<host>/<name>-<date>` first, else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
+| Adaptive slots (default on, 30-minute cadence; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
@@ -54,7 +55,7 @@ running worker. Production deploys are a separate track: only a red main stops s
 New-issue admission reports three separate counts: raw Todo candidates, candidates
 passing the issue predicate, and new issues after the owning lane's PR budget.
 Worker and doctor share the same budget decision: each dated lane branch counts
-once while non-green, with a cap of effective slots × 2. Manual branches and
+once while non-green, with a cap of configured base slots × 2. Manual branches and
 disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
 malformed or truncation-ambiguous inventory stays unknown and cannot admit new
 issues. Maintenance claims still run first and do not depend on that budget read.
@@ -333,6 +334,23 @@ its idle, clean and published checks, then `worktree_pool.recycle()` detaches HE
 `origin/main`, runs `git clean -ffdx` except `node_modules` and `.cache`, and moves the
 checkout into the pool while there is room and disk. Deleting one installed worktree
 took 3 to 32 minutes under load; recycling takes seconds.
+
+`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. Scale-up
+above today's base is held until the JOV-7587 merge-queue brake lands; scale-down
+still drops one slot after 30 idle ticks, floor `ceil(base/2)`.
+`SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
+divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
+disk or memory emergencies cut immediately and ignore that cooldown. Tim set
+this on 2026-10-02 with no observe-only period. `observe` or `shadow` records
+the decision and leaves `Host.slots()` on the configured base. The kill switch
+is `SYMPHONY_AUTOSCALE=0` (`off` or `false`), in the environment or
+`~/.config/jovie-lanes/autoscale.env` (the environment wins). Ceilings are
+`SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` (default twice the base) and
+`SYMPHONY_AUTOSCALE_HOST_MAX` (default twice the base sum, never below today's
+base sum). New-issue budgets stay on base slots (`×2` active, `×4` terminal).
+Missing, stale, or corrupt input fails safe to base; an unknown API budget
+never exceeds base; a disabled lane stays at 0. `install.sh` does not pass
+the flag. Scale-down does not signal workers.
 
 ## Preserved repairs (JOV-7347)
 

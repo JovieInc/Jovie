@@ -603,8 +603,8 @@ class RunnablePoolTest(unittest.TestCase):
                 with mock.patch.object(lane, "load_providers", return_value=providers), \
                         mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
                     capacity = doctor.host_capacity(lane.Host(state=state), lane)
-                self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0},
-                    "codex": {"slots": 0, "running": 1}, "claude": {"slots": 0, "running": 0}})
+                self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0, "base": 4},
+                    "codex": {"slots": 0, "running": 1, "base": 0}, "claude": {"slots": 0, "running": 0, "base": 0}})
                 feed_lane = SimpleNamespace(HOST="mac", provider_throughput=throughput_stub)
                 feed = doctor.status_feed(SimpleNamespace(state=state), feed_lane,
                                           obs(capacityByProvider=capacity), {}, {})

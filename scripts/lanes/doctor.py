@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import autoscale  # noqa: E402  (sibling module of the release)
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
@@ -77,9 +78,12 @@ def host_capacity(host, lane) -> dict:
     """Configured seats, including draining workers but not stale lock files."""
     capacity = {}
     for name, spec in lane.load_providers().items():
-        slots = max(0, host.slots(name, spec.get("slots", 1))) if spec.get("enabled", True) else 0
+        enabled = spec.get("enabled", True)
+        configured = spec.get("slots", 1)
+        base = host.base_slots(name, configured) if enabled else 0
+        slots = max(0, host.slots(name, configured)) if enabled else 0
         running = sum(_locked(path) for path in (host.state / "slots").glob(f"{name}.*.lock"))
-        capacity[name] = {"slots": slots, "running": running}
+        capacity[name] = {"slots": slots, "running": running, "base": base}
     return capacity
 
 
@@ -145,7 +149,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
         eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
-        budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
+        budgets = {name: lane.read_new_issue_budget(name, seats["base"] if "base" in seats else seats["slots"])
                    for name, seats in capacity_by_provider.items()}
         qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
                                  for name, issues in qualified_by_provider.items()}
@@ -805,7 +809,18 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
             "slo": obs.get("slo"),
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
-            "remediation": obs.get("remediation") or remediation.empty_remediation()}
+            "remediation": obs.get("remediation") or remediation.empty_remediation(),
+            "autoscale": _autoscale_block(host)}
+
+
+def _autoscale_block(host) -> dict:
+    state = getattr(host, "state", None)
+    if state is None:
+        return {"mode": autoscale.mode(), "lanes": {}, "history": []}
+    try:
+        return autoscale.public_block(state)
+    except Exception:
+        return {"mode": autoscale.mode(), "lanes": {}, "history": []}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
@@ -909,6 +924,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         result[key] = result["remediation"].get(key, 0)
     result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
+    result["autoscale"] = _autoscale_block(host)
     if not os.environ.get("LANES_SELFTEST"):
         try:
             obs["slo"] = fetch_slo(host, lane)
