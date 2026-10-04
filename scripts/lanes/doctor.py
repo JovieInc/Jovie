@@ -732,11 +732,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
 
 
 def _autoscale_block(host) -> dict:
-    state = getattr(host, "state", None)
-    if state is None:
-        return {"mode": autoscale.mode(), "lanes": {}, "history": []}
     try:
-        return autoscale.public_block(state)
+        return autoscale.public_block(getattr(host, "state", None))
     except Exception:
         return {"mode": autoscale.mode(), "lanes": {}, "history": []}
 

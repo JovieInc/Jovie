@@ -863,7 +863,6 @@ class Linear:
                 self._capture_budget(getattr(response, "headers", None), getattr(response, "status", 200), raw)
                 payload = json.loads(raw)
         except urllib.error.HTTPError as error:
-            raw = b""
             try:
                 raw = error.read()
             except Exception:
@@ -875,11 +874,10 @@ class Linear:
         return payload["data"]
 
     def _capture_budget(self, headers, status: int, raw: bytes) -> None:
-        """Linear rate-limit headers are local input for autoscale. Capture never changes gql's result."""
+        """Linear rate-limit headers feed autoscale. Capture never changes gql's result."""
         try:
-            state = getattr(self, "state", None)
-            if state is None:
-                state = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes"))
+            state = getattr(self, "state", None) or Path(
+                os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes"))
             autoscale.record_linear_budget(state, headers, status, raw)
         except Exception:
             return

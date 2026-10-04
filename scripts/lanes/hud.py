@@ -157,8 +157,7 @@ def local_model(host) -> dict:
     providers = lane.load_providers()
     enabled = {name: spec for name, spec in providers.items() if spec.get("enabled", True)}
     slots = {name: host.slots(name, spec.get("slots", 1)) for name, spec in enabled.items()}
-    # Fixture hosts in the HUD tests only implement slots(). Production Host.base_slots
-    # is the configured count; without it the display stays on the static line.
+    # Fixture hosts only implement slots(); without base_slots the static line stays.
     base_reader = getattr(host, "base_slots", None)
     base_slots = ({name: base_reader(name, spec.get("slots", 1)) for name, spec in enabled.items()}
                   if base_reader else dict(slots))

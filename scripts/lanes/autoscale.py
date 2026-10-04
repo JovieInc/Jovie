@@ -2,9 +2,8 @@
 """Adaptive per-lane slot counts for the existing minute dispatch tick.
 
 Default mode is apply. ``SYMPHONY_AUTOSCALE=0`` (or ``off`` / ``false``) is the
-kill switch and leaves ``Host.slots()`` on the configured base. This module
-does no I/O at import and ``decide()`` is pure: dispatch reads local files,
-then writes one ``autoscale.json`` receipt. No new controller, timer, or API.
+kill switch and leaves ``Host.slots()`` on the configured base. ``decide()``
+is pure: dispatch reads local files, then writes one ``autoscale.json`` receipt.
 """
 from __future__ import annotations
 
@@ -74,6 +73,16 @@ def _positive_int(value) -> int | None:
     return number if number > 0 else None
 
 
+def _nonneg_int(value) -> int | None:
+    parsed = _positive_int(value)
+    if parsed is None:
+        try:
+            parsed = int(str(value).strip())
+        except (TypeError, ValueError):
+            parsed = None
+    return parsed if parsed is not None and parsed >= 0 else None
+
+
 def _as_int(value) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
@@ -88,8 +97,6 @@ def _as_number(value) -> float | None:
 
 def _parse_mode(raw) -> str:
     value = str(raw).strip().lower()
-    if value in _OFF:
-        return "off"
     if value in _OBSERVE:
         return "observe"
     if value in _APPLY:
@@ -105,10 +112,8 @@ def _parse_file(path: Path) -> dict:
         return found
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
         key, sep, value = stripped.partition("=")
-        if not sep:
+        if not sep or not stripped or stripped.startswith("#"):
             continue
         key = key.strip().removeprefix("export ").strip()
         if key == "SYMPHONY_AUTOSCALE" or key.startswith("SYMPHONY_AUTOSCALE_"):
@@ -118,12 +123,10 @@ def _parse_file(path: Path) -> dict:
 
 def _merged(env, config: Path) -> dict:
     """Environment wins per key. An invalid env value does not fall through to the file."""
-    file_vals = _parse_file(config)
-    merged = dict(file_vals)
+    merged = _parse_file(config)
     for key, value in env.items():
         if key == "SYMPHONY_AUTOSCALE" or key.startswith("SYMPHONY_AUTOSCALE_"):
-            merged[key] = value
-            merged["__env__" + key] = True
+            merged[key], merged["__env__" + key] = value, True
     return merged
 
 
@@ -135,73 +138,54 @@ def _from_env_or_file(env, file_vals: dict, key: str):
     return None
 
 
+def _config_path(config) -> Path:
+    return config if config is not None else Path.home() / ".config" / "jovie-lanes" / "autoscale.env"
+
+
 def mode(env=None, config=None) -> str:
     """``off`` | ``observe`` | ``apply``. Unset, or a missing config line, is apply."""
-    if env is None:
-        env = os.environ
-    if config is None:
-        config = Path.home() / ".config" / "jovie-lanes" / "autoscale.env"
+    env = os.environ if env is None else env
+    config = _config_path(config)
     if "SYMPHONY_AUTOSCALE" in env:
         return _parse_mode(env.get("SYMPHONY_AUTOSCALE"))
     file_vals = _parse_file(config)
-    if "SYMPHONY_AUTOSCALE" not in file_vals:
-        return "apply"
-    return _parse_mode(file_vals.get("SYMPHONY_AUTOSCALE"))
+    return _parse_mode(file_vals.get("SYMPHONY_AUTOSCALE")) if "SYMPHONY_AUTOSCALE" in file_vals else "apply"
 
 
 def load_config(env=None, config=None) -> dict:
     """Mode plus optional ceilings and the cadence interval."""
-    if env is None:
-        env = os.environ
-    if config is None:
-        config = Path.home() / ".config" / "jovie-lanes" / "autoscale.env"
-    file_vals = _parse_file(config)
-    maxima = {}
+    env = os.environ if env is None else env
+    file_vals = _parse_file(_config_path(config))
     prefix = "SYMPHONY_AUTOSCALE_MAX_"
     keys = set(file_vals) | {key for key in env if key.startswith("SYMPHONY_AUTOSCALE")}
-    for key in keys:
-        if not key.startswith(prefix):
-            continue
-        provider = key[len(prefix):].strip().lower()
-        if not provider:
-            continue
-        parsed = _from_env_or_file(env, file_vals, key)
-        if parsed is not None:
-            maxima[provider] = parsed
+    maxima = {key[len(prefix):].strip().lower(): parsed
+              for key in keys if key.startswith(prefix) and key[len(prefix):].strip()
+              for parsed in (_from_env_or_file(env, file_vals, key),) if parsed is not None}
     interval = _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_INTERVAL_S") or DEFAULT_INTERVAL_S
-    return {
-        "mode": mode(env, config),
-        "max": maxima,
-        "hostMax": _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_HOST_MAX"),
-        "intervalS": interval,
-    }
+    return {"mode": mode(env, config), "max": maxima, "intervalS": interval,
+            "hostMax": _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_HOST_MAX")}
 
 
 def sample_host(proc_root=Path("/proc")) -> dict:
     """Local CPU, load, MemAvailable and PSI. Memory and PSI are None when absent (macOS)."""
-    cpu = os.cpu_count() or 1
     try:
         load1 = os.getloadavg()[0]
     except OSError:
         load1 = None
-    mem = None
-    meminfo = Path(proc_root) / "meminfo"
     try:
-        for line in meminfo.read_text().splitlines():
-            if line.startswith("MemAvailable:"):
-                mem = int(line.split()[1]) * 1024
-                break
+        mem = next((int(line.split()[1]) * 1024
+                    for line in (Path(proc_root) / "meminfo").read_text().splitlines()
+                    if line.startswith("MemAvailable:")), None)
     except (OSError, ValueError, IndexError):
         mem = None
     pressure = Path(proc_root) / "pressure"
     psi = None
     if pressure.is_dir():
-        psi = {
-            "cpuSomeAvg10": _pressure_avg(pressure / "cpu", "some"),
-            "memoryFullAvg10": _pressure_avg(pressure / "memory", "full"),
-            "ioFullAvg10": _pressure_avg(pressure / "io", "full"),
-        }
-    return {"cpuCount": cpu, "load1": load1, "memAvailableBytes": mem, "psi": psi}
+        psi = {key: _pressure_avg(pressure / name, label)
+               for key, name, label in (("cpuSomeAvg10", "cpu", "some"),
+                                        ("memoryFullAvg10", "memory", "full"),
+                                        ("ioFullAvg10", "io", "full"))}
+    return {"cpuCount": os.cpu_count() or 1, "load1": load1, "memAvailableBytes": mem, "psi": psi}
 
 
 def _pressure_avg(path: Path, label: str) -> float | None:
@@ -211,7 +195,7 @@ def _pressure_avg(path: Path, label: str) -> float | None:
                 found = _AVG10.search(line)
                 return float(found.group(1)) if found else None
     except (OSError, ValueError):
-        return None
+        pass
     return None
 
 
@@ -226,35 +210,27 @@ def _valid_state(state) -> bool:
     return isinstance(state, dict) and state.get("schema") == SCHEMA and isinstance(state.get("lanes"), dict)
 
 
+def _section(source, key: str) -> dict:
+    value = source.get(key) if isinstance(source, dict) else None
+    return value if isinstance(value, dict) else {}
+
+
 def collect(state_dir: Path, tick: dict, now: float) -> dict:
     """Gather the signals ``decide`` needs. Local files only: no GitHub or Linear calls."""
     root = Path(state_dir)
     doctor = _read_json(root / "doctor.json")
-    observed = {}
-    alerts: list[str] = []
-    fresh = False
-    throughput = {}
+    observed, alerts, fresh, throughput = {}, [], False, {}
     if isinstance(doctor, dict):
-        if isinstance(doctor.get("observed"), dict):
-            observed = doctor["observed"]
+        observed = _section(doctor, "observed")
         stamp = _as_number(observed.get("now"))
         fresh = stamp is not None and 0 <= now - stamp <= STALE_S
-        if isinstance(doctor.get("alerts"), dict):
-            alerts = [key for key in doctor["alerts"] if isinstance(key, str)]
-        feed = doctor.get("statusFeed")
-        if isinstance(feed, dict):
-            throughput = ((feed.get("throughput") or {}).get("providers") or {})
+        alerts = [key for key in _section(doctor, "alerts") if isinstance(key, str)]
+        throughput = _section(_section(doctor, "statusFeed").get("throughput"), "providers")
     if not throughput:
-        status = _read_json(root / "lanes-status.json")
-        if isinstance(status, dict):
-            throughput = ((status.get("throughput") or {}).get("providers") or {})
-    if not isinstance(throughput, dict):
-        throughput = {}
+        throughput = _section(_section(_read_json(root / "lanes-status.json"), "throughput"), "providers")
     api = _read_json(root / "api-budget.json")
-    if not isinstance(api, dict):
-        api = {}
-    cooling = []
-    cooldown_at = {}
+    api = api if isinstance(api, dict) else {}
+    cooling, cooldown_at = [], {}
     cool_dir = root / "cooldown"
     if cool_dir.is_dir():
         for path in sorted(cool_dir.iterdir()):
@@ -264,50 +240,30 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
                     cooling.append(path.name)
             except (OSError, ValueError):
                 continue
-    latest_bank = None
     accounts = _read_json(root / "codex-accounts.json")
-    if isinstance(accounts, dict):
-        for entry in accounts.values():
-            if not isinstance(entry, dict) or entry.get("lastKind") not in ("rate", "limit", "usage"):
-                continue
-            stamp = _as_number(entry.get("lastRunAt"))
-            if stamp is not None:
-                latest_bank = stamp if latest_bank is None else max(latest_bank, stamp)
-    running = {}
-    capacity = observed.get("capacityByProvider") if isinstance(observed.get("capacityByProvider"), dict) else {}
-    for name, row in capacity.items():
-        if isinstance(row, dict):
-            seats = _as_int(row.get("running"))
-            if seats is not None:
-                running[name] = seats
-    tick_obs = observed.get("tick") if isinstance(observed.get("tick"), dict) else {}
-    unhealthy = [item for item in (tick_obs.get("unhealthy") or []) if isinstance(item, str)]
-    productive = {}
-    starts = {}
-    for name, metric in throughput.items():
-        if isinstance(metric, dict):
-            productive[name] = metric.get("productiveRunRate")
-            starts[name] = metric.get("workerStarts")
-    disk = tick.get("disk") if isinstance(tick, dict) and isinstance(tick.get("disk"), dict) else {}
-    attribution = observed.get("codexAttribution") if isinstance(observed.get("codexAttribution"), dict) else {}
-    unleased = _as_int(attribution.get("unleasedAvailable"))
-    maintenance = observed.get("maintenanceQueueByProvider")
-    if not isinstance(maintenance, dict):
-        maintenance = {}
+    latest_bank = None
+    for entry in (accounts if isinstance(accounts, dict) else {}).values():
+        stamp = _as_number(entry.get("lastRunAt")) if isinstance(entry, dict) else None
+        if stamp is not None and entry.get("lastKind") in ("rate", "limit", "usage"):
+            latest_bank = stamp if latest_bank is None else max(latest_bank, stamp)
+    running = {name: seats for name, row in _section(observed, "capacityByProvider").items()
+               if isinstance(row, dict)
+               for seats in (_as_int(row.get("running")),) if seats is not None}
+    unhealthy = [item for item in (_section(observed, "tick").get("unhealthy") or [])
+                 if isinstance(item, str)]
+    metrics = {name: m for name, m in throughput.items() if isinstance(m, dict)}
+    productive = {name: m.get("productiveRunRate") for name, m in metrics.items()}
+    starts = {name: m.get("workerStarts") for name, m in metrics.items()}
+    disk = _section(tick if isinstance(tick, dict) else {}, "disk")
+    unleased = _as_int(_section(observed, "codexAttribution").get("unleasedAvailable"))
     return {
-        "doctorFresh": fresh,
-        "eligiblePoolByProvider": observed.get("eligiblePoolByProvider") if isinstance(observed.get("eligiblePoolByProvider"), dict) else {},
-        "newIssueBudgetByProvider": observed.get("newIssueBudgetByProvider") if isinstance(observed.get("newIssueBudgetByProvider"), dict) else {},
-        "maintenanceQueueByProvider": maintenance,
-        "runningByProvider": running,
-        "unhealthy": unhealthy,
-        "cooling": cooling,
-        "cooldownAt": cooldown_at,
+        "doctorFresh": fresh, "runningByProvider": running, "unhealthy": unhealthy,
+        "eligiblePoolByProvider": _section(observed, "eligiblePoolByProvider"),
+        "newIssueBudgetByProvider": _section(observed, "newIssueBudgetByProvider"),
+        "maintenanceQueueByProvider": _section(observed, "maintenanceQueueByProvider"),
+        "cooling": cooling, "cooldownAt": cooldown_at, "codexUnleasedAvailable": unleased,
         "rateBankAt": {"codex": latest_bank} if latest_bank is not None else {},
-        "codexUnleasedAvailable": unleased,
-        "productiveRunRate": productive,
-        "starts": starts,
-        "alerts": alerts,
+        "productiveRunRate": productive, "starts": starts, "alerts": alerts,
         "gateWaitMedianS24h": observed.get("gateWaitMedianS24h"),
         "githubRemaining": _as_int(observed.get("githubRemaining")),
         "linearRemaining": _as_int(api.get("linearRemaining")),
@@ -342,10 +298,8 @@ def _lane_ceiling(name: str, base: int, running, obs: dict, config: dict) -> int
     cap = named if isinstance(named, int) and named > 0 else 2 * base
     if name == "codex":
         unleased = obs.get("codexUnleasedAvailable")
-        if unleased is None or running is None:
-            cap = min(cap, base)
-        else:
-            cap = min(cap, max(0, running) + max(0, unleased))
+        cap = min(cap, base if unleased is None or running is None
+                  else max(0, running) + max(0, unleased))
     return max(MIN_SLOTS, cap)
 
 
@@ -362,26 +316,22 @@ def _demand(name: str, obs: dict) -> int | None:
         if not isinstance(eligible, int) or isinstance(eligible, bool) or eligible < 0:
             return None
         return eligible + maint
-    if reason in ("over-budget", "terminal-pr-backlog", "provider-disabled", "pr-inventory-unavailable"):
-        return maint
-    return None
+    return maint if reason in ("over-budget", "terminal-pr-backlog", "provider-disabled",
+                               "pr-inventory-unavailable") else None
 
 
 def _budget_unknown(obs: dict) -> str | None:
     if _as_int(obs.get("githubRemaining")) is None:
         return "github-unknown"
     remaining, limit = _as_int(obs.get("linearRemaining")), _as_int(obs.get("linearLimit"))
-    if remaining is None or limit is None or limit <= 0:
-        return "linear-unknown"
-    return None
+    return "linear-unknown" if remaining is None or limit is None or limit <= 0 else None
 
 
 def _multi_reason(name: str, obs: dict, sample: dict, now: float) -> str | None:
     bank = _as_number((obs.get("rateBankAt") or {}).get(name))
-    if bank is not None and now - bank <= MULTIPLICATIVE_WINDOW_S:
-        return "rate-limited"
     written = _as_number((obs.get("cooldownAt") or {}).get(name))
-    if written is not None and now - written <= MULTIPLICATIVE_WINDOW_S:
+    recent = lambda stamp: stamp is not None and now - stamp <= MULTIPLICATIVE_WINDOW_S
+    if recent(bank) or recent(written):
         return "rate-limited"
     github = _as_int(obs.get("githubRemaining"))
     if github is not None and github < GITHUB_DECREASE_BELOW:
@@ -407,13 +357,10 @@ def _multi_reason(name: str, obs: dict, sample: dict, now: float) -> str | None:
 
 def _additive_reason(obs: dict, sample: dict) -> str | None:
     load = _load_ratio(sample)
-    if load is not None and load >= LOAD_DECREASE_MIN:
-        return "host-pressure"
     mem = _as_number(sample.get("memAvailableBytes"))
-    if mem is not None and mem < MEM_HEADROOM_BYTES:
-        return "host-pressure"
     free = _as_number((obs.get("disk") or {}).get("freePct"))
-    if free is not None and free < DISK_SOFT:
+    if (load is not None and load >= LOAD_DECREASE_MIN) or (mem is not None and mem < MEM_HEADROOM_BYTES) \
+            or (free is not None and free < DISK_SOFT):
         return "host-pressure"
     alerts = set(obs.get("alerts") or [])
     if "failed-runs" in alerts or "gate-timeouts" in alerts:
@@ -428,31 +375,24 @@ def _increase_blockers(name: str, obs: dict, sample: dict, now: float, running, 
     blockers = []
     budget = (obs.get("newIssueBudgetByProvider") or {}).get(name) or {}
     reason = budget.get("reason") if isinstance(budget, dict) else None
-    if reason == "over-budget":
-        blockers.append("over-budget")
-    elif reason == "terminal-pr-backlog":
-        blockers.append("terminal-pr-backlog")
+    if reason in ("over-budget", "terminal-pr-backlog"):
+        blockers.append(reason)
     if demand is None:
         blockers.append("unknown-demand")
     elif demand <= 0:
         blockers.append("zero-demand")
-    if name in set(obs.get("unhealthy") or []):
-        blockers.append("unhealthy")
-    if name in set(obs.get("cooling") or []):
-        blockers.append("cooling")
+    if name in set(obs.get("unhealthy") or []): blockers.append("unhealthy")
+    if name in set(obs.get("cooling") or []): blockers.append("cooling")
     bank = _as_number((obs.get("rateBankAt") or {}).get(name))
-    if bank is not None and now - bank <= RATE_QUIET_S:
-        blockers.append("rate-bank")
-    if name == "codex" and (obs.get("codexUnleasedAvailable") is None or obs.get("codexUnleasedAvailable") < 1):
+    if bank is not None and now - bank <= RATE_QUIET_S: blockers.append("rate-bank")
+    if name == "codex" and (obs.get("codexUnleasedAvailable") is None
+                            or obs.get("codexUnleasedAvailable") < 1):
         blockers.append("codex-unleased")
-    if running is None or running < 0:
-        blockers.append("unknown-running")
-    starts = (obs.get("starts") or {}).get(name)
+    if running is None or running < 0: blockers.append("unknown-running")
+    start_count = _as_int((obs.get("starts") or {}).get(name))
     rate = (obs.get("productiveRunRate") or {}).get(name)
-    start_count = _as_int(starts)
-    if start_count is None or start_count < PRODUCTIVE_MIN_STARTS:
-        pass
-    elif _as_number(rate) is None or rate < PRODUCTIVE_MIN:
+    if start_count is not None and start_count >= PRODUCTIVE_MIN_STARTS and (
+            _as_number(rate) is None or rate < PRODUCTIVE_MIN):
         blockers.append("low-productive-rate")
     alerts = set(obs.get("alerts") or [])
     if "failed-runs" in alerts or "gate-timeouts" in alerts:
@@ -461,16 +401,14 @@ def _increase_blockers(name: str, obs: dict, sample: dict, now: float, running, 
     if gate is not None and (_as_number(gate) is None or gate >= GATE_WAIT_INCREASE_MAX):
         blockers.append("gate-wait")
     load = _load_ratio(sample)
-    if load is None or load >= LOAD_INCREASE_MAX:
-        blockers.append("high-load")
+    if load is None or load >= LOAD_INCREASE_MAX: blockers.append("high-load")
     mem = sample.get("memAvailableBytes")
     if mem is not None and (_as_number(mem) is None or mem < MEM_HEADROOM_BYTES):
         blockers.append("low-mem")
     psi = sample.get("psi")
-    if psi is not None:
-        if not _psi_known(psi) or psi["cpuSomeAvg10"] > PSI_CPU_OK or psi["memoryFullAvg10"] > PSI_MEM_OK \
-                or psi["ioFullAvg10"] > PSI_IO_OK:
-            blockers.append("psi-high")
+    if psi is not None and (not _psi_known(psi) or psi["cpuSomeAvg10"] > PSI_CPU_OK
+                            or psi["memoryFullAvg10"] > PSI_MEM_OK or psi["ioFullAvg10"] > PSI_IO_OK):
+        blockers.append("psi-high")
     disk = obs.get("disk") or {}
     free = _as_number(disk.get("freePct"))
     if disk.get("admitted") is not True or free is None or free <= DISK_INCREASE_MIN:
@@ -488,41 +426,38 @@ def _increase_blockers(name: str, obs: dict, sample: dict, now: float, running, 
     return blockers
 
 
+def _hold(tag: str):
+    return "hold:" + tag, [tag]
+
+
 def _blank_lane(base: int, running, changed, reason: str, blockers: list[str], ceiling: int | None = None) -> dict:
-    floor = MIN_SLOTS if base > 0 else 0
-    return {
-        "base": base, "effective": base, "floor": floor,
-        "ceiling": base if ceiling is None else ceiling, "running": running,
-        "upStreak": 0, "idleStreak": 0, "lastChangeAt": changed,
-        "lastReason": reason, "blockers": blockers,
-    }
+    return {"base": base, "effective": base, "floor": MIN_SLOTS if base > 0 else 0,
+            "ceiling": base if ceiling is None else ceiling, "running": running,
+            "upStreak": 0, "idleStreak": 0, "lastChangeAt": changed,
+            "lastReason": reason, "blockers": blockers}
 
 
 def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, config: dict, now: float) -> dict:
     """Pure AIMD step. Returns the next ``symphony-lanes-autoscale/v1`` receipt."""
     previous = previous if isinstance(previous, dict) else {}
-    prev_lanes = previous.get("lanes") if isinstance(previous.get("lanes"), dict) else {}
-    prev_host = previous.get("host") if isinstance(previous.get("host"), dict) else {}
+    prev_lanes = _section(previous, "lanes")
+    host_last = _as_number(_section(previous, "host").get("lastChangeAt"))
     history = [row for row in (previous.get("history") or []) if isinstance(row, dict)]
     interval = _positive_int((config or {}).get("intervalS")) or DEFAULT_INTERVAL_S
-    up_need = streak_ticks(interval)
-    idle_need = up_need
-    host_last = _as_number(prev_host.get("lastChangeAt"))
+    up_need = idle_need = streak_ticks(interval)
     cpu = _as_int((host_sample or {}).get("cpuCount")) or 1
     if cpu <= 0:
         cpu = 1
-    enabled_bases = {name: base for name, base in bases.items() if _as_int(base) is not None and base > 0}
-    base_sum = sum(enabled_bases.values())
+    base_sum = sum(base for base in bases.values() if _as_int(base) is not None and base > 0)
     host_max = (config or {}).get("hostMax")
-    host_ceiling = min(host_max if isinstance(host_max, int) and host_max > 0 else 2 * base_sum, cpu)
-    host_cap = max(host_ceiling, base_sum)
+    host_cap = max(min(host_max if isinstance(host_max, int) and host_max > 0 else 2 * base_sum, cpu),
+                   base_sum)
     fresh = bool(obs.get("doctorFresh"))
     unknown_budget = _budget_unknown(obs) if fresh else None
-    rows = {}
-    pending = []
+    rows, pending = {}, []
     for order, (name, raw_base) in enumerate(bases.items()):
         base = _as_int(raw_base) or 0
-        prev = prev_lanes.get(name) if isinstance(prev_lanes.get(name), dict) else {}
+        prev = _section(prev_lanes, name)
         changed = _as_number(prev.get("lastChangeAt"))
         running = _as_int((obs.get("runningByProvider") or {}).get(name))
         if base <= 0:
@@ -533,17 +468,15 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             rows[name] = _blank_lane(base, running, changed, "hold:stale-doctor", ["stale-doctor"], ceiling=ceiling)
             continue
         current = _as_int(prev.get("effective"))
-        if current is None or current < MIN_SLOTS:
-            current = base
+        current = base if current is None or current < MIN_SLOTS else current
         up = _as_int(prev.get("upStreak")) or 0
         idle = _as_int(prev.get("idleStreak")) or 0
         demand = _demand(name, obs)
         multi = _multi_reason(name, obs, host_sample or {}, now)
         additive = _additive_reason(obs, host_sample or {})
-        effective = current
-        reason = "hold:steady"
+        effective, reason, want = current, "hold:steady", False
+        effective, reason, want = current, "hold:steady", False
         blockers: list[str] = []
-        want = False
         if multi:
             effective = max(MIN_SLOTS, math.ceil(current / 2))
             reason, blockers, up, idle = multi, [multi], 0, 0
@@ -556,24 +489,24 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
                 reason, blockers = "hold:host-cooldown", [additive, "host-cooldown"]
             up, idle = 0, 0
         else:
-            idle_signal = (demand == 0 and running is not None and running <= current - 2)
+            idle_signal = demand == 0 and running is not None and running <= current - 2
             idle = min(idle_need, idle + 1) if idle_signal else 0
             lane_ready = changed is None or now - changed >= interval
             floor = idle_floor(base)
             if idle_signal and current <= floor:
                 up = 0
-                reason, blockers = "hold:idle-floor", ["idle-floor"]
+                reason, blockers = _hold("idle-floor")
             elif idle_signal and idle >= idle_need and current > floor:
                 up = 0
                 if lane_ready:
                     effective = current - 1
                     reason, blockers, idle = "idle-decay", [], 0
                 else:
-                    reason, blockers = "hold:lane-cooldown", ["lane-cooldown"]
+                    reason, blockers = _hold("lane-cooldown")
             elif idle_signal:
                 # Streak is still accumulating. Zero demand must not scale the lane up.
                 up = 0
-                reason, blockers = "hold:zero-demand", ["zero-demand"]
+                reason, blockers = _hold("zero-demand")
             else:
                 blockers = _increase_blockers(name, obs, host_sample or {}, now, running, demand)
                 if running is not None and running < current and "unknown-running" not in blockers:
@@ -584,25 +517,18 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
                 else:
                     up = min(up_need, up + 1)
                     host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
-                    if not lane_ready:
-                        reason, blockers = "hold:lane-cooldown", ["lane-cooldown"]
-                    elif not host_ready:
-                        reason, blockers = "hold:host-cooldown", ["host-cooldown"]
-                    elif current + 1 > ceiling:
-                        reason, blockers = "hold:lane-ceiling", ["lane-ceiling"]
-                    elif up < up_need:
-                        reason, blockers = "hold:up-streak", ["up-streak"]
-                    else:
-                        want = True
-                        reason, blockers = "hold:one-lane", ["one-lane"]
+                    tag = ("lane-cooldown" if not lane_ready else
+                           "host-cooldown" if not host_ready else
+                           "lane-ceiling" if current + 1 > ceiling else
+                           "up-streak" if up < up_need else "one-lane")
+                    want = tag == "one-lane"
+                    reason, blockers = _hold(tag)
         if current > ceiling and effective > ceiling:
             effective = max(MIN_SLOTS, ceiling)
-            reason, blockers = "hold:lane-ceiling", ["lane-ceiling"]
-        rows[name] = {
-            "base": base, "effective": effective, "floor": MIN_SLOTS, "ceiling": ceiling,
-            "running": running, "upStreak": up, "idleStreak": idle, "lastChangeAt": changed,
-            "lastReason": reason, "blockers": blockers,
-        }
+            reason, blockers = _hold("lane-ceiling")
+        rows[name] = {"base": base, "effective": effective, "floor": MIN_SLOTS, "ceiling": ceiling,
+                      "running": running, "upStreak": up, "idleStreak": idle, "lastChangeAt": changed,
+                      "lastReason": reason, "blockers": blockers}
         if want:
             pending.append((demand or 0, order, name, current))
     if pending:
@@ -611,22 +537,16 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         for _demand_value, _order, chosen, current in ranked:
             row = rows[chosen]
             if used + 1 <= host_cap and current + 1 <= row["ceiling"]:
-                row["effective"] = current + 1
-                row["lastReason"] = "sustained-demand"
-                row["blockers"] = []
-                row["upStreak"] = 0
+                row.update(effective=current + 1, lastReason="sustained-demand",
+                           blockers=[], upStreak=0)
                 break
-            row["lastReason"] = "hold:host-ceiling"
-            row["blockers"] = ["host-ceiling"]
+            row.update(lastReason="hold:host-ceiling", blockers=["host-ceiling"])
     for name, row in rows.items():
         base = row["base"]
         if base > 0 and fresh and unknown_budget and row["effective"] > base:
-            row["effective"] = base
-            row["lastReason"] = "hold:" + unknown_budget
-            row["blockers"] = [unknown_budget]
-            row["upStreak"] = 0
-        prev = prev_lanes.get(name) if isinstance(prev_lanes.get(name), dict) else {}
-        before = _as_int(prev.get("effective"))
+            row.update(effective=base, lastReason="hold:" + unknown_budget,
+                       blockers=[unknown_budget], upStreak=0)
+        before = _as_int(_section(prev_lanes, name).get("effective"))
         if before is None:
             before = base
         if row["effective"] != before:
@@ -634,22 +554,15 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             history.append({"at": now, "lane": name, "from": before, "to": row["effective"],
                             "reason": row["lastReason"]})
             host_last = now
-    any_change = host_last is not None and host_last == now and any(
-        row.get("lastChangeAt") == now for row in rows.values())
+    any_change = host_last == now and any(row.get("lastChangeAt") == now for row in rows.values())
     return {
-        "schema": SCHEMA,
-        "mode": (config or {}).get("mode") or "apply",
-        "observedAt": now,
+        "schema": SCHEMA, "mode": (config or {}).get("mode") or "apply", "observedAt": now,
         "host": {"lastChangeAt": host_last, "ceiling": host_cap, "cpuCount": cpu},
-        "lanes": rows,
-        "hostSample": host_sample,
-        "apiBudget": {
-            "githubRemaining": _as_int(obs.get("githubRemaining")),
-            "linearRemaining": _as_int(obs.get("linearRemaining")),
-            "linearLimit": _as_int(obs.get("linearLimit")),
-            "linearRateLimitedAt": _as_number(obs.get("linearRateLimitedAt")),
-        },
-        "history": history[-HISTORY_CAP:],
+        "lanes": rows, "hostSample": host_sample, "history": history[-HISTORY_CAP:],
+        "apiBudget": {"githubRemaining": _as_int(obs.get("githubRemaining")),
+                      "linearRemaining": _as_int(obs.get("linearRemaining")),
+                      "linearLimit": _as_int(obs.get("linearLimit")),
+                      "linearRateLimitedAt": _as_number(obs.get("linearRateLimitedAt"))},
         "_changed": any_change,
     }
 
@@ -671,28 +584,20 @@ def effective_slots(state_dir: Path, name: str, base: int, now: float | None = N
         return base
     now = time.time() if now is None else now
     state = _read_json(Path(state_dir) / "autoscale.json")
-    if not _valid_state(state):
-        return base
-    observed = _as_number(state.get("observedAt"))
-    if observed is None or now - observed > STALE_S or now < observed:
-        return base
-    row = state["lanes"].get(name)
+    observed = _as_number(state.get("observedAt")) if _valid_state(state) else None
+    row = state["lanes"].get(name) if observed is not None and 0 <= now - observed <= STALE_S else None
     if not isinstance(row, dict):
         return base
     effective = _as_int(row.get("effective"))
     if effective is None:
         return base
     floor = _as_int(row.get("floor"))
-    if floor is None:
-        floor = MIN_SLOTS
     ceiling = _as_int(row.get("ceiling"))
-    if ceiling is None:
-        ceiling = effective
-    return max(floor, min(ceiling, effective))
+    return max(floor if floor is not None else MIN_SLOTS,
+               min(ceiling if ceiling is not None else effective, effective))
 
 
-def apply_tick(state_dir, tick: dict, bases: dict, now: float | None = None,
-               host_sample: dict | None = None, config: dict | None = None) -> dict:
+def apply_tick(state_dir, tick: dict, bases: dict, now: float | None = None, host_sample: dict | None = None, config: dict | None = None) -> dict:
     """Read local signals, decide, and write the receipt. Returns the tick summary."""
     now = time.time() if now is None else now
     config = config or load_config()
@@ -713,13 +618,9 @@ def public_block(state_dir) -> dict:
     state = _read_json(Path(state_dir) / "autoscale.json")
     if not _valid_state(state):
         return {"mode": mode(), "lanes": {}, "history": []}
-    lanes = {}
-    for name, row in state["lanes"].items():
-        if isinstance(row, dict):
-            lanes[name] = {
-                "base": row.get("base"), "effective": row.get("effective"),
-                "reason": row.get("lastReason"), "blockers": list(row.get("blockers") or []),
-            }
+    lanes = {name: {"base": row.get("base"), "effective": row.get("effective"),
+                    "reason": row.get("lastReason"), "blockers": list(row.get("blockers") or [])}
+             for name, row in state["lanes"].items() if isinstance(row, dict)}
     history = state.get("history") if isinstance(state.get("history"), list) else []
     return {"mode": state.get("mode") or mode(), "lanes": lanes, "history": history[-10:]}
 
@@ -729,28 +630,20 @@ def record_linear_budget(state_dir, headers, status: int, raw: bytes) -> None:
     root = Path(state_dir)
     path = root / "api-budget.json"
     current = _read_json(path)
-    if not isinstance(current, dict):
-        current = {}
+    current = current if isinstance(current, dict) else {}
     updated = False
     if headers is not None and hasattr(headers, "get"):
-        for header, key in (
-            ("X-RateLimit-Requests-Remaining", "linearRemaining"),
-            ("X-RateLimit-Requests-Limit", "linearLimit"),
-            ("X-RateLimit-Requests-Reset", "linearReset"),
-        ):
+        for header, key in (("X-RateLimit-Requests-Remaining", "linearRemaining"),
+                            ("X-RateLimit-Requests-Limit", "linearLimit"),
+                            ("X-RateLimit-Requests-Reset", "linearReset")):
             raw_value = headers.get(header)
             if raw_value is None or raw_value == "":
                 continue
             if key == "linearReset":
                 current[key] = str(raw_value)
             else:
-                parsed = _positive_int(raw_value)
-                if parsed is None:
-                    try:
-                        parsed = int(str(raw_value).strip())
-                    except (TypeError, ValueError):
-                        parsed = None
-                if parsed is not None and parsed >= 0:
+                parsed = _nonneg_int(raw_value)
+                if parsed is not None:
                     current[key] = parsed
             updated = True
     if status == 400 and raw:
@@ -760,8 +653,7 @@ def record_linear_budget(state_dir, headers, status: int, raw: bytes) -> None:
             payload = None
         errors = payload.get("errors") if isinstance(payload, dict) else None
         if isinstance(errors, list) and any(
-                isinstance(item, dict) and (item.get("extensions") or {}).get("code") == "RATELIMITED"
-                for item in errors):
+                _section(item, "extensions").get("code") == "RATELIMITED" for item in errors):
             current["linearRateLimitedAt"] = time.time()
             updated = True
     if not updated:
