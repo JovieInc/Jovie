@@ -40,6 +40,17 @@ describe('public marketing navigation', () => {
     expect(labels).not.toContain('Pitch');
   });
 
+  it('links the AI public brief from the Resources footer', () => {
+    const resources = MARKETING_FOOTER_COLUMNS.find(
+      column => column.title === 'Resources'
+    );
+
+    expect(resources?.links).toContainEqual({
+      href: '/ai',
+      label: 'AI Operating System',
+    });
+  });
+
   it('keeps the Music footer and fan labels until the generic creator flag is on', () => {
     expect(getMarketingFooterColumns(false)).toBe(MARKETING_FOOTER_COLUMNS);
     expect(getMarketingToolsFlyoutLinks(false)).toBe(

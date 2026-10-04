@@ -169,6 +169,15 @@ const renderSurfaces = [
     includeInFastHealth: false,
   },
   {
+    id: 'people-recovery',
+    name: 'Admin People Recovery',
+    path: buildAdminPeopleHref('recovery'),
+    rootTestId: 'admin-people-view-recovery',
+    snapshotSlug: 'admin-people-recovery',
+    utilityRoot: false,
+    includeInFastHealth: false,
+  },
+  {
     id: 'growth',
     name: 'Admin Growth',
     path: APP_ROUTES.ADMIN_GROWTH,

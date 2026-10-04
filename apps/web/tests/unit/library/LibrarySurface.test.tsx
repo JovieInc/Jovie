@@ -412,8 +412,15 @@ describe('LibrarySurface', () => {
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
-    expect(source).toContain('ReleaseAudioAssetPanel');
-    expect(source).toContain('LibraryInspectorAssetSlots');
+    expect(source).toContain('LibraryFilesPanel');
+    const filesPanelSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/library/LibraryFilesPanel.tsx'
+      ),
+      'utf8'
+    );
+    expect(filesPanelSource).toContain('ReleaseAudioAssetPanel');
     expect(source).toContain('function LibraryFilterPanel');
     expect(source).toContain("data-testid='library-filter-active-indicator'");
     expect(source).toContain("surfaceMode='table'");
@@ -509,6 +516,21 @@ describe('LibrarySurface', () => {
       'font-semibold',
       'text-primary-token'
     );
+  });
+
+  it('exposes the YouTube ledger directly from every Work state', () => {
+    const emptyLibrary = renderLibrary([]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
+
+    emptyLibrary.unmount();
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
   });
 
   it('uses the canonical Spotify sync owner for an empty connected library', () => {
@@ -1559,11 +1581,19 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
 
+    // Missing audio is not a broken state — acquisition sits behind Add File.
+    expect(screen.getByTestId('library-files-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
+
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
       screen.getByLabelText('Upload audio for Take Me Over')
     ).toHaveAttribute('accept', expect.stringContaining('audio/mpeg'));
     expect(screen.queryByTestId('library-audio-ready')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-file-back'));
+    fireEvent.click(screen.getByTestId('library-file-artwork:release-1'));
     expect(screen.getByTestId('library-artwork-object')).toBeInTheDocument();
     expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
   });
@@ -1591,6 +1621,7 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
+    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
     fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
       target: {
         files: [
@@ -1647,6 +1678,86 @@ describe('LibrarySurface', () => {
         name: 'More actions',
       })
     ).toBeInTheDocument();
+  });
+
+  it.each(['inside', 'outside'] as const)(
+    'closes the inspector on Escape with focus %s and returns focus to the opener',
+    focusLocation => {
+      renderLibrary([buildAsset()]);
+
+      const row = screen.getByTestId('library-release-row-release-1');
+      row.focus();
+      fireEvent.click(row);
+      const drawer = screen.getByTestId('library-asset-drawer');
+      expect(drawer).toHaveAttribute('aria-hidden', 'false');
+
+      const focused =
+        focusLocation === 'inside'
+          ? within(drawer).getByRole('tab', { name: 'Files' })
+          : screen.getByRole('button', { name: /^Show filters/i });
+      focused.focus();
+      expect(focused).toHaveFocus();
+      fireEvent.keyDown(focused, { key: 'Escape' });
+
+      expect(drawer).toHaveAttribute('aria-hidden', 'true');
+      expect(row).toHaveFocus();
+    }
+  );
+
+  it('preserves the opener while changing assets with focus inside the inspector', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Another release' }),
+    ]);
+    const opener = screen.getByTestId('library-release-row-release-1');
+    const next = screen.getByTestId('library-release-row-release-2');
+    opener.focus();
+    fireEvent.click(opener);
+    const drawer = screen.getByTestId('library-asset-drawer');
+    const files = within(drawer).getByRole('tab', { name: 'Files' });
+    files.focus();
+    expect(files).toHaveFocus();
+
+    fireEvent.click(next);
+    expect(
+      within(drawer).getAllByText('Another release').length
+    ).toBeGreaterThan(0);
+    fireEvent.keyDown(files, { key: 'Escape' });
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+    expect(opener).toHaveFocus();
+
+    next.focus();
+    fireEvent.click(next);
+    within(drawer).getByRole('tab', { name: 'Files' }).focus();
+    fireEvent.keyDown(drawer, { key: 'Escape' });
+    expect(next).toHaveFocus();
+  });
+
+  it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
+    renderLibrary([buildAsset()]);
+    fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
+
+    const table = screen
+      .getByTestId('library-release-row-release-1')
+      .closest('table');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+  });
+
+  it('counts tracks in the singular for one-track releases on grid cards', () => {
+    renderLibrary([
+      buildAsset({ releaseType: 'album', trackCount: 1 }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Second Album',
+        releaseType: 'album',
+        trackCount: 9,
+      }),
+    ]);
+    clickGridView();
+
+    expect(screen.getByText('1 Track')).toBeInTheDocument();
+    expect(screen.getByText('9 Tracks')).toBeInTheDocument();
+    expect(screen.queryByText('1 Tracks')).not.toBeInTheDocument();
   });
 
   it('does not render route filtering as a second shell search surface', () => {

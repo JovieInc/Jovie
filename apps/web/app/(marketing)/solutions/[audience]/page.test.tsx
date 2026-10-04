@@ -19,6 +19,7 @@ import {
   getMarketingSection,
   MARKETING_SECTION_IDS,
 } from '@/data/marketing/sections';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import SolutionsAudiencePage, {
   dynamicParams,
   generateMetadata,
@@ -47,10 +48,17 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('next/image', () => ({
-  default: (props: { readonly alt?: string; readonly src?: unknown }) => (
+  default: (props: {
+    readonly alt?: string;
+    readonly src?: unknown;
+    readonly width?: number;
+    readonly height?: number;
+  }) => (
     <img
       alt={props.alt ?? ''}
       src={typeof props.src === 'string' ? props.src : ''}
+      width={props.width}
+      height={props.height}
     />
   ),
 }));
@@ -65,6 +73,7 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
     id: 'solutions.founders',
     slug: 'founders',
     status: 'shadow',
+    heroVariant: 'f-layout-desktop-screenshot',
     brief: {
       audience: 'founders building an owned audience',
       job: 'show founders how a public profile captures subscribers',
@@ -79,16 +88,19 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
           renderer: 'factory-hero',
           instanceId: 'hero-1',
           sectionId: 'hero',
+          variantId: 'split-screenshot-right',
         },
         {
           renderer: 'factory-feature-split',
           instanceId: 'capture-1',
           sectionId: 'feature-split',
+          variantId: 'phone-right',
         },
         {
           renderer: 'factory-cta',
           instanceId: 'cta-1',
           sectionId: 'cta',
+          variantId: 'final-single-claim',
         },
       ],
     },
@@ -100,19 +112,20 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
       'capture-1.body': {
         text: 'Visitors subscribe from your page and opt into updates.',
       },
+      'capture-1.headline': { text: 'Build a direct relationship.' },
       'cta-1.headline': { text: 'Start free today' },
       ...copyOverrides,
     },
     media: {
       'hero-1': {
-        kind: 'public-path',
-        id: '/og/default.png',
-        alt: 'Public profile preview',
+        kind: 'screenshot-registry',
+        id: 'public-profile-desktop',
+        alt: getMarketingExportImage('public-profile-desktop').alt,
       },
       'capture-1': {
-        kind: 'public-path',
-        id: '/og/default.png',
-        alt: 'Subscriber capture preview',
+        kind: 'screenshot-registry',
+        id: 'tim-white-profile-subscribe-mobile',
+        alt: getMarketingExportImage('tim-white-profile-subscribe-mobile').alt,
       },
     },
     proof: [],
@@ -123,6 +136,22 @@ function factoryRecord(copyOverrides: PageRecord['copy'] = {}) {
       description: 'Claim a public profile and capture subscribers.',
       keywords: [],
     },
+  });
+}
+
+function leftNoneFactoryRecord(withHeroMedia = false) {
+  const base = factoryRecord();
+  const sections = base.composition.sections.map((section, index) =>
+    index === 0 ? { ...section, variantId: 'left-none' } : section
+  );
+  const media = { ...base.media };
+  if (!withHeroMedia) delete media['hero-1'];
+
+  return definePage({
+    ...base,
+    heroVariant: 'left-content',
+    composition: { ...base.composition, sections },
+    media,
   });
 }
 
@@ -156,10 +185,56 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     expect(container).toHaveTextContent(
       'Visitors subscribe from your page and opt into updates.'
     );
+    expect(container).toHaveTextContent('Build a direct relationship.');
     expect(container).toHaveTextContent('Start free today');
-    expect(
-      container.querySelector('[data-factory-media="/og/default.png"]')
-    ).toBeInTheDocument();
+    const featureSplit = container.querySelector(
+      '[data-testid="marketing-section-feature-split"][data-marketing-occurrence="capture-1"]'
+    );
+    const expectedCapture = getMarketingExportImage(
+      'tim-white-profile-subscribe-mobile'
+    );
+    expect(featureSplit).toHaveAttribute(
+      'data-marketing-variant',
+      'phone-right'
+    );
+    expect(featureSplit).toHaveTextContent('Build a direct relationship.');
+    expect(featureSplit).toHaveTextContent(
+      'Visitors subscribe from your page and opt into updates.'
+    );
+    expect(featureSplit?.querySelector('img')).toHaveAttribute(
+      'src',
+      expectedCapture.publicUrl
+    );
+    expect(featureSplit?.querySelector('img')).toHaveAttribute(
+      'alt',
+      expectedCapture.alt
+    );
+    expect(featureSplit?.querySelector('figcaption')).toBeNull();
+  });
+
+  it('renders left-none as a left-aligned hero with no media column', () => {
+    const record = leftNoneFactoryRecord();
+
+    expect(() => assertRenderableSolutionsRecord(record)).not.toThrow();
+    const { container } = render(<SolutionsRecordBody record={record} />);
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+
+    expect(hero).toHaveAttribute('data-marketing-variant', 'left-none');
+    expect(hero).toHaveClass('marketing-hero--left');
+    expect(hero?.querySelector('.marketing-hero-media')).toBeNull();
+  });
+
+  it('rejects media for left-none before it can render as a split hero', () => {
+    const record = leftNoneFactoryRecord(true);
+
+    expect(() => assertRenderableSolutionsRecord(record)).toThrowError(
+      /variant left-none cannot render media; choose a split hero variant/u
+    );
+    expect(() => render(<SolutionsRecordBody record={record} />)).toThrowError(
+      /variant left-none cannot render media; choose a split hero variant/u
+    );
   });
 
   it('fails the build gate when a factory section is missing a required copy slot', () => {
@@ -324,5 +399,106 @@ describe('/solutions/[audience] family renderer (JOV-7275)', () => {
     expect(() =>
       assertRenderableSolutionsRecord(solutionsArtistsPage, [])
     ).toThrowError(/references unknown claims/u);
+  });
+});
+
+describe('generated media slot (JOV-7765)', () => {
+  const digest = `sha256:${'b'.repeat(64)}`;
+
+  function withHeroMedia(media: PageRecord['media'][string]) {
+    const record = factoryRecord();
+    return definePage({
+      ...record,
+      media: { ...record.media, 'hero-1': media },
+    });
+  }
+
+  function heroFrame(container: HTMLElement) {
+    const frame = container.querySelector<HTMLElement>(
+      '[data-factory-media-digest]'
+    );
+    expect(frame).not.toBeNull();
+    return frame as HTMLElement;
+  }
+
+  it('reserves the render aspect ratio and exposes its digest', () => {
+    const { container } = render(
+      <SolutionsRecordBody
+        record={withHeroMedia({
+          kind: 'generated',
+          id: '/marketing/factory/hero.avif',
+          alt: 'Generated hero',
+          mime: 'image/avif',
+          width: 1600,
+          height: 900,
+          digest,
+        })}
+      />
+    );
+    const frame = heroFrame(container);
+
+    const image = frame.querySelector('img');
+
+    expect(frame).toHaveAttribute('data-factory-media-digest', digest);
+    expect(image).toHaveAttribute('alt', 'Generated hero');
+    // Intrinsic size on the element is what reserves its box (CLS 0).
+    expect(image).toHaveAttribute('width', '1600');
+    expect(image).toHaveAttribute('height', '900');
+    expect(frame.querySelector('video')).toBeNull();
+  });
+
+  it('renders captioned video click-to-play behind its poster, never autoplaying', () => {
+    const { container } = render(
+      <SolutionsRecordBody
+        record={withHeroMedia({
+          kind: 'generated',
+          id: '/marketing/factory/hero.mp4',
+          alt: 'Generated walkthrough',
+          mime: 'video/mp4',
+          width: 1280,
+          height: 720,
+          digest,
+          poster: '/marketing/factory/hero-poster.avif',
+          captions: '/marketing/factory/hero.vtt',
+        })}
+      />
+    );
+    const video = heroFrame(container).querySelector('video');
+
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute('width', '1280');
+    expect(video).toHaveAttribute('height', '720');
+    expect(video).toHaveAttribute(
+      'poster',
+      '/marketing/factory/hero-poster.avif'
+    );
+    expect(video).toHaveAttribute('controls');
+    expect(video).toHaveAttribute('preload', 'none');
+    expect(video).not.toHaveAttribute('autoplay');
+    expect(video).not.toHaveAttribute('loop');
+    expect(video?.querySelector('track')).toHaveAttribute(
+      'src',
+      '/marketing/factory/hero.vtt'
+    );
+    expect(video?.querySelector('source')).toHaveAttribute('type', 'video/mp4');
+  });
+
+  it('puts a re-render on the page as a new artifact', () => {
+    const markup = (hash: string) =>
+      renderToStaticMarkup(
+        <SolutionsRecordBody
+          record={withHeroMedia({
+            kind: 'generated',
+            id: '/marketing/factory/hero.avif',
+            alt: 'Generated hero',
+            mime: 'image/avif',
+            width: 1600,
+            height: 900,
+            digest: hash,
+          })}
+        />
+      );
+
+    expect(markup(digest)).not.toBe(markup(`sha256:${'c'.repeat(64)}`));
   });
 });

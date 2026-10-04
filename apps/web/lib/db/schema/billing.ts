@@ -1,4 +1,6 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
+  check,
   index,
   jsonb,
   pgTable,
@@ -36,6 +38,8 @@ export const billingAuditLog = pgTable(
   'billing_audit_log',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Null only for system rows (reconciliation heartbeat and remediation
+    // filing). Per-user billing changes still require a user id.
     userId: uuid('user_id').references(() => users.id, {
       onDelete: 'cascade',
     }),
@@ -50,6 +54,10 @@ export const billingAuditLog = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
+    userIdRequiredUnlessSystem: check(
+      'billing_audit_log_user_id_check',
+      drizzleSql`${table.userId} IS NOT NULL OR ${table.eventType} IN ('reconciliation_run', 'billing_sync_remediation_filed')`
+    ),
     userIdIdx: index('billing_audit_log_user_id_idx').on(table.userId),
     stripeEventIdIdx: index('billing_audit_log_stripe_event_id_idx').on(
       table.stripeEventId
