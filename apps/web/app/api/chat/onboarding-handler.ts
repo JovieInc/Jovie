@@ -24,6 +24,10 @@ import {
   type FallbackReason,
 } from '@/lib/chat/onboarding-script/respond';
 import { STREAM_ERROR_LINE } from '@/lib/chat/onboarding-script/script';
+import {
+  type PersistedOnboardingMessage,
+  resumeOnboardingTranscript,
+} from '@/lib/chat/onboarding-transcript';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
@@ -57,8 +61,10 @@ import {
   rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
+import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import {
   isTurnstileConfigured,
+  verifyTurnstileTestModeToken,
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -364,11 +370,25 @@ export async function tryHandleAnonymousOnboardingChat(
     }
 
     if (!shouldBypassTurnstile) {
-      const verify = await verifyTurnstileToken(
-        parsed.data.turnstileToken,
-        ip,
-        extractRequestHostname(req)
+      // Approved synthetic principals (JOV-7697) verify in Cloudflare's test
+      // mode. Passage needs a verified session on the controlled canary
+      // mailbox plus a roster grant and a default-off gate. Anonymous
+      // visitors and every other account still verify against the real key.
+      const syntheticPrincipal = await resolveSyntheticPassage(
+        signedInSession,
+        'onboarding_chat',
+        { requestId }
       );
+      if (syntheticPrincipal) {
+        Sentry.setTag('synthetic_principal', syntheticPrincipal.actorId);
+      }
+      const verify = syntheticPrincipal
+        ? await verifyTurnstileTestModeToken(parsed.data.turnstileToken, ip)
+        : await verifyTurnstileToken(
+            parsed.data.turnstileToken,
+            ip,
+            extractRequestHostname(req)
+          );
       if (!verify.success) {
         return NextResponse.json(
           {
@@ -459,8 +479,8 @@ export async function tryHandleAnonymousOnboardingChat(
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const uiMessages = rawMessages as UIMessage[];
-  const latestUserMessage = getLatestUserMessage(uiMessages);
+  const clientMessages = rawMessages as UIMessage[];
+  const latestUserMessage = getLatestUserMessage(clientMessages);
   if (!latestUserMessage) {
     return NextResponse.json(
       {
@@ -471,7 +491,7 @@ export async function tryHandleAnonymousOnboardingChat(
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const turnCount = uiMessages.filter(m => m.role === 'user').length;
+  const clientTurnCount = clientMessages.filter(m => m.role === 'user').length;
   const accessControlled = await isWaitlistGateEnabled().catch(error => {
     // Fail closed: a settings outage must never grant anonymous instant access.
     Sentry.captureException(error, {
@@ -490,7 +510,11 @@ export async function tryHandleAnonymousOnboardingChat(
   } catch (error) {
     Sentry.captureException(error, {
       tags: { context: 'onboarding_handler_persistence' },
-      extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+      extra: {
+        sessionId: sessionId.slice(0, 8),
+        requestId,
+        turnCount: clientTurnCount,
+      },
     });
     return NextResponse.json(
       {
@@ -510,6 +534,14 @@ export async function tryHandleAnonymousOnboardingChat(
   // access decision, so it comes from the tool calls this server persisted,
   // never from tool outputs in the client-supplied history.
   const serverToolHistory = await loadServerToolHistory(conversationId);
+  // A reload or new tab sends only the newest message; the server transcript
+  // is the conversation of record, so the turn never restarts at the opener.
+  const uiMessages = resumeOnboardingTranscript({
+    clientMessages,
+    persisted: await loadPersistedTranscript(conversationId),
+    latestClientMessageId: latestUserMessage.clientMessageId,
+  });
+  const turnCount = uiMessages.filter(m => m.role === 'user').length;
   const onboardingState = createOnboardingTurnState({
     sessionId,
     turnCount,
@@ -846,6 +878,34 @@ async function loadServerToolHistory(
 }
 
 const MAX_SERVER_TOOL_HISTORY_ROWS = 200;
+
+async function loadPersistedTranscript(
+  conversationId: string
+): Promise<PersistedOnboardingMessage[]> {
+  const rows = await db
+    .select({
+      id: chatMessages.id,
+      role: chatMessages.role,
+      content: chatMessages.content,
+      clientMessageId: chatMessages.clientMessageId,
+    })
+    .from(chatMessages)
+    .where(eq(chatMessages.conversationId, conversationId))
+    .orderBy(asc(chatMessages.createdAt))
+    .limit(MAX_SERVER_TOOL_HISTORY_ROWS);
+  return rows.flatMap(row =>
+    row.role === 'user' || row.role === 'assistant'
+      ? [
+          {
+            id: String(row.id),
+            role: row.role,
+            content: row.content,
+            clientMessageId: row.clientMessageId,
+          },
+        ]
+      : []
+  );
+}
 
 async function reserveAnonymousOnboardingConversation({
   sessionId,

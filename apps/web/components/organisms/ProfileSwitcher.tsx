@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/organisms/ProfileSwitcher.test.tsx
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import { useState, useTransition } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { toast } from '@/components/feedback';
 import { Avatar } from '@/components/molecules/Avatar';
+import { SHELL_RAIL_LABEL } from '@/components/shell/rail-motion';
 import { cn } from '@/lib/utils';
 import { CreateIdentityDialog } from './CreateProfileDialog';
 
@@ -70,7 +72,7 @@ export function IdentitySwitcher() {
             aria-label='Switch Identity'
             className={cn(
               'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
-              'group-data-[collapsible=icon]:justify-center'
+              'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
             )}
           >
             <Avatar
@@ -84,7 +86,12 @@ export function IdentitySwitcher() {
               }
               className='shrink-0'
             />
-            <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+            <span
+              className={cn(
+                'truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                SHELL_RAIL_LABEL
+              )}
+            >
               {activeIdentity?.displayName || 'Select identity'}
             </span>
             <ChevronDown

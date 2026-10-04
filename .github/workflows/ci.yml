@@ -323,6 +323,27 @@ jobs:
           save_merge_group_workspace: 'true'
       - name: Revalidate published workspace receipt
         run: node scripts/lib/ci-dependency-workspace.mjs validate
+      - name: Measure actual installed combined dependency graph
+        env:
+          DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
+        run: node .github/scripts/dependency-parity-evidence.mjs write
+      - name: Compare verified constituent dependency digests
+        if: ${{ vars.DEPENDENCY_PARITY_ENFORCED == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPENDENCY_PARITY_ENFORCED: ${{ vars.DEPENDENCY_PARITY_ENFORCED }}
+          DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
+        run: node .github/scripts/dependency-parity-evidence.mjs compare
+      - name: Preserve combined dependency evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-digest-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.merge_group.head_sha }}
+          path: |
+            ${{ runner.temp }}/jovie-dependency-parity/dep-digest.json
+            ${{ runner.temp }}/jovie-dependency-parity/dep-parity.json
+          if-no-files-found: error
+          retention-days: 14
 
   # Successful root for every CI event, with one-shot proof only for push:main.
   # Queue-proven SHAs reuse their exact merge_group gate and skip every duplicate
@@ -5280,6 +5301,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true' && matrix.shard == '7/14'
         continue-on-error: true
         env:
+          VITEST_JUNIT_OUTPUT_FILE: test-report.quarantine.junit.xml
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -5314,8 +5336,10 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'
         run: pnpm turbo test --filter=@jovie/ui
 
-      - name: Preserve failed unit-shard diagnosis
-        if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+      - name: Preserve completed unit-shard diagnosis
+        # Successful retries are evidence too; cancellation cannot certify a
+        # completed execution. Keep the existing artifact identity for readers.
+        if: ${{ always() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}

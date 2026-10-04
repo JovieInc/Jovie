@@ -2,10 +2,11 @@
 
 Status: shipping. Owner: Summer. Issue: JOV-7201. Related compiler: JOV-7084.
 
-An issue labeled `escaped-defect` stays open when its repair PR merges. Merge is
-not activation, and a product fix is only half of the required outcome. Closure
-uses the existing Linear issue, Quality Gap Finder, and production evidence; it
-does not create a second governor or incident record.
+An issue labeled `escaped-defect` moves or returns to `Validating` when its
+repair PR merges. Merge is not activation, and a product fix is only half of
+the required outcome. Closure uses the existing Linear issue, Quality Gap
+Finder, JOV-2967/JOV-7084 learning compiler, and production evidence; it does
+not create a second governor or incident record.
 
 ## Required loop
 
@@ -20,12 +21,19 @@ does not create a second governor or incident record.
 8. Attach the receipt below to the originating Linear issue and only then use
    `PRODUCTION_VERIFIED_SHA=<full-sha> scripts/linear-transition-issue.mjs <JOV-ID> Done`.
 
-`linear-sync-on-merge` never closes an escaped defect. The guarded transition
-CLI validates the receipt before moving it to Done. The existing Quality Gap
-Finder independently reports any recently completed escaped defect whose
-receipt is missing or invalid and links the proposal back to the originating
-issue. `PRODUCTION_VERIFIED_SHA` must match the receipt's deployed-build SHA;
-omitting it fails closed.
+`linear-sync-on-merge` sends an escaped defect to `Validating` and never closes
+it. The guarded transition CLI validates the receipt before moving it to Done.
+The existing Quality Gap Finder independently reports any recently completed
+escaped defect whose receipt is missing or invalid and links the proposal back
+to the originating issue. `PRODUCTION_VERIFIED_SHA` must match the receipt's
+deployed-build SHA; omitting it fails closed.
+
+For reversible UI controls, the reusable detector is
+`apps/web/tests/utils/reversible-control-detector.ts`. It requires at least two
+complete transition cycles and both pointer and keyboard activation. The
+JOV-7207 replay proves the historical collapse-without-reopen behavior fails,
+while composed-shell coverage applies the same detector to the left rail,
+right rail/drawer, and persistent audio-player reveal.
 
 ## Closure receipt
 
@@ -56,9 +64,18 @@ SHAs, `TODO`, and narration are validated rather than trusted by implication.
     "originatingIssue": "JOV-1234",
     "gapClass": "missing-invariant",
     "gapAnalysis": "The previous certification checked render success but not the failed interaction outcome.",
+    "learningCompiler": {
+      "issue": "JOV-7084",
+      "outputRef": "https://linear.app/jovie/issue/JOV-7084#compiled-output"
+    },
     "detectorRef": "apps/web/tests/e2e/the-journey.spec.ts",
     "coveredClass": "the interaction outcome across every surface using this shared primitive",
-    "deliberateRedRef": "https://github.com/JovieInc/Jovie/actions/runs/125#deliberate-red"
+    "deliberateRedRef": "https://github.com/JovieInc/Jovie/actions/runs/125#deliberate-red",
+    "verification": {
+      "status": "live-verified",
+      "evidenceRef": "https://github.com/JovieInc/Jovie/actions/runs/125#detector-live",
+      "verifiedAt": "2026-09-29T12:05:00Z"
+    }
   },
   "remediation": {
     "mode": "not-automatic"
@@ -72,18 +89,28 @@ SHAs, `TODO`, and narration are validated rather than trusted by implication.
 `missing-remediator`, `remediator-failed`, `false-green`,
 `founder-only-surface`, or `coverage-gap`.
 
+`learningCompiler.issue` must be `JOV-2967` or `JOV-7084` and `outputRef`
+must identify the compiled output. Detector source alone is not enough:
+`verification.status` must be `live-verified`, with evidence and timestamp.
+
 ## Non-applicability
 
 A detector may be non-applicable only when the receipt still explains the
 detection gap and replaces `gapClass`, `detectorRef`, `coveredClass`, and
-`deliberateRedRef` with all of:
+`deliberateRedRef` with all of the object below. The `learningCompiler` object
+remains required alongside it.
 
 ```json
 {
   "nonApplicability": {
     "justification": "A specific explanation of why no reusable machine detector applies.",
     "evidenceRef": "https://linear.app/jovie/issue/JOV-1234#evidence",
-    "approvedBy": "Summer"
+    "approvedBy": "Summer",
+    "independentVerification": {
+      "verifiedBy": "Gem",
+      "evidenceRef": "https://linear.app/jovie/issue/JOV-1234#independent-verification",
+      "verifiedAt": "2026-09-29T12:05:00Z"
+    }
   }
 }
 ```

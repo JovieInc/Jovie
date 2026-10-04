@@ -146,19 +146,19 @@ function laneCopy(lane: MerchDesignLane): {
   switch (lane) {
     case 'band_tour_uniform':
       return {
-        eyebrow: 'LIVE SIGNAL',
+        eyebrow: 'SIGNATURE UNIFORM',
         footer: 'JOVIE MERCH SERIES',
         density: 'maximal',
       };
     case 'fashion_graphic_item':
       return {
         eyebrow: 'LIMITED OBJECT',
-        footer: 'WEAR THE SOUND',
+        footer: 'WEAR THE WORLD',
         density: 'minimal',
       };
     case 'artist_world_artifact':
       return {
-        eyebrow: 'ARTIST WORLD',
+        eyebrow: 'CREATOR WORLD',
         footer: 'ARCHIVE PIECE',
         density: 'medium',
       };

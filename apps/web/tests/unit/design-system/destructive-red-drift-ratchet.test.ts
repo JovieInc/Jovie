@@ -31,14 +31,48 @@ import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet'
  * site, not a mechanical rename — this ratchet only stops the raw-red count
  * from growing until that review happens.
  *
- * Pattern mirrors linear-namespace-ratchet.test.ts (baseline JSON + source
- * scan; shrink-only, merge-group-safe count policy).
+ * Floors are per source file (JOV-7708): `destructive-red-drift.baseline/`
+ * holds one JSON entry per apps/web file that still carries debt, named
+ * `<path with / as __>.json` and discovered by directory listing. Concurrent
+ * PRs that burn down different files edit different entries, so they no longer
+ * collide on one shared count. A file without an entry has a floor of zero;
+ * delete an entry once both of its counts reach zero. Shrink-only and
+ * merge-group-safe per file (evaluateShrinkOnlyCount).
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // tests/unit/design-system → apps/web
 const WEB_ROOT = join(__dirname, '..', '..', '..');
-const BASELINE_PATH = join(__dirname, 'destructive-red-drift.baseline.json');
+const BASELINE_DIR = join(__dirname, 'destructive-red-drift.baseline');
+const BASELINE_DIR_NAME = 'destructive-red-drift.baseline';
+
+type FloorMetric = 'destructiveUtilityCount' | 'rawRedUtilityCount';
+
+interface BaselineEntry {
+  readonly file: string;
+  readonly destructiveUtilityCount: number;
+  readonly rawRedUtilityCount: number;
+}
+
+/** Entry filename for an apps/web-relative source path. */
+export function baselineEntryName(file: string): string {
+  return `${file.replaceAll('/', '__')}.json`;
+}
+
+function readBaseline(): Map<
+  string,
+  BaselineEntry & { readonly name: string }
+> {
+  const entries = new Map<string, BaselineEntry & { readonly name: string }>();
+  for (const name of readdirSync(BASELINE_DIR).sort()) {
+    if (!name.endsWith('.json')) continue;
+    const entry = JSON.parse(
+      readFileSync(join(BASELINE_DIR, name), 'utf8')
+    ) as BaselineEntry;
+    entries.set(entry.file, { ...entry, name });
+  }
+  return entries;
+}
 
 const DESTRUCTIVE_UTILITY = /\b(?:text|bg|border|ring)-destructive\b/g;
 const RAW_RED_UTILITY = /\b(?:text|bg|border|ring)-red-\d+\b/g;
@@ -108,78 +142,97 @@ function topFiles(perFile: Map<string, number>): string {
     .join('\n');
 }
 
-describe('destructive/red drift ratchet (shrink-only, JOV-6773)', () => {
-  it('does not add new {text,bg,border,ring}-destructive usage beyond the baseline', {
-    timeout: 60_000,
-  }, () => {
-    const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
-      destructiveUtilityCount: number;
-    };
-    const { count, perFile } = countDestructiveUtilityUsage();
+function perFileFailures(
+  metric: FloorMetric,
+  label: string,
+  perFile: Map<string, number>
+): string[] {
+  const baseline = readBaseline();
+  const files = new Set([...perFile.keys(), ...baseline.keys()]);
+  const failures: string[] = [];
+  for (const file of [...files].sort()) {
+    const count = perFile.get(file) ?? 0;
+    const entry = baseline.get(file);
     const verdict = evaluateShrinkOnlyCount({
       count,
-      baseline: baseline.destructiveUtilityCount,
-      metric: '{text,bg,border,ring}-destructive usage',
+      baseline: entry?.[metric] ?? 0,
+      metric: `${label} in ${file}`,
     });
+    if (verdict.ok) continue;
+    const target = `${BASELINE_DIR_NAME}/${entry?.name ?? baselineEntryName(file)}`;
+    failures.push(
+      verdict.status === 'regression'
+        ? `${verdict.message}`
+        : `${verdict.message} Set "${metric}" to ${count} in ${target} ` +
+            '(delete the entry once both counts are 0).'
+    );
+  }
+  return failures;
+}
 
-    if (!verdict.ok && verdict.status === 'regression') {
-      expect.fail(
-        `destructive-utility usage grew: ${count} > baseline ${baseline.destructiveUtilityCount}. ` +
-          `destructive is a value-preserving alias of -error (tailwind.config.js maps both to ` +
-          `--color-error) — use the -error utility instead of adding new -destructive debt.\nTop files:\n${topFiles(perFile)}`
-      );
+describe('destructive/red drift ratchet (shrink-only, JOV-6773)', () => {
+  it('names every baseline entry for its file and records real debt', () => {
+    const baseline = readBaseline();
+    expect(baseline.size).toBeGreaterThan(0);
+    for (const [file, entry] of baseline) {
+      expect(entry.name).toBe(baselineEntryName(file));
+      for (const metric of [
+        'destructiveUtilityCount',
+        'rawRedUtilityCount',
+      ] as const) {
+        expect(Number.isInteger(entry[metric]) && entry[metric] >= 0).toBe(
+          true
+        );
+      }
+      expect(
+        entry.destructiveUtilityCount + entry.rawRedUtilityCount
+      ).toBeGreaterThan(0);
     }
-    if (!verdict.ok) {
-      expect.fail(
-        `${verdict.message} Lower "destructiveUtilityCount" in destructive-red-drift.baseline.json ` +
-          `to ${count} in this PR.`
-      );
-    }
-    expect(verdict.ok).toBe(true);
-    expect(count).toBeLessThanOrEqual(baseline.destructiveUtilityCount);
   });
 
-  it('does not add new raw {text,bg,border,ring}-red-* usage beyond the baseline', {
+  it('does not add new {text,bg,border,ring}-destructive usage beyond any file floor', {
     timeout: 60_000,
   }, () => {
-    const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
-      rawRedUtilityCount: number;
-    };
-    const { count, perFile } = countRawRedUtilityUsage();
-    const verdict = evaluateShrinkOnlyCount({
-      count,
-      baseline: baseline.rawRedUtilityCount,
-      metric: '{text,bg,border,ring}-red-* usage',
-    });
+    const { perFile } = countDestructiveUtilityUsage();
+    const failures = perFileFailures(
+      'destructiveUtilityCount',
+      '{text,bg,border,ring}-destructive usage',
+      perFile
+    );
+    if (failures.length > 0) {
+      expect.fail(
+        `${failures.join('\n')}\ndestructive is a value-preserving alias of -error (tailwind.config.js ` +
+          `maps both to --color-error): use the -error utility instead of adding new -destructive debt.` +
+          `\nTop files:\n${topFiles(perFile)}`
+      );
+    }
+  });
 
-    if (!verdict.ok && verdict.status === 'regression') {
+  it('does not add new raw {text,bg,border,ring}-red-* usage beyond any file floor', {
+    timeout: 60_000,
+  }, () => {
+    const { perFile } = countRawRedUtilityUsage();
+    const failures = perFileFailures(
+      'rawRedUtilityCount',
+      '{text,bg,border,ring}-red-* usage',
+      perFile
+    );
+    if (failures.length > 0) {
       expect.fail(
-        `raw red-* usage grew: ${count} > baseline ${baseline.rawRedUtilityCount}. ` +
-          `Tailwind's default red-* palette is NOT --color-error (#ef4444 vs #f72a36) — use the ` +
-          `-error utility for danger/error states, or a brand token for decorative red, instead of ` +
-          `adding a new raw red-* call site.\nTop files:\n${topFiles(perFile)}`
+        `${failures.join('\n')}\nTailwind's default red-* palette is NOT --color-error (#ef4444 vs ` +
+          `#f72a36): use the -error utility for danger/error states, or a brand token for decorative ` +
+          `red, instead of adding a new raw red-* call site.\nTop files:\n${topFiles(perFile)}`
       );
     }
-    if (!verdict.ok) {
-      expect.fail(
-        `${verdict.message} Lower "rawRedUtilityCount" in destructive-red-drift.baseline.json ` +
-          `to ${count} in this PR.`
-      );
-    }
-    expect(verdict.ok).toBe(true);
-    expect(count).toBeLessThanOrEqual(baseline.rawRedUtilityCount);
   });
 
   it('keeps dead {text,bg,border,ring}-danger/-danger-token usage at zero', {
     timeout: 60_000,
   }, () => {
-    const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
-      deadDangerUtilityCount: number;
-    };
     const { count, perFile } = countDeadDangerUtilityUsage();
     const verdict = evaluateShrinkOnlyCount({
       count,
-      baseline: baseline.deadDangerUtilityCount,
+      baseline: 0,
       metric: '{text,bg,border,ring}-danger/-danger-token usage',
     });
 

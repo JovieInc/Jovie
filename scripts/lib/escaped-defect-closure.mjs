@@ -11,6 +11,7 @@
 export const ESCAPED_DEFECT_CLOSURE_SCHEMA = 'jovie.escaped-defect-closure/v1';
 export const ESCAPED_DEFECT_LABEL = 'escaped-defect';
 export const MAX_AUTOMATIC_REMEDIATION_ATTEMPTS = 3;
+export const LEARNING_COMPILER_ISSUES = Object.freeze(['JOV-2967', 'JOV-7084']);
 
 export const DETECTION_GAP_CLASSES = Object.freeze([
   'missing-signal',
@@ -200,6 +201,17 @@ export function validateEscapedDefectClosureEvidence(
       'detection.gapAnalysis must explain why certification or dogfood missed the defect'
     );
   }
+  const learningCompiler = isRecord(detection.learningCompiler)
+    ? detection.learningCompiler
+    : {};
+  if (!LEARNING_COMPILER_ISSUES.includes(learningCompiler.issue)) {
+    errors.push(
+      `detection.learningCompiler.issue must be one of ${LEARNING_COMPILER_ISSUES.join(', ')}`
+    );
+  }
+  if (!hasEvidenceRef(learningCompiler.outputRef)) {
+    errors.push('detection.learningCompiler.outputRef is required');
+  }
   const nonApplicability = isRecord(detection.nonApplicability)
     ? detection.nonApplicability
     : null;
@@ -214,6 +226,34 @@ export function validateEscapedDefectClosureEvidence(
     }
     if (!hasText(nonApplicability.approvedBy, 2)) {
       errors.push('detection.nonApplicability.approvedBy is required');
+    }
+    const independentVerification = isRecord(
+      nonApplicability.independentVerification
+    )
+      ? nonApplicability.independentVerification
+      : {};
+    if (!hasText(independentVerification.verifiedBy, 2)) {
+      errors.push(
+        'detection.nonApplicability.independentVerification.verifiedBy is required'
+      );
+    } else if (
+      hasText(nonApplicability.approvedBy, 2) &&
+      independentVerification.verifiedBy.trim().toLowerCase() ===
+        nonApplicability.approvedBy.trim().toLowerCase()
+    ) {
+      errors.push(
+        'detection.nonApplicability independent verifier must differ from approvedBy'
+      );
+    }
+    if (!hasEvidenceRef(independentVerification.evidenceRef)) {
+      errors.push(
+        'detection.nonApplicability.independentVerification.evidenceRef is required'
+      );
+    }
+    if (!validTimestamp(independentVerification.verifiedAt)) {
+      errors.push(
+        'detection.nonApplicability.independentVerification.verifiedAt must be a non-future ISO timestamp'
+      );
     }
   } else {
     if (!DETECTION_GAP_CLASSES.includes(detection.gapClass)) {
@@ -231,7 +271,21 @@ export function validateEscapedDefectClosureEvidence(
     }
     if (!hasEvidenceRef(detection.deliberateRedRef)) {
       errors.push(
-        'detection.deliberateRedRef must prove the original failure is rejected'
+        'detection.deliberateRedRef must replay the historical failure and prove it is rejected'
+      );
+    }
+    const verification = isRecord(detection.verification)
+      ? detection.verification
+      : {};
+    if (verification.status !== 'live-verified') {
+      errors.push('detection.verification.status must be live-verified');
+    }
+    if (!hasEvidenceRef(verification.evidenceRef)) {
+      errors.push('detection.verification.evidenceRef is required');
+    }
+    if (!validTimestamp(verification.verifiedAt)) {
+      errors.push(
+        'detection.verification.verifiedAt must be a non-future ISO timestamp'
       );
     }
   }

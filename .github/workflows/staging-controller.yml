@@ -23,9 +23,9 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/product-lane-release"
           receipt_name="product-lane-release-${EXPECTED_SHA}-${SOURCE_CI_RUN_ATTEMPT}"
-          artifact_id="$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_CI_RUN_ID/artifacts?per_page=100" \
-            --jq --arg name "$receipt_name" \
-            '[.artifacts[] | select(.expired == false and .name == $name)] | sort_by(.id) | last | .id // empty')"
+          artifact_id="$(gh api \
+            "repos/$REPOSITORY/actions/artifacts?name=$receipt_name&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.id) | last | .id // empty')"
           if [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]; then
             gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
               > "$RUNNER_TEMP/product-lane-release/receipt.zip"

@@ -626,6 +626,148 @@ describe('production marker attempt state', () => {
     }
   });
 
+  describe('post-verification publication failure (JOV-7724)', () => {
+    // Exact attempt-1 job shape of Production Controller run 37144574062:
+    // head c75c559 descends from the deployed generation, Production
+    // Verified passed, and only the customer changelog publication failed.
+    const run37144574062: Array<[string, string]> = [
+      ['Bind completed staging to source CI', 'success'],
+      ['Coalesce release wave', 'success'],
+      ['Authorize fleet deployment state', 'success'],
+      ['Authorize exact main CI evidence', 'success'],
+      ['Production Release / Check current main before release', 'success'],
+      [
+        'Production Release / Recheck main before production mutation',
+        'success',
+      ],
+      ['Production Release / deploy-staging', 'skipped'],
+      ['Production Release / Canary Health Gate (staging)', 'skipped'],
+      ['Production Release / Recheck main before staging alias', 'skipped'],
+      ['Production Release / Attest staging build provenance', 'skipped'],
+      [
+        'Production Release / Alias verified preview to staging.jov.ie',
+        'skipped',
+      ],
+      [
+        'Production Release / Preserve exact staging deployment receipt',
+        'skipped',
+      ],
+      ['Production Release / Migrate production database', 'success'],
+      ['Production Release / Promote to Production', 'success'],
+      ['Production Release / Production OAuth Gate (observational)', 'success'],
+      [
+        'Production Release / Production public-profile alias usable-result gate',
+        'success',
+      ],
+      ['Production Release / Sentry Error Gate (production)', 'success'],
+      [
+        'Production Release / File Vercel production deploy remediation',
+        'success',
+      ],
+      ['Production Release / Centralized production rollback', 'skipped'],
+      ['Production Release / Production release result', 'success'],
+      ['Lighthouse CI (Production)', 'success'],
+      ['Post-Deploy Smoke (Production)', 'success'],
+      ['Post-Deploy Auth Smoke (Production)', 'success'],
+      ['File post-deploy smoke remediation', 'success'],
+      ['File post-deploy auth remediation', 'success'],
+      ['Production Verified', 'success'],
+      ['Publish verified customer changelog', 'failure'],
+    ];
+    const head = 'c'.repeat(40);
+
+    function replayMarker(
+      jobs: Array<[string, string]> = run37144574062,
+      runHead = head
+    ) {
+      const marker = primaryMarker('completed', 'failure');
+      marker.attemptRun.head_sha = runHead;
+      marker.attemptJobs = jobs.map(([name, conclusion], index) => ({
+        ...job(name, 1, 'completed', conclusion),
+        id: 5000 + index,
+        head_sha: runHead,
+      }));
+      return marker;
+    }
+
+    it('keeps run 37144574062 verified when only publication failed', () => {
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [replayMarker()],
+            latestRun: run(1, 'completed', 'failure'),
+            descendantHeads: [head],
+          })
+        )
+      ).toMatchObject({
+        state: 'verified',
+        reason: 'exact_attempt_verified',
+        controllerAttempt: 1,
+        deploymentId: 'dpl_primary123',
+      });
+    });
+
+    it('stays verified when the publication remediation filer also failed', () => {
+      const jobs: Array<[string, string]> = [
+        ...run37144574062,
+        ['File customer changelog remediation', 'failure'],
+      ];
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({ markers: [replayMarker(jobs, sha)] })
+        )
+      ).toMatchObject({ state: 'verified' });
+    });
+
+    it('still treats any other failure as an interrupted generation', () => {
+      const withFailure = (name: string, conclusion = 'failure') =>
+        run37144574062.map(([jobName, result]): [string, string] => [
+          jobName,
+          jobName === name ? conclusion : result,
+        ]);
+      for (const jobs of [
+        withFailure('Post-Deploy Smoke (Production)'),
+        withFailure('Production Verified'),
+        withFailure(
+          'Production Release / Production release result',
+          'cancelled'
+        ),
+      ]) {
+        expect(
+          classifyProductionMarkerEvidence(
+            evidence({ markers: [replayMarker(jobs, sha)] })
+          )
+        ).toMatchObject({
+          state: 'recovery_available',
+          reason: 'one_interrupted_marker_safe_to_rerun',
+        });
+      }
+    });
+
+    it('never tolerates publication failure after an executed rollback', () => {
+      const jobs = run37144574062.map(([name, result]): [string, string] => [
+        name,
+        name.endsWith('Centralized production rollback') ? 'success' : result,
+      ]);
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({ markers: [replayMarker(jobs, sha)] })
+        )
+      ).not.toMatchObject({ state: 'verified' });
+    });
+
+    it('does not bind the descendant head without ancestry proof', () => {
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({ markers: [replayMarker()] })
+        )
+      ).toMatchObject({
+        state: 'manual',
+        reason: 'contradictory_marker_attempt',
+      });
+    });
+  });
+
   it('rejects marker payload, artifact, run, and attempt mismatches', () => {
     const marker = primaryMarker('completed', 'cancelled');
     marker.payload.controllerRun = String(controllerRun + 1);

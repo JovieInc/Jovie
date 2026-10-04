@@ -25,7 +25,6 @@
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
-    "/artist-profile": ["agentic:structured-data"],
     "/artist-profiles": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/blog": ["agentic:structured-data", "geo:geo-jsonld-type"],
     "/blog/authors/tim": [
@@ -81,7 +80,6 @@
     "/engineering": [
       "agentic:structured-data",
       "geo:geo-jsonld-type",
-      "geo:geo-orphan",
       "geo:geo-sibling-links"
     ],
     "/engineering/preview": ["agentic:structured-data"],

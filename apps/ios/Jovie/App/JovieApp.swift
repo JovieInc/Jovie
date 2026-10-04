@@ -243,6 +243,7 @@ enum LiveLaunchConfigurationResolver {
 struct JovieApp: App {
   @UIApplicationDelegateAdaptor(JovieAppDelegate.self) private var appDelegate
   @State private var appState: AppState
+  @StateObject private var authCoordinator: MobileAuthCoordinator
   private let isLiveAuthAvailable: Bool
   private let launchAuthErrorMessage: String?
 
@@ -276,15 +277,15 @@ struct JovieApp: App {
     let pushNotifications = PushNotificationManager.shared
     pushNotifications.configure(apiClient: apiClient)
 
-    _appState = State(
-      initialValue: AppState(
+    let state = AppState(
         configuration: configuration,
         launchMode: launchMode,
         repository: repository,
         brightnessManager: ScreenBrightnessManager(),
         pushNotifications: pushNotifications
       )
-    )
+    _appState = State(initialValue: state)
+    _authCoordinator = StateObject(wrappedValue: MobileAuthCoordinator(appState: state))
   }
 
   var body: some Scene {
@@ -292,9 +293,9 @@ struct JovieApp: App {
       Group {
 #if DEBUG
         if appState.launchMode == .uiTestingAuthCallback {
-          UITestingAuthCallbackRoot(appState: appState)
+          UITestingAuthCallbackRoot(appState: appState, authCoordinator: authCoordinator)
         } else if appState.launchMode.usesLiveAuth, isLiveAuthAvailable {
-          LiveRootContainer(appState: appState)
+          LiveRootContainer(appState: appState, authCoordinator: authCoordinator)
         } else {
           RootView(
             appState: appState,
@@ -302,14 +303,13 @@ struct JovieApp: App {
             isSignInUnavailable: launchAuthErrorMessage != nil,
             authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
-            onLogout: { _ = await appState.signOut() },
-            onAuthReturn: { _ in },
-            onAuthError: { _ in }
+            authCoordinator: authCoordinator,
+            onLogout: { authCoordinator.cancelCurrentAuth(); _ = await appState.signOut() }
           )
         }
 #else
         if appState.launchMode.usesLiveAuth, isLiveAuthAvailable {
-          LiveRootContainer(appState: appState)
+          LiveRootContainer(appState: appState, authCoordinator: authCoordinator)
         } else {
           RootView(
             appState: appState,
@@ -317,9 +317,8 @@ struct JovieApp: App {
             isSignInUnavailable: launchAuthErrorMessage != nil,
             authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
-            onLogout: { _ = await appState.signOut() },
-            onAuthReturn: { _ in },
-            onAuthError: { _ in }
+            authCoordinator: authCoordinator,
+            onLogout: { authCoordinator.cancelCurrentAuth(); _ = await appState.signOut() }
           )
         }
 #endif

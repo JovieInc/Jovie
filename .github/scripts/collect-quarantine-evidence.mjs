@@ -136,7 +136,22 @@ export function buildQuarantineEvidence(
     blockedFiles: [...blockedFiles].sort(),
   };
 }
+class CollectionChangedError extends Error {}
+
 export function collectPaged(endpoint, key, api) {
+  // A completed-run listing can move while CI finishes. Discard the entire
+  // inconsistent snapshot and restart; never combine pages across attempts.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return collectPageSnapshot(endpoint, key, api);
+    } catch (error) {
+      if (!(error instanceof CollectionChangedError) || attempt === 2)
+        throw error;
+    }
+  }
+}
+
+function collectPageSnapshot(endpoint, key, api) {
   const all = [];
   let expected = null;
   for (let page = 1; page <= 10; page++) {
@@ -151,10 +166,9 @@ export function collectPaged(endpoint, key, api) {
       'Incomplete API collection'
     );
     if (expected === null) expected = value.total_count;
-    check(
-      expected === value.total_count && value[key].length <= 100,
-      'Collection changed during pagination'
-    );
+    check(value[key].length <= 100, 'Oversized API page');
+    if (expected !== value.total_count)
+      throw new CollectionChangedError('Collection changed during pagination');
     all.push(...value[key]);
     if (all.length === expected) {
       check(

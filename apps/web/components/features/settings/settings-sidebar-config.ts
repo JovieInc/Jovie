@@ -1,28 +1,25 @@
+import type { ComponentType, SVGProps } from 'react';
 import {
-  Banknote,
-  Cable,
-  Contact,
-  Gauge,
-  Lock,
-  type LucideIcon,
-  Palette,
-  ShieldCheck,
-  Trash2,
-  UserRound,
-} from 'lucide-react';
-import { APP_ROUTES } from '@/constants/routes';
+  artistSettingsNavigation,
+  userSettingsNavigation,
+} from '@/components/features/dashboard/dashboard-nav/config';
+import type { NavItem } from '@/components/features/dashboard/dashboard-nav/types';
 
-// Settings IA — approved 2026-07-03 via Design Shootout (`settings-ia`).
-// Groups the settings sub-pages under 4 top-level groups. This config is
-// the single source of truth for the settings sidebar; the nav snapshot test
-// in settings-sidebar-config.test.ts locks the structure so changes require
-// a deliberate review (see #12645 IA guardrails).
+/**
+ * Settings IA projection.
+ *
+ * `userSettingsNavigation` and `artistSettingsNavigation` in
+ * `dashboard-nav/config.ts` are the only settings list DashboardNav renders.
+ * This module must not declare a second set of hrefs. Appearance, Referral,
+ * Retargeting, and Delete Account stayed in an unused snapshot and are not
+ * part of the live rail.
+ */
 
 export interface SettingsSidebarItem {
   readonly id: string;
   readonly label: string;
   readonly href: string;
-  readonly icon: LucideIcon;
+  readonly icon: ComponentType<SVGProps<SVGSVGElement>>;
   /** Only rendered when the current user is an admin. */
   readonly adminOnly?: boolean;
   /** Optional native tooltip for rows whose purpose is not obvious. */
@@ -35,98 +32,29 @@ export interface SettingsSidebarGroup {
   readonly items: readonly SettingsSidebarItem[];
 }
 
+function toSidebarItem(item: NavItem): SettingsSidebarItem {
+  return {
+    id: item.id,
+    label: item.name,
+    href: item.href,
+    icon: item.icon,
+    ...(item.description ? { title: item.description } : {}),
+  };
+}
+
 export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
-  {
-    id: 'profile',
-    label: 'Profile',
-    items: [
-      {
-        id: 'artist-profile',
-        label: 'Artist Profile',
-        href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
-        icon: UserRound,
-      },
-      {
-        id: 'contacts',
-        label: 'Contacts',
-        href: APP_ROUTES.SETTINGS_CONTACTS,
-        icon: Contact,
-      },
-      {
-        id: 'appearance',
-        label: 'Appearance',
-        href: APP_ROUTES.SETTINGS_APPEARANCE,
-        icon: Palette,
-      },
-    ],
-  },
   {
     id: 'account',
     label: 'Account',
-    items: [
-      {
-        id: 'account',
-        label: 'Account',
-        href: APP_ROUTES.SETTINGS_ACCOUNT,
-        icon: ShieldCheck,
-      },
-      {
-        id: 'data-privacy',
-        label: 'Data & Privacy',
-        href: APP_ROUTES.SETTINGS_DATA_PRIVACY,
-        icon: Lock,
-      },
-      {
-        id: 'delete-account',
-        label: 'Delete Account',
-        href: APP_ROUTES.SETTINGS_DELETE_ACCOUNT,
-        icon: Trash2,
-      },
-    ],
+    items: userSettingsNavigation.map(toSidebarItem),
   },
   {
-    id: 'workspace',
-    label: 'Workspace',
-    items: [
-      {
-        id: 'connections',
-        label: 'Connections',
-        href: APP_ROUTES.SETTINGS_CONNECTORS,
-        icon: Cable,
-      },
-    ],
-  },
-  {
-    id: 'billing',
-    label: 'Billing',
-    items: [
-      {
-        id: 'billing',
-        label: 'Billing',
-        href: APP_ROUTES.SETTINGS_BILLING,
-        icon: Banknote,
-      },
-      {
-        id: 'usage',
-        label: 'Usage',
-        href: APP_ROUTES.SETTINGS_USAGE,
-        icon: Gauge,
-      },
-    ],
+    id: 'profile',
+    label: 'Profile',
+    items: artistSettingsNavigation.map(toSidebarItem),
   },
 ];
 
-/**
- * Filter the settings groups for the sidebar's search input.
- *
- * Customer settings carry no admin rows: operator controls live in Ovie
- * (JOV-6771), so admins and creators see the same settings IA.
- *
- * - Admin-only items are dropped unless `isAdmin` is true.
- * - A query matches an item when it appears in the item label or the group
- *   label (case-insensitive substring).
- * - Groups with no visible items are dropped entirely.
- */
 export interface FilterSettingsGroupsOptions {
   readonly isAdmin?: boolean;
 }

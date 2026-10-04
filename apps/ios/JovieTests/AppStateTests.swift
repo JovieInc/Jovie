@@ -1,6 +1,7 @@
 import AuthenticationServices
 import Foundation
 import JovieKit
+import Security
 import Testing
 import UserNotifications
 @testable import Jovie
@@ -2491,6 +2492,7 @@ actor ProfileLoadGate {
 
 private actor ControlledProfileRepository: AppStateRepository {
   private let firstCacheGate: ProfileLoadGate?
+  private let firstCacheSnapshot: MobileMeResponse?
   private let loadGates: [ProfileLoadGate]
   private let firstResult: Result<MeRepositoryResult, Error>
   private let validatesOwner: Bool
@@ -2500,6 +2502,7 @@ private actor ControlledProfileRepository: AppStateRepository {
 
   init(
     firstCacheGate: ProfileLoadGate? = nil,
+    firstCacheSnapshot: MobileMeResponse? = .previewNeedsOnboarding,
     loadGates: [ProfileLoadGate],
     firstResult: Result<MeRepositoryResult, Error> = .success(
       MeRepositoryResult(response: .previewReady, isStale: false)
@@ -2508,6 +2511,7 @@ private actor ControlledProfileRepository: AppStateRepository {
   ) {
     self.validatesOwner = validatesOwner
     self.firstCacheGate = firstCacheGate
+    self.firstCacheSnapshot = firstCacheSnapshot
     self.loadGates = loadGates
     self.firstResult = firstResult
   }
@@ -2516,7 +2520,7 @@ private actor ControlledProfileRepository: AppStateRepository {
     cacheCalls += 1
     guard cacheCalls == 1, let firstCacheGate else { return nil }
     _ = await firstCacheGate.wait()
-    return .previewNeedsOnboarding
+    return firstCacheSnapshot
   }
 
   func loadMe(for userID: String) async throws -> MeRepositoryResult {
@@ -3544,11 +3548,83 @@ extension AppStateTests {
   }
 }
 
-
 extension AppStateTests {
-  @Test(arguments: [false, true])
-  func exactExpiryCleanupSurvivesCallerCancellationAndReplay(profileOrigin: Bool) async throws {
+  @Test(arguments: ["cache", "cache-miss", "ready", "onboarding", "waitlist", "transport"])
+  func acceptedAuthFencesOldProfileBeforeInstallingCredentials(phase: String) async throws {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession(), oldGate = ProfileLoadGate(), recoveryGate = ProfileLoadGate()
+      let profile: MobileMeResponse = phase == "onboarding" ? .previewNeedsOnboarding
+        : phase == "waitlist" ? .previewWaitlistPending : .previewReady
+      let response: Result<MeRepositoryResult, Error> = phase == "transport"
+        ? .failure(APIClientError.transportFailed(code: -1009))
+        : .success(MeRepositoryResult(response: profile, isStale: false))
+      let cacheHeld = phase.hasPrefix("cache")
+      let repository = ControlledProfileRepository(firstCacheGate: cacheHeld ? oldGate : nil,
+        firstCacheSnapshot: phase == "cache-miss" ? nil : .previewNeedsOnboarding,
+        loadGates: cacheHeld ? [recoveryGate] : [oldGate, recoveryGate], firstResult: response)
+      let state = makeState(repository)
+      let caller = Task { await state.handleSignedInUserChange("same-user"); await oldGate.ownerFinished() }
+      #expect(await oldGate.waitUntilEntered())
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      await state.handleSignedInUserChange(nil); await state.handleSignedInUserChange("same-user")
+      await oldGate.complete(true); await caller.value
+      #expect(state.route == .launching && !state.isOffline)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      #expect(await repository.loadCount() == (cacheHeld ? 0 : 1))
+      let resolution = try #require(NativeSessionTokenStore.cancelAuthAttempt(attempt))
+      let recovery = state.reconcileAuth(resolution)
+      let observer = Task { await recovery?.value; await recoveryGate.ownerFinished() }
+      let entered = await recoveryGate.waitUntilEntered()
+      #expect(entered, "Pre-I/O cancellation resumes verified A through the canonical profile path")
+      await recoveryGate.complete(true); await observer.value
+      #expect(state.dashboardState == .loaded(.previewReady))
+      #expect(!NativeSessionTokenStore.hasPendingAuth)
+    }
+  }
+
+  @Test(arguments: [false, true], ["preserved", "unreadable", "fenced", "expired"])
+  func persistenceFailureRestoresOnlyPreviouslyAcceptedPresentation(accepted: Bool, fault: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let script = NativeAuthSecurityScript()
+      let previous = NativeSessionTokenStore.replaceSecurityOperationsForTesting(script.operations)
+      defer { _ = NativeSessionTokenStore.replaceSecurityOperationsForTesting(previous) }
+      let authorization = try saveSession(), gate = ProfileLoadGate()
+      let repository = ControlledProfileRepository(loadGates: [gate])
+      let state = makeState(repository)
+      if accepted { await gate.complete(true); await state.handleSignedInUserChange("same-user") }
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      if fault == "preserved" || fault == "expired" { script.configure(deleteStatus: errSecAuthFailed, addStatus: errSecAuthFailed) }
+      else if fault == "unreadable" { script.configure(reads: [(errSecSuccess, nil)]) }
+      else { script.configure(reads: [(errSecSuccess, script.data), (errSecSuccess, Data("mixed".utf8))]) }
+      let result = try #require(NativeSessionTokenStore.commit(attempt, session: NativeStoredSession(
+        userID: "same-user", token: "new-token", expiresAt: Date().addingTimeInterval(3_600))))
+      if fault == "expired" {
+        script.configure()
+        _ = try ownedProfileExpiryReceipt(authorization)
+      }
+      var publications = 0
+      let work = state.reconcileAuth(result) { publications += 1 }
+      await work?.value
+      let replay = state.reconcileAuth(result) { publications += 1 }
+      await replay?.value
+      let restored = accepted && fault != "fenced" && fault != "expired"
+      #expect(state.route == (restored ? .ready : .signedOut))
+      #expect(state.dashboardState == (restored ? .loaded(.previewReady) : .idle))
+      #expect(state.activeSessionOwnership == (restored ? authorization.ownership : nil))
+      #expect(await repository.loadCount() == (accepted ? 1 : 0), "Write failure cannot promote a bare old token")
+      #expect(publications == 1)
+      #expect(await repository.clearedUsers() == (fault == "expired" ? ["same-user"] : []))
+    }
+  }
+
+  @Test(arguments: [false, true], ["none", "before-cancel", "held-cancel", "held-consumed", "held-failure"])
+  func pendingAuthRetainsExactExpiryCleanupAcrossCallerCancellationAndReplay(
+    profileOrigin: Bool, resolution: String
+  ) async throws {
+    try await withNativeAuthSecurityScript { @MainActor script in
+      let acceptWhileHeld = resolution.hasPrefix("held")
       let authorization = try saveSession(), apiGate = ProfileLoadGate(), cleanupGate = ProfileLoadGate()
       let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), log = ProfileTaskCancellationLog()
       defer { caches.cleanup(); push.cleanup() }
@@ -3571,6 +3647,11 @@ extension AppStateTests {
       let receipt: NativeSessionExpiryReceipt
       do { receipt = try ownedProfileExpiryReceipt(authorization) }
       catch { await apiGate.complete(true); await cleanupGate.complete(true); await profile.value; throw error }
+      var attempt: NativeAuthAttempt?
+      if resolution == "before-cancel" {
+        attempt = NativeSessionTokenStore.beginAuthAttempt()
+        if let attempt { state.acceptAuthAttempt(attempt) }
+      }
       let caller: Task<Void, Never>
       if profileOrigin {
         await caches.api.updateMode(.failure(NativeSessionRequestError.expired(receipt)))
@@ -3579,11 +3660,44 @@ extension AppStateTests {
       let entered = await cleanupGate.waitUntilEntered()
       #expect(entered)
       caller.cancel()
+      if acceptWhileHeld {
+        await state.handleSignedInUserChange(caches.userID)
+        await state.handleSignedInUserChange(nil)
+        await state.handleSignedInUserChange(caches.userID)
+        #expect(state.activeUserID == nil && state.dashboardState == .idle)
+        attempt = NativeSessionTokenStore.beginAuthAttempt()
+        if let attempt { state.acceptAuthAttempt(attempt) }
+      }
       let duplicate = Task { await state.handleExpiredSession(receipt) }
-      await state.handleSignedInUserChange(caches.userID)
       await state.handleSignedInUserChange(nil); await state.handleSignedInUserChange(caches.userID)
-      #expect(state.route == .signedOut && state.activeUserID == nil && state.dashboardState == .idle)
-      await cleanupGate.complete(true); await caller.value; await duplicate.value
+      #expect(state.route == (attempt == nil ? .signedOut : .launching) && state.activeUserID == nil)
+      var recovery: Task<Void, Never>?
+      if let attempt {
+        if resolution.hasSuffix("cancel") {
+          recovery = NativeSessionTokenStore.cancelAuthAttempt(attempt).flatMap { state.reconcileAuth($0) }
+          #expect(state.route == .signedOut)
+        } else {
+          script.configure(addStatus: errSecDuplicateItem)
+          let adopted = ProfileLoadGate()
+          var signal: Task<Void, Never>?
+          recovery = Task {
+            await finalizeMobileAuthAttempt(attempt, exchange: {
+              if resolution.hasSuffix("failure") { throw APIClientError.invalidResponse }
+              return NativeAuthExchangeResponse(ticket: nil, sessionToken: "b", sessionId: nil,
+                userId: caches.userID, returnTo: "/app", expiresInSeconds: 3_600)
+            }, reconcile: { result, _ in
+              let work = state.reconcileAuth(result)
+              signal = Task { await adopted.complete(true) }
+              return work
+            }, failure: { _, _ in Issue.record("Existing receipt must not claim a second cleanup"); return nil },
+            settled: { _ in })
+            await adopted.complete(false)
+          }
+          #expect(await adopted.wait())
+          await signal?.value
+        }
+      }
+      await cleanupGate.complete(true); await caller.value; await duplicate.value; await recovery?.value
       #expect(await log.recorded() == [false, false], "Caller cancellation must not abandon retained cleanup")
       await state.handleExpiredSession(receipt)
       await state.handleSignedInUserChange(caches.userID)
@@ -3623,9 +3737,62 @@ private actor FirstHeldAuthCleanupRepository: AppStateRepository {
 }
 
 extension AppStateTests {
-  @Test(arguments: [false, true])
-  func replacementOfHeldTerminalKeepsItsCleanupUserAndNewProfile(installs: Bool) async throws {
-    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+  @Test(arguments: ["persisted", "preserved", "consumed", "unknown"], ["delete", "add", "copy2"])
+  func admittedWriteCancellationReconcilesThroughActualAppState(outcome: String, point: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor script in
+      _ = try saveSession()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), gate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      push.defaults.set("apns-a", forKey: PushLifecycleHarness.tokenKey)
+      await push.manager.activate()
+      let cancellations = ProfileTaskCancellationLog()
+      let cache = PausedMeCache(base: caches.me, gate: gate, phase: .write)
+      let repository = DelayedCleanupRepository(base: MeRepository(apiClient: caches.api, cache: cache),
+        gate: gate, cancellations: cancellations)
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = AppState(configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker, pushNotifications: push.manager,
+        chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      script.configure(deleteStatus: outcome == "preserved" ? errSecInteractionNotAllowed : errSecSuccess,
+        addStatus: ["preserved", "consumed"].contains(outcome) ? errSecDuplicateItem : errSecSuccess,
+        reads: outcome == "unknown" ? [(errSecSuccess, script.data), (errSecInteractionNotAllowed, nil)] : [],
+        cancelAt: point)
+      var persistedEvents = 0, errors = 0, deliveries = 0
+      let caller = Task {
+        await finalizeMobileAuthAttempt(attempt, exchange: {
+          NativeAuthExchangeResponse(ticket: nil, sessionToken: "new-token", sessionId: nil,
+            userId: caches.userID, returnTo: "/app", expiresInSeconds: 3_600)
+        }, reconcile: { result, error in
+          state.reconcileAuth(result) {
+            deliveries += 1
+            if result.outcome == .persisted { persistedEvents += 1 }
+            if error != nil { errors += 1 }
+          }
+        }, failure: { _, _ in Issue.record("Persistence used exchange-failure cleanup"); return nil }, settled: { _ in })
+        await gate.ownerFinished()
+      }
+      let entered = await gate.waitUntilEntered()
+      #expect(entered == ["persisted", "consumed"].contains(outcome))
+      await gate.complete(true); await caller.value
+      #expect(deliveries == 1 && persistedEvents == (outcome == "persisted" ? 1 : 0))
+      #expect(errors == (outcome == "persisted" ? 0 : 1))
+      #expect(state.route == (outcome == "persisted" ? .ready : .signedOut))
+      #expect(state.dashboardState == (outcome == "persisted" ? .loaded(.previewReady) : .idle))
+      #expect(await cancellations.recorded() == (outcome == "consumed" ? [false, false] : []))
+      await caches.expectContents(present: outcome != "consumed")
+      #expect(push.unregisterCount == (outcome == "consumed" ? 1 : 0))
+      #expect(await revoker.calls() == 0)
+      #expect(await push.service.requests().deletions.isEmpty)
+    }
+  }
+
+  @Test(arguments: ["consumed-failure", "consumed-logout", "consumed-persisted", "expiry-persisted", "expiry-logout"])
+  func replacementOfHeldTerminalKeepsItsCleanupUserAndNewProfile(kind: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor script in
       let original = try saveSession(), terminalGate = ProfileLoadGate(), profileGate = ProfileLoadGate()
       let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
       defer { caches.cleanup(); push.cleanup() }
@@ -3639,17 +3806,38 @@ extension AppStateTests {
       state.didInitializeAuth = true
       await state.handleSignedInUserChange(caches.userID)
       await push.manager.activate()
-      let receipt = try ownedProfileExpiryReceipt(original)
-      let old = Task { await state.handleExpiredSession(receipt); await terminalGate.ownerFinished() }
+      let old: Task<Void, Never>
+      if kind.hasPrefix("expiry") {
+        let receipt = try ownedProfileExpiryReceipt(original)
+        old = Task { await state.handleExpiredSession(receipt); await terminalGate.ownerFinished() }
+      } else {
+        let attempt = NativeSessionTokenStore.beginAuthAttempt()
+        state.acceptAuthAttempt(attempt)
+        script.configure(addStatus: errSecDuplicateItem)
+        let result = try #require(NativeSessionTokenStore.commit(attempt, session: NativeStoredSession(
+          userID: caches.userID, token: "not-saved", expiresAt: .distantFuture)))
+        #expect(result.outcome == .consumed)
+        let work = state.reconcileAuth(result)
+        old = Task { await work?.value; await terminalGate.ownerFinished() }
+      }
       #expect(await terminalGate.waitUntilEntered())
+      script.configure()
       let next: Task<Void, Never>
-      if installs {
-        _ = try saveSession()
+      if kind.hasSuffix("logout") { next = Task { _ = await state.signOut() } }
+      else {
+        let attempt = NativeSessionTokenStore.beginAuthAttempt()
+        state.acceptAuthAttempt(attempt)
         next = Task {
-          await state.handleSignedInUserChange(caches.userID)
+          await finalizeMobileAuthAttempt(attempt, exchange: {
+            if kind == "consumed-failure" { throw APIClientError.invalidResponse }
+            return NativeAuthExchangeResponse(ticket: nil, sessionToken: "same-token", sessionId: nil,
+              userId: caches.userID, returnTo: "/app", expiresInSeconds: 3_600)
+          }, reconcile: { result, _ in state.reconcileAuth(result) },
+          failure: { claim, _ in state.reconcileAuthFailure(claim) { _ in } }, settled: { _ in })
           await profileGate.ownerFinished()
         }
-      } else { next = Task { _ = await state.signOut() } }
+      }
+      let installs = kind.hasSuffix("persisted")
       if installs { #expect(await profileGate.waitUntilEntered()) }
       else { await next.value; await caches.expectContents(present: false) }
       let current = NativeSessionTokenStore.captureSessionContext()
@@ -3664,6 +3852,53 @@ extension AppStateTests {
       }
       #expect(NativeSessionTokenStore.captureSessionContext() == current)
       #expect(await revoker.calls() == (installs ? 0 : 1))
+    }
+  }
+
+  @Test(arguments: ["delete", "post"], [false, true])
+  func genuineFailureUsesOwnedPipelineAndCannotFinishOverAcceptedReplacement(pause: String, replace: Bool) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let original = try saveSession(), gate = ProfileLoadGate()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      push.defaults.set("apns-a", forKey: PushLifecycleHarness.tokenKey)
+      await push.manager.activate()
+      if pause == "delete" { await push.service.holdOwnedDelete(gate) }
+      let revoker = MockSessionRevoker(result: .failed(statusCode: 503), gate: pause == "post" ? gate : nil)
+      let state = cleanupState(caches, push: push, revoker: revoker)
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      var rootErrors = 0
+      let caller = Task {
+        await finalizeMobileAuthAttempt(attempt, exchange: { throw APIClientError.invalidResponse },
+          reconcile: { result, _ in state.reconcileAuth(result) }, failure: { claim, _ in
+            state.reconcileAuthFailure(claim) { completion in
+              NativeSessionTokenStore.performIfCurrent(completion) { rootErrors += 1 }
+            }
+          }, settled: { _ in Issue.record("Exchange failure published success") })
+        await gate.ownerFinished()
+      }
+      #expect(await gate.waitUntilEntered())
+      caller.cancel()
+      var replacement: NativeAuthAttempt?
+      if replace {
+        replacement = NativeSessionTokenStore.beginAuthAttempt()
+        if let replacement { state.acceptAuthAttempt(replacement) }
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      await gate.complete(false); await caller.value
+      #expect(rootErrors == (replace ? 0 : 1))
+      #expect(state.route == (replace ? .launching : .signedOut))
+      #expect(push.storedToken == (replace && pause == "delete" ? "apns-a" : nil))
+      #expect(push.unregisterCount == (replace && pause == "delete" ? 0 : 1))
+      #expect(await push.service.requests().deletions.first?.authorization == original)
+      #expect(await revoker.capturedAuthorizations() == (pause == "post" || !replace ? [original] : []))
+      await caches.expectContents(present: replace)
+      if let replacement {
+        #expect(NativeSessionTokenStore.performIfCurrent(replacement, {}))
+        #expect(NativeSessionTokenStore.captureSessionContext() == context)
+      } else { #expect(NativeSessionTokenStore.load() == nil) }
     }
   }
 }
@@ -3728,5 +3963,1062 @@ extension NativeSessionTokenStoreTestLockTests {
     #expect(await owner.value == outcome)
     await contender.value
     #expect(await contenderEntries.recorded() == [true])
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: ["current", "empty", "cancelled", "pending-replacement", "installed-replacement", "expired"])
+  func realPreconsumeRejectionPreservesOnlyItsCurrentAcceptedSession(scenario: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), exchangeGate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let original = scenario == "empty" ? nil : try saveSession()
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = cleanupState(caches, push: push, revoker: revoker)
+      if original != nil { await state.handleSignedInUserChange(caches.userID) }
+      else { await state.handleSignedInUserChange(nil) }
+      await push.manager.activate()
+      let unregisterBefore = push.unregisterCount
+      let session = NativeExchangeReplyProtocol.session(status: 401,
+        body: "{\"exchangePhase\":\"preconsume\",\"reason\":\"wrong_verifier\"}")
+      defer { session.invalidateAndCancel() }
+      let client = NativeAuthExchangeClient(baseURL: URL(string: "https://jov.ie")!, session: session)
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      var errors = 0, deliveries = 0, settled = 0
+      let caller = Task {
+        await finalizeMobileAuthAttempt(attempt, exchange: {
+          do { return try await client.exchange(MobileAuthReturn(code: "code", state: "state", codeVerifier: "verifier")) }
+          catch { _ = await exchangeGate.wait(); throw error }
+        }, reconcile: { result, error in
+          state.reconcileAuth(result) { deliveries += 1; if error != nil { errors += 1 } }
+        }, failure: { claim, _ in
+          Issue.record("Preconsume rejection attempted destructive failure cleanup")
+          return state.reconcileAuthFailure(claim) { _ in }
+        }, settled: { result in
+          NativeSessionTokenStore.performIfCurrent(result) { settled += 1 }
+        })
+        await exchangeGate.ownerFinished()
+      }
+      #expect(await exchangeGate.waitUntilEntered())
+      var replacement: NativeAuthAttempt?
+      if scenario.hasSuffix("replacement") {
+        let next = NativeSessionTokenStore.beginAuthAttempt()
+        replacement = next
+        state.acceptAuthAttempt(next)
+        if scenario == "installed-replacement" {
+          await caches.api.updateMode(.success(.previewNeedsOnboarding))
+          if let result = NativeSessionTokenStore.commit(next, session: NativeStoredSession(
+            userID: caches.userID, token: "b", expiresAt: .distantFuture)) {
+            await state.reconcileAuth(result)?.value
+          } else { Issue.record("Replacement did not install") }
+        }
+      } else if scenario == "expired", let original {
+        do { await state.handleExpiredSession(try ownedProfileExpiryReceipt(original)) }
+        catch {
+          await exchangeGate.complete(true)
+          await caller.value
+          throw error
+        }
+      } else if scenario == "cancelled" { caller.cancel() }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      await exchangeGate.complete(true); await caller.value
+      #expect(NativeExchangeReplyProtocol.requests.count == 1)
+      #expect(deliveries == (replacement == nil ? 1 : 0))
+      #expect(errors == (replacement == nil && scenario != "cancelled" ? 1 : 0))
+      #expect(settled == (replacement == nil && scenario != "cancelled" ? 1 : 0))
+      #expect(NativeSessionTokenStore.captureSessionContext() == context)
+      #expect(await revoker.calls() == 0)
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(push.unregisterCount == unregisterBefore + (scenario == "expired" ? 1 : 0))
+      await caches.expectContents(present: scenario != "expired",
+        profile: scenario == "installed-replacement" ? .previewNeedsOnboarding : .previewReady)
+      let route: AppRouter = scenario == "pending-replacement" ? .launching
+        : scenario == "installed-replacement" ? .needsOnboarding
+        : ["empty", "expired"].contains(scenario) ? .signedOut : .ready
+      #expect(state.route == route)
+      if scenario == "pending-replacement", let replacement {
+        #expect(NativeSessionTokenStore.performIfCurrent(replacement, {}))
+      } else { #expect(!NativeSessionTokenStore.hasPendingAuth) }
+    }
+  }
+
+  @Test func preconsumeRecoveryProfileOutlivesItsFinalizerCaller() async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let original = try saveSession(), cacheGate = ProfileLoadGate()
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      await caches.seed()
+      let repository = MeRepository(apiClient: caches.api,
+        cache: PausedMeCache(base: caches.me, gate: cacheGate, phase: .write))
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = AppState(configuration: .mock, launchMode: .live, repository: repository,
+        brightnessManager: MockBrightnessController(), sessionRevoker: revoker, pushNotifications: push.manager,
+        chatCache: caches.chat, audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+      state.didInitializeAuth = true
+      let session = NativeExchangeReplyProtocol.session(status: 401,
+        body: "{\"exchangePhase\":\"preconsume\",\"reason\":\"expired\"}")
+      defer { session.invalidateAndCancel() }
+      let client = NativeAuthExchangeClient(baseURL: URL(string: "https://jov.ie")!, session: session)
+      let attempt = NativeSessionTokenStore.beginAuthAttempt()
+      state.acceptAuthAttempt(attempt)
+      var deliveries = 0
+      let caller = Task {
+        await finalizeMobileAuthAttempt(attempt, exchange: {
+          try await client.exchange(MobileAuthReturn(code: "code", state: "state", codeVerifier: "verifier"))
+        }, reconcile: { result, _ in state.reconcileAuth(result) { deliveries += 1 } },
+          failure: { _, _ in Issue.record("Preconsume recovery claimed cleanup"); return nil }, settled: { _ in })
+        await cacheGate.ownerFinished()
+      }
+      #expect(await cacheGate.waitUntilEntered())
+      caller.cancel()
+      await cacheGate.complete(true); await caller.value
+      #expect(deliveries == 1 && NativeExchangeReplyProtocol.requests.count == 1)
+      #expect(state.dashboardState == .loaded(.previewReady) && state.route == .ready)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      #expect(!NativeSessionTokenStore.hasPendingAuth)
+      #expect(await revoker.calls() == 0)
+      #expect(push.unregisterCount == 0)
+      #expect(await push.service.requests().deletions.isEmpty)
+      await caches.expectContents(present: true)
+    }
+  }
+}
+
+
+private struct DelayedProfileCompletionResult: ProfileCompleting {
+  let gate: ProfileLoadGate
+  var authorizationToExpire: NativeRequestAuthorization?
+  func completeProfile(displayName: String, username: String, for userID: String,
+                       ifOwnedBy owner: NativeSessionOwnership) async throws {
+    if let authorizationToExpire {
+      do {
+        _ = try NativeSessionTokenStore.resolveUnauthorized(authorizedBy: authorizationToExpire, allowRetry: false)
+        Issue.record("Expected current-owner expiry")
+      } catch {
+        _ = await gate.wait()
+        throw error
+      }
+    } else { _ = await gate.wait() }
+  }
+}
+
+extension AppStateTests {
+  @MainActor
+  private func completionState(_ caches: CleanupCacheHarness, push: PushLifecycleHarness,
+                               revoker: MockSessionRevoker, client: APIClient) -> AppState {
+    let state = AppState(configuration: .mock, launchMode: .live,
+      repository: MeRepository(apiClient: client, cache: caches.me),
+      brightnessManager: MockBrightnessController(), sessionRevoker: revoker,
+      pushNotifications: push.manager, chatCache: caches.chat,
+      audienceHighlightsCache: caches.audience, actionLoopCache: caches.actionLoop)
+    state.didInitializeAuth = true
+    return state
+  }
+
+  @Test(arguments: ["ready", "waitlist", "onboarding", "decode", "transport"])
+  func profileCompletionRequiresItsFreshAcceptedProfile(outcome: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let response: MobileMeResponse = outcome == "ready" ? .previewReady
+        : outcome == "waitlist" ? .previewWaitlistPending : .previewNeedsOnboarding
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(),
+        .init(body: outcome == "decode" ? Data("{".utf8) : try JSONEncoder().encode(response),
+          failure: outcome == "transport" ? .networkConnectionLost : nil),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      let message = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+        ifOwnedBy: original.ownership!, using: client)
+      await ProfileCompletionURLProtocol.drain()
+      let accepted = outcome == "ready" || outcome == "waitlist"
+      #expect((message == nil) == accepted)
+      #expect(state.route == (outcome == "ready" ? .ready : outcome == "waitlist" ? .waitlistPending : .needsOnboarding))
+      #expect(state.dashboardState == .loaded(response))
+      #expect(state.isOffline == (outcome == "decode" || outcome == "transport"))
+      #expect(state.activeSessionOwnership == original.ownership)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      await caches.expectContents(present: true, profile: response)
+      let requests = await script.requests
+      #expect(requests.map(\.httpMethod) == ["GET", "POST", "GET"])
+      #expect(requests.filter { $0.url?.path == "/api/mobile/v1/me" }.count == 2)
+      #expect(await revoker.calls() == 0)
+    }
+  }
+
+  @Test(arguments: ["same-user", "different-user", "pending"], [200, 401, 409])
+  func oldProfileCompletionCannotPublishOrReloadAReplacement(change: String, status: Int) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), gate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(status: status, body: Data((status == 409 ? #"{"error":"Old form error"}"# : #"{"profileId":"p"}"#).utf8),
+          headers: ["set-auth-token": "late-a"], gate: gate),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewWaitlistPending)),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: client)
+        await gate.ownerFinished()
+        return result
+      }
+      #expect(await gate.waitUntilEntered())
+      var pending: NativeAuthAttempt?
+      let nextUser = change == "different-user" ? "other-user" : caches.userID
+      if change == "pending" {
+        let attempt = NativeSessionTokenStore.beginAuthAttempt()
+        pending = attempt
+        state.acceptAuthAttempt(attempt)
+      } else {
+        NativeSessionTokenStore.save(token: "b", userID: nextUser, expiresAt: .distantFuture)
+        await state.handleSignedInUserChange(nextUser)
+      }
+      let context = NativeSessionTokenStore.captureSessionContext()
+      let route = state.route, dashboard = state.dashboardState, owner = state.activeSessionOwnership
+      await gate.complete(true)
+      let message = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == nil && state.route == route)
+      // Pending auth keeps its route while the exact receipt cleans A's profile.
+      if change == "pending", status == 401 {
+        #expect(NativeSessionTokenStore.load() == nil)
+        #expect(state.activeUserID == nil && state.activeSessionOwnership == nil)
+        #expect(state.dashboardState == .idle)
+        await caches.expectContents(present: false)
+      } else {
+        if change == "pending", status == 200 {
+          // Pending intent freezes presentation, while A may still rotate its own bearer.
+          let refreshed = NativeSessionTokenStore.captureSessionContext()
+          #expect(refreshed.ownership == context.ownership)
+          #expect(NativeSessionTokenStore.load()?.userID == caches.userID)
+          #expect(refreshed.authorization?.bearerToken == "late-a")
+          #expect(refreshed.authorization != context.authorization)
+        } else {
+          #expect(NativeSessionTokenStore.captureSessionContext() == context)
+        }
+        #expect(state.activeSessionOwnership == owner && state.dashboardState == dashboard)
+      }
+      if let pending { #expect(NativeSessionTokenStore.performIfCurrent(pending, {})) }
+      else {
+        #expect(await caches.me.load(for: nextUser)?.response == .previewWaitlistPending)
+        #expect(await MeCache(defaults: caches.defaults).load(for: nextUser)?.response == .previewWaitlistPending)
+      }
+      #expect(await script.requests.count == (change == "pending" ? 2 : 3))
+      #expect(await revoker.calls() == 0)
+    }
+  }
+
+  @Test func postCompletionReloadRetiresOldLoadAndOutlivesCaller() async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession(), oldGate = ProfileLoadGate(), newGate = ProfileLoadGate()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding), gate: oldGate),
+        .init(),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewReady), gate: newGate),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let state = completionState(caches, push: push, revoker: MockSessionRevoker(result: .revoked), client: client)
+      let initial = Task { await state.handleSignedInUserChange(caches.userID); await oldGate.ownerFinished() }
+      #expect(await oldGate.waitUntilEntered())
+      #expect(state.route == .needsOnboarding)
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: client)
+        await newGate.ownerFinished()
+        return result
+      }
+      #expect(await newGate.waitUntilEntered())
+      caller.cancel()
+      await oldGate.complete(true); await newGate.complete(true)
+      await initial.value
+      let message = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == nil && state.route == .ready && state.dashboardState == .loaded(.previewReady))
+      #expect(state.activeSessionOwnership == original.ownership)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      await caches.expectContents(present: true)
+      #expect(await script.requests.map(\.httpMethod) == ["GET", "POST", "GET"])
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func canceledCompletionStillDeliversAnAlreadyIssuedExpiry(expire: Bool) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), gate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      await caches.api.updateMode(.success(.previewNeedsOnboarding))
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = cleanupState(caches, push: push, revoker: revoker)
+      await state.handleSignedInUserChange(caches.userID)
+      await push.manager.activate()
+      let unregisterBefore = push.unregisterCount
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: DelayedProfileCompletionResult(gate: gate,
+            authorizationToExpire: expire ? original : nil))
+        await gate.ownerFinished()
+        return result
+      }
+      #expect(await gate.waitUntilEntered())
+      caller.cancel()
+      await gate.complete(true)
+      let message = await caller.value
+      #expect(message == nil)
+      #expect(state.route == (expire ? .signedOut : .needsOnboarding))
+      #expect(NativeSessionTokenStore.requestAuthorization() == (expire ? nil : original))
+      #expect(push.unregisterCount == unregisterBefore + (expire ? 1 : 0))
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(await revoker.calls() == 0)
+      await caches.expectContents(present: !expire, profile: .previewNeedsOnboarding)
+    }
+  }
+
+  @Test(arguments: [401, 409])
+  func currentProfileCompletionDeliversOnlyItsCurrentError(status: Int) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(status: status, body: Data(#"{"error":"Username is taken"}"#.utf8)),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      await push.manager.activate()
+      let unregisterBefore = push.unregisterCount
+      let message = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+        ifOwnedBy: original.ownership!, using: client)
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == (status == 401 ? nil : "Username is taken"))
+      #expect(state.route == (status == 401 ? .signedOut : .needsOnboarding))
+      #expect(NativeSessionTokenStore.requestAuthorization() == (status == 401 ? nil : original))
+      #expect(push.unregisterCount == unregisterBefore + (status == 401 ? 1 : 0))
+      #expect(await push.service.requests().deletions.isEmpty)
+      #expect(await revoker.calls() == 0)
+      await caches.expectContents(present: status != 401, profile: .previewNeedsOnboarding)
+      #expect(await script.requests.map(\.httpMethod) == ["GET", "POST"])
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func postCompletionProfileCannotOutliveItsSession(expire: Bool) async throws {
+    try await withNativeAuthSecurityScript { @MainActor _ in
+      let caches = CleanupCacheHarness(), push = PushLifecycleHarness(), gate = ProfileLoadGate()
+      defer { caches.cleanup(); push.cleanup() }
+      let original = try saveSession()
+      await caches.seed(profile: .previewNeedsOnboarding)
+      let script = ProfileCompletionHTTP([
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewNeedsOnboarding)),
+        .init(),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewReady), gate: gate),
+        .init(body: try JSONEncoder().encode(MobileMeResponse.previewWaitlistPending)),
+      ])
+      let session = ProfileCompletionURLProtocol.session(script)
+      defer { session.invalidateAndCancel() }
+      let client = APIClient(baseURL: URL(string: "https://jov.ie")!, session: session,
+        tokenProvider: NativeSessionTokenProvider())
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = completionState(caches, push: push, revoker: revoker, client: client)
+      await state.handleSignedInUserChange(caches.userID)
+      let caller = Task {
+        let result = await state.completeProfile(displayName: "A", username: "a", for: caches.userID,
+          ifOwnedBy: original.ownership!, using: client)
+        await gate.ownerFinished()
+        return result
+      }
+      #expect(await gate.waitUntilEntered())
+      if expire {
+        do { await state.handleExpiredSession(try ownedProfileExpiryReceipt(original)) }
+        catch {
+          await gate.complete(true); _ = await caller.value
+          await ProfileCompletionURLProtocol.drain()
+          throw error
+        }
+      } else {
+        NativeSessionTokenStore.save(token: "b", userID: caches.userID, expiresAt: .distantFuture)
+        await state.handleSignedInUserChange(caches.userID)
+      }
+      let preserved = NativeSessionTokenStore.captureSessionContext()
+      await gate.complete(true)
+      let message = await caller.value
+      await ProfileCompletionURLProtocol.drain()
+      #expect(message == nil && NativeSessionTokenStore.captureSessionContext() == preserved)
+      #expect(state.route == (expire ? .signedOut : .waitlistPending))
+      #expect(state.dashboardState == (expire ? .idle : .loaded(.previewWaitlistPending)))
+      await caches.expectContents(present: !expire, profile: .previewWaitlistPending)
+      #expect(await script.requests.count == (expire ? 3 : 4))
+      #expect(await revoker.calls() == 0)
+    }
+  }
+}
+
+
+// Record the actual callback/deinit tasks so a rejected callback has a joined end.
+private final class BrowserOwnerTaskLog: @unchecked Sendable {
+  private let lock = NSLock()
+  private var tasks: [Task<Void, Never>] = []
+  func dispatch(_ operation: @escaping @MainActor @Sendable () -> Void) -> Task<Void, Never> {
+    let task = Task { @MainActor in operation() }
+    lock.lock(); tasks.append(task); lock.unlock()
+    return task
+  }
+  private func snapshot() -> [Task<Void, Never>] {
+    lock.lock(); defer { lock.unlock() }; return tasks
+  }
+  func join() async {
+    var joined = 0
+    while true {
+      let batch = snapshot()
+      guard joined < batch.count else { return }
+      for task in batch.dropFirst(joined) { await task.value }
+      joined = batch.count
+    }
+  }
+}
+
+@MainActor
+private final class BrowserOwnerHarness {
+  let suite = "BrowserOwnerTests.\(UUID().uuidString)"
+  let defaults: UserDefaults
+  let pending: MobileAuthPendingStore
+  let dispatched = BrowserOwnerTaskLog()
+  let windows = [ProfileLoadGate(), ProfileLoadGate(), ProfileLoadGate()]
+  let delay = ProfileLoadGate(), exchangeGate = ProfileLoadGate()
+  var callbacks: [@Sendable (URL?, Error?) -> Void] = []
+  var starts: [Int] = [], cancels: [Int] = [], exchanges: [MobileAuthReturn] = []
+  var observations: [Task<Void, Never>] = []
+  var nextWindow = 0, verifierCount = 0, completions = 0
+  var hasAnchor = true, startsSuccessfully = true, randomFails = false
+  var sessionToken = "native-A"
+  var nonce = String(repeating: "A", count: 43), nonceCount = 0
+  var nonceFails = false
+  var exchangeFailure: Error?
+  func seed(_ verifier: String) {
+    pending.save(codeVerifier: verifier, nativeAttempt: nonce, baseURL: AppConfiguration.mock.webBaseURL)
+  }
+  init() { defaults = UserDefaults(suiteName: suite)!; pending = MobileAuthPendingStore(defaults: defaults) }
+  func owner(_ state: AppState) -> MobileAuthCoordinator {
+    let log = dispatched
+    let browser = MobileAuthBrowserDependencies(dispatch: { log.dispatch($0) }, makeNativeAttempt: {
+      if self.nonceFails { throw MobileAuthCoordinatorError.randomGenerationFailed(errSecNotAvailable) }
+      self.nonceCount += 1
+      self.nonce = String(repeating: "A", count: 42) + String(self.nonceCount)
+      return self.nonce
+    }, makeVerifier: {
+      if self.randomFails { throw MobileAuthCoordinatorError.randomGenerationFailed(errSecNotAvailable) }
+      self.verifierCount += 1; return "verifier-\(self.verifierCount)"
+    }, waitForPresentation: {
+      let index = self.nextWindow; self.nextWindow += 1
+      guard index < self.windows.count else { Issue.record("Unexpected browser presentation"); return }
+      _ = await self.windows[index].wait()
+    }, hasPresentationAnchor: { self.hasAnchor }, makeSession: { _, _, callback in
+      let index = self.callbacks.count; self.callbacks.append(callback)
+      return MobileAuthBrowserSession(start: { self.starts.append(index); return self.startsSuccessfully },
+        cancel: { self.cancels.append(index) })
+    })
+    return MobileAuthCoordinator(appState: state, pendingStore: pending, browser: browser,
+      callbackDelay: { _ = await self.delay.wait() }, exchange: {
+        self.exchanges.append($0); _ = await self.exchangeGate.wait()
+        if let failure = self.exchangeFailure { throw failure }
+        return NativeAuthExchangeResponse(ticket: nil, sessionToken: self.sessionToken, sessionId: "session-A",
+          userId: "same-user", returnTo: "/app", expiresInSeconds: 3600)
+      })
+  }
+  func entered(_ gate: ProfileLoadGate, tasks: [Task<Void, Never>]) async -> Bool {
+    observations.append(Task { for task in tasks { await task.value }; await gate.ownerFinished() })
+    let entered = await gate.waitUntilEntered(); #expect(entered); return entered
+  }
+  func open(_ owner: MobileAuthCoordinator, window: Int) async {
+    let tasks = owner.workTasks
+    await windows[window].complete(true)
+    for task in tasks { await task.value }
+  }
+  func callback(_ index: Int, url: URL? = nil, error: Error? = nil) async {
+    guard callbacks.indices.contains(index) else { Issue.record("Missing browser callback"); return }
+    callbacks[index](url, error); await dispatched.join()
+  }
+  func finish(_ owner: inout MobileAuthCoordinator?, tasks: [Task<Void, Never>] = []) async {
+    let owned = owner?.workTasks ?? []
+    owner?.cancelCurrentAuth()
+    owner = nil
+    for gate in windows + [delay, exchangeGate] { await gate.complete(true) }
+    for task in tasks + owned + observations { await task.value }
+    await dispatched.join()
+    defaults.removePersistentDomain(forName: suite)
+  }
+  var callbackURL: URL { URL(string: "ie.jov.jovie://auth/complete?code=code-A&state=\(suite)&native_attempt=\(nonce)")! }
+  var retryError: Error {
+    NSError(domain: ASWebAuthenticationSessionErrorDomain,
+      code: ASWebAuthenticationSessionError.Code.presentationContextInvalid.rawValue)
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: ["initial-window", "retry-window", "old-success", "old-error", "old-retry-session"])
+  func oldBrowserWorkCannotMutateTheCurrentProducer(phase: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: [])); state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.startBrowserAuth(isMock: false)
+      var oldTasks = owner!.workTasks
+      if phase == "initial-window" {
+        _ = await harness.entered(harness.windows[0], tasks: oldTasks)
+      } else {
+        await harness.open(owner!, window: 0)
+        if phase == "retry-window" || phase == "old-retry-session" {
+          await harness.callback(0, error: harness.retryError)
+          oldTasks = owner!.workTasks
+          if phase == "retry-window" { _ = await harness.entered(harness.windows[1], tasks: oldTasks) }
+          else { await harness.open(owner!, window: 1) }
+        }
+      }
+      let sameProducer = phase == "old-retry-session"
+      if !sameProducer {
+        owner!.startSignIn(baseURL: state.configuration.webBaseURL) { _ in harness.completions += 1 }
+        await harness.open(owner!, window: phase == "retry-window" ? 2 : 1)
+      }
+      let pending = harness.pending.snapshot(), route = state.route
+      let started = harness.starts, cancelled = harness.cancels, opening = owner!.isOpening
+      if phase == "initial-window" || phase == "retry-window" {
+        await harness.windows[phase == "initial-window" ? 0 : 1].complete(true)
+        for task in oldTasks { await task.value }
+      } else {
+        await harness.callback(0, url: phase == "old-error" ? nil : harness.callbackURL,
+          error: phase == "old-error" ? CancellationError() : nil)
+      }
+      #expect(harness.pending.isCurrent(pending) && harness.pending.hasCodeVerifier())
+      #expect(harness.starts == started && harness.cancels == cancelled && harness.completions == 0)
+      #expect(harness.exchanges.isEmpty && owner!.authErrorMessage == nil && owner!.isOpening == opening)
+      #expect(state.route == route && !NativeSessionTokenStore.hasPendingAuth)
+      await harness.finish(&owner, tasks: oldTasks)
+    }
+  }
+
+  @Test(arguments: ["cancel", "provider", "missing-url", "invalid-callback", "no-anchor", "start-false", "RNG", "nonce-RNG"])
+  func currentBrowserTerminalFailurePreservesItsExpectedCopy(reason: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: [])); state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      harness.hasAnchor = reason != "no-anchor"; harness.startsSuccessfully = reason != "start-false"
+      harness.randomFails = reason == "RNG"
+      harness.nonceFails = reason == "nonce-RNG"
+      let inputFails = harness.randomFails || harness.nonceFails
+      if inputFails { harness.pending.save(codeVerifier: "preserved") }
+      let before = harness.pending.snapshot()
+      owner!.startBrowserAuth(isMock: false)
+      if !inputFails { await harness.open(owner!, window: 0) }
+      if ["cancel", "provider", "missing-url", "invalid-callback"].contains(reason) {
+        let url = reason == "provider" ? URL(string: "ie.jov.jovie://auth/complete?error=access_denied&native_attempt=\(harness.nonce)")
+          : reason == "invalid-callback" ? URL(string: "https://unrelated.example/invalid") : nil
+        await harness.callback(0, url: url, error: reason == "cancel" ? CancellationError() : nil)
+      }
+      #expect(!owner!.isOpening && harness.exchanges.isEmpty && !NativeSessionTokenStore.hasPendingAuth)
+      #expect(owner!.authErrorMessage == (["cancel", "provider"].contains(reason) ? MobileAuthCopy.cancellation : MobileAuthCopy.failure))
+      if inputFails { #expect(harness.pending.isCurrent(before)) }
+      else { #expect(harness.pending.hasCodeVerifier() == (reason == "invalid-callback")) }
+      await harness.finish(&owner)
+    }
+  }
+}
+
+
+extension AppStateTests {
+  @Test(arguments: ["browser-open", "presentation-await", "retry-await"], [false, true])
+  func releasingBrowserOwnerCancelsOnlyItsExactSession(phase: String, replace: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: [])); state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      weak var released = owner
+      owner?.startBrowserAuth(isMock: false)
+      if phase != "presentation-await", let current = owner { await harness.open(current, window: 0) }
+      if phase == "retry-await" { await harness.callback(0, error: harness.retryError) }
+      let tasks = owner?.workTasks ?? []
+      if phase != "browser-open" {
+        _ = await harness.entered(harness.windows[phase == "retry-await" ? 1 : 0], tasks: tasks)
+      }
+      owner = nil
+      #expect(released == nil)
+      if replace { harness.pending.save(codeVerifier: "replacement-B") }
+      let replacement = harness.pending.snapshot()
+      await harness.dispatched.join()
+      #expect(harness.cancels == (phase == "browser-open" ? [0] : []))
+      #expect(harness.pending.isCurrent(replacement) == replace)
+      #expect(harness.pending.hasCodeVerifier() == replace)
+      await harness.finish(&owner, tasks: tasks)
+      #expect(harness.exchanges.isEmpty && !NativeSessionTokenStore.hasPendingAuth)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func delayedURLWithoutVerifierRespectsItsCapturedPendingProducer(replace: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: [])); state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.handleAuthReturn(harness.callbackURL)
+      let retry = owner!.workTasks
+      _ = await harness.entered(harness.delay, tasks: retry)
+      if replace { owner!.startBrowserAuth(isMock: false) }
+      let pending = harness.pending.snapshot()
+      await harness.delay.complete(true)
+      for task in retry { await task.value }
+      #expect(harness.pending.isCurrent(pending) && harness.pending.hasCodeVerifier() == replace)
+      #expect(harness.exchanges.isEmpty && owner!.isOpening == replace)
+      #expect(owner!.authErrorMessage == (replace ? nil : MobileAuthCopy.failure))
+      #expect(!NativeSessionTokenStore.hasPendingAuth)
+      if replace {
+        await harness.open(owner!, window: 0)
+        #expect(harness.starts == [0])
+      } else { #expect(harness.starts.isEmpty) }
+      await harness.finish(&owner)
+    }
+  }
+}
+
+
+extension AppStateTests {
+  @Test(arguments: ["cold-inbox", "manual", "browser-duplicates", "replacement-view"])
+  func retainedOwnerCompletesRealIngressOnce(ingress: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let profile = ProfileLoadGate(); await profile.complete(true)
+      let repository = ControlledProfileRepository(loadGates: [profile])
+      let state = makeState(repository); state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      if ingress == "browser-duplicates" {
+        owner!.startBrowserAuth(isMock: false); await harness.open(owner!, window: 0)
+        await harness.callback(0, url: harness.callbackURL)
+      } else {
+        harness.seed("manual-verifier")
+        if ingress == "cold-inbox" {
+          MobileAuthCallbackURLInbox.shared.enqueue(harness.callbackURL)
+          owner!.drainPendingAuthCallbackURLs()
+        } else { owner!.handleAuthReturn(harness.callbackURL) }
+      }
+      let tasks = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: tasks)
+      #expect(NativeSessionTokenStore.hasPendingAuth && state.route == .launching)
+      if ingress == "browser-duplicates" {
+        await harness.callback(0, url: harness.callbackURL)
+        owner!.handleAuthReturn(harness.callbackURL)
+        MobileAuthCallbackURLInbox.shared.enqueue(harness.callbackURL)
+        owner!.drainPendingAuthCallbackURLs()
+      }
+      if ingress == "replacement-view" {
+        // Compiled wiring/identity only: this does not claim hosted onDisappear execution.
+        var first: LiveRootContainer? = LiveRootContainer(appState: state, authCoordinator: owner!)
+        let replacement = LiveRootContainer(appState: state, authCoordinator: owner!)
+        let screen = AuthScreen(isMock: false, isSignInUnavailable: false,
+          errorMessage: owner!.authErrorMessage, authCoordinator: owner!)
+        #expect(first?.authCoordinator === replacement.authCoordinator)
+        #expect(screen.authCoordinator === owner)
+        first = nil
+      }
+      await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      #expect(harness.exchanges.count == 1 && !harness.pending.hasCodeVerifier())
+      #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == "native-A")
+      #expect(state.route == .ready && state.dashboardState == .loaded(.previewReady))
+      #expect(await repository.loadCount() == 1)
+      await harness.finish(&owner, tasks: tasks)
+    }
+  }
+
+#if DEBUG
+  @Test(arguments: [false, true])
+  func launchInputRunsOnceAcrossRebuildAndNewPendingProducer(replace: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let profile = ProfileLoadGate(); await profile.complete(true)
+      let state = AppState(configuration: .mock, launchMode: .uiTestingLiveAuth,
+        repository: ControlledProfileRepository(loadGates: [profile]), brightnessManager: MockBrightnessController())
+      state.didInitializeAuth = true; state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      let launchNonce = harness.nonce, launchURL = harness.callbackURL
+      owner!.handleLaunchInputOnce(verifier: "launch-A", nativeAttempt: launchNonce, callbackURL: launchURL)
+      let tasks = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: tasks)
+      await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      if replace { owner!.startBrowserAuth(isMock: false); await harness.open(owner!, window: 0) }
+      let pending = harness.pending.snapshot(), authorization = NativeSessionTokenStore.requestAuthorization()
+      owner!.handleLaunchInputOnce(verifier: "launch-A", nativeAttempt: launchNonce, callbackURL: launchURL)
+      #expect(harness.pending.isCurrent(pending) && harness.pending.hasCodeVerifier() == replace)
+      #expect(harness.exchanges.count == 1 && NativeSessionTokenStore.requestAuthorization() == authorization)
+      #expect(owner!.authErrorMessage == nil && owner!.isOpening == replace)
+      await harness.finish(&owner, tasks: tasks)
+    }
+  }
+#endif
+}
+
+
+extension AppStateTests {
+  @Test(arguments: ["exchange-held", "profile-held", "superseded"])
+  func releasedOwnerLeavesRecoveryAndAcceptedProfileWithAppState(phase: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession(), initial = ProfileLoadGate(), nextProfile = ProfileLoadGate()
+      await initial.complete(true)
+      let state = makeState(ControlledProfileRepository(loadGates: [initial, nextProfile]))
+      await state.handleSignedInUserChange("same-user")
+      let harness = BrowserOwnerHarness(), replacementHarness = BrowserOwnerHarness()
+      replacementHarness.sessionToken = "native-B"
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      var replacement: MobileAuthCoordinator?
+      weak var released = owner
+      harness.seed("A"); owner!.handleAuthReturn(harness.callbackURL)
+      let tasks = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: tasks)
+      if phase == "profile-held" {
+        await harness.exchangeGate.complete(true)
+        _ = await harness.entered(nextProfile, tasks: tasks)
+      }
+      var replacementTasks: [Task<Void, Never>] = []
+      if phase == "superseded" {
+        replacement = replacementHarness.owner(state)
+        replacementHarness.seed("B")
+        replacement!.handleAuthReturn(replacementHarness.callbackURL)
+        replacementTasks = replacement!.workTasks
+        _ = await replacementHarness.entered(replacementHarness.exchangeGate, tasks: replacementTasks)
+      }
+      owner = nil
+      #expect(released == nil)
+      await harness.dispatched.join()
+      // A cancellation cannot finish an uncooperative exchange; release then join it.
+      await nextProfile.complete(true); await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      #expect(!harness.pending.snapshot().isCorrelated)
+      if phase == "superseded" {
+        #expect(NativeSessionTokenStore.hasPendingAuth && state.route == .launching)
+        #expect(NativeSessionTokenStore.requestAuthorization() == original)
+        #expect(replacement!.authErrorMessage == nil)
+        await replacementHarness.exchangeGate.complete(true)
+        for task in replacementTasks { await task.value }
+        #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == "native-B")
+      } else {
+        #expect(!NativeSessionTokenStore.hasPendingAuth)
+        #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == (phase == "profile-held" ? "native-A" : original.bearerToken))
+      }
+      #expect(state.route == .ready && state.dashboardState == .loaded(.previewReady))
+      await harness.finish(&owner, tasks: tasks)
+      await replacementHarness.finish(&replacement, tasks: replacementTasks)
+    }
+  }
+
+  @Test(arguments: ["valid-B", "RNG-failure", "nonce-RNG-failure", "invalid-URL", "invalid-origin"])
+  func aNewBrowserRetiresAcceptedExchangeOnlyAfterItsInputsAreValid(change: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession(), first = ProfileLoadGate(), reload = ProfileLoadGate()
+      await first.complete(true); await reload.complete(true)
+      let state = makeState(ControlledProfileRepository(loadGates: [first, reload]))
+      await state.handleSignedInUserChange("same-user")
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.startBrowserAuth(isMock: false); await harness.open(owner!, window: 0)
+      await harness.callback(0, url: harness.callbackURL)
+      let accepted = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: accepted)
+      let consumed = harness.pending.snapshot()
+      harness.randomFails = change == "RNG-failure"
+      harness.nonceFails = change == "nonce-RNG-failure"
+      let url = change == "invalid-URL" ? URL(string: "http://unsafe.example")!
+        : change == "invalid-origin" ? URL(string: "https://user@jov.ie")! : state.configuration.webBaseURL
+      owner!.startSignIn(baseURL: url) { _ in harness.completions += 1 }
+      let recovery = state.reconciliationTask
+      let valid = change == "valid-B", pending = harness.pending.snapshot()
+      #expect((recovery != nil) == valid)
+      #expect(NativeSessionTokenStore.hasPendingAuth == !valid)
+      #expect(harness.completions == (valid ? 0 : 1))
+      if valid { await harness.open(owner!, window: 1) }
+      else { #expect(harness.pending.isCurrent(consumed) && state.route == .launching) }
+      await harness.exchangeGate.complete(true)
+      for task in accepted { await task.value }
+      await recovery?.value
+      #expect(harness.pending.isCurrent(pending) == valid && harness.pending.hasCodeVerifier() == valid)
+      #expect(harness.exchanges.count == 1 && owner!.authErrorMessage == nil)
+      #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == (valid ? original.bearerToken : "native-A"))
+      #expect(state.route == .ready && !NativeSessionTokenStore.hasPendingAuth)
+      if valid { #expect(harness.starts == [0, 1] && harness.completions == 0) }
+      await harness.finish(&owner, tasks: accepted)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func explicitLogoutCancelsBrowserOrAcceptedExchangeBeforeSigningOut(accepted: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      _ = try saveSession()
+      let initial = ProfileLoadGate(), recovery = ProfileLoadGate()
+      await initial.complete(true); await recovery.complete(true)
+      let revoker = MockSessionRevoker(result: .revoked)
+      let state = makeState(ControlledProfileRepository(loadGates: [initial, recovery]), sessionRevoker: revoker)
+      await state.handleSignedInUserChange("same-user")
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.startBrowserAuth(isMock: false)
+      if accepted {
+        await harness.open(owner!, window: 0); await harness.callback(0, url: harness.callbackURL)
+      }
+      let tasks = owner!.workTasks
+      _ = await harness.entered(accepted ? harness.exchangeGate : harness.windows[0], tasks: tasks)
+      owner!.cancelCurrentAuth()
+      let recoveryTask = state.reconciliationTask
+      #expect((recoveryTask != nil) == accepted)
+      let completion = await state.signOut()
+      await recoveryTask?.value
+      #expect(completion != nil && state.route == .signedOut && NativeSessionTokenStore.load() == nil)
+      harness.pending.save(codeVerifier: "later-B")
+      let pending = harness.pending.snapshot()
+      await harness.windows[0].complete(true); await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      #expect(harness.pending.isCurrent(pending) && harness.pending.hasCodeVerifier())
+      #expect(state.route == .signedOut && !NativeSessionTokenStore.hasPendingAuth)
+      #expect(NativeSessionTokenStore.load() == nil && owner!.authErrorMessage == nil && !owner!.isOpening)
+      #expect(await revoker.calls() == 1)
+      await harness.finish(&owner, tasks: tasks)
+    }
+  }
+}
+
+
+extension AppStateTests {
+  @Test(arguments: ["opening", "error"])
+  func reconstructedViewsUseTheRetainedBrowserPresentation(phase: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: [])); state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.startBrowserAuth(isMock: false)
+      if phase == "opening" {
+        _ = await harness.entered(harness.windows[0], tasks: owner!.workTasks)
+      } else {
+        await harness.open(owner!, window: 0)
+        await harness.callback(0, error: CancellationError())
+      }
+      let opening = owner!.isOpening, error = owner!.authErrorMessage
+      // These are compiled identity/projection controls, not hosted view lifecycle proof.
+      var first: LiveRootContainer? = LiveRootContainer(appState: state, authCoordinator: owner!)
+      #expect(first?.authCoordinator === owner)
+      first = nil
+      var replacement: AuthScreen? = AuthScreen(isMock: false, isSignInUnavailable: false,
+        errorMessage: owner!.authErrorMessage, authCoordinator: owner!)
+      #expect(replacement?.authCoordinator === owner)
+      #expect(replacement?.authCoordinator.isOpening == opening && opening == (phase == "opening"))
+      #expect(replacement?.errorMessage == error && error == (phase == "error" ? MobileAuthCopy.cancellation : nil))
+      replacement = nil
+      #expect(harness.exchanges.isEmpty && !NativeSessionTokenStore.hasPendingAuth)
+      await harness.finish(&owner)
+    }
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func retiredAuthOwnerCannotClearAnotherOwnersPendingAttempt(accepted: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: []))
+      state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var old: MobileAuthCoordinator? = harness.owner(state)
+      var current: MobileAuthCoordinator? = harness.owner(state)
+      old!.startBrowserAuth(isMock: false)
+      await harness.open(old!, window: 0)
+      if accepted { await harness.callback(0, url: harness.callbackURL) }
+      let oldTasks = old!.workTasks
+      if accepted { _ = await harness.entered(harness.exchangeGate, tasks: oldTasks) }
+      current!.startBrowserAuth(isMock: false)
+      await harness.open(current!, window: 1)
+      let pendingB = harness.pending.snapshot()
+      old!.cancelCurrentAuth()
+      let recovery = state.reconciliationTask
+      #expect(harness.pending.isCurrent(pendingB) && harness.pending.hasCodeVerifier())
+      current!.cancelCurrentAuth()
+      #expect(!harness.pending.hasCodeVerifier())
+      await harness.finish(&old, tasks: oldTasks)
+      await recovery?.value
+      await harness.finish(&current)
+    }
+  }
+
+  @Test(arguments: ["manual", "cold-inbox", "browser"])
+  func oldCorrelatedReturnCannotConsumeCurrentPendingSignIn(ingress: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession()
+      let initial = ProfileLoadGate(), next = ProfileLoadGate()
+      await initial.complete(true); await next.complete(true)
+      let state = makeState(ControlledProfileRepository(loadGates: [initial, next]))
+      await state.handleSignedInUserChange("same-user")
+      let harness = BrowserOwnerHarness()
+      harness.sessionToken = "native-B"
+      harness.seed("old-verifier-A")
+      let oldURL = harness.callbackURL
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.startBrowserAuth(isMock: false)
+      await harness.open(owner!, window: 0)
+      let pendingB = harness.pending.snapshot(), currentURL = harness.callbackURL
+      if ingress == "cold-inbox" {
+        MobileAuthCallbackURLInbox.shared.enqueue(oldURL)
+        owner!.drainPendingAuthCallbackURLs()
+      } else if ingress == "browser" { await harness.callback(0, url: oldURL) }
+      else { owner!.handleAuthReturn(oldURL) }
+      #expect(harness.pending.isCurrent(pendingB) && harness.pending.hasCodeVerifier())
+      #expect(harness.exchanges.isEmpty && !NativeSessionTokenStore.hasPendingAuth)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original && state.route == .ready)
+      owner!.handleAuthReturn(currentURL)
+      let tasks = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: tasks)
+      await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      #expect(harness.exchanges.count == 1 && harness.exchanges.first?.nativeAttempt == harness.nonce)
+      #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == "native-B")
+      await harness.finish(&owner, tasks: tasks)
+    }
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func explicitPreconsumeRejectionAllowsOneLaterManualReturnWithoutAutomaticReplay(previousSession: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      var original: NativeRequestAuthorization?
+      if previousSession { original = try saveSession() }
+      let profiles = [ProfileLoadGate(), ProfileLoadGate(), ProfileLoadGate()]
+      for gate in profiles { await gate.complete(true) }
+      let state = makeState(ControlledProfileRepository(loadGates: profiles))
+      if previousSession { await state.handleSignedInUserChange("same-user") }
+      else { state.route = .signedOut }
+      let harness = BrowserOwnerHarness()
+      harness.exchangeFailure = NativeAuthExchangeError.rejectedBeforeConsume(reason: "wrong_attempt")
+      harness.seed("verifier-A")
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      let url = harness.callbackURL
+      let foreignURL = URL(string: url.absoluteString.replacingOccurrences(of: harness.nonce,
+        with: String(repeating: "B", count: 43)))!
+      owner!.handleAuthReturn(url)
+      let first = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: first)
+      // This duplicate must not survive rearm as an automatic view-drain retry.
+      MobileAuthCallbackURLInbox.shared.enqueue(url)
+      MobileAuthCallbackURLInbox.shared.enqueue(foreignURL)
+      await harness.exchangeGate.complete(true)
+      for task in first { await task.value }
+      #expect(harness.pending.hasCodeVerifier() && !NativeSessionTokenStore.hasPendingAuth)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      #expect(state.route == (previousSession ? .ready : .signedOut))
+      #expect(owner!.authErrorMessage == MobileAuthCopy.failure)
+      let remaining = MobileAuthCallbackURLInbox.shared.drain()
+      #expect(remaining == [foreignURL])
+      for callback in remaining { owner!.handleAuthReturn(callback) }
+      #expect(harness.exchanges.count == 1 && owner!.workTasks.isEmpty)
+      harness.exchangeFailure = nil
+      MobileAuthCallbackURLInbox.shared.enqueue(url)
+      owner!.drainPendingAuthCallbackURLs()
+      let retry = owner!.workTasks
+      for task in retry { await task.value }
+      #expect(harness.exchanges.count == 2 && harness.exchanges.first == harness.exchanges.last)
+      #expect(!harness.pending.snapshot().isCorrelated && owner!.authErrorMessage == nil)
+      #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == "native-A" && state.route == .ready)
+      await harness.finish(&owner, tasks: first + retry)
+    }
+  }
+
+  @Test(arguments: ["untagged", "OTT", "transport", "decode", "missing-credential", "persistence"])
+  func otherExchangeOutcomesNeverReopenThePendingAttempt(outcome: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor script in
+      let state = makeState(ControlledProfileRepository(loadGates: []),
+        sessionRevoker: MockSessionRevoker(result: .revoked))
+      state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      switch outcome {
+      case "untagged": harness.exchangeFailure = NativeAuthExchangeError.requestFailed(statusCode: 401, reason: "wrong_attempt")
+      case "OTT": harness.exchangeFailure = NativeAuthExchangeError.requestFailed(statusCode: 401, reason: "ott_invalid")
+      case "transport": harness.exchangeFailure = NativeAuthExchangeError.transportFailed(code: URLError.timedOut.rawValue)
+      case "decode": harness.exchangeFailure = NativeAuthExchangeError.decodingFailed
+      case "persistence": script.configure(addStatus: errSecDuplicateItem)
+      default: harness.sessionToken = ""
+      }
+      harness.seed("verifier-A")
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      let url = harness.callbackURL
+      owner!.handleAuthReturn(url)
+      let tasks = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: tasks)
+      await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      #expect(!harness.pending.snapshot().isCorrelated && !harness.pending.hasCodeVerifier())
+      #expect(!NativeSessionTokenStore.hasPendingAuth && NativeSessionTokenStore.load() == nil)
+      #expect(state.route == .signedOut && owner!.authErrorMessage == MobileAuthCopy.failure)
+      #expect(script.calls.contains("add") == (outcome == "persistence"))
+      owner!.handleAuthReturn(url)
+      #expect(harness.exchanges.count == 1 && owner!.workTasks.isEmpty)
+      await harness.finish(&owner, tasks: tasks)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func latePreconsumeResponseCannotReopenOrReportFailureOverReplacement(browserReplacement: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: []))
+      state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      harness.exchangeFailure = NativeAuthExchangeError.rejectedBeforeConsume(reason: "wrong_attempt")
+      harness.seed("verifier-A")
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.handleAuthReturn(harness.callbackURL)
+      let old = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: old)
+      if browserReplacement {
+        owner!.startSignIn(baseURL: state.configuration.webBaseURL) { _ in }
+        await harness.open(owner!, window: 0)
+      } else {
+        harness.nonce = String(repeating: "B", count: 43)
+        harness.seed("verifier-B")
+      }
+      let recovery = state.reconciliationTask, pendingB = harness.pending.snapshot()
+      await harness.exchangeGate.complete(true)
+      for task in old { await task.value }
+      await recovery?.value
+      #expect(harness.pending.isCurrent(pendingB) && harness.pending.hasCodeVerifier())
+      #expect(owner!.authErrorMessage == nil && harness.exchanges.count == 1)
+      await harness.finish(&owner, tasks: old)
+    }
   }
 }

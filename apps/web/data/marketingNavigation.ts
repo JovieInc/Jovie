@@ -96,6 +96,24 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
   },
 ] as const satisfies readonly MarketingNavFlyoutLink[]);
 
+/** JOV-7580. Literal so the nav label/destination invariant can read it. */
+const GENERIC_SMART_LINKS_FLYOUT_LINK = {
+  href: APP_ROUTES.SMART_LINKS,
+  label: 'Smart Links',
+  description: 'Share your work with one link. Example: a release.',
+} as const satisfies MarketingNavFlyoutLink;
+
+export function getMarketingToolsFlyoutLinks(
+  genericCreatorNav = false
+): readonly MarketingNavFlyoutLink[] {
+  if (!genericCreatorNav) return MARKETING_TOOLS_FLYOUT_LINKS;
+  return MARKETING_TOOLS_FLYOUT_LINKS.map(link =>
+    link.href === APP_ROUTES.SMART_LINKS
+      ? GENERIC_SMART_LINKS_FLYOUT_LINK
+      : link
+  );
+}
+
 const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
@@ -138,6 +156,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     links: [
       MARKETING_DEVELOPER_LINK,
       MARKETING_CLI_LINK,
+      { href: APP_ROUTES.ENGINEERING, label: 'Engineering' },
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
       { href: APP_ROUTES.COMPARE, label: 'Compare' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
@@ -164,6 +183,47 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
   }));
 
 /**
+ * JOV-7580. The generic Customers column: Artists first, then the Music column
+ * hrefs with audience wording. Kept literal so every label is validated.
+ */
+const RAW_GENERIC_CREATOR_FOOTER_LINKS = [
+  { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
+  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+  { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
+  { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
+  { href: APP_ROUTES.PAY, label: 'Pay' },
+  {
+    href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
+    label: 'Audience Capture',
+  },
+  {
+    href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
+    label: 'Audience Reactivation',
+  },
+  { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
+  { href: APP_ROUTES.LAUNCH, label: 'Release System' },
+] as const satisfies readonly MarketingFooterLink[];
+
+/**
+ * JOV-7580. Flag off returns the current Music column. Flag on renames that
+ * column to Customers, adds Artists, and uses audience wording. Href targets
+ * stay the same.
+ */
+export function getMarketingFooterColumns(
+  genericCreatorNav = false
+): readonly MarketingFooterColumn[] {
+  if (!genericCreatorNav) return MARKETING_FOOTER_COLUMNS;
+  return MARKETING_FOOTER_COLUMNS.map(column =>
+    column.title === 'Music'
+      ? {
+          title: 'Customers',
+          links: eligibleLinks(RAW_GENERIC_CREATOR_FOOTER_LINKS),
+        }
+      : column
+  );
+}
+
+/**
  * Commercial pages for the flagged site-footer refresh.
  * Every href is an existing public route. Count stays between 4 and 6.
  */
@@ -182,6 +242,32 @@ export const PUBLIC_COMMERCIAL_FOOTER_COLUMN: MarketingFooterColumn = {
   title: 'Product',
   links: PUBLIC_COMMERCIAL_FOOTER_LINKS,
 };
+
+const GENERIC_SMART_LINKS_FOOTER_LINK = {
+  href: APP_ROUTES.SMART_LINKS,
+  label: 'Smart Links',
+} as const satisfies MarketingFooterLink;
+
+export function getPublicCommercialFooterLinks(
+  genericCreatorNav = false
+): readonly MarketingFooterLink[] {
+  if (!genericCreatorNav) return PUBLIC_COMMERCIAL_FOOTER_LINKS;
+  return PUBLIC_COMMERCIAL_FOOTER_LINKS.map(link =>
+    link.href === APP_ROUTES.SMART_LINKS
+      ? GENERIC_SMART_LINKS_FOOTER_LINK
+      : link
+  );
+}
+
+export function getPublicCommercialFooterColumn(
+  genericCreatorNav = false
+): MarketingFooterColumn {
+  if (!genericCreatorNav) return PUBLIC_COMMERCIAL_FOOTER_COLUMN;
+  return {
+    title: PUBLIC_COMMERCIAL_FOOTER_COLUMN.title,
+    links: getPublicCommercialFooterLinks(true),
+  };
+}
 
 export const MARKETING_LEGAL_LINKS: readonly MarketingFooterLink[] = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },

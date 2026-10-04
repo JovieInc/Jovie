@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -215,7 +216,9 @@ test('unknown HTTP outcomes, malformed identities and oversized bodies fail clos
 });
 
 function sourceFixture() {
-  const root = mkdtempSync(join(tmpdir(), 'native-controller-test-'));
+  const root = realpathSync(
+    mkdtempSync(join(tmpdir(), 'native-controller-test-'))
+  );
   roots.push(root);
   const sourceRoot = join(root, 'source');
   mkdirSync(sourceRoot);

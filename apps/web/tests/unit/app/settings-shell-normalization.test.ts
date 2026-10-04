@@ -62,17 +62,6 @@ const SETTINGS_ALIAS_ROUTES = [
     ),
   },
   {
-    route: 'settings appearance',
-    expectedDestination: 'APP_ROUTES.SETTINGS_ACCOUNT',
-    filePath: findSourceFile(
-      resolve(process.cwd(), 'app/app/(shell)/settings/appearance/page.tsx'),
-      resolve(
-        process.cwd(),
-        'apps/web/app/app/(shell)/settings/appearance/page.tsx'
-      )
-    ),
-  },
-  {
     route: 'settings delete-account',
     expectedDestination: 'APP_ROUTES.SETTINGS_DATA_PRIVACY',
     filePath: findSourceFile(
@@ -86,6 +75,14 @@ const SETTINGS_ALIAS_ROUTES = [
       )
     ),
   },
+] as const;
+
+const SETTINGS_APPEARANCE_PAGE_CANDIDATES = [
+  resolve(process.cwd(), 'app/app/(shell)/settings/appearance/page.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/settings/appearance/page.tsx'
+  ),
 ] as const;
 
 const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
@@ -272,6 +269,12 @@ describe('settings shell normalization', () => {
       expect(source).not.toContain('getCachedAuth');
       expect(source).not.toContain('DashboardSettings');
       expect(source).not.toContain('redirect_url=/app/settings');
+    }
+  });
+
+  it('leaves the legacy appearance alias to the Next.js redirect config', () => {
+    for (const filePath of SETTINGS_APPEARANCE_PAGE_CANDIDATES) {
+      expect(existsSync(filePath), filePath).toBe(false);
     }
   });
 

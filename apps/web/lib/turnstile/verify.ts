@@ -1,7 +1,10 @@
 import 'server-only';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { resolveTurnstileSecretKey } from '@/lib/turnstile/keys';
+import {
+  resolveTurnstileSecretKey,
+  TURNSTILE_ALWAYS_PASS_SECRET_KEY,
+} from '@/lib/turnstile/keys';
 
 /**
  * Cloudflare Turnstile siteverify helper (JOV-2132).
@@ -121,6 +124,33 @@ export async function verifyTurnstileToken(
     return { success: false, reason: 'turnstile_not_configured' };
   }
 
+  return verifyWithSecret(token, remoteIp, secretKey);
+}
+
+/**
+ * Verify a token in Cloudflare's official test mode (JOV-7697).
+ *
+ * Only for callers that have already resolved an approved synthetic
+ * principal from a verified session (`lib/synthetic/passage.server.ts`).
+ * The always-pass test secret accepts only Cloudflare's dummy token, and the
+ * real siteverify round trip still runs, so the actor exercises the same
+ * protocol as a visitor. Never select this from request input alone.
+ */
+export async function verifyTurnstileTestModeToken(
+  token: string | undefined | null,
+  remoteIp?: string | null
+): Promise<TurnstileVerifyResult> {
+  if (!token || token.length === 0) {
+    return { success: false, reason: 'missing_token' };
+  }
+  return verifyWithSecret(token, remoteIp, TURNSTILE_ALWAYS_PASS_SECRET_KEY);
+}
+
+async function verifyWithSecret(
+  token: string,
+  remoteIp: string | null | undefined,
+  secretKey: string
+): Promise<TurnstileVerifyResult> {
   const body = new URLSearchParams();
   body.set('secret', secretKey);
   body.set('response', token);

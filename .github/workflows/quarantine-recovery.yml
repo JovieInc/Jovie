@@ -1,0 +1,122 @@
+name: Quarantine Recovery
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Complete execution artifacts and canonical Linear intake must precede a guarded ledger-only draft; the fast flakiness report cannot collect seven days of evidence on every main completion.
+# removal-trigger: Retire when the canonical producer provides an authenticated complete history and guarded proposal receipt in-band.
+# clock-class: temporal-resource
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: quarantine-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover-quarantine:
+    if: ${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' && github.event_name != 'workflow_run' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Record actual landed quarantine releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          QUARANTINE_AUTO_HEAL_ENABLED: ${{ vars.QUARANTINE_AUTO_HEAL_ENABLED }}
+        run: node scripts/record-quarantine-releases.mjs
+
+      - name: Collect verified quarantine execution history
+        id: collect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/collect-quarantine-evidence.mjs
+
+      - name: Analyze current failure signatures
+        id: analyze
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node .github/scripts/analyze-test-flakiness.js
+
+      - name: File verified failure clusters in Linear
+        id: intake
+        if: ${{ success() && steps.collect.outcome == 'success' && steps.analyze.outcome == 'success' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node scripts/file-quarantine-clusters.mjs
+
+      - name: Generate guarded proposal token
+        id: proposal-token
+        if: ${{ success() && steps.intake.outcome == 'success' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Propose guarded quarantine ledger reconciliation
+        if: ${{ success() && steps.intake.outcome == 'success' && steps.proposal-token.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ steps.proposal-token.outputs.token }}
+        run: node scripts/propose-quarantine-ledger.mjs
+
+  publish-queue-results:
+    name: Publish verified merge-group test results
+    if: >-
+      vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.workflow_id == 178737329 &&
+      github.event.workflow_run.event == 'merge_group' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["success","failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout trusted result publisher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Prepare verified failure-containing JUnit reports
+        id: reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUARANTINE_AUTO_HEAL_ENABLED: ${{ vars.QUARANTINE_AUTO_HEAL_ENABLED }}
+        run: node .github/scripts/publish-queue-junit.mjs
+      - name: Publish queue results to Codecov
+        if: ${{ steps.reports.outputs.upload == 'true' }}
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ steps.reports.outputs.files }}
+          disable_search: true
+          flags: mergegroup-unittests
+          override_commit: ${{ steps.reports.outputs.head_sha }}
+          override_branch: ${{ steps.reports.outputs.branch }}
+          override_build: ${{ steps.reports.outputs.run_id }}
+          fail_ci_if_error: true

@@ -99,6 +99,17 @@ describe('shipping SLO workflow credentials', () => {
     );
     expect(WORKFLOW).toContain('docs/metrics/blog-publish-latency-latest.json');
   });
+
+  it('publishes generated snapshots through a pull request instead of protected main', () => {
+    expect(WORKFLOW).toContain(
+      'BRANCH="bot/shipping-slo-snapshot-${{ github.run_id }}-${{ github.run_attempt }}"'
+    );
+    expect(WORKFLOW).toContain('git push -u origin "$BRANCH"');
+    expect(WORKFLOW).toContain(
+      'gh pr create --repo "${{ github.repository }}" --base main --head "$BRANCH"'
+    );
+    expect(WORKFLOW).not.toContain('git push origin HEAD:main');
+  });
 });
 
 describe('ciWalltimeByEvent', () => {
