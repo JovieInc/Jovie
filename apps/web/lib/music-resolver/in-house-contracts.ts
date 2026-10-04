@@ -21,11 +21,21 @@ export interface ResolutionCandidate {
 
 export type InHouseEntityKind = 'track' | 'album' | 'artist';
 
+export const RESOLUTION_SOURCE_ERROR_CODES = [
+  'UPSTREAM_FAILURE',
+  'UNAUTHORIZED',
+  'RATE_LIMITED',
+  'TIMEOUT',
+  'INVALID_RESPONSE',
+  'UNSUPPORTED',
+] as const;
+
 /** Aggregate enrichment sources; provider-specific outcomes remain separate work. */
 export interface ResolutionSourceError {
   readonly source: 'catalog_isrc' | 'musicbrainz_isrc';
-  readonly code: 'UPSTREAM_FAILURE';
+  readonly code: (typeof RESOLUTION_SOURCE_ERROR_CODES)[number];
   readonly retryable: boolean;
+  readonly retryAfterSeconds?: number;
 }
 
 export interface InHouseResolution {

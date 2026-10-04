@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { type InHouseQuery, resolveInHouse } from './in-house';
+import { RESOLUTION_SOURCE_ERROR_CODES } from './in-house-contracts';
 import { createDefaultInHouseSources } from './in-house-sources';
 
 export const musicResolveSchema = z
@@ -87,8 +88,13 @@ export const musicResolveOutputSchema = z
         z
           .object({
             source: z.enum(['catalog_isrc', 'musicbrainz_isrc']),
-            code: z.literal('UPSTREAM_FAILURE'),
+            code: z.enum(RESOLUTION_SOURCE_ERROR_CODES),
             retryable: z.boolean(),
+            retryAfterSeconds: z
+              .number()
+              .min(0)
+              .max(Number.MAX_SAFE_INTEGER)
+              .optional(),
           })
           .strict()
       )
@@ -154,7 +160,17 @@ export async function resolvePublicMusic(
   );
   if (signal?.aborted)
     return { error: { code: 'CANCELLED', retryable: false } };
-  if (result.status === 'upstream_error')
-    return { error: { code: 'UPSTREAM_FAILURE', retryable: true } };
+  if (result.status === 'upstream_error') {
+    const sourceErrors = result.sourceErrors;
+    return {
+      error: {
+        code: 'UPSTREAM_FAILURE',
+        retryable: sourceErrors
+          ? sourceErrors.some(error => error.retryable)
+          : true,
+        ...(sourceErrors ? { sourceErrors } : {}),
+      },
+    };
+  }
   return musicResolveOutputSchema.parse(result);
 }

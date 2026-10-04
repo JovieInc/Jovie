@@ -13,6 +13,7 @@ import {
   type ResolvedArtistMetadata,
   type ResolvedDspLink,
 } from './in-house-contracts';
+import { sourceFailure } from './source-outcomes';
 
 export type {
   ArtistCandidate,
@@ -176,7 +177,7 @@ async function fanOutIsrc(
       throw error;
     }
     // Never expose exception messages, request URLs, or upstream bodies.
-    sourceErrors.push({ source, code: 'UPSTREAM_FAILURE', retryable: true });
+    sourceErrors.push(sourceFailure(source, error));
   }
   const tracks = catalog.status === 'fulfilled' ? catalog.value : [];
   const rels = musicbrainz.status === 'fulfilled' ? musicbrainz.value : [];

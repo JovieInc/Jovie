@@ -52,6 +52,148 @@ const rejected = async () => {
 };
 
 describe('partial track resolution', () => {
+  it.each([false, true])(
+    'keeps failed-lookup diagnostics in the public error (transient: %s)',
+    async transient => {
+      defaults.mockReturnValue(
+        sources({
+          trackByIsrc: async () => {
+            throw { statusCode: 401 };
+          },
+          ...(transient
+            ? {
+                urlRelsForIsrc: async () => {
+                  throw { errorCode: 'TIMEOUT' };
+                },
+              }
+            : {}),
+        })
+      );
+      const result = await resolvePublicMusic({
+        kind: 'track',
+        input: track.isrc,
+      });
+      expect(result).toEqual({
+        error: {
+          code: 'UPSTREAM_FAILURE',
+          retryable: transient,
+          sourceErrors: [
+            { source: 'catalog_isrc', code: 'UNAUTHORIZED', retryable: false },
+            ...(transient
+              ? [
+                  {
+                    source: 'musicbrainz_isrc',
+                    code: 'TIMEOUT',
+                    retryable: true,
+                  },
+                ]
+              : []),
+          ],
+        },
+      });
+    }
+  );
+
+  it.each([
+    [{ statusCode: 401 }, 'UNAUTHORIZED', false],
+    [{ status: 403 }, 'UNAUTHORIZED', false],
+    [{ code: 'SPOTIFY_NOT_CONNECTED' }, 'UNAUTHORIZED', false],
+    [{ statusCode: 400 }, 'UPSTREAM_FAILURE', false],
+    [{ code: 'SPOTIFY_RATE_LIMITED', retryAfter: 17 }, 'RATE_LIMITED', true],
+    [{ statusCode: 429, retryAfter: 0 }, 'RATE_LIMITED', true],
+    [{ errorCode: 'TIMEOUT' }, 'TIMEOUT', true],
+    [{ name: 'TimeoutError' }, 'TIMEOUT', true],
+    [
+      { errorCode: 'INVALID_RESPONSE', retryable: true },
+      'INVALID_RESPONSE',
+      false,
+    ],
+    [{ code: 'UNSUPPORTED' }, 'UNSUPPORTED', false],
+    [
+      { code: 'SPOTIFY_UNAVAILABLE', retryable: false },
+      'UPSTREAM_FAILURE',
+      false,
+    ],
+  ] as const)(
+    'classifies structured failure %j safely',
+    async (fields, code, retryable) => {
+      const error = Object.assign(
+        new Error('private credential and response'),
+        fields
+      );
+      const result = await resolveInHouse(
+        { kind: 'track', url: track.url },
+        sources({
+          urlRelsForIsrc: async () => {
+            throw error;
+          },
+        })
+      );
+      expect(result.status).toBe('resolved');
+      expect(result.links.map(link => link.url)).toEqual([track.url]);
+      expect(result).toHaveProperty('sourceErrors', [
+        {
+          source: 'musicbrainz_isrc',
+          code,
+          retryable,
+          ...('retryAfter' in fields
+            ? { retryAfterSeconds: fields.retryAfter }
+            : {}),
+        },
+      ]);
+      expect(musicResolveOutputSchema.safeParse(result).success).toBe(true);
+      expect(JSON.stringify(result)).not.toContain(error.message);
+    }
+  );
+
+  it.each([
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+    -1,
+    '10',
+    null,
+  ])('discards invalid retry delays: %s', async retryAfter => {
+    const result = await resolveInHouse(
+      { kind: 'track', url: track.url },
+      sources({
+        urlRelsForIsrc: async () => {
+          throw Object.assign(new Error('private response'), {
+            statusCode: 429,
+            retryAfter,
+          });
+        },
+      })
+    );
+    expect(result).toHaveProperty('sourceErrors', [
+      {
+        source: 'musicbrainz_isrc',
+        code: 'RATE_LIMITED',
+        retryable: true,
+      },
+    ]);
+    expect(musicResolveOutputSchema.safeParse(result).success).toBe(true);
+  });
+
+  it.each([null, 'private upstream response'])(
+    'normalizes an unstructured rejection safely: %s',
+    async error => {
+      const result = await resolveInHouse(
+        { kind: 'track', url: track.url },
+        sources({
+          urlRelsForIsrc: async () => {
+            throw error;
+          },
+        })
+      );
+      expect(result.status).toBe('resolved');
+      expect(result).toHaveProperty('sourceErrors', [
+        diagnostic('musicbrainz_isrc'),
+      ]);
+      expect(JSON.stringify(result)).not.toContain('private upstream response');
+    }
+  );
+
   it('exposes successful links and safe failures through the public transport', async () => {
     defaults.mockReturnValue(sources({ urlRelsForIsrc: rejected }));
     const result = await resolvePublicMusic({
