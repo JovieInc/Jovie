@@ -232,6 +232,8 @@ export interface MarketingSection {
   readonly illegalAfter?: readonly MarketingSectionId[];
   /** Sections that MUST appear before this one (provenance precondition). */
   readonly requiresPrior?: readonly MarketingSectionId[];
+  /** Each group requires at least one matching semantic predecessor. */
+  readonly requiresPriorAnyOf?: readonly (readonly MarketingSectionId[])[];
   /** Per-slot content budgets. Over-budget = check failure. */
   readonly contentBudgets: readonly ContentBudget[];
   /**
@@ -1028,7 +1030,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'proof', // zero-proof gated — the load-bearing legality
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero'], // proof belongs after value/feature, never immediately after hero (B2B C4: proof is a gradient, not a top beat)
-    requiresPrior: ['hero', 'feature-grid'], // credibility preconditions
+    requiresPrior: ['hero'], // credibility preconditions
+    requiresPriorAnyOf: [['feature-grid', 'feature-split', 'how-it-works']],
     contentBudgets: [
       {
         slot: 'quote',
@@ -1116,7 +1119,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'proof', // zero-proof gated — every metric must be specific and attributable (B2B C4)
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'how-it-works'],
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [['feature-grid', 'feature-split', 'how-it-works']],
     contentBudgets: [
       {
         slot: 'stat-value',
@@ -1305,7 +1309,10 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     illegalAfter: ['hero', 'cta'], // comparison needs value framing first; never as a closing beat
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [
+      ['feature-grid', 'feature-split', 'how-it-works', 'content-prose'],
+    ],
     contentBudgets: [
       {
         slot: 'feature-name',
@@ -1375,7 +1382,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero'], // FAQ never immediately after hero — it handles objections that arise after value/proof
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [
+      [
+        'feature-grid',
+        'feature-split',
+        'how-it-works',
+        'content-prose',
+        'pricing',
+        'blog-feed',
+      ],
+    ],
     contentBudgets: [
       {
         slot: 'question',
@@ -1485,7 +1502,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero'], // hero has its own CTA; mid-page terminal only after proof
-    requiresPrior: ['hero', 'feature-grid'], // CTA before value is B2B anti-pattern #7
+    requiresPrior: ['hero'], // CTA before value is B2B anti-pattern #7
+    requiresPriorAnyOf: [
+      [
+        'feature-grid',
+        'feature-split',
+        'how-it-works',
+        'content-prose',
+        'pricing',
+        'blog-feed',
+      ],
+    ],
     contentBudgets: [
       {
         slot: 'headline',
@@ -1641,7 +1668,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'cta'],
-    requiresPrior: ['hero', 'feature-grid'], // spec-wall is depth after breadth
+    requiresPrior: ['hero'], // spec-wall is depth after breadth
+    requiresPriorAnyOf: [['feature-grid', 'feature-split', 'how-it-works']],
     contentBudgets: [
       {
         slot: 'tile-title',
@@ -1710,7 +1738,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'cta'],
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [
+      [
+        'feature-grid',
+        'feature-split',
+        'how-it-works',
+        'content-prose',
+        'blog-feed',
+      ],
+    ],
     contentBudgets: [
       {
         slot: 'headline',
@@ -2076,9 +2113,14 @@ export function hasRequiredPrior(
   priorSections: readonly MarketingSectionId[]
 ): boolean {
   const def = getMarketingSection(section);
-  return (def.requiresPrior ?? []).every(required =>
+  const allRequiredPresent = (def.requiresPrior ?? []).every(required =>
     priorSections.includes(required)
   );
+  const everyAlternativeGroupSatisfied = (def.requiresPriorAnyOf ?? []).every(
+    alternatives =>
+      alternatives.some(alternative => priorSections.includes(alternative))
+  );
+  return allRequiredPresent && everyAlternativeGroupSatisfied;
 }
 
 export function isLegalForAudience(
