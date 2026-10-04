@@ -48,6 +48,10 @@ private struct MobileAuthFinalizationStageError: LocalizedError, CustomNSError {
   }
 }
 
+func isPreconsumeMobileAuthRejection(_ error: Error) -> Bool {
+  (error as? MobileAuthFinalizationStageError)?.isPreconsumeExchangeRejection == true
+}
+
 @MainActor
 func runMobileAuthFinalizationStage<Value>(
   _ stage: String,
@@ -154,7 +158,7 @@ func finalizeMobileAuthAttempt(
   } catch {
     if error is CancellationError || Task.isCancelled {
       await cancel()?.value
-    } else if (error as? MobileAuthFinalizationStageError)?.isPreconsumeExchangeRejection == true {
+    } else if isPreconsumeMobileAuthRejection(error) {
       // This request was rejected before consuming a server credential. Retire
       // only its accepted intent; the previous session keeps its authority.
       if let result = NativeSessionTokenStore.cancelAuthAttempt(attempt) {

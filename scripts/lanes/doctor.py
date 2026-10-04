@@ -24,6 +24,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
+import merge_evidence  # noqa: E402  (shared complete merge-window reader)
+import file_overlap  # noqa: E402
 import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
@@ -140,7 +142,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     try:
         qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
         design_census = design_gate.apply_to_pool(
-            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo))
+            qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
         eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
         budgets = {name: lane.read_new_issue_budget(name, seats["slots"])
@@ -160,13 +162,16 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         eligible_pool, eligible_by_provider, budgets = None, {}, {}
         design_census = None
     github = None
-    merged, merged_error = [], None
+    merged, merged_error, merged_window = [], None, None
     try:
         lane.load_github_env()
         budget = lane.graphql_budget()
         github = budget[0] if budget else None
         if not os.environ.get("LANES_SELFTEST"):
-            merged = merged_prs_24h(lane, now)
+            merged_window = merge_evidence.collect(lane.REPO_SLUG, now - 86400, now)
+            merged = merge_evidence.require_complete(merged_window)
+    except merge_evidence.IncompleteMergeEvidence as error:
+        merged_error = str(error)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
         merged_error = "merged-pr-attribution-unreadable"
     held = read_json(state / "held.json", {})
@@ -205,8 +210,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
         "designGate": design_census,
+        "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
+        "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
@@ -236,16 +243,7 @@ def open_pr_numbers() -> set[int] | None:
 
 
 def merged_prs_24h(lane, now: float) -> list[dict]:
-    since = datetime.fromtimestamp(now - 86400, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    result = subprocess.run(
-        ["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "merged", "--limit", "100",
-         "--search", f"merged:>={since}", "--json", "number,headRefName,createdAt,mergedAt"],
-        capture_output=True, text=True, timeout=60,
-    )
-    if result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout or "merged PR read failed")[-120:])
-    rows = json.loads(result.stdout or "[]")
-    return [row for row in rows if row.get("number") and row.get("mergedAt")]
+    return merge_evidence.require_complete(merge_evidence.collect(lane.REPO_SLUG, now - 86400, now))
 
 
 def failed_by_reason(failures: dict) -> dict[str, int]:
@@ -399,6 +397,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+    stale_briefs = (obs.get("designGate") or {}).get("stale") or []
+    if stale_briefs:
+        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
+                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -710,6 +712,12 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         obs.get("merged24h") or [],
         attribution_receipts=obs.get("_allReceipts") or [],
     )
+    if obs.get("mergedAttributionError"):
+        throughput["landedByAttribution"] = None
+        throughput["landedByOrigin"] = None
+        for metric in throughput["providers"].values():
+            metric["landedOutput"] = None
+            metric["issueToMergeSecondsP50"] = None
     idle_since = dict((previous or {}).get("idleQualifiedSince") or {})
     next_idle_since = {}
     account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
@@ -760,7 +768,12 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                              "outcomes": {key: 0 for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")},
                              "incidents": [], "topBlocker": "capacity projector unavailable",
                              "founderJudgmentRequired": False, "controls": "show-only"}
+    overlap = obs.get("fileOverlap")
+    if not overlap:
+        overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
+                   {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
+            "fileOverlap": overlap,
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
@@ -784,6 +797,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
+            "mergedWindow": obs.get("mergedWindow"),
             "capacity": capacity,
             "prs": (obs.get("reconcile") or {}).get("counts") or {}, "_idleQualifiedSince": next_idle_since,
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
@@ -890,6 +904,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
     result["remediation"] = obs.get("remediation") or remediation.empty_remediation()
+    result["fileOverlap"] = obs.get("fileOverlap") or file_overlap.doctor_view(host.state)
     for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
         result[key] = result["remediation"].get(key, 0)
     result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}

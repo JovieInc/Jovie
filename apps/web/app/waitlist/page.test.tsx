@@ -29,6 +29,9 @@ vi.mock('@/components/features/waitlist/WaitlistPublicLanding', () => ({
 vi.mock('@/components/features/waitlist/WaitlistSuccessView', () => ({
   WaitlistSuccessView: () => null,
 }));
+vi.mock('@/lib/config/pricing', () => ({
+  PRICING: { pro: { monthly: { priceId: 'price_pro_monthly' } } },
+}));
 vi.mock('@/components/site/MarketingPageContractMarkers', () => ({
   MarketingPageContractMarkers: () => null,
 }));
@@ -71,5 +74,7 @@ describe('waitlist receipt reload', () => {
     expect(mocks.reservedHandle).toHaveBeenCalledWith('entry_1');
     expect(receipt.props.reservedHandle).toBe('coolartist');
     expect(receipt.props.email).toBe('test@example.com');
+    // Anyone waiting can buy Pro now; payment admits them (JOV-7701).
+    expect(receipt.props.proCheckoutPriceId).toBe('price_pro_monthly');
   });
 });

@@ -34,6 +34,13 @@ export const CODE_FLAGS = {
   // does not call MusicFetch either way. FEATURE_IN_HOUSE_RESOLVER=true
   // turns the product cutover on; false is the kill switch.
   IN_HOUSE_RESOLVER: false,
+  // JOV-7580 / JOV-7579: generic creator marketing labels and the
+  // /smart-links hero. Default off, so the Music footer and the current
+  // smart-link headline stay. FEATURE_MARKETING_GENERIC_CREATOR_NAV=true
+  // uses audience wording and frames a release as the worked example.
+  // Does not certify smart links beyond music. Static pages pick this up
+  // at build time.
+  MARKETING_GENERIC_CREATOR_NAV: false,
   // gh-9869: v0 studio-session memory loop (creator tag photo → person/context → studio-session → approval-gated opportunity).
   MEMORY_STUDIO_SESSION_V0: true,
   NEW_RELEASE_PAGE: true,
@@ -43,6 +50,10 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
+  // Social-network HTML must not be fetched from Jovie server IPs. Default
+  // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
+  // isolated provider and still fails closed until that provider exists.
+  SOCIAL_HTML_ISOLATED_PROVIDER: false,
   // JOV-5862: paste-channel thumbnail redo generation (model spend). Ships
   // OFF per cert-sla-v1 — the lander + channel lookup work without it; the
   // flag flips on only when Tim certifies the redo output. Env override:
