@@ -19,6 +19,9 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
+import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import { runBillingSyncRemediation } from '@/lib/billing/sync-remediation';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
@@ -38,6 +41,7 @@ import {
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { runAutoApprove } from '@/lib/leads/auto-approve';
 import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
+import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
 import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
@@ -115,6 +119,15 @@ export async function GET(request: Request) {
     await db.execute(drizzleSql`SELECT 1`);
     return { latencyMs: Date.now() - pingStart };
   });
+
+  // 15-minute detector. Database only; it does not call /api/billing/health.
+  results.billingSyncRemediation = await runSubJob(
+    'billingSyncRemediation',
+    async () => {
+      const remediation = await runBillingSyncRemediation();
+      return { ...remediation };
+    }
+  );
 
   // 1.5 Redis write/read canary — hourly. PING can remain green after a hard
   // command quota is exhausted, so only a real ephemeral write/read proves the
@@ -255,6 +268,21 @@ export async function GET(request: Request) {
     const batchSize = getOutreachBatchSize(startTime);
     if (batchSize === 0) {
       return { skipped: true, reason: 'insufficient_budget' };
+    }
+
+    // JOV-7696: autonomous cold outreach is deliberate acquisition, so it
+    // waits for ACQUISITION_ELIGIBLE. Probe only when sends are switched on.
+    if (isInstantlyOutboundEnabled()) {
+      const eligibility = await getAcquisitionEligibility();
+      if (!eligibility.eligible) {
+        return {
+          skipped: true,
+          reason: 'acquisition_not_eligible',
+          verdict: eligibility.verdict,
+          firstBlocker: eligibility.firstBlocker?.id ?? null,
+          detail: describeAcquisitionBlock(eligibility),
+        };
+      }
     }
 
     const outreachResult = await processOutreachBatch(batchSize);

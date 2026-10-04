@@ -1,0 +1,167 @@
+{
+  "schema": "jovie.voc-persona-objections/v1",
+  "generatedAt": "2026-10-03",
+  "source": "gbrain ops/voc/runs/2026-10-03 (private; product names are anonymized here)",
+  "personas": {
+    "indie-release": [
+      {
+        "type": "free-alternative",
+        "objection": "My free link page already does the job; why pay at all?",
+        "evidence": {
+          "vocItemId": "voc:b4cb860540404fffbefc",
+          "category": "link-in-bio",
+          "sourceType": "app-store",
+          "quote": "when i first started using this app, ofcourse there was the subscription version, i stayed using the free version because enough was free for me to use and be able to be happy with my business."
+        }
+      },
+      {
+        "type": "cant-justify-roi",
+        "objection": "I paid for a store and made no sales.",
+        "evidence": {
+          "vocItemId": "voc:91525b6ccc4e0e280569",
+          "category": "storefront",
+          "sourceType": "app-store",
+          "quote": "No sales"
+        }
+      },
+      {
+        "type": "not-worth-price",
+        "objection": "Link-in-bio Pro costs $9 to $30 a month; $199 needs proof it pays for itself.",
+        "evidence": {
+          "vocItemId": "voc:4c7eb633d6cbf81e212d",
+          "category": "link-in-bio",
+          "sourceType": "app-store",
+          "quote": "Totally overpriced for what it can do."
+        }
+      },
+      {
+        "type": "paywalled-basics",
+        "objection": "I won't pay monthly just to remove someone else's logo.",
+        "evidence": {
+          "vocItemId": "voc:6570ac9dbd1d38909147",
+          "category": "link-in-bio",
+          "sourceType": "trustpilot",
+          "quote": "30$ a month to remove [lib-02] logo...These guys suck BIG time, their subscription cancelation process is also long - you need to complete several surveys to cancel your subscription.Not to mention BILLING 30$ per month just to not have their branding on my links..."
+        }
+      }
+    ],
+    "manager": [
+      {
+        "type": "pricing-opacity",
+        "objection": "Fan tools quietly bill more as the list grows.",
+        "evidence": {
+          "vocItemId": "voc:ebf8b4d9c80a6bc2646e",
+          "category": "fan-crm",
+          "sourceType": "web",
+          "quote": "The recurring complaints: ### Billing & Overcharging (#1 complaint) - \"Showed $14/mo in dashboard then charged me $566\" - \"I deleted contacts but still got charged for them\" - \"[crm-02] is deliberately unclear about unpause conditions\" - \"Charged my card for $110 5 months after…"
+        }
+      },
+      {
+        "type": "churn",
+        "objection": "Annual plans renew without warning and refunds get refused.",
+        "evidence": {
+          "vocItemId": "voc:6893a1bf6e037a0e3629",
+          "category": "link-in-bio",
+          "sourceType": "trustpilot",
+          "quote": "They renew your yearly subscription WITHOUT any warning and when you request a refund you are never able to talk to a human, instead can only submit a ticket which they never get back to you about."
+        }
+      },
+      {
+        "type": "support",
+        "objection": "Support is a bot that never resolves anything.",
+        "evidence": {
+          "vocItemId": "voc:cbae5eab7ea502bd0993",
+          "category": "storefront",
+          "sourceType": "trustpilot",
+          "quote": "I provided full proof that I was blocked by the seller within the refund period, yet [sto-02] kept sending automated AI replies saying “contact the seller.” Now, they simply ignore my emails — not…"
+        }
+      }
+    ],
+    "producer": [
+      {
+        "type": "only-need-basic",
+        "objection": "I only need one simple card, not a suite.",
+        "evidence": {
+          "vocItemId": "voc:ec498ba293ee2218b7d1",
+          "category": "contact-card",
+          "sourceType": "app-store",
+          "quote": "I figured there would be a lesser tier, I don’t need the AI portion, only need 1 card type."
+        }
+      },
+      {
+        "type": "lock-in-data",
+        "objection": "Platforms shut down or kill my page when I stop paying.",
+        "evidence": {
+          "vocItemId": "voc:be1dc92a580d69fa98aa",
+          "category": "contact-card",
+          "sourceType": "web",
+          "quote": "Some platforms immediately deactivate your digital profile the moment a subscription lapses — meaning anyone who taps your NFC card or scans your QR code gets an error page or a generic platform message rather than your professional profile."
+        }
+      }
+    ],
+    "skeptic": [
+      {
+        "type": "cant-justify-roi",
+        "objection": "I paid promo services and got no real results.",
+        "evidence": {
+          "vocItemId": "voc:5d7f7f39a1325f8d87b7",
+          "category": "music-marketing",
+          "sourceType": "trustpilot",
+          "quote": "Terrible service, it feels and I think that it’s a scam, just taking our money without delivering real results."
+        }
+      },
+      {
+        "type": "not-worth-price",
+        "objection": "Pay-to-pitch tools favor insiders.",
+        "evidence": {
+          "vocItemId": "voc:e9616e285d8f0abdf541",
+          "category": "music-marketing",
+          "sourceType": "web",
+          "quote": "the lack of promoters in the standard category pushes people into buying premium coins.\" Another put it more bluntly still: \"3 credits is huge scam, they take just hypercommercial stuff or their friends.\" That's the skeptic case in two comments."
+        }
+      },
+      {
+        "type": "privacy-ai-terms",
+        "objection": "AI tools rewrite their terms to claim rights to my name, face and voice.",
+        "evidence": {
+          "vocItemId": "voc:c4a3b9e3d542aee7ae02",
+          "category": "link-in-bio",
+          "sourceType": "app-store",
+          "quote": "They updated their terms of service so they get to do whatever they want with your content and even modify my and make derivate copies and they own the rights to your name, face, and voice."
+        }
+      }
+    ],
+    "creator": [
+      {
+        "type": "fees-cut",
+        "objection": "Store tools take a cut of every sale on cheaper tiers.",
+        "evidence": {
+          "vocItemId": "voc:132eafb8836774afcf87",
+          "category": "link-in-bio",
+          "sourceType": "web",
+          "quote": "But the 9% transaction fee on free and entry-level plans quietly eats your margins, customer support is genuinely bad, and the platform has reliability problems that have cost creators real money."
+        }
+      },
+      {
+        "type": "fees-cut",
+        "objection": "I can't withdraw my own money until I hit a minimum.",
+        "evidence": {
+          "vocItemId": "voc:bbfc4fcc756f2cc35497",
+          "category": "storefront",
+          "sourceType": "app-store",
+          "quote": "This app has went downhill for sure a client paid me $25 I couldn’t get the money unless I had $100 so I tried to refund her they kept $5 and I was only able to refund her $20.."
+        }
+      },
+      {
+        "type": "pricing-opacity",
+        "objection": "I was charged after I cancelled.",
+        "evidence": {
+          "vocItemId": "voc:c7c5490b01131c1f84fa",
+          "category": "link-in-bio",
+          "sourceType": "trustpilot",
+          "quote": "They stole 144 dollars from their subscriptions when I had cancel it weeks before in they still charged me for absolutely no reason very bad website don’t vist or they will steal from you aswell"
+        }
+      }
+    ]
+  }
+}

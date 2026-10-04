@@ -44,6 +44,7 @@ import {
   type ServerAnalyticsDelivery,
   trackServerEventTx,
 } from '@/lib/server-analytics';
+import { getAccountMetricCohort } from '@/lib/utils/email';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -577,6 +578,7 @@ export async function completeOnboarding({
     await recordFunnelStep({
       funnel: 'artist_signup',
       step: 'claim_complete',
+      cohort: getAccountMetricCohort(userEmail),
     });
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops

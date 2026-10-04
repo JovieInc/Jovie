@@ -343,6 +343,36 @@ describe('Statsig server initialization', () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['YOUTUBE_WORKSPACE_NAV', 'JOVIE_WORK_NAV'] as const)(
+    'keeps %s off for admins unless resolved on',
+    async flagName => {
+      mockIsAdmin.mockResolvedValue(true);
+
+      vi.doMock('flags/next', () => ({
+        dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+      }));
+
+      const run = vi.fn().mockResolvedValue(false);
+      vi.doMock('@/lib/flags/registry', () => ({
+        APP_FLAG_REGISTRY: {
+          [flagName]: { run },
+        },
+        SUBSCRIBE_CTA_VARIANT_FLAG: {
+          run: vi.fn().mockResolvedValue('two_step'),
+        },
+        PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+          run: vi.fn().mockResolvedValue('button'),
+        },
+      }));
+
+      const { getAppFlagValue } = await import('@/lib/flags/server');
+      await expect(
+        getAppFlagValue(flagName, { userId: 'admin_123' })
+      ).resolves.toBe(false);
+      expect(run).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('keeps paid welcome email role-invariant for admin users', async () => {
     mockIsAdmin.mockResolvedValue(true);
 
@@ -366,6 +396,33 @@ describe('Statsig server initialization', () => {
     const { getAppFlagValue } = await import('@/lib/flags/server');
     await expect(
       getAppFlagValue('PAID_WELCOME_EMAIL', { userId: 'admin_123' })
+    ).resolves.toBe(false);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the visibility audit offer role-invariant for admin users', async () => {
+    mockIsAdmin.mockResolvedValue(true);
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: {
+        VISIBILITY_AUDIT_OFFER: { run },
+      },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(
+      getAppFlagValue('VISIBILITY_AUDIT_OFFER', { userId: 'admin_123' })
     ).resolves.toBe(false);
     expect(run).toHaveBeenCalledTimes(1);
   });

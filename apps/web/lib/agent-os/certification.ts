@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { sha256 as sha256Bytes } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 
 export const JOVIE_CERTIFICATION_CONTRACT = 'jovie.certification/v1' as const;
 
@@ -92,7 +93,10 @@ export type CertificationBlockerCode =
   | 'deploy_missing'
   | 'deploy_failed'
   | 'runtime_dogfood_missing'
-  | 'runtime_dogfood_failed';
+  | 'runtime_dogfood_failed'
+  /** Inbox-only: domain machine evidence (e.g. ACQUISITION_ELIGIBLE) is red/unknown. */
+  | 'machine_evidence_failed'
+  | 'machine_evidence_unknown';
 
 const MISSING_TASTE_BLOCKER_CODES = {
   canonical_references: 'canonical_reference_missing',
@@ -367,9 +371,9 @@ function stableSerialize(value: StableValue): string {
 }
 
 function sha256(value: StableValue): string {
-  return `sha256:${createHash('sha256')
-    .update(stableSerialize(value))
-    .digest('hex')}`;
+  return `sha256:${bytesToHex(
+    sha256Bytes(new TextEncoder().encode(stableSerialize(value)))
+  )}`;
 }
 
 function receiptDigestInput(

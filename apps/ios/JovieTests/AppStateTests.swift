@@ -1835,123 +1835,7 @@ struct AppStateTests {
   }
 }
 
-struct FeatureIntroPresentationTests {
-  private let highlight = FeatureIntroHighlight(
-    id: "highlight-a",
-    systemImage: "sparkles",
-    title: "Your Catalog Is Already In Chat",
-    oneLine: "Ask about a release, a show, or the next move.",
-    ctaTitle: "Ask Something"
-  )
-
-  private var fourBullets: [FeatureIntroBullet] {
-    [
-      FeatureIntroBullet(id: "one", text: "Talk from the home screen.", accent: .accent),
-      FeatureIntroBullet(id: "two", text: "Library stays nearby.", accent: .blue),
-      FeatureIntroBullet(id: "three", text: "Profile setup stays on iPhone.", accent: .orange),
-      FeatureIntroBullet(id: "four", text: "Canceled sign-in is recoverable.", accent: .accent),
-    ]
-  }
-
-  @Test func prefersHighlightOverWhatsNewUntilThatHighlightIsDismissed() {
-    let catalog = FeatureIntroCatalog(
-      highlight: highlight,
-      whatsNewID: "wave-1",
-      whatsNewItems: Array(fourBullets.prefix(2))
-    )
-
-    #expect(
-      FeatureIntroPresentation.resolve(
-        catalog: catalog,
-        dismissedHighlightID: nil,
-        dismissedWhatsNewID: nil
-      ) == .highlight(highlight)
-    )
-    #expect(
-      FeatureIntroPresentation.resolve(
-        catalog: catalog,
-        dismissedHighlightID: "",
-        dismissedWhatsNewID: nil
-      ) == .highlight(highlight)
-    )
-
-    guard case let .whatsNew(id, rows) = FeatureIntroPresentation.resolve(
-      catalog: catalog,
-      dismissedHighlightID: highlight.id,
-      dismissedWhatsNewID: nil
-    ) else {
-      Issue.record("Expected what's new after the highlight is dismissed")
-      return
-    }
-    #expect(id == "wave-1")
-    #expect(rows == fourBullets.prefix(2).map(FeatureIntroVisibleRow.bullet))
-  }
-
-  @Test func usesWhatsNewWhenTheCatalogHasNoHighlight() {
-    let catalog = FeatureIntroCatalog(
-      highlight: nil,
-      whatsNewID: "wave-1",
-      whatsNewItems: Array(fourBullets.prefix(2))
-    )
-
-    guard case let .whatsNew(id, _) = FeatureIntroPresentation.resolve(
-      catalog: catalog,
-      dismissedHighlightID: nil,
-      dismissedWhatsNewID: nil
-    ) else {
-      Issue.record("Expected what's new when no highlight is published")
-      return
-    }
-    #expect(id == "wave-1")
-  }
-
-  @Test func dismissPersistenceHidesTheSameCardAcrossLaunches() {
-    let catalog = FeatureIntroCatalog(
-      highlight: highlight,
-      whatsNewID: "wave-1",
-      whatsNewItems: Array(fourBullets.prefix(2))
-    )
-
-    #expect(
-      FeatureIntroPresentation.resolve(
-        catalog: catalog,
-        dismissedHighlightID: highlight.id,
-        dismissedWhatsNewID: "wave-1"
-      ) == nil
-    )
-    #expect(
-      FeatureIntroPresentation.isDismissed(id: highlight.id, dismissedID: highlight.id)
-    )
-    #expect(
-      !FeatureIntroPresentation.isDismissed(id: highlight.id, dismissedID: "other")
-    )
-    #expect(FeatureIntroStorage.dismissedHighlightIDKey == "jovie.featureIntro.dismissedHighlightID")
-    #expect(FeatureIntroStorage.dismissedWhatsNewIDKey == "jovie.featureIntro.dismissedWhatsNewID")
-  }
-
-  @Test func capsWhatsNewAtThreeRowsAndUsesAndMoreWhenThereAreMoreThanThreeItems() {
-    let overflow = FeatureIntroPresentation.visibleWhatsNewRows(from: fourBullets)
-    #expect(overflow.count == FeatureIntroPresentation.maxWhatsNewRows)
-    #expect(overflow == [
-      .bullet(fourBullets[0]),
-      .bullet(fourBullets[1]),
-      .andMore,
-    ])
-
-    let three = FeatureIntroPresentation.visibleWhatsNewRows(from: Array(fourBullets.prefix(3)))
-    #expect(three == fourBullets.prefix(3).map(FeatureIntroVisibleRow.bullet))
-    #expect(!three.contains(.andMore))
-
-    let two = FeatureIntroPresentation.visibleWhatsNewRows(from: Array(fourBullets.prefix(2)))
-    #expect(two.count == 2)
-    #expect(!two.contains(.andMore))
-  }
-
-  @Test func changelogURLStaysOnTheWebOrigin() {
-    let url = FeatureIntroCatalog.changelogURL(from: URL(string: "https://jov.ie")!)
-    #expect(url.absoluteString == "https://jov.ie/changelog")
-  }
-
+struct WhatsNewPresentationTests {
   @Test func versionedItemsNameTestableChanges() {
     let items = WhatsNewCatalog.items(for: "1.0")
     #expect(items.isEmpty == false)
@@ -4426,10 +4310,21 @@ private final class BrowserOwnerHarness {
   var nextWindow = 0, verifierCount = 0, completions = 0
   var hasAnchor = true, startsSuccessfully = true, randomFails = false
   var sessionToken = "native-A"
+  var nonce = String(repeating: "A", count: 43), nonceCount = 0
+  var nonceFails = false
+  var exchangeFailure: Error?
+  func seed(_ verifier: String) {
+    pending.save(codeVerifier: verifier, nativeAttempt: nonce, baseURL: AppConfiguration.mock.webBaseURL)
+  }
   init() { defaults = UserDefaults(suiteName: suite)!; pending = MobileAuthPendingStore(defaults: defaults) }
   func owner(_ state: AppState) -> MobileAuthCoordinator {
     let log = dispatched
-    let browser = MobileAuthBrowserDependencies(dispatch: { log.dispatch($0) }, makeVerifier: {
+    let browser = MobileAuthBrowserDependencies(dispatch: { log.dispatch($0) }, makeNativeAttempt: {
+      if self.nonceFails { throw MobileAuthCoordinatorError.randomGenerationFailed(errSecNotAvailable) }
+      self.nonceCount += 1
+      self.nonce = String(repeating: "A", count: 42) + String(self.nonceCount)
+      return self.nonce
+    }, makeVerifier: {
       if self.randomFails { throw MobileAuthCoordinatorError.randomGenerationFailed(errSecNotAvailable) }
       self.verifierCount += 1; return "verifier-\(self.verifierCount)"
     }, waitForPresentation: {
@@ -4444,6 +4339,7 @@ private final class BrowserOwnerHarness {
     return MobileAuthCoordinator(appState: state, pendingStore: pending, browser: browser,
       callbackDelay: { _ = await self.delay.wait() }, exchange: {
         self.exchanges.append($0); _ = await self.exchangeGate.wait()
+        if let failure = self.exchangeFailure { throw failure }
         return NativeAuthExchangeResponse(ticket: nil, sessionToken: self.sessionToken, sessionId: "session-A",
           userId: "same-user", returnTo: "/app", expiresInSeconds: 3600)
       })
@@ -4470,7 +4366,7 @@ private final class BrowserOwnerHarness {
     await dispatched.join()
     defaults.removePersistentDomain(forName: suite)
   }
-  var callbackURL: URL { URL(string: "ie.jov.jovie://auth/complete?code=code-A&state=\(suite)")! }
+  var callbackURL: URL { URL(string: "ie.jov.jovie://auth/complete?code=code-A&state=\(suite)&native_attempt=\(nonce)")! }
   var retryError: Error {
     NSError(domain: ASWebAuthenticationSessionErrorDomain,
       code: ASWebAuthenticationSessionError.Code.presentationContextInvalid.rawValue)
@@ -4519,7 +4415,7 @@ extension AppStateTests {
     }
   }
 
-  @Test(arguments: ["cancel", "provider", "missing-url", "invalid-callback", "no-anchor", "start-false", "RNG"])
+  @Test(arguments: ["cancel", "provider", "missing-url", "invalid-callback", "no-anchor", "start-false", "RNG", "nonce-RNG"])
   func currentBrowserTerminalFailurePreservesItsExpectedCopy(reason: String) async throws {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
       let state = makeState(ControlledProfileRepository(loadGates: [])); state.route = .signedOut
@@ -4527,19 +4423,21 @@ extension AppStateTests {
       var owner: MobileAuthCoordinator? = harness.owner(state)
       harness.hasAnchor = reason != "no-anchor"; harness.startsSuccessfully = reason != "start-false"
       harness.randomFails = reason == "RNG"
-      if harness.randomFails { harness.pending.save(codeVerifier: "preserved") }
+      harness.nonceFails = reason == "nonce-RNG"
+      let inputFails = harness.randomFails || harness.nonceFails
+      if inputFails { harness.pending.save(codeVerifier: "preserved") }
       let before = harness.pending.snapshot()
       owner!.startBrowserAuth(isMock: false)
-      if !harness.randomFails { await harness.open(owner!, window: 0) }
+      if !inputFails { await harness.open(owner!, window: 0) }
       if ["cancel", "provider", "missing-url", "invalid-callback"].contains(reason) {
-        let url = reason == "provider" ? URL(string: "ie.jov.jovie://auth/complete?error=access_denied")
+        let url = reason == "provider" ? URL(string: "ie.jov.jovie://auth/complete?error=access_denied&native_attempt=\(harness.nonce)")
           : reason == "invalid-callback" ? URL(string: "https://unrelated.example/invalid") : nil
         await harness.callback(0, url: url, error: reason == "cancel" ? CancellationError() : nil)
       }
       #expect(!owner!.isOpening && harness.exchanges.isEmpty && !NativeSessionTokenStore.hasPendingAuth)
       #expect(owner!.authErrorMessage == (["cancel", "provider"].contains(reason) ? MobileAuthCopy.cancellation : MobileAuthCopy.failure))
-      if harness.randomFails { #expect(harness.pending.isCurrent(before)) }
-      else { #expect(!harness.pending.hasCodeVerifier()) }
+      if inputFails { #expect(harness.pending.isCurrent(before)) }
+      else { #expect(harness.pending.hasCodeVerifier() == (reason == "invalid-callback")) }
       await harness.finish(&owner)
     }
   }
@@ -4614,7 +4512,7 @@ extension AppStateTests {
         owner!.startBrowserAuth(isMock: false); await harness.open(owner!, window: 0)
         await harness.callback(0, url: harness.callbackURL)
       } else {
-        harness.pending.save(codeVerifier: "manual-verifier")
+        harness.seed("manual-verifier")
         if ingress == "cold-inbox" {
           MobileAuthCallbackURLInbox.shared.enqueue(harness.callbackURL)
           owner!.drainPendingAuthCallbackURLs()
@@ -4659,14 +4557,15 @@ extension AppStateTests {
       state.didInitializeAuth = true; state.route = .signedOut
       let harness = BrowserOwnerHarness()
       var owner: MobileAuthCoordinator? = harness.owner(state)
-      owner!.handleLaunchInputOnce(verifier: "launch-A", callbackURL: harness.callbackURL)
+      let launchNonce = harness.nonce, launchURL = harness.callbackURL
+      owner!.handleLaunchInputOnce(verifier: "launch-A", nativeAttempt: launchNonce, callbackURL: launchURL)
       let tasks = owner!.workTasks
       _ = await harness.entered(harness.exchangeGate, tasks: tasks)
       await harness.exchangeGate.complete(true)
       for task in tasks { await task.value }
       if replace { owner!.startBrowserAuth(isMock: false); await harness.open(owner!, window: 0) }
       let pending = harness.pending.snapshot(), authorization = NativeSessionTokenStore.requestAuthorization()
-      owner!.handleLaunchInputOnce(verifier: "launch-A", callbackURL: harness.callbackURL)
+      owner!.handleLaunchInputOnce(verifier: "launch-A", nativeAttempt: launchNonce, callbackURL: launchURL)
       #expect(harness.pending.isCurrent(pending) && harness.pending.hasCodeVerifier() == replace)
       #expect(harness.exchanges.count == 1 && NativeSessionTokenStore.requestAuthorization() == authorization)
       #expect(owner!.authErrorMessage == nil && owner!.isOpening == replace)
@@ -4690,7 +4589,7 @@ extension AppStateTests {
       var owner: MobileAuthCoordinator? = harness.owner(state)
       var replacement: MobileAuthCoordinator?
       weak var released = owner
-      harness.pending.save(codeVerifier: "A"); owner!.handleAuthReturn(harness.callbackURL)
+      harness.seed("A"); owner!.handleAuthReturn(harness.callbackURL)
       let tasks = owner!.workTasks
       _ = await harness.entered(harness.exchangeGate, tasks: tasks)
       if phase == "profile-held" {
@@ -4700,7 +4599,7 @@ extension AppStateTests {
       var replacementTasks: [Task<Void, Never>] = []
       if phase == "superseded" {
         replacement = replacementHarness.owner(state)
-        replacementHarness.pending.save(codeVerifier: "B")
+        replacementHarness.seed("B")
         replacement!.handleAuthReturn(replacementHarness.callbackURL)
         replacementTasks = replacement!.workTasks
         _ = await replacementHarness.entered(replacementHarness.exchangeGate, tasks: replacementTasks)
@@ -4711,6 +4610,7 @@ extension AppStateTests {
       // A cancellation cannot finish an uncooperative exchange; release then join it.
       await nextProfile.complete(true); await harness.exchangeGate.complete(true)
       for task in tasks { await task.value }
+      #expect(!harness.pending.snapshot().isCorrelated)
       if phase == "superseded" {
         #expect(NativeSessionTokenStore.hasPendingAuth && state.route == .launching)
         #expect(NativeSessionTokenStore.requestAuthorization() == original)
@@ -4728,7 +4628,7 @@ extension AppStateTests {
     }
   }
 
-  @Test(arguments: ["valid-B", "RNG-failure", "invalid-URL"])
+  @Test(arguments: ["valid-B", "RNG-failure", "nonce-RNG-failure", "invalid-URL", "invalid-origin"])
   func aNewBrowserRetiresAcceptedExchangeOnlyAfterItsInputsAreValid(change: String) async throws {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
       let original = try saveSession(), first = ProfileLoadGate(), reload = ProfileLoadGate()
@@ -4743,7 +4643,9 @@ extension AppStateTests {
       _ = await harness.entered(harness.exchangeGate, tasks: accepted)
       let consumed = harness.pending.snapshot()
       harness.randomFails = change == "RNG-failure"
-      let url = change == "invalid-URL" ? URL(string: "http://unsafe.example")! : state.configuration.webBaseURL
+      harness.nonceFails = change == "nonce-RNG-failure"
+      let url = change == "invalid-URL" ? URL(string: "http://unsafe.example")!
+        : change == "invalid-origin" ? URL(string: "https://user@jov.ie")! : state.configuration.webBaseURL
       owner!.startSignIn(baseURL: url) { _ in harness.completions += 1 }
       let recovery = state.reconciliationTask
       let valid = change == "valid-B", pending = harness.pending.snapshot()
@@ -4755,7 +4657,7 @@ extension AppStateTests {
       await harness.exchangeGate.complete(true)
       for task in accepted { await task.value }
       await recovery?.value
-      #expect(harness.pending.isCurrent(pending) && harness.pending.hasCodeVerifier() == valid)
+      #expect(harness.pending.isCurrent(pending) == valid && harness.pending.hasCodeVerifier() == valid)
       #expect(harness.exchanges.count == 1 && owner!.authErrorMessage == nil)
       #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == (valid ? original.bearerToken : "native-A"))
       #expect(state.route == .ready && !NativeSessionTokenStore.hasPendingAuth)
@@ -4828,6 +4730,179 @@ extension AppStateTests {
       replacement = nil
       #expect(harness.exchanges.isEmpty && !NativeSessionTokenStore.hasPendingAuth)
       await harness.finish(&owner)
+    }
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func retiredAuthOwnerCannotClearAnotherOwnersPendingAttempt(accepted: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: []))
+      state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      var old: MobileAuthCoordinator? = harness.owner(state)
+      var current: MobileAuthCoordinator? = harness.owner(state)
+      old!.startBrowserAuth(isMock: false)
+      await harness.open(old!, window: 0)
+      if accepted { await harness.callback(0, url: harness.callbackURL) }
+      let oldTasks = old!.workTasks
+      if accepted { _ = await harness.entered(harness.exchangeGate, tasks: oldTasks) }
+      current!.startBrowserAuth(isMock: false)
+      await harness.open(current!, window: 1)
+      let pendingB = harness.pending.snapshot()
+      old!.cancelCurrentAuth()
+      let recovery = state.reconciliationTask
+      #expect(harness.pending.isCurrent(pendingB) && harness.pending.hasCodeVerifier())
+      current!.cancelCurrentAuth()
+      #expect(!harness.pending.hasCodeVerifier())
+      await harness.finish(&old, tasks: oldTasks)
+      await recovery?.value
+      await harness.finish(&current)
+    }
+  }
+
+  @Test(arguments: ["manual", "cold-inbox", "browser"])
+  func oldCorrelatedReturnCannotConsumeCurrentPendingSignIn(ingress: String) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let original = try saveSession()
+      let initial = ProfileLoadGate(), next = ProfileLoadGate()
+      await initial.complete(true); await next.complete(true)
+      let state = makeState(ControlledProfileRepository(loadGates: [initial, next]))
+      await state.handleSignedInUserChange("same-user")
+      let harness = BrowserOwnerHarness()
+      harness.sessionToken = "native-B"
+      harness.seed("old-verifier-A")
+      let oldURL = harness.callbackURL
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.startBrowserAuth(isMock: false)
+      await harness.open(owner!, window: 0)
+      let pendingB = harness.pending.snapshot(), currentURL = harness.callbackURL
+      if ingress == "cold-inbox" {
+        MobileAuthCallbackURLInbox.shared.enqueue(oldURL)
+        owner!.drainPendingAuthCallbackURLs()
+      } else if ingress == "browser" { await harness.callback(0, url: oldURL) }
+      else { owner!.handleAuthReturn(oldURL) }
+      #expect(harness.pending.isCurrent(pendingB) && harness.pending.hasCodeVerifier())
+      #expect(harness.exchanges.isEmpty && !NativeSessionTokenStore.hasPendingAuth)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original && state.route == .ready)
+      owner!.handleAuthReturn(currentURL)
+      let tasks = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: tasks)
+      await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      #expect(harness.exchanges.count == 1 && harness.exchanges.first?.nativeAttempt == harness.nonce)
+      #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == "native-B")
+      await harness.finish(&owner, tasks: tasks)
+    }
+  }
+}
+
+extension AppStateTests {
+  @Test(arguments: [false, true])
+  func explicitPreconsumeRejectionAllowsOneLaterManualReturnWithoutAutomaticReplay(previousSession: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      var original: NativeRequestAuthorization?
+      if previousSession { original = try saveSession() }
+      let profiles = [ProfileLoadGate(), ProfileLoadGate(), ProfileLoadGate()]
+      for gate in profiles { await gate.complete(true) }
+      let state = makeState(ControlledProfileRepository(loadGates: profiles))
+      if previousSession { await state.handleSignedInUserChange("same-user") }
+      else { state.route = .signedOut }
+      let harness = BrowserOwnerHarness()
+      harness.exchangeFailure = NativeAuthExchangeError.rejectedBeforeConsume(reason: "wrong_attempt")
+      harness.seed("verifier-A")
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      let url = harness.callbackURL
+      let foreignURL = URL(string: url.absoluteString.replacingOccurrences(of: harness.nonce,
+        with: String(repeating: "B", count: 43)))!
+      owner!.handleAuthReturn(url)
+      let first = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: first)
+      // This duplicate must not survive rearm as an automatic view-drain retry.
+      MobileAuthCallbackURLInbox.shared.enqueue(url)
+      MobileAuthCallbackURLInbox.shared.enqueue(foreignURL)
+      await harness.exchangeGate.complete(true)
+      for task in first { await task.value }
+      #expect(harness.pending.hasCodeVerifier() && !NativeSessionTokenStore.hasPendingAuth)
+      #expect(NativeSessionTokenStore.requestAuthorization() == original)
+      #expect(state.route == (previousSession ? .ready : .signedOut))
+      #expect(owner!.authErrorMessage == MobileAuthCopy.failure)
+      let remaining = MobileAuthCallbackURLInbox.shared.drain()
+      #expect(remaining == [foreignURL])
+      for callback in remaining { owner!.handleAuthReturn(callback) }
+      #expect(harness.exchanges.count == 1 && owner!.workTasks.isEmpty)
+      harness.exchangeFailure = nil
+      MobileAuthCallbackURLInbox.shared.enqueue(url)
+      owner!.drainPendingAuthCallbackURLs()
+      let retry = owner!.workTasks
+      for task in retry { await task.value }
+      #expect(harness.exchanges.count == 2 && harness.exchanges.first == harness.exchanges.last)
+      #expect(!harness.pending.snapshot().isCorrelated && owner!.authErrorMessage == nil)
+      #expect(NativeSessionTokenStore.requestAuthorization()?.bearerToken == "native-A" && state.route == .ready)
+      await harness.finish(&owner, tasks: first + retry)
+    }
+  }
+
+  @Test(arguments: ["untagged", "OTT", "transport", "decode", "missing-credential", "persistence"])
+  func otherExchangeOutcomesNeverReopenThePendingAttempt(outcome: String) async throws {
+    try await withNativeAuthSecurityScript { @MainActor script in
+      let state = makeState(ControlledProfileRepository(loadGates: []),
+        sessionRevoker: MockSessionRevoker(result: .revoked))
+      state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      switch outcome {
+      case "untagged": harness.exchangeFailure = NativeAuthExchangeError.requestFailed(statusCode: 401, reason: "wrong_attempt")
+      case "OTT": harness.exchangeFailure = NativeAuthExchangeError.requestFailed(statusCode: 401, reason: "ott_invalid")
+      case "transport": harness.exchangeFailure = NativeAuthExchangeError.transportFailed(code: URLError.timedOut.rawValue)
+      case "decode": harness.exchangeFailure = NativeAuthExchangeError.decodingFailed
+      case "persistence": script.configure(addStatus: errSecDuplicateItem)
+      default: harness.sessionToken = ""
+      }
+      harness.seed("verifier-A")
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      let url = harness.callbackURL
+      owner!.handleAuthReturn(url)
+      let tasks = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: tasks)
+      await harness.exchangeGate.complete(true)
+      for task in tasks { await task.value }
+      #expect(!harness.pending.snapshot().isCorrelated && !harness.pending.hasCodeVerifier())
+      #expect(!NativeSessionTokenStore.hasPendingAuth && NativeSessionTokenStore.load() == nil)
+      #expect(state.route == .signedOut && owner!.authErrorMessage == MobileAuthCopy.failure)
+      #expect(script.calls.contains("add") == (outcome == "persistence"))
+      owner!.handleAuthReturn(url)
+      #expect(harness.exchanges.count == 1 && owner!.workTasks.isEmpty)
+      await harness.finish(&owner, tasks: tasks)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func latePreconsumeResponseCannotReopenOrReportFailureOverReplacement(browserReplacement: Bool) async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let state = makeState(ControlledProfileRepository(loadGates: []))
+      state.route = .signedOut
+      let harness = BrowserOwnerHarness()
+      harness.exchangeFailure = NativeAuthExchangeError.rejectedBeforeConsume(reason: "wrong_attempt")
+      harness.seed("verifier-A")
+      var owner: MobileAuthCoordinator? = harness.owner(state)
+      owner!.handleAuthReturn(harness.callbackURL)
+      let old = owner!.workTasks
+      _ = await harness.entered(harness.exchangeGate, tasks: old)
+      if browserReplacement {
+        owner!.startSignIn(baseURL: state.configuration.webBaseURL) { _ in }
+        await harness.open(owner!, window: 0)
+      } else {
+        harness.nonce = String(repeating: "B", count: 43)
+        harness.seed("verifier-B")
+      }
+      let recovery = state.reconciliationTask, pendingB = harness.pending.snapshot()
+      await harness.exchangeGate.complete(true)
+      for task in old { await task.value }
+      await recovery?.value
+      #expect(harness.pending.isCurrent(pendingB) && harness.pending.hasCodeVerifier())
+      #expect(owner!.authErrorMessage == nil && harness.exchanges.count == 1)
+      await harness.finish(&owner, tasks: old)
     }
   }
 }

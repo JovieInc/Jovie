@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   getWaitlistAccess: vi.fn(),
   isWaitlistGateEnabled: vi.fn(),
   getSession: vi.fn(),
-  resolveSyntheticPassage: vi.fn(),
+  resolveSyntheticPassage: vi.fn().mockResolvedValue(null),
+  resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('next/headers', () => ({
@@ -21,6 +22,10 @@ vi.mock('@/lib/auth/better-auth', () => ({
 
 vi.mock('@/lib/synthetic/passage.server', () => ({
   resolveSyntheticPassage: mocks.resolveSyntheticPassage,
+}));
+
+vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
+  resolveStartEntryProfile: mocks.resolveStartEntryProfile,
 }));
 
 // OnboardingShell is a UI component we don't need to render in this test.
@@ -108,6 +113,34 @@ describe('StartPage', () => {
     });
   });
 
+  it('passes the real page behind a handle-only entry into the shell', async () => {
+    const entry = { status: 'available', handle: 'megaran' } as const;
+    mocks.resolveStartEntryProfile.mockResolvedValueOnce(entry);
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({ handle: 'megaran' }),
+    });
+
+    expect(mocks.resolveStartEntryProfile).toHaveBeenCalledWith({
+      handle: 'megaran',
+    });
+    expect(result.props.entryProfile).toEqual(entry);
+  });
+
+  it('skips the handle lookup when an explicit starter prompt drives the chat', async () => {
+    mocks.resolveStartEntryProfile.mockClear();
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({
+        handle: 'megaran',
+        starter_prompt: 'I want to claim jov.ie/megaran.',
+      }),
+    });
+
+    expect(mocks.resolveStartEntryProfile).not.toHaveBeenCalled();
+    expect(result.props.entryProfile).toBeNull();
+  });
+
   it('redirects a pending account to the canonical receipt when the waitlist read fails', async () => {
     mocks.resolveUserState.mockResolvedValueOnce({
       state: 'WAITLIST_PENDING',
@@ -185,6 +218,41 @@ describe('StartPage', () => {
       const result = await StartPage({ searchParams: Promise.resolve({}) });
 
       expect(result.props.turnstileTestMode).toBe(false);
+    });
+
+    it('keeps the production widget when synthetic approval itself fails', async () => {
+      mocks.resolveUserState.mockResolvedValueOnce({
+        state: 'NEEDS_ONBOARDING',
+        context: { email: 'signup+synthetic-grokbot@canary.example' },
+      });
+      mocks.getSession.mockResolvedValueOnce({ user: { id: 'u2' } });
+      mocks.resolveSyntheticPassage.mockRejectedValueOnce(
+        new Error('gate down')
+      );
+
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(result.props.turnstileTestMode).toBe(false);
+    });
+
+    it('preserves the handle entry while mounting an approved synthetic widget', async () => {
+      const entry = { status: 'available', handle: 'megaran' } as const;
+      mocks.resolveStartEntryProfile.mockResolvedValueOnce(entry);
+      mocks.resolveUserState.mockResolvedValueOnce({
+        state: 'NEEDS_ONBOARDING',
+        context: { email: 'signup+synthetic-grokbot@canary.example' },
+      });
+      mocks.getSession.mockResolvedValueOnce({ user: { id: 'u2' } });
+      mocks.resolveSyntheticPassage.mockResolvedValueOnce({
+        actorId: 'grokbot',
+      });
+
+      const result = await StartPage({
+        searchParams: Promise.resolve({ handle: 'megaran' }),
+      });
+
+      expect(result.props.entryProfile).toEqual(entry);
+      expect(result.props.turnstileTestMode).toBe(true);
     });
   });
 });

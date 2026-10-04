@@ -137,8 +137,9 @@ function renderedEvidenceIssue(
 }
 
 const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
-  '(marketing)/artist-profiles/page.tsx': () => <ArtistProfileLandingRoute />,
-  '(marketing)/artist-profile/page.tsx': () => <ArtistProfileLandingRoute />,
+  '(marketing)/artist-profiles/page.tsx': () => (
+    <ArtistProfileLandingRoute logoPlacement={{ page: '/artist-profiles' }} />
+  ),
   '(marketing)/solutions/[audience]/page.tsx': () => (
     <SolutionsRecordBody record={solutionsArtistsPage} />
   ),

@@ -13,6 +13,7 @@ enum LaunchMode: Equatable, CaseIterable {
   case uiTestingChatOffline
   case uiTestingChatEntityFixture
   case uiTestingChatAllComponents
+  case uiTestingStorefrontChat
   case uiTestingSettings
   case uiTestingVenueMode
   case uiTestingQRUnavailable
@@ -44,6 +45,7 @@ enum LaunchMode: Equatable, CaseIterable {
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
+         .uiTestingStorefrontChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingQRUnavailable,
@@ -74,6 +76,7 @@ enum LaunchMode: Equatable, CaseIterable {
       || self == .uiTestingChatOffline
       || self == .uiTestingChatEntityFixture
       || self == .uiTestingChatAllComponents
+      || self == .uiTestingStorefrontChat
       || self == .uiTestingWhatsNew
   }
 
@@ -86,6 +89,8 @@ enum LaunchMode: Equatable, CaseIterable {
       return MobileChatEntityFixture.default
     case .uiTestingChatAllComponents:
       return MobileChatAllComponentsFixture.default
+    case .uiTestingStorefrontChat:
+      return MobileChatStorefrontFixture.default
     default:
       return nil
     }
@@ -97,6 +102,8 @@ enum LaunchMode: Equatable, CaseIterable {
       return MobileChatEntityFixture.conversationID
     case .uiTestingChatAllComponents:
       return MobileChatAllComponentsFixture.conversationID
+    case .uiTestingStorefrontChat:
+      return MobileChatStorefrontFixture.conversationID
     default:
       return nil
     }
@@ -206,6 +213,10 @@ enum LaunchMode: Equatable, CaseIterable {
 
     if arguments.contains("-ui-testing-chat-all-components") {
       return .uiTestingChatAllComponents
+    }
+
+    if arguments.contains("-ui-testing-storefront-chat") {
+      return .uiTestingStorefrontChat
     }
 
     if arguments.contains("-ui-testing-settings") {

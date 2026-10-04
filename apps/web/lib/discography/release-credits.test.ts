@@ -313,6 +313,53 @@ describe('release credit integrity', () => {
     ).toMatchObject({ spotifyId: 'tones-and-i' });
   });
 
+  it('does not duplicate or flag a primary whose name differs only by case', () => {
+    const reconciled = reconcilePrimaryArtists({
+      storedCredits: [
+        {
+          artistId: 'artist-tones',
+          name: 'Tones and I',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+      ],
+      providerArtists: [
+        { provider: 'spotify', id: 'tones-and-i', name: 'Tones And I' },
+      ],
+    });
+
+    expect(reconciled.primaryArtists.map(credit => credit.name)).toEqual([
+      'Tones and I',
+    ]);
+    expect(reconciled.mismatch).toBeNull();
+  });
+
+  it('does not hide a provider id conflict behind a case-only name match', () => {
+    const reconciled = reconcilePrimaryArtists({
+      storedCredits: [
+        {
+          artistId: 'artist-tones',
+          spotifyId: 'different-spotify-artist',
+          name: 'Tones and I',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+      ],
+      providerArtists: [
+        { provider: 'spotify', id: 'tones-and-i', name: 'Tones And I' },
+      ],
+    });
+
+    expect(reconciled.primaryArtists).toHaveLength(2);
+    expect(reconciled.mismatch).toMatchObject({
+      addedNames: ['Tones And I'],
+    });
+  });
+
   it('does not treat unrelated neighbors as a split provider artist', () => {
     const reconciled = reconcilePrimaryArtists({
       storedCredits: [

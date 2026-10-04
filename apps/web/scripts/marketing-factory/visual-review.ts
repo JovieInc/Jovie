@@ -12,6 +12,9 @@
 
 import type { JudgeTransport } from '@jovie/copy';
 import { modelFamily } from '@jovie/copy';
+import { findRefCopies } from '@/lib/agent-os/design-reference-corpus/perceptual-hash';
+import type { ArtDirection } from '@/lib/agent-os/design-reference-corpus/refs-context';
+import type { CorpusReferenceRecord } from '@/lib/agent-os/design-reference-corpus/types';
 import {
   auditMarketingTasteAdmission,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
@@ -65,7 +68,7 @@ export interface VisualReview {
 
 export type VisualReviewOutcome = VisualReview | Unavailable;
 
-const VISUAL_REVIEW_ROW: RoutedInvariantRow = {
+export const VISUAL_REVIEW_ROW: RoutedInvariantRow = {
   rowId: 'factory-visual-review',
   invariantId: 'factory-visual-review',
   ruleId: null,
@@ -80,7 +83,48 @@ const VISUAL_REVIEW_ROW: RoutedInvariantRow = {
   },
 };
 
-function unitFor(pageId: string): CertifiableUnit {
+/**
+ * The design reference corpus as the review sees it (JOV-7081): every
+ * reference for the anti-copy guard, plus the surface's active art
+ * direction for the judges to score movement toward.
+ */
+export interface RefGuard {
+  readonly references: readonly CorpusReferenceRecord[];
+  readonly direction: ArtDirection | null;
+  /** Injectable for tests; defaults to the dHash corpus check. */
+  readonly findCopies?: typeof findRefCopies;
+}
+
+/** The judge rubric stays under the dispatcher's 4k cap with this budget. */
+const DIRECTION_RUBRIC_CHARS = 1_000;
+
+export function directionRubric(direction: ArtDirection): string {
+  const { principles } = direction;
+  const text = [
+    `${direction.title}: ${direction.thesis}`,
+    `Light: ${principles.light[0]}`,
+    `Composition: ${principles.composition[0]}`,
+    `Type: ${principles.type[0]}`,
+    `Color: ${principles.color[0]}`,
+    'Pass work that moves toward this direction in Jovie tokens; fail work that reproduces a reference layout, image or mark.',
+  ].join(' ');
+  return text.length > DIRECTION_RUBRIC_CHARS
+    ? `${text.slice(0, DIRECTION_RUBRIC_CHARS - 1)}…`
+    : text;
+}
+
+function reviewRow(direction: ArtDirection | null): RoutedInvariantRow {
+  if (!direction) return VISUAL_REVIEW_ROW;
+  return {
+    ...VISUAL_REVIEW_ROW,
+    policyFingerprintSource: {
+      ...(VISUAL_REVIEW_ROW.policyFingerprintSource as object),
+      direction: directionRubric(direction),
+    },
+  };
+}
+
+export function visualReviewUnit(pageId: string): CertifiableUnit {
   return {
     id: `factory:${pageId}`,
     kind: 'screen',
@@ -112,7 +156,8 @@ export function sameFamilyFinding(
  */
 export async function runVisualReview(
   request: VisualReviewRequest,
-  judges: RouteJudges
+  judges: RouteJudges,
+  refs: RefGuard | null = null
 ): Promise<VisualReviewOutcome> {
   if (judges.cheap.id === null) {
     return {
@@ -139,12 +184,33 @@ export async function runVisualReview(
       reason: 'no rendered screenshots to review',
     };
   }
-  const unit = unitFor(request.pageId);
+  if (refs) {
+    // Deterministic and free, so it runs before any judge is paid.
+    const copies = await (refs.findCopies ?? findRefCopies)({
+      images: request.captures.map(capture => capture.screenshot.path),
+      references: refs.references,
+    });
+    if (copies.length > 0) {
+      return {
+        status: 'reviewed',
+        judgeModel: 'design-refs/anti-copy',
+        verdict: 'fail',
+        score: 0,
+        findings: copies.map(
+          copy =>
+            `ref-copy: ${copy.image} at y=${copy.region.top} is ${copy.distance} bits from reference ${copy.referenceId}`
+        ),
+        judges: [],
+      };
+    }
+  }
+  const row = reviewRow(refs?.direction ?? null);
+  const unit = visualReviewUnit(request.pageId);
   const decisions = [];
   for (const capture of request.captures) {
     const decision = await runClassifierFirst(
       {
-        row: VISUAL_REVIEW_ROW,
+        row,
         unit,
         cellId: `factory-visual-review::${request.pageId}@${capture.width}`,
         text: null,
@@ -262,22 +328,50 @@ export function auditVisualAdmission(input: {
 
 /**
  * Live vision judges, mirroring design-ci-judge-dispatch buildLiveJudges:
- * the cheap judge excludes the producer family, the flagship excludes the
- * cheap judge's family. Unreachable models leave the id null.
+ * both judges exclude the producer family, and the flagship also excludes
+ * the cheap judge's family. An unavailable escalation stays undecided.
+ */
+type LoadArtEvaluator = () => Promise<
+  ArtEvaluatorModule & { subscriptionVisionTransport(): VisionTransport }
+>;
+
+const loadLiveArtEvaluator: LoadArtEvaluator = async () =>
+  (await import(
+    '../../../../scripts/vision/art-evaluator.mjs'
+  )) as unknown as ArtEvaluatorModule & {
+    subscriptionVisionTransport(): VisionTransport;
+  };
+
+/** One named live vision judge, for judge-calibration.ts. */
+export async function liveVisionJudge(
+  transport: JudgeTransport | null,
+  model: string,
+  loadArtEvaluator: LoadArtEvaluator = loadLiveArtEvaluator
+) {
+  const reachable = transport?.available?.(model) ?? false;
+  const art = await loadArtEvaluator();
+  return visionJudge({
+    module: art,
+    transport: art.subscriptionVisionTransport(),
+    model: reachable ? model : null,
+  });
+}
+
+/**
+ * `failedCalibration`: judges the latest judge-calibration receipt failed;
+ * they are never seated.
  */
 export async function liveVisualJudges(
   transport: JudgeTransport | null,
   producerModel: string,
-  loadArtEvaluator: () => Promise<
-    ArtEvaluatorModule & { subscriptionVisionTransport(): VisionTransport }
-  > = async () =>
-    (await import(
-      '../../../../scripts/vision/art-evaluator.mjs'
-    )) as unknown as ArtEvaluatorModule & {
-      subscriptionVisionTransport(): VisionTransport;
-    }
+  failedCalibration: ReadonlySet<string> = new Set(),
+  loadArtEvaluator: LoadArtEvaluator = loadLiveArtEvaluator
 ): Promise<RouteJudges> {
-  const available = visionAvailability(transport?.available ?? (() => false));
+  const reachable = visionAvailability(transport?.available ?? (() => false));
+  const available = (model: string) =>
+    !failedCalibration.has(model) &&
+    reachable(model) &&
+    sameFamilyFinding(model, producerModel) === null;
   const cheap = pickRoleModel('vision-judge', {
     available,
     modality: 'vision',

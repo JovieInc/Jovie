@@ -55,6 +55,14 @@ SURFACE_MARKER = "symphony-surface"
 CLAIM_WINDOW_S = 30 * 60
 HOLD_NAG_S = 24 * 3600
 LOCKFILES = frozenset({"pnpm-lock.yaml"})
+# Conflicts confined to machine-derived files resolve without a model: take main's copy,
+# run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
+# extends the same deterministic rung to the generated workflow topology so Symphony PRs
+# stop hand-merging `.gen.` output.
+GENERATED_RESOLVERS = {
+    ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
+    "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+}
 DIFF_POLICY = frozenset({"secret-file", "diff-too-large", "lockfile-without-manifest"})
 STALE_LABELS = frozenset({"lane-fix-exhausted", "queue-poison", "lane-fix-escalating"})
 FLAKY_CONCLUSIONS = frozenset({"CANCELLED", "TIMED_OUT", "STARTUP_FAILURE", "CANCELED"})
@@ -287,7 +295,9 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
 
     if merge in {"DIRTY", "BEHIND"} or str(pr.get("mergeable") or "").upper() == "CONFLICTING":
         files = [str(path) for path in (pr.get("conflictFiles") or [])]
-        subtype = "lockfile-only" if files and set(files) <= LOCKFILES else "semantic"
+        subtype = ("lockfile-only" if set(files) <= LOCKFILES else
+                   "generated-only" if set(files) <= GENERATED_RESOLVERS.keys() else
+                   "semantic") if files else "semantic"
         if bot_threads:
             evidence.append("unresolved bot review: " + "; ".join(
                 f"{thread.get('severity') or 'note'} {(thread.get('body') or '')[:120]}"
@@ -295,7 +305,7 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
         if files:
             evidence.append("conflicts: " + ", ".join(files[:12]))
         evidence.append(f"mergeStateStatus={merge or 'CONFLICTING'}")
-        action = "resolve-lockfile" if subtype == "lockfile-only" else "update-branch"
+        action = "resolve-generated" if subtype in {"lockfile-only", "generated-only"} else "update-branch"
         return blocker("needs-rebase", subtype, evidence, action)
 
     overlap = _main_overlap(pr, main_rollup)
@@ -366,10 +376,12 @@ def classify_event(event: dict) -> dict:
     return blocker("fixable-by-model", source or "event", [excerpt[:240] or "remediation event"], "route")
 
 
-def _indexed(providers: dict) -> list[tuple[int, int, str, dict]]:
+def _indexed(providers: dict, *, remote: bool = False) -> list[tuple[int, int, str, dict]]:
+    """Lanes by tier. Remote-only lanes (`repairs: false`, Hyperagent) cannot continue a local
+    worktree or repair a checkout, so handoff and escalation never see them unless asked."""
     rows = []
     for index, (name, spec) in enumerate(providers.items()):
-        if not isinstance(spec, dict):
+        if not isinstance(spec, dict) or (not remote and spec.get("repairs") is False):
             continue
         tier = spec.get("tier", index)
         try:
@@ -432,6 +444,136 @@ def select_escalation_lane(providers: dict, attempted: set[str], *, healthy=None
         return None
     strongest = max(catalog, key=lambda row: (row["tier"], -row["index"]))
     return {**strongest, "topRung": True}
+
+
+# ---------------------------------------------------------------- issue routing (JOV-7706)
+# One decision per issue: the capability floor comes from risk (routing.json), then the
+# cheapest available route that clears it, by effective cost = route cost x quota pressure.
+# Free and subsidized lanes come first; subscription lanes get dearer as their window fills
+# and drop out while banked. Nothing ever falls below the floor: no qualifying route holds.
+
+CAPABILITIES = ("bounded", "standard", "frontier")
+ROUTING_SCHEMA = "jovie-lane-route/v1"
+
+
+def capability_rank(name) -> int:
+    return CAPABILITIES.index(name) if name in CAPABILITIES else CAPABILITIES.index("standard")
+
+
+def required_capability(title: str, description: str, labels, policy: dict) -> dict:
+    """Risk floor for one issue. Frontier evidence beats a bounded marker: a frozen plan for a
+    protected surface still needs a frontier implementer here (JOV-7343 phase receipts are
+    separate work), so cheap lanes only take bounded work that touches nothing protected."""
+    lowered = {str(label).lower() for label in labels or ()}
+    reasons = []
+    frontier = policy.get("frontier") or {}
+    for label in sorted(lowered & {str(x).lower() for x in frontier.get("labels") or ()}):
+        reasons.append(f"label:{label}")
+    for pattern in frontier.get("titlePatterns") or ():
+        if re.search(pattern, title or "", re.I):
+            reasons.append(f"title:{pattern}")
+    for pattern in frontier.get("bodyPatterns") or ():
+        if re.search(pattern, description or "", re.I):
+            reasons.append(f"body:{pattern}")
+    if reasons:
+        return {"capability": "frontier", "reasons": reasons}
+    bounded = policy.get("bounded") or {}
+    for label in sorted(lowered & {str(x).lower() for x in bounded.get("labels") or ()}):
+        reasons.append(f"label:{label}")
+    for marker in bounded.get("bodyMarkers") or ():
+        if marker.lower() in (description or "").lower():
+            reasons.append(f"marker:{marker}")
+    if reasons:
+        return {"capability": "bounded", "reasons": reasons}
+    return {"capability": "standard", "reasons": ["default"]}
+
+
+def issue_routes(providers: dict) -> list[dict]:
+    """Every enabled (lane, model) route with its capability and base cost."""
+    rows = []
+    for tier, index, name, spec in _indexed(providers, remote=True):
+        if not spec.get("enabled", True):
+            continue
+        for order, route in enumerate(spec.get("routes") or ()):
+            if not isinstance(route, dict) or not route.get("model"):
+                continue
+            rows.append({"lane": name, "model": route["model"], "alias": route.get("alias"),
+                         "capability": route.get("capability", "standard"),
+                         "costClass": route.get("costClass"), "cost": float(route.get("cost", tier)),
+                         "tier": tier, "index": index, "order": order})
+    return rows
+
+
+def explicit_lane(labels, providers: dict) -> dict | None:
+    """`route:<lane>[:<alias>]` or a bare lane label names the route; the floor still applies."""
+    lowered = [str(label).lower() for label in labels or ()]
+    for label in lowered:
+        if label.startswith("route:"):
+            parts = label.split(":")
+            if len(parts) >= 2 and parts[1] in providers:
+                return {"lane": parts[1], "alias": parts[2] if len(parts) > 2 else None, "via": label}
+    for name, spec in providers.items():
+        if isinstance(spec, dict) and str(spec.get("label", name)).lower() in lowered:
+            return {"lane": name, "alias": None, "via": spec.get("label", name)}
+    return None
+
+
+def route_issue(issue: dict, providers: dict, policy: dict, availability, *, only_lanes=None) -> dict:
+    """Pure routing decision; `availability(lane, route)` returns {ok, why, pressure}.
+
+    Candidates are routes at or above the floor, cheapest effective cost first (ties: tier,
+    then list order). An explicit lane narrows the candidates to that lane when it can clear
+    the floor; otherwise it is ignored and the receipt says so. `only_lanes` is the guarded
+    sensitive-surface restriction. The first available candidate is chosen; none -> held.
+    """
+    labels = issue.get("labels") or []
+    need = required_capability(issue.get("title", ""), issue.get("description", ""), labels, policy)
+    floor = capability_rank(need["capability"])
+    routes = issue_routes(providers)
+    if only_lanes is not None:
+        routes = [row for row in routes if row["lane"] in only_lanes]
+    qualified = [row for row in routes if capability_rank(row["capability"]) >= floor]
+    explicit = explicit_lane(labels, providers)
+    notes = []
+    if explicit:
+        pinned = [row for row in qualified if row["lane"] == explicit["lane"]
+                  and (explicit["alias"] is None or row["alias"] == explicit["alias"])]
+        if pinned:
+            qualified = pinned
+            notes.append(f"explicit:{explicit['via']}")
+        else:
+            notes.append(f"explicit-below-floor-or-disabled:{explicit['via']}")
+    candidates = []
+    for row in qualified:
+        seen = availability(row["lane"], row) or {}
+        pressure = max(0.0, float(seen.get("pressure") or 0.0))
+        candidates.append({**row, "available": bool(seen.get("ok")), "why": seen.get("why") or "ok",
+                           "pressure": round(pressure, 3),
+                           "effectiveCost": round(row["cost"] * (1 + pressure), 3)})
+    candidates.sort(key=lambda row: (row["effectiveCost"], row["tier"], row["index"], row["order"]))
+    chosen = next((row for row in candidates if row["available"]), None)
+    rejected = [row for row in routes if capability_rank(row["capability"]) < floor]
+    if chosen is None:
+        rationale = (f"no available route clears the {need['capability']} floor; held, never downgraded"
+                     if candidates else f"no enabled route clears the {need['capability']} floor; held")
+    else:
+        cheaper = [row for row in candidates if row["effectiveCost"] < chosen["effectiveCost"]]
+        rationale = (f"{need['capability']} work ({', '.join(need['reasons'])}) -> {chosen['lane']}/"
+                     f"{chosen['model']} at effective cost {chosen['effectiveCost']} "
+                     f"({chosen['costClass'] or 'unclassed'}, pressure {chosen['pressure']})")
+        if cheaper:
+            rationale += "; cheaper skipped: " + ", ".join(f"{row['lane']}/{row['model']}={row['why']}" for row in cheaper)
+        if rejected:
+            rationale += "; below floor: " + ", ".join(sorted({f"{row['lane']}/{row['model']}" for row in rejected}))
+    return {"schema": ROUTING_SCHEMA, "issue": issue.get("identifier"), "required": need["capability"],
+            "reasons": need["reasons"], "notes": notes,
+            "chosen": None if chosen is None else {key: chosen[key] for key in
+                                                   ("lane", "model", "alias", "capability", "costClass",
+                                                    "cost", "pressure", "effectiveCost")},
+            "candidates": [{key: row[key] for key in ("lane", "model", "capability", "cost", "pressure",
+                                                      "effectiveCost", "available", "why")}
+                           for row in candidates],
+            "rationale": rationale}
 
 
 def _rungs(record: dict, head: str, kind: str | None = None, rung: str | None = None) -> list[dict]:
@@ -515,8 +657,8 @@ def plan_ladder(classified: dict, record: dict, providers: dict, now: float, hea
         if not deterministic_used(record, head, "rerun"):
             return {"action": "rerun", "reason": "flaky-infra", "kind": "deterministic", "cls": cls}
     if cls == "needs-rebase":
-        if subtype == "lockfile-only" and not deterministic_used(record, head, "lockfile"):
-            return {"action": "resolve-lockfile", "reason": "lockfile-only", "kind": "deterministic", "cls": cls}
+        if subtype in {"lockfile-only", "generated-only"} and not deterministic_used(record, head, "lockfile"):
+            return {"action": "resolve-lockfile", "reason": subtype, "kind": "deterministic", "cls": cls}
         if not deterministic_used(record, head, "update-branch"):
             return {"action": "update-branch", "reason": subtype or "needs-rebase", "kind": "deterministic", "cls": cls}
     if cls in {"fixable-by-model", "needs-rebase", "flaky-infra"}:

@@ -2,11 +2,14 @@
 import { MarketingPageShell } from '@/components/marketing/MarketingPageShell';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import type { LogoPlacement } from '@/data/product-truth/logo-permissions';
 import { ARTIST_PROFILE_FLAGS } from '@/lib/featureFlags';
 import { ArtistProfileLandingPage } from './ArtistProfileLandingPage';
 import './ArtistProfileLandingPage.css';
 
-export function ArtistProfileLandingRoute() {
+export function ArtistProfileLandingRoute({
+  logoPlacement,
+}: Readonly<{ logoPlacement: LogoPlacement }>) {
   return (
     <MarketingPageShell
       className='artist-profiles-home-system'
@@ -15,6 +18,7 @@ export function ArtistProfileLandingRoute() {
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
         flags={ARTIST_PROFILE_FLAGS}
+        logoPlacement={logoPlacement}
       />
     </MarketingPageShell>
   );

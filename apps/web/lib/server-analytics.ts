@@ -21,8 +21,9 @@ import {
 import { type DbOrTransaction, db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { withTimeout } from '@/lib/resilience/primitives';
+import { ACCOUNT_METRIC_COHORTS } from '@/lib/utils/email';
 
-export const SERVER_ANALYTICS_CONTRACT_VERSION = 'server-analytics/v1';
+export const SERVER_ANALYTICS_CONTRACT_VERSION = 'server-analytics/v2';
 export const SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS = 2_000;
 export const SERVER_ANALYTICS_PRIVACY_CLASS =
   'pseudonymous_ids_no_contact_data';
@@ -254,11 +255,11 @@ export const SERVER_ANALYTICS_EVENTS = {
     category: 'billing',
     properties: ['stripeEventId'],
   },
-  // signup-funnel/v1: no source entity, so a step can never be joined back
+  // signup-funnel/v2: no source entity, so a step can never be joined back
   // to a profile, user, or visitor.
   funnel_step: {
     category: 'funnel',
-    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason'],
+    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason', 'cohort'],
   },
   asset_page_viewed: limitedDropEvent,
   drop_countdown_viewed: limitedDropEvent,
@@ -475,6 +476,7 @@ const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   funnel_id: new Set(SIGNUP_FUNNEL_IDS),
   step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
   outcome: new Set(SIGNUP_FUNNEL_OUTCOMES),
+  cohort: new Set(ACCOUNT_METRIC_COHORTS),
   item_mode: new Set(LIMITED_DROP_ITEM_MODES),
   page_id: new Set(LIMITED_DROP_PAGE_IDS),
   state: new Set(LIMITED_DROP_STATES),

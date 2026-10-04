@@ -37,13 +37,17 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
       // rollout role-invariant so entering customer mode never gives admins
       // a different sidebar from creators.
       flagName !== 'INBOX_HOME' &&
+      // Unapproved workspace doors remain off for admins and customers.
+      flagName !== 'YOUTUBE_WORKSPACE_NAV' &&
+      flagName !== 'JOVIE_WORK_NAV' &&
       // External-recipient paid welcome stays founder-gated. Admins must
       // not receive a different default than customers (JOV-6445).
       flagName !== 'PAID_WELCOME_EMAIL' &&
       // Creator Financial Health is a release-blocking gate (JOV-4621):
       // owner-only financial data must stay dark for everyone — including
       // admins — until the privacy/correctness matrix is certified.
-      flagName !== 'CREATOR_FINANCE'
+      flagName !== 'CREATOR_FINANCE' &&
+      flagName !== 'VISIBILITY_AUDIT_OFFER'
   )
 );
 

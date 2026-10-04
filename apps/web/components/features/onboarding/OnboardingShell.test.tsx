@@ -1,7 +1,10 @@
 import { act, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { OnboardingShell } from './OnboardingShell';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildEntryProfileBuilderState,
+  OnboardingShell,
+} from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
@@ -72,11 +75,45 @@ vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
   resolveTurnstileSiteKey: () => null,
 }));
 
+const claimState = vi.hoisted(() => ({ value: 'error' }));
 vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
-  useOnboardingClaim: () => 'error',
+  useOnboardingClaim: () => claimState.value,
 }));
 
 describe('OnboardingShell status', () => {
+  beforeEach(() => {
+    claimState.value = 'error';
+  });
+
+  it.each([false, true])(
+    'forwards the server-selected Turnstile test mode (%s) to the widget',
+    testMode => {
+      render(
+        <OnboardingShell sessionLabel='pending' turnstileTestMode={testMode} />
+      );
+
+      expect(turnstileProps.current).toMatchObject({ testMode });
+    }
+  );
+
+  it('explains identity recovery without suggesting another handle or a blind retry', () => {
+    claimState.value = 'identity-conflict';
+    render(<OnboardingShell sessionLabel='pending' />);
+    const alert = screen.getByText(
+      /This Spotify artist already has a Jovie profile/
+    );
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(alert).toHaveTextContent('Sign in with the original account');
+    expect(alert).toHaveTextContent(
+      'Choosing another handle will not resolve this conflict'
+    );
+    expect(
+      screen.queryByText(
+        "We couldn't save your request. Refresh this page to try again."
+      )
+    ).not.toBeInTheDocument();
+  });
+
   it('renders the claim-error status with the error token, not raw red-* (JOV-6773)', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
@@ -135,5 +172,61 @@ describe('OnboardingShell status', () => {
     builderState.current = null;
 
     expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+  });
+
+  it('previews the prebuilt page behind /start?handle= before the chat knows anything (JOV-7753)', () => {
+    render(
+      <OnboardingShell sessionLabel='pending' entryProfile={MEGARAN_ENTRY} />
+    );
+
+    expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
+  });
+
+  it('keeps the rail hidden for an open handle with no page yet', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        entryProfile={{ status: 'available', handle: 'newartist' }}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('onboarding-profile-rail')
+    ).not.toBeInTheDocument();
+  });
+});
+
+const MEGARAN_ENTRY = {
+  status: 'claimable',
+  handle: 'megaran',
+  displayName: 'Mega Ran',
+  avatarUrl: 'https://blob.example.com/a.png',
+  spotifyId: null,
+  spotifyUrl: null,
+  genres: ['hip hop'],
+  socialLinks: ['https://instagram.com/megaran'],
+  linkPlatforms: ['instagram'],
+  linkCount: 1,
+} as const;
+
+describe('buildEntryProfileBuilderState (JOV-7753)', () => {
+  it('maps a prebuilt page to rail preview state and nothing else', () => {
+    expect(buildEntryProfileBuilderState(MEGARAN_ENTRY)).toEqual({
+      artist: {
+        id: 'handle-megaran',
+        name: 'Mega Ran',
+        url: '',
+        imageUrl: 'https://blob.example.com/a.png',
+        genres: ['hip hop'],
+      },
+      artistConfirmed: false,
+      handle: 'megaran',
+      socialLinks: ['https://instagram.com/megaran'],
+    });
+    expect(
+      buildEntryProfileBuilderState({ status: 'available', handle: 'x-y-z' })
+        .artist
+    ).toBeNull();
+    expect(buildEntryProfileBuilderState(null).artist).toBeNull();
   });
 });

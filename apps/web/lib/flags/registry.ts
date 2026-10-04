@@ -42,6 +42,8 @@ function buildBooleanFlag(flagName: AppFlagName): Flag<boolean> {
 }
 
 export const APP_FLAG_REGISTRY = {
+  YOUTUBE_WORKSPACE_NAV: buildBooleanFlag('YOUTUBE_WORKSPACE_NAV'),
+  JOVIE_WORK_NAV: buildBooleanFlag('JOVIE_WORK_NAV'),
   BILLING_UPGRADE_DIRECT: buildBooleanFlag('BILLING_UPGRADE_DIRECT'),
   SMARTLINK_PRE_SAVE: buildBooleanFlag('SMARTLINK_PRE_SAVE'),
   IOS_APPLE_MUSIC_PRIORITY: buildBooleanFlag('IOS_APPLE_MUSIC_PRIORITY'),
@@ -64,9 +66,9 @@ export const APP_FLAG_REGISTRY = {
   PROFILE_SEARCH_MONITORING: buildBooleanFlag('PROFILE_SEARCH_MONITORING'),
   ONBOARDING_WOW_TASK_QUEUE: buildBooleanFlag('ONBOARDING_WOW_TASK_QUEUE'),
   PAID_WELCOME_EMAIL: buildBooleanFlag('PAID_WELCOME_EMAIL'),
-  MERCH_QA_GATE: buildBooleanFlag('MERCH_QA_GATE'),
   AGENT_PROFILE_CREATE: buildBooleanFlag('AGENT_PROFILE_CREATE'),
   CREATOR_FINANCE: buildBooleanFlag('CREATOR_FINANCE'),
+  VISIBILITY_AUDIT_OFFER: buildBooleanFlag('VISIBILITY_AUDIT_OFFER'),
 } as const satisfies Record<AppFlagName, Flag<boolean>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/gate';
 import { captureWarning } from '@/lib/error-tracking';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.server';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
@@ -112,7 +113,14 @@ export default async function StartPage(
     typeof params.intent_id === 'string' ? params.intent_id : undefined;
   const starterHandoff = resolveStartEntryHandoff(params);
 
-  const authResult = await resolveUserState({ createDbUserIfMissing: false });
+  // JOV-7753: a handle-only entry (outreach, claim redirect) shows the
+  // visitor's real page first. Explicit prompts and intents keep their flow.
+  const [authResult, entryProfile] = await Promise.all([
+    resolveUserState({ createDbUserIfMissing: false }),
+    starterHandoff || intentId
+      ? Promise.resolve(null)
+      : resolveStartEntryProfile(params),
+  ]);
   const startRedirect = await resolveStartPageRedirect(authResult);
   if (startRedirect) {
     redirect(startRedirect);
@@ -128,6 +136,7 @@ export default async function StartPage(
       intentId={intentId}
       sessionLabel='pending'
       starterHandoff={starterHandoff}
+      entryProfile={entryProfile}
     />
   );
 }

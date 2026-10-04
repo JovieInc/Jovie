@@ -1,0 +1,46 @@
+/* MarketingAmbientField (JOV-7757). The poster is the same composition as
+   the shader at rest, so the cross-fade is a change in life, not in look. */
+
+.marketing-ambient-field {
+  --ambient-accent: var(--color-accent-blue);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--color-bg-page);
+  background-image: radial-gradient(
+    ellipse 81% 50% at 50% 0%,
+    color-mix(in oklab, var(--ambient-accent) 34%, transparent),
+    color-mix(in oklab, var(--ambient-accent) 10%, transparent) 55%,
+    transparent 80%
+  );
+}
+
+.marketing-ambient-field[data-accent="purple"] {
+  --ambient-accent: var(--color-accent-purple);
+}
+.marketing-ambient-field[data-accent="pink"] {
+  --ambient-accent: var(--color-accent-pink);
+}
+.marketing-ambient-field[data-accent="orange"] {
+  --ambient-accent: var(--color-accent-orange);
+}
+.marketing-ambient-field[data-accent="green"] {
+  --ambient-accent: var(--color-accent-green);
+}
+.marketing-ambient-field[data-accent="red"] {
+  --ambient-accent: var(--color-accent-red);
+}
+
+.marketing-ambient-field__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--duration-cinematic) var(--ease-out);
+}
+
+.marketing-ambient-field[data-live="true"] .marketing-ambient-field__canvas {
+  opacity: 1;
+}

@@ -4,6 +4,29 @@ Read [DESIGN.md](../../DESIGN.md) first. This is its on-demand reference, subord
 to root authority and current source registries. Load the section needed for the
 current task. The Decisions Log is historical evidence, not a second rule source.
 
+## Settings decisions
+
+Founder-locked 2026-10-02.
+
+- A user decision must earn a control or screen. Explain the user job, scope,
+  consequence and why the existing task context or grouped screen is insufficient.
+  Do not use a fixed number of controls as a screen-admission rule.
+- Prefer sensible automatic behavior. Preserve informed consent, privacy controls,
+  data export/deletion and meaningful manual overrides; explain an override when
+  documenting an automatic default. Convenience must not silently grant consent.
+- Group related decisions and disclose advanced choices progressively. Keep task
+  options and approvals in their workflow. Keep operator controls in Ovie.
+- Connections owns service status, permissions, consent and access recovery.
+  Suggested content or booking approvals belong to their appropriate inbox cards.
+- Reuse the live settings lists in `dashboard-nav/config.ts`, shared admission
+  metadata in `settings-decision-admission.ts`, and UnifiedSidebar renderer.
+  Admission joins the existing app-screen registry; aliases do not earn
+  duplicate screens. Update the existing snapshot/admission tests deliberately.
+- Contextual menus contain relevant secondary actions, not unrelated settings or
+  hidden essential consent. Usage surfaces show one truthful snapshot and status.
+- Verify behavior through existing local, weekly and shadow checks. Metadata and
+  structural validation are review evidence, not runtime or app-wide certification.
+
 ## Surface Classification
 
 > **Direction (2026-06-18, founder-locked): one design system, two languages.**
@@ -313,7 +336,9 @@ Three input variables generate the entire palette:
 
 Text secondary/tertiary/quaternary follow the **cinematic depth** ramp
 (founder-locked, Tim, 2026-09-25): one big step down from primary, then a
-compressed ordered tail. Each light value is ≥4.5:1 against white; secondary
+compressed ordered tail. Each light value is ≥4.5:1 against white, and the
+tail also clears 4.5:1 on the table row hover/selected tints in both themes
+(JOV-7861, `tests/unit/design-system/table-row-state-contrast.test.ts`); secondary
 and tertiary are also gated at 4.5:1 against `--color-bg-base`/`surface-1` by
 `contrast-pairs.config.json` (dark values follow the same ramp via the
 Noir Ion anchors below).
@@ -329,8 +354,8 @@ Noir Ion anchors below).
 | `--color-bg-secondary` | `lch(95.94% 0.5 282)` | `#f3f3f5` | Secondary surfaces, sidebar |
 | Text primary | `lch(9.894% 0 282)` | `#0c0c0c` | Headings, primary text |
 | Text secondary | `#5A606A` | `#5a606a` | Body text, labels |
-| Text tertiary | `#666C76` | `#666c76` | Descriptions, meta |
-| Text quaternary | `#6A7078` | `#6A7078` | Placeholders |
+| Text tertiary | `#626872` | `#626872` | Descriptions, meta |
+| Text quaternary | `#646A72` | `#646a72` | Placeholders |
 | Border subtle | `oklch(0% 0 0 / 6%)` | — | Dividers |
 | Border default | `oklch(0% 0 0 / 10%)` | — | Borders |
 | Border strong | `oklch(0% 0 0 / 18%)` | — | Emphasis |
@@ -355,7 +380,7 @@ prior anchors without a second theme provider).
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
 | Text secondary | `#A0A5AF` | `--color-text-secondary-token` | Labels |
 | Text muted | `#8F95A0` | `--color-text-tertiary-token` | Meta |
-| Text tertiary | `#858B96` | `--color-text-quaternary-token` | Placeholders |
+| Text tertiary | `#8C939E` | `--color-text-quaternary-token` | Placeholders |
 | Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
 | Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
 | Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |

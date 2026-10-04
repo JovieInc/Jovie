@@ -10,9 +10,11 @@ import {
   liveProviders,
 } from './providers';
 import {
+  type FactoryRunManifest,
   readJson,
   type StageAttemptRecord,
   verifyFactoryRun,
+  writeJson,
 } from './receipts';
 import { runFactory } from './run';
 import { FACTORY_STAGE_RUNNERS } from './stages';
@@ -66,6 +68,192 @@ afterEach(() => {
 });
 
 describe('factory:run content stages', () => {
+  it('blocks copy when an active variant has no renderer in this page family', async () => {
+    const generated: string[] = [];
+    const manifest = await run({
+      brief: {
+        ...brief,
+        hero: { useCase: 'claim-conversion', conversion: 'claim-profile' },
+      },
+      providers: dryProviders(brief, {
+        async generate(request) {
+          generated.push(request.stage);
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        },
+      }),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'layout' });
+    expect(
+      record('05-layout.attempt-3.json').receipt.invariantsFailed
+    ).toContain('family-renderer:hero-1');
+    expect(generated).not.toContain('copy');
+  });
+
+  it('never calls the copy model when the story layout fails', async () => {
+    const generated: string[] = [];
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        async generate(request) {
+          generated.push(request.stage);
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        },
+      }),
+      runners: {
+        ...CONTENT_STAGE_RUNNERS,
+        layout: async () => {
+          throw new Error('incomplete story: missing terminal conversion');
+        },
+      },
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'layout' });
+    expect(generated).not.toContain('copy');
+    expect(manifest.chain.map(link => link.stage)).not.toContain('copy');
+  });
+
+  it('blocks copy when an essential story job has no certified section', async () => {
+    const generated: string[] = [];
+    const manifest = await run({
+      brief: {
+        ...brief,
+        sectionJobs: [
+          ...brief.sectionJobs,
+          {
+            job: 'unregistered-required-mechanism',
+            contentShape: { headline: 40 },
+            mediaNeed: 'none',
+            evidence: ['claim:offer.free.price'],
+            essential: true,
+          },
+        ],
+      },
+      providers: dryProviders(brief, {
+        async generate(request) {
+          generated.push(request.stage);
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        },
+      }),
+    });
+
+    expect(manifest.status).toBe('failed');
+    expect(['layout', 'gap-detection']).toContain(manifest.stoppedAt);
+    expect(generated).not.toContain('copy');
+  });
+
+  it('blocks copy when persuasion alone finds an essential section gap', async () => {
+    const generated: string[] = [];
+    const persuasion = {
+      ...brief.persuasion,
+      benchmark: brief.persuasion.benchmark.map(entry =>
+        entry.primitive === 'capability-breadth'
+          ? {
+              ...entry,
+              status: 'weak' as const,
+              need: {
+                job: 'essential-persuasion-only-gap',
+                contentShape: { headline: 40 },
+                mediaNeed: 'none',
+                evidence: ['claim:offer.free.price'],
+                essential: true,
+              },
+            }
+          : entry
+      ),
+    };
+    const manifest = await run({
+      brief: { ...brief, persuasion },
+      providers: dryProviders(brief, {
+        async generate(request) {
+          generated.push(request.stage);
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        },
+      }),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'layout' });
+    expect(generated).not.toContain('copy');
+    expect(manifest.chain.map(link => link.stage)).not.toContain('copy');
+  });
+
+  it('passes nonessential persuasion section requests into the copy prompt', async () => {
+    let copyInput: unknown;
+    const persuasion = {
+      ...brief.persuasion,
+      benchmark: brief.persuasion.benchmark.map(entry =>
+        entry.primitive === 'capability-breadth'
+          ? {
+              ...entry,
+              status: 'weak' as const,
+              need: {
+                job: 'persuasion-only-copy-context',
+                contentShape: { headline: 40 },
+                mediaNeed: 'none',
+                evidence: ['claim:offer.free.price'],
+                essential: false,
+              },
+            }
+          : entry
+      ),
+    };
+    const manifest = await run({
+      brief: { ...brief, persuasion },
+      providers: dryProviders(brief, {
+        async generate(request) {
+          if (request.stage === 'copy') copyInput = request;
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        },
+      }),
+    });
+
+    expect(manifest.chain.map(link => link.stage)).toContain('copy');
+    expect(JSON.stringify(copyInput)).toContain('persuasion-only-copy-context');
+  });
+
+  it('binds the copy model to the passed layout and proof plan', async () => {
+    let copyInput: unknown;
+    const manifest = await run({
+      providers: dryProviders(brief, {
+        async generate(request) {
+          if (request.stage === 'copy') copyInput = request;
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        },
+      }),
+    });
+
+    const stages = manifest.chain.map(link => link.stage);
+    expect(stages.indexOf('layout')).toBeLessThan(stages.indexOf('copy'));
+    expect(stages.indexOf('proof')).toBeLessThan(stages.indexOf('copy'));
+    expect(stages.indexOf('gap-detection')).toBeLessThan(
+      stages.indexOf('copy')
+    );
+    expect(JSON.stringify(copyInput)).toContain(
+      'product-profile-subscribe-capture'
+    );
+  });
+
+  it('resolves layout from the verified narrative instead of a separate recipe order', async () => {
+    await run();
+    const narrative = record('04-narrative.attempt-1.json').artifact as {
+      sections: { sectionInstanceId: string; sectionId: string }[];
+    };
+    const layout = record('05-layout.attempt-1.json').artifact as {
+      sections: { sectionInstanceId: string; sectionId: string }[];
+    };
+
+    expect(
+      layout.sections.map(({ sectionInstanceId, sectionId }) => ({
+        sectionInstanceId,
+        sectionId,
+      }))
+    ).toEqual(
+      narrative.sections.map(({ sectionInstanceId, sectionId }) => ({
+        sectionInstanceId,
+        sectionId,
+      }))
+    );
+  });
+
   it('passes truth through gap detection and stops where no runner exists', async () => {
     const manifest = await run();
 
@@ -79,25 +267,25 @@ describe('factory:run content stages', () => {
       'persuasion',
       'outcomes',
       'narrative',
-      'copy',
       'layout',
       'hero-variant',
       'proof',
       'gap-detection',
+      'copy',
     ]);
     expect(verifyFactoryRun(runDir())).toEqual([]);
 
-    const copy = record('05-copy.attempt-1.json').receipt;
+    const copy = record('09-copy.attempt-1.json').receipt;
     expect(copy.producer).toMatchObject({
       modelId: 'fixture:anthropic/claude-opus-5.5',
       family: 'anthropic',
     });
     expect(copy.evaluators.map(e => e.family)).toEqual(['openai', 'zai']);
-    expect(record('07-hero-variant.attempt-1.json').artifact).toMatchObject({
-      variantId: 'xm2iz',
+    expect(record('06-hero-variant.attempt-1.json').artifact).toMatchObject({
+      variantId: 'joK4X',
       headerId: 'eoUUU',
     });
-    expect(record('08-proof.attempt-1.json').artifact).toMatchObject({
+    expect(record('07-proof.attempt-1.json').artifact).toMatchObject({
       items: [{ registryId: 'product-profile-subscribe-capture' }],
       requests: [],
     });
@@ -142,8 +330,8 @@ describe('stage retries', () => {
     });
 
     expect(manifest.chain.find(link => link.stage === 'copy')?.attempt).toBe(2);
-    expect(record('05-copy.attempt-1.json').receipt.passed).toBe(false);
-    expect(record('05-copy.attempt-2.json').feedbackIn).toContain(
+    expect(record('09-copy.attempt-1.json').receipt.passed).toBe(false);
+    expect(record('09-copy.attempt-2.json').feedbackIn).toContain(
       'copy-no-em-dash'
     );
     expect(verifyFactoryRun(runDir())).toEqual([]);
@@ -156,16 +344,22 @@ describe('stage retries', () => {
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'copy' });
     expect(manifest.attempts.filter(file => file.includes('-copy.'))).toEqual([
-      '05-copy.attempt-1.json',
-      '05-copy.attempt-2.json',
-      '05-copy.attempt-3.json',
+      '09-copy.attempt-1.json',
+      '09-copy.attempt-2.json',
+      '09-copy.attempt-3.json',
     ]);
-    expect(existsSync(join(runDir(), '06-layout.attempt-1.json'))).toBe(false);
+    expect(existsSync(join(runDir(), '10-media-decision.attempt-1.json'))).toBe(
+      false
+    );
     expect(manifest.chain.map(link => link.stage)).toEqual([
       'truth',
       'persuasion',
       'outcomes',
       'narrative',
+      'layout',
+      'hero-variant',
+      'proof',
+      'gap-detection',
     ]);
   });
 
@@ -180,13 +374,25 @@ describe('stage retries', () => {
     });
 
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'layout' });
-    expect(record('06-layout.attempt-3.json').feedbackIn).toContain(
+    expect(record('05-layout.attempt-3.json').feedbackIn).toContain(
       'stage-error: resolver exploded'
     );
   });
 });
 
 describe('harness rules', () => {
+  it('rejects a resume chain with the right length but old stage identities', async () => {
+    await run();
+    const path = join(runDir(), 'run.json');
+    const manifest = readJson<FactoryRunManifest>(path);
+    manifest.chain[4] = { ...manifest.chain[4], stage: 'copy' };
+    writeJson(path, manifest);
+
+    await expect(run({ fromStage: 'copy' })).rejects.toThrow(
+      /prior stage identities do not match the current spine order/
+    );
+  });
+
   it('rejects self-review even when the judge selection is wrong', async () => {
     const manifest = await run({
       providers: dryProviders(brief, {
@@ -229,7 +435,7 @@ describe('harness rules', () => {
     });
 
     expect(manifest.chain.map(link => link.stage)).toContain('copy');
-    const copy = record('05-copy.attempt-1.json').receipt;
+    const copy = record('09-copy.attempt-1.json').receipt;
     expect(copy.evaluators.every(e => e.score <= 1)).toBe(true);
   });
 

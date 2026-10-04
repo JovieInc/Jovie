@@ -21,6 +21,18 @@ import {
   type StageReceipt,
   validateStageReceipt,
 } from '../../data/marketing/factory/spine';
+import { listProductTruthClaims } from '../../data/product-truth/claims';
+import { PROOF_REGISTRY, type ProofItem } from '../../data/product-truth/proof';
+import {
+  type Capability,
+  type Claim,
+  listCapabilities,
+} from '../../data/product-truth/registry';
+import {
+  buildTruthDigest,
+  hashProof,
+} from '../../data/product-truth/truth-sync';
+import type { FactoryPageBrief } from './brief';
 
 export const FACTORY_RUN_SCHEMA = 'jovie.factory-run/v1' as const;
 
@@ -50,9 +62,70 @@ export function digestOf(value: unknown): string {
 
 export function stageInputDigest(
   briefDigest: string,
-  priorOutputDigests: readonly string[]
+  priorOutputDigests: readonly string[],
+  sourceDigest?: string | null
 ): string {
-  return digestOf({ brief: briefDigest, prior: priorOutputDigests });
+  const input = { brief: briefDigest, prior: priorOutputDigests };
+  return digestOf(sourceDigest ? { ...input, source: sourceDigest } : input);
+}
+
+export interface FactoryTruthSources {
+  readonly claims?: readonly Claim[];
+  readonly capabilities?: readonly Capability[];
+  readonly proofs?: readonly ProofItem[];
+}
+
+/**
+ * Source records owned directly by a factory stage. These snapshots are scoped
+ * to the page brief so a change for one capability does not invalidate other
+ * page runs.
+ */
+export function factoryStageSourceDigest(
+  stage: FactoryStage,
+  brief: Pick<FactoryPageBrief, 'claimIds' | 'proof' | 'asOf'>,
+  source: FactoryTruthSources = {}
+): string | null {
+  const claims = source.claims ?? listProductTruthClaims();
+  const capabilities = source.capabilities ?? listCapabilities();
+  const proofs = source.proofs ?? PROOF_REGISTRY;
+
+  if (stage === 'truth') {
+    const claimIds = new Set(brief.claimIds);
+    const relevantClaims = claims.filter(claim => claimIds.has(claim.id));
+    const capabilityIds = new Set(
+      relevantClaims.map(claim => claim.capabilityId)
+    );
+    const relevantCapabilities = capabilities.filter(capability =>
+      capabilityIds.has(capability.id)
+    );
+    return digestOf({
+      requestedClaimIds: [...claimIds].sort(),
+      truth: buildTruthDigest(relevantClaims, relevantCapabilities, []),
+    });
+  }
+
+  if (stage === 'proof') {
+    const claimIds = new Set(brief.proof.map(need => need.claimId));
+    const capabilityByClaim = new Map(
+      claims.map(claim => [claim.id, claim.capabilityId])
+    );
+    const evidence = proofs
+      .filter(proof => claimIds.has(proof.claimId))
+      .map(proof => ({
+        id: proof.id,
+        claimId: proof.claimId,
+        capabilityId: capabilityByClaim.get(proof.claimId) ?? null,
+        digest: hashProof(proof),
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id));
+    return digestOf({
+      asOf: brief.asOf,
+      requestedClaimIds: [...claimIds].sort(),
+      evidence,
+    });
+  }
+
+  return null;
 }
 
 export interface StageAttemptRecord {
@@ -91,6 +164,21 @@ export const FactoryRunManifestSchema = z.object({
     })
   ),
   attempts: z.array(z.string().min(1)),
+  /** Each rejection routed back to its owning stage, oldest first. */
+  reworks: z
+    .array(
+      z.object({
+        iteration: z.number().int().min(1),
+        /** What started the rework; absent on runs before JOV-7750. */
+        trigger: z.enum(['visual-rejection', 'proof-landed']).optional(),
+        rejectedAt: z.enum(FACTORY_STAGES),
+        reworkFrom: z.enum(FACTORY_STAGES),
+        /** The render output the rejection judged; a rework must replace it. */
+        rejectedRenderDigest: z.string().min(1).nullable(),
+        findings: z.array(z.string()),
+      })
+    )
+    .optional(),
   paidBudget: z
     .object({
       id: z.string().min(1),
@@ -112,9 +200,14 @@ export const FactoryRunManifestSchema = z.object({
 
 export type FactoryRunManifest = z.infer<typeof FactoryRunManifestSchema>;
 
-export function attemptFileName(stage: FactoryStage, attempt: number): string {
+export function attemptFileName(
+  stage: FactoryStage,
+  attempt: number,
+  rework = 0
+): string {
   const index = String(FACTORY_STAGES.indexOf(stage) + 1).padStart(2, '0');
-  return `${index}-${stage}.attempt-${attempt}.json`;
+  const pass = rework > 0 ? `.rework-${rework}` : '';
+  return `${index}-${stage}${pass}.attempt-${attempt}.json`;
 }
 
 export function writeJson(path: string, value: unknown): void {
@@ -129,7 +222,9 @@ export function readJson<T = unknown>(path: string): T {
 function verifyLink(
   runDir: string,
   manifest: FactoryRunManifest,
-  index: number
+  index: number,
+  brief: FactoryPageBrief | null,
+  source: FactoryTruthSources
 ): string[] {
   const entry = manifest.chain[index];
   if (!entry) return [];
@@ -170,8 +265,14 @@ function verifyLink(
     issues.push(`${where}: run.json digest does not match the receipt`);
   }
   const prior = manifest.chain.slice(0, index).map(link => link.outputDigest);
-  if (receipt.inputDigest !== stageInputDigest(manifest.briefDigest, prior)) {
-    issues.push(`${where}: input digest does not bind the prior chain`);
+  const sourceDigest = brief
+    ? factoryStageSourceDigest(entry.stage, brief, source)
+    : null;
+  if (
+    receipt.inputDigest !==
+    stageInputDigest(manifest.briefDigest, prior, sourceDigest)
+  ) {
+    issues.push(`${where}: input digest does not bind current stage inputs`);
   }
   if (
     entry.stage === 'publish' &&
@@ -183,7 +284,10 @@ function verifyLink(
 }
 
 /** Re-checks every receipt digest and rule in a run directory. Empty = valid. */
-export function verifyFactoryRun(runDir: string): string[] {
+export function verifyFactoryRun(
+  runDir: string,
+  source: FactoryTruthSources = {}
+): string[] {
   const manifestPath = join(runDir, 'run.json');
   if (!existsSync(manifestPath)) return [`no run.json in ${runDir}`];
   const parsed = FactoryRunManifestSchema.safeParse(readJson(manifestPath));
@@ -195,10 +299,15 @@ export function verifyFactoryRun(runDir: string): string[] {
   const manifest = parsed.data;
   const issues: string[] = [];
   const briefPath = join(runDir, 'brief.json');
+  let brief: FactoryPageBrief | null = null;
   if (!existsSync(briefPath)) {
     issues.push('missing brief.json');
-  } else if (digestOf(readJson(briefPath)) !== manifest.briefDigest) {
-    issues.push('brief.json digest does not match run.json');
+  } else {
+    const savedBrief = readJson<FactoryPageBrief>(briefPath);
+    brief = savedBrief;
+    if (digestOf(savedBrief) !== manifest.briefDigest) {
+      issues.push('brief.json digest does not match run.json');
+    }
   }
   if (
     manifest.status === 'complete' &&
@@ -209,7 +318,7 @@ export function verifyFactoryRun(runDir: string): string[] {
     );
   }
   for (let index = 0; index < manifest.chain.length; index++) {
-    issues.push(...verifyLink(runDir, manifest, index));
+    issues.push(...verifyLink(runDir, manifest, index, brief, source));
   }
   return issues;
 }
