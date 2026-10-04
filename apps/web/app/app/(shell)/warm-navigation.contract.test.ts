@@ -14,12 +14,10 @@ const warmNavigationLoadingBoundaries = [
   'tasks/loading.tsx',
   'settings/loading.tsx',
   'settings/account/loading.tsx',
-  'settings/appearance/loading.tsx',
   'settings/artist-profile/loading.tsx',
   'settings/audience/loading.tsx',
   'settings/billing/loading.tsx',
   'settings/contacts/loading.tsx',
-  'settings/retargeting-ads/loading.tsx',
   'settings/touring/loading.tsx',
 ] as const;
 const shellLayout = readFileSync(join(shellDirectory, 'layout.tsx'), 'utf8');

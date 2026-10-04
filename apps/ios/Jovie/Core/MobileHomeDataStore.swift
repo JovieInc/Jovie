@@ -286,6 +286,10 @@ actor ActionLoopCache {
     removeInbox(for: userID, workspace: .ovie)
   }
 
+  func remove(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) {
+    NativeSessionTokenStore.performIfCurrent(ownership) { remove(for: userID) }
+  }
+
   private func removeInbox(for userID: String, workspace: MobileWorkspaceMode) {
     let key = inboxCacheKey(for: userID, workspace: workspace)
     inboxMemory[key] = nil

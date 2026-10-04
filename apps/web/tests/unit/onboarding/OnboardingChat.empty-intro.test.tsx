@@ -145,6 +145,23 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
+  it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {
+    render(
+      <OnboardingChat
+        entryProfile={{ status: 'available', handle: 'newartist' }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Claim jov.ie/newartist')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
+    expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('falls back to blank entry when a stored intent is missing', async () => {
     render(
       <OnboardingChat

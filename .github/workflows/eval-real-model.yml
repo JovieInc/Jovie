@@ -33,6 +33,16 @@ on:
         required: false
         default: '2.00'
         type: string
+      cost_eligibility_account:
+        description: 'Explicitly authorized billing account for this manual live run'
+        required: false
+        default: ''
+        type: string
+      cost_eligibility_provider:
+        description: 'Explicitly authorized provider for this manual live run'
+        required: false
+        default: ''
+        type: string
       sample_size:
         description: 'Golden-case sample size (N)'
         required: false
@@ -47,7 +57,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  JOVIE_RUN_REAL_MODEL_EVALS: '1'
+  JOVIE_RUN_REAL_MODEL_EVALS: ''
   REAL_EVAL_SAMPLE_SIZE: ${{ github.event.inputs.sample_size || '5' }}
   REAL_EVAL_MIN_PASS: '3'
   REAL_EVAL_ADVERSARIAL_MIN_PASS: '6'
@@ -65,6 +75,27 @@ jobs:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Construct explicit live-model eligibility
+        env:
+          ELIGIBILITY_ACCOUNT: ${{ github.event.inputs.cost_eligibility_account }}
+          ELIGIBILITY_PROVIDER: ${{ github.event.inputs.cost_eligibility_provider }}
+          ELIGIBILITY_CAP_USD: ${{ github.event.inputs.budget_cap_usd }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const account = (process.env.ELIGIBILITY_ACCOUNT ?? '').trim();
+          const provider = (process.env.ELIGIBILITY_PROVIDER ?? '').trim();
+          const capUsd = Number(process.env.ELIGIBILITY_CAP_USD);
+          const eligible = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+            && account.length > 0 && provider.length > 0
+            && Number.isFinite(capUsd) && capUsd > 0 && capUsd <= 25;
+          const token = eligible ? JSON.stringify({ account, provider, capUsd }) : '';
+          appendFileSync(process.env.GITHUB_ENV,
+            `JOVIE_RUN_REAL_MODEL_EVALS=${eligible ? '1' : ''}\n`
+            + `REAL_EVAL_ELIGIBILITY=${token}\n`
+            + (eligible ? `BUDGET_CAP_USD=${capUsd}\n` : ''));
+          NODE
 
       - name: Run real-model eval lane (batch size 1)
         working-directory: apps/web

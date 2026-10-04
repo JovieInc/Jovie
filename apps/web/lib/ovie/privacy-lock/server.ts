@@ -3,9 +3,11 @@ import 'server-only';
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { adminStepUpIdentifier } from '@/lib/admin/mfa';
 import { getFreshAuth } from '@/lib/auth/cached';
+import { getCachedDevTestAuthSession } from '@/lib/auth/dev-test-auth.server';
 import { db } from '@/lib/db';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { baPasskeys, baVerifications } from '@/lib/db/schema/better-auth';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import {
   isFreshPrivacyCeremony,
   OVIE_PRIVACY_UNLOCK_TTL_MS,
@@ -61,6 +63,16 @@ export async function assertOviePrivacyUnlocked(
   const identity = auth ?? (await getFreshAuth());
   if (!identity.userId || !identity.sessionId)
     throw new OviePrivacyLockError('UNAUTHORIZED', 'Please sign in.', 401);
+  // Secretless visual capture has no database to read a policy from
+  // (JOV-7126). Only the producer's own dev-test-auth bypass session is
+  // exempt — isAdmin already grants that same synthetic actor under this
+  // exact gate, so a real session still falls through to the
+  // Postgres-backed check below.
+  if (
+    isVisualCaptureSyntheticAuthEnabled() &&
+    (await getCachedDevTestAuthSession())?.dbUserId === identity.userId
+  )
+    return;
   if ((await getOviePrivacyLockState(identity as PrivacyAuth)).locked)
     throw new OviePrivacyLockError(
       'PRIVACY_UNLOCK_REQUIRED',

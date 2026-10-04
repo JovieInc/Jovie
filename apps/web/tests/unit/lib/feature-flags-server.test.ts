@@ -93,6 +93,7 @@ describe('Statsig server initialization', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     envState.STATSIG_SERVER_SECRET = undefined;
     envState.VERCEL_ENV = undefined;
     envState.NODE_ENV = 'test';
@@ -253,7 +254,7 @@ describe('Statsig server initialization', () => {
   });
 
   it('ignores client override cookies in production', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     process.env.VERCEL_ENV = 'production';
     mockCookiesGet.mockImplementation((name: string) =>
       name === 'jovie_app_flag_overrides'
@@ -369,6 +370,33 @@ describe('Statsig server initialization', () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the visibility audit offer role-invariant for admin users', async () => {
+    mockIsAdmin.mockResolvedValue(true);
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: {
+        VISIBILITY_AUDIT_OFFER: { run },
+      },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(
+      getAppFlagValue('VISIBILITY_AUDIT_OFFER', { userId: 'admin_123' })
+    ).resolves.toBe(false);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('honors a per-environment override before the registry default', async () => {
     // RELEASE_PLAN_DEMO is NOT admin-default-true, so the env override is the
     // deciding layer for an anonymous request.
@@ -394,8 +422,60 @@ describe('Statsig server initialization', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it('keeps the release plan demo on outside production when nothing is published', async () => {
+    mockGetFlagOverrideMap.mockResolvedValue({});
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: { RELEASE_PLAN_DEMO: { run } },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(getAppFlagValue('RELEASE_PLAN_DEMO')).resolves.toBe(true);
+
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.VERCEL_ENV = 'preview';
+    await expect(getAppFlagValue('RELEASE_PLAN_DEMO')).resolves.toBe(true);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('keeps the release plan demo off in production when nothing is published', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.VERCEL_ENV = 'production';
+    mockGetFlagOverrideMap.mockResolvedValue({});
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: { RELEASE_PLAN_DEMO: { run } },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(getAppFlagValue('RELEASE_PLAN_DEMO')).resolves.toBe(false);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('honors a personal override cookie for admins in production', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     process.env.VERCEL_ENV = 'production';
     mockIsAdmin.mockResolvedValue(true);
     mockCookiesGet.mockImplementation((name: string) =>

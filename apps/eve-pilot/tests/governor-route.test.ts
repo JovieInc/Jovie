@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type CapacityEconomics,
   calibrateRouteCost,
   type DecisionJob,
+  deriveMeasuredEfficiencyMultiplier,
   deriveShadowPrice,
   type EconomicEstimate,
   type FullyLoadedCostProfile,
@@ -14,6 +16,7 @@ import {
   routeByExpectedCost,
   routeSummerSymphonyDecisionJob,
   SUMMER_SYMPHONY_ROUTES,
+  summarizeRouteCohort,
 } from '../agent/lib/governor-route';
 
 function decisionJob(
@@ -41,6 +44,67 @@ function observed(value: number, name: string): EconomicEstimate {
     confidence: 0.9,
     material: true,
   };
+}
+
+function subscription(
+  id: string,
+  marginalCashCost: number,
+  amortizedSubscriptionCost: number
+): CapacityEconomics {
+  return {
+    funding: 'subscription',
+    fixedSubscriptionPrice: observed(200, `${id}/fixed`),
+    billingPeriodStartedAt: '2026-09-01T00:00:00.000Z',
+    billingPeriodEndsAt: '2026-10-01T00:00:00.000Z',
+    includedCapacityRemaining: observed(100, `${id}/remaining`),
+    capacityUnit: 'quota-unit',
+    resetOrExpiryAt: '2026-09-28T13:00:00.000Z',
+    accessLossAt: null,
+    marginalCashCost: observed(marginalCashCost, `${id}/marginal`),
+    amortizedSubscriptionCost: observed(
+      amortizedSubscriptionCost,
+      `${id}/allocated`
+    ),
+    retailEquivalentCost: observed(4, `${id}/retail`),
+    sourceRef: `capacity-ledger://${id}`,
+  };
+}
+
+function measuredCohort(routeId: string, effectiveCost: number) {
+  return summarizeRouteCohort(
+    [0, 1, 2].map(index => ({
+      routeId,
+      workloadClass: 'fixture-workload',
+      riskTier: 'low' as const,
+      observedAt: `2026-09-28T13:0${index}:00.000Z`,
+      sourceRef: `outcome://${routeId}/${index}`,
+      laneOccupancyMinutes: 20,
+      completionMinutes: 20,
+      humanInterventionMinutes: 0,
+      retries: 0,
+      downstreamDelayMinutes: 0,
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheTokens: 10,
+      modelTurns: 1,
+      toolCalls: 2,
+      contextRebuilds: 0,
+      fallbacks: 0,
+      elapsedToArtifactMinutes: 10,
+      elapsedToGreenMinutes: 15,
+      firstPassGreen: true,
+      firstPassCertified: true,
+      independentReviewFindings: 0,
+      downstreamIncidents: 0,
+      certified: true,
+      landed: true,
+      marginalCashCost: effectiveCost,
+      amortizedSubscriptionCost: 0,
+      effectiveFullyLoadedCost: effectiveCost,
+    })),
+    'sampling-frame://representative-fixture',
+    true
+  );
 }
 
 function costProfile(
@@ -79,7 +143,9 @@ function routeCandidate(
     tuple: {
       model: id,
       provider: id,
+      endpoint: id,
       cli: id,
+      harness: 'eve',
       configVersion: 'fixture-v1',
       tools: ['fixture'],
       reviewPlan: 'none',
@@ -197,6 +263,35 @@ describe('Governor route-by-expected-cost', () => {
     expect(receipt.selectedRoute.estimatedTokenCost).toBeGreaterThan(
       cheap!.estimatedTokenCost
     );
+  });
+
+  it('excludes anecdotal multipliers and derives efficiency only from representative outcomes', () => {
+    const anecdotal = {
+      ...routeCandidate('anecdotal-14x', costProfile('anecdotal-14x', 14)),
+      unverifiedEfficiencyClaims: ['14x efficiency'],
+    };
+    const measured = routeCandidate(
+      'measured-cheap',
+      costProfile('measured', 1)
+    );
+    const receipt = routeByExpectedCost(
+      decisionJob('lightweight-deterministic', 'low', 'mechanical'),
+      [anecdotal, measured]
+    );
+
+    expect(receipt.selectedRoute.id).toBe('measured-cheap');
+    expect(receipt.alternativeCosts[0].excludedUnverifiedClaims).toEqual([
+      '14x efficiency',
+    ]);
+    const incumbent = measuredCohort('incumbent', 10);
+    const challenger = measuredCohort('challenger', 4);
+    expect(deriveMeasuredEfficiencyMultiplier(incumbent, challenger)).toBe(2.5);
+    expect(
+      deriveMeasuredEfficiencyMultiplier(incumbent, {
+        ...challenger,
+        representative: false,
+      })
+    ).toBeNull();
   });
 
   it('routes high-risk spend allocation to the high-capability Symphony route', () => {
@@ -337,7 +432,8 @@ describe('Governor route-by-expected-cost', () => {
     const quotaDemand = resourceDemand('provider-quota-unit', 10, 'quota');
     const useQuota = routeCandidate(
       'use-expiring-quota',
-      costProfile('use-expiring-quota', 0.2, {
+      costProfile('use-expiring-quota', 0, {
+        capacityEconomics: subscription('sol-seat', 0, 20),
         resourceDemands: [quotaDemand],
       })
     );
@@ -362,12 +458,48 @@ describe('Governor route-by-expected-cost', () => {
     );
 
     expect(receipt.selectedRoute.id).toBe('use-expiring-quota');
+    expect(receipt.fullyLoadedCost.expectedTotal.amount).toBe(0);
+    expect(receipt.fullyLoadedCost.fullyAllocatedAccountingCost.amount).toBe(
+      20
+    );
+    expect(
+      receipt.fullyLoadedCost.capacityEconomics?.fixedSubscriptionPrice.value
+    ).toBe(200);
     expect(receipt.fullyLoadedCost.resourceCosts[0]).toMatchObject({
       status: 'perishable-surplus',
       amountPerUnit: 0,
       expectedCost: 0,
       timeToExpiryMinutes: 60,
     });
+  });
+
+  it('prices scarce subscription quota when higher-value work is queued', () => {
+    const quota = routeCandidate(
+      'scarce-subscription',
+      costProfile('scarce-subscription', 0, {
+        capacityEconomics: subscription('scarce-seat', 0, 20),
+        resourceDemands: [resourceDemand('provider-quota-unit', 10, 'scarce')],
+      })
+    );
+    const retail = routeCandidate('retail', costProfile('retail', 0.3));
+    const receipt = routeByExpectedCost(
+      decisionJob('lightweight-deterministic', 'low', 'mechanical'),
+      [quota, retail],
+      'fixture-v1',
+      {
+        decisionAt: '2026-09-28T12:00:00.000Z',
+        evidence: [
+          scarcity('provider-quota-unit', {
+            capacityUnits: 10,
+            committedUnits: 0,
+            compatibleDemandUnits: 10,
+          }),
+        ],
+      }
+    );
+
+    expect(receipt.selectedRoute.id).toBe('retail');
+    expect(receipt.alternativeCosts[0].opportunityCost.amount).toBe(0.5);
   });
 
   it('demotes a founder-review-heavy route when autonomous certification costs less', () => {
@@ -499,6 +631,7 @@ describe('Governor route-by-expected-cost', () => {
     const calibration = calibrateRouteCost(receipt, {
       routeId: 'calibrated-route',
       workloadClass: 'fixture-workload',
+      riskTier: 'low',
       observedAt: '2026-09-28T13:00:00.000Z',
       sourceRef: 'execution-attempt://fixture-1',
       laneOccupancyMinutes: 9,
@@ -506,9 +639,18 @@ describe('Governor route-by-expected-cost', () => {
       humanInterventionMinutes: 6,
       retries: 1,
       downstreamDelayMinutes: 7,
+      modelTurns: 2,
+      amortizedSubscriptionCost: 3,
+      effectiveFullyLoadedCost: 2,
     });
 
     expect(calibration.workloadClass).toBe('fixture-workload');
+    expect(calibration.riskTier).toBe('low');
+    expect(calibration.actual.modelTurns).toBe(2);
+    expect(calibration.costReconciliation).toMatchObject({
+      actualEffectiveCost: 2,
+      actualFullyAllocatedCost: 5,
+    });
     expect(calibration.dimensions).toEqual({
       laneOccupancyMinutes: { predicted: 8, actual: 9, absoluteError: 1 },
       completionMinutes: { predicted: 10, actual: 12, absoluteError: 2 },

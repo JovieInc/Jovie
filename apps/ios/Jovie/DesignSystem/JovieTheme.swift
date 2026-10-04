@@ -1,5 +1,10 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+import CoreText
+#endif
 
 /// System B dark tokens. Hexes match the Noir Ion table in DESIGN.md and
 /// `--noir-ion-*` anchors in apps/web/styles/design-system.css. Do not invent
@@ -44,15 +49,6 @@ enum JovieColor {
     static let track = Color(hex: 0x11AFFF)
     /// event -> --color-accent-orange
     static let event = Color(hex: 0xFFC857)
-
-    static func color(for kind: MobileChatEntityKind) -> Color {
-      switch kind {
-      case .release: return release
-      case .artist: return artist
-      case .track: return track
-      case .event: return event
-      }
-    }
   }
 }
 
@@ -80,6 +76,7 @@ enum JovieFont {
   }
 
   private static func font(size: CGFloat, weight: Font.Weight) -> Font {
+    #if canImport(UIKit)
     if UIFont(name: "Inter Variable", size: size) != nil {
       return .custom("Inter Variable", size: size).weight(weight)
     }
@@ -87,11 +84,21 @@ enum JovieFont {
     if UIFont(name: "Inter", size: size) != nil {
       return .custom("Inter", size: size).weight(weight)
     }
+    #else
+    if NSFont(name: "Inter Variable", size: size) != nil {
+      return .custom("Inter Variable", size: size).weight(weight)
+    }
+
+    if NSFont(name: "Inter", size: size) != nil {
+      return .custom("Inter", size: size).weight(weight)
+    }
+    #endif
 
     return .system(size: size, weight: weight)
   }
 
   private static func font(size: CGFloat, numericWeight: CGFloat) -> Font {
+    #if canImport(UIKit)
     let uiWeight = UIFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
     let descriptorBase =
       UIFont(name: "Inter Variable", size: size)
@@ -101,7 +108,25 @@ enum JovieFont {
       .traits: [UIFontDescriptor.TraitKey.weight: uiWeight.rawValue]
     ])
     return Font(UIFont(descriptor: descriptor, size: size))
+    #else
+    return Font(appKitBody(size: size, numericWeight: numericWeight) as CTFont)
+    #endif
   }
+
+  #if canImport(AppKit) && !canImport(UIKit)
+  /// The native editor shares the same Inter resolution and weight mapping as SwiftUI.
+  static func appKitBody(size: CGFloat, numericWeight: CGFloat = 400) -> NSFont {
+    let weight = NSFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
+    let descriptorBase =
+      NSFont(name: "Inter Variable", size: size)
+      ?? NSFont(name: "Inter", size: size)
+      ?? NSFont.systemFont(ofSize: size)
+    let descriptor = descriptorBase.fontDescriptor.addingAttributes([
+      .traits: [NSFontDescriptor.TraitKey.weight: weight.rawValue]
+    ])
+    return NSFont(descriptor: descriptor, size: size) ?? descriptorBase
+  }
+  #endif
 
   /// Maps CSS/Satoshi weights onto UIFont.Weight raw values.
   static func uiFontWeightRawValue(forCSSWeight cssWeight: CGFloat) -> CGFloat {
@@ -198,7 +223,7 @@ private struct JovieSurfaceModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if #available(iOS 26.0, *) {
+    if #available(iOS 26.0, macOS 26.0, *) {
       if interactive {
         content
           .glassEffect(

@@ -153,6 +153,45 @@ describe('customer changelog projection', () => {
     });
   });
 
+  it('carries the publication action and supporting copy, defaulting safely', () => {
+    const bullet = 'Get updates from an artist: sign up on eligible profiles.';
+    const source = release('2026-10-02', '2026-10-02', {
+      changed: [bullet],
+    });
+    source.customerOutcomes = {
+      [bullet]: {
+        availability: 'limited',
+        prerequisites: ['Claimed artist profiles with updates enabled'],
+        supporting: [
+          'Fans opt in per artist; nothing is sent without a signup.',
+        ],
+        action: {
+          label: 'See it on a demo profile',
+          href: '/demo/showcase/tim-white-profile?mode=subscribe',
+        },
+      },
+    };
+
+    const [entry] = projectCustomerChangelog([source]);
+    expect(entry).toMatchObject({
+      title: 'Get updates from an artist',
+      availability: 'limited',
+      prerequisites: ['Claimed artist profiles with updates enabled'],
+      supporting: ['Fans opt in per artist; nothing is sent without a signup.'],
+      action: {
+        label: 'See it on a demo profile',
+        href: '/demo/showcase/tim-white-profile?mode=subscribe',
+      },
+    });
+    expect(CustomerChangelogEntrySchema.parse(entry)).toEqual(entry);
+
+    const [plain] = projectCustomerChangelog([
+      release('2026-10-02', '2026-10-02', { added: [bullet] }),
+    ]);
+    expect(plain.action).toBeNull();
+    expect(plain.supporting).toEqual([]);
+  });
+
   it('groups outcomes by month newest first and formats tertiary version', () => {
     const months = groupCustomerChangelogByMonth(
       projectCustomerChangelog([

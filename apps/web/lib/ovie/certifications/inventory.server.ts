@@ -2,6 +2,11 @@ import 'server-only';
 
 import type { AcquisitionCertificationStore } from '@/lib/acquisition/certification-store';
 import {
+  type AcquisitionEligibility,
+  describeAcquisitionBlock,
+} from '@/lib/acquisition/eligibility';
+import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import {
   evaluateCertificationAdmission,
   type FounderCertificationDecisionKind,
 } from '@/lib/agent-os/certification';
@@ -11,6 +16,7 @@ import type {
 } from '@/lib/agent-os/certification-adapter';
 import {
   type CertificationInboxDelivery,
+  type CertificationInboxMachineEvidence,
   projectCertificationInbox,
 } from '@/lib/agent-os/certification-inbox';
 import { getMarketingCertificationStore } from '@/lib/agent-os/certification-runtime-store';
@@ -92,6 +98,14 @@ export interface OvieCertificationInventoryDeps {
   readonly backend: () => CertificationRecordBackend;
   readonly readPacketFiles: () => Promise<CertificationPacketFileRead>;
   readonly customers?: CustomerCertificationSource;
+  /**
+   * ACQUISITION_ELIGIBLE (JOV-7696). Prospect outreach is acquisition, so a
+   * prospect reaches the founder only while the $199 cone is green. Absent
+   * reads as unknown and holds prospects (fail closed).
+   */
+  readonly acquisitionEligibility?: () => Promise<
+    Pick<AcquisitionEligibility, 'eligible' | 'verdict' | 'firstBlocker'>
+  >;
 }
 
 export const defaultOvieCertificationInventoryDeps: OvieCertificationInventoryDeps =
@@ -99,7 +113,37 @@ export const defaultOvieCertificationInventoryDeps: OvieCertificationInventoryDe
     marketingStore: getMarketingCertificationStore,
     backend: postgresRecordBackend,
     readPacketFiles: () => readCertificationPacketFiles(),
+    acquisitionEligibility: () => getAcquisitionEligibility(),
   };
+
+async function prospectMachineEvidence(
+  deps: OvieCertificationInventoryDeps
+): Promise<CertificationInboxMachineEvidence> {
+  if (!deps.acquisitionEligibility) {
+    return {
+      status: 'unknown',
+      summary: 'ACQUISITION_ELIGIBLE is not wired for prospect certification.',
+    };
+  }
+  try {
+    const eligibility = await deps.acquisitionEligibility();
+    if (eligibility.eligible) {
+      return {
+        status: 'green',
+        summary: describeAcquisitionBlock(eligibility),
+      };
+    }
+    return {
+      status: eligibility.verdict === 'BLOCKED' ? 'red' : 'unknown',
+      summary: describeAcquisitionBlock(eligibility),
+    };
+  } catch {
+    return {
+      status: 'unknown',
+      summary: 'ACQUISITION_ELIGIBLE could not be read.',
+    };
+  }
+}
 
 const STATE_ORDER = new Map(
   (
@@ -304,7 +348,8 @@ async function packetDomain(
 async function customerProjection(
   store: Pick<AcquisitionCertificationStore, 'project' | 'decide'>,
   candidate: CustomerCertificationCandidateRef,
-  evaluatedAt: string
+  evaluatedAt: string,
+  machineEvidence?: CertificationInboxMachineEvidence
 ): Promise<{
   readonly row: OvieCertificationRow;
   readonly delivery: CertificationInboxDelivery;
@@ -357,6 +402,7 @@ async function customerProjection(
       packet: projection.packet,
       ranking: { impact: (candidate.payScore ?? 0) * 10 },
       requestedDecision: 'Certify this prospect for outreach.',
+      ...(machineEvidence ? { machineEvidence } : {}),
     },
   };
 }
@@ -399,9 +445,10 @@ async function customersDomain(
       };
     }
     const store = source.store();
+    const machineEvidence = await prospectMachineEvidence(deps);
     const projections = await Promise.all(
       candidates.map(candidate =>
-        customerProjection(store, candidate, evaluatedAt)
+        customerProjection(store, candidate, evaluatedAt, machineEvidence)
       )
     );
     return {

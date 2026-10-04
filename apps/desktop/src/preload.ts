@@ -35,6 +35,8 @@ const APP_BOOTED_CHANNEL = 'app-booted';
 const DESKTOP_COMPOSER_READINESS_CHANNEL = 'desktop-composer-readiness';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
+const GET_VISUAL_ACTIVITY_CHANNEL = 'desktop-get-visual-activity';
+const VISUAL_ACTIVITY_CHANNEL = 'desktop-visual-activity';
 const DESKTOP_UPDATE_STATE_CHANNEL = 'desktop-update-state';
 const DESKTOP_UPDATE_GET_STATE_CHANNEL = 'desktop-update-get-state';
 const DESKTOP_UPDATE_CHECK_CHANNEL = 'desktop-update-check';
@@ -95,6 +97,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send(WORK_STATE_CHANGED_CHANNEL);
   },
   getWorkState: () => sessionWorkReporter.read(),
+  getVisualActivity: () => ipcRenderer.invoke(GET_VISUAL_ACTIVITY_CHANNEL),
+  onVisualActivity: (callback: (active: boolean) => void) => {
+    if (typeof callback !== 'function') return () => undefined;
+    const listener = (_event: unknown, active: unknown) => {
+      if (typeof active === 'boolean') callback(active);
+    };
+    ipcRenderer.on(VISUAL_ACTIVITY_CHANNEL, listener);
+    return () => ipcRenderer.removeListener(VISUAL_ACTIVITY_CHANNEL, listener);
+  },
 
   /** Fires when electron-updater detects a new version is available for download. */
   onUpdateAvailable: (cb: () => void) => {
