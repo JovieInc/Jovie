@@ -6,6 +6,7 @@
 import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HomepageIdentityFaq } from '@/components/homepage/HomepageIdentityFaq';
 import { HomepageLogoStrip } from '@/components/homepage/HomepageLogoStrip';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { PROOF_REGISTRY } from '@/data/product-truth/proof';
@@ -137,5 +138,23 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
     expect(
       screen.getByTestId('marketing-section-logo-cloud')
     ).toBeInTheDocument();
+  });
+
+  it('renders the FAQ as a bounded disclosure list from the homepage copy', () => {
+    render(<HomepageIdentityFaq />);
+    const faq = screen.getByTestId('marketing-section-faq');
+    expect(faq).toHaveAttribute(
+      'data-marketing-variant',
+      'structured-data-list'
+    );
+    expect(
+      within(faq).getByRole('heading', {
+        level: 2,
+        name: HOMEPAGE_IDENTITY_COPY.faq.heading,
+      })
+    ).toBeInTheDocument();
+    expect(within(faq).getAllByRole('button')).toHaveLength(
+      HOMEPAGE_IDENTITY_COPY.faq.items.length
+    );
   });
 });

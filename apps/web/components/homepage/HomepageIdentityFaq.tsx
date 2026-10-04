@@ -14,7 +14,7 @@ export function HomepageIdentityFaq() {
   return (
     <div className='homepage-faq-section' data-homepage-testid='homepage-faq'>
       <FaqSection
-        sectionVariant='homepage-identity'
+        sectionVariant='structured-data-list'
         heading={faq.heading}
         items={faq.items}
         analyticsEventName='homepage_faq_opened'
