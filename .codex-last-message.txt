@@ -1,0 +1,8 @@
+NOT-SHIPPABLE: The required check hit the Jovie Bot installation’s GitHub GraphQL rate limit before evaluating this PR’s failure-hold logic. This is unrelated infrastructure failure.
+
+- PR state: `OPEN`, `isInMergeQueue=false`
+- Head: `9f70539deb58e1fe9f0f34078a47ba2dd033a8f0`
+- Worktree remains clean
+- No code changes, commit, or push attempted
+
+[Failed job](https://github.com/JovieInc/Jovie/actions/runs/37197368100/job/111421899449)
