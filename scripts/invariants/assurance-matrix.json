@@ -3,7 +3,7 @@
   "contract": "jovie.certification/v1",
   "issue": "JOV-6064",
   "extends": "JOV-5853",
-  "matrixRevision": "2026-10-03.3",
+  "matrixRevision": "2026-10-04.1",
   "asOf": "2026-10-03T00:00:00Z",
   "evidenceMaxAgeMs": 2592000000,
   "scope": {
