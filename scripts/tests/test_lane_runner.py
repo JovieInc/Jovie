@@ -897,7 +897,9 @@ class LinearRateLimitTest(unittest.TestCase):
                     client.gql("query", {})
                 path = lane.linear_cooldown_path(client.key)
                 record = json.loads(path.read_text())
-                self.assertEqual(path.name, hashlib.sha256(client.key.encode()).hexdigest() + ".json")
+                scope = hashlib.sha256(f"{lane.LINEAR_API_URL}\0{client.key}".encode()).hexdigest()
+                self.assertEqual(path.parent.name, scope)
+                self.assertRegex(path.name, r"^\d+-[0-9a-f-]+\.json$")
                 self.assertNotIn(client.key, path.read_text())
                 self.assertNotIn(client.key, str(path))
                 self.assertEqual(record["schema"], 1)
@@ -905,6 +907,17 @@ class LinearRateLimitTest(unittest.TestCase):
                 budget = json.loads((Path(os.environ["LANES_STATE"]) / "api-budget.json").read_text())
                 self.assertEqual((budget["remaining"], budget["limit"]), (0, 2500))
                 self.assertIsNotNone(budget["rateLimitedAt"])
+
+    def test_js_and_python_root_precedence_agree_for_the_existing_backoff_override(self):
+        backoff = Path(self.tmp.name) / "backoff-override"
+        default = Path(self.tmp.name) / "default-lanes"
+        with patch.dict(os.environ, {"LINEAR_BACKOFF_STATE_DIR": str(backoff)}, clear=True), \
+                patch.object(lane, "lane_state_dir", side_effect=lambda: Path(os.environ.get("LANES_STATE", str(default)))):
+            self.assertEqual(lane.linear_cooldown_root(), backoff)
+            os.environ["LANES_STATE"] = str(self.state)
+            self.assertEqual(lane.linear_cooldown_root(), self.state / "linear-cooldown")
+            os.environ["LINEAR_COOLDOWN_STATE_DIR"] = str(default / "explicit")
+            self.assertEqual(lane.linear_cooldown_root(), default / "explicit")
 
     def test_cooldown_is_shared_across_workers_and_expires(self):
         headers = self.headers(remaining="0")
@@ -919,10 +932,19 @@ class LinearRateLimitTest(unittest.TestCase):
             other.gql("query", {})
         self.assertEqual(calls, [], "a second worker must honor the cooldown file")
         self.assertGreater(caught.exception.reset_at, time.time() + 60)
-        path = lane.linear_cooldown_path(self.client.key)
-        path.write_text(json.dumps({"schema": 1, "resetAt": int((time.time() - 5) * 1000)}))
+        scope = lane.linear_cooldown_scope(self.client.key)
+        for child in scope.iterdir():
+            child.unlink()
+        expired = int((time.time() - 5) * 1000)
+        record = scope / f"{expired}-dead.json"
+        record.write_text(json.dumps({"schema": 1, "resetAt": expired}))
+        record.chmod(0o644)
+        self.assertEqual(lane._scan_scope(scope, int(time.time() * 1000)), 0)
+        self.assertTrue(record.exists(), "cleanup must preserve nonprivate records")
+        record.chmod(0o600)
         self.assertEqual(other.gql("query", {})["ok"], True)
         self.assertEqual(len(calls), 1)
+        self.assertFalse(record.exists())
 
     def test_later_cooldown_is_kept_when_a_shorter_one_arrives(self):
         long_headers = self.headers()
@@ -943,6 +965,47 @@ class LinearRateLimitTest(unittest.TestCase):
             self.client.gql("query", {})
         self.assertIsNone(lane.linear_cooldown_path(self.client.key) and lane.linear_cooldown_until(self.client.key))
         self.assertFalse((self.state / "linear-cooldown").exists())
+
+    def test_http_200_ratelimited_opens_the_same_cooldown(self):
+        payload = {"errors": [{"message": "slow", "extensions": {"code": "RATELIMITED", "statusCode": 429}}]}
+        lane.urllib.request.urlopen = lambda request, timeout: self.response(payload, self.headers(remaining="0"))
+        with patch.object(lane.random, "random", return_value=0), self.assertRaises(lane.LinearRateLimited) as caught:
+            self.client.gql("query", {})
+        self.assertGreater(caught.exception.reset_at, time.time() + 59)
+        self.assertIsNotNone(lane.linear_cooldown_until(self.client.key))
+        calls = []
+        lane.urllib.request.urlopen = lambda request, timeout: calls.append(1) or self.response({"data": {"ok": True}}, self.headers())
+        with self.assertRaises(lane.LinearRateLimited):
+            lane.Linear(self.env).gql("query", {})
+        self.assertEqual(calls, [])
+
+    def test_legacy_single_file_and_orchestrator_directory_are_honored(self):
+        now_ms = int((time.time() + 90) * 1000)
+        root = self.state / "linear-cooldown"
+        root.mkdir()
+        legacy = root / f"{hashlib.sha256(self.client.key.encode()).hexdigest()}.json"
+        legacy.write_text(json.dumps({"schema": 1, "resetAt": now_ms}))
+        calls = []
+        lane.urllib.request.urlopen = lambda request, timeout: calls.append(1) or self.response({"data": {"ok": True}}, self.headers())
+        with self.assertRaises(lane.LinearRateLimited):
+            self.client.gql("query", {})
+        self.assertEqual(calls, [])
+        legacy.unlink()
+        scope = hashlib.sha256(f"{lane.LINEAR_API_URL}\0{self.client.key}".encode()).hexdigest()
+        old = Path(self.tmp.name) / "jovie-linear-backoff" / scope
+        old.mkdir(parents=True)
+        (old / f"{now_ms}-abcd.json").write_text(json.dumps({"schema": 1, "resetAt": now_ms}))
+        previous = os.environ.get("LINEAR_BACKOFF_STATE_DIR")
+        os.environ["LINEAR_BACKOFF_STATE_DIR"] = str(Path(self.tmp.name) / "jovie-linear-backoff")
+        try:
+            with self.assertRaises(lane.LinearRateLimited):
+                self.client.gql("query", {})
+        finally:
+            if previous is None:
+                os.environ.pop("LINEAR_BACKOFF_STATE_DIR", None)
+            else:
+                os.environ["LINEAR_BACKOFF_STATE_DIR"] = previous
+        self.assertEqual(calls, [])
 
     def test_budget_headers_reach_api_budget_and_doctor_json(self):
         (self.state / "doctor.json").write_text(json.dumps({"schema": "keep-me", "alerts": []}))
@@ -970,6 +1033,58 @@ class LinearRateLimitTest(unittest.TestCase):
         with patch.object(lane, "_write_state_json", side_effect=OSError("read-only state dir")):
             with self.assertRaises(lane.LinearRateLimited):
                 self.client.gql("query", {})
+
+    def test_doctor_observe_skips_linear_during_a_cooldown(self):
+        os.environ["LANES_SELFTEST"] = "1"
+        self.addCleanup(lambda: os.environ.pop("LANES_SELFTEST", None))
+        with patch.object(lane.random, "random", return_value=0):
+            lane.publish_linear_cooldown(self.client.key, self.headers(), now=time.time())
+        host = lane.Host()
+        host.state = self.state
+        host.linear_env = self.env
+        called = []
+
+        def boom(*_args, **_kwargs):
+            called.append(1)
+            raise AssertionError("linear pool read")
+
+        with patch.object(lane.doctor, "qualified_pool", boom), \
+                patch.object(lane.doctor, "host_capacity", lambda *_a, **_k: {}), \
+                patch.object(lane, "load_github_env", lambda: None), \
+                patch.object(lane, "graphql_budget", lambda: None):
+            obs = lane.doctor.observe(host, lane, SimpleNamespace(status=lambda: {"accounts": {}}))
+        self.assertEqual(called, [])
+        self.assertEqual(obs["linearSkipped"], "cooldown")
+        self.assertIsNone(obs["linearError"])
+
+
+class HeldPruneTest(unittest.TestCase):
+    def test_drops_terminal_and_expired_heads_and_stops_at_the_bound(self):
+        now = 1_700_000_000.0
+        held = {
+            "1": {"sha": "aaa", "at": now - 10},
+            "2": {"sha": "old", "at": now - lane.HELD_STALE_HEAD_S - 5},
+            "3": {"sha": "bbb", "at": now - 10},
+            "4": {"sha": "recent", "at": now - 10},
+            "nope": {"sha": "x"},
+        }
+        open_prs = [
+            {"number": 1, "headRefOid": "aaa"},
+            {"number": 2, "headRefOid": "new"},
+            {"number": 4, "headRefOid": "newer"},
+        ]
+        self.assertEqual(lane.held_drop_keys(held, open_prs, now, complete=False), ["nope"])
+        self.assertEqual(set(lane.held_drop_keys(held, open_prs, now, complete=True)), {"2", "3", "nope"})
+        crowded = {str(number): {"sha": "x", "at": now - number} for number in range(300)}
+        self.assertEqual(len(lane.held_drop_keys(crowded, open_prs, now, complete=True)), lane.HELD_PRUNE_LIMIT)
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host()
+            host.state = Path(tmp)
+            (host.state / "held.json").write_text(json.dumps(held))
+            dropped = lane.prune_held(host, open_prs, now, complete=True)
+            left = set(json.loads((host.state / "held.json").read_text()))
+        self.assertEqual(dropped, 3)
+        self.assertEqual(left, {"1", "4"})
 
 
 class ClaimScanCacheTest(unittest.TestCase):
@@ -1056,6 +1171,47 @@ class ClaimScanCacheTest(unittest.TestCase):
             lane.shared = saved
         self.assertEqual(calls, [])
         self.assertEqual((found[0].identifier, found[0].labels), ("JOV-9", ["codex"]))
+
+    def test_hud_reason_queue_and_sweep_state_share_one_minute(self):
+        import hud
+        import reason_lane
+        calls = {"hud": 0, "reason": 0, "state": 0}
+
+        class Client:
+            def gql(self, query, variables):
+                if "labels:{name:{eq:$l}}" in query:
+                    calls["reason"] += 1
+                    return {"issues": {"nodes": [{"id": "i", "identifier": "JOV-1", "title": "t",
+                                                  "description": "", "createdAt": "1"}]}}
+                calls["hud"] += 1
+                return {"pool": {"nodes": []}, "triage": {"nodes": []}}
+
+            def state_of(self, issue_id):
+                calls["state"] += 1
+                return "In Progress"
+
+        client = Client()
+        saved = hud.lane.Linear, hud.lane.SHARED_CACHE_DIR
+        hud.lane.Linear = lambda env: client
+        # hud.py loads its own lane_runner, and reason_lane imports that copy.
+        hud.lane.SHARED_CACHE_DIR = lane.SHARED_CACHE_DIR
+        try:
+            with patch.object(lane.time, "time", lambda: self.clock["now"]), \
+                    patch.object(hud.lane.time, "time", lambda: self.clock["now"]):
+                self.assertEqual(reason_lane.queued_jobs(client, "reasoning-job")[0]["identifier"], "JOV-1")
+                reason_lane.queued_jobs(client, "reasoning-job")
+                self.assertEqual(lane.cached_issue_state(client, "JOV-9"), "In Progress")
+                lane.cached_issue_state(client, "JOV-9")
+                self.assertTrue(hud.linear_model(Path("/x"))["ok"])
+                hud.linear_model(Path("/x"))
+                self.assertEqual(calls, {"hud": 1, "reason": 1, "state": 1})
+                self.clock["now"] += lane.CLAIM_SCAN_TTL_S + 1
+                reason_lane.queued_jobs(client, "reasoning-job")
+                lane.cached_issue_state(client, "JOV-9")
+                hud.linear_model(Path("/x"))
+                self.assertEqual(calls, {"hud": 2, "reason": 2, "state": 2})
+        finally:
+            hud.lane.Linear, hud.lane.SHARED_CACHE_DIR = saved
 
 
 class RunIssueTest(unittest.TestCase):
