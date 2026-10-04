@@ -295,5 +295,140 @@ class SequencingTest(unittest.TestCase):
         self.assertTrue(any("labels[]=hold" in call for args in calls for call in args))
 
 
+class StatefulOverlapRemote:
+    """Apply label/auto-merge effects, then return detached inventory snapshots."""
+    REPO_SLUG = "JovieInc/Jovie"
+
+    def __init__(self, rows):
+        self.rows = {row["number"]: row for row in rows}
+        self.calls = []
+
+    def inventory(self, order):
+        return json.loads(json.dumps([self.rows[number] for number in order]))
+
+    def sh(self, args):
+        self.calls.append(list(args))
+        if args[:4] == ["gh", "api", "-X", "POST"]:
+            number = int(args[4].split("/")[-2])
+            assert args[5] == "-f" and args[6].startswith("labels[]=")
+            label = args[6].split("=", 1)[1]
+            labels = self.rows[number]["labels"]
+            if not any(row["name"] == label for row in labels):
+                labels.append({"name": label})
+        elif args[:4] == ["gh", "api", "-X", "DELETE"]:
+            assert args[4].endswith("/labels/hold")
+            number = int(args[4].split("/")[-3])
+            self.rows[number]["labels"] = [row for row in self.rows[number]["labels"]
+                                           if row["name"] != "hold"]
+        else:
+            assert args[:3] == ["gh", "pr", "merge"]
+            assert args[4:] == ["--repo", self.REPO_SLUG, "--disable-auto"]
+            self.rows[int(args[3])]["autoMergeRequest"] = None
+        return SimpleNamespace(returncode=0)
+
+
+class SharedHoldOwnershipTest(unittest.TestCase):
+    def make_remote(self, *, external=False):
+        first = pr(1, [changed("scripts/lanes/lane_runner.py")])
+        first["autoMergeRequest"] = {"enabledAt": "2026-10-04T01:00:00Z"}
+        migration = pr(2, [changed("apps/web/drizzle/migrations/0131_billing.sql", "ADDED")])
+        later = pr(3, [changed("scripts/lanes/lane_runner.py"),
+                       changed("apps/web/drizzle/migrations/0131_profiles.sql", "ADDED")])
+        if external:
+            later["labels"] = [{"name": "hold"}, {"name": "human-owned"}]
+        return StatefulOverlapRemote([first, migration, later])
+
+    def test_pair_downgrade_preserves_and_transfers_the_remaining_semantic_hold(self):
+        for order in ([1, 2, 3], [2, 1, 3]):
+            for external in (False, True):
+                for retirement in ("later-armed", "first-idle"):
+                    with self.subTest(order=order, external=external, retirement=retirement), \
+                            tempfile.TemporaryDirectory() as tmp, \
+                            patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+                        remote = self.make_remote(external=external)
+                        host = SimpleNamespace(state=Path(tmp))
+                        # The sequence owns the newly added hold. The migration pair
+                        # arrives later and sees that hold rather than claiming it.
+                        overlap.reconcile_open_prs(host, remote, remote.inventory([1, 3]))
+                        overlap.reconcile_open_prs(host, remote, remote.inventory(order))
+                        before = overlap.read_state(host.state)["active"]
+                        self.assertEqual(before["pr:#1|pr:#3|sequence"]["holdApplied"], not external)
+                        self.assertFalse(before["pr:#2|pr:#3|block"]["holdApplied"])
+                        remote.calls.clear()
+                        if retirement == "later-armed":
+                            remote.rows[3]["autoMergeRequest"] = {"enabledAt": "2026-10-04T02:00:00Z"}
+                        else:
+                            remote.rows[1]["autoMergeRequest"] = None
+                        overlap.reconcile_open_prs(host, remote, remote.inventory(order))
+                        active = overlap.read_state(host.state)["active"]
+                        self.assertEqual({key: row["actionTaken"] for key, row in active.items()},
+                                         {"pr:#1|pr:#3|sequence": "flag", "pr:#2|pr:#3|block": "block"})
+                        self.assertEqual(active["pr:#2|pr:#3|block"]["holdApplied"], not external)
+                        self.assertIn({"name": "hold"}, remote.rows[3]["labels"])
+                        self.assertEqual(remote.calls, [])
+                        overlap.reconcile_open_prs(host, remote, remote.inventory(order))
+                        self.assertEqual(remote.calls, [])
+                        # Flag-only mode retires the final policy owner without a
+                        # disappeared parent, so no rebase request is warranted.
+                        os.environ["SYMPHONY_FILE_OVERLAP_GUARD"] = "flag"
+                        overlap.reconcile_open_prs(host, remote, remote.inventory(order))
+                        delete = ["gh", "api", "-X", "DELETE",
+                                  "repos/JovieInc/Jovie/issues/3/labels/hold"]
+                        self.assertEqual(remote.calls, [] if external else [delete])
+                        expected_labels = [{"name": "hold"}, {"name": "human-owned"}] if external else []
+                        self.assertEqual(remote.rows[3]["labels"], expected_labels)
+                        remote.calls.clear()
+                        overlap.reconcile_open_prs(host, remote, remote.inventory(order))
+                        self.assertEqual(remote.calls, [])
+
+    def test_downgrade_and_other_parent_disappearance_share_one_rebase(self):
+        for order in ([1, 2, 3], [2, 1, 3]):
+            with self.subTest(order=order), tempfile.TemporaryDirectory() as tmp, \
+                    patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+                remote = self.make_remote()
+                host = SimpleNamespace(state=Path(tmp))
+                overlap.reconcile_open_prs(host, remote, remote.inventory(order))
+                remote.calls.clear()
+                remote.rows[3]["autoMergeRequest"] = {"enabledAt": "2026-10-04T02:00:00Z"}
+                overlap.reconcile_open_prs(host, remote, remote.inventory([1, 3]))
+                self.assertEqual(remote.calls, [
+                    ["gh", "api", "-X", "DELETE", "repos/JovieInc/Jovie/issues/3/labels/hold"],
+                    ["gh", "api", "-X", "POST", "repos/JovieInc/Jovie/issues/3/labels",
+                     "-f", "labels[]=lane-fix-dequeued"],
+                ])
+                state = overlap.read_state(host.state)
+                self.assertEqual({key: row["actionTaken"] for key, row in state["active"].items()},
+                                 {"pr:#1|pr:#3|sequence": "flag"})
+                self.assertEqual(state["metrics"]["rebases_caused_by_overlap"], 1)
+                remote.calls.clear()
+                overlap.reconcile_open_prs(host, remote, remote.inventory([1, 3]))
+                self.assertEqual(remote.calls, [])
+
+    def test_final_shared_owner_release_deletes_and_rebases_only_once(self):
+        for order in ([1, 2, 3], [2, 1, 3]):
+            with self.subTest(order=order), tempfile.TemporaryDirectory() as tmp, \
+                    patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
+                remote = self.make_remote()
+                host = SimpleNamespace(state=Path(tmp))
+                overlap.reconcile_open_prs(host, remote, remote.inventory(order))
+                before = overlap.read_state(host.state)["active"]
+                self.assertEqual(len(before), 2)
+                self.assertTrue(all(row["holdApplied"] for row in before.values()))
+                remote.calls.clear()
+                overlap.reconcile_open_prs(host, remote, remote.inventory([3]))
+                self.assertEqual(remote.calls, [
+                    ["gh", "api", "-X", "DELETE", "repos/JovieInc/Jovie/issues/3/labels/hold"],
+                    ["gh", "api", "-X", "POST", "repos/JovieInc/Jovie/issues/3/labels",
+                     "-f", "labels[]=lane-fix-dequeued"],
+                ])
+                self.assertEqual(remote.rows[3]["labels"], [{"name": "lane-fix-dequeued"}])
+                state = overlap.read_state(host.state)
+                self.assertEqual(state["active"], {})
+                self.assertEqual(state["metrics"]["rebases_caused_by_overlap"], 1)
+                remote.calls.clear()
+                overlap.reconcile_open_prs(host, remote, remote.inventory([3]))
+                self.assertEqual(remote.calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()
