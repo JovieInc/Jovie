@@ -72,6 +72,8 @@ class GithubEnvTest(unittest.TestCase):
             self.assertIn("gh_app_token.py", shim)
             self.assertIn("exec /usr/bin/gh", shim)
             self.assertIn("[ \"$1\" = gist ] && exec /usr/bin/gh", shim, "gists keep the host login")
+            self.assertIn('"$GH_HOST" != github.com ] && exec /usr/bin/gh', shim,
+                          "a non-github.com GH_HOST keeps the caller's credentials")
             self.assertTrue(os.environ["PATH"].startswith(str(shim_dir)))
 
     def test_no_key_and_no_env_changes_nothing(self):

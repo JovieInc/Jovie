@@ -1,8 +1,18 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  accessSync,
+  closeSync,
+  constants,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -16,17 +26,42 @@ import { crc32 } from 'node:zlib';
 
 export const GH_FAKE_HOST = 'github.localhost';
 
-/** Absolute path of the real gh binary, or null when it is not installed. */
-export function resolveRealGh() {
+/**
+ * Lane environments prepend a token-minting `gh` shim to PATH (lane_runner's
+ * load_github_env). That shim is a shell script that rewrites GH_TOKEN on
+ * every call, which breaks this harness — the fixture supplies its own token
+ * and a HOME with no app key, so the shim fails before gh runs. The contract
+ * here is the real gh binary, so skip shim scripts and keep scanning PATH.
+ */
+function isTokenMintingShim(file) {
+  let fd;
   try {
-    return (
-      execFileSync('sh', ['-c', 'command -v gh'], {
-        encoding: 'utf8',
-      }).trim() || null
-    );
+    fd = openSync(file, 'r');
+    const head = Buffer.alloc(4096);
+    const size = readSync(fd, head, 0, head.length, 0);
+    return head.subarray(0, size).includes('gh_app_token');
   } catch {
-    return null;
+    return false;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
+}
+
+/** Absolute path of the real gh binary, or null when it is not installed. */
+export function resolveRealGh(env = process.env) {
+  for (const dir of String(env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    const candidate = join(dir, 'gh');
+    try {
+      if (!statSync(candidate).isFile()) continue;
+      accessSync(candidate, constants.X_OK);
+    } catch {
+      continue;
+    }
+    if (isTokenMintingShim(candidate)) continue;
+    return candidate;
+  }
+  return null;
 }
 
 /** First line of `gh --version`, recorded as the exercised boundary version. */
@@ -116,7 +151,7 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
+          PATH: `${dirname(binary)}${delimiter}${process.env.PATH}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
