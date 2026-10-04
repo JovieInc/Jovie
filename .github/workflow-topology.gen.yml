@@ -1045,6 +1045,18 @@ nodes:
       - workflow_call
     terminalReceipt: job:release-result
     jobCount: 16
+  - name: Public Profile Benchmark
+    path: .github/workflows/public-benchmark.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:benchmark
+    jobCount: 1
   - name: Quality Gap Finder
     path: .github/workflows/quality-gap-finder.yml
     active: true
