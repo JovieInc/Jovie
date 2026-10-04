@@ -148,6 +148,13 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly onToggleRowSelection?: (row: TData, rowIndex: number) => void;
 
   /**
+   * Shift-click selects a contiguous range: every row from the focused row
+   * (the anchor) through the clicked row, in the table's visible order.
+   * Ignored when `onRowShiftClick` is provided.
+   */
+  readonly onSelectRowRange?: (rows: TData[]) => void;
+
+  /**
    * Context menu handler for row
    */
   readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
@@ -447,6 +454,7 @@ function UnifiedTableContent<TData extends RowData>({
   onRowClick,
   onRowShiftClick,
   onToggleRowSelection,
+  onSelectRowRange,
   onRowContextMenu,
   getContextMenuItems,
   contextMenuSearchable = false,
@@ -694,6 +702,24 @@ function UnifiedTableContent<TData extends RowData>({
     [rows, toggleRowSelection]
   );
 
+  // A ref keeps the anchor current without re-rendering every row on focus.
+  const rangeAnchorRef = useRef(0);
+  useEffect(() => {
+    rangeAnchorRef.current = focusedIndex;
+  }, [focusedIndex]);
+  const selectRangeOnShiftClick = useCallback(
+    (rowIndex: number) => {
+      if (!onSelectRowRange) return;
+      const start = Math.min(rangeAnchorRef.current, rowIndex);
+      const end = Math.max(rangeAnchorRef.current, rowIndex);
+      onSelectRowRange(rows.slice(start, end + 1).map(row => row.original));
+      setFocusedIndex(rowIndex);
+    },
+    [onSelectRowRange, rows, setFocusedIndex]
+  );
+  const resolvedRowShiftClick =
+    onRowShiftClick ?? (onSelectRowRange ? selectRangeOnShiftClick : undefined);
+
   const { handleKeyDown } = useTableKeyboardNav({
     enabled: shouldEnableKeyboardNav,
     focusedIndex,
@@ -742,7 +768,7 @@ function UnifiedTableContent<TData extends RowData>({
           onFocusChange={setFocusedIndex}
           getRowClassName={getRowClassName}
           getRowTestId={getRowTestId}
-          onRowShiftClick={onRowShiftClick}
+          onRowShiftClick={resolvedRowShiftClick}
           columnSnap={snapColumns}
           columnSnapOrder={Math.min(index, COLUMN_SNAP_STAGGER_CAP)}
         />
@@ -801,7 +827,7 @@ function UnifiedTableContent<TData extends RowData>({
       getRowClassName,
       isRowSelected,
       getRowTestId,
-      onRowShiftClick,
+      resolvedRowShiftClick,
       getExpandableRowId,
       expandedRowIds,
       renderExpandedContent,
@@ -1005,7 +1031,7 @@ function UnifiedTableContent<TData extends RowData>({
             contextMenuSearchable={contextMenuSearchable}
             contextMenuSearchPlaceholder={contextMenuSearchPlaceholder}
             contextMenuSearchMode={contextMenuSearchMode}
-            onRowShiftClick={onRowShiftClick}
+            onRowShiftClick={resolvedRowShiftClick}
             getRowClassName={getRowClassName}
             isRowSelected={isRowSelected}
             getRowTestId={getRowTestId}
