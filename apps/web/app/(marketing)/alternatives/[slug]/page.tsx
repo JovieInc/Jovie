@@ -9,8 +9,8 @@ import {
   MarketingHero,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
 interface AlternativesPageProps {
@@ -51,6 +51,7 @@ export default async function AlternativesPage({
   const { slug } = await params;
   const data = getAlternative(slug);
   if (!data) notFound();
+  const freeOffer = getPublicPriceClaim('free');
 
   const faqSchema = buildFaqSchema(data.faq);
   const breadcrumbSchema = buildBreadcrumbSchema([
@@ -92,16 +93,16 @@ export default async function AlternativesPage({
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <h2 className='text-2xl font-semibold text-primary-token line-clamp-2'>
-            Why Musicians Are Switching
+            Why Consider A Different Profile
           </h2>
           <ul className='mt-6 space-y-4'>
             {data.whySwitch.map(reason => (
               <li
-                key={reason}
+                key={reason.text}
                 className='flex gap-3 text-base leading-relaxed text-secondary-token'
               >
                 <span className='mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-token' />
-                {reason}
+                {reason.text}
               </li>
             ))}
           </ul>
@@ -134,13 +135,18 @@ export default async function AlternativesPage({
         <section>
           <div className='rounded-xl border border-border-primary bg-surface-secondary p-8 text-center'>
             <h2 className='text-xl font-semibold text-primary-token line-clamp-2'>
-              Ready To Try {APP_NAME}?
+              Start With A Free {APP_NAME} Profile
             </h2>
-            <p className='mt-2 text-sm text-secondary-token'>
-              Create your free profile in under a minute.
+            <p
+              className='mt-2 text-sm text-secondary-token'
+              data-claim-id='jovie.free-profile'
+            >
+              {freeOffer.note}
             </p>
             <Button asChild variant='primary' size='lg' className='mt-6'>
-              <Link href={APP_ROUTES.SIGNUP}>Request Access</Link>
+              <Link href={freeOffer.ctaHref} data-claim-id='jovie.free-profile'>
+                {freeOffer.ctaLabel}
+              </Link>
             </Button>
           </div>
         </section>

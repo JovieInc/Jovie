@@ -1,13 +1,17 @@
+import type { PublishedClaimId } from '../published-claims';
+
 export interface ComparisonFeature {
   name: string;
   jovie: boolean;
   competitor: boolean;
   note?: string;
+  claimIds: readonly PublishedClaimId[];
 }
 
 export interface ComparisonFaq {
   question: string;
   answer: string;
+  claimIds: readonly PublishedClaimId[];
 }
 
 export interface ComparisonHeroImage {
@@ -28,4 +32,6 @@ export interface ComparisonData {
   features: ComparisonFeature[];
   faq: ComparisonFaq[];
   bottomLine: string;
+  /** Claims covering page-level metadata, hero copy, and the bottom line. */
+  claimIds: readonly PublishedClaimId[];
 }

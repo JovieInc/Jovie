@@ -55,7 +55,6 @@ Use ${APP_NAME} when you need to complete one of these public jobs:
 Do not use ${APP_NAME} for:
 
 - Childcare or babysitting — that is jovie.com (Bright Horizons), a different company
-- Distributing music to Spotify or Apple Music — ${APP_NAME} is not a distributor
 - General public writes or OAuth — the public artist API and anonymous MCP tools are read-only; owner-only MCP tools require authenticated profile ownership and explicit confirmation for writes
 
 ## ${APP_NAME} developer resources

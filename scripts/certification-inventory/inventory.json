@@ -1,0 +1,289 @@
+{
+  "schema": "jovie.certification-inventory/v1",
+  "inventoryVersion": "2026-09-30.1",
+  "issue": "JOV-7328",
+  "certificationContract": "jovie.certification/v1",
+  "asOf": "2026-09-30T00:00:00Z",
+  "notes": "Bootstrap certification debt denominator. Nothing is removed for being old, hard, optional, or uninstrumented; statuses are source-truthful classifications, not certificates.",
+  "objects": [
+    {
+      "id": "capability:artist-identity-resolution",
+      "title": "Artist identity resolution",
+      "layer": "capability",
+      "status": "never-evaluated",
+      "owner": "music-data",
+      "prerequisites": [],
+      "journeys": [
+        "journey:artist-profile-public",
+        "journey:signup-onboarding"
+      ],
+      "surfaces": ["api"],
+      "risk": "revenue-critical",
+      "uiRequired": false,
+      "expectedEvidence": [
+        "canonical resolve contract probe",
+        "provider mismatch handling"
+      ],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "capability:music-catalog-resolution",
+      "title": "Music Resolver catalog resolution",
+      "layer": "capability",
+      "status": "running",
+      "owner": "music-data",
+      "prerequisites": ["capability:artist-identity-resolution"],
+      "journeys": ["journey:smartlink-fan-click"],
+      "surfaces": ["api", "cli"],
+      "risk": "revenue-critical",
+      "uiRequired": false,
+      "expectedEvidence": [
+        "first-party resolver shadow parity",
+        "staged musicfetch cutover receipt",
+        "vendor fallback removal gate"
+      ],
+      "issues": ["JOV-7320", "JOV-7323"]
+    },
+    {
+      "id": "capability:canonical-release-data",
+      "title": "Canonical release/provider data",
+      "layer": "capability",
+      "status": "never-evaluated",
+      "owner": "music-data",
+      "prerequisites": ["capability:music-catalog-resolution"],
+      "journeys": ["journey:smartlink-fan-click", "journey:release-publish"],
+      "surfaces": ["api"],
+      "risk": "high",
+      "uiRequired": false,
+      "expectedEvidence": [
+        "provider data freshness probe",
+        "canonical schema conformance"
+      ],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "capability:smartlink-create-resolve",
+      "title": "Smart Link creation and retrieval",
+      "layer": "capability",
+      "status": "running",
+      "owner": "growth",
+      "prerequisites": ["capability:canonical-release-data"],
+      "journeys": ["journey:smartlink-fan-click"],
+      "surfaces": ["api", "cli", "mcp"],
+      "risk": "revenue-critical",
+      "uiRequired": false,
+      "expectedEvidence": [
+        "create/retrieve idempotency probe",
+        "distribution OS 7.7 canary dogfood receipt"
+      ],
+      "issues": ["JOV-7316"]
+    },
+    {
+      "id": "capability:profile-assembly",
+      "title": "Profile assembly",
+      "layer": "capability",
+      "status": "never-evaluated",
+      "owner": "profiles",
+      "prerequisites": [
+        "capability:artist-identity-resolution",
+        "capability:smartlink-create-resolve"
+      ],
+      "journeys": ["journey:artist-profile-public"],
+      "surfaces": ["api", "web"],
+      "risk": "revenue-critical",
+      "uiRequired": false,
+      "expectedEvidence": ["profile composition contract probe"],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "capability:claim-flow",
+      "title": "Profile claim flow",
+      "layer": "capability",
+      "status": "never-evaluated",
+      "owner": "profiles",
+      "prerequisites": ["capability:profile-assembly"],
+      "journeys": [
+        "journey:artist-profile-public",
+        "journey:signup-onboarding"
+      ],
+      "surfaces": ["api"],
+      "risk": "revenue-critical",
+      "uiRequired": false,
+      "expectedEvidence": [
+        "claim authorization probe",
+        "ownership transfer receipt"
+      ],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "capability:billing-checkout",
+      "title": "Billing checkout and entitlement",
+      "layer": "capability",
+      "status": "never-evaluated",
+      "owner": "billing",
+      "prerequisites": [],
+      "journeys": ["journey:checkout-billing"],
+      "surfaces": ["api", "web"],
+      "risk": "revenue-critical",
+      "uiRequired": false,
+      "expectedEvidence": [
+        "Stripe webhook reconciliation probe",
+        "entitlement grant/revoke receipt"
+      ],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "surface:smartlink-api",
+      "title": "Smart Link API adapter",
+      "layer": "surface",
+      "status": "never-evaluated",
+      "owner": "growth",
+      "prerequisites": ["capability:smartlink-create-resolve"],
+      "journeys": ["journey:smartlink-fan-click"],
+      "surfaces": ["api"],
+      "risk": "revenue-critical",
+      "uiRequired": false,
+      "expectedEvidence": ["auth and error contract probe"],
+      "issues": ["JOV-7316"]
+    },
+    {
+      "id": "surface:smartlink-cli",
+      "title": "Smart Link CLI adapter",
+      "layer": "surface",
+      "status": "never-evaluated",
+      "owner": "growth",
+      "prerequisites": ["capability:smartlink-create-resolve"],
+      "journeys": ["journey:smartlink-fan-click"],
+      "surfaces": ["cli"],
+      "risk": "high",
+      "uiRequired": false,
+      "expectedEvidence": ["CLI auth/error/state contract probe"],
+      "issues": ["JOV-7316"]
+    },
+    {
+      "id": "surface:smartlink-mcp",
+      "title": "Smart Link agent/MCP adapter",
+      "layer": "surface",
+      "status": "never-evaluated",
+      "owner": "growth",
+      "prerequisites": ["capability:smartlink-create-resolve"],
+      "journeys": ["journey:smartlink-fan-click"],
+      "surfaces": ["mcp"],
+      "risk": "high",
+      "uiRequired": false,
+      "expectedEvidence": ["agent invocation contract probe"],
+      "issues": ["JOV-7316"]
+    },
+    {
+      "id": "surface:profile-web",
+      "title": "Public profile web surface",
+      "layer": "surface",
+      "status": "never-evaluated",
+      "owner": "profiles",
+      "prerequisites": ["capability:profile-assembly"],
+      "journeys": ["journey:artist-profile-public"],
+      "surfaces": ["web"],
+      "risk": "revenue-critical",
+      "uiRequired": true,
+      "expectedEvidence": [
+        "screen certification proof",
+        "accessibility contract"
+      ],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "surface:billing-web",
+      "title": "Checkout web surface",
+      "layer": "surface",
+      "status": "never-evaluated",
+      "owner": "billing",
+      "prerequisites": ["capability:billing-checkout"],
+      "journeys": ["journey:checkout-billing"],
+      "surfaces": ["web"],
+      "risk": "revenue-critical",
+      "uiRequired": true,
+      "expectedEvidence": ["checkout screen certification proof"],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "experience:smartlink-fan-click",
+      "title": "Smart Link fan click journey",
+      "layer": "experience",
+      "status": "never-evaluated",
+      "owner": "growth",
+      "prerequisites": [
+        "surface:smartlink-api",
+        "surface:smartlink-cli",
+        "surface:smartlink-mcp"
+      ],
+      "journeys": ["journey:smartlink-fan-click"],
+      "surfaces": ["web", "cli", "mcp"],
+      "risk": "revenue-critical",
+      "uiRequired": true,
+      "expectedEvidence": [
+        "end-to-end fan click outcome receipt",
+        "revenue/trust proof"
+      ],
+      "issues": ["JOV-7316", "JOV-7328"]
+    },
+    {
+      "id": "experience:artist-profile-public",
+      "title": "Public artist profile journey",
+      "layer": "experience",
+      "status": "never-evaluated",
+      "owner": "profiles",
+      "prerequisites": ["surface:profile-web", "capability:claim-flow"],
+      "journeys": ["journey:artist-profile-public"],
+      "surfaces": ["web"],
+      "risk": "revenue-critical",
+      "uiRequired": true,
+      "expectedEvidence": ["end-to-end profile view/claim outcome receipt"],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "experience:signup-onboarding",
+      "title": "Signup and onboarding journey",
+      "layer": "experience",
+      "status": "never-evaluated",
+      "owner": "growth",
+      "prerequisites": [
+        "capability:artist-identity-resolution",
+        "capability:claim-flow"
+      ],
+      "journeys": ["journey:signup-onboarding"],
+      "surfaces": ["web"],
+      "risk": "revenue-critical",
+      "uiRequired": true,
+      "expectedEvidence": ["end-to-end signup outcome receipt"],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "experience:checkout-billing",
+      "title": "Checkout billing journey",
+      "layer": "experience",
+      "status": "never-evaluated",
+      "owner": "billing",
+      "prerequisites": ["surface:billing-web"],
+      "journeys": ["journey:checkout-billing"],
+      "surfaces": ["web"],
+      "risk": "revenue-critical",
+      "uiRequired": true,
+      "expectedEvidence": ["paid conversion outcome receipt"],
+      "issues": ["JOV-7328"]
+    },
+    {
+      "id": "experience:release-publish",
+      "title": "Release publish journey",
+      "layer": "experience",
+      "status": "never-evaluated",
+      "owner": "music-data",
+      "prerequisites": ["capability:canonical-release-data"],
+      "journeys": ["journey:release-publish"],
+      "surfaces": ["web", "api"],
+      "risk": "high",
+      "uiRequired": true,
+      "expectedEvidence": ["end-to-end publish outcome receipt"],
+      "issues": ["JOV-7328"]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { getAlternative } from '@/content/alternatives';
+import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
 
 const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
@@ -12,7 +12,10 @@ vi.mock('next/navigation', () => ({
   notFound: mocks.notFound,
 }));
 
-import AlternativesPage from './page';
+import AlternativesPage, {
+  generateMetadata,
+  generateStaticParams,
+} from './page';
 
 async function renderSlug(slug: string) {
   const jsx = await AlternativesPage({ params: Promise.resolve({ slug }) });
@@ -34,6 +37,15 @@ describe('AlternativesPage', () => {
       expect(
         screen.getByAltText(data.heroImage.alt).getAttribute('src')
       ).toContain(encodeURIComponent(data.heroImage.src));
+      for (const reason of data.whySwitch) {
+        expect(screen.getByText(reason.text)).toBeInTheDocument();
+      }
+      for (const highlight of data.highlights) {
+        expect(screen.getByText(highlight.description)).toBeInTheDocument();
+      }
+      expect(
+        screen.getByRole('link', { name: 'Claim my free profile' })
+      ).toHaveAttribute('href', '/signup?plan=free');
 
       unmount();
     }
@@ -47,5 +59,22 @@ describe('AlternativesPage', () => {
     }
 
     expect(linktree.heroImage.src).not.toBe(linkInBio.heroImage.src);
+  });
+
+  it('keeps static params and canonical metadata aligned with the inventory', async () => {
+    expect(await generateStaticParams()).toEqual(
+      getAlternativeSlugs().map(slug => ({ slug }))
+    );
+    for (const slug of getAlternativeSlugs()) {
+      const data = getAlternative(slug);
+      if (!data) throw new Error(`Missing alternative fixture ${slug}`);
+      const metadata = await generateMetadata({
+        params: Promise.resolve({ slug }),
+      });
+      expect(metadata.title).toBe(data.title);
+      expect(metadata.alternates?.canonical).toBe(
+        `https://jov.ie/alternatives/${slug}`
+      );
+    }
   });
 });

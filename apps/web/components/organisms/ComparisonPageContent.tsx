@@ -8,8 +8,8 @@ import {
   MarketingHero,
 } from '@/components/marketing';
 import { APP_NAME } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
 import type { ComparisonData } from '@/content/comparisons';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 interface ComparisonPageContentProps {
   readonly data: ComparisonData;
@@ -18,6 +18,8 @@ interface ComparisonPageContentProps {
 export function ComparisonPageContent({
   data,
 }: Readonly<ComparisonPageContentProps>) {
+  const freeOffer = getPublicPriceClaim('free');
+
   return (
     <>
       <MarketingHero
@@ -131,7 +133,9 @@ export function ComparisonPageContent({
           </p>
           <div className='mt-8'>
             <Button asChild variant='primary' size='lg'>
-              <Link href={APP_ROUTES.SIGNUP}>Try {APP_NAME} Free</Link>
+              <Link href={freeOffer.ctaHref} data-claim-id='jovie.free-profile'>
+                {freeOffer.ctaLabel}
+              </Link>
             </Button>
           </div>
         </section>
