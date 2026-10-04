@@ -75,12 +75,18 @@ export function parseSpotifyRef(url: string): SpotifyRef {
   if (!parsed || !/(^|\.)open\.spotify\.com$/u.test(parsed.hostname)) {
     return null;
   }
-  const match =
-    /^\/(?:intl-[a-z-]+\/)?(artist|album|track)\/([A-Za-z0-9]{22})/u.exec(
-      parsed.pathname
-    );
-  if (!match) return null;
-  return { kind: match[1] as 'artist' | 'album' | 'track', id: match[2] };
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  // Localized links carry a leading `intl-xx` segment.
+  if (segments[0]?.startsWith('intl-')) segments.shift();
+  const [kind, id] = segments;
+  if (
+    (kind !== 'artist' && kind !== 'album' && kind !== 'track') ||
+    !id ||
+    !/^[A-Za-z0-9]{22}$/u.test(id)
+  ) {
+    return null;
+  }
+  return { kind, id };
 }
 
 export interface BioLink {
