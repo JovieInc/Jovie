@@ -68,10 +68,12 @@
   --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
   --ds-marketing-display-leading: 0.94;
   --ds-marketing-display-tracking: -0.045em;
+  /* Section titles cap at the 56px marketing hero headline so no h2 ever
+     outranks the page h1 (route DOM heading-hierarchy-inversion). */
   --ds-marketing-title-size: clamp(
     var(--text-4xl),
     4.6vw,
-    calc(var(--text-5xl) + var(--space-4))
+    calc(var(--text-5xl) + var(--space-2))
   );
   --ds-marketing-title-leading: 1.08;
   --ds-marketing-title-tracking: 0;
@@ -1198,8 +1200,9 @@
      one big step from primary, then a compressed ordered tail. */
   --color-text-primary-token: lch(9.894% 0 282);
   --color-text-secondary-token: #5a606a;
-  --color-text-tertiary-token: #666c76;
-  --color-text-quaternary-token: #6a7078;
+  /* Tail steps clear 4.5:1 on the selected row tint (JOV-7861). */
+  --color-text-tertiary-token: #626872;
+  --color-text-quaternary-token: #646a72;
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
@@ -1437,7 +1440,8 @@
      compressed ordered tail. */
   --noir-ion-text-secondary: #a0a5af;
   --noir-ion-text-muted: #8f95a0;
-  --noir-ion-text-tertiary: #858b96;
+  /* Clears 4.5:1 on the selected row tint over surface-1 (JOV-7861). */
+  --noir-ion-text-tertiary: #8c939e;
   --noir-ion-text-disabled: #525d75;
   --noir-ion-text-inverse: #020307;
   --noir-ion-ion: #11afff;
@@ -3063,6 +3067,13 @@ html:not(.dark) .smart-link-powered-by {
 
 html:not(.dark) .smart-link-powered-by {
   color: rgb(64 64 64) !important;
+}
+
+/* Marketing headings balance their lines so no headline strands one word on
+   its last line (route DOM orphaned-line). Zero specificity: an explicit
+   text-wrap on a heading still wins. */
+:where(.system-b-marketing) :where(h1, h2, h3) {
+  text-wrap: balance;
 }
 
 /* Marketing typography: headings use Satoshi (display font). Product controls

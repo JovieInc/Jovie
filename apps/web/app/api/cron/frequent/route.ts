@@ -21,6 +21,7 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import { runBillingSyncRemediation } from '@/lib/billing/sync-remediation';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
@@ -118,6 +119,15 @@ export async function GET(request: Request) {
     await db.execute(drizzleSql`SELECT 1`);
     return { latencyMs: Date.now() - pingStart };
   });
+
+  // 15-minute detector. Database only; it does not call /api/billing/health.
+  results.billingSyncRemediation = await runSubJob(
+    'billingSyncRemediation',
+    async () => {
+      const remediation = await runBillingSyncRemediation();
+      return { ...remediation };
+    }
+  );
 
   // 1.5 Redis write/read canary — hourly. PING can remain green after a hard
   // command quota is exhausted, so only a real ephemeral write/read proves the
