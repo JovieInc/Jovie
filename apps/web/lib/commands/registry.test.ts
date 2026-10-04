@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
-import { buildCommands, COMMANDS, type NavCommand } from './registry';
+import {
+  buildCommands,
+  COMMANDS,
+  commandsForSurface,
+  type NavCommand,
+} from './registry';
 
 function navCommands(commands: readonly { kind: string }[]): NavCommand[] {
   return commands.filter(
@@ -30,6 +35,15 @@ describe('command registry navigation', () => {
     expect(byId.has('go-jovie-work')).toBe(false);
     expect(byId.has('go-calendar')).toBe(true);
     expect(byId.has('go-tasks')).toBe(true);
+  });
+
+  it('keeps workspace navigation out of the slash picker even when enabled', () => {
+    expect(
+      commandsForSurface('chat-slash', {
+        youtubeWorkspaceNav: true,
+        jovieWorkNav: true,
+      }).every(command => command.kind === 'skill')
+    ).toBe(true);
   });
 
   it('uses profile wording on shared commands', () => {

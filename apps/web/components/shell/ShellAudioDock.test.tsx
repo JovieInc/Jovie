@@ -48,6 +48,9 @@ describe('ShellAudioDock', () => {
     const dock = getDock();
     expect(dock).toHaveAttribute('data-state', 'closed');
     expect(dock).toHaveAttribute('aria-hidden', 'true');
+    // JOV-4522: the dock publishes its shared rail-motion slot so
+    // certification can sample it alongside the left/right rails.
+    expect(dock).toHaveAttribute('data-shell-rail-motion', 'dock');
     expect(dock.style.maxHeight).toBe('0px');
     expect(dock.style.marginTop).toBe('0px');
   });

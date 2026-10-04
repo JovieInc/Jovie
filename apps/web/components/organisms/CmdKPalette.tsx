@@ -38,10 +38,10 @@ import {
   type NavCommand,
   type SkillCommand,
 } from '@/lib/commands/registry';
+import { useAppFlag } from '@/lib/flags/client';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
-import { cn } from '@/lib/utils';
 import {
   artistResultToEntityRef,
   type ReleaseLikeRow,
@@ -79,9 +79,11 @@ interface CmdKPaletteProps {
 }
 
 function useCmdkData(profileId: string, query: string, open: boolean) {
+  const youtubeWorkspaceNav = useAppFlag('YOUTUBE_WORKSPACE_NAV');
+  const jovieWorkNav = useAppFlag('JOVIE_WORK_NAV');
   const commands = useMemo<readonly Command[]>(
-    () => commandsForSurface('cmdk'),
-    []
+    () => commandsForSurface('cmdk', { youtubeWorkspaceNav, jovieWorkNav }),
+    [youtubeWorkspaceNav, jovieWorkNav]
   );
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
     profileId,
@@ -445,23 +447,7 @@ export function CmdKPalette({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        // JOV-2982: full-viewport search takeover (not a centered card).
-        // Overrides DialogContent centered defaults via tailwind-merge.
-        className={cn(
-          'left-0 top-0 h-dvh w-full max-w-none [translate:0_0]',
-          'grid gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none',
-          'bg-(--app-shell-content-surface)',
-          'sm:max-w-none',
-          // Full-page: fade only (no zoom — zoom reads as a modal card)
-          'data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100'
-        )}
-        hideClose
-        overlayProps={{
-          className: 'bg-(--app-shell-content-surface)',
-        }}
-        testId='cmdk-full-page'
-      >
+      <DialogContent variant='fullscreen' hideClose testId='cmdk-full-page'>
         <DialogPrimitive.Title className='sr-only'>
           Command palette
         </DialogPrimitive.Title>

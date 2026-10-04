@@ -109,6 +109,13 @@ enum JovieFont {
     ])
     return Font(UIFont(descriptor: descriptor, size: size))
     #else
+    return Font(appKitBody(size: size, numericWeight: numericWeight) as CTFont)
+    #endif
+  }
+
+  #if canImport(AppKit) && !canImport(UIKit)
+  /// The native editor shares the same Inter resolution and weight mapping as SwiftUI.
+  static func appKitBody(size: CGFloat, numericWeight: CGFloat = 400) -> NSFont {
     let weight = NSFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
     let descriptorBase =
       NSFont(name: "Inter Variable", size: size)
@@ -117,10 +124,9 @@ enum JovieFont {
     let descriptor = descriptorBase.fontDescriptor.addingAttributes([
       .traits: [NSFontDescriptor.TraitKey.weight: weight.rawValue]
     ])
-    let resolved = NSFont(descriptor: descriptor, size: size) ?? descriptorBase
-    return Font(resolved as CTFont)
-    #endif
+    return NSFont(descriptor: descriptor, size: size) ?? descriptorBase
   }
+  #endif
 
   /// Maps CSS/Satoshi weights onto UIFont.Weight raw values.
   static func uiFontWeightRawValue(forCSSWeight cssWeight: CGFloat) -> CGFloat {

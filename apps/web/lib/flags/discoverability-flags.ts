@@ -1,27 +1,19 @@
-/**
- * Default-off doors for shipped workspaces Tim has not approved for navigation.
- *
- * Override with FEATURE_<FLAG_NAME>=true. These flags only show or hide
- * Cmd-K rows. They do not change route auth.
- */
+import { APP_FLAG_DEFAULTS, type PartialAppFlagSnapshot } from './contracts';
 
+/** Default-off Cmd-K doors. Resolve audited overrides on the server and hydrate
+ * the existing AppFlagProvider; client code never reads server-only env values.
+ * Navigation visibility does not change route authorization.
+ */
 export const DISCOVERABILITY_FLAGS = {
-  /** Cmd-K for /app/youtube. The revival queue is real; generation stays off. */
-  YOUTUBE_WORKSPACE_NAV: false,
-  /** Cmd-K for /app/jovie-work. Agent-shipped feed, not a founder-approved rail item. */
-  JOVIE_WORK_NAV: false,
-} as const satisfies Record<string, boolean>;
+  YOUTUBE_WORKSPACE_NAV: APP_FLAG_DEFAULTS.YOUTUBE_WORKSPACE_NAV,
+  JOVIE_WORK_NAV: APP_FLAG_DEFAULTS.JOVIE_WORK_NAV,
+} as const;
 
 export type DiscoverabilityFlagName = keyof typeof DISCOVERABILITY_FLAGS;
 
 export function isDiscoverabilityFlagEnabled(
-  name: DiscoverabilityFlagName
+  name: DiscoverabilityFlagName,
+  snapshot: PartialAppFlagSnapshot = {}
 ): boolean {
-  if (typeof process === 'undefined' || !process.env) {
-    return DISCOVERABILITY_FLAGS[name];
-  }
-  const envVal = process.env[`FEATURE_${name}`];
-  if (envVal === 'true') return true;
-  if (envVal === 'false') return false;
-  return DISCOVERABILITY_FLAGS[name];
+  return snapshot[name] ?? DISCOVERABILITY_FLAGS[name];
 }

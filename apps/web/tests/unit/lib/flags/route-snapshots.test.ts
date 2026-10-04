@@ -28,7 +28,12 @@ describe('route flag snapshots', () => {
       APP_ROUTES.LEGACY_FEATURE_FLAGS,
     ]) {
       expect(resolveAppShellRouteFlagNames(pathname)).toEqual(
-        expect.arrayContaining(['STRIPE_CONNECT_ENABLED', 'INBOX_HOME'])
+        expect.arrayContaining([
+          'STRIPE_CONNECT_ENABLED',
+          'INBOX_HOME',
+          'YOUTUBE_WORKSPACE_NAV',
+          'JOVIE_WORK_NAV',
+        ])
       );
     }
   });

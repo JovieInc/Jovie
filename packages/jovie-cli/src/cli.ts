@@ -96,8 +96,9 @@ function usage(): string {
   });
   return `Usage: jovie <command> [options]
 
-Jovie for agents: create artist profiles from Spotify and read public artist
-data. No login or API key is needed for public commands.
+Jovie for agents: extract public creator data, create artist profiles from
+Spotify, and read public artist data.
+No login or API key is needed for public commands.
 Internal fleet commands require a scoped JOVIE_WORKER_TOKEN supplied by the
 operator. Every command supports --json.
 
@@ -116,6 +117,7 @@ Options:
   -v, --version          Show the installed CLI version
 
 Examples:
+  jovie creator lookup https://www.youtube.com/@creator --json
   jovie profile create https://open.spotify.com/artist/<id> --json
   jovie artist get <username> --json
   npx -y @jovie/cli mcp

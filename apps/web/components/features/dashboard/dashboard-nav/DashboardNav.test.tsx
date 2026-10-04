@@ -53,6 +53,39 @@ describe('DashboardNav route warming', () => {
     resetDashboardNavTestMocks();
   });
 
+  it('leaves Inbox to the brand-row bell without removing other destinations', () => {
+    const destinations = () =>
+      screen.getAllByRole('link').map(link => ({
+        label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
+        href: link.getAttribute('href'),
+      }));
+    const baseline = renderDashboardNav({ renderFn: render });
+    const before = destinations();
+    expect(before.filter(link => link.label === 'Inbox')).toEqual([
+      { label: 'Inbox', href: APP_ROUTES.DASHBOARD },
+    ]);
+    const retained = before.filter(link => link.label !== 'Inbox');
+    expect(retained.length).toBeGreaterThan(0);
+    baseline.unmount();
+    renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
+    expect(
+      screen.queryByRole('link', { name: 'Inbox' })
+    ).not.toBeInTheDocument();
+    expect(destinations()).toEqual(retained);
+    expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
+  });
+
+  it('keeps the divider when a search surface precedes navigation actions', () => {
+    renderDashboardNav({
+      renderFn: render,
+      navChildren: <button type='button'>Search</button>,
+    });
+    expect(screen.getByRole('button', { name: 'Search' })).toBeVisible();
+    expect(
+      document.querySelector('[data-sidebar-search-divider]')
+    ).toBeInTheDocument();
+  });
+
   it('fully prefetches every canonical dynamic customer route', () => {
     renderDashboardNav({ renderFn: render });
 
@@ -242,6 +275,17 @@ describe('DashboardNav route warming', () => {
         expect(el.className).not.toContain('mask-image');
       }
     }
+  });
+
+  it('stages the search slot exit on the shared rail-motion contract (JOV-4522)', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
+    );
+    // The search pill collapses vertically (max-height + fade) in lockstep
+    // with the rail instead of snapping to display:none at frame one.
+    const slot = source.slice(source.indexOf('data-sidebar-search-slot'));
+    expect(slot).toContain('SHELL_RAIL_BLOCK_LABEL');
+    expect(slot).not.toContain('group-data-[collapsible=icon]:hidden');
   });
 
   it('imports sidebar chrome from the modular sidebar specifier', () => {

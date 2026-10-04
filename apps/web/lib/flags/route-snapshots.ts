@@ -6,6 +6,8 @@ import type { AppFlagName } from './contracts';
 const SHELL_CHROME_FLAG_NAMES = [
   'STRIPE_CONNECT_ENABLED',
   'INBOX_HOME',
+  'YOUTUBE_WORKSPACE_NAV',
+  'JOVIE_WORK_NAV',
 ] as const satisfies readonly AppFlagName[];
 
 const AUTH_ROUTE_FLAG_NAMES = [] as const satisfies readonly AppFlagName[];

@@ -278,6 +278,16 @@ const nextConfig = {
         headers: healthNoStoreHeaders,
       },
       {
+        // `:path*` does not match the exact root. Keep failure and liveness
+        // bodies out of the public CDN cache. Vary stays on this exact rule
+        // so build-info and redis keep the shared health header block.
+        source: '/api/health',
+        headers: [
+          ...healthNoStoreHeaders,
+          { key: 'Vary', value: 'Authorization, Cookie' },
+        ],
+      },
+      {
         // Billing sync detail is credentialed. A public s-maxage would let
         // the CDN replay an authorized body to anonymous callers (JOV-7557).
         source: '/api/billing/health',
@@ -550,6 +560,13 @@ const nextConfig = {
         destination: '/artists',
         permanent: true,
       },
+      // Consolidate the singular marketing alias onto the canonical lander.
+      // Use an explicit 301 for search engines and existing inbound links.
+      {
+        source: '/artist-profile',
+        destination: '/artist-profiles',
+        statusCode: 301,
+      },
       // No /solutions index page exists; send it to the shipped solutions
       // route instead of falling through to profile resolution ("Profile
       // not found").
@@ -769,6 +786,9 @@ const nextConfig = {
       '@dnd-kit/utilities',
       'framer-motion',
       'motion',
+      // Motion's React entry declares full motion aliases beside wildcard
+      // exports. Resolve named helpers to their leaves before bundling.
+      'motion/react',
       'zod',
       '@tanstack/react-table',
       '@tanstack/react-virtual',

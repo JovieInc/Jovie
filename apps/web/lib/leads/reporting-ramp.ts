@@ -1,6 +1,11 @@
 import 'server-only';
 
 import { and, count, eq, gte } from 'drizzle-orm';
+import {
+  type AcquisitionEligibility,
+  describeAcquisitionBlock,
+} from '@/lib/acquisition/eligibility';
+import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import {
@@ -176,6 +181,30 @@ function evaluateRampAction(opts: {
   };
 }
 
+/**
+ * JOV-7696: more outreach volume is a deliberate acquisition recommendation,
+ * so an `increase` holds at the current cap until ACQUISITION_ELIGIBLE is
+ * true. `hold` and `pause` already reduce or keep volume and pass through.
+ */
+export function applyAcquisitionEligibility(
+  recommendation: RampRecommendation,
+  currentDailyCap: number,
+  eligibility: Pick<
+    AcquisitionEligibility,
+    'eligible' | 'verdict' | 'firstBlocker'
+  >
+): RampRecommendation {
+  if (recommendation.recommendedAction !== 'increase' || eligibility.eligible) {
+    return recommendation;
+  }
+  return {
+    ...recommendation,
+    recommendedAction: 'hold',
+    recommendedNextDailyCap: currentDailyCap,
+    reasons: [...recommendation.reasons, describeAcquisitionBlock(eligibility)],
+  };
+}
+
 export async function getRampRecommendation(): Promise<RampRecommendation> {
   try {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -226,7 +255,7 @@ export async function getRampRecommendation(): Promise<RampRecommendation> {
       contacted > 0 ? Number(failedRow?.total ?? 0) / contacted : null;
     const claimClickRate = contacted > 0 ? claimClicks / contacted : null;
 
-    return evaluateRampAction({
+    const recommendation = evaluateRampAction({
       contacted,
       claimClickRate,
       providerFailureRate,
@@ -235,6 +264,13 @@ export async function getRampRecommendation(): Promise<RampRecommendation> {
       guardrailsEnabled,
       rampMode: settings?.rampMode ?? 'manual',
     });
+    // Only an increase needs the cone probe.
+    if (recommendation.recommendedAction !== 'increase') return recommendation;
+    return applyAcquisitionEligibility(
+      recommendation,
+      currentDailyCap,
+      await getAcquisitionEligibility()
+    );
   } catch (error) {
     if (isMissingLeadReportingSchemaError(error)) {
       await captureWarning(

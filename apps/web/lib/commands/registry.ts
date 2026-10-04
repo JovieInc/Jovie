@@ -383,8 +383,12 @@ export function buildCommands(
 
 export const COMMANDS: readonly Command[] = buildCommands();
 
-export function commandsForSurface(surface: CommandSurface): Command[] {
-  return COMMANDS.filter(c => c.surfaces.includes(surface));
+export function commandsForSurface(
+  surface: CommandSurface,
+  discoverability?: CommandDiscoverability
+): Command[] {
+  const commands = discoverability ? buildCommands(discoverability) : COMMANDS;
+  return commands.filter(c => c.surfaces.includes(surface));
 }
 
 export function skillById(id: string): SkillCommand | undefined {

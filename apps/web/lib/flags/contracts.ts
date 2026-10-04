@@ -29,6 +29,8 @@ export interface StatsigFeatureFlagsBootstrap {
 }
 
 export const APP_FLAG_DEFAULTS = {
+  YOUTUBE_WORKSPACE_NAV: false,
+  JOVIE_WORK_NAV: false,
   BILLING_UPGRADE_DIRECT: true,
   SMARTLINK_PRE_SAVE: true,
   IOS_APPLE_MUSIC_PRIORITY: true,
@@ -37,7 +39,12 @@ export const APP_FLAG_DEFAULTS = {
   PLAYLIST_ENGINE: true,
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: true,
-  RELEASE_PLAN_DEMO: true,
+  /**
+   * Mock EP planner at /app/dashboard/release-plan. Off in production.
+   * Dev and preview stay on unless an env override publishes a value
+   * (`getAppFlagValue`).
+   */
+  RELEASE_PLAN_DEMO: false,
   RELEASE_TO_REVENUE_AUTOPILOT: true,
   AI_CONNECTORS_BETA: true,
   MERCH_MVP: true,
@@ -81,6 +88,7 @@ export const APP_FLAG_DEFAULTS = {
    * independent of flag-resolution latency.
    */
   CREATOR_FINANCE: false,
+  VISIBILITY_AUDIT_OFFER: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -89,6 +97,8 @@ export type AppFlagSnapshot = Record<AppFlagName, boolean>;
 export type PartialAppFlagSnapshot = Partial<Record<AppFlagName, boolean>>;
 
 export const APP_FLAG_KEYS = {
+  YOUTUBE_WORKSPACE_NAV: 'youtube_workspace_nav',
+  JOVIE_WORK_NAV: 'jovie_work_nav',
   BILLING_UPGRADE_DIRECT: LEGACY_STATSIG_GATE_KEYS.BILLING_UPGRADE_DIRECT,
   SMARTLINK_PRE_SAVE: LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
   IOS_APPLE_MUSIC_PRIORITY: LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY,
@@ -112,9 +122,12 @@ export const APP_FLAG_KEYS = {
   MERCH_QA_GATE: 'merch_qa_gate',
   AGENT_PROFILE_CREATE: 'agent_profile_create',
   CREATOR_FINANCE: 'creator_finance',
+  VISIBILITY_AUDIT_OFFER: 'visibility_audit_offer',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
+  YOUTUBE_WORKSPACE_NAV: 'code:YOUTUBE_WORKSPACE_NAV',
+  JOVIE_WORK_NAV: 'code:JOVIE_WORK_NAV',
   BILLING_UPGRADE_DIRECT: 'code:BILLING_UPGRADE_DIRECT',
   SMARTLINK_PRE_SAVE: 'code:SMARTLINK_PRE_SAVE',
   IOS_APPLE_MUSIC_PRIORITY: 'code:IOS_APPLE_MUSIC_PRIORITY',
@@ -138,6 +151,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   MERCH_QA_GATE: 'code:MERCH_QA_GATE',
   AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
   CREATOR_FINANCE: 'code:CREATOR_FINANCE',
+  VISIBILITY_AUDIT_OFFER: 'code:VISIBILITY_AUDIT_OFFER',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -157,6 +171,8 @@ export const APP_FLAG_TO_STATSIG_GATE = {
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
 
 export const APP_FLAG_DESCRIPTIONS = {
+  YOUTUBE_WORKSPACE_NAV: 'Cmd-K discovery of the YouTube workspace',
+  JOVIE_WORK_NAV: 'Cmd-K discovery of autonomous work on your profile',
   BILLING_UPGRADE_DIRECT: 'Direct billing upgrade (skip pricing page)',
   SMARTLINK_PRE_SAVE: 'Spotify pre-save campaigns',
   IOS_APPLE_MUSIC_PRIORITY: 'Prefer Apple Music on iOS',
@@ -194,6 +210,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Anonymous agent profile creation via POST /api/agents/profiles (public CLI/MCP write path).',
   CREATOR_FINANCE:
     'Creator Financial Health owner-only surfaces (JOV-4621). Release-blocking gate — stays off until the privacy/correctness matrix is certified.',
+  VISIBILITY_AUDIT_OFFER:
+    'Hidden unless the flag and a Stripe Payment Link are both set.',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -201,6 +219,10 @@ export const APP_FLAG_DESCRIPTIONS = {
  * flag without an exit condition is an indefinite second product state.
  */
 export const APP_FLAG_REMOVAL_CONDITIONS = {
+  YOUTUBE_WORKSPACE_NAV:
+    'Remove when the YouTube navigation door is approved or retired.',
+  JOVIE_WORK_NAV:
+    'Remove when the autonomous work navigation door is approved or retired.',
   BILLING_UPGRADE_DIRECT:
     'Remove after direct checkout is the only supported upgrade path.',
   SMARTLINK_PRE_SAVE:
@@ -246,6 +268,7 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Retain while the anonymous public write path needs an abuse stop control.',
   CREATOR_FINANCE:
     'Remove when the JOV-4621 release gate is certified and financial access no longer needs a fleet-wide stop control.',
+  VISIBILITY_AUDIT_OFFER: 'Remove when the audit checkout is retired.',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_AUDIT_OWNER = '@itstimwhite' as const;
@@ -301,9 +324,11 @@ export const APP_FLAG_AUDIT_REGISTRY = Object.fromEntries(
  * justification, or the flag-registration-guardrail test will fail.
  */
 export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
+  'YOUTUBE_WORKSPACE_NAV', // unapproved navigation door; local default off, audited override only
+  'JOVIE_WORK_NAV', // unapproved navigation door; local default off, audited override only
   'PLAYLIST_ENGINE', // internal v1 default-on feature; no remote gate
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
-  'RELEASE_PLAN_DEMO', // internal v1 default-on feature; no remote gate
+  'RELEASE_PLAN_DEMO', // mock EP planner; default off in production, on in dev/preview, no remote gate
   'RELEASE_TO_REVENUE_AUTOPILOT', // internal v1 default-on pilot surface; no remote gate
   'INBOX_HOME', // rollout gate for Inbox-as-home IA; default off in prod (JOV-3931)
   'PROFILES_WORKSPACE', // JOV-2659 Tim-first unified Profiles rollout
@@ -313,4 +338,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'MERCH_QA_GATE', // JOV-4739 publish gate; default off until a real visual reviewer replaces the stub — no Statsig gate
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
   'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate
+  'VISIBILITY_AUDIT_OFFER', // default off; no Statsig gate
 ]);

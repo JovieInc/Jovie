@@ -15,12 +15,12 @@ import {
   type LucideIcon,
   Map,
   MessageSquare,
-  Mic,
+  MessagesSquare,
+  SearchCheck,
   Share2,
   TrendingUp,
   Truck,
   Users,
-  Waypoints,
 } from 'lucide-react';
 import {
   ADMIN_NAV_REGISTRY,
@@ -40,8 +40,11 @@ const OPERATOR_ICON_BY_ID = {
   ops: Gauge,
   shipping: Truck,
   people: Users,
+  interviews: MessagesSquare,
   growth: FolderKanban,
   platform_connections: Cable,
+  playlists: ListMusic,
+  presence: SearchCheck,
   activity: Activity,
   investors: Briefcase,
   feature_registry: ListChecks,
@@ -51,9 +54,6 @@ const OPERATOR_ICON_BY_ID = {
   share_studio: Share2,
   system_map: Map,
   features: Flag,
-  interviews: Mic,
-  playlists: ListMusic,
-  company_presence: Waypoints,
 } as const satisfies Record<AdminWorkspaceId, LucideIcon>;
 
 export interface OperatorNavItem extends Omit<NavItem, 'badge'> {
