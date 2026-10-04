@@ -274,6 +274,78 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
   },
 ];
 
+/**
+ * Claims the golden path wants to make but cannot render yet: buyer
+ * objections (VOC 2026-10-03) and findings the persona judge rewarded in
+ * the Pen frames. Each one stays an open ProofRequest naming its generator
+ * and owner until proof lands; copy may not state it before then.
+ */
+export interface WantedClaim {
+  readonly id: string;
+  readonly statement: string;
+  /** The buyer objection or judge finding this claim answers. */
+  readonly answers: string;
+  readonly unlocks: readonly GoldenPathStep[];
+  readonly kind: ProofKind;
+  readonly generator: ProofGeneratorId;
+  /** Linear issue that owns producing the proof. */
+  readonly owner: string;
+}
+
+export const WANTED_CLAIMS: readonly WantedClaim[] = [
+  {
+    id: 'outcome.creator-before-after',
+    statement:
+      'A before/after result on a creator’s own data: fans, streams or bookings.',
+    answers: 'VOC: "I made no sales", "no real results" (ends subscriptions)',
+    unlocks: ['upgrade', 'pricing'],
+    kind: 'metric',
+    generator: 'pilot',
+    owner: 'JOV-7793',
+  },
+  {
+    id: 'billing.renewal-reminder-and-refund',
+    statement:
+      'A renewal reminder at least 7 days before the charge, one-click cancel and a pro-rated refund.',
+    answers: 'VOC: billing honesty',
+    unlocks: ['upgrade', 'pricing'],
+    kind: 'product-proof',
+    generator: 'dogfood',
+    owner: 'JOV-7805',
+  },
+  {
+    id: 'ownership.page-and-export-survive-lapse',
+    statement:
+      'The public page stays live after a plan lapses, and the audience exports as CSV on any plan.',
+    answers: 'VOC: ownership and lock-in',
+    unlocks: ['signup', 'upgrade', 'pricing'],
+    kind: 'product-proof',
+    generator: 'dogfood',
+    owner: 'JOV-7806',
+  },
+  {
+    id: 'rights.no-training-on-creator-work',
+    statement:
+      'Jovie does not train on, or claim rights to, a creator’s work or likeness.',
+    answers: 'VOC: creator rights',
+    unlocks: ['signup', 'upgrade', 'pricing'],
+    kind: 'third-party',
+    generator: 'research',
+    owner: 'JOV-7807',
+  },
+  {
+    id: 'computed.link-drift-finding',
+    statement:
+      'A drift finding about the visitor: a public link that points somewhere stale.',
+    answers:
+      'Persona judge: most-quoted line in studio round 3 preview (value 6.9)',
+    unlocks: ['preview', 'upgrade'],
+    kind: 'product-proof',
+    generator: 'computed',
+    owner: 'JOV-7794',
+  },
+];
+
 export const CLAIM_STATUSES = [
   'admissible',
   'proof-gap',
@@ -310,6 +382,8 @@ export interface GoldenPathProofReport {
   /** Paywall steps that show no admissible outcome proof at all. */
   readonly prooflessPaywallSteps: readonly GoldenPathStep[];
   readonly proofRequests: readonly ProofRequest[];
+  /** Claims copy wants but may not make yet, each with its request. */
+  readonly wantedClaims: readonly WantedClaim[];
 }
 
 export interface GoldenPathAuditInput {
@@ -318,6 +392,7 @@ export interface GoldenPathAuditInput {
   readonly offerClaims: readonly Claim[];
   readonly registry?: readonly ProofCandidate[];
   readonly claims?: readonly GoldenPathClaim[];
+  readonly wantedClaims?: readonly WantedClaim[];
 }
 
 const HAS_DIGIT = /\d/u;
@@ -524,6 +599,16 @@ export function auditGoldenPathClaims(
         generator: 'dogfood',
       })
     ),
+    ...(input.wantedClaims ?? WANTED_CLAIMS).map(wanted =>
+      createProofRequest({
+        kind: wanted.kind,
+        claimId: `wanted.${wanted.id}`,
+        pagesBlocked: wanted.unlocks.map(
+          step => inventory.find(claim => claim.step === step)?.route ?? step
+        ),
+        generator: wanted.generator,
+      })
+    ),
   ];
 
   return {
@@ -535,6 +620,7 @@ export function auditGoldenPathClaims(
     statusCounts,
     prooflessPaywallSteps,
     proofRequests,
+    wantedClaims: input.wantedClaims ?? WANTED_CLAIMS,
   };
 }
 

@@ -14,6 +14,7 @@ import {
   type GoldenPathClaim,
   type GoldenPathProofReport,
   HARD_FAIL_STATUSES,
+  WANTED_CLAIMS,
 } from './golden-path-claims';
 import type { ProofCandidate } from './proof';
 
@@ -295,6 +296,23 @@ describe('golden-path claim inventory', () => {
       stale,
       'resolved gaps: rerun with UPDATE_GOLDEN_PATH_PROOF=1'
     ).toEqual([]);
+  });
+
+  it('keeps every wanted claim out of rendered copy until its proof lands', () => {
+    const ids = WANTED_CLAIMS.map(wanted => wanted.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const requests = liveReport().proofRequests;
+    for (const wanted of WANTED_CLAIMS) {
+      expect(wanted.owner).toMatch(/^JOV-\d+$/u);
+      expect(wanted.unlocks.length).toBeGreaterThan(0);
+      expect(
+        requests.find(request => request.claimId === `wanted.${wanted.id}`)
+          ?.generator
+      ).toBe(wanted.generator);
+      expect(
+        GOLDEN_PATH_CLAIMS.some(claim => claim.copy === wanted.statement)
+      ).toBe(false);
+    }
   });
 
   it('names a generator for every open proof request', () => {
