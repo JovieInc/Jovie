@@ -13,9 +13,7 @@ on:
 
 concurrency:
   group: test-flakiness-report
-  # A newer wake replaces only a pending run. Cancelling a running report
-  # discarded API reads it had already spent and never cached (JOV-7744).
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
