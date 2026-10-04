@@ -331,23 +331,16 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers public SmartLink release and track pages', () => {
-    assert.equal(
-      kindOf('apps/web/app/[username]/[slug]/page.tsx'),
-      'registered'
-    );
-    assert.equal(
-      kindOf('apps/web/app/[username]/[slug]/[trackSlug]/page.tsx'),
-      'registered'
-    );
+  it('registers public SmartLink alias, release, and track pages', () => {
+    const sources = [
+      'apps/web/app/[username]/[...slug]/page.tsx',
+      'apps/web/app/[username]/[slug]/page.tsx',
+      'apps/web/app/[username]/[slug]/[trackSlug]/page.tsx',
+    ];
+    for (const source of sources) assert.equal(kindOf(source), 'registered');
+
     const result = evaluateChangedScreens({
-      changedFiles: [
-        { path: 'apps/web/app/[username]/[slug]/page.tsx', status: 'M' },
-        {
-          path: 'apps/web/app/[username]/[slug]/[trackSlug]/page.tsx',
-          status: 'M',
-        },
-      ],
+      changedFiles: sources.map(path => ({ path, status: 'M' })),
       headSha: HEAD,
       proofs: [],
     });

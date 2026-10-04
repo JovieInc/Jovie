@@ -234,7 +234,7 @@ web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.t
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
-web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
+web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
 web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
