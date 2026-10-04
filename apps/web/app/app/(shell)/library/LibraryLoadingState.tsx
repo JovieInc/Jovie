@@ -2,7 +2,10 @@
 
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import { UnifiedTableSkeleton } from '@/components/organisms/table/organisms/UnifiedTableSkeleton';
-import { alignment } from '@/components/organisms/table/table.styles';
+import {
+  alignment,
+  type TableRowMode,
+} from '@/components/organisms/table/table.styles';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ColumnDef } from '@/lib/tanstack-table';
@@ -18,7 +21,12 @@ import type { LibraryReleaseAsset, LibraryView } from './library-data';
  * skeleton reads. `LibraryLoadingState.test.ts` pins them to the live table.
  */
 
-export const LIBRARY_TABLE_ROW_HEIGHT = 56;
+/**
+ * List rows carry two lines (title + artist), so they use the canonical
+ * two-line row mode. A bare `rowHeight` sizes virtualization only; the 40px
+ * row class and 32px cell clamp still apply, which clipped the artist line.
+ */
+export const LIBRARY_LIST_ROW_MODE = 'two-line' satisfies TableRowMode;
 export const LIBRARY_TABLE_MIN_WIDTH = '0';
 
 export const LIBRARY_VIEW_FILTER_CHIP_KEYS: readonly LibraryView[] = [
@@ -56,49 +64,49 @@ export const LIBRARY_TABLE_SKELETON_COLUMNS = [
     header: 'Item',
     minSize: 220,
     size: 9999,
-    meta: { className: alignment.workspaceSeamX },
+    meta: { className: alignment.workspaceSeamX, primary: true, minWidth: 220 },
   },
   {
     id: 'releaseDate',
     header: 'Release Date',
     size: 112,
     minSize: 96,
-    meta: { className: 'pl-2 pr-3' },
+    meta: { className: 'pl-2 pr-3', priority: 5, minWidth: 112 },
   },
   {
     id: 'status',
     header: 'Release',
     size: 112,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: { className: 'px-2', priority: 4, minWidth: 112 },
   },
   {
     id: 'approval',
     header: 'Approval',
     size: 128,
     minSize: 108,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: { className: 'px-2', priority: 4, minWidth: 128 },
   },
   {
     id: 'type',
     header: 'Type',
     size: 104,
     minSize: 88,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: { className: 'px-2', priority: 2, minWidth: 104 },
   },
   {
     id: 'providers',
     header: 'Providers',
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: { className: 'px-2', priority: 3, minWidth: 120 },
   },
   {
     id: 'shareUrl',
     header: 'Share URL',
     size: 220,
     minSize: 180,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: { className: 'px-2', priority: 1, minWidth: 220 },
   },
   {
     id: 'actions',
@@ -144,7 +152,7 @@ export function LibraryLoadingState() {
       <UnifiedTableSkeleton<LibraryReleaseAsset>
         columns={LIBRARY_TABLE_SKELETON_COLUMNS}
         hideHeader
-        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
+        rowMode={LIBRARY_LIST_ROW_MODE}
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}

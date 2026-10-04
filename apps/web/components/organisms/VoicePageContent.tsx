@@ -54,6 +54,9 @@ export function VoicePageContent() {
         }}
         headingId='voice-hero-heading'
         titleTestId='voice-hero-title'
+        // JOV-7772: lg splits the hero into two columns, so use 40px in its
+        // narrower text column; xl restores 48px as the column widens.
+        titleClassName='text-3xl md:text-5xl lg:text-4xl xl:text-5xl'
         sectionTestId='voice-hero-section'
         primaryCtaLabel='Start voice cloning'
         primaryCtaHref={APP_ROUTES.START}
@@ -125,7 +128,11 @@ export function VoicePageContent() {
               </ul>
               <div className='mt-8 flex flex-wrap gap-3'>
                 <Button asChild variant='primary'>
-                  <Link href={APP_ROUTES.START} data-testid='voice-trust-cta'>
+                  <Link
+                    href={APP_ROUTES.START}
+                    prefetch={false}
+                    data-testid='voice-trust-cta'
+                  >
                     Start your first clone
                   </Link>
                 </Button>
@@ -150,7 +157,11 @@ export function VoicePageContent() {
               demand.
             </p>
             <Button asChild variant='secondary' className='mt-2'>
-              <Link href={APP_ROUTES.START} data-testid='voice-final-cta'>
+              <Link
+                href={APP_ROUTES.START}
+                prefetch={false}
+                data-testid='voice-final-cta'
+              >
                 Clone my voice now
               </Link>
             </Button>

@@ -11,17 +11,26 @@ import { DashboardShellPrivacyBoundary } from '@/app/app/(shell)/DashboardShellP
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
 import { AuthShellWrapper } from './AuthShellWrapper';
 
-const { route, lifecycle, routeEscape, privacyState, routeConfig, railScope } =
-  vi.hoisted(() => ({
-    route: { pathname: '/app/tasks' },
-    lifecycle: vi.fn(),
-    routeEscape: vi.fn(),
-    privacyState: vi.fn(),
-    routeConfig: { isChatRoute: false, isArtistProfileSettings: false },
-    railScope: { current: undefined as string | undefined },
-  }));
+const {
+  route,
+  lifecycle,
+  routeEscape,
+  privacyState,
+  routeConfig,
+  railScope,
+  shortcutsRender,
+} = vi.hoisted(() => ({
+  route: { pathname: '/app/tasks' },
+  lifecycle: vi.fn(),
+  routeEscape: vi.fn(),
+  privacyState: vi.fn(),
+  routeConfig: { isChatRoute: false, isArtistProfileSettings: false },
+  railScope: { current: undefined as string | undefined },
+  shortcutsRender: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -45,9 +54,22 @@ vi.mock('@/hooks/useGlobalShortcutActions', () => ({
 vi.mock('@/hooks/RightRailKeyboardHandler', () => ({
   RightRailKeyboardHandler: () => null,
 }));
-vi.mock('@/components/organisms/keyboard-shortcuts-sheet', () => ({
-  KeyboardShortcutsSheet: () => null,
-}));
+vi.mock('@/components/organisms/keyboard-shortcuts-sheet', async () => {
+  const { useKeyboardShortcuts: useShortcuts } = await import(
+    '@/contexts/KeyboardShortcutsContext'
+  );
+  return {
+    KeyboardShortcutsSheet: function MockKeyboardShortcutsSheet() {
+      shortcutsRender();
+      const { close } = useShortcuts();
+      return (
+        <button type='button' onClick={close}>
+          Close shortcut help
+        </button>
+      );
+    },
+  };
+});
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   PreviewPanelProvider: ({
     children,
@@ -208,13 +230,23 @@ function Boundary({
     </DashboardShellPrivacyBoundary>
   );
 }
-function openSearch() {
+async function openSearch() {
   fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+  await screen.findByRole('combobox', { name: 'Command Palette Search' });
 }
 function closeSearch() {
   fireEvent.keyDown(
     screen.getByRole('combobox', { name: 'Command Palette Search' }),
     { key: 'Escape' }
+  );
+}
+
+function OpenShortcutHelp() {
+  const { open } = useKeyboardShortcuts();
+  return (
+    <button type='button' onClick={open}>
+      Open shortcut help
+    </button>
   );
 }
 
@@ -224,6 +256,7 @@ beforeEach(() => {
   routeConfig.isArtistProfileSettings = false;
   railScope.current = undefined;
   lifecycle.mockClear();
+  shortcutsRender.mockClear();
   routeEscape.mockClear();
   privacyState.mockReset();
 });
@@ -232,7 +265,36 @@ afterEach(() => {
 });
 
 describe('main-plane Search route recovery', () => {
-  it('preserves the ordinary Jovie route independently of the optional Ovie boundary', () => {
+  it('mounts shortcut help only on demand and can reopen it after closing', async () => {
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <OpenShortcutHelp />
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    expect(shortcutsRender).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('button', { name: 'Close shortcut help' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open shortcut help' }));
+    const close = await screen.findByRole('button', {
+      name: 'Close shortcut help',
+    });
+    expect(shortcutsRender).toHaveBeenCalled();
+    fireEvent.click(close);
+    expect(
+      screen.queryByRole('button', { name: 'Close shortcut help' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('No selection')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Open shortcut help' }));
+    expect(
+      await screen.findByRole('button', { name: 'Close shortcut help' })
+    ).toBeVisible();
+  });
+
+  it('preserves the ordinary Jovie route independently of the optional Ovie boundary', async () => {
     render(
       <DashboardDataProvider value={dashboard}>
         <AuthShellWrapper mode='customer'>
@@ -244,7 +306,7 @@ describe('main-plane Search route recovery', () => {
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
     const selectedDocument = screen.getByLabelText('Synthetic draft');
-    openSearch();
+    await openSearch();
     expect(selectedDocument).not.toBeVisible();
     closeSearch();
     expect(screen.getByLabelText('Synthetic draft')).toBe(selectedDocument);
@@ -265,7 +327,7 @@ describe('main-plane Search route recovery', () => {
     const draft = screen.getByLabelText('Synthetic draft');
     fireEvent.change(draft, { target: { value: 'Unsaved synthetic draft' } });
     draft.focus();
-    openSearch();
+    await openSearch();
     expect(draft).not.toBeVisible();
     expect(screen.getByTestId('cmdk-main-plane')).toBeVisible();
     expect(lifecycle).toHaveBeenLastCalledWith('cleanup', 'tasks');
@@ -280,7 +342,7 @@ describe('main-plane Search route recovery', () => {
     expect(screen.queryByTestId('cmdk-main-plane')).not.toBeInTheDocument();
   });
 
-  it('suspends ambient route Escape while Search is visible and resumes it afterwards', () => {
+  it('suspends ambient route Escape while Search is visible and resumes it afterwards', async () => {
     render(
       <Boundary>
         <RouteDocument />
@@ -289,7 +351,7 @@ describe('main-plane Search route recovery', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
-    openSearch();
+    await openSearch();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.getByLabelText('Synthetic draft')).toBeVisible();
     expect(routeEscape).not.toHaveBeenCalled();
@@ -298,7 +360,7 @@ describe('main-plane Search route recovery', () => {
     expect(screen.queryByLabelText('Synthetic draft')).not.toBeInTheDocument();
   });
 
-  it('does not resurrect the old route when navigation occurs during Search', () => {
+  it('does not resurrect the old route when navigation occurs during Search', async () => {
     const view = render(
       <Boundary>
         <RouteDocument key='tasks' />
@@ -307,7 +369,7 @@ describe('main-plane Search route recovery', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
-    openSearch();
+    await openSearch();
     route.pathname = '/app/calendar';
     view.rerender(
       <Boundary>
@@ -324,7 +386,7 @@ describe('main-plane Search route recovery', () => {
     expect(screen.queryByLabelText('Synthetic draft')).not.toBeInTheDocument();
   });
 
-  it('removes retained private DOM on an actual C lock event while Search is open', () => {
+  it('removes retained private DOM on an actual C lock event while Search is open', async () => {
     render(
       <Boundary>
         <RouteDocument />
@@ -334,7 +396,7 @@ describe('main-plane Search route recovery', () => {
       screen.getByRole('button', { name: 'Select synthetic task' })
     );
     const privateInput = screen.getByLabelText('Synthetic draft');
-    openSearch();
+    await openSearch();
     act(() => {
       window.dispatchEvent(
         new CustomEvent('ovie:privacy-lock-confirmed', {
@@ -394,7 +456,7 @@ describe('main-plane Search route recovery', () => {
     );
     expect(screen.getByText('Unlock Ovie')).toBeVisible();
     expect(lifecycle).not.toHaveBeenCalled();
-    openSearch();
+    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
     expect(screen.queryByTestId('cmdk-main-plane')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('region', { name: 'Route tasks', hidden: true })

@@ -238,9 +238,10 @@ nodes:
       - Agent Pipeline
       - Auto-Ready Agent Drafts
       - iOS CI
+      - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
-      - Production Controller
+      - Quarantine Recovery
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -249,7 +250,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 60
+    jobCount: 62
   - name: Claude Review (gbrain-aware)
     path: .github/workflows/claude-review.yml
     active: true
@@ -271,6 +272,30 @@ nodes:
     triggeringStateTransition:
       - issue_comment
     terminalReceipt: job:claude
+    jobCount: 1
+  - name: CLI Chaos Nightly
+    path: .github/workflows/cli-chaos-nightly.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:remediation
+    jobCount: 2
+  - name: CODEOWNERS Path Drift
+    path: .github/workflows/codeowners-drift.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:drift
     jobCount: 1
   - name: CodeQL Security Analysis
     path: .github/workflows/codeql.yml
@@ -295,6 +320,18 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:evaluate
+    jobCount: 1
+  - name: Native Security Advisory
+    path: .github/workflows/deepsec-native.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:native
     jobCount: 1
   - name: Delivery Control Receipts
     path: .github/workflows/delivery-control-receipts.yml
@@ -331,6 +368,17 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:intake
+    jobCount: 1
+  - name: Design gate
+    path: .github/workflows/design-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:brief
     jobCount: 1
   - name: Design Governance
     path: .github/workflows/design-governance.yml
@@ -452,9 +500,9 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - pull_request_target
       - push
       - repository_dispatch
+      - schedule
       - workflow_dispatch
     terminalReceipt: job:assess
     jobCount: 2
@@ -503,7 +551,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
@@ -515,21 +564,11 @@ nodes:
     category: remediation-dispatch
     authoritativeProducer: Lane Fix Relay
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:probe-and-autofix
-    jobCount: 1
-  - name: HA CI remediator poke
-    path: .github/workflows/ha-ci-remediator-poke.yml
-    active: true
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:poke
     jobCount: 1
   - name: Help Center Recertification
     path: .github/workflows/help-center-recertification.yml
@@ -565,6 +604,20 @@ nodes:
       - pull_request_target
     terminalReceipt: job:review
     jobCount: 1
+  - name: iOS App Store Graphics
+    path: .github/workflows/ios-app-store-graphics.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_call
+      - workflow_dispatch
+    terminalReceipt: job:graphics
+    jobCount: 1
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -596,11 +649,12 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - iOS CI
+      - iOS App Store Graphics
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-upload
-    jobCount: 4
+    jobCount: 5
   - name: Jovie artist agent Eve release and rollback
     path: .github/workflows/jovie-agent-release.yml
     active: true
@@ -621,10 +675,12 @@ nodes:
       - remediation-dispatch
     allowedConsumers: []
     triggeringStateTransition:
+      - deployment_status
       - pull_request_review
       - pull_request_review_comment
       - pull_request_target
       - push
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:relay
@@ -652,6 +708,9 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
+      - schedule
+      - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:sync_done
     jobCount: 1
   - name: M2 Revenue-Path Canary
@@ -714,10 +773,11 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request_target
+      - schedule
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:enroll
-    jobCount: 1
+    terminalReceipt: job:rearm-green-victims
+    jobCount: 4
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -785,6 +845,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Lane Fix Relay
       - Test Flakiness Report
     triggeringStateTransition:
       - push
@@ -825,7 +886,7 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 1
+    jobCount: 3
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -847,7 +908,7 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:notify-failure
-    jobCount: 5
+    jobCount: 6
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -873,6 +934,29 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:prepare
     jobCount: 2
+  - name: PR Review Learn
+    path: .github/workflows/pr-review-learn.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:learn
+    jobCount: 1
+  - name: PR Review (shadow)
+    path: .github/workflows/pr-review.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:review
+    jobCount: 1
   - name: PR Size Guard Label Override
     path: .github/workflows/pr-size-guard-label-override.yml
     active: true
@@ -933,7 +1017,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:preserve-incident
-    jobCount: 4
+    jobCount: 5
   - name: Production Controller Health
     path: .github/workflows/production-controller-health.yml
     active: true
@@ -958,11 +1042,13 @@ nodes:
       - Delivery Control Receipts
       - desktop-release
       - iOS TestFlight
+      - Lane Fix Relay
+      - Linear Sync on Merge
       - Production Release
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:publish-customer-changelog
-    jobCount: 9
+    terminalReceipt: job:heal-interrupted-marker
+    jobCount: 14
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -985,7 +1071,19 @@ nodes:
     triggeringStateTransition:
       - workflow_call
     terminalReceipt: job:release-result
-    jobCount: 15
+    jobCount: 16
+  - name: Public Profile Benchmark
+    path: .github/workflows/public-benchmark.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:benchmark
+    jobCount: 1
   - name: Quality Gap Finder
     path: .github/workflows/quality-gap-finder.yml
     active: true
@@ -999,6 +1097,31 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:find
+    jobCount: 1
+  - name: Quarantine Recovery
+    path: .github/workflows/quarantine-recovery.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:publish-queue-results
+    jobCount: 2
+  - name: Remediation Sweep
+    path: .github/workflows/remediation-sweep.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:sweep
     jobCount: 1
   - name: Repository documentation shadow
     path: .github/workflows/repository-docs-shadow.yml
@@ -1211,6 +1334,7 @@ nodes:
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
+      - PR Review (shadow)
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
@@ -1222,6 +1346,7 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Production Controller
       - Production Release
     triggeringStateTransition:
       - workflow_run
@@ -1261,8 +1386,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:limiter-store-health
-    jobCount: 3
+    terminalReceipt: job:docs-deploy-jovie
+    jobCount: 6
   - name: Taste Classifier
     path: .github/workflows/taste-classifier.yml
     active: false
@@ -1370,6 +1495,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
     jobCount: 2
+  - name: VOC Mine
+    path: .github/workflows/voc-mine.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:mine
+    jobCount: 1
 edges:
   - from: CI
     to: iOS CI
@@ -1386,6 +1523,9 @@ edges:
   - from: iOS TestFlight
     to: iOS CI
     type: workflow_call
+  - from: iOS TestFlight
+    to: iOS App Store Graphics
+    type: workflow_call
   - from: Source Validation
     to: Lane Fix Relay
     type: workflow_run
@@ -1394,6 +1534,24 @@ edges:
     type: workflow_run
   - from: PR Size Guard
     to: Lane Fix Relay
+    type: workflow_run
+  - from: CI
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Golden Path Nightly
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Golden Path Prod Autofix
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Production Controller
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Changed-Evidence Test Suites
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: Production Controller
+    to: Linear Sync on Merge
     type: workflow_run
   - from: Source Validation
     to: Merge Queue Green Enroll
@@ -1407,7 +1565,10 @@ edges:
   - from: PR Size Guard
     to: Merge Queue Green Enroll
     type: workflow_run
-  - from: CI
+  - from: Source Validation
+    to: PR Review (shadow)
+    type: workflow_run
+  - from: Staging Controller
     to: Production Controller
     type: workflow_run
   - from: Production Controller
@@ -1416,6 +1577,9 @@ edges:
   - from: Production Release
     to: Canary Health Gate
     type: workflow_call
+  - from: CI
+    to: Quarantine Recovery
+    type: workflow_run
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run

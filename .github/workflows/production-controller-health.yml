@@ -3,7 +3,7 @@ name: Production Controller Health
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: Deployed-base marker healing dispatches only the bounded marker-recovery re-proof inside the production-mutation FIFO; it never redeploys, aliases, promotes, or rolls back.
-# revisit-trigger: Remove when the Production Controller heals interrupted deployed markers in-band instead of via a dispatched recovery run.
+# revisit-trigger: The Production Controller heals markers it interrupts in-band (JOV-7773); remove this audit when GitHub exposes durable workflow_run delivery receipts and cancelled runs can heal themselves.
 
 on:
   # polling-exception: GitHub may drop a workflow_run delivery. This once-daily
@@ -245,90 +245,55 @@ jobs:
               [ "$marker_reason" = "one_interrupted_marker_safe_to_rerun" ] || \
                 incident contradictory_recovery_authority
               run_id="$(jq -r '.controllerRun // 0' <<<"$marker_state_json")"
-              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || incident malformed_recovery_run
+              run_attempt="$(jq -r '.controllerAttempt // 0' <<<"$marker_state_json")"
+              deployment_id="$(jq -r '.deploymentId // ""' <<<"$marker_state_json")"
+              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] &&
+                [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]] &&
+                [[ "$deployment_id" =~ ^dpl_[A-Za-z0-9]+$ ]] || incident malformed_recovery_run
               echo "run_url=https://github.com/$REPOSITORY/actions/runs/$run_id" \
                 >> "$GITHUB_OUTPUT"
 
-              # TOCTOU boundary: re-read the marker-owned exact attempt, its
-              # rollback job, the latest run, the lease listing, and main
-              # immediately before requesting the sole full rerun.
-              exact_attempt="$(gh api \
-                "repos/$REPOSITORY/actions/runs/$run_id/attempts/1")"
-              jq -e \
-                --argjson run_id "$run_id" \
-                --arg sha "$current_sha" \
-                --arg repo "$REPOSITORY" \
-                --argjson workflow_id "$controller_workflow_id" '
-                .id == $run_id and .run_attempt == 1 and
-                .workflow_id == $workflow_id and
-                .path == ".github/workflows/production-controller.yml" and
-                .head_sha == $sha and .head_branch == "main" and
-                .head_repository.full_name == $repo and
-                .event == "workflow_run" and .status == "completed" and
-                (.conclusion | IN("cancelled", "failure", "startup_failure", "timed_out"))
-              ' >/dev/null <<<"$exact_attempt" || incident changed_exact_attempt
+              # JOV-7773: never request a full controller rerun. A rerun drops
+              # the attempt-1 marker artifacts and then fails closed with
+              # no_marker (run 37144574062, 2026-10-03). The bounded marker
+              # re-proof needs no attempt-1 bytes, so it is the only heal.
+              [ -n "$deployed_sha" ] || incident current_marker_live_bind_unreadable
+              if [ "$deployed_sha" != "$current_sha" ]; then
+                incident interrupted_current_marker_not_live
+              fi
+              recovery_runs="$(gh api \
+                "repos/$REPOSITORY/actions/workflows/production-marker-recovery.yml/runs?per_page=30")"
+              inflight="$(jq --arg sha "$current_sha" \
+                '[.workflow_runs[] | select(.status != "completed" and ((.display_title // "") | contains($sha)))] | length' \
+                <<<"$recovery_runs")"
+              if [ "$inflight" != "0" ]; then
+                echo "Marker recovery for $current_sha is already in flight."
+                exit 0
+              fi
 
-              exact_jobs="$(gh api \
-                "repos/$REPOSITORY/actions/runs/$run_id/attempts/1/jobs?per_page=100")"
-              jq -e \
-                --argjson run_id "$run_id" \
-                --arg sha "$current_sha" '
-                type == "object" and
-                (.total_count | type == "number") and
-                (.jobs | type == "array") and
-                .total_count == (.jobs | length) and
-                all(.jobs[];
-                  (.id | type == "number" and . > 0) and
-                  (.run_id | type == "number" and . > 0) and
-                  (.run_attempt | type == "number" and . > 0) and
-                  (.name | type == "string" and length > 0) and
-                  (.head_sha | type == "string" and length > 0) and
-                  (.head_branch | type == "string" and length > 0) and
-                  (.status | type == "string" and length > 0) and
-                  ((.conclusion | type) == "string" or .conclusion == null)
-                ) and
-                ([.jobs[] | select(
-                  (.name | type == "string") and
-                  (.name | endswith("Centralized production rollback")) and
-                  .run_id == $run_id and .run_attempt == 1 and
-                  .head_sha == $sha and .head_branch == "main" and
-                  .status == "completed" and .conclusion == "skipped"
-                )] | length) == 1 and
-                ([.jobs[] | select(
-                  (.name | type == "string") and
-                  (.name | endswith("Centralized production rollback"))
-                )] | length) == 1
-              ' >/dev/null <<<"$exact_jobs" || incident unsafe_rollback_at_boundary
-
-              latest_run="$(gh api "repos/$REPOSITORY/actions/runs/$run_id")"
-              jq -e --argjson run_id "$run_id" --arg sha "$current_sha" \
-                --arg repo "$REPOSITORY" --argjson workflow_id "$controller_workflow_id" '
-                .id == $run_id and .run_attempt == 1 and
-                .workflow_id == $workflow_id and
-                .path == ".github/workflows/production-controller.yml" and
-                .head_sha == $sha and .head_branch == "main" and
-                .head_repository.full_name == $repo and
-                .event == "workflow_run" and .status == "completed"
-                and (.conclusion | IN("cancelled", "failure", "startup_failure", "timed_out"))
-              ' >/dev/null <<<"$latest_run" || incident recovery_attempt_already_started
-
-              lease_name="production-generation-recovery-$current_sha"
-              lease_listing="$(gh api \
-                "repos/$REPOSITORY/actions/artifacts?name=$lease_name&per_page=100")"
-              jq -e --arg name "$lease_name" '
-                type == "object" and .total_count == 0 and
-                (.artifacts | type == "array" and length == 0)
-              ' >/dev/null <<<"$lease_listing" || incident recovery_lease_already_exists
-
+              # TOCTOU boundary: main, the live bind, and the classification
+              # must all be unchanged immediately before the dispatch.
               boundary_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
               [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || incident invalid_recovery_boundary
               if [ "$boundary_sha" != "$current_sha" ]; then
                 echo "Controller recovery was superseded by $boundary_sha; neutral."
                 exit 0
               fi
-              gh run rerun "$run_id"
-              echo "recovery_reason=full_controller_rerun_requested" >> "$GITHUB_OUTPUT"
-              echo "Requested the sole full recovery for controller run $run_id."
+              boundary_marker="$(node .github/scripts/production-marker-state.mjs \
+                --sha "$current_sha" \
+                --repo "$REPOSITORY" \
+                --controller-workflow-id "$controller_workflow_id")"
+              if [ "$(jq -r '.state // empty' <<<"$boundary_marker")" != "recovery_available" ]; then
+                echo "Current marker state changed during evaluation; recovery dispatch is neutral."
+                exit 0
+              fi
+              gh workflow run production-marker-recovery.yml \
+                -f sha="$current_sha" \
+                -f deployment_id="$deployment_id" \
+                -f controller_run="$run_id" \
+                -f controller_attempt="$run_attempt"
+              echo "recovery_reason=current_marker_recovery_dispatched" >> "$GITHUB_OUTPUT"
+              echo "Dispatched bounded marker recovery for current generation $current_sha."
               exit 0
               ;;
             none) ;;
@@ -589,6 +554,58 @@ jobs:
             incident controller_completed_without_marker
           fi
 
+          # Production starts only after exact staging completion. A live
+          # staging FIFO generation is evidence of delivery, not a dropped CI event.
+          staging_workflow="$(gh api "repos/$REPOSITORY/actions/workflows/staging-controller.yml")"
+          jq -e '.id > 0 and .name == "Staging Controller" and
+            .path == ".github/workflows/staging-controller.yml" and .state == "active"' \
+            >/dev/null <<<"$staging_workflow" || incident invalid_staging_workflow
+          staging_workflow_id="$(jq -r '.id' <<<"$staging_workflow")"
+          staging_runs="$(gh api "repos/$REPOSITORY/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&head_sha=$current_sha&per_page=100")"
+          jq -e 'type == "object" and (.workflow_runs | type == "array") and
+            (.total_count | type == "number") and .total_count == (.workflow_runs | length)' \
+            >/dev/null <<<"$staging_runs" || incident incomplete_staging_listing
+          staging_title="$current_sha from CI $source_ci_id attempt $source_ci_attempt"
+          staging_matches="$(jq -c --arg title "$staging_title" --arg sha "$current_sha" \
+            --arg repo "$REPOSITORY" --argjson workflow "$staging_workflow_id" '
+            [.workflow_runs[] | select(.display_title == $title and .workflow_id == $workflow and
+              .path == ".github/workflows/staging-controller.yml" and .head_sha == $sha and
+              .head_branch == "main" and .head_repository.full_name == $repo and
+              .event == "workflow_run")] | unique_by(.id)' <<<"$staging_runs")"
+          staging_count="$(jq 'length' <<<"$staging_matches")"
+          [ "$staging_count" -le 1 ] || incident duplicate_staging_generation
+          if [ "$staging_count" = 1 ]; then
+            staging_id="$(jq -r '.[0].id' <<<"$staging_matches")"
+            [[ "$staging_id" =~ ^[1-9][0-9]*$ ]] || incident malformed_staging_generation
+            live_staging="$(gh api "repos/$REPOSITORY/actions/runs/$staging_id")"
+            jq -e --argjson id "$staging_id" --arg title "$staging_title" \
+              --arg sha "$current_sha" --arg repo "$REPOSITORY" --argjson workflow "$staging_workflow_id" '
+              .id == $id and .display_title == $title and .workflow_id == $workflow and
+              .path == ".github/workflows/staging-controller.yml" and .head_sha == $sha and
+              .head_branch == "main" and .head_repository.full_name == $repo and
+              .event == "workflow_run" and (.run_attempt | type == "number" and . > 0) and
+              (.updated_at | type == "string" and length > 0)' \
+              >/dev/null <<<"$live_staging" || incident changed_staging_run
+            staging_status="$(jq -r '.status' <<<"$live_staging")"
+            case "$staging_status" in
+              queued|in_progress|pending|requested|waiting)
+                echo "recovery_reason=staging_pending" >> "$GITHUB_OUTPUT"
+                echo "Exact staging generation $staging_id remains $staging_status; production awaits completion."
+                exit 0
+                ;;
+              completed)
+                [ "$(jq -r '.conclusion' <<<"$live_staging")" = success ] || incident staging_failed
+                staging_epoch="$(date -u -d "$(jq -r '.updated_at' <<<"$live_staging")" +%s)"
+                if [ "$(($(date +%s) - staging_epoch))" -lt 900 ]; then
+                  echo "recovery_reason=staging_completion_delivery_grace" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                incident staging_completed_without_controller
+                ;;
+              *) incident malformed_staging_status ;;
+            esac
+          fi
+
           source_epoch="$(date -u -d "$source_ci_updated" +%s)"
           age_seconds=$(($(date +%s) - source_epoch))
           if [ "$age_seconds" -lt 900 ]; then
@@ -621,3 +638,16 @@ jobs:
           fi
           gh issue create --title "$title" --label incident --body \
             "Automatic recovery failed closed (${RECOVERY_REASON:-unknown}). Inspect exact controller evidence before any manual rerun or production mutation: ${RUN_URL:-https://github.com/${GH_REPO}/actions}"
+
+      - name: File controller-health remediation
+        if: always()
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-controller-health
+          REMEDIATION_SOURCE: production-controller-health.yml
+          REMEDIATION_CONCLUSION: ${{ steps.evaluate.outputs.needs_manual == 'true' && 'failure' || 'success' }}
+          REMEDIATION_DETAIL: ${{ steps.evaluate.outputs.recovery_reason }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs

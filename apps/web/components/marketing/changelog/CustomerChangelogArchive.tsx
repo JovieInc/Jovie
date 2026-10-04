@@ -1,14 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import {
-  ArrowRight,
-  CircleMinus,
-  type LucideIcon,
-  Sparkles,
-  TrendingUp,
-  Wrench,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FilterChip } from '@/components/molecules/filters/FilterChip';
@@ -101,24 +95,6 @@ const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
   ...CUSTOMER_CHANGELOG_CATEGORY_LABELS,
 };
 
-/**
- * Compact source-backed fallback artwork. Customer entries do not currently
- * carry an approved media asset, so the archive uses an icon, a neutral
- * product-update label, and the entry title instead of an empty visual block.
- */
-const ENTRY_MEDIA_TONES = ['ion', 'pulse', 'ultra'] as const;
-type EntryMediaTone = (typeof ENTRY_MEDIA_TONES)[number];
-
-const ENTRY_MEDIA_ICONS: Record<
-  CustomerChangelogEntry['category'],
-  LucideIcon
-> = {
-  new: Sparkles,
-  improved: TrendingUp,
-  fixed: Wrench,
-  removed: CircleMinus,
-};
-
 export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
   readonly technicalReleases?: readonly { version: string; date: string }[];
@@ -158,28 +134,47 @@ function versionHref(version: string): string {
   return `${APP_ROUTES.CHANGELOG}/${encodeURIComponent(version)}`;
 }
 
+/**
+ * One approved feature visual per entry, rendered only when the projected
+ * media contract supplies an asset. Null, unsupported, or failed media
+ * yields no region at all — the entry stays compact and text-first rather
+ * than showing decorative placeholder artwork.
+ */
 function EntryMedia({
-  entry,
-  tone,
-  variant,
+  media,
 }: {
-  readonly entry: CustomerChangelogEntry;
-  readonly tone: EntryMediaTone;
-  readonly variant: 'feature' | 'card';
+  readonly media: NonNullable<CustomerChangelogEntry['media']>;
 }) {
-  const Icon = ENTRY_MEDIA_ICONS[entry.category];
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
 
   return (
-    <div
-      aria-hidden='true'
-      className={`changelog-entry-media changelog-entry-media--${variant} changelog-entry-media--${tone}`}
-    >
-      <Icon
-        className='changelog-entry-media__icon'
-        size={variant === 'feature' ? 28 : 22}
-      />
-      <span className='changelog-entry-media__label'>Product update</span>
-      <span className='changelog-entry-media__title'>{entry.title}</span>
+    <div className='changelog-entry-media'>
+      {media.kind === 'video' ? (
+        <video
+          className='changelog-entry-media__asset'
+          controls
+          muted
+          playsInline
+          preload='metadata'
+          src={media.src}
+          aria-label={media.alt || undefined}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        // Unoptimized: media srcs come from the receipt-backed contract and
+        // are not limited to the optimizer's allowlisted hosts. The 16:9
+        // frame reserves the box so fill+lazy loading never shifts layout.
+        <Image
+          className='changelog-entry-media__asset'
+          src={media.src}
+          alt={media.alt}
+          fill
+          sizes='(min-width: 1024px) 56rem, 100vw'
+          unoptimized
+          onError={() => setFailed(true)}
+        />
+      )}
     </div>
   );
 }
@@ -224,13 +219,7 @@ function EntryActionLink({
   );
 }
 
-function EntryRow({
-  entry,
-  tone,
-}: {
-  readonly entry: CustomerChangelogEntry;
-  readonly tone: EntryMediaTone;
-}) {
+function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
   const tertiary = formatCustomerChangelogTertiary(
     entry.date,
     entry.technicalVersion
@@ -270,7 +259,7 @@ function EntryRow({
             </p>
           ) : null}
           <h3 className='changelog-entry__title'>{entry.title}</h3>
-          <EntryMedia entry={entry} tone={tone} variant='feature' />
+          {entry.media ? <EntryMedia media={entry.media} /> : null}
           {hasLevel2 ? (
             <div className='space-y-2'>
               {entry.explanation ? (
@@ -314,14 +303,6 @@ function EntryRow({
             </details>
           ) : null}
         </div>
-        <div className='changelog-entry__card'>
-          <EntryMedia entry={entry} tone={tone} variant='card' />
-          <p className='changelog-entry__card-title'>{entry.title}</p>
-          <p className='changelog-entry__card-meta'>
-            {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]} ·{' '}
-            {formatCustomerChangelogDate(entry.date)}
-          </p>
-        </div>
       </div>
     </article>
   );
@@ -329,10 +310,8 @@ function EntryRow({
 
 function MonthSection({
   group,
-  toneOffset,
 }: {
   readonly group: CustomerChangelogMonthGroup;
-  readonly toneOffset: number;
 }) {
   return (
     <section
@@ -348,14 +327,8 @@ function MonthSection({
         {group.label}
       </h2>
       <div>
-        {group.entries.map((entry, index) => (
-          <EntryRow
-            key={entry.slug}
-            entry={entry}
-            tone={
-              ENTRY_MEDIA_TONES[(toneOffset + index) % ENTRY_MEDIA_TONES.length]
-            }
-          />
+        {group.entries.map(entry => (
+          <EntryRow key={entry.slug} entry={entry} />
         ))}
       </div>
     </section>
@@ -546,12 +519,6 @@ export function CustomerChangelogArchive({
   const visibleMonths = filteredMonths.slice(0, visibleCount);
   const remainingCount = filteredMonths.length - visibleCount;
 
-  const monthToneOffsets = visibleMonths.map((_, index) =>
-    visibleMonths
-      .slice(0, index)
-      .reduce((sum, group) => sum + group.entries.length, 0)
-  );
-
   return (
     <div data-reduced-motion='static'>
       <CategoryFilterToolbar
@@ -564,24 +531,11 @@ export function CustomerChangelogArchive({
           {`No ${CATEGORY_FILTER_LABELS[activeCategory].toLowerCase()} updates yet.`}
         </p>
       ) : (
-        <>
-          <details className='mb-6'>
-            <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
-              Browse all updates
-            </summary>
-            <ArchiveJumpNav months={filteredMonths} />
-            <TechnicalReleaseNav releases={technicalReleases} />
-          </details>
-          <div id='changelog-outcome-list'>
-            {visibleMonths.map((group, index) => (
-              <MonthSection
-                key={group.monthKey}
-                group={group}
-                toneOffset={monthToneOffsets[index] ?? 0}
-              />
-            ))}
-          </div>
-        </>
+        <div id='changelog-outcome-list'>
+          {visibleMonths.map(group => (
+            <MonthSection key={group.monthKey} group={group} />
+          ))}
+        </div>
       )}
 
       {remainingCount > 0 ? (
@@ -600,6 +554,16 @@ export function CustomerChangelogArchive({
             Load Earlier Updates
           </Button>
         </div>
+      ) : null}
+
+      {filteredMonths.length > 0 ? (
+        <details className='mt-6'>
+          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+            Browse all updates
+          </summary>
+          <ArchiveJumpNav months={filteredMonths} />
+          <TechnicalReleaseNav releases={technicalReleases} />
+        </details>
       ) : null}
     </div>
   );

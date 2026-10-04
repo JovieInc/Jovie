@@ -11,10 +11,13 @@ import {
 import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import {
   inspectRouteDom,
+  installLayoutShiftObserver,
   MARKETING_TASTE_FINDING_KINDS,
+  measureLayoutShift,
   ROUTE_DOM_CERTIFICATION_SCHEMA,
   type RouteDomFindingKind,
 } from '../e2e/utils/route-dom-detector';
+import { inspectShellMaterial } from '../e2e/utils/shell-material-detector';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import {
   isExternalBaseUrl,
@@ -163,6 +166,47 @@ async function expectDeliberateRed(
 }
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
+  // JOV-7710 / AM-017: one semantic level reads as one material.
+  const plane = (inner: string) =>
+    `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
+
+  test('rejects an inset header strip on the main plane (JOV-7207)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      plane(
+        '<header style="height:40px;background:rgb(24,25,30)">Inbox</header><div style="height:400px">rows</div>'
+      )
+    );
+    const report = await inspectShellMaterial(page);
+    expect(report.findings.map(finding => finding.element)).toEqual(['header']);
+  });
+
+  test('rejects a boxed table region on the main plane', async ({ page }) => {
+    await page.setContent(
+      plane(
+        '<div style="height:40px">Releases</div><div data-testid="boxed" style="width:900px;height:300px;background:rgba(255,255,255,0.03)">table</div>'
+      )
+    );
+    const report = await inspectShellMaterial(page);
+    expect(report.findings.map(finding => finding.element)).toEqual([
+      'div[data-testid="boxed"]',
+    ]);
+  });
+
+  test('passes controls and declared surfaces on one plane', async ({
+    page,
+  }) => {
+    await page.setContent(
+      plane(
+        '<header style="height:40px;background:rgb(16,17,20)"><button style="width:80px;height:28px;background:rgb(60,60,70)">New</button></header><div role="menu" style="width:900px;height:200px;background:rgb(30,31,36)"><div style="width:880px;height:40px;background:rgb(40,41,46)">item</div></div><div style="width:900px;height:200px;background:transparent">table</div>'
+      )
+    );
+    const report = await inspectShellMaterial(page);
+    expect(report.plane).toBe('rgb(16 17 20)');
+    expect(report.findings).toEqual([]);
+  });
+
   test('reproduces R01 sibling overlap', async ({ page }) => {
     await page.setContent(
       '<main><section><h1>R01</h1><p>Overlap proposal</p></section><section style="position:relative;height:200px"><article style="position:absolute;inset:0 0 auto 0;height:100px">Card A</article><article style="position:absolute;inset:40px 0 auto 0;height:100px">Card B</article></section></main>'
@@ -258,6 +302,15 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'clipped-heading');
   });
 
+  test('rejects a clamped heading whose block size is also capped (/launch hero)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1 style="width:520px;font-size:80px;line-height:0.94;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-block-size:calc(2 * 1lh);overflow:hidden">Your entire music career. One intelligent link.</h1></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'clipped-heading');
+  });
+
   test('rejects an unstyled terminal CTA stack (/product footer CTA)', async ({
     page,
   }) => {
@@ -272,6 +325,68 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
       '<main><section><h1>Card</h1><figure><p>Your name</p></figure></section></main>'
     );
     await expectDeliberateRed(page, 'marketing', 'placeholder-copy');
+  });
+
+  test('rejects a one-word last line in a headline', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1 style="font:20px/1.2 monospace;width:12ch">aa bb cc dd ee</h1></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'orphaned-line');
+  });
+
+  test('passes a balanced headline', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1 style="font:20px/1.2 monospace;width:12ch;text-wrap:balance">aa bb cc dd ee</h1></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
+      'orphaned-line'
+    );
+  });
+
+  test('rejects missing layout-shift observation instead of certifying zero', async ({
+    page,
+  }) => {
+    await page.setContent('<main><h1>Stable content</h1></main>');
+    await expect(measureLayoutShift(page)).rejects.toThrow(
+      'Layout-shift observation is unavailable'
+    );
+  });
+
+  test('certifies an observed stable document', async ({ page }, testInfo) => {
+    const fixtureUrl = new URL(
+      '/__route-dom-fixture__/stable',
+      exactBaseUrl(testInfo)
+    ).href;
+    await page.route(fixtureUrl, route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<main><h1>Stable content</h1></main>',
+      })
+    );
+    await installLayoutShiftObserver(page);
+    await page.goto(fixtureUrl);
+    expect(await measureLayoutShift(page)).toBeNull();
+  });
+
+  test('rejects cumulative layout shift over budget', async ({
+    page,
+  }, testInfo) => {
+    const fixtureUrl = new URL(
+      '/__route-dom-fixture__/shift',
+      exactBaseUrl(testInfo)
+    ).href;
+    await page.route(fixtureUrl, route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<main><div id="late"></div><section style="height:600px"><h1>Hero</h1><p>Body copy that moves.</p></section></main><script>setTimeout(()=>{document.getElementById("late").style.height="400px"},300)</script>',
+      })
+    );
+    await installLayoutShiftObserver(page);
+    await page.goto(fixtureUrl);
+    await page.waitForTimeout(600);
+    const finding = await measureLayoutShift(page);
+    expect(finding?.kind).toBe('layout-shift');
   });
 
   test('passes a composed, centered terminal CTA', async ({ page }) => {
@@ -433,68 +548,84 @@ test('certifies every marketing route and public-profile open state', async ({
   const nextTasteBaseline: Record<string, number> = {};
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await installLayoutShiftObserver(page);
   for (const target of certificationScope === 'public-profile'
     ? []
     : MARKETING_EXACT_PUBLIC_ROUTE_TARGETS) {
     for (const viewport of target.viewports) {
-      await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
-      const response = await page.goto(target.fixturePath, {
-        waitUntil: 'domcontentloaded',
-        timeout: 90_000,
-      });
-      expect.soft(response?.status(), target.url).toBeLessThan(400);
-      await expect(
-        page.locator(target.expectedRuntimeSelector).first()
-      ).toBeVisible({ timeout: 20_000 });
-      await page.waitForTimeout(250);
+      // Release requests and renderer state after every viewport receipt.
+      const page = await context.newPage();
+      try {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await installLayoutShiftObserver(page);
+        await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
+        const response = await page.goto(target.fixturePath, {
+          waitUntil: 'domcontentloaded',
+          timeout: 90_000,
+        });
+        expect.soft(response?.status(), target.url).toBeLessThan(400);
+        await expect(
+          page.locator(target.expectedRuntimeSelector).first()
+        ).toBeVisible({ timeout: 20_000 });
+        await page.waitForTimeout(250);
 
-      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
-      const imageContrast = await inspectImageContrast(page);
-      const findings = [...snapshot.findings, ...imageContrast.findings];
-      const snapshotPath = path.join(
-        'marketing',
-        `${safeName(target.url)}-${viewport}.json`
-      );
-      await writeSnapshot(snapshotPath, {
-        schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
-        sourceGitSha,
-        deploymentId,
-        deploymentUrl: baseUrl,
-        route: target.url,
-        fixturePath: target.fixturePath,
-        viewport,
-        state: 'default',
-        ...snapshot,
-        findings,
-        imageContrast,
-      });
-      receipts.push({
-        route: target.url,
-        viewport,
-        state: 'default',
-        snapshotPath,
-        findingCount: findings.length,
-      });
-      const tasteCounts = new Map<string, number>();
-      for (const finding of findings) {
-        if (!isTasteKind(finding.kind)) continue;
-        const key = `${target.url}|${viewport}|${finding.kind}`;
-        tasteCounts.set(key, (tasteCounts.get(key) ?? 0) + 1);
-      }
-      for (const [key, count] of tasteCounts) nextTasteBaseline[key] = count;
-      const overBaseline = [...tasteCounts]
-        .filter(([key, count]) => count > (tasteBaseline[key] ?? 0))
-        .map(([key, count]) => `${key}: ${count} > ${tasteBaseline[key] ?? 0}`);
-      expect
-        .soft(
-          findings.filter(finding => !isTasteKind(finding.kind)),
-          `${target.url} ${viewport}`
-        )
-        .toEqual([]);
-      if (!updateTasteBaseline) {
+        const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+        const imageContrast = await inspectImageContrast(page);
+        const layoutShift = await measureLayoutShift(page);
+        const findings = [
+          ...snapshot.findings,
+          ...imageContrast.findings,
+          ...(layoutShift ? [layoutShift] : []),
+        ];
+        const snapshotPath = path.join(
+          'marketing',
+          `${safeName(target.url)}-${viewport}.json`
+        );
+        await writeSnapshot(snapshotPath, {
+          schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+          sourceGitSha,
+          deploymentId,
+          deploymentUrl: baseUrl,
+          route: target.url,
+          fixturePath: target.fixturePath,
+          viewport,
+          state: 'default',
+          ...snapshot,
+          findings,
+          imageContrast,
+        });
+        receipts.push({
+          route: target.url,
+          viewport,
+          state: 'default',
+          snapshotPath,
+          findingCount: findings.length,
+        });
+        const tasteCounts = new Map<string, number>();
+        for (const finding of findings) {
+          if (!isTasteKind(finding.kind)) continue;
+          const key = `${target.url}|${viewport}|${finding.kind}`;
+          tasteCounts.set(key, (tasteCounts.get(key) ?? 0) + 1);
+        }
+        for (const [key, count] of tasteCounts) nextTasteBaseline[key] = count;
+        const overBaseline = [...tasteCounts]
+          .filter(([key, count]) => count > (tasteBaseline[key] ?? 0))
+          .map(
+            ([key, count]) => `${key}: ${count} > ${tasteBaseline[key] ?? 0}`
+          );
         expect
-          .soft(overBaseline, `${target.url} ${viewport} taste ratchet`)
+          .soft(
+            findings.filter(finding => !isTasteKind(finding.kind)),
+            `${target.url} ${viewport}`
+          )
           .toEqual([]);
+        if (!updateTasteBaseline) {
+          expect
+            .soft(overBaseline, `${target.url} ${viewport} taste ratchet`)
+            .toEqual([]);
+        }
+      } finally {
+        await page.close();
       }
     }
   }
@@ -588,4 +719,94 @@ test('certifies every marketing route and public-profile open state', async ({
     routeCount: MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.length,
     receipts,
   });
+});
+
+// JOV-7710 / AM-017: the composed app shell's main plane (header + route
+// content) is one material. Ratcheted per route like the marketing taste
+// kinds; regenerate after fixes with UPDATE_SHELL_MATERIAL_BASELINE=1.
+const shellMaterialRoutes = [
+  '/demo',
+  '/demo/audience',
+  '/demo/showcase/analytics',
+  '/demo/showcase/earnings',
+  '/demo/showcase/links',
+  '/demo/showcase/releases',
+  '/demo/showcase/settings',
+  '/demo/showcase/release-tracked-links',
+] as const;
+const shellMaterialBaselinePath = path.resolve(
+  'tests/product-screenshots/shell-material-baseline.json'
+);
+
+test('certifies a single-material main plane on composed shell routes', async ({
+  page,
+}, testInfo) => {
+  test.skip(certificationScope === 'public-profile', 'profile-only scope');
+  test.setTimeout(10 * 60_000);
+  const baseUrl = exactBaseUrl(testInfo);
+  const baseline: Record<string, number> = JSON.parse(
+    readFileSync(shellMaterialBaselinePath, 'utf8')
+  );
+  const update = process.env.UPDATE_SHELL_MATERIAL_BASELINE === '1';
+  const next: Record<string, number> = {};
+  const receipts: Array<Record<string, string | number>> = [];
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize(SCREENSHOT_VIEWPORTS.desktop);
+  for (const route of shellMaterialRoutes) {
+    const response = await page.goto(route, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    expect.soft(response?.status(), route).toBeLessThan(400);
+    await expect(page.locator('main#main-content')).toBeVisible({
+      timeout: 30_000,
+    });
+    await waitForHydration(page);
+    await page.waitForTimeout(500);
+    const report = await inspectShellMaterial(page);
+    expect.soft(report.plane, `${route} main plane`).not.toBeNull();
+    const snapshotPath = `${safeName(route)}-desktop.json`;
+    await writeSnapshot(path.join('shell', snapshotPath), {
+      schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+      sourceGitSha,
+      deploymentUrl: baseUrl,
+      route,
+      viewport: 'desktop',
+      state: 'default',
+      plane: report.plane,
+      findings: report.findings,
+    });
+    receipts.push({
+      route,
+      viewport: 'desktop',
+      state: 'default',
+      snapshotPath,
+      findingCount: report.findings.length,
+    });
+    if (report.findings.length > 0) next[route] = report.findings.length;
+    if (!update) {
+      expect
+        .soft(
+          report.findings.length,
+          `${route} nested surface materials: ${JSON.stringify(report.findings)}`
+        )
+        .toBeLessThanOrEqual(baseline[route] ?? 0);
+    }
+  }
+  await writeSnapshot(path.join('shell', 'receipt.json'), {
+    schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+    capturedAt: new Date().toISOString(),
+    certificationMode: 'local-production-build',
+    deploymentUrl: baseUrl,
+    deploymentId,
+    sourceGitSha,
+    routeCount: shellMaterialRoutes.length,
+    receipts,
+  });
+  if (update) {
+    await writeFile(
+      shellMaterialBaselinePath,
+      `${JSON.stringify(next, null, 2)}\n`
+    );
+  }
 });

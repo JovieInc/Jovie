@@ -492,11 +492,7 @@ export const sendNotification = async (
     if (channel === 'sms') {
       const smsResult = await handleSmsChannel(message, target);
       results.push(smsResult);
-      continue;
     }
-
-    // Placeholder for in-app transport
-    results.push(buildSkippedResult(channel, 'Channel not implemented yet'));
   }
 
   return {

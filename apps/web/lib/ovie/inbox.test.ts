@@ -125,6 +125,17 @@ describe('Ovie inbox projection', () => {
 });
 
 describe('Inbox coverage and producer adapters', () => {
+  it('rejects a design modification instead of approving the proposal', () => {
+    expect(() =>
+      inboxDecisionRequest(
+        { kind: 'design', id: 'proposal', dayBucket: '2026-10-02' },
+        'modify',
+        'Revise the direction',
+        'a'
+      )
+    ).toThrow('Reject with notes');
+  });
+
   it('makes disconnected domains explicit', () => {
     const result = projectOvieInbox([], [], {
       ...inventory,
@@ -262,6 +273,10 @@ describe('Certification Inbox convergence', () => {
       blockers: [],
       actions: ['certify'],
       observedAt: inventory.generatedAt,
+      revenueTierRank: 3,
+      revenueTier: 'revenue_path_certification',
+      heldForMachineEvidence: false,
+      card: null,
     };
     const source = {
       ...inventory,

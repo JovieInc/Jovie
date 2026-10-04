@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const request = vi.fn();
+const resolveInHouse = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/music-resolver/in-house', () => ({
+  resolveInHouse: (...args: unknown[]) => resolveInHouse(...args),
+}));
 vi.mock('@/lib/musicfetch/resilient-client', () => {
   class MusicfetchRequestError extends Error {
     constructor(
@@ -17,6 +21,8 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
     musicfetchRequest: (...args: unknown[]) => request(...args),
   };
 });
+
+import { resetMusicfetchDormantForTests } from '@/lib/music-resolver/musicfetch-gate';
 
 import { prepareReleaseLaunchSchema } from './draft-contract';
 import {
@@ -112,7 +118,27 @@ describe('canonical release URL shapes', () => {
 });
 
 describe('agent release resolution', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    resetMusicfetchDormantForTests();
+    delete process.env.FEATURE_IN_HOUSE_RESOLVER;
+    delete process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS;
+    delete process.env.MUSICFETCH_API_TOKEN;
+    resolveInHouse.mockResolvedValue({
+      status: 'no_match',
+      kind: 'track',
+      title: null,
+      artist: null,
+      isrc: null,
+      upc: null,
+      mbid: null,
+      links: [],
+      candidates: [],
+      confidence: 0,
+      provenance: {},
+      candidateCount: 0,
+    });
+  });
 
   it('resolves a DSP URL into normalized public release and smart-link facts', async () => {
     request.mockResolvedValue({
@@ -372,7 +398,157 @@ describe('agent release resolution', () => {
     });
   });
 
-  it.each([400, 401, 402, 403, 422, 429, 500, 503])(
+  it.each([401, 403])(
+    'treats MusicFetch HTTP %i as non-retryable vendor unavailable',
+    async status => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      request.mockRejectedValueOnce(
+        new MusicfetchRequestError('subscription not active', status)
+      );
+      const result = await resolveAgentRelease(
+        prepareReleaseLaunchSchema.parse({
+          ...draft,
+          release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        })
+      );
+      expect(result).toEqual({
+        status: 'error',
+        code: 'UPSTREAM_FAILURE',
+        retryable: false,
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('uses the in-house resolver when MusicFetch is unavailable, before cached metadata', async () => {
+    const { MusicfetchRequestError } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    request.mockRejectedValueOnce(
+      new MusicfetchRequestError('unavailable', 401)
+    );
+    resolveInHouse.mockResolvedValueOnce({
+      status: 'resolved',
+      kind: 'album',
+      title: 'Signal Fire',
+      artist: 'The Artist',
+      isrc: null,
+      upc: '00123456789012',
+      mbid: null,
+      links: [
+        {
+          provider: 'spotify',
+          url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          provenance: 'input_url',
+          confidence: 0.95,
+        },
+      ],
+      candidates: [],
+      confidence: 0.95,
+      provenance: { spotify: 'input_url' },
+      candidateCount: 1,
+    });
+    const result = await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        release_metadata: {
+          title: 'Cached Title',
+          artist_name: 'Cached Artist',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      })
+    );
+    expect(resolveInHouse).toHaveBeenCalledWith({
+      kind: 'album',
+      url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+    });
+    expect(result).toEqual({
+      status: 'resolved',
+      facts: [
+        {
+          source: 'release_url',
+          content_type: 'album',
+          title: 'Signal Fire',
+          artist_name: 'The Artist',
+          release_date: null,
+          artwork_url: null,
+          upc: '00123456789012',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+          artists: [{ name: 'The Artist', ids: {} }],
+        },
+      ],
+    });
+  });
+
+  it('falls back to supplied release metadata when MusicFetch is vendor-unavailable', async () => {
+    const { MusicfetchRequestError } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    request.mockRejectedValueOnce(
+      new MusicfetchRequestError('subscription not active', 401)
+    );
+    const result = await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+        release_metadata: {
+          title: 'Signal Fire',
+          artist_name: 'The Artist',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      })
+    );
+    expect(result).toMatchObject({
+      status: 'resolved',
+      facts: [
+        {
+          source: 'release_metadata',
+          title: 'Signal Fire',
+          dsp_links: {
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      ],
+    });
+  });
+
+  it('routes a MusicFetch 401 to JOV-7323 and does not call it again', async () => {
+    const { MusicfetchRequestError } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    request.mockRejectedValue(
+      new MusicfetchRequestError(
+        'MusicFetch API error: 401 - subscription not active',
+        401
+      )
+    );
+    const input = prepareReleaseLaunchSchema.parse({
+      ...draft,
+      release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+    });
+    expect(await resolveAgentRelease(input)).toEqual({
+      status: 'error',
+      code: 'UPSTREAM_FAILURE',
+      retryable: false,
+    });
+    expect(await resolveAgentRelease(input)).toEqual({
+      status: 'error',
+      code: 'UPSTREAM_FAILURE',
+      retryable: false,
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 402, 422, 429, 500, 503])(
     'keeps provider HTTP %i failures distinct from a missing release',
     async status => {
       const { MusicfetchRequestError } = await import(
@@ -398,4 +574,95 @@ describe('agent release resolution', () => {
       expect(request).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('resolves a release through the in-house ladder and skips MusicFetch', async () => {
+    process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS = 'true';
+    process.env.MUSICFETCH_API_TOKEN = 'unpaid-token';
+    resolveInHouse.mockResolvedValue({
+      status: 'resolved',
+      kind: 'album',
+      title: 'Signal Fire',
+      artist: 'The Artist',
+      isrc: null,
+      upc: null,
+      mbid: null,
+      confidence: 0.95,
+      provenance: { spotify: 'input_url', deezer: 'upc_exact' },
+      candidateCount: 2,
+      candidates: [],
+      links: [
+        {
+          provider: 'spotify',
+          url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          provenance: 'input_url',
+          confidence: 0.95,
+        },
+        {
+          provider: 'deezer',
+          url: 'https://www.deezer.com/album/1234',
+          provenance: 'upc_exact',
+          confidence: 0.92,
+        },
+      ],
+    });
+    const result = await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+      })
+    );
+    expect(result).toMatchObject({
+      status: 'resolved',
+      facts: [
+        {
+          content_type: 'album',
+          title: 'Signal Fire',
+          dsp_links: {
+            deezer: 'https://www.deezer.com/album/1234',
+            spotify: 'https://open.spotify.com/album/6habFhsOp2NvshLv26DqMb',
+          },
+        },
+      ],
+    });
+    expect(request).not.toHaveBeenCalled();
+    expect(resolveInHouse).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an Apple Music album URL with a song id as a track', async () => {
+    process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS = 'true';
+    resolveInHouse.mockResolvedValue({
+      status: 'resolved',
+      kind: 'track',
+      title: 'Signal Fire',
+      artist: 'The Artist',
+      isrc: 'USABC1234567',
+      upc: null,
+      mbid: null,
+      confidence: 0.95,
+      provenance: { apple_music: 'input_url' },
+      candidateCount: 1,
+      candidates: [],
+      links: [
+        {
+          provider: 'apple_music',
+          url: 'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+          provenance: 'input_url',
+          confidence: 0.95,
+        },
+      ],
+    });
+
+    await resolveAgentRelease(
+      prepareReleaseLaunchSchema.parse({
+        ...draft,
+        release_url: 'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+      })
+    );
+
+    expect(resolveInHouse).toHaveBeenCalledWith({
+      kind: 'track',
+      url: 'https://music.apple.com/us/album/signal-fire/1234?i=5678',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
 });

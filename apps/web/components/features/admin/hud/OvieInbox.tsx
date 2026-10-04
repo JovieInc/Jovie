@@ -211,7 +211,7 @@ export function OvieInbox() {
             </p>
           )}
           {error ? (
-            <p role='alert' className='text-xs text-destructive'>
+            <p role='alert' className='text-xs text-error'>
               {error}
             </p>
           ) : null}

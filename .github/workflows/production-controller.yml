@@ -7,14 +7,13 @@ name: Production Controller
 #   evidence can prove whether a newer eligible generation is queued.
 # revisit-trigger: Revisit when merge-queue state is carried on the
 #   workflow_run event payload or the controller moves to webhook dispatch.
-run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
+run-name: Production Controller ${{ github.event.workflow_run.display_title }}
 
 on:
-  # CI completion is the sole release signal. Every main SHA reaches CI because
-  # ci.yml has no push path filters, and every completed retry naturally creates
-  # a new controller opportunity without a duplicate push-triggered generation.
+  # Successful staging completion carries the original exact CI attempt.
+  # Production never races the staging FIFO with a receipt polling deadline.
   workflow_run:
-    workflows: [CI]
+    workflows: [Staging Controller]
     types: [completed]
     branches: [main]
 
@@ -30,6 +29,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-source:
+    name: Bind completed staging to source CI
+    if: ${{ github.event.workflow_run.event == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {actions: read, contents: read}
+    outputs:
+      ci: ${{ steps.source.outputs.ci }}
+      eligible: ${{ steps.source.outputs.eligible }}
+      staging_artifact_id: ${{ steps.source.outputs.staging_artifact_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts/staging-release-source.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        with: {node-version: 24.21.0}
+      - id: source
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: node .github/scripts/staging-release-source.mjs
   # Event-driven supersession, not a fixed release-wave sleep: main itself is
   # the release-lineage event log and the merge queue is the only place a
   # newer eligible generation can already be validating or queued. This
@@ -45,8 +66,9 @@ jobs:
   # stream cannot starve production the way exact-SHA yields did on
   # 2026-09-26.
   coalesce-production:
+    needs: [release-source]
     name: Coalesce release wave
-    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ needs.release-source.outputs.eligible == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -64,7 +86,7 @@ jobs:
         id: coalesce
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           # Starvation bound for the forward-only lineage gate: once main has
           # carried unshipped commits this long, an in-flight ancestor
@@ -227,7 +249,7 @@ jobs:
 
   fleet-promotion:
     name: Authorize fleet deployment state
-    needs: [coalesce-production]
+    needs: [release-source, coalesce-production]
     if: ${{ needs.coalesce-production.result == 'success' && needs.coalesce-production.outputs.is_current == 'true' }}
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 5
@@ -248,15 +270,15 @@ jobs:
       - name: Checkout exact main policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           persist-credentials: false
       - name: Resolve exact CI risk lane
         id: risk
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
-          SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_RUN_ID: ${{ fromJSON(needs.release-source.outputs.ci).id }}
+          SOURCE_RUN_ATTEMPT: ${{ fromJSON(needs.release-source.outputs.ci).run_attempt }}
+          SOURCE_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPO: ${{ github.repository }}
         shell: bash
         run: |
@@ -289,15 +311,15 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token }}
           dry-run: 'false'
           consumer: deployment
-          expected-sha: ${{ github.event.workflow_run.head_sha }}
+          expected-sha: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           surface: production-web
           mutation: promote-staged-web-release
           risk-lane: ${{ steps.risk.outputs.risk_lane }}
 
   authorize-production:
     name: Authorize exact main CI evidence
-    needs: [coalesce-production, fleet-promotion]
-    if: ${{ needs.coalesce-production.result == 'success' && needs.coalesce-production.outputs.is_current == 'true' && needs.fleet-promotion.result == 'success' && needs.fleet-promotion.outputs.deployment_allowed == 'true' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
+    needs: [release-source, coalesce-production, fleet-promotion]
+    if: ${{ needs.coalesce-production.result == 'success' && needs.coalesce-production.outputs.is_current == 'true' && needs.fleet-promotion.result == 'success' && needs.fleet-promotion.outputs.deployment_allowed == 'true' && fromJSON(needs.release-source.outputs.ci).event == 'push' && fromJSON(needs.release-source.outputs.ci).conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -320,13 +342,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Bind scoped fleet admission to the release lineage
         env:
           ADMISSION_RECEIPT_B64: ${{ needs.fleet-promotion.outputs.admission_receipt_b64 }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -341,17 +363,18 @@ jobs:
         id: authorize
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
-          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
-          TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-          TRIGGER_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
-          TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
-          TRIGGER_RUN_PATH: ${{ github.event.workflow_run.path }}
-          TRIGGER_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          TRIGGER_RUN_STATUS: ${{ github.event.workflow_run.status }}
-          TRIGGER_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          TRIGGER_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          EXACT_STAGING_ARTIFACT_ID: ${{ needs.release-source.outputs.staging_artifact_id }}
+          TRIGGER_RUN_ID: ${{ fromJSON(needs.release-source.outputs.ci).id }}
+          TRIGGER_RUN_ATTEMPT: ${{ fromJSON(needs.release-source.outputs.ci).run_attempt }}
+          TRIGGER_WORKFLOW_ID: ${{ fromJSON(needs.release-source.outputs.ci).workflow_id }}
+          TRIGGER_RUN_EVENT: ${{ fromJSON(needs.release-source.outputs.ci).event }}
+          TRIGGER_RUN_PATH: ${{ fromJSON(needs.release-source.outputs.ci).path }}
+          TRIGGER_HEAD_BRANCH: ${{ fromJSON(needs.release-source.outputs.ci).head_branch }}
+          TRIGGER_RUN_STATUS: ${{ fromJSON(needs.release-source.outputs.ci).status }}
+          TRIGGER_RUN_CONCLUSION: ${{ fromJSON(needs.release-source.outputs.ci).conclusion }}
+          TRIGGER_HEAD_REPOSITORY: ${{ fromJSON(needs.release-source.outputs.ci).head_repository.full_name }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         shell: bash
         run: |
@@ -662,16 +685,54 @@ jobs:
               staging_compare="$(gh api "repos/$REPOSITORY/compare/${staging_receipt_sha}...${EXPECTED_SHA}" --jq '.status // empty')"
               [[ "$staging_compare" =~ ^(ahead|identical)$ ]] || { echo "::error::Canonical staging SHA $staging_receipt_sha is not on the production lineage to $EXPECTED_SHA."; exit 1; }
               staging_artifact_name="staging-deployment-${staging_receipt_sha}"
-              staging_artifact_id=""
-              # 25 min bound: staging queue + deploy took ~20 min on 2026-09-29; a 10 min wait
-              # failed valid releases with "receipt missing" (JOV-19527).
-              for attempt in $(seq 1 150); do
+              if [ "$staging_receipt_sha" = "$EXPECTED_SHA" ]; then
+                if [ -n "$EXACT_STAGING_ARTIFACT_ID" ]; then
+                  # Completion binds this artifact to the staging producer and CI attempt.
+                  staging_artifact_id="$EXACT_STAGING_ARTIFACT_ID"
+                else
+                  # A same-SHA CI rerun can select no Web lane. Authenticate the
+                  # existing canonical deployment rather than using an empty ID.
+                  canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+                  staging_deployment_id="$(jq -er '.deploymentId | select(type == "string" and test("^dpl_[A-Za-z0-9]+$"))' <<<"$canonical_staging_identity")"
+                  staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
+                    REPOSITORY="$REPOSITORY" EXPECTED_SHA="$EXPECTED_SHA" \
+                    node .github/scripts/canonical-staging-receipt.mjs)"
+                fi
+              else
+                # Preserve cumulative-range historical Web evidence, without polling.
                 staging_artifact_id="$(gh api \
                   "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
                   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
-                [ -n "$staging_artifact_id" ] && break
-                [ "$attempt" -lt 150 ] && sleep 10
-              done
+                if [ -z "$staging_artifact_id" ]; then
+                  # A superseded staging generation never deploys, so its exact
+                  # receipt can never exist. Its durable lineage receipt either
+                  # rebinds this wait to the exact replacement SHA on this
+                  # release lineage or proves this generation is stale.
+                  lineage_report="$RUNNER_TEMP/staging-lineage-decision.txt"
+                  if ! EXPECTED_SHA="$EXPECTED_SHA" REPOSITORY="$REPOSITORY" \
+                    STAGING_RECEIPT_SHA="$staging_receipt_sha" RUNNER_TEMP="$RUNNER_TEMP" \
+                    bash .github/scripts/staging-generation-lineage.sh > "$lineage_report"; then
+                    exit 1
+                  fi
+                  case "$(tail -n 1 "$lineage_report")" in
+                    "action=rebind replacement="*)
+                      staging_receipt_sha="$(tail -n 1 "$lineage_report")"
+                      staging_receipt_sha="${staging_receipt_sha#action=rebind replacement=}"
+                      staging_deployment_id=""
+                      staging_artifact_name="staging-deployment-${staging_receipt_sha}"
+                      staging_artifact_id="$(gh api \
+                        "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
+                        --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
+                      ;;
+                    "action=yield") exit 0 ;;
+                    "action=wait") ;;
+                    *)
+                      echo "::error::Staging lineage decision was malformed."
+                      exit 1
+                      ;;
+                  esac
+                fi
+              fi
               [[ "$staging_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
                 echo "::error::Exact staging receipt is missing. Next: inspect Staging Controller for $staging_receipt_sha. Proof: $staging_artifact_name."
                 exit 1
@@ -845,6 +906,7 @@ jobs:
     outputs:
       credentials_configured: ${{ steps.check-creds.outputs.credentials_configured }}
       auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
+      login_timeout: ${{ steps.auth-result.outputs.login_timeout }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -906,6 +968,8 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
+          log="$RUNNER_TEMP/auth-smoke.log"
+          set +e
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
@@ -915,8 +979,17 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
-          echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
+                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line \
+            >"$log" 2>&1
+          status=$?
+          set -e
+          cat "$log"
+          login="$(node "$GITHUB_WORKSPACE/scripts/remediation-signal-intake.mjs" --detect-login "$log" || true)"
+          echo "login_timeout=${login:-false}" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 0 ]; then
+            echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
@@ -1026,6 +1099,7 @@ jobs:
     name: Production Verified
     needs:
       [
+        release-source,
         authorize-production,
         production-release,
         ci-public-profile-smoke,
@@ -1035,7 +1109,8 @@ jobs:
     if: >-
       ${{
         always() &&
-        github.event.workflow_run.event == 'push' &&
+        needs.release-source.result == 'success' &&
+        fromJSON(needs.release-source.outputs.ci || '{}').event == 'push' &&
         needs.authorize-production.result == 'success' &&
         needs.authorize-production.outputs.already_verified != 'true'
       }}
@@ -1354,6 +1429,55 @@ jobs:
             echo "::warning::Production is verified, but the bounded Slack notification failed."
           fi
 
+  remediation-post-deploy-smoke:
+    name: File post-deploy smoke remediation
+    needs: [ci-public-profile-smoke]
+    if: ${{ always() && needs.ci-public-profile-smoke.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve production-monitor-post-deploy-smoke
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-post-deploy-smoke
+          REMEDIATION_SOURCE: production-controller.yml
+          REMEDIATION_CONCLUSION: ${{ needs.ci-public-profile-smoke.result }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
+  remediation-auth-smoke:
+    name: File post-deploy auth remediation
+    needs: [ci-post-deploy-auth-smoke]
+    if: ${{ always() && needs.ci-post-deploy-auth-smoke.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve auth smoke remediation
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: auth-smoke
+          REMEDIATION_SOURCE: production-controller.yml:auth-smoke
+          REMEDIATION_JOB_RESULT: ${{ needs.ci-post-deploy-auth-smoke.result }}
+          REMEDIATION_AUTH_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
+          REMEDIATION_LOGIN_TIMEOUT: ${{ needs.ci-post-deploy-auth-smoke.outputs.login_timeout }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
   publish-customer-changelog:
     name: Publish verified customer changelog
     needs: [authorize-production, production-verified]
@@ -1388,7 +1512,13 @@ jobs:
           JOVIE_AGENT_PROFILE: coder
         run: |
           set -euo pipefail
-          open_notes="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open --limit 100 --json number,headRefName,headRefOid,isDraft --jq '[.[] | select(.headRefName | startswith("release/daily-changelog-"))]')"
+          # The release-writer token has an independent REST quota; avoid making
+          # publication depend on the installation-wide GraphQL quota.
+          open_notes="$(
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" \
+            | jq '[.[][]? | select(.head.ref | startswith("release/daily-changelog-"))]'
+          )"
           test "$(jq length <<<"$open_notes")" -le 1 || { echo '::error::Multiple customer-note writers'; exit 1; }
           if [ "$(jq length <<<"$open_notes")" = 1 ]; then
             pr="$(jq -r '.[0].number' <<<"$open_notes")"
@@ -1430,3 +1560,100 @@ jobs:
           path: ${{ runner.temp }}/customer-changelog/plan.json
           if-no-files-found: ignore
           retention-days: 30
+
+  # Publication runs after Production Verified and never touches production,
+  # so production-marker-state keeps the generation verified when it fails
+  # (JOV-7724). The failure files here instead of freezing later releases.
+  remediation-customer-changelog:
+    name: File customer changelog remediation
+    needs: [publish-customer-changelog]
+    if: ${{ always() && needs.publish-customer-changelog.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve customer changelog publication remediation
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-customer-changelog
+          REMEDIATION_SOURCE: production-controller.yml:customer-changelog
+          REMEDIATION_CONCLUSION: ${{ needs.publish-customer-changelog.result }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
+  # JOV-7773: a generation that wrote its verified marker and then hit an
+  # interrupting failure classifies recovery_available, which blocks every
+  # later release. A full rerun drops the attempt-1 marker artifacts, so heal
+  # in-band instead: dispatch the bounded marker re-proof, which queues in the
+  # production-mutation FIFO behind this run and admits only once this attempt
+  # has completed and still owns canonical production.
+  heal-interrupted-marker:
+    name: Heal interrupted verified marker
+    needs:
+      [
+        authorize-production,
+        production-release,
+        production-verified,
+        remediation-post-deploy-smoke,
+        remediation-auth-smoke,
+      ]
+    if: ${{ always() && needs.production-verified.outputs.verified == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch bounded marker recovery for an interrupted generation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
+          RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
+          MARKER_RECOVERY: ${{ needs.authorize-production.outputs.marker_recovery }}
+          VERIFIED_RESULT: ${{ needs.production-verified.result }}
+          SMOKE_REMEDIATION_RESULT: ${{ needs.remediation-post-deploy-smoke.result }}
+          AUTH_REMEDIATION_RESULT: ${{ needs.remediation-auth-smoke.result }}
+          CONTROLLER_RUN: ${{ github.run_id }}
+          CONTROLLER_ATTEMPT: ${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only jobs that can fail after the marker write interrupt a verified
+          # generation. Publication jobs never do (production-marker-state).
+          interrupted=false
+          for result in "$VERIFIED_RESULT" "$SMOKE_REMEDIATION_RESULT" "$AUTH_REMEDIATION_RESULT"; do
+            case "$result" in
+              success|skipped) ;;
+              *) interrupted=true ;;
+            esac
+          done
+          if [ "$interrupted" != true ]; then
+            echo "Verified generation $EXPECTED_SHA finished without interruption; nothing to heal."
+            exit 0
+          fi
+          if [ "$MARKER_RECOVERY" = true ] || [ "$RUN_WEB" != true ]; then
+            echo "::warning::Interrupted generation $EXPECTED_SHA is not an exact promoted primary; the Production Controller Health audit owns it."
+            exit 0
+          fi
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+            [[ "$DEPLOYMENT_ID" =~ ^dpl_[A-Za-z0-9]+$ ]] &&
+            [[ "$CONTROLLER_RUN" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$CONTROLLER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Interrupted generation lacks exact SHA, deployment, or attempt evidence for marker recovery."
+            exit 1
+          }
+          gh workflow run production-marker-recovery.yml --ref main \
+            -f sha="$EXPECTED_SHA" \
+            -f deployment_id="$DEPLOYMENT_ID" \
+            -f controller_run="$CONTROLLER_RUN" \
+            -f controller_attempt="$CONTROLLER_ATTEMPT"
+          echo "::notice::Dispatched bounded marker recovery for interrupted generation $EXPECTED_SHA ($CONTROLLER_RUN/$CONTROLLER_ATTEMPT)."

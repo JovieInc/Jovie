@@ -9,6 +9,7 @@ import {
   fetchOpenApi,
   fetchSiteLlms,
   JovieInputError,
+  lookupCreator,
   normalizeBaseUrl,
   readResponseBody,
   reportIssue,
@@ -98,6 +99,84 @@ describe('Jovie public resource client', () => {
     });
   });
 
+  it('looks up a creator with a read-only GET request', async () => {
+    const { calls, fetchImpl } = createFetch(
+      '{"platform":"youtube","displayName":"Creator"}'
+    );
+
+    await expect(
+      lookupCreator(' https://www.youtube.com/@creator ', { fetchImpl })
+    ).resolves.toEqual({ platform: 'youtube', displayName: 'Creator' });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      input:
+        'https://jov.ie/api/agents/creator-lookup?url=https%3A%2F%2Fwww.youtube.com%2F%40creator',
+      init: { method: 'GET' },
+    });
+    expect(calls[0].init?.body).toBeUndefined();
+  });
+
+  it.each([
+    ['youtube:@creator', 'https%3A%2F%2Fwww.youtube.com%2F%40creator'],
+    ['youtube:creator', 'https%3A%2F%2Fwww.youtube.com%2F%40creator'],
+    [
+      'youtube:UCxxxxxxxxxxxxxxxxxxxxxx',
+      'https%3A%2F%2Fwww.youtube.com%2Fchannel%2FUCxxxxxxxxxxxxxxxxxxxxxx',
+    ],
+    ['instagram:creator', 'https%3A%2F%2Fwww.instagram.com%2Fcreator'],
+    ['tiktok:creator', 'https%3A%2F%2Fwww.tiktok.com%2F%40creator'],
+    ['linktree:creator', 'https%3A%2F%2Flinktr.ee%2Fcreator'],
+  ])(
+    'expands platform:handle input %s into a canonical lookup URL',
+    async (input, encodedUrl) => {
+      const { calls, fetchImpl } = createFetch('{"exists":false}');
+
+      await expect(lookupCreator(input, { fetchImpl })).resolves.toBeDefined();
+
+      expect(calls[0].input).toBe(
+        `https://jov.ie/api/agents/creator-lookup?url=${encodedUrl}`
+      );
+    }
+  );
+
+  it('rejects malformed platform:handle input before making a request', () => {
+    const { calls, fetchImpl } = createFetch('{}');
+
+    for (const value of [
+      'youtube:bad handle',
+      'youtube:a/b',
+      'instagram:@',
+      'tiktok:',
+      'linktree:ha%cker',
+    ]) {
+      expect(() => lookupCreator(value, { fetchImpl })).toThrow(
+        JovieInputError
+      );
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects unsafe creator lookup URLs before making a request', () => {
+    const { calls, fetchImpl } = createFetch('{}');
+    const credentialedUrl = [
+      'https://user',
+      ':credential@youtube.com/@creator',
+    ].join('');
+
+    for (const value of [
+      'not-a-url',
+      'http://youtube.com/@creator',
+      credentialedUrl,
+      `https://youtube.com/@${'x'.repeat(2048)}`,
+    ]) {
+      expect(() => lookupCreator(value, { fetchImpl })).toThrow(
+        JovieInputError
+      );
+    }
+    expect(calls).toHaveLength(0);
+  });
+
   it('fetches site and per-artist llms resources as text', async () => {
     const site = createFetch('# site guide');
     await expect(
@@ -176,7 +255,7 @@ describe('Jovie public resource client', () => {
       code: 'REQUEST_FAILED',
       message: 'GET https://jov.ie/llms.txt failed: socket unavailable',
     });
-    expect(attempts).toBe(2);
+    expect(attempts).toBe(3);
 
     const nonErrorFetch: FetchImplementation = async () => {
       throw 'connection closed';
@@ -285,7 +364,8 @@ describe('Jovie public resource client', () => {
     await expect(
       createProfile('https://open.spotify.com/artist/abc', { fetchImpl })
     ).rejects.toMatchObject({
-      message: 'POST https://jov.ie/api/agents/profiles returned HTTP 429',
+      message:
+        'Rate limited by jov.ie. Retry in 120s. (POST https://jov.ie/api/agents/profiles returned HTTP 429)',
       apiCode: 'RATE_LIMITED',
       status: 429,
       retryAfterSeconds: 120,

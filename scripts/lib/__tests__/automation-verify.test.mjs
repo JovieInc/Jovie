@@ -19,13 +19,214 @@ import {
   buildSelectedTestCommands,
   buildVerificationEnv,
   CONTROL_TEST_CONCURRENCY,
+  classifyBlogContentForAffectedTests,
   controlCoverageReportsDirectory,
   formatAffectedTestPlanDiagnostic,
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
+import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+
+describe('lane Python qualification coverage', () => {
+  it.each([
+    ['lane source', ['scripts/lanes/hyperagent_lane.py']],
+    ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['merge reader', ['scripts/lanes/merge_evidence.py']],
+    ['HUD regression', ['scripts/tests/test_hud.py']],
+    ['falsy inputs', [null, false, '', 'scripts/lanes/execution_attempt.py']],
+    ['missing pinned dependencies', ['scripts/lanes/hyperagent_lane.py'], true],
+    [
+      'mixed full fallback',
+      ['scripts/lanes/hyperagent_lane.py', 'apps/web/lib/unknown.ts'],
+    ],
+    [
+      'global full fallback',
+      ['scripts/lanes/execution_attempt.py', 'package.json'],
+    ],
+    [
+      'unknown Python peer',
+      ['scripts/lanes/hyperagent_lane.py', 'scripts/lanes/unknown-new.py'],
+    ],
+  ])(
+    'fails the real %s qualifier when lane Python coverage fails',
+    async (_, files, missingDependencies = false) => {
+      const dir = mkdtempSync(resolve(tmpdir(), 'lane-python-qualification-'));
+      const marker = resolve(dir, 'python-covered');
+      try {
+        for (const binary of ['node', 'pnpm']) {
+          writeFileSync(resolve(dir, binary), '#!/bin/sh\nexit 0\n', {
+            mode: 0o755,
+          });
+        }
+        writeFileSync(
+          resolve(dir, 'python3'),
+          missingDependencies
+            ? '#!/bin/sh\nexit 1\n'
+            : '#!/bin/sh\ncase "$*" in *"coverage run"*) touch "$LANE_PYTHON_MARKER"; exit 73;; esac\nexit 0\n',
+          { mode: 0o755 }
+        );
+        const child = spawn(
+          process.execPath,
+          [
+            resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+            '--changed-files-json',
+            JSON.stringify(files),
+            '--shard-concurrency',
+            '1',
+          ],
+          {
+            env: {
+              ...process.env,
+              PATH: `${dir}:${process.env.PATH}`,
+              LANE_PYTHON_MARKER: marker,
+            },
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
+        );
+        // Drain output so a child cannot block on an inherited pipe buffer.
+        child.stdout.resume();
+        child.stderr.resume();
+        const status = await new Promise((resolveExit, reject) => {
+          child.once('error', reject);
+          child.once('exit', resolveExit);
+        });
+        expect(status).toBe(missingDependencies ? 1 : 73);
+        expect(existsSync(marker)).toBe(!missingDependencies);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+});
+
+describe('merge evidence coverage selection', () => {
+  const inputs = [
+    'scripts/lanes/merge_evidence.py',
+    'scripts/lanes/doctor.py',
+    'scripts/lanes/hud.py',
+    'scripts/tests/test_doctor.py',
+    'scripts/tests/test_hud.py',
+  ];
+  it('qualifies the complete reader and both consumers with structural Python coverage', () => {
+    const plan = buildAffectedTestPlan(inputs, { isFileAvailable: () => true });
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    const commands = buildSelectedTestCommands(plan, '1');
+    const command = commands.find(
+      ([binary, args]) =>
+        binary === 'env' &&
+        Array.isArray(args) &&
+        args.some(arg => arg.includes('coverage run --branch'))
+    );
+    expect(command).toBeDefined();
+    if (!command || !Array.isArray(command[1])) {
+      throw new Error('Expected structural Python command arguments');
+    }
+    expect(command[1].join(' ')).toContain('scripts/tests/test_hud.py');
+    expect(command[1].join(' ')).toContain('scripts/tests/test_doctor.py');
+    expect(command[1].join(' ')).toContain(
+      '*/scripts/lanes/merge_evidence.py" --fail-under=85'
+    );
+  });
+  it.each(['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'])(
+    'fails closed when %s is unavailable',
+    missing => {
+      const plan = buildAffectedTestPlan(inputs, {
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'merge evidence coverage proof is unavailable'
+      );
+      expect(plan.lanePythonCoverage).toBe(true);
+    }
+  );
+  it.each([
+    'scripts/lanes/unknown-new.py',
+    'scripts/tests/test_merge_evidence.py',
+  ])('retains full fallback for unmapped peer %s', peer => {
+    const plan = buildAffectedTestPlan([...inputs, peer], {
+      isFileAvailable: () => true,
+    });
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'unmapped Python peer mixed with lane coverage'
+    );
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
+  it('retains full fallback when changing the selector infrastructure with the reader', () => {
+    const plan = buildAffectedTestPlan(
+      [
+        ...inputs,
+        'scripts/run-affected-tests.mjs',
+        'scripts/ci-fast-lanes.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+      ],
+      { isFileAvailable: () => true }
+    );
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
+});
+
+describe('lane coverage full fallback', () => {
+  it('does not treat an unknown Python peer as covered by the known lane suite', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/lanes/hyperagent_lane.py',
+      'scripts/lanes/unknown-new.py',
+    ]);
+    expect(plan.mode).toBe('full');
+  });
+});
 
 describe('affected-test selector inventory', () => {
+  it('fails closed to the full suite when the real blog Git diff cannot be classified', () => {
+    const receipt = classifyBlogContentForAffectedTests(
+      '0'.repeat(40),
+      'HEAD',
+      { prerequisitesAvailable: true }
+    );
+    expect(
+      buildAffectedTestPlan(['apps/web/content/blog/article.md'], {
+        blogContentReceipt: receipt,
+      }).mode
+    ).toBe('full');
+  });
+  it('selects publication, certification, and candidate-build proof for a status-qualified post', () => {
+    const path = 'apps/web/content/blog/a-safe-article.md';
+    const plan = buildAffectedTestPlan([path], {
+      blogContentReceipt: classifyBlogContentChanges([{ status: 'M', path }]),
+      isFileAvailable: () => true,
+    });
+
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      blogCandidateBuild: true,
+      selectedTests: [
+        'apps/web/tests/unit/lib/blog/publication.test.ts',
+        'apps/web/scripts/marketing-factory/blog-adapter.test.ts',
+      ],
+    });
+    expect(buildSelectedTestCommands(plan, '1').at(-1)).toEqual([
+      'env',
+      expect.arrayContaining(['pnpm', 'build', '--filter=@jovie/web']),
+    ]);
+  });
+
+  it('fails closed without status evidence or with a mixed renderer change', () => {
+    const post = 'apps/web/content/blog/a-safe-article.md';
+    expect(buildAffectedTestPlan([post]).mode).toBe('full');
+    expect(
+      buildAffectedTestPlan([post, 'apps/web/lib/blog/getBlogPosts.ts'], {
+        blogContentReceipt: classifyBlogContentChanges([
+          { status: 'M', path: post },
+          { status: 'M', path: 'apps/web/lib/blog/getBlogPosts.ts' },
+        ]),
+        isFileAvailable: () => true,
+      }).mode
+    ).toBe('full');
+  });
   const certificationSource = 'apps/web/lib/ovie/certifications/normalize.ts';
   const certificationTests = [
     'apps/web/lib/ovie/certifications/normalize.test.ts',
@@ -182,6 +383,8 @@ describe('affected-test selector inventory', () => {
     );
     expect(args).toContain('--coverage');
     expect(args).toContain('--coverage.include=lib/linear-sync-on-merge.mjs');
+    expect(args).toContain('--coverage.include=lib/validation-lifecycle.mjs');
+    expect(args).toContain('--coverage.include=lib/validation-sync.mjs');
     expect(args).toContain('--coverage.thresholds.lines=85');
     expect(args).toContain('--coverage.thresholds.branches=70');
   });
@@ -208,6 +411,22 @@ describe('affected-test selector inventory', () => {
 });
 
 describe('structural control stage execution', () => {
+  it('enforces coverage for public CLI artifact routing in the canonical control stage', () => {
+    const [nativeControl] = buildControlCoverageCommands();
+    expect(nativeControl[1]).toContain(
+      'lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(nativeControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=lib/product-lane-classifier.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.branches=75',
+        '--coverage.thresholds.functions=82',
+      ])
+    );
+  });
+
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
     expect(stages).toHaveLength(23);
@@ -3128,6 +3347,8 @@ describe('linear sync on merge selection', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+      'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+      'scripts/lib/__tests__/validation-sync.test.mjs',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });

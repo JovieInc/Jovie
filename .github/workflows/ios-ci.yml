@@ -114,6 +114,7 @@ jobs:
         run: |
           bash scripts/ios-best-practices-lint.sh apps/ios/Jovie
           bash scripts/ios-best-practices-lint.sh apps/ios/Packages/JovieKit/Sources
+          bash scripts/ios-best-practices-lint.sh apps/ios/JovieMac
 
       - name: Test iOS release configuration scripts
         run: |
@@ -171,6 +172,27 @@ jobs:
           xcrun swiftc -typecheck -swift-version 5 \
             -sdk "$mac_theme_sdk" -target "$(uname -m)-apple-macosx14.0" \
             apps/ios/Jovie/DesignSystem/JovieTheme.swift
+
+      - name: Test native Mac development boundary
+        timeout-minutes: 5
+        run: |
+          mkdir -p artifacts/macos-native-tests
+          for mac_configuration in Debug Release; do
+            xcodebuild test -project apps/ios/JovieMac.xcodeproj -scheme JovieMac \
+              -configuration "$mac_configuration" -destination platform=macOS \
+              -derivedDataPath .build/macos-native-ci \
+              -resultBundlePath "artifacts/macos-native-tests/$mac_configuration.xcresult" \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ENABLE_TESTABILITY=YES
+          done
+
+      - name: Upload native Mac development results
+        if: ${{ always() && hashFiles('artifacts/macos-native-tests/**/*.xcresult/**') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-native-tests-${{ inputs.checkout-ref || github.sha }}-${{ github.run_attempt }}
+          path: artifacts/macos-native-tests/*.xcresult
+          if-no-files-found: error
+          retention-days: 5
 
       - name: Run fast unit and coverage gate
         if: ${{ !inputs.full-regression }}

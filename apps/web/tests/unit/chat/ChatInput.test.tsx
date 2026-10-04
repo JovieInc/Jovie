@@ -766,6 +766,7 @@ describe('ChatInput', () => {
   });
 
   it('surfaces microphone permission errors without blocking send', async () => {
+    const user = userEvent.setup();
     installMockSpeechRecognition();
 
     fastRender(withProviders(<ChatInput {...baseProps} />));
@@ -787,8 +788,10 @@ describe('ChatInput', () => {
     expect(screen.getByTestId('chat-composer-surface')).not.toContainElement(
       screen.getByRole('alert')
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    screen.getByRole('button', { name: 'Dismiss' }).focus();
+    await user.keyboard('{Enter}');
     expect(screen.queryByRole('alert')).toBeNull();
+    expect(dictationButton).toHaveFocus();
   });
 
   it('never starts Web Speech in stale Electron and points at system dictation instead', async () => {
@@ -811,6 +814,7 @@ describe('ChatInput', () => {
   });
 
   it('shows the system-dictation hint when the desktop bridge reports dictation unavailable', async () => {
+    const user = userEvent.setup();
     installMockSpeechRecognition();
     setElectronAPI({
       platform: 'darwin',
@@ -834,8 +838,60 @@ describe('ChatInput', () => {
     const hint = screen.getByRole('status');
     expect(hint).toHaveTextContent(/press the 🎤 key/i);
 
+    expect(hint.closest('[data-chat-composer-overlay="true"]')).toBeNull();
+    within(hint)
+      .getByRole('button', { name: /dismiss/i })
+      .focus();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(dictationButton).toHaveFocus();
+  });
+
+  it('keeps dictation guidance reachable when the attachment picker opens', async () => {
+    const user = userEvent.setup();
+    setElectronAPI({ platform: 'darwin', versions: { app: '0.1.0' } });
+    fastRender(
+      withProviders(<ChatInput {...baseProps} onFileAttach={vi.fn()} />)
+    );
+    const dictationButton = await screen.findByRole('button', {
+      name: /show how to dictate/i,
+    });
+    await user.click(dictationButton);
+    await user.click(
+      screen.getByRole('button', { name: /attachment options/i })
+    );
+
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    const hint = screen.getByRole('status');
+    expect(
+      within(hint).getByRole('button', { name: /dismiss/i })
+    ).toBeVisible();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(hint).toBeInTheDocument();
+    within(hint)
+      .getByRole('button', { name: /dismiss/i })
+      .focus();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(dictationButton).toHaveFocus();
+  });
+
+  it('preserves composer focus and draft when guidance is dismissed without owning focus', async () => {
+    setElectronAPI({ platform: 'darwin', versions: { app: '0.1.0' } });
+    fastRender(
+      withProviders(<ChatInput {...baseProps} value='Keep this draft' />)
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /show how to dictate/i })
+    );
+    const hint = screen.getByRole('status');
+    const input = screen.getByRole('textbox');
+    input.focus();
     fireEvent.click(within(hint).getByRole('button', { name: /dismiss/i }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('Keep this draft');
   });
 
   it('degrades to the system-dictation hint when Electron Web Speech fails with a network error', async () => {

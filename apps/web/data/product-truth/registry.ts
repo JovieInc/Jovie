@@ -434,6 +434,58 @@ export const PRODUCT_CAPABILITIES = {
     },
   },
   /**
+   * Agent-readable profile summary. Every indexable public profile serves
+   * plain text at `/{username}/llms.txt`
+   * (`apps/web/app/[username]/llms.txt/route.ts`; covered by
+   * `apps/web/tests/unit/profile/artist-llms-txt-route.test.ts`). Live in
+   * production as `text/plain` with entity identity, claim and verification
+   * status, location, genres, and stream links. No feature flag. The
+   * screenshot registry has no scenario for a text response.
+   */
+  'agent-readable-profile-summary': {
+    maturity: 'general_availability',
+    publication: 'public',
+    access: 'open',
+    entitlementKeys: [],
+    evidence: {
+      captureScenarios: [],
+      routes: ['/{username}/llms.txt'],
+    },
+    marketing: {
+      audience: 'general',
+      supportedJobs: ['machine-readable public profile summary'],
+      proofAuthorized: true,
+      contentRevision: '2026-09-16',
+    },
+  },
+  /**
+   * Public Ask on profiles. `AskJovieWidget`
+   * (`apps/web/components/features/ask-jovie/AskJovieWidget.tsx`, tests in
+   * `AskJovieWidget.test.tsx`) mounts for anonymous visitors from
+   * `apps/web/app/[username]/page.tsx` and posts to
+   * `apps/web/app/api/profile/[username]/ask/route.ts` (route tests alongside
+   * that file). No feature flag; the page omits it only when
+   * `PUBLIC_NOAUTH_SMOKE=1`. The launcher is in the production profile HTML.
+   * Golden-path keyframe `anonymous-chat` drives `/start` onboarding, not
+   * this widget, and no screenshot scenario id covers the launcher.
+   */
+  'public-ask': {
+    maturity: 'general_availability',
+    publication: 'public',
+    access: 'open',
+    entitlementKeys: [],
+    evidence: {
+      captureScenarios: [],
+      routes: ['/{username}', '/api/profile/{username}/ask'],
+    },
+    marketing: {
+      audience: 'general',
+      supportedJobs: ['anonymous Ask on a public profile'],
+      proofAuthorized: true,
+      contentRevision: '2026-09-30',
+    },
+  },
+  /**
    * Selective reach ("Send less. Matter more.", JOV-6299). The copy line is
    * founder-approved, but presenting it as working Jovie behavior is gated on
    * certified segments, real preview/approval/scheduling/send paths, consent
@@ -639,6 +691,14 @@ export type FlagCapabilityBinding =
   | { readonly nonMarketing: string };
 
 export const PRODUCT_FLAG_CAPABILITIES = {
+  YOUTUBE_WORKSPACE_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
+  JOVIE_WORK_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
   BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
   SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },
@@ -661,10 +721,12 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   PROFILE_SEARCH_MONITORING: { capabilityId: 'profile-monitoring' },
   ONBOARDING_WOW_TASK_QUEUE: { nonMarketing: 'onboarding orchestration' },
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
-  MERCH_QA_GATE: { capabilityId: 'instant-merch' },
   AGENT_PROFILE_CREATE: { capabilityId: 'cli' },
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
+  },
+  VISIBILITY_AUDIT_OFFER: {
+    nonMarketing: 'hidden until the flag and a Stripe Payment Link are set',
   },
   NEW_RELEASE_PAGE: { nonMarketing: 'UI layout toggle' },
   CANVAS_GRAIN: { nonMarketing: 'UI visual treatment' },
@@ -672,12 +734,41 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CHAT_COMPOSER_V2: { nonMarketing: 'UI layout toggle' },
   MEMORY_STUDIO_SESSION_V0: { nonMarketing: 'internal memory loop' },
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
+  MARKETING_GENERIC_CREATOR_NAV: {
+    nonMarketing:
+      'marketing copy presentation; default off; does not change smart-link certification (JOV-7580)',
+  },
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
     nonMarketing: 'OAuth dynamic client registration kill switch',
   },
   CHATGPT_APP_DIRECTORY_MCP: {
     nonMarketing:
       'ChatGPT directory MCP kill switch; anonymous public artist reads; default off',
+  },
+  IN_HOUSE_RESOLVER: {
+    nonMarketing:
+      'legacy JOV-7323 umbrella rollback override for resolver families',
+  },
+  MUSICFETCH_FALLBACK: {
+    nonMarketing: 'reversible JOV-7323 MusicFetch vendor-off switch',
+  },
+  MUSIC_RESOLVER_PROVIDER_LINKS: {
+    nonMarketing: 'JOV-7323 provider-link resolver family cutover',
+  },
+  MUSIC_RESOLVER_RELEASE_FACTS: {
+    nonMarketing: 'JOV-7323 release-facts resolver family cutover',
+  },
+  AUTH_OFFER_SUMMARY: {
+    nonMarketing:
+      'auth offer recap; default off; no price, trial, or entitlement change',
+  },
+  SOCIAL_HTML_ISOLATED_PROVIDER: {
+    nonMarketing:
+      'internal ingestion routing kill switch; reserved for future isolated provider rollout',
+  },
+  INVESTOR_PORTAL_YC_DECK: {
+    nonMarketing:
+      'investor brief section order; default off until founder design approval',
   },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 

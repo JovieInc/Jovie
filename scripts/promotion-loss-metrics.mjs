@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { parseTrustedFailureStatus } from './merge-group-failure-hold.mjs';
 
 export const REPO = 'JovieInc/Jovie';
 const MINUTE_MS = 60_000;
@@ -104,6 +105,14 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
   const hours = (now - since) / UNITS.h;
   const opened = prs.filter(pr => inWindow(pr.createdAt, since, now));
   const merged = prs.filter(pr => inWindow(pr.mergedAt, since, now));
+  const queueEntries = prs.reduce(
+    (total, pr) =>
+      total +
+      (pr.events ?? []).filter(
+        event => event.type === 'added' && inWindow(event.at, since, now)
+      ).length,
+    0
+  );
   const closedUnmerged = opened.filter(
     pr => pr.state === 'CLOSED' && !pr.mergedAt
   );
@@ -114,6 +123,34 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
   }
   const multi = Object.entries(byKey).filter(([, count]) => count > 1);
   const mergeGroupRuns = runs.filter(run => run.event === 'merge_group');
+  const queueWait = openPrs
+    .filter(pr => pr.isInMergeQueue && pr.mergeQueueEntry?.enqueuedAt)
+    .map(pr =>
+      minutes(pr.mergeQueueEntry.enqueuedAt, new Date(now).toISOString())
+    )
+    .filter(value => Number.isFinite(value) && value >= 0);
+  const heldRevisions = prs
+    .map(pr => ({
+      number: pr.number,
+      receipts: Array.isArray(pr.failureReceipts) ? pr.failureReceipts : [],
+    }))
+    .filter(pr => pr.receipts.length > 0);
+  const deterministicFailureRecurrence = heldRevisions.reduce((total, pr) => {
+    if (
+      !pr.receipts.some(
+        receipt => receipt.classification === 'deterministic-source'
+      )
+    ) {
+      return total;
+    }
+    return (
+      total +
+      Math.max(
+        0,
+        Math.max(...pr.receipts.map(receipt => receipt.failureNumber)) - 1
+      )
+    );
+  }, 0);
   const minutesBy = event => {
     const timed = runs.filter(
       run => run.event === event && run.minutes != null
@@ -132,12 +169,19 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
       since: new Date(since).toISOString(),
       hours: Math.round(hours * 10) / 10,
     },
+    queueEntries,
+    queueEntriesPerMerge: merged.length
+      ? Math.round((queueEntries / merged.length) * 10) / 10
+      : null,
     firstPass: {
       rate: resolved ? Math.round((firstPass / resolved) * 1000) / 1000 : null,
       merged: firstPass,
       resolvedEntries: resolved,
     },
     ejections: {
+      rate: resolved
+        ? Math.round(((resolved - firstPass) / resolved) * 1000) / 1000
+        : null,
       byReason: removals,
       mergeGroupRuns: mergeGroupRuns.length,
       mergeGroupFailed: mergeGroupRuns.filter(
@@ -146,6 +190,8 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
       mergeGroupRunsPerMergedPr: merged.length
         ? Math.round((mergeGroupRuns.length / merged.length) * 100) / 100
         : null,
+      revisionFailureHolds: heldRevisions.length,
+      deterministicFailureRecurrence,
     },
     occupancy: {
       inQueue: openPrs.filter(pr => pr.isInMergeQueue).length,
@@ -155,6 +201,7 @@ export function computeMetrics({ prs, openPrs, queue, runs, since, now }) {
           !pr.isDraft && pr.mergeStateStatus === 'CLEAN' && !pr.isInMergeQueue
       ).length,
     },
+    queueWaitMinutes: stats(queueWait),
     reenqueueMinutes: { ...stats(reenqueue), pending: reenqueuePending },
     openToFirstEnqueueMinutes: stats(openToFirstEnqueue),
     lastEnqueueToMergedMinutes: stats(lastEnqueueToMerged),
@@ -211,8 +258,11 @@ export function renderMarkdown(m) {
     '|---|---|',
     `| Merge-group first-pass rate | ${pct} (${m.firstPass.merged}/${m.firstPass.resolvedEntries} entries) |`,
     `| Queue removals by reason | ${reasons} |`,
+    `| Queue entries / per merged PR | ${m.queueEntries} / ${fmt(m.queueEntriesPerMerge)} |`,
     `| merge_group CI runs (failed) / per merged PR | ${m.ejections.mergeGroupRuns} (${m.ejections.mergeGroupFailed}) / ${fmt(m.ejections.mergeGroupRunsPerMergedPr)} |`,
+    `| Revision failure holds / deterministic same-head recurrence | ${m.ejections.revisionFailureHolds} / ${m.ejections.deterministicFailureRecurrence} |`,
     `| Queue now: entries / max build · CLEAN PRs not queued | ${m.occupancy.inQueue} / ${fmt(m.occupancy.maxEntriesToBuild)} · ${m.occupancy.cleanNotQueued} |`,
+    `| Current queue wait min p50/p75 (n) | ${fmt(m.queueWaitMinutes.p50)} / ${fmt(m.queueWaitMinutes.p75)} (${m.queueWaitMinutes.n}) |`,
     `| Ejection → re-enqueue min p50/p75 (n, still waiting) | ${fmt(m.reenqueueMinutes.p50)} / ${fmt(m.reenqueueMinutes.p75)} (${m.reenqueueMinutes.n}, ${m.reenqueueMinutes.pending}) |`,
     `| Open → first enqueue min p50/p75 (n) | ${fmt(m.openToFirstEnqueueMinutes.p50)} / ${fmt(m.openToFirstEnqueueMinutes.p75)} (${m.openToFirstEnqueueMinutes.n}) |`,
     `| Last enqueue → merged min p50/p75 (n) | ${fmt(m.lastEnqueueToMergedMinutes.p50)} / ${fmt(m.lastEnqueueToMergedMinutes.p75)} (${m.lastEnqueueToMergedMinutes.n}) |`,
@@ -252,9 +302,12 @@ const QUEUE_EVENTS = `timelineItems(first: 100, itemTypes: [ADDED_TO_MERGE_QUEUE
   nodes { __typename
     ... on AddedToMergeQueueEvent { createdAt }
     ... on RemovedFromMergeQueueEvent { createdAt reason }
-    ... on MergedEvent { createdAt } } }`;
+    ... on MergedEvent { createdAt } } }
+  commits(last: 1) { nodes { commit { status { contexts {
+    context state description targetUrl creator { __typename login }
+  } } } } }`;
 
-function collect({ since, until, runnerMinutes }) {
+function collect({ since, until, runnerMinutes, autoscale }) {
   const [owner, name] = REPO.split('/');
   const iso = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
   const sinceIso = iso(since);
@@ -264,20 +317,29 @@ function collect({ since, until, runnerMinutes }) {
       nodes { ... on PullRequest { number title headRefName state createdAt mergedAt ${QUEUE_EVENTS} } } } }`,
     { q: `repo:${REPO} is:pr base:main updated:>=${sinceIso}` },
     data => data.search
-  ).map(pr => ({ ...pr, events: toEvents(pr.timelineItems.nodes) }));
+  ).map(pr => ({
+    ...pr,
+    events: toEvents(pr.timelineItems.nodes),
+    failureReceipts: (pr.commits?.nodes?.[0]?.commit?.status?.contexts ?? [])
+      .map(status => parseTrustedFailureStatus(status, REPO))
+      .filter(Boolean),
+  }));
   const openPrs = graphqlPages(
     `query($owner: String!, $name: String!, $cursor: String) { repository(owner: $owner, name: $name) {
       pullRequests(states: OPEN, baseRefName: "main", first: 100, after: $cursor) {
         pageInfo { hasNextPage endCursor }
-        nodes { number title body headRefName isDraft mergeStateStatus isInMergeQueue } } } }`,
+        nodes { number title body headRefName isDraft mergeStateStatus isInMergeQueue
+          mergeQueueEntry { enqueuedAt } } } } }`,
     { owner, name },
     data => data.repository.pullRequests
   );
-  const rules = JSON.parse(gh(['api', `repos/${REPO}/rules/branches/main`]));
+  const rules = autoscale
+    ? []
+    : JSON.parse(gh(['api', `repos/${REPO}/rules/branches/main`]));
   const queue =
     rules.find(rule => rule.type === 'merge_queue')?.parameters ?? {};
   const runs = [];
-  for (const event of ['merge_group', 'pull_request']) {
+  for (const event of autoscale ? [] : ['merge_group', 'pull_request']) {
     const pages = JSON.parse(
       gh([
         'api',
@@ -324,7 +386,12 @@ function main(argv) {
   if (Number.isNaN(now)) throw new Error('--until must be an ISO timestamp');
   const since = now - parseWindow(argv.includes('--since') ? sinceArg : '24h');
   const metrics = computeMetrics({
-    ...collect({ since, until: now, runnerMinutes: flag('--runner-minutes') }),
+    ...collect({
+      since,
+      until: now,
+      runnerMinutes: flag('--runner-minutes'),
+      autoscale: flag('--autoscale'),
+    }),
     since,
     now,
   });

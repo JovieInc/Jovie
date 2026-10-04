@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
@@ -38,11 +38,27 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+const sentry = vi.hoisted(() => ({
+  addBreadcrumb: vi.fn(),
+  captureMessage: vi.fn(),
+}));
+vi.mock('@sentry/nextjs', () => sentry);
+
 describe('musicfetch resilient client', () => {
+  afterEach(async () => {
+    const { resetMusicfetchDormantForTests } = await import(
+      '@/lib/music-resolver/musicfetch-gate'
+    );
+    resetMusicfetchDormantForTests();
+  });
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     token = 'test-token';
+    delete process.env.FEATURE_MUSICFETCH_FALLBACK;
+    delete process.env.FEATURE_MUSIC_RESOLVER_PROVIDER_LINKS;
+    delete process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS;
     mockGetRedis.mockReturnValue(null);
     mockLimit.mockResolvedValue({
       success: true,
@@ -184,6 +200,55 @@ describe('musicfetch resilient client', () => {
     expect(mockReserveMusicfetchBudget).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each([401, 403])(
+    'opens the circuit and does not retry MusicFetch HTTP %i',
+    async status => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status,
+        headers: { get: () => null },
+        text: async () =>
+          JSON.stringify({
+            error: { message: 'subscription not active' },
+          }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { musicfetchRequest, MusicfetchVendorUnavailableError } =
+        await import('@/lib/musicfetch/resilient-client');
+      const { musicfetchCircuitBreaker } = await import(
+        '@/lib/discography/musicfetch-circuit-breaker'
+      );
+      const { logger } = await import('@/lib/utils/logger');
+      const params = new URLSearchParams({
+        url: 'https://open.spotify.com/artist/1',
+      });
+
+      await expect(
+        musicfetchRequest('/url', params, { timeoutMs: 2000 })
+      ).rejects.toBeInstanceOf(MusicfetchVendorUnavailableError);
+      await expect(
+        musicfetchRequest('/url', params, { timeoutMs: 2000 })
+      ).rejects.toMatchObject({
+        failureClass: 'vendor_unavailable',
+        vendorUnavailable: true,
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(mockReserveMusicfetchBudget).toHaveBeenCalledTimes(1);
+      expect(musicfetchCircuitBreaker.getState()).toBe('OPEN');
+      expect(logger.warn).toHaveBeenCalledTimes(status === 401 ? 1 : 0);
+      expect(sentry.captureMessage).not.toHaveBeenCalled();
+      expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+      expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'info',
+          message: expect.stringContaining('CLOSED -> OPEN'),
+        })
+      );
+    }
+  );
 
   it('preserves API error details on non-retryable HTTP failures', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
@@ -402,5 +467,85 @@ describe('musicfetch resilient client', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('does not call MusicFetch again after a 401 subscription failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: { get: () => null },
+      text: async () =>
+        JSON.stringify({ error: { message: 'subscription not active' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { musicfetchRequest } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    const { musicfetchDormantReason, musicfetchRemediation } = await import(
+      '@/lib/music-resolver/musicfetch-gate'
+    );
+
+    await expect(
+      musicfetchRequest(
+        '/url',
+        new URLSearchParams({ url: 'https://open.spotify.com/track/1' }),
+        { timeoutMs: 2000 }
+      )
+    ).rejects.toThrow(/subscription not active/);
+
+    await expect(
+      musicfetchRequest(
+        '/url',
+        new URLSearchParams({ url: 'https://open.spotify.com/track/2' }),
+        { timeoutMs: 2000 }
+      )
+    ).rejects.toThrow(/remediation:musicfetch-subscription-inactive/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(musicfetchDormantReason()).toBe('subscription_inactive');
+    expect(musicfetchRemediation('subscription_inactive')).toEqual({
+      fingerprint: 'remediation:musicfetch-subscription-inactive',
+      issue: 'JOV-7323',
+      renewal: false,
+    });
+  });
+
+  it('does not call MusicFetch when the token is missing', async () => {
+    token = undefined;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { musicfetchRequest } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+    await expect(
+      musicfetchRequest(
+        '/isrc',
+        new URLSearchParams({ isrc: 'USUM72212345' }),
+        {
+          timeoutMs: 2000,
+        }
+      )
+    ).rejects.toThrow(/remediation:musicfetch-missing-token JOV-7323/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not call MusicFetch when the vendor fallback switch is off', async () => {
+    process.env.FEATURE_MUSICFETCH_FALLBACK = 'false';
+    process.env.FEATURE_MUSIC_RESOLVER_PROVIDER_LINKS = 'true';
+    process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS = 'true';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { musicfetchRequest, MusicfetchVendorUnavailableError } =
+      await import('@/lib/musicfetch/resilient-client');
+
+    await expect(
+      musicfetchRequest(
+        '/isrc',
+        new URLSearchParams({ isrc: 'USUM72212345' }),
+        { timeoutMs: 2000 }
+      )
+    ).rejects.toBeInstanceOf(MusicfetchVendorUnavailableError);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockReserveMusicfetchBudget).not.toHaveBeenCalled();
   });
 });

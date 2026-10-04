@@ -23,3 +23,24 @@ export const Sized: Story = {
     size: 32,
   },
 };
+
+/** JOV-7207: the mirrored rail-toggle family at its real 14px and 16px sizes. */
+export const RailFamily: Story = {
+  render: () => (
+    <div className='flex items-center gap-4 text-primary-token'>
+      {(
+        [
+          'RailLeftClosed',
+          'RailLeftOpen',
+          'RailRightClosed',
+          'RailRightOpen',
+        ] as const
+      ).map(name => (
+        <span key={name} className='flex items-center gap-1.5'>
+          <Icon name={name} size={14} />
+          <Icon name={name} size={16} />
+        </span>
+      ))}
+    </div>
+  ),
+};

@@ -16,7 +16,7 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Opportunity Inbox', () => {
-  test('authenticated home renders the inbox surface', async ({ page }) => {
+  test('authenticated home renders the opportunity queue', async ({ page }) => {
     await setTestAuthBypassSession(page, 'creator-ready');
     await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
       waitUntil: 'domcontentloaded',
@@ -26,7 +26,7 @@ test.describe('Opportunity Inbox', () => {
       timeout: 30_000,
     });
     await expect(
-      page.getByRole('heading', { name: 'Inbox', exact: true })
+      page.getByRole('heading', { name: 'Home', exact: true })
     ).toBeVisible();
 
     const feed = page.getByTestId('opportunity-inbox-feed');

@@ -19,6 +19,7 @@ import {
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
+import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import { getRedis } from '@/lib/redis';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -69,6 +70,7 @@ const profileSelectColumns = {
   genres: creatorProfiles.genres,
   location: creatorProfiles.location,
   activeSinceYear: creatorProfiles.activeSinceYear,
+  spotifyFollowers: creatorProfiles.spotifyFollowers,
   spotifyPopularity: creatorProfiles.spotifyPopularity,
   createdAt: creatorProfiles.createdAt,
   updatedAt: creatorProfiles.updatedAt,
@@ -517,6 +519,7 @@ function buildProfileFallbackDefaults(
     genres: [],
     location: null,
     activeSinceYear: null,
+    spotifyFollowers: null,
     spotifyPopularity: null,
     userIsPro: false,
     userClerkId: null,
@@ -648,6 +651,12 @@ async function fetchProfileFromDatabase(
 
   return {
     ...profile,
+    // Ingested pages stored scraped tab titles as names ("x | Instagram,
+    // Facebook"); an unclaimed page shows the clean name (JOV-7753). A
+    // claimed owner's own name is never rewritten.
+    displayName: profile.isClaimed
+      ? profile.displayName
+      : (cleanScrapedDisplayName(profile.displayName) ?? profile.displayName),
     socialLinks: linksResult,
     contacts: contactsResult,
     latestRelease,

@@ -242,6 +242,8 @@ export function inboxDecisionRequest(
         },
       };
     case 'design':
+      if (decision === 'modify')
+        throw new Error('Reject with notes to request changes.');
       return {
         url: `/api/admin/design-lab/proposals/${encodeURIComponent(target.id)}/review`,
         body: {

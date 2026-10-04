@@ -113,6 +113,15 @@ export {
   type Tip,
   tips,
 } from './analytics';
+// Artist daily public-metric snapshots (append-only)
+export {
+  ARTIST_DAILY_SNAPSHOT_SOURCES,
+  type ArtistDailySnapshot,
+  type ArtistDailySnapshotProvenance,
+  type ArtistDailySnapshotSource,
+  artistDailySnapshots,
+  type NewArtistDailySnapshot,
+} from './artist-daily-snapshots';
 // Audit (Ingest Audit Logs)
 export {
   type IngestAuditLog,
@@ -1451,6 +1460,26 @@ export {
   selectAppleWalletPassRegistrationSchema,
   selectAppleWalletProfilePassSchema,
 } from './wallet';
+// Generic Identity ↔ Work facade over the music-specific content tables
+// (JOV-7631; physical renames land with JOV-7323)
+export {
+  type NewWork,
+  type NewWorkCredit,
+  type NewWorkItem,
+  type NewWorkItemCredit,
+  type NewWorkItemPlacement,
+  type Work,
+  type WorkCredit,
+  type WorkCreditRole,
+  type WorkItem,
+  type WorkItemCredit,
+  type WorkItemPlacement,
+  workCredits,
+  workItemCredits,
+  workItemPlacements,
+  workItems,
+  works,
+} from './works';
 // YouTube Video Library (channel video sync, metrics, thumbnail history, ISRC links — JOV-5136)
 export {
   insertYoutubeThumbnailVersionSchema,

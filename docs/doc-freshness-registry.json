@@ -59,7 +59,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -161,23 +161,23 @@
     ".claude/rules/linear.md": {
       "owner": "@itstimwhite",
       "claim": "Issue closure behavior is implemented by the existing merge synchronizer.",
-      "documentSha256": "1a49d7bbec185a719ec356a4ccf27bb7661a6032557d0c901cd21acec2fd4bbf",
+      "documentSha256": "5629444b1fb60b0e65e72a548df9d444ebcd633605fdd66d1a2d6018fcff43a6",
       "sources": [
         {
           "path": "scripts/lib/linear-sync-on-merge.mjs",
-          "sha256": "ee9ddb6898c98f75b426ba4bff01bde9fe8d95916b2f88b428d5b6633ecad64e"
+          "sha256": "8a091bc6d861054228f3a042f60eb2fa437a4e2821d1497530ef1a2c5fd83cdc"
         }
       ]
     },
     ".claude/rules/macos.md": {
       "owner": "@itstimwhite",
       "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
-      "documentSha256": "9cc005256ec7213695b5bee957165489f0f273249b4f3dff2b9a894eb956a4e6",
+      "documentSha256": "3e478342371997f9537a7194222b21221735e6ea564eee3651fb3dd9319945f9",
       "sources": [
         {
           "path": "docs/macos/swift-control-invariants.md",
           "section": "## Current Mac stack",
-          "sha256": "4734e9584f58bf5354e64b117b69cc74fd5f037d8ab4b7a059db9a37f153d6f4"
+          "sha256": "5c14a12977081c02bc0e7f8e6e8ca8fc9725cb20c9e604827324398d2cafdae6"
         },
         {
           "path": "docs/macos/ADR-swift-native-mac.md",
@@ -216,7 +216,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -224,7 +224,7 @@
     ".claude/rules/release.md": {
       "owner": "@itstimwhite",
       "claim": "Draft publication and exact-head qualification are separate canonical phases.",
-      "documentSha256": "543f67bef47e2aa7d757759145aa530ea82072c65b383480075cf83bec6dd20c",
+      "documentSha256": "650a00c3a586814b757200e8b62652b33975f6602f88e393f6ba8e8d6dd4633b",
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
@@ -251,7 +251,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR → `main`",
+          "section": "## 1. Unit of work: one small PR \u2192 `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -339,7 +339,7 @@
     "CLAUDE.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router implements the company constitution without replacing it.",
-      "documentSha256": "1b75c23c85e8d0b7431ff336dfa6211d9ef2f5e49649963530500ff0081222ec",
+      "documentSha256": "8a34aa0ffe385bdc1ee2872e0f6a22df21d6a860dfcb224d2c150e951e7dcafa",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
@@ -399,7 +399,7 @@
     "docs/AI_AGENT_GUIDE.md": {
       "owner": "@itstimwhite",
       "claim": "API inventory uses Better Auth per the canonical auth rule; inventories are not runtime certification.",
-      "documentSha256": "a72ff588f03a09c0abe10824f09192d5865f2b087f697ba8d0355397c1ed436e",
+      "documentSha256": "cf9dea440ef7f8f4e391d687226c3e4f72bd940933fc72feb4bec584e46a0f1c",
       "sources": [
         {
           "path": ".claude/rules/auth.md",

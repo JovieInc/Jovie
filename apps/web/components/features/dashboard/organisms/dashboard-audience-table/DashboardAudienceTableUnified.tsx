@@ -15,6 +15,8 @@ import {
   convertToCommonDropdownItems,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { columnPrioritySpecsFromDefs } from '@/components/organisms/table/column-priority';
+import { useColumnPriorityLayout } from '@/components/organisms/table/hooks/useColumnPriorityLayout';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import {
@@ -54,9 +56,8 @@ import { buildAudienceActions } from './audience-actions';
 import { NowMsProvider } from './cells';
 import {
   AUDIENCE_TABLE_CONTAINER_CLASS,
+  audienceTableMinWidthForLayout,
   buildAudienceMemberColumns,
-  getAudienceColumnVisibility,
-  getAudienceTableMinWidth,
 } from './table-config';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
@@ -210,70 +211,6 @@ export const DashboardAudienceTableUnified = memo(
 
     const [desktopTableNode, setDesktopTableNode] =
       React.useState<HTMLDivElement | null>(null);
-    // Initialize to "wide" tier so SSR + first paint show ALL columns.
-    // Otherwise SSR renders with progressive hiding active, and the row
-    // memoization prevents restoring hidden cells once ResizeObserver
-    // measures the real width on a wide screen.
-    const [desktopTableWidth, setDesktopTableWidth] =
-      React.useState<number>(1280);
-
-    React.useEffect(() => {
-      const node = desktopTableNode;
-      if (!node) {
-        return;
-      }
-
-      const updateWidth = (nextWidth?: number) => {
-        const measuredWidth = nextWidth ?? node.getBoundingClientRect().width;
-
-        setDesktopTableWidth(currentWidth =>
-          currentWidth === measuredWidth ? currentWidth : measuredWidth
-        );
-      };
-
-      updateWidth();
-
-      if (typeof ResizeObserver !== 'function') {
-        const handleResize = () => updateWidth();
-        globalThis.addEventListener('resize', handleResize);
-        return () => {
-          globalThis.removeEventListener('resize', handleResize);
-        };
-      }
-
-      const resizeObserver = new ResizeObserver(entries => {
-        updateWidth(entries[0]?.contentRect.width);
-      });
-
-      resizeObserver.observe(node);
-
-      return () => {
-        resizeObserver.disconnect();
-      };
-    }, [desktopTableNode]);
-
-    const columnVisibility = React.useMemo(
-      () => getAudienceColumnVisibility(desktopTableWidth),
-      [desktopTableWidth]
-    );
-
-    const hiddenMetadataColumns = React.useMemo(
-      () => ({
-        location: false,
-        source: false,
-        engagement: columnVisibility.engagement === false,
-        lastSeen: columnVisibility.last === false,
-      }),
-      [columnVisibility]
-    );
-
-    const hasMetadataSubtitle =
-      hiddenMetadataColumns.engagement || hiddenMetadataColumns.lastSeen;
-
-    const tableMinWidth = React.useMemo(
-      () => `${getAudienceTableMinWidth(desktopTableWidth)}px`,
-      [desktopTableWidth]
-    );
 
     // Bridge URL sort state ↔ TanStack SortingState
     const sorting: SortingState = useMemo(() => {
@@ -632,6 +569,30 @@ export const DashboardAudienceTableUnified = memo(
     );
 
     const columns = useMemo(() => buildAudienceMemberColumns(mode), [mode]);
+    const prioritySpecs = useMemo(
+      () => columnPrioritySpecsFromDefs(columns),
+      [columns]
+    );
+    // Wide initial width matches the old first paint: memoized rows keep every
+    // cell until ResizeObserver reports a real container width.
+    const columnLayout = useColumnPriorityLayout(
+      prioritySpecs,
+      desktopTableNode,
+      { initialWidth: 1280 }
+    );
+    const columnVisibility = columnLayout.visibility;
+    const hiddenMetadataColumns = useMemo(
+      () => ({
+        location: false,
+        source: false,
+        engagement: columnVisibility.engagement === false,
+        lastSeen: columnVisibility.last === false,
+      }),
+      [columnVisibility]
+    );
+    const hasMetadataSubtitle =
+      hiddenMetadataColumns.engagement || hiddenMetadataColumns.lastSeen;
+    const tableMinWidth = `${audienceTableMinWidthForLayout(columnLayout)}px`;
 
     // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
     const stableContextValue = useMemo(

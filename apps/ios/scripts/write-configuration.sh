@@ -11,6 +11,10 @@ SENTRY_DSN="${JOVIE_IOS_SENTRY_DSN:-${NEXT_PUBLIC_SENTRY_DSN_DEV:-${NEXT_PUBLIC_
 OBSERVABILITY_ENVIRONMENT="${JOVIE_IOS_OBSERVABILITY_ENVIRONMENT:-${OBSERVABILITY_ENVIRONMENT:-${SENTRY_ENVIRONMENT:-development}}}"
 OBSERVABILITY_INGEST_URL="${JOVIE_IOS_OBSERVABILITY_INGEST_URL:-${OBSERVABILITY_INGEST_URL:-}}"
 OBSERVABILITY_INGEST_SECRET="${JOVIE_IOS_OBSERVABILITY_INGEST_SECRET:-${OBSERVABILITY_INGEST_SECRET:-}}"
+# Release provenance: the exact commit baked into this artifact. TestFlight
+# builds resolve it to the authorized release SHA via the checkout; local builds
+# fall back to the worktree HEAD. Empty when no commit can be resolved.
+GIT_COMMIT="${JOVIE_IOS_COMMIT_SHA:-$(git -C "$IOS_DIR" rev-parse HEAD 2>/dev/null || true)}"
 mkdir -p "$(dirname "$TARGET_PLIST")"
 
 # ponytail: use /usr/bin/plutil (always present on macOS) instead of python3 to
@@ -23,5 +27,6 @@ mkdir -p "$(dirname "$TARGET_PLIST")"
 /usr/bin/plutil -insert ObservabilityEnvironment -string "$OBSERVABILITY_ENVIRONMENT" "$TARGET_PLIST"
 /usr/bin/plutil -insert ObservabilityIngestUrl -string "$OBSERVABILITY_INGEST_URL" "$TARGET_PLIST"
 /usr/bin/plutil -insert ObservabilityIngestSecret -string "$OBSERVABILITY_INGEST_SECRET" "$TARGET_PLIST"
+/usr/bin/plutil -insert GitCommit                -string "$GIT_COMMIT"                "$TARGET_PLIST"
 
 echo "Wrote $TARGET_PLIST"

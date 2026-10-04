@@ -54,6 +54,16 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_design_brief_held_past_24h_alerts(self):
+        alerts = doctor.judge(obs(designGate={"stale": ["JOV-3"]}))
+        self.assertIn("JOV-3", alerts["design-brief-stale"])
+        self.assertEqual(doctor.judge(obs(designGate={"stale": []})), {})
+
+    def test_escalation_alert_names_the_pr_and_class(self):
+        alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
+        self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
+        self.assertEqual(doctor.judge(obs(escalation={"surfaced": []})), {})
+
     def test_each_rule_names_its_cause(self):
         alerts = doctor.judge(obs(
             tick={"at": "x", "unhealthy": ["devin"], "error": "Boom"},
@@ -132,6 +142,17 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("codex-broken", doctor.judge(obs(codex={"error": "no codex", "accounts": {}, "available": []})))
         self.assertNotIn("hud-stale", doctor.judge(obs(hudExpected=False, hudBeatAge=None)))
 
+    def test_sustained_merge_queue_brake_files_only_after_one_interval(self):
+        signal = {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6,
+                  "openedPerHour": 31, "ejectionRate": 0.55}
+        brake = {"active": True, "heldForS": 1800, "intervalS": 1800, "signal": signal}
+        self.assertNotIn("bottleneck:merge-queue", doctor.judge(obs(autoscale={"throughputBrake": brake})))
+        alert = doctor.judge(obs(autoscale={"throughputBrake": {**brake, "heldForS": 1801}}))[
+            "bottleneck:merge-queue"]
+        self.assertIn("30", alert)
+        self.assertIn("6 merged/h vs 31 opened/h", alert)
+        self.assertIn("ejection rate 0.55", alert)
+
 
 class FakeTracker:
     def __init__(self):
@@ -141,10 +162,10 @@ class FakeTracker:
         self.opened.append((key, text))
         return f"id-{key}"
 
-    def reopen(self, issue_id, text):
+    def reopen(self, issue_id, text, key=None):
         self.reopened.append((issue_id, text))
 
-    def close(self, issue_id):
+    def close(self, issue_id, key=None):
         self.closed.append(issue_id)
 
     def contradict_invariant(self, event):
@@ -232,14 +253,23 @@ class ReconcileTest(unittest.TestCase):
                 self.calls = []
 
             def gql(self, query, variables):
-                self.calls.append(query)
+                self.calls.append((query, variables))
                 if "title:{eq:$t}" in query:
                     return {"issues": {"nodes": [{"id": "existing-1"}]}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}, {
+                            "id": "disk", "name": "remediation:disk-low"}]}}]}}
+                if "issueAddLabel" in query:
+                    return {"issueAddLabel": {"success": True}}
                 raise AssertionError("must not create when one exists")
         linear = FakeLinear()
         tracker = doctor.Tracker(linear, "gem")
         self.assertEqual(tracker.title("disk-low"), "Symphony doctor: disk-low (gem)")
         self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
+        added = [variables for query, variables in linear.calls if "issueAddLabel" in query]
+        self.assertEqual(added, [{"id": "existing-1", "l": "disk"}])
 
     def test_idle_codex_alert_opens_as_urgent(self):
         captured = []
@@ -251,12 +281,120 @@ class ReconcileTest(unittest.TestCase):
                 if "teams(filter" in query:
                     return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
                         "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
-                            "id": "symphony", "name": "symphony"}]}}]}}
+                            "id": "symphony", "name": "symphony"}, {
+                            "id": "idle", "name": "remediation:provider-idle-codex"}]}}]}}
                 captured.append(variables["i"])
                 return {"issueCreate": {"issue": {"id": "urgent", "identifier": "JOV-1"}}}
 
         self.assertEqual(doctor.Tracker(FakeLinear(), "gem").open("provider-idle:codex", "idle"), "urgent")
         self.assertEqual(captured[0]["priority"], 1)
+        self.assertEqual(captured[0]["labelIds"], ["symphony", "idle"])
+
+    def test_alert_label_is_created_on_open_reopen_and_close(self):
+        created = []
+        added = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}]}}]}}
+                if "issueLabelCreate" in query:
+                    created.append(variables["i"])
+                    return {"issueLabelCreate": {"issueLabel": {"id": "new-label", "name": variables["i"]["name"]}}}
+                if "issueAddLabel" in query:
+                    added.append(variables)
+                    return {"issueAddLabel": {"success": True}}
+                if "issueCreate" in query:
+                    return {"issueCreate": {"issue": {"id": "iss-1", "identifier": "JOV-1"}}}
+                raise AssertionError(query)
+
+            def move(self, issue_id, state):
+                return None
+
+            def comment(self, issue_id, text):
+                return None
+
+        tracker = doctor.Tracker(FakeLinear(), "gem")
+        self.assertEqual(tracker.open("provider-down:codex", "down"), "iss-1")
+        self.assertEqual(created, [{
+            "teamId": "team", "name": "remediation:provider-down-codex", "color": "#E5484D"}])
+        tracker.reopen("iss-1", "again", "provider-down:codex")
+        tracker.close("iss-1", "provider-down:codex")
+        self.assertEqual([row["l"] for row in added], ["new-label", "new-label"])
+        self.assertEqual(doctor.remediation.alert_key_slug("provider-down:codex"), "provider-down-codex")
+        self.assertEqual(doctor.remediation.remediation_label_for_alert("provider-down:codex"),
+                         "remediation:provider-down-codex")
+        self.assertIsNone(doctor.remediation.alert_key_slug("---"))
+        os.environ["LANES_ESCALATION"] = "0"
+        try:
+            quiet = []
+
+            class OffLinear(FakeLinear):
+                def gql(self, query, variables):
+                    if "issueLabelCreate" in query or "issueAddLabel" in query:
+                        quiet.append(query)
+                    return super().gql(query, variables)
+
+            off = doctor.Tracker(OffLinear(), "gem")
+            self.assertEqual(off.open("disk-low", "low"), "iss-1")
+            off.reopen("iss-1", "again", "disk-low")
+            off.close("iss-1", "disk-low")
+            self.assertEqual(quiet, [])
+        finally:
+            os.environ.pop("LANES_ESCALATION", None)
+
+    def test_merge_queue_remediation_reopens_the_deduplicated_issue(self):
+        class FakeLinear:
+            def __init__(self):
+                self.moves, self.comments = [], []
+
+            def gql(self, query, variables):
+                self.query, self.variables = query, variables
+                return {"issues": {"nodes": [{"id": "remediation", "state": {"type": "completed"}}]}}
+
+            def move(self, issue_id, state):
+                self.moves.append((issue_id, state))
+
+            def comment(self, issue_id, text):
+                self.comments.append((issue_id, text))
+
+        linear = FakeLinear()
+        tracker = doctor.Tracker(linear, "gem")
+        self.assertEqual(tracker.title("bottleneck:merge-queue"),
+                         "remediation:symphony-bottleneck-merge-queue")
+        self.assertEqual(tracker.open("bottleneck:merge-queue", "queue stalled"), "remediation")
+        self.assertEqual(linear.moves, [("remediation", "Triage")])
+        self.assertIn("fired again", linear.comments[0][1])
+
+    def test_reopened_merge_queue_owner_survives_notification_failure_without_duplicate(self):
+        class FakeLinear:
+            def __init__(self):
+                self.moves, self.creates = [], []
+
+            def gql(self, query, variables):
+                if "issueCreate" in query:
+                    self.creates.append(variables)
+                    return {"issueCreate": {"issue": {"id": "duplicate"}}}
+                return {"issues": {"nodes": [{"id": "remediation", "state": {"type": "completed"}}]}}
+
+            def move(self, issue_id, state):
+                self.moves.append((issue_id, state))
+
+            def comment(self, issue_id, text):
+                raise RuntimeError("notification unavailable")
+
+        linear = FakeLinear()
+        tracker = doctor.Tracker(linear, "gem")
+        with mock.patch.object(tracker, "apply_alert_label"), mock.patch.object(tracker, "_team", return_value={
+            "id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]}, "labels": {"nodes": []},
+        }), mock.patch.object(tracker, "_remediation_label_id", return_value=None):
+            self.assertEqual(tracker.open("bottleneck:merge-queue", "queue stalled"), "remediation")
+        self.assertEqual(linear.moves, [("remediation", "Triage")])
+        self.assertEqual(linear.creates, [])
 
     def test_new_condition_generation_reopens_completed_liveness_owner(self):
         class FakeLinear:
@@ -280,6 +418,42 @@ class ReconcileTest(unittest.TestCase):
         doctor.Tracker(linear, "gem").contradict_invariant(event)
         self.assertEqual(linear.moves, [("owner", "Triage")])
         self.assertIn("gem:provider-idle:devin:2", linear.comments[0][1])
+
+
+class MergeThroughputSampleTest(unittest.TestCase):
+    def test_samples_the_five_signals_and_uses_the_bounded_cache(self):
+        metrics = {
+            "window": {"hours": 1},
+            "occupancy": {"inQueue": 30},
+            "queueWaitMinutes": {"p50": 38},
+            "intake": {"mergesPerHour": 6, "opensPerHour": 31},
+            "ejections": {"rate": 0.55},
+        }
+        calls = []
+
+        def succeed(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout=json.dumps(metrics), stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            sampled, error = doctor.sample_merge_throughput(state, 1000.0, run=succeed)
+            self.assertIsNone(error)
+            self.assertEqual(
+                {key: sampled[key] for key in ("queueDepth", "queueWaitP50Minutes", "mergedPerHour",
+                                                "openedPerHour", "ejectionRate")},
+                {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6,
+                 "openedPerHour": 31, "ejectionRate": 0.55})
+            cached, error = doctor.sample_merge_throughput(
+                state, 1100.0, run=lambda *_args, **_kwargs: self.fail("fresh cache must avoid GitHub reads"))
+            self.assertEqual(cached, sampled)
+            self.assertIsNone(error)
+            stale, error = doctor.sample_merge_throughput(
+                state, 1301.0,
+                run=lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="GitHub down"))
+            self.assertEqual(stale, sampled)
+            self.assertIn("GitHub down", error)
+        self.assertIn("--autoscale", calls[0])
 
 
 class OrphanPrTest(unittest.TestCase):
@@ -317,6 +491,21 @@ class AgedPrTest(unittest.TestCase):
 
 
 class StatusFeedTest(unittest.TestCase):
+    def test_incomplete_merge_evidence_suppresses_landed_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp))
+            lane = SimpleNamespace(HOST="gem", provider_throughput=lambda *a, **kw: {
+                "providers": {"devin": {"landedOutput": 0, "issueToMergeSecondsP50": 0}},
+                "landedByAttribution": {}, "landedByOrigin": {}})
+            evidence = {"complete": False, "reason": "unstable_snapshot"}
+            feed = doctor.status_feed(host, lane, obs(mergedAttributionError="merged-pr-evidence:unstable_snapshot",
+                                                      mergedWindow=evidence), {}, {})
+        self.assertIsNone(feed["throughput"]["providers"]["devin"]["landedOutput"])
+        self.assertIsNone(feed["throughput"]["providers"]["devin"]["issueToMergeSecondsP50"])
+        self.assertIsNone(feed["throughput"]["landedByOrigin"])
+        self.assertIsNone(feed["throughput"]["landedByAttribution"])
+        self.assertEqual(feed["mergedWindow"], evidence)
+
     def test_feed_counts_running_and_idle_slots_per_lane(self):
         import fcntl
         with tempfile.TemporaryDirectory() as tmp:
@@ -409,6 +598,20 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
         self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
 
+    def test_terminal_pr_backlog_is_its_own_idle_reason(self):
+        """JOV-7514: parked hold/exhausted PRs must not be reported as the active open-PR cap."""
+        host = type("Host", (), {"state": Path("/tmp")})()
+        lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+        seats = {"codex": {"running": 0, "slots": 3}}
+        parked = doctor.status_feed(host, lane, obs(
+            capacityByProvider=seats,
+            newIssueBudgetByProvider={"codex": {"reason": "terminal-pr-backlog"}}), {}, {})
+        active = doctor.status_feed(host, lane, obs(
+            capacityByProvider=seats,
+            newIssueBudgetByProvider={"codex": {"reason": "over-budget"}}), {}, {})
+        self.assertEqual(parked["throughput"]["providers"]["codex"]["idleReason"], "terminal-pr-backlog")
+        self.assertEqual(active["throughput"]["providers"]["codex"]["idleReason"], "open-pr-budget")
+
 
 
 class RunnablePoolTest(unittest.TestCase):
@@ -496,8 +699,8 @@ class RunnablePoolTest(unittest.TestCase):
                 with mock.patch.object(lane, "load_providers", return_value=providers), \
                         mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
                     capacity = doctor.host_capacity(lane.Host(state=state), lane)
-                self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0},
-                    "codex": {"slots": 0, "running": 1}, "claude": {"slots": 0, "running": 0}})
+                self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0, "base": 4},
+                    "codex": {"slots": 0, "running": 1, "base": 0}, "claude": {"slots": 0, "running": 0, "base": 0}})
                 feed_lane = SimpleNamespace(HOST="mac", provider_throughput=throughput_stub)
                 feed = doctor.status_feed(SimpleNamespace(state=state), feed_lane,
                                           obs(capacityByProvider=capacity), {}, {})
@@ -614,7 +817,7 @@ class AccountAttributionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "none")
             lane = SimpleNamespace(HOST="test", load_providers=lambda: {}, load_github_env=lambda: None,
-                                   graphql_budget=lambda: None, Linear=mock.Mock(side_effect=OSError("no Linear")))
+                                   graphql_budget=lambda: None, Linear=mock.Mock(side_effect=SystemExit("LINEAR_API_KEY missing")))
             for generated, expected in [(1001, "leases-occupied"), (1002, "unknown")]:
                 report = {"generatedAt": doctor.epoch_iso(generated), "count": 1,
                           "accounts": {"a": {"available": True, "leased": True}}}
@@ -622,6 +825,8 @@ class AccountAttributionTest(unittest.TestCase):
                         mock.patch.object(doctor.time, "time", side_effect=[1000.9, 1001.2]):
                     observation = doctor.observe(host, lane, SimpleNamespace(status=lambda: report))
                 self.assertEqual(observation["codexAttribution"]["state"], expected)
+                self.assertIsNone(observation["pool"])
+                self.assertIn("SystemExit: LINEAR_API_KEY missing", observation["linearError"])
 
 
 class AdmissionBackpressureTest(unittest.TestCase):
@@ -703,17 +908,202 @@ class RunTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "test"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {"count": 0, "available": [], "accounts": {}})})
             tracker = FakeTracker()
-            os.environ["LANES_SELFTEST"] = "1"  # no gist from a unit test
-            try:
+            # No gist from a unit test, and the host's own overlap-guard knob (a lane host may run
+            # SYMPHONY_FILE_OVERLAP_GUARD=flag) must not leak into the release self-test.
+            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+                os.environ.pop("SYMPHONY_FILE_OVERLAP_GUARD", None)
                 result = doctor.run(host, lane, codex, tracker)
-            finally:
-                os.environ.pop("LANES_SELFTEST", None)
             self.assertIn("provider-down:devin", result["alerts"])
             self.assertIn("linear-down", result["alerts"])
+            self.assertEqual(result["eventsOpen"], 0)
+            self.assertEqual(result["eventsClaimed"], 0)
+            self.assertEqual(result["eventsHuman"], 0)
+            self.assertEqual(result["eventsExhausted"], 0)
+            self.assertEqual(result["byFingerprint"], {})
             written = json.loads((state / "doctor.json").read_text())
             self.assertEqual(set(written["alerts"]) >= {"provider-down:devin", "linear-down"}, True)
             self.assertEqual(written["conditions"]["linear-down"]["source"]["status"], "unknown")
+            self.assertEqual(written["fileOverlap"]["mode"], "enforce")
+            self.assertEqual(written["fileOverlap"]["pairs"], [])
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
+
+
+class DoctorLockTest(unittest.TestCase):
+    def test_flock_failure_closes_the_lock_fd_and_still_writes(self):
+        import fcntl
+        state = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(state, ignore_errors=True))
+        opened = []
+        real_open = open
+
+        def tracking_open(file, mode="r", *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if str(file).endswith("doctor.lock"):
+                opened.append(handle)
+            return handle
+
+        def fail_lock(handle, operation):
+            raise OSError("flock failed")
+
+        wrote = []
+        with mock.patch("builtins.open", tracking_open), mock.patch.object(fcntl, "flock", fail_lock):
+            doctor.locked_doctor_write(state, lambda: wrote.append("ok"))
+        self.assertEqual(wrote, ["ok"])
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(opened[0].closed)
+
+
+class MergeWindowTest(unittest.TestCase):
+    NOW = 1_800_000_000
+
+    def row(self, number, age):
+        return {"number": number, "title": "repair", "headRefName": "codex/jov-1",
+                "baseRefName": "main", "createdAt": doctor.epoch_iso(self.NOW - 10000),
+                "mergedAt": doctor.epoch_iso(self.NOW - age),
+                "updatedAt": doctor.epoch_iso(self.NOW - age)}
+
+    def pages(self, rows):
+        def fetch(cursor):
+            start = int(cursor or 0)
+            end = min(start + 100, len(rows))
+            return {"totalCount": len(rows), "nodes": rows[start:end],
+                    "pageInfo": {"hasNextPage": end < len(rows), "endCursor": str(end)}}
+        return fetch
+
+    def collect(self, fetch, **options):
+        return doctor.merge_evidence.collect("JovieInc/Jovie", self.NOW - 200, self.NOW,
+                                             fetch_page=fetch, **options)
+
+    def test_more_than_100_and_exact_half_open_boundaries(self):
+        rows = [self.row(i + 1, i) for i in range(206)]
+        result = self.collect(self.pages(rows))
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["pages"], 6)
+        self.assertEqual(result["scans"], 2)
+        self.assertEqual([r["number"] for r in result["prs"]], list(range(2, 202)))
+
+    def test_old_merge_updated_recently_does_not_count(self):
+        old = self.row(1, 300)
+        old["updatedAt"] = doctor.epoch_iso(self.NOW)
+        result = self.collect(self.pages([old, self.row(2, 1)]))
+        self.assertEqual([r["number"] for r in result["prs"]], [2])
+
+    def test_second_scan_detects_equal_count_changed_membership(self):
+        rounds = 0
+        def fetch(cursor):
+            nonlocal rounds
+            rounds += 1
+            return self.pages([self.row(rounds, 1)])(cursor)
+        result = self.collect(fetch)
+        self.assertEqual(result["reason"], "unstable_snapshot")
+        self.assertEqual(result["prs"], [])
+
+    def test_typed_incomplete_for_corrupt_or_partial_pages(self):
+        good = self.pages([self.row(1, 1)])(None)
+        cases = [
+            (None, "malformed_page"),
+            ({**good, "totalCount": True}, "malformed_page"),
+            ({**good, "totalCount": 2}, "result_count_mismatch"),
+            ({**good, "totalCount": 0}, "result_count_mismatch"),
+            ({**good, "nodes": [{**good["nodes"][0], "mergedAt": "bad"}]}, "malformed_pr"),
+            ({**good, "nodes": [{**good["nodes"][0], "number": True}]}, "malformed_pr"),
+            ({**good, "nodes": [self.row(1, 2), self.row(2, 1)]}, "unstable_page_order"),
+            ({**good, "totalCount": 2, "nodes": [self.row(1, 1), self.row(1, 1)]}, "duplicate_pr"),
+            ({**good, "pageInfo": {"hasNextPage": False}}, "malformed_page"),
+            ({**good, "pageInfo": {"hasNextPage": True, "endCursor": ""}}, "malformed_cursor"),
+        ]
+        for page, reason in cases:
+            with self.subTest(reason=reason, page=page):
+                result = self.collect(lambda cursor: page)
+                self.assertFalse(result["complete"])
+                self.assertEqual(result["reason"], reason)
+                self.assertEqual(result["prs"], [])
+                with self.assertRaisesRegex(doctor.merge_evidence.IncompleteMergeEvidence, reason):
+                    doctor.merge_evidence.require_complete(result)
+
+    def test_page_limit_count_drift_and_repeated_cursor(self):
+        source = self.pages([self.row(i + 1, i + 1) for i in range(102)])
+        self.assertEqual(self.collect(source, max_pages=1)["reason"], "max_pages_reached")
+        def changed_count(cursor):
+            page = source(cursor)
+            if cursor:
+                page["totalCount"] += 1
+            return page
+        self.assertEqual(self.collect(changed_count)["reason"], "unstable_snapshot")
+        def repeated(cursor):
+            page = source(cursor)
+            page["pageInfo"] = {"hasNextPage": True, "endCursor": "100"}
+            return page
+        self.assertEqual(self.collect(repeated)["reason"], "malformed_cursor")
+
+    def test_read_failure_deadline_and_invalid_options(self):
+        with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=OSError("offline")):
+            result = doctor.merge_evidence.collect("JovieInc/Jovie", 1, 2)
+        self.assertEqual(result["reason"], "fetch_failed")
+        with mock.patch.object(doctor.merge_evidence.time, "monotonic", side_effect=[0, 0, 61]):
+            self.assertEqual(self.collect(self.pages([]))["reason"], "deadline_exceeded")
+        self.assertEqual(self.collect(self.pages([]), max_pages=0)["reason"], "invalid_fetch_options")
+        self.assertEqual(self.collect(self.pages([]), timeout_s=float("nan"))["reason"], "invalid_fetch_options")
+
+    def test_default_transport_paginates_both_scans_under_one_deadline(self):
+        source = self.pages([self.row(i + 1, i + 1) for i in range(120)])
+        calls = []
+        def run(args, **kwargs):
+            calls.append((args, kwargs))
+            cursor = next((arg.removeprefix("cursor=") for arg in args
+                           if arg.startswith("cursor=")), None)
+            return SimpleNamespace(returncode=0, stdout=json.dumps({
+                "data": {"repository": {"pullRequests": source(cursor)}}}))
+        with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=run):
+            result = doctor.merge_evidence.collect("JovieInc/Jovie", self.NOW - 200, self.NOW)
+        self.assertTrue(result["complete"])
+        self.assertEqual((result["pages"], result["scans"], len(result["prs"])), (4, 2, 120))
+        self.assertEqual(len(calls), 4)
+        for args, kwargs in calls:
+            self.assertEqual(args[:3], ["gh", "api", "graphql"])
+            self.assertIn("owner=JovieInc", args)
+            self.assertIn("name=Jovie", args)
+            self.assertGreater(kwargs["timeout"], 0)
+            self.assertLessEqual(kwargs["timeout"], 60)
+        self.assertEqual(sum("cursor=100" in args for args, _ in calls), 2)
+        timeouts = [kwargs["timeout"] for _, kwargs in calls]
+        self.assertEqual(timeouts, sorted(timeouts, reverse=True))
+
+    def test_default_transport_suppresses_bad_response_and_timeout(self):
+        cases = [
+            (SimpleNamespace(returncode=1, stdout=""), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout="not json"), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout="[]"), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout='{"errors":[{"message":"unavailable"}]}'), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout='{"data":{"repository":null}}'), "fetch_failed"),
+            (doctor.merge_evidence.subprocess.TimeoutExpired("gh", 1), "deadline_exceeded"),
+        ]
+        for response, reason in cases:
+            with self.subTest(response=response):
+                kwargs = {"side_effect": response} if isinstance(response, Exception) else {"return_value": response}
+                with mock.patch.object(doctor.merge_evidence.subprocess, "run", **kwargs):
+                    result = doctor.merge_evidence.collect("JovieInc/Jovie", 1, 2)
+                self.assertEqual(result["reason"], reason)
+                self.assertEqual(result["prs"], [])
+
+    def test_deadline_before_fetch_and_invalid_timestamp_relations(self):
+        with mock.patch.object(doctor.merge_evidence.time, "monotonic", side_effect=[0, 61]):
+            with mock.patch.object(doctor.merge_evidence.subprocess, "run") as run:
+                self.assertEqual(self.collect(self.pages([]))["reason"], "deadline_exceeded")
+                run.assert_not_called()
+        for stamp in [None, "2026-01-01T00:00:00"]:
+            with self.subTest(stamp=stamp), self.assertRaises(ValueError):
+                doctor.merge_evidence._epoch(stamp)
+        bad = self.row(1, 1)
+        bad["updatedAt"] = doctor.epoch_iso(self.NOW - 2)
+        self.assertEqual(self.collect(self.pages([bad]))["reason"], "malformed_pr")
+
+    def test_doctor_legacy_reader_uses_shared_complete_evidence(self):
+        rows = [self.row(1, 1)]
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie")
+        with mock.patch.object(doctor.merge_evidence, "collect", return_value={"complete": True, "prs": rows}) as collect:
+            self.assertEqual(doctor.merged_prs_24h(lane, self.NOW), rows)
+            collect.assert_called_once_with(lane.REPO_SLUG, self.NOW - 86400, self.NOW)
 
 
 if __name__ == "__main__":

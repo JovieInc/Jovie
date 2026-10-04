@@ -1,6 +1,7 @@
 {
   "devin": {
     "label": "devin",
+    "tier": 0,
     "model": "swe-2-medium",
     "slots": 4,
     "health": ["devin", "auth", "status"],
@@ -16,10 +17,19 @@
       "dangerous",
       "--respect-workspace-trust",
       "false"
+    ],
+    "routes": [
+      {
+        "model": "swe-2-medium",
+        "capability": "standard",
+        "costClass": "free",
+        "cost": 0
+      }
     ]
   },
   "codex": {
     "label": "codex",
+    "tier": 1,
     "model": "codex-default",
     "accountClass": "chatgpt-oauth",
     "reasoningEffort": "xhigh",
@@ -38,31 +48,114 @@
       "{provider_receipt}",
       "--cwd",
       "{cwd}"
-    ]
+    ],
+    "routes": [
+      {
+        "model": "codex-default",
+        "capability": "frontier",
+        "costClass": "subscription",
+        "cost": 3.5
+      }
+    ],
+    "quota": {
+      "source": "codex-accounts"
+    }
   },
   "claude": {
     "label": "claude",
-    "model": "sonnet",
+    "tier": 2,
+    "model": "claude-sonnet-5-5",
+    "accountClass": "claude-subscription",
     "slots": 2,
-    "health": ["claude", "auth", "status"],
-    "healthy": "\"loggedIn\": true",
-    "cmd": [
-      "claude",
-      "-p",
-      "--model",
-      "sonnet",
-      "--dangerously-skip-permissions",
-      "{prompt}"
+    "routes": [
+      {
+        "alias": "sonnet",
+        "model": "claude-sonnet-5-5",
+        "capability": "standard",
+        "costClass": "subscription",
+        "cost": 2
+      },
+      {
+        "alias": "opus",
+        "model": "claude-opus-5-5",
+        "capability": "frontier",
+        "costClass": "subscription",
+        "cost": 3
+      }
     ],
-    "enabled": false
+    "quota": {
+      "source": "claude-lane",
+      "windowS": 18000,
+      "softRuns": 12
+    },
+    "health": ["python3", "{here}/claude_lane.py", "health"],
+    "healthy": "available: true",
+    "cmd": [
+      "python3",
+      "{here}/claude_lane.py",
+      "run",
+      "--model",
+      "{model}",
+      "--prompt-file",
+      "{prompt_file}",
+      "--receipt-file",
+      "{provider_receipt}",
+      "--cwd",
+      "{cwd}"
+    ]
   },
   "hyperagent": {
     "label": "hyperagent",
+    "tier": 3,
     "model": "z-ai/glm-5.3",
+    "agentId": "cmtj3n2q901i407adklzzq01t",
+    "agentName": "GLM 5.3 Developer",
+    "accountClass": "hyperagent-credits",
     "slots": 2,
-    "health": ["hyperagent", "models", "--json"],
-    "healthy": "glm-5\\.3",
-    "cmd": ["hyperagent", "--model", "z-ai/glm-5.3", "-p", "{prompt}"],
+    "repairs": false,
+    "routes": [
+      {
+        "model": "z-ai/glm-5.3",
+        "capability": "standard",
+        "costClass": "subsidized",
+        "cost": 1
+      }
+    ],
+    "quota": {
+      "source": "ledger",
+      "windowS": 86400,
+      "softRuns": 24
+    },
+    "health": ["python3", "{here}/hyperagent_lane.py", "health"],
+    "healthy": "available: true",
+    "cmd": [
+      "hyperagent",
+      "--agent-id",
+      "cmtj3n2q901i407adklzzq01t",
+      "--model",
+      "z-ai/glm-5.3",
+      "-p",
+      "{prompt}"
+    ]
+  },
+  "grok": {
+    "label": "grok",
+    "tier": 4,
+    "model": "grok-4.7",
+    "slots": 1,
+    "health": ["grok", "models"],
+    "healthy": "logged in",
+    "cmd": ["grok", "-m", "grok-4.7", "--prompt-file", "{prompt_file}"],
+    "enabled": false
+  },
+  "kimi": {
+    "label": "kimi",
+    "tier": 5,
+    "model": "kimi-code/k3",
+    "slots": 1,
+    "health": ["kimi", "provider", "list", "--json"],
+    "healthy": "kimi-code/k3",
+    "cmd": ["kimi", "--model", "kimi-code/k3", "-p", "{prompt}"],
     "enabled": false
   }
 }

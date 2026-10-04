@@ -311,6 +311,40 @@ describe('founder design invariants (JOV-INV-038)', () => {
     );
   });
 
+  it('binds Engineering to its public index and rejects the draft preview', () => {
+    assert.deepEqual(
+      scanNavSemantics(
+        NAVIGATION_SOURCE,
+        "const L = [{ href: APP_ROUTES.ENGINEERING, label: 'Engineering' }];"
+      ),
+      []
+    );
+    assert.deepEqual(
+      scanNavSemantics(
+        NAVIGATION_SOURCE,
+        "const L = [{ href: APP_ROUTES.ENGINEERING_PREVIEW, label: 'Engineering' }];"
+      ).map(item => item.rule),
+      ['nav-label-route-mismatch']
+    );
+  });
+
+  it('binds the AI Operating System brief to its public route only', () => {
+    assert.deepEqual(
+      scanNavSemantics(
+        NAVIGATION_SOURCE,
+        "const L = [{ href: APP_ROUTES.AI, label: 'AI Operating System' }];"
+      ),
+      []
+    );
+    assert.deepEqual(
+      scanNavSemantics(
+        NAVIGATION_SOURCE,
+        "const L = [{ href: APP_ROUTES.PRODUCT, label: 'AI Operating System' }];"
+      ).map(item => item.rule),
+      ['nav-label-route-mismatch']
+    );
+  });
+
   it('deliberate red: rejects a label with no declared destination', () => {
     assert.deepEqual(
       scanNavSemantics(

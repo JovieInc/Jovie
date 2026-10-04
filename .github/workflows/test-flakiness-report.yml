@@ -27,20 +27,41 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Completed-run jobs/artifacts are immutable per (run id, attempt), so
+      # each wake reads only runs it has not seen (JOV-7744).
+      - name: Restore completed-run evidence
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .flaky-run-cache
+          key: flaky-run-evidence-${{ github.run_id }}
+          restore-keys: flaky-run-evidence-
+
+      # Keep exhaustive seven-day quarantine collection off this hot path.
+      # Merge-queue volume exceeds GitHub's 1,000-result search window, and
+      # missing quarantine evidence cannot authorize a ledger change.
       - name: Analyze test results from recent runs
         id: analyze
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # gh run download reads Unit Tests unit-flaky-* artifacts.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          FLAKY_RUN_CACHE_DIR: .flaky-run-cache
         run: node .github/scripts/analyze-test-flakiness.js
+
+      # The analyzer bounds the cache and emits a content-digest key (also on
+      # a red high-flakiness exit); an unchanged cache matches an existing key.
+      - name: Save completed-run evidence
+        if: ${{ !cancelled() && steps.analyze.outputs.run_evidence_key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .flaky-run-cache
+          key: ${{ steps.analyze.outputs.run_evidence_key }}
 
       - name: Check flaky-rate ratchet
         id: ratchet
         env:
-          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count }}
         run: node .github/scripts/check-flaky-ratchet.js
 
       - name: Upload flakiness report
@@ -48,7 +69,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: flakiness-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: flakiness-report.md
+          path: |
+            flakiness-report.md
+            flakiness-clusters.json
           retention-days: 90
 
       - name: Find or create tracking issue
@@ -193,12 +216,21 @@ jobs:
               console.log(`Created deflake issue #${issue.number}: ${deflakeTitle}`);
             }
 
+      - name: File Linear remediation when the ratchet is red
+        if: ${{ failure() && steps.ratchet.outcome == 'failure' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
+          RATCHET_STATUS: ${{ steps.ratchet.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/flaky-test-filing-intake.mjs
+
       - name: Summarize report
         if: always()
         env:
-          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
-          RETRY_RATE: ${{ steps.analyze.outputs.retry_rate || '0' }}
-          HIGH_SEVERITY: ${{ steps.analyze.outputs.high_severity || '0' }}
+          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || 'unknown' }}
+          RETRY_RATE: ${{ steps.analyze.outputs.retry_rate || 'unknown' }}
+          HIGH_SEVERITY: ${{ steps.analyze.outputs.high_severity || 'unknown' }}
           RATCHET_STATUS: ${{ steps.ratchet.outcome }}
         run: |
           {

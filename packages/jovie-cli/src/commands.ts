@@ -4,6 +4,7 @@ import {
   fetchArtistLlms,
   fetchOpenApi,
   fetchSiteLlms,
+  lookupCreator,
   type ReportKind,
   type ResourceOptions,
   reportIssue,
@@ -127,6 +128,19 @@ export const COMMANDS: readonly CommandSpec[] = [
     },
     readOnly: false,
     run: (input, options) => createProfile(required(input), options),
+  },
+  {
+    path: ['creator', 'lookup'],
+    tool: 'lookup_creator',
+    summary:
+      'Resolve a creator to their existing Jovie profile or extract public fields. Accepts a profile URL or platform:handle (youtube, instagram, tiktok, linktree). Never creates a profile.',
+    arg: {
+      name: 'url-or-handle',
+      description:
+        'Creator profile URL or platform:handle, e.g. youtube:@creator',
+    },
+    readOnly: true,
+    run: (input, options) => lookupCreator(required(input), options),
   },
   {
     path: ['artist', 'get'],

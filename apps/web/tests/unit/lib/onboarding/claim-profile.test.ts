@@ -2,18 +2,51 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockDbSelect,
+  mockIdentityConflict,
   mockDbUpdate,
   mockDbInsert,
+  mockRecordFunnelStep,
   mockFetchArtistBySpotifyUrl,
   mockReserveOnboardingHandle,
   mockDeriveClaimedOnboardingStateFromMessageRows,
 } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
+  mockIdentityConflict: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbInsert: vi.fn(),
+  mockRecordFunnelStep: vi.fn().mockResolvedValue(undefined),
   mockFetchArtistBySpotifyUrl: vi.fn(),
   mockReserveOnboardingHandle: vi.fn(),
   mockDeriveClaimedOnboardingStateFromMessageRows: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics/signup-funnel.server', () => ({
+  recordFunnelStep: mockRecordFunnelStep,
+}));
+
+vi.mock('@/lib/auth/session', () => ({
+  withDbSessionTx: async (callback: (tx: unknown) => Promise<unknown>) =>
+    callback({
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: (fields: unknown) => {
+        if (fields)
+          return {
+            from: () => ({
+              where: () => ({ limit: async () => [{ id: 'user_1' }] }),
+            }),
+          };
+        return mockDbSelect();
+      },
+      update: mockDbUpdate,
+      insert: mockDbInsert,
+    }),
+}));
+vi.mock('@/lib/profile/spotify-profile-identity', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/lib/profile/spotify-profile-identity')
+  >()),
+  assertSpotifyProfileIdentityAvailable: mockIdentityConflict,
+  lockSpotifyProfileIdentity: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -27,6 +60,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/schema/auth', () => ({
   users: {
     id: 'users.id',
+    email: 'users.email',
     activeProfileId: 'users.active_profile_id',
     updatedAt: 'users.updated_at',
   },
@@ -92,6 +126,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
+  sql: vi.fn(),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   desc: vi.fn((col: unknown) => ({ desc: col })),
   eq: vi.fn((col: unknown, val: unknown) => ({ eq: [col, val] })),
@@ -118,6 +153,7 @@ vi.mock('@/lib/tasks/chat-work-record', () => ({
   ensureChatWorkRecord: vi.fn().mockResolvedValue(null),
 }));
 
+import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
 
 const HANDLE_UNIQUE_VIOLATION = new Error(
@@ -146,11 +182,13 @@ function setupOwnedConversationAndMessages(userId = 'user_1') {
 }
 
 function setupExistingProfileSelect(profile: Record<string, unknown> | null) {
-  const limit = vi.fn().mockResolvedValue(profile ? [profile] : []);
+  const limit = vi.fn().mockReturnValue({
+    for: vi.fn().mockResolvedValue(profile ? [profile] : []),
+  });
   const orderBy = vi.fn().mockReturnValue({ limit });
   const where = vi.fn().mockReturnValue({ orderBy });
   const from = vi.fn().mockReturnValue({ where });
-  mockDbSelect.mockReturnValueOnce({ from });
+  mockDbSelect.mockReturnValue({ from });
 }
 
 function queueProfileInsert(
@@ -198,8 +236,11 @@ function queueProfileUpdate(
   return valueSpies;
 }
 
-function queuePostPersistWrites() {
-  const userWhere = vi.fn().mockResolvedValue(undefined);
+function queuePostPersistWrites(
+  owner: { email: string | null } | null = { email: 'artist@band.com' }
+) {
+  const userReturning = vi.fn().mockResolvedValue(owner ? [owner] : []);
+  const userWhere = vi.fn().mockReturnValue({ returning: userReturning });
   const userSet = vi.fn().mockReturnValue({ where: userWhere });
   mockDbUpdate.mockReturnValueOnce({ set: userSet });
 
@@ -212,6 +253,8 @@ function queuePostPersistWrites() {
 
   const auditValues = vi.fn().mockResolvedValue(undefined);
   mockDbInsert.mockReturnValueOnce({ values: auditValues });
+
+  return { userWhere, userReturning };
 }
 
 // Reserved mode skips the users.activeProfileId update and the
@@ -228,6 +271,7 @@ function queueReservedPostPersistWrites() {
 describe('materializeClaimedOnboardingProfile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIdentityConflict.mockReset();
     mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
       artist: null,
       handle: 'coolartist',
@@ -236,6 +280,54 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
     mockReserveOnboardingHandle.mockResolvedValue('coolartist1');
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
+  });
+
+  it('returns a recoverable Spotify conflict without retrying the handle (JOV-7504)', async () => {
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    queueProfileInsert({
+      error: Object.assign(new Error('duplicate Spotify identity'), {
+        code: '23505',
+        constraint: 'creator_profiles_spotify_id_unique',
+      }),
+    });
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).rejects.toMatchObject({
+      errorCode: 'SPOTIFY_IDENTITY_CONFLICT',
+      status: 409,
+    });
+    expect(mockReserveOnboardingHandle).not.toHaveBeenCalled();
+  });
+
+  it('refuses to overwrite an owned profile identity from a stale transcript', async () => {
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: { id: 'selected_artist', name: 'Synthetic artist', genres: [] },
+      handle: 'coolartist',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect({
+      id: 'profile_owned',
+      userId: 'user_1',
+      spotifyId: 'original_artist',
+    });
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).rejects.toMatchObject({ errorCode: 'SPOTIFY_IDENTITY_CONFLICT' });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
   it('fails closed with UNAUTHORIZED when userId is empty (no profile created)', async () => {
@@ -252,6 +344,7 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
 
     expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockRecordFunnelStep).not.toHaveBeenCalled();
   });
 
   it('blocks non-owners when the conversation belongs to another user', async () => {
@@ -270,6 +363,7 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
 
     expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockRecordFunnelStep).not.toHaveBeenCalled();
     expect(mockReserveOnboardingHandle).not.toHaveBeenCalled();
   });
 
@@ -298,7 +392,53 @@ describe('materializeClaimedOnboardingProfile', () => {
     // conversation + messages
     expect(mockDbSelect).toHaveBeenCalledTimes(2);
     expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockRecordFunnelStep).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {
+      label: 'customer',
+      owner: { email: 'artist@band.com' },
+      cohort: 'customer',
+    },
+    {
+      label: 'synthetic',
+      owner: { email: 'auth-surface-qa@test.jovie.com' },
+      cohort: 'synthetic',
+    },
+    { label: 'unknown email', owner: { email: null }, cohort: 'unattributed' },
+    { label: 'missing owner row', owner: null, cohort: 'unattributed' },
+  ])(
+    'records the verified $label claim without contact data',
+    async ({ owner, cohort }) => {
+      setupOwnedConversationAndMessages();
+      setupExistingProfileSelect(null);
+      queueProfileInsert({ id: 'profile_new' });
+      const { userWhere, userReturning } = queuePostPersistWrites(owner);
+
+      await expect(
+        materializeClaimedOnboardingProfile({
+          userId: 'user_1',
+          conversationId: 'conv_1',
+          ipAddress: null,
+          userAgent: null,
+        })
+      ).resolves.toEqual({
+        profileId: 'profile_new',
+        handle: 'coolartist',
+        status: 'created',
+      });
+
+      expect(userWhere).toHaveBeenCalledWith({ eq: ['users.id', 'user_1'] });
+      expect(userReturning).toHaveBeenCalledWith({ email: 'users.email' });
+      expect(mockRecordFunnelStep).toHaveBeenCalledTimes(1);
+      expect(mockRecordFunnelStep).toHaveBeenCalledWith({
+        funnel: 'artist_signup',
+        step: 'claim_complete',
+        cohort,
+      });
+    }
+  );
 
   it('creates a profile using the proposed handle without a pre-insert availability check', async () => {
     setupOwnedConversationAndMessages();
@@ -379,6 +519,60 @@ describe('materializeClaimedOnboardingProfile', () => {
         spotifyPopularity: 61,
         spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
       })
+    );
+  });
+
+  it('finishes the claim with Spotify fields when MusicFetch is vendor-unavailable', async () => {
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: 'spotify_1',
+        name: 'Luna Waves',
+        url: 'https://open.spotify.com/artist/spotify_1',
+        imageUrl: 'https://i.scdn.co/image/luna.jpg',
+        followers: 42_000,
+        popularity: 61,
+        genres: ['indie pop'],
+      },
+      handle: 'lunawaves',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    const vendorUnavailable = new Error('MusicFetch vendor unavailable');
+    vendorUnavailable.name = 'MusicfetchRequestError';
+    (vendorUnavailable as Error & { statusCode: number }).statusCode = 401;
+    mockFetchArtistBySpotifyUrl.mockRejectedValue(vendorUnavailable);
+
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    const [profileInsertValues] = queueProfileInsert({ id: 'profile_new' });
+    queuePostPersistWrites();
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).resolves.toEqual({
+      profileId: 'profile_new',
+      handle: 'lunawaves',
+      status: 'created',
+    });
+
+    expect(captureError).not.toHaveBeenCalled();
+    expect(profileInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatarUrl: 'https://i.scdn.co/image/luna.jpg',
+        displayName: 'Luna Waves',
+        isClaimed: true,
+        isPublic: true,
+        spotifyId: 'spotify_1',
+        spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
+      })
+    );
+    expect(profileInsertValues).toHaveBeenCalledWith(
+      expect.not.objectContaining({ bio: expect.any(String) })
     );
   });
 
@@ -492,6 +686,7 @@ describe('materializeClaimedOnboardingProfile', () => {
 describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-7204)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIdentityConflict.mockReset();
     mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
       artist: null,
       handle: 'coolartist',
@@ -538,6 +733,7 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
     // Only the profile insert + audit log — no userProfileClaims row.
     expect(mockDbInsert).toHaveBeenCalledTimes(2);
+    expect(mockRecordFunnelStep).not.toHaveBeenCalled();
   });
 
   it('refuses a second claimant the held handle and reserves a fallback instead', async () => {

@@ -81,4 +81,30 @@ describe('RailToggleButton', () => {
     expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
     expect(button).toHaveAttribute('data-icon-button-size', 'sm');
   });
+
+  it.each([
+    ['left', true, 'lucide-rail-left-open'],
+    ['left', false, 'lucide-rail-left-closed'],
+    ['right', true, 'lucide-rail-right-open'],
+    ['right', false, 'lucide-rail-right-closed'],
+  ] as const)(
+    'draws the %s rail (open=%s) from the Jovie rail family',
+    (side, open, glyph) => {
+      render(
+        <RailToggleButton
+          side={side}
+          open={open}
+          openLabel='Hide'
+          closedLabel='Show'
+          onToggle={vi.fn()}
+          dataTestId='toggle'
+          iconTestId='toggle-icon'
+        />
+      );
+
+      const icon = screen.getByTestId('toggle-icon');
+      expect(icon.getAttribute('class')).toContain(glyph);
+      expect(icon.getAttribute('class')).not.toMatch(/lucide-(panel|chevron)-/);
+    }
+  );
 });

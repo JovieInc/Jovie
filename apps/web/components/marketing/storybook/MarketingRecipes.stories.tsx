@@ -201,7 +201,9 @@ export const artistLp: Story = {
   render: () => (
     <RecipeChrome recipeId='artist-lp'>
       <PublicPageShell>
-        <ArtistProfileLandingRoute />
+        <ArtistProfileLandingRoute
+          logoPlacement={{ page: '/artist-profiles' }}
+        />
       </PublicPageShell>
     </RecipeChrome>
   ),

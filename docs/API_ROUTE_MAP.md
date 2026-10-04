@@ -32,6 +32,19 @@
 |-------|---------|------|-------------|
 | `/api/v1/actions` | GET | `auth` | Read-only canonical Actions discovery. Resolves advisory capabilities for the four stable action IDs against an owned profile. No writes. |
 
+### External Operational Contracts
+
+These handlers intentionally have no in-repo HTTP caller. Their callers are
+sibling deployments, machine publishers, or source-repository automation.
+
+| Route | Methods | Auth | External Caller / Description |
+|-------|---------|------|-------------------------------|
+| `/api/hud/hermes-events` | GET, POST | HUD auth (GET); `HERMES_HUD_API_KEY` bearer (POST) | Hermes laptop publisher writes Agent OS events; HUD clients read the current feed |
+| `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer certification clients use the shared Ovie route projection |
+| `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
+| `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
+| `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
+
 ### Admin
 
 | Route | Methods | Auth | Description |
@@ -52,7 +65,6 @@
 | `/api/admin/feedback/[id]/dismiss` | POST | `admin` | Dismiss feedback item |
 | `/api/admin/fit-scores` | GET | `admin` | Get creator fit scores |
 | `/api/admin/impersonate` | POST | `admin` | Start admin impersonation |
-| `/api/admin/ingestion-health` | GET | `admin` | Ingestion pipeline health |
 | `/api/admin/investors/links` | GET, POST | `admin` | Investor link management |
 | `/api/admin/investors/links/[id]` | PUT, DELETE | `admin` | Update/delete investor link |
 | `/api/admin/investors/settings` | GET, PUT | `admin` | Investor portal settings |
@@ -121,7 +133,7 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/billing/health` | GET | `auth` | Billing system health check |
+| `/api/billing/health` | GET | `public` liveness; detail is `admin` or `CRON_SECRET` | Anonymous callers get `{healthy, timestamp}` only. Full sync metrics require an admin session or `Authorization: Bearer ${CRON_SECRET}` |
 | `/api/billing/history` | GET | `auth` | Payment history |
 | `/api/billing/status` | GET | `auth` | Current subscription status |
 
@@ -225,7 +237,6 @@
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |
 | `/api/dashboard/releases/[releaseId]/tracks` | GET | `auth` | Release tracks |
-| `/api/dashboard/retargeting/attribution` | GET | `auth` | Retargeting attribution data |
 | `/api/dashboard/shop` | GET, POST | `auth` | Shop management |
 | `/api/dashboard/social-links` | GET, POST, PUT, PATCH, DELETE | `auth` | Social link CRUD; PUT/PATCH/DELETE accept optional `expectedVersion`, success returns `version`, stale writes return 409 `VERSION_CONFLICT` |
 | `/api/dashboard/tour-dates/[id]/analytics` | GET | `auth` | Tour date analytics |
@@ -243,7 +254,6 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/dsp/bio-sync` | GET, POST | `auth` | List bio sync providers or trigger bio sync |
-| `/api/dsp/bio-sync/status` | GET | `auth` | Get bio sync job status |
 | `/api/dsp/discover` | POST | `auth` | Trigger DSP artist discovery for cross-platform matching |
 | `/api/dsp/enrichment/status` | GET | `auth` | Get DSP enrichment status for a profile |
 | `/api/dsp/matches` | GET | `auth` | List DSP artist match suggestions |
@@ -254,7 +264,6 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/youtube-library/links` | GET | `auth` | Approval queue: pending_review video↔release ISRC links for the user's profiles |
 | `/api/youtube-library/links/[id]/approve` | POST | `auth` | Approve a pending ISRC release link (owner only) |
 | `/api/youtube-library/links/[id]/reject` | POST | `auth` | Reject a pending ISRC release link with a reason (owner only) |
 | `/api/youtube-library/videos/[videoId]/optimization` | GET | `auth` | Evidence-backed YouTube thumbnail, metric, and experiment snapshot |
@@ -294,16 +303,16 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/health` | GET | `public` | Basic health check |
-| `/api/health/auth` | GET | `public` | Auth system health |
+| `/api/health` | GET | `public` liveness; detail on failure is admin or `CRON_SECRET` | Success stays `{status:"ok"}`. Failure is `{healthy:false,timestamp}` unless the caller is an admin session or `Authorization: Bearer $CRON_SECRET` |
+| `/api/health/auth` | GET | `public` liveness outside production; detail is admin or `CRON_SECRET` | Production returns 403 for every caller. Outside production, anonymous is `{healthy,timestamp}` and does not read the session |
 | `/api/health/build-info` | GET | `public` | Build and deployment metadata |
-| `/api/health/comprehensive` | GET | `public` | Full health check (DB, Redis, Stripe, etc.) |
-| `/api/health/db` | GET | `public` | Database connectivity |
-| `/api/health/db/performance` | GET | `public` | Database performance metrics |
-| `/api/health/deploy` | GET | `public` | Deployment status and version |
-| `/api/health/env` | GET | `public` | Environment variable presence check |
-| `/api/health/homepage` | GET | `public` | Homepage rendering health |
-| `/api/health/keys` | GET | `public` | Cryptographic key health |
+| `/api/health/comprehensive` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` with no DB or vendor calls. Full env/DB/system body requires admin session or `CRON_SECRET` |
+| `/api/health/db` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous connectivity is `{healthy,timestamp}` (200/503). Pool, config, and error strings require admin session or `CRON_SECRET` |
+| `/api/health/db/performance` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not run performance queries |
+| `/api/health/deploy` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous still runs env and DB checks, body is `{healthy,timestamp}`. `checks` and `issues` require admin session or `CRON_SECRET` |
+| `/api/health/env` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous local validation is `{healthy,timestamp}` with no error strings or integration flags |
+| `/api/health/homepage` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not fetch featured creators |
+| `/api/health/keys` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy,timestamp}` (503 when a required key is missing) with no key labels |
 | `/api/health/redis` | GET | `admin` or `CRON_SECRET` | Redis write/read operability (protected to prevent quota burn) |
 
 ### HUD
@@ -413,7 +422,6 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/pre-save/apple` | POST | `auth` | Submit Apple Music pre-save |
-| `/api/pre-save/spotify/start` | GET | `public` | Initiate Spotify OAuth for pre-save |
 | `/api/pre-save/spotify/callback` | GET | `public` | Handle Spotify OAuth callback |
 
 ### Profile
@@ -421,14 +429,6 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/profile/view` | POST | `public` | Increment profile view count (bot-filtered) |
-
-### Referrals
-
-| Route | Methods | Auth | Description |
-|-------|---------|------|-------------|
-| `/api/referrals/apply` | POST | `auth` | Apply a referral code |
-| `/api/referrals/code` | GET, POST | `auth` | Get or generate referral code |
-| `/api/referrals/stats` | GET | `auth` | Get referral statistics and earnings |
 
 ### Revalidate
 

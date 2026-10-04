@@ -222,6 +222,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
   'apps/web/app/app/(shell)/admin/certifications/page.tsx',
   'apps/web/app/app/(shell)/admin/chat/page.tsx',
+  'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
   'apps/web/app/app/(shell)/admin/costs/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
   'apps/web/app/app/(shell)/admin/feature-registry/page.tsx',
@@ -290,6 +291,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/insights/page.tsx',
   'apps/web/app/app/(shell)/jovie-work/page.tsx',
   'apps/web/app/app/(shell)/library/page.tsx',
+  'apps/web/app/app/(shell)/links/page.tsx',
   'apps/web/app/app/(shell)/lyrics/[trackId]/page.tsx',
   'apps/web/app/app/(shell)/page.tsx',
   'apps/web/app/app/(shell)/presence/page.tsx',
@@ -300,7 +302,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/account/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
   'apps/web/app/app/(shell)/settings/analytics/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
   'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/audience/page.tsx',
   'apps/web/app/app/(shell)/settings/billing/page.tsx',
@@ -311,8 +312,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
   'apps/web/app/app/(shell)/settings/profile/page.tsx',
-  'apps/web/app/app/(shell)/settings/referral/page.tsx',
-  'apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx',
   'apps/web/app/app/(shell)/settings/touring/page.tsx',
   'apps/web/app/app/(shell)/settings/usage/page.tsx',
   'apps/web/app/app/(shell)/tasks/page.tsx',
@@ -339,7 +338,6 @@ const LEGACY_SOURCES = new Set<string>([
 
 const ALIAS_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/profile/page.tsx',
@@ -349,6 +347,7 @@ const ALIAS_SOURCES = new Set<string>([
 const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/algorithm-health/page.tsx',
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
+  'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
   'apps/web/app/app/(shell)/admin/feedback/page.tsx',
   'apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx',
@@ -390,7 +389,6 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/profile/page.tsx',
   'apps/web/app/app/(shell)/releases/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
@@ -482,8 +480,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/library',
   },
   'apps/web/app/app/(shell)/dashboard/links/page.tsx': {
-    conceptId: '/app/chat',
-    redirectTo: '/app/chat?panel=profile',
+    conceptId: '/app/links',
+    redirectTo: '/app/links',
   },
   'apps/web/app/app/(shell)/dashboard/page.tsx': {
     conceptId: '/app',
@@ -534,10 +532,6 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
   'apps/web/app/app/(shell)/settings/admin/page.tsx': {
     conceptId: '/app/settings/artist-profile',
     redirectTo: '/app/settings/artist-profile',
-  },
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx': {
-    conceptId: '/app/settings/account',
-    redirectTo: '/app/settings/account',
   },
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx': {
     conceptId: '/app/settings/data-privacy',
@@ -615,9 +609,7 @@ export function appScreenConceptToStoryId(conceptId: string): string {
   return `app-screens-${slug}--reference`;
 }
 
-const RECIPE_BY_ID: Readonly<
-  Record<AppScreenRecipeId, AppScreenRecipeRegistryEntry>
-> = Object.fromEntries(
+const RECIPE_BY_ID = new Map<AppScreenRecipeId, AppScreenRecipeRegistryEntry>(
   APP_SCREEN_RECIPE_REGISTRY.map(recipe => [recipe.id, recipe])
 );
 
@@ -634,7 +626,8 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
       kind === 'alias' || kind === 'legacy'
         ? ALIAS_LEGACY_CONCEPT_MAP[source]
         : undefined;
-    const recipe = RECIPE_BY_ID[recipeId];
+    const recipe = RECIPE_BY_ID.get(recipeId);
+    if (!recipe) throw new Error(`Missing app-screen recipe: ${recipeId}`);
     return {
       id: routeToId(route),
       route,

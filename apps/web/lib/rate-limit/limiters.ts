@@ -351,6 +351,18 @@ export const agentProfileCreateLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for anonymous creator extraction
+ * (`GET /api/agents/creator-lookup`). Limit: 60 requests per hour per IP.
+ * Fails closed without Redis.
+ */
+export const agentCreatorLookupLimiter = createRateLimiter(
+  RATE_LIMITERS.agentCreatorLookup,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for the public claim-token entry route (`/claim/[token]`)
  * Limit: 20 requests per minute per IP. Durable (Redis) so the throttle holds
  * across serverless instances; callers treat a degraded backend as advisory
@@ -359,6 +371,18 @@ export const agentProfileCreateLimiter = createRateLimiter(
  */
 export const claimTokenAccessLimiter = createRateLimiter(
   RATE_LIMITERS.claimTokenAccess,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
+ * Rate limiter for investor-portal token validation (`/investor-portal`).
+ * Limit: 30 attempts per minute per IP; fail-closed without Redis so a limiter
+ * outage cannot reopen the DB-backed token-guessing oracle.
+ */
+export const investorPortalTokenLimiter = createRateLimiter(
+  RATE_LIMITERS.investorPortalToken,
   {
     requireRedis: true,
   }
@@ -1292,7 +1316,9 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicProfile: publicProfileLimiter,
     publicArtistApi: publicArtistApiLimiter,
     agentProfileCreate: agentProfileCreateLimiter,
+    agentCreatorLookup: agentCreatorLookupLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
+    investorPortalToken: investorPortalTokenLimiter,
     libraryAssetShareAccess: libraryAssetShareAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,

@@ -74,9 +74,40 @@ describe('MCP server', () => {
     const create = tools.find(tool => tool.name === 'create_profile');
     expect(create?.inputSchema.required).toEqual(['url']);
     expect(create?.annotations.readOnlyHint).toBe(false);
+    const lookup = tools.find(tool => tool.name === 'lookup_creator');
+    expect(lookup?.inputSchema.required).toEqual(['url-or-handle']);
+    expect(lookup?.annotations.readOnlyHint).toBe(true);
     expect(
       tools.find(tool => tool.name === 'get_artist')?.annotations
     ).toMatchObject({ readOnlyHint: true });
+  });
+
+  it('calls the read-only creator lookup tool', async () => {
+    const urls: string[] = [];
+    const fetchImpl: FetchImplementation = async (input, init) => {
+      urls.push(`${init?.method} ${String(input)}`);
+      return new Response('{"platform":"youtube","displayName":"Creator"}');
+    };
+
+    const response = await handleMcpMessage(
+      {
+        jsonrpc: '2.0',
+        id: 50,
+        method: 'tools/call',
+        params: {
+          name: 'lookup_creator',
+          arguments: { 'url-or-handle': 'https://youtube.com/@creator' },
+        },
+      },
+      context(fetchImpl)
+    );
+
+    expect(urls).toEqual([
+      'GET https://jov.ie/api/agents/creator-lookup?url=https%3A%2F%2Fyoutube.com%2F%40creator',
+    ]);
+    expect(response?.result).toMatchObject({
+      structuredContent: { platform: 'youtube', displayName: 'Creator' },
+    });
   });
 
   it('calls a tool and returns structured content', async () => {

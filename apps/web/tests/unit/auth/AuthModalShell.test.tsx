@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockBack = vi.fn();
+const mockPush = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     back: mockBack,
+    push: mockPush,
   }),
 }));
 
@@ -40,6 +42,7 @@ describe('AuthModalShell', () => {
 
   beforeEach(() => {
     mockBack.mockReset();
+    mockPush.mockReset();
     // jsdom doesn't implement the native dialog API used by showModal().
     HTMLDialogElement.prototype.showModal = vi.fn(function showModalMock(
       this: HTMLDialogElement
@@ -110,6 +113,130 @@ describe('AuthModalShell', () => {
     fireEvent.mouseDown(dialog!);
 
     expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // JOV-6225: the visible back control is destination navigation, bound to
+  // the same validated context as its label — never history-dependent.
+  it('navigates the default back control to the homepage instead of history', () => {
+    render(
+      <AuthModalShell>
+        <div>body</div>
+      </AuthModalShell>
+    );
+
+    fireEvent.click(screen.getByLabelText('Back to homepage'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith('/');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('navigates a caller-supplied destination to exactly that path', () => {
+    render(
+      <AuthModalShell
+        backButtonLabel='Back to chat'
+        backDestination='/start?intent_id=abc'
+      >
+        <div>body</div>
+      </AuthModalShell>
+    );
+
+    fireEvent.click(screen.getByLabelText('Back to chat'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith('/start?intent_id=abc');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('navigates the claim back link to the claim surface with context intact', () => {
+    render(
+      <AuthModalShell
+        backButtonLabel='Back to @aria'
+        backDestination='/aria?claim=1'
+      >
+        <div>body</div>
+      </AuthModalShell>
+    );
+
+    fireEvent.click(screen.getByLabelText('Back to @aria'));
+
+    expect(mockPush).toHaveBeenCalledWith('/aria?claim=1');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    '//evil.com',
+    '/%2fevil.com',
+    '/%5cevil.com',
+    '/\t/evil.com',
+    '/%09/evil.com',
+    '/%0a/evil.com',
+    'https://evil.com',
+    '/redirect#fragment\\..\\evil',
+    '\\\\evil.com',
+  ])(
+    'refuses an unsafe backDestination (%j) and degrades to dismissal',
+    unsafe => {
+      render(
+        <AuthModalShell backDestination={unsafe}>
+          <div>body</div>
+        </AuthModalShell>
+      );
+
+      fireEvent.click(screen.getByLabelText('Back to homepage'));
+
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('degrades an unknown-label back control without a destination to dismissal', () => {
+    // A label the shell cannot bind to a validated destination must not
+    // guess a route — it falls back to the modal-dismiss path.
+    render(
+      <AuthModalShell backButtonLabel='Back somewhere'>
+        <div>body</div>
+      </AuthModalShell>
+    );
+
+    fireEvent.click(screen.getByLabelText('Back somewhere'));
+
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['constructor', 'toString', '__proto__'])(
+    'dismisses an inherited label key %j safely',
+    label => {
+      render(
+        <AuthModalShell backButtonLabel={label}>
+          <div>body</div>
+        </AuthModalShell>
+      );
+      fireEvent.click(screen.getByLabelText(label));
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('keeps Escape dismissal separate from destination navigation', () => {
+    // Escape/backdrop are modal-DISMISSAL (history pop of the intercepted
+    // route) and must never navigate to the back destination.
+    const { container } = render(
+      <AuthModalShell backDestination='/start'>
+        <div>body</div>
+      </AuthModalShell>
+    );
+
+    const dialog = container.querySelector('dialog');
+    expect(dialog).not.toBeNull();
+
+    fireEvent(dialog!, new Event('cancel', { cancelable: true }));
+    fireEvent.mouseDown(dialog!);
+
+    expect(mockBack).toHaveBeenCalledTimes(2);
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('defaults the back control to an explicit Back to homepage destination', () => {

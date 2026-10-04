@@ -29,7 +29,6 @@ const DEFAULT_CHANNELS: Record<NotificationDeliveryChannel, boolean> = {
   email: true,
   sms: true,
   push: false,
-  in_app: true,
 };
 
 const EMPTY_PREFERENCES: NotificationPreferences = {

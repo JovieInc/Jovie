@@ -133,6 +133,11 @@ describe('fleet compaction primitives', () => {
       events: {
         [delivery.mission.missionId]: {
           requestId: delivery.mission.missionId,
+          eventId: delivery.mission.missionId,
+          delegationId: randomUUID(),
+          requestHash: 'pending-proposal',
+          createdAt: iso(-60000),
+          expiresAt: iso(-1),
           state: 'pending',
         },
       },
@@ -218,7 +223,15 @@ describe('fleet compaction primitives', () => {
     s.requestWorkers[missionId] = ['prior-helper', 'helper'];
     s.summer = {
       events: {
-        [missionId]: { requestId: missionId, state: 'completed' },
+        [missionId]: {
+          requestId: missionId,
+          eventId: missionId,
+          delegationId: randomUUID(),
+          requestHash: 'completed-proposal',
+          createdAt: iso(-60000),
+          expiresAt: iso(60000),
+          state: 'completed',
+        },
       },
     };
     const rows = compactFleetState('profile', s, now);

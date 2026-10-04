@@ -128,6 +128,9 @@ export async function GET(request: Request) {
         userId,
         returnTo: stateRecord.returnTo,
         codeChallenge: stateRecord.codeChallenge,
+        ...(stateRecord.nativeAttempt !== undefined
+          ? { nativeAttempt: stateRecord.nativeAttempt }
+          : {}),
         ott,
       });
 
@@ -175,6 +178,7 @@ export async function GET(request: Request) {
           code: exchangeCode,
           state: stateRecord.state,
           desktopFlow: stateRecord.desktopFlow,
+          nativeAttempt: stateRecord.nativeAttempt,
           returnCode,
           desktopLoopbackPort: stateRecord.desktopLoopbackPort ?? null,
         }),

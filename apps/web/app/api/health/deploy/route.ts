@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { validateDbConnection } from '@/lib/db';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +29,7 @@ export const dynamic = 'force-dynamic';
  *   "rewrites": [{ "source": "/health", "destination": "/api/health/deploy" }]
  * }
  */
-export async function GET() {
+export async function GET(request: Request) {
   const now = new Date().toISOString();
   const issues: string[] = [];
 
@@ -52,8 +56,14 @@ export async function GET() {
     issues.push('DB: DATABASE_URL not configured');
   }
 
-  // Determine health status
+  // Determine health status. Anonymous callers still run the checks so 503
+  // stays truthful, but the body is liveness only.
   const isHealthy = issues.length === 0;
+  const authorized = await canReadHealthDetail(request, '/api/health/deploy');
+
+  if (!authorized) {
+    return publicHealthLiveness(isHealthy);
+  }
 
   const response = {
     status: isHealthy ? 'healthy' : 'unhealthy',
@@ -90,6 +100,6 @@ export async function GET() {
 
   return NextResponse.json(response, {
     status: isHealthy ? 200 : 503,
-    headers: NO_STORE_HEADERS,
+    headers: HEALTH_DETAIL_HEADERS,
   });
 }

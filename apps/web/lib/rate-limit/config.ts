@@ -455,6 +455,21 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
+  /**
+   * Anonymous creator extraction (GET /api/agents/creator-lookup): 60 per hour
+   * per IP. Each request performs one bounded fetch to a supported platform.
+   */
+  agentCreatorLookup: {
+    name: 'Agent Creator Lookup',
+    limit: 60,
+    window: '1 h',
+    prefix: 'public:agent-creator-lookup',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   /** Public click: 50 requests per minute per IP */
   publicClick: {
     name: 'Public Click',
@@ -490,6 +505,22 @@ export const RATE_LIMITERS = {
     limit: 20,
     window: '1 m',
     prefix: 'public:claim-token',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /**
+   * Investor-portal token validation: 30 attempts per minute per IP.
+   * Each attempt is a DB-backed token lookup, so the dedicated bucket bounds
+   * brute-force token guessing whether the token arrives via ?t= or cookie.
+   */
+  investorPortalToken: {
+    name: 'Investor Portal Token',
+    limit: 30,
+    window: '1 m',
+    prefix: 'public:investor-portal-token',
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',

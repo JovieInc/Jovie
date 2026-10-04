@@ -13,16 +13,52 @@ import {
   FLEET_SCOPES,
   type FleetActionId,
   fleetAuthoritySchema,
+  fleetHistoryEntrySchema,
   fleetMissionSchema,
   fleetRequestSchema,
   fleetWorkerSchema,
   getActionDescriptor,
 } from '@jovie/action-contracts';
 import { z } from 'zod';
+import {
+  type ArchivedInvocation,
+  type ArchivedLease,
+  type ArchiveKind,
+  compactFleetState,
+  fleetArchiveKey,
+  fleetHistoryKey,
+  fleetHistoryPrefix,
+  readArchiveValue,
+} from './retention';
+import {
+  applySummerDecision,
+  enqueueSummerRequest,
+  FleetSummerError,
+  type FleetSummerEvent,
+  type FleetSummerState,
+  installSummerDelegation,
+  pendingSummerEvents,
+  planSummerDecision,
+  revokeSummerDelegation,
+  summerDelegationInputSchema,
+  summerUndelegationInputSchema,
+} from './summer';
 
 // One CAS document in Summer's existing operating store. PostgreSQL is the
 // sole authority: no Redis failover/split-brain, no new dispatcher service.
 export interface FleetBackend {
+  compareAndSetWithRecords?(
+    key: string,
+    before: unknown,
+    after: unknown,
+    records: { key: string; value: unknown }[],
+    ttlSeconds: number
+  ): Promise<boolean>;
+  listRecords?(
+    prefix: string,
+    after: string | undefined,
+    limit: number
+  ): Promise<{ key: string; value: unknown }[]>;
   get(key: string): Promise<unknown>;
   setIfAbsent(
     key: string,
@@ -43,6 +79,8 @@ export type HelpRequest = z.infer<typeof fleetRequestSchema>;
 export type FleetControlOperation =
   | 'provision'
   | 'rotate'
+  | 'delegate'
+  | 'undelegate'
   | 'revoke'
   | 'assign'
   | 'accept'
@@ -91,7 +129,7 @@ export type FleetResult =
   | { status: 'in_progress'; receipt: ActionReceipt; retryAfterMs: number };
 export type InvocationRecord = {
   hash: string;
-  result: FleetResult;
+  result?: FleetResult;
   refresh?: true;
 };
 type DefectOperation = {
@@ -108,6 +146,7 @@ type DefectOperation = {
 };
 export type FleetState = {
   schema: 'jovie.summer.fleet/v1';
+  summer?: FleetSummerState;
   credentials: Record<string, Credential>;
   workers: Record<string, Worker>;
   missions: Record<string, Mission>;
@@ -118,7 +157,6 @@ export type FleetState = {
   requestWorkers: Record<string, string[]>;
   receiptHistoryRecorded: Record<string, boolean>;
   // Pending Summer deliveries pin their source until authoritative resolution.
-  summer?: { events: Record<string, { requestId: string; state: string }> };
   receipts: Record<string, TerminalReceipt>;
   invocations: Record<string, InvocationRecord>;
   defects: Record<string, Issue>;
@@ -338,7 +376,12 @@ function requestView(
       state: receipt.outcome as 'completed' | 'failed' | 'blocked',
       receipt: receipt as HelpRequest['receipt'],
     };
-  if (request.state === 'rejected') return request;
+  if (
+    ['rejected', 'completed', 'failed', 'blocked', 'expired'].includes(
+      request.state
+    )
+  )
+    return request;
   if (!liveCredential(s.credentials[request.requesterWorkerId], now))
     return { ...request, state: 'unavailable', reason: 'identity' };
   const target = request.proposal.targetWorkerId;
@@ -369,6 +412,18 @@ function admission(s: FleetState, input: unknown): Mission {
 function uuidFrom(value: string): string {
   const h = digest(value);
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+function boundedProjection<T>(items: T[], maxBytes: number): T[] {
+  const result: T[] = [];
+  let bytes = 2;
+  for (const item of items) {
+    const size = Buffer.byteLength(JSON.stringify(item)) + 1;
+    if (bytes + size > maxBytes) break;
+    result.push(item);
+    bytes += size;
+  }
+  if (items.length && !result.length) throw new FleetError('INTERNAL');
+  return result;
 }
 function capacity(records: Record<string, unknown>, limit: number) {
   if (Object.keys(records).length >= limit)
@@ -442,22 +497,99 @@ export class FleetDispatcher {
   }
   private async mutate<T>(
     profileId: string,
-    fn: (s: FleetState) => T
+    fn: (s: FleetState) => T | Promise<T>
   ): Promise<T> {
     for (let attempt = 0; attempt < 12; attempt++) {
       const before = await this.deps.backend.get(key(profileId));
       const next = state(before),
-        result = fn(next);
+        result = await fn(next);
+      const archived = this.archival()
+        ? compactFleetState(profileId, next, this.now())
+        : [];
       const written =
         before === null || before === undefined
           ? await this.deps.backend.setIfAbsent(key(profileId), next, STORE_TTL)
-          : await this.deps.backend.compareAndSet(
-              key(profileId),
-              before,
-              next,
-              STORE_TTL
-            );
+          : archived.length > 0
+            ? await this.deps.backend.compareAndSetWithRecords!(
+                key(profileId),
+                before,
+                next,
+                archived,
+                STORE_TTL
+              )
+            : await this.deps.backend.compareAndSet(
+                key(profileId),
+                before,
+                next,
+                STORE_TTL
+              );
       if (written) return result;
+    }
+    throw new FleetError('TEMPORARILY_UNAVAILABLE', true);
+  }
+  private archival() {
+    return (
+      !!this.deps.backend.compareAndSetWithRecords &&
+      !!this.deps.backend.listRecords
+    );
+  }
+  /** Called only inside an authenticated/approved CAS attempt. */
+  private async archived<T>(
+    profileId: string,
+    kind: ArchiveKind,
+    id: string
+  ): Promise<T | undefined> {
+    if (!this.archival()) return undefined;
+    return readArchiveValue<T>(
+      await this.deps.backend.get(fleetArchiveKey(profileId, kind, id)),
+      kind,
+      id
+    );
+  }
+  private async history(
+    profileId: string,
+    workerId: string,
+    after: number,
+    limit: number
+  ) {
+    if (!this.archival()) return undefined;
+    const rows = await this.deps.backend.listRecords!(
+      fleetHistoryPrefix(profileId, workerId),
+      fleetHistoryKey(profileId, workerId, after),
+      limit + 1
+    );
+    const entries = boundedProjection(
+      rows.slice(0, limit).map(row => fleetHistoryEntrySchema.parse(row.value)),
+      256 * 1024
+    );
+    return {
+      entries,
+      nextCursor:
+        rows.length > entries.length ? entries.at(-1)!.sequence : null,
+    };
+  }
+  private async prepareInvocation(
+    profileId: string,
+    token: string | undefined,
+    scope: string
+  ) {
+    if (!this.archival()) return;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const before = await this.deps.backend.get(key(profileId));
+      const next = state(before);
+      authenticate(next, token, profileId, scope, this.now());
+      const rows = compactFleetState(profileId, next, this.now());
+      if (rows.length === 0) return;
+      if (
+        await this.deps.backend.compareAndSetWithRecords!(
+          key(profileId),
+          before,
+          next,
+          rows,
+          STORE_TTL
+        )
+      )
+        return;
     }
     throw new FleetError('TEMPORARILY_UNAVAILABLE', true);
   }
@@ -521,22 +653,26 @@ export class FleetDispatcher {
       .object({ workerId: z.string().regex(/^[a-z][a-z0-9-]{2,63}$/) })
       .strict();
     const parsed = (
-      operation === 'assign'
-        ? fleetMissionSchema
-        : operation === 'accept'
-          ? acceptSchema
-          : operation === 'reject'
-            ? rejectSchema
-            : operation === 'provision' || operation === 'rotate'
-              ? provisionSchema
-              : revokeSchema
+      operation === 'delegate'
+        ? summerDelegationInputSchema
+        : operation === 'undelegate'
+          ? summerUndelegationInputSchema
+          : operation === 'assign'
+            ? fleetMissionSchema
+            : operation === 'accept'
+              ? acceptSchema
+              : operation === 'reject'
+                ? rejectSchema
+                : operation === 'provision' || operation === 'rotate'
+                  ? provisionSchema
+                  : revokeSchema
     ).parse(input) as Record<string, unknown>;
     safeText(parsed);
     const token =
       operation === 'provision' || operation === 'rotate'
         ? `jwf.${profileId}.${parsed.workerId}.${randomBytes(32).toString('base64url')}`
         : undefined;
-    return this.mutate(profileId, s => {
+    return this.mutate(profileId, async s => {
       const approval = s.approvals[approvalId];
       if (
         !approval ||
@@ -546,7 +682,19 @@ export class FleetDispatcher {
         approval.hash !== digest(stable({ profileId, operation, input }))
       )
         throw new FleetError('CONFIRMATION_REQUIRED');
-      if (operation === 'provision' || operation === 'rotate') {
+      if (operation === 'delegate') {
+        const delegation = installSummerDelegation(
+          s,
+          profileId,
+          actor,
+          parsed,
+          this.now()
+        );
+        approval.consumed = true;
+        return { delegation };
+      } else if (operation === 'undelegate') {
+        revokeSummerDelegation(s, profileId, this.now());
+      } else if (operation === 'provision' || operation === 'rotate') {
         const workerId = parsed.workerId as string;
         const previous = s.credentials[workerId];
         if (operation === 'provision' ? !!previous : !previous)
@@ -646,8 +794,16 @@ export class FleetDispatcher {
           (mission.command.startsWith('artist.') && !mission.argument)
         )
           throw new FleetError('VALIDATION_FAILED');
-        if (s.missions[mission.missionId]) throw new FleetError('CONFLICT');
-        if (operation === 'assign' && s.requests[mission.missionId])
+        if (
+          s.missions[mission.missionId] ||
+          (await this.archived(profileId, 'missions', mission.missionId))
+        )
+          throw new FleetError('CONFLICT');
+        if (
+          operation === 'assign' &&
+          (s.requests[mission.missionId] ||
+            (await this.archived(profileId, 'requests', mission.missionId)))
+        )
           throw new FleetError('CONFLICT');
         // One active admission per canonical Linear issue avoids duplicate work.
         if (
@@ -683,9 +839,28 @@ export class FleetDispatcher {
     });
   }
   /** Founder-only projection reads the same state used by workers, no second fleet. */
-  async inspect(profileId: string) {
+  async inspect(
+    profileId: string,
+    history?: { workerId: string; after?: number; limit?: number }
+  ) {
     const s = state(await this.deps.backend.get(key(profileId)));
+    if (history && !s.credentials[history.workerId])
+      throw new FleetError('FORBIDDEN');
     return {
+      historyWorkers: Object.entries(s.historySequences).map(
+        ([workerId, latestSequence]) => ({ workerId, latestSequence })
+      ),
+      ...(history
+        ? {
+            history: await this.history(
+              profileId,
+              history.workerId,
+              history.after ?? 0,
+              history.limit ?? 50
+            ),
+          }
+        : {}),
+      summer: s.summer ?? null,
       workers: Object.values(s.workers),
       missions: Object.values(s.missions),
       leases: Object.values(s.leases),
@@ -700,6 +875,71 @@ export class FleetDispatcher {
   async requestMission(profileId: string, input: unknown) {
     return admission(state(await this.deps.backend.get(key(profileId))), input);
   }
+  /** OIDC route calls these methods only after exact founder-profile binding. */
+  async pendingSummerEvents(profileId: string) {
+    if (!this.deps.enabled) throw new FleetError('FEATURE_DISABLED');
+    return pendingSummerEvents(
+      state(await this.deps.backend.get(key(profileId)))
+    );
+  }
+  async processSummerEvent(
+    profileId: string,
+    eventId: string,
+    validateMission: (mission: unknown) => Promise<boolean>
+  ) {
+    if (!this.deps.enabled) throw new FleetError('FEATURE_DISABLED');
+    const archivedDecision = async (s: FleetState) => {
+      if (s.summer?.events[eventId]) return;
+      const archived = await this.archived<FleetSummerEvent>(
+        profileId,
+        'summerEvents',
+        eventId
+      );
+      if (!archived) return;
+      if (!archived.receipt || archived.state === 'pending')
+        throw new FleetSummerError('CONFLICT');
+      // Reuse binding checks without restoring archived work to hot state.
+      const replay = planSummerDecision(
+        { ...s, summer: { events: { [eventId]: archived } } },
+        profileId,
+        eventId,
+        this.now()
+      );
+      if (replay.kind !== 'terminal') throw new FleetSummerError('CONFLICT');
+      return replay;
+    };
+    // Stamp before any provider read so one unavailable canonical issue cannot
+    // monopolize repair. Attempt metadata is deliberately outside plan authority.
+    const plan = await this.mutate(profileId, async s => {
+      const replay = await archivedDecision(s);
+      if (replay) return replay;
+      const event = s.summer?.events[eventId];
+      if (event?.state === 'pending') event.lastAttemptAt = iso(this.now());
+      return planSummerDecision(s, profileId, eventId, this.now());
+    });
+    if (plan.kind === 'terminal')
+      return { status: 'completed' as const, receipt: plan.receipt };
+    if (plan.kind === 'blocked')
+      return { status: 'blocked' as const, reason: plan.reason };
+    // Provider reads are bounded by the existing Linear adapter. The exact plan
+    // is rechecked in the final CAS; an OIDC wake never grants arbitrary work.
+    const valid =
+      plan.kind === 'accept' ? await validateMission(plan.mission) : false;
+    const receipt = await this.mutate(
+      profileId,
+      async s =>
+        (await archivedDecision(s))?.receipt ??
+        applySummerDecision(
+          s,
+          profileId,
+          eventId,
+          plan.proof,
+          valid,
+          this.now()
+        )
+    );
+    return { status: 'completed' as const, receipt };
+  }
   async invoke(
     id: FleetActionId,
     raw: unknown,
@@ -713,8 +953,10 @@ export class FleetDispatcher {
       receipt: { ...receipt, status: 'unavailable' },
       error: {
         code:
-          error instanceof FleetError ? error.code : 'TEMPORARILY_UNAVAILABLE',
-        messageKey: `errors.actions.fleet.${error instanceof FleetError ? error.code : 'TEMPORARILY_UNAVAILABLE'}`,
+          error instanceof FleetError || error instanceof FleetSummerError
+            ? error.code
+            : 'TEMPORARILY_UNAVAILABLE',
+        messageKey: `errors.actions.fleet.${error instanceof FleetError || error instanceof FleetSummerError ? error.code : 'TEMPORARILY_UNAVAILABLE'}`,
         retryable: error instanceof FleetError ? error.retryable : true,
       },
     });
@@ -734,7 +976,8 @@ export class FleetDispatcher {
       hash = digest(stable({ id, input }));
     let operation: DefectOperation | undefined;
     try {
-      const result = await this.mutate(profileId, s => {
+      await this.prepareInvocation(profileId, token, scope);
+      const result = await this.mutate(profileId, async s => {
         operation = undefined;
         const workerId = authenticate(s, token, profileId, scope, this.now());
         const credentialId = s.credentials[workerId].credentialId;
@@ -743,17 +986,30 @@ export class FleetDispatcher {
         const invocationId = digest(
           `${profileId}:${workerId}:${id}:${envelope.idempotencyKey}${credentialId ? `:${credentialId}` : ''}`
         );
-        const replay = s.invocations[invocationId];
+        const replay: ArchivedInvocation | undefined =
+          s.invocations[invocationId] ??
+          (await this.archived<ArchivedInvocation>(
+            profileId,
+            'invocations',
+            invocationId
+          )) ??
+          (await this.archived<ArchivedInvocation>(
+            profileId,
+            'invocationRetries',
+            invocationId
+          ));
         if (replay) {
           if (replay.hash !== hash) throw new FleetError('CONFLICT');
           if (
+            replay.result &&
             replay.result.status !== 'in_progress' &&
             id !== 'fleet.directory' &&
             id !== 'fleet.status'
           )
             return replay.result;
         }
-        if (!replay) capacity(s.invocations, CAPACITY.invocations);
+        if (!s.invocations[invocationId])
+          capacity(s.invocations, CAPACITY.invocations);
         safeText(input);
         let data: Record<string, unknown>;
         if (id === 'fleet.register') {
@@ -788,26 +1044,83 @@ export class FleetDispatcher {
           const current = Object.values(s.leases).find(
             l => l.workerId === workerId && active(l, this.now())
           );
-          if (id === 'fleet.status')
+          if (id === 'fleet.status') {
+            const requests = Object.values(s.requests)
+              .filter(
+                r =>
+                  r.requesterWorkerId === workerId ||
+                  s.requestWorkers[r.requestId]?.includes(workerId) ||
+                  Object.values(s.leases).some(
+                    l =>
+                      l.workerId === workerId &&
+                      l.mission.missionId === r.requestId
+                  )
+              )
+              .sort((a, b) =>
+                a.requestId < b.requestId
+                  ? -1
+                  : a.requestId > b.requestId
+                    ? 1
+                    : 0
+              );
+            const remaining = requests.filter(
+              r =>
+                !input.requestsAfter ||
+                r.requestId > String(input.requestsAfter)
+            );
+            const requestPage = boundedProjection(
+              remaining.map(r => requestView(s, r, this.now())),
+              128 * 1024
+            );
+            const receipts = Object.values(s.receipts)
+              .filter(r => r.workerId === workerId)
+              .sort((a, b) => b.reportedAt.localeCompare(a.reportedAt));
+            const history = await this.history(
+              profileId,
+              workerId,
+              Number(input.historyAfter ?? 0),
+              Number(input.historyLimit ?? 50)
+            );
+            const historicalRequests =
+              history?.entries.flatMap(entry =>
+                entry.kind === 'request' ? [entry.request] : []
+              ) ?? [];
             data = {
               worker,
               lease: current ?? null,
-              receipts: Object.values(s.receipts).filter(
-                r => r.workerId === workerId
+              receipts: boundedProjection(receipts, 128 * 1024),
+              requests: boundedProjection(
+                [...requestPage, ...historicalRequests],
+                128 * 1024
               ),
-              requests: Object.values(s.requests)
-                .filter(
-                  r =>
-                    r.requesterWorkerId === workerId ||
-                    Object.values(s.leases).some(
-                      l =>
-                        l.workerId === workerId &&
-                        l.mission.missionId === r.requestId
-                    )
-                )
-                .map(r => requestView(s, r, this.now())),
+              requestsNextCursor:
+                requestPage.length < remaining.length
+                  ? requestPage.at(-1)!.requestId
+                  : null,
+              ...(this.archival()
+                ? {
+                    history: {
+                      ...history,
+                      pending:
+                        Object.values(s.receipts).some(
+                          r =>
+                            r.workerId === workerId &&
+                            !s.receiptHistoryRecorded[r.receiptId]
+                        ) ||
+                        requests.some(r =>
+                          [
+                            'completed',
+                            'failed',
+                            'blocked',
+                            'expired',
+                            'rejected',
+                          ].includes(requestView(s, r, this.now()).state)
+                        ),
+                    },
+                  }
+                : {}),
             };
-          else if (id === 'fleet.directory') {
+          } else if (id === 'fleet.directory') {
             if (!worker.authority) throw new FleetError('REQUIRES_INPUT');
             data = {
               workers: Object.values(s.workers).filter(
@@ -849,7 +1162,13 @@ export class FleetDispatcher {
                 throw new FleetError('FORBIDDEN');
             }
             const requestId = input.requestId as string;
-            const previous = s.requests[requestId];
+            const previous =
+              s.requests[requestId] ??
+              (await this.archived<HelpRequest>(
+                profileId,
+                'requests',
+                requestId
+              ));
             if (previous) {
               if (
                 previous.requesterWorkerId !== workerId ||
@@ -864,6 +1183,7 @@ export class FleetDispatcher {
             } else {
               if (
                 s.missions[requestId] ||
+                (await this.archived(profileId, 'missions', requestId)) ||
                 Object.values(s.receipts).some(r => r.missionId === requestId)
               )
                 throw new FleetError('CONFLICT');
@@ -887,6 +1207,7 @@ export class FleetDispatcher {
                 state: 'pending',
               });
               s.requests[requestId] = request;
+              enqueueSummerRequest(s, profileId, request, this.now());
               data = { request };
             }
           } else if (id === 'work.next') {
@@ -943,17 +1264,34 @@ export class FleetDispatcher {
                 };
                 capacity(s.leases, CAPACITY.receipts);
                 s.leases[lease.leaseId] = lease;
+                if (s.requests[mission.missionId])
+                  s.requestWorkers[mission.missionId] = [
+                    ...new Set([
+                      ...(s.requestWorkers[mission.missionId] ?? []),
+                      workerId,
+                    ]),
+                  ];
                 if (credentialId)
                   s.leaseCredentials[lease.leaseId] = credentialId;
                 data = { lease };
               }
             }
           } else {
-            const lease = s.leases[input.leaseId as string];
+            const leaseId = input.leaseId as string;
+            const historic = s.leases[leaseId]
+              ? undefined
+              : await this.archived<ArchivedLease>(
+                  profileId,
+                  'leases',
+                  leaseId
+                );
+            const lease = s.leases[leaseId] ?? historic?.lease;
             if (
               !lease ||
               lease.workerId !== workerId ||
-              s.leaseCredentials[lease.leaseId] !== credentialId
+              (historic
+                ? historic.credentialId
+                : s.leaseCredentials[lease.leaseId]) !== credentialId
             )
               throw new FleetError('FORBIDDEN');
             if (id === 'work.claim') {
@@ -972,9 +1310,15 @@ export class FleetDispatcher {
               data = { lease };
             } else if (id === 'work.report') {
               evidenceSafe(input.evidence as Evidence[]);
-              const previous = Object.values(s.receipts).find(
-                r => r.leaseId === lease.leaseId
-              );
+              const previous =
+                Object.values(s.receipts).find(
+                  r => r.leaseId === lease.leaseId
+                ) ??
+                (await this.archived<TerminalReceipt>(
+                  profileId,
+                  'receipts',
+                  lease.leaseId
+                ));
               if (previous) {
                 if (
                   stable({
@@ -1068,8 +1412,14 @@ export class FleetDispatcher {
                 attemptId: randomUUID(),
                 fingerprint,
                 issueId:
-                  s.defects[fingerprint]?.issueId ??
-                  uuidFrom(`jovie-fleet-defect:${fingerprint}`),
+                  (
+                    s.defects[fingerprint] ??
+                    (await this.archived<Issue>(
+                      profileId,
+                      'defects',
+                      fingerprint
+                    ))
+                  )?.issueId ?? uuidFrom(`jovie-fleet-defect:${fingerprint}`),
                 input,
                 leaseId: lease.leaseId,
                 workerId,
@@ -1095,10 +1445,10 @@ export class FleetDispatcher {
         }
         const complete: FleetResult = { status: 'completed', receipt, data };
         // Store cloned data: later lease transitions must not mutate old receipts.
-        s.invocations[invocationId] = {
-          hash,
-          result: structuredClone(complete),
-        };
+        s.invocations[invocationId] =
+          id === 'fleet.status' || id === 'fleet.directory'
+            ? { hash, refresh: true }
+            : { hash, result: structuredClone(complete) };
         return complete;
       });
       if (!operation) return result;
@@ -1186,17 +1536,26 @@ export class FleetDispatcher {
         });
       }
       const resolved = issue;
-      return await this.mutate(profileId, s => {
+      return await this.mutate(profileId, async s => {
         authenticate(s, token, profileId, scope, this.now());
         const pending = s.pendingDefects[op.fingerprint];
         if (pending?.attemptId !== op.attemptId)
+          throw new FleetError('CONFLICT');
+        const archived = await this.archived<Issue>(
+          profileId,
+          'defects',
+          op.fingerprint
+        );
+        if (archived && archived.issueId !== resolved.issueId)
           throw new FleetError('CONFLICT');
         const complete: FleetResult = {
           status: 'completed',
           receipt: op.receipt,
           data: { ...resolved },
         };
-        s.defects[op.fingerprint] = resolved;
+        // Linear display metadata can change. Keep the immutable dedupe binding
+        // archived; the new invocation receipt records the current projection.
+        if (!archived) s.defects[op.fingerprint] = resolved;
         s.invocations[op.invocationId] = { hash: op.hash, result: complete };
         delete s.pendingDefects[op.fingerprint];
         return complete;

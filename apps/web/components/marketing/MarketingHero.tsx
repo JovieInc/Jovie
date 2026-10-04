@@ -1,9 +1,9 @@
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { CSSProperties, ElementType, ReactNode } from 'react';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
@@ -79,9 +79,9 @@ export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
   readonly primaryCta: MarketingHeroCta;
   readonly secondaryCta?: MarketingHeroCta;
   /**
-   * Proof element rendered below the hero copy. Defaults to the existing
-   * distributor logo bar (`HomeTrustSection`). Pass `false` to omit, or a
-   * node to override.
+   * Proof element rendered below the hero copy. Omitted by default: a logo
+   * bar needs a permission for the page (JOV-7795), so callers pass
+   * a `HomeTrustSection` with a placement explicitly. `false` also omits.
    *
    * Intentionally NO stats props: numeric social-proof claims must not
    * render here (decision, 2026-07-03 — unverifiable stats never ship;
@@ -287,7 +287,7 @@ function MarketingHeroCtaLink({
     >
       <LinkComponent
         href={cta.href}
-        prefetch={cta.prefetch}
+        prefetch={resolveMarketingAuthPrefetch(cta.href, cta.prefetch)}
         data-testid={cta.testId}
         data-primary-action={intent === 'primary' ? 'true' : undefined}
         data-cta-sign-up={cta.signUp ? 'true' : undefined}
@@ -364,15 +364,7 @@ function MarketingHeroContent({
           {media ? <div className='marketing-hero-media'>{media}</div> : null}
         </div>
       </MarketingContainer>
-      {logos === false ? null : (
-        <div className='marketing-hero-logos'>
-          {logos ?? (
-            <MarketingContainer width='page'>
-              <HomeTrustSection variant='compact' presentation='card' />
-            </MarketingContainer>
-          )}
-        </div>
-      )}
+      {logos ? <div className='marketing-hero-logos'>{logos}</div> : null}
     </MarketingHeroFrame>
   );
 }
