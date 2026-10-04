@@ -12,6 +12,14 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('settings page aliases', () => {
+  it('redirects the retired artist-profile settings page to Profile', async () => {
+    const { default: LegacyArtistProfilePage } = await import(
+      '../../../app/app/(shell)/settings/artist-profile/page'
+    );
+    LegacyArtistProfilePage();
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_PROFILE);
+  });
+
   it('redirects the settings root to the canonical account settings page', async () => {
     const { default: SettingsPage } = await import(
       '../../../app/app/(shell)/settings/page'
@@ -22,12 +30,9 @@ describe('settings page aliases', () => {
     expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_ACCOUNT);
   });
 
-  it('keeps artist profile settings on the shared shell route context path', () => {
+  it('keeps profile settings on the shared shell route context path', () => {
     const source = readFileSync(
-      resolve(
-        process.cwd(),
-        'app/app/(shell)/settings/artist-profile/page.tsx'
-      ),
+      resolve(process.cwd(), 'app/app/(shell)/settings/profile/page.tsx'),
       'utf8'
     );
 

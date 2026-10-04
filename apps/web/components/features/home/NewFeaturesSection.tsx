@@ -23,8 +23,8 @@ const outcomes = [
     description: 'Know your fans, not just your clicks.',
   },
   {
-    title: 'Optimization over time',
-    description: 'Automatic A/B testing by persona.',
+    title: 'Clear performance signals',
+    description: 'See which links and referrers drive fan action.',
   },
 ] as const;
 
@@ -42,15 +42,13 @@ const featureDetails = [
     color: 'green' as keyof typeof accentColors,
   },
   {
-    title: 'AI-driven personalization',
-    description:
-      'Ongoing A/B optimization for higher conversion with location, device, and persona awareness.',
+    title: 'Audience intelligence',
+    description: 'See the locations and devices behind each profile visit.',
     color: 'purple' as keyof typeof accentColors,
   },
   {
     title: 'Smart deep links',
-    description:
-      "Intuitive /listen, /tip paths that work with Instagram's multiple links for seamless navigation.",
+    description: 'Open native music apps from a single profile.',
     color: 'teal' as keyof typeof accentColors,
   },
   {
@@ -83,8 +81,8 @@ export function NewFeaturesSection() {
         {/* Section header */}
         <div className='text-center mb-12 sm:mb-16'>
           <h2 className='text-3xl md:text-4xl font-medium tracking-tight text-primary-token line-clamp-2'>
-            Sharable profile{' '}
-            <span className='text-accent-token'>built to convert</span>
+            Sharable Profile{' '}
+            <span className='text-accent-token'>Built to Convert</span>
           </h2>
           <p className='mt-4 text-base text-secondary-token max-w-xl mx-auto'>
             A focused profile system designed to turn attention into real fan

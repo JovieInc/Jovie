@@ -18,6 +18,245 @@ import {
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
+test('trusted source-read guards reject a deleted test on an old head and execute in the source checkout', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const step = workflow.jobs.deterministic.steps.find(
+    step =>
+      step.name === 'Validate disk-read source contracts from trusted base'
+  );
+  assert.ok(step, 'disk-read guards must run before queue admission');
+  const script = step.run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-read-bootstrap-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const runner = join(root, 'runner');
+  for (const dir of [repo, bin, runner]) mkdirSync(dir, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    const archive = execFileSync(
+      '/usr/bin/git',
+      ['archive', 'HEAD', 'scripts'],
+      { maxBuffer: 20 * 1024 * 1024 }
+    );
+    execFileSync('tar', ['-x', '-C', repo], { input: archive });
+    const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
+    mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
+    mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
+    const manifest = join(repo, 'apps/web/tests/node-environment-files.json');
+    writeFileSync(manifest, '["lib/merch/qa-gate.test.ts"]\n');
+    writeFileSync(retired, 'test fixture\n');
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
+      { mode: 0o755 }
+    );
+    git('init', '--quiet', '--initial-branch=source-head');
+    git('config', 'user.name', 'Source guard test');
+    git('config', 'user.email', 'source-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'trusted source-read guards');
+    git('branch', 'main');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    rmSync(join(repo, 'scripts'), { recursive: true });
+    rmSync(retired);
+    git('add', '--all');
+    git('commit', '--quiet', '-m', 'older head deletes a manifest-listed test');
+    const invoke = () =>
+      spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_BASE_REF: 'main',
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          RUNNER_TEMP: runner,
+          SOURCE_CHECKOUT: repo,
+        },
+      });
+    const rejected = invoke();
+    assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
+    assert.match(rejected.stdout, /node-environment-files: exit 1/);
+    writeFileSync(manifest, '[]\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'remove the retired manifest entry');
+    const accepted = invoke();
+    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+    assert.match(accepted.stdout, /node-environment-files: exit 0/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('source contract rejects a malformed story before queue admission', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const script = workflow.jobs.deterministic.steps
+    .find(step => step.name === 'Run deterministic source contract')
+    .run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-story-types-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const types = join(root, 'types');
+  for (const dir of [repo, bin, types]) mkdirSync(dir);
+  const story = join(repo, 'PersonCell.stories.ts');
+  const calls = join(root, 'pnpm.log');
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    // Unrelated prerequisites are isolated; the story boundary invokes the
+    // real TypeScript compiler rather than returning a canned failure.
+    writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    writeFileSync(
+      join(bin, 'pnpm'),
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "$FIXTURE_CALLS"
+case "$*" in
+  '--filter @jovie/web run typecheck:stories')
+    exec "$FIXTURE_NODE" "$FIXTURE_TSC" --noEmit --strict --skipLibCheck --typeRoots "$FIXTURE_TYPES" "$FIXTURE_STORY" ;;
+esac
+exit 0
+`,
+      { mode: 0o755 }
+    );
+    const writeStory = invalid =>
+      writeFileSync(
+        story,
+        `type PersonCellProps = { name: string };\nconst args: Partial<PersonCellProps> = { name: 'Anonymous Fan'${invalid ? ', anonymous: true' : ''} };\n`
+      );
+    writeStory(true);
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'Source story type test');
+    git('config', 'user.email', 'source-story-types@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'malformed story');
+    git('remote', 'add', 'origin', repo);
+    const invoke = () => {
+      writeFileSync(calls, '');
+      return spawnSync('/bin/bash', ['-eo', 'pipefail', '-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          FIXTURE_CALLS: calls,
+          FIXTURE_NODE: process.execPath,
+          FIXTURE_TSC: createRequire(import.meta.url).resolve(
+            'typescript/bin/tsc'
+          ),
+          FIXTURE_TYPES: types,
+          FIXTURE_STORY: story,
+        },
+      });
+    };
+    const rejected = invoke();
+    assert.notEqual(rejected.status, 0, rejected.stdout + rejected.stderr);
+    assert.match(rejected.stdout + rejected.stderr, /TS2353/);
+    assert.match(readFileSync(calls, 'utf8'), /typecheck:stories\n$/);
+    writeStory(false);
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'use supported story props');
+    const accepted = invoke();
+    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+    assert.match(readFileSync(calls, 'utf8'), /component-ship-gate/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('trusted UI admission rejects hover-only affordances even when the head lacks the checker', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const step = workflow.jobs.deterministic.steps.find(
+    step => step.name === 'Validate UI interaction source from trusted base'
+  );
+  assert.ok(step, 'UI source rules must run before queue admission');
+  assert.equal(
+    step.if,
+    undefined,
+    'metadata reuse must not skip current UI policy'
+  );
+  const root = mkdtempSync(join(tmpdir(), 'source-ui-bootstrap-'));
+  const repo = join(root, 'repo');
+  const runner = join(root, 'runner');
+  mkdirSync(join(repo, 'scripts'), { recursive: true });
+  mkdirSync(join(repo, 'apps/web/components'), { recursive: true });
+  mkdirSync(runner);
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const component = join(repo, 'apps/web/components/EvidenceLink.tsx');
+  try {
+    writeFileSync(
+      join(repo, 'scripts/design-frontend-skill-check.mjs'),
+      readFileSync('scripts/design-frontend-skill-check.mjs')
+    );
+    writeFileSync(component, 'export const EvidenceLink = () => <span />;\n');
+    git('init', '--quiet', '--initial-branch=source-head');
+    git('config', 'user.name', 'Source UI guard test');
+    git('config', 'user.email', 'source-ui-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'trusted UI policy');
+    git('branch', 'main');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    rmSync(join(repo, 'scripts'), { recursive: true });
+    writeFileSync(
+      component,
+      "export const EvidenceLink = () => <span className='opacity-0 group-hover:opacity-100' />;\n"
+    );
+    git('add', '--all');
+    git('commit', '--quiet', '-m', 'old head with hover-only evidence');
+    const invoke = () =>
+      spawnSync('/bin/bash', ['-c', step.run], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          BASE_BRANCH: 'main',
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          RUNNER_TEMP: runner,
+        },
+      });
+    const rejected = invoke();
+    assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
+    assert.match(rejected.stdout + rejected.stderr, /FS-006/);
+    writeFileSync(
+      component,
+      "export const EvidenceLink = () => <span className='opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100' />;\n"
+    );
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'make evidence keyboard discoverable');
+    const accepted = invoke();
+    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+    assert.match(accepted.stdout, /0 error\(s\)/);
+    const stale = spawnSync('/bin/bash', ['-c', step.run], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        BASE_BRANCH: 'main',
+        EXPECTED_HEAD: '0'.repeat(40),
+        RUNNER_TEMP: runner,
+      },
+    });
+    assert.notEqual(
+      stale.status,
+      0,
+      'a head mismatch must fail before policy execution'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('source and size checks wake when the PR base or contract text is edited', () => {
   for (const file of ['source-validation.yml', 'pr-size-guard.yml']) {
     const workflow = load(readFileSync(`.github/workflows/${file}`, 'utf8'));
@@ -761,4 +1000,160 @@ test('trusted context guard works for old heads and still rejects oversized merg
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// Metadata-only edits reuse the newest exact-head proof (ci-eff, 2026-10-04):
+// 262 of 303 same-head Source Validation reruns in 24h were PR body edits.
+function sourceValidationWorkflow() {
+  return load(readFileSync('.github/workflows/source-validation.yml', 'utf8'));
+}
+
+function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
+  const step = sourceValidationWorkflow().jobs.deterministic.steps.find(
+    candidate => candidate.id === 'reuse'
+  );
+  const root = mkdtempSync(join(tmpdir(), 'source-proof-reuse-'));
+  try {
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      join(root, 'runs.json'),
+      JSON.stringify({ workflow_runs: runs })
+    );
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n${ghFails ? 'exit 1' : `cat "${root}/runs.json"`}\n`,
+      { mode: 0o755 }
+    );
+    const output = join(root, 'output');
+    writeFileSync(output, '');
+    const result = spawnSync('bash', ['-c', step.run], {
+      encoding: 'utf8',
+      env: {
+        PATH: `${bin}:${process.env.PATH}`,
+        GITHUB_OUTPUT: output,
+        GH_TOKEN: 'test',
+        HEAD_SHA: sha,
+        HEAD_REF: 'agent/jov-1',
+        REPOSITORY: 'JovieInc/Jovie',
+        RUN_ID: '500',
+      },
+    });
+    let ghLog = '';
+    try {
+      ghLog = readFileSync(join(root, 'gh.log'), 'utf8');
+    } catch {}
+    return {
+      status: result.status,
+      stderr: result.stderr,
+      output: readFileSync(output, 'utf8'),
+      ghLog,
+    };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const proofRun = (id, conclusion, overrides = {}) => ({
+  id,
+  conclusion,
+  head_sha: 'a'.repeat(40),
+  head_branch: 'agent/jov-1',
+  path: '.github/workflows/source-validation.yml',
+  ...overrides,
+});
+
+test('a metadata-only edit reuses the newest green exact-head proof', () => {
+  const result = runProofReuse({
+    runs: [
+      proofRun(300, 'success'),
+      proofRun(400, 'success'),
+      proofRun(900, 'success'),
+    ],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.output, 'reuse=true\nproof_run=400\n');
+  assert.match(
+    result.ghLog,
+    /head_sha=a{40}&event=pull_request&status=completed/
+  );
+});
+
+test('a red, foreign, or unreadable predecessor runs the full source contract', () => {
+  /** @type {[string, { runs: object[], ghFails?: boolean, sha?: string }][]} */
+  const cases = [
+    [
+      'newest predecessor failed',
+      { runs: [proofRun(300, 'success'), proofRun(400, 'failure')] },
+    ],
+    [
+      'newest predecessor cancelled',
+      { runs: [proofRun(300, 'success'), proofRun(400, 'cancelled')] },
+    ],
+    [
+      'other branch',
+      { runs: [proofRun(400, 'success', { head_branch: 'other' })] },
+    ],
+    [
+      'other workflow',
+      {
+        runs: [proofRun(400, 'success', { path: '.github/workflows/ci.yml' })],
+      },
+    ],
+    ['no predecessor', { runs: [] }],
+    [
+      'run list unreadable',
+      { runs: [proofRun(400, 'success')], ghFails: true },
+    ],
+    ['malformed head', { runs: [proofRun(400, 'success')], sha: 'short' }],
+  ];
+  for (const [name, input] of cases) {
+    const result = runProofReuse(input);
+    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
+    assert.match(result.output, /^reuse=false\n/, name);
+  }
+});
+
+test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
+  const workflow = sourceValidationWorkflow();
+  const gate = "steps.reuse.outputs.reuse != 'true'";
+  const reuseStep = workflow.jobs.deterministic.steps[0];
+  assert.equal(reuseStep.id, 'reuse');
+  // Base retargets change the compared tree, so they never reuse a proof.
+  assert.equal(
+    reuseStep.if,
+    "${{ github.event.action == 'edited' && !github.event.changes.base }}"
+  );
+  for (const job of ['security', 'migration', 'coverage']) {
+    const [first, ...rest] = workflow.jobs[job].steps;
+    assert.equal(first.id, 'reuse', job);
+    assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
+    for (const step of rest)
+      assert.equal(step.if, gate, `${job}: ${step.name ?? step.uses}`);
+  }
+  const always = [
+    'Validate customer changelog decision from trusted base',
+    'Measure actual installed source dependency graph',
+    'Preserve exact source dependency evidence',
+  ];
+  const deterministic = workflow.jobs.deterministic.steps;
+  for (const name of always) {
+    const step = deterministic.find(candidate => candidate.name === name);
+    assert.ok(step, name);
+    assert.equal(
+      step.if,
+      undefined,
+      `${name} must run on a metadata-only edit`
+    );
+  }
+  assert.equal(
+    deterministic.find(
+      step => step.name === 'Run deterministic source contract'
+    ).if,
+    gate
+  );
+  assert.equal(
+    workflow.jobs.ready.steps[0].run,
+    'test "$RESULTS" = \'success,success,success,success\''
+  );
 });

@@ -157,7 +157,11 @@ async function captureOgCard(page, { url, outFile }) {
 /**
  * Capture every capturable step at both viewports.
  *
- * @param {{ baseUrl: string, handle: string, steps: import('./steps.mjs').FunnelStep[], outDir: string, settleMs?: number, throttleMobile?: boolean }} options
+ * `bypassSecret` (VERCEL_AUTOMATION_BYPASS_SECRET) opens a protected Vercel
+ * preview: one request per context sets Vercel's bypass cookie on the preview
+ * host only, so the secret never rides third-party requests.
+ *
+ * @param {{ baseUrl: string, handle: string, steps: import('./steps.mjs').FunnelStep[], outDir: string, settleMs?: number, throttleMobile?: boolean, bypassSecret?: string }} options
  */
 export async function captureFunnel({
   baseUrl,
@@ -166,6 +170,7 @@ export async function captureFunnel({
   outDir,
   settleMs = 2500,
   throttleMobile = true,
+  bypassSecret,
 }) {
   const axeSource = loadAxeSource();
   const browser = await chromium.launch();
@@ -199,6 +204,12 @@ export async function captureFunnel({
           // axe is injected as an inline script; CSP nonces would block it.
           bypassCSP: true,
         });
+        if (bypassSecret) {
+          const bypass = new URL('/', baseUrl);
+          bypass.searchParams.set('x-vercel-protection-bypass', bypassSecret);
+          bypass.searchParams.set('x-vercel-set-bypass-cookie', 'true');
+          await context.request.get(bypass.toString());
+        }
         await context.addInitScript(PERF_OBSERVER_SCRIPT);
         const page = await context.newPage();
         if (viewport === 'mobile' && throttleMobile)

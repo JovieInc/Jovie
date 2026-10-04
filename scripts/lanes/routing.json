@@ -1,0 +1,38 @@
+{
+  "schema": "jovie-lane-routing-policy/v1",
+  "about": "Risk floor per issue for remediation.route_issue (JOV-7706). Route costs and capabilities live on each lane's `routes` in providers.json. Frontier = protected surfaces (JOV-7343 blast radius) and company-OS orchestration (JOV-7701); bounded = frozen plans and mechanical work.",
+  "frontier": {
+    "labels": [
+      "route:frontier",
+      "protected",
+      "governance",
+      "ws:release-deploy",
+      "ws:symphony-throughput",
+      "ws:security-auth"
+    ],
+    "titlePatterns": [
+      "\\b(staging|production|release)[- ]controller\\b",
+      "\\bmerge[- ]queue\\b",
+      "\\b(admission|promotion|rollback|release[- ]lineage)\\b",
+      "\\b(model|provider|lane)[- ]rout(er|ing)\\b",
+      "\\b(governor|governance|control[- ]plane|authority)\\b",
+      "\\bcertification (policy|rules?)\\b",
+      "\\bmigrations?\\b",
+      "\\bentitlements?\\b"
+    ],
+    "bodyPatterns": [
+      "\\.github/workflows/(staging|production)-controller",
+      "scripts/lanes/(remediation|routing|providers)",
+      "apps/web/drizzle/migrations/"
+    ]
+  },
+  "bounded": {
+    "labels": [
+      "route:bounded",
+      "frozen-plan",
+      "mechanical",
+      "ws:docs-changelog"
+    ],
+    "bodyMarkers": ["<!-- frozen-plan", "## Frozen plan"]
+  }
+}

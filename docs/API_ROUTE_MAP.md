@@ -32,6 +32,19 @@
 |-------|---------|------|-------------|
 | `/api/v1/actions` | GET | `auth` | Read-only canonical Actions discovery. Resolves advisory capabilities for the four stable action IDs against an owned profile. No writes. |
 
+### External Operational Contracts
+
+These handlers intentionally have no in-repo HTTP caller. Their callers are
+sibling deployments, machine publishers, or source-repository automation.
+
+| Route | Methods | Auth | External Caller / Description |
+|-------|---------|------|-------------------------------|
+| `/api/hud/hermes-events` | GET, POST | HUD auth (GET); `HERMES_HUD_API_KEY` bearer (POST) | Hermes laptop publisher writes Agent OS events; HUD clients read the current feed |
+| `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer certification clients use the shared Ovie route projection |
+| `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
+| `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
+| `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
+
 ### Admin
 
 | Route | Methods | Auth | Description |
@@ -52,7 +65,6 @@
 | `/api/admin/feedback/[id]/dismiss` | POST | `admin` | Dismiss feedback item |
 | `/api/admin/fit-scores` | GET | `admin` | Get creator fit scores |
 | `/api/admin/impersonate` | POST | `admin` | Start admin impersonation |
-| `/api/admin/ingestion-health` | GET | `admin` | Ingestion pipeline health |
 | `/api/admin/investors/links` | GET, POST | `admin` | Investor link management |
 | `/api/admin/investors/links/[id]` | PUT, DELETE | `admin` | Update/delete investor link |
 | `/api/admin/investors/settings` | GET, PUT | `admin` | Investor portal settings |
@@ -65,6 +77,10 @@
 | `/api/admin/leads/qualify` | POST | `admin` | Qualify leads |
 | `/api/admin/leads/seed` | POST | `admin` | Seed leads |
 | `/api/admin/leads/settings` | GET, PUT | `admin` | Lead pipeline settings |
+| `/api/admin/ov-lists` | GET, POST | `admin` | Ovie lists + smart views (sidebar), create list |
+| `/api/admin/ov-lists/[id]` | GET, PATCH, DELETE | `admin` | List detail, rate/favorite/swipe/suggestion decisions |
+| `/api/admin/ov-lists/[id]/suggest` | POST | `admin` | Propose explainable auto-fill suggestions (never auto-adds) |
+| `/api/admin/ov-lists/creators` | GET | `admin` | Search existing creator profiles to add to a list |
 | `/api/admin/outreach` | GET, POST | `admin` | Outreach management |
 | `/api/admin/outreach/debug` | GET | `admin` | Debug outreach |
 | `/api/admin/outreach/settings` | GET | `admin` | Outreach settings |
@@ -225,7 +241,6 @@
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |
 | `/api/dashboard/releases/[releaseId]/tracks` | GET | `auth` | Release tracks |
-| `/api/dashboard/retargeting/attribution` | GET | `auth` | Retargeting attribution data |
 | `/api/dashboard/shop` | GET, POST | `auth` | Shop management |
 | `/api/dashboard/social-links` | GET, POST, PUT, PATCH, DELETE | `auth` | Social link CRUD; PUT/PATCH/DELETE accept optional `expectedVersion`, success returns `version`, stale writes return 409 `VERSION_CONFLICT` |
 | `/api/dashboard/tour-dates/[id]/analytics` | GET | `auth` | Tour date analytics |
@@ -243,7 +258,6 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/dsp/bio-sync` | GET, POST | `auth` | List bio sync providers or trigger bio sync |
-| `/api/dsp/bio-sync/status` | GET | `auth` | Get bio sync job status |
 | `/api/dsp/discover` | POST | `auth` | Trigger DSP artist discovery for cross-platform matching |
 | `/api/dsp/enrichment/status` | GET | `auth` | Get DSP enrichment status for a profile |
 | `/api/dsp/matches` | GET | `auth` | List DSP artist match suggestions |
@@ -254,7 +268,6 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/youtube-library/links` | GET | `auth` | Approval queue: pending_review video↔release ISRC links for the user's profiles |
 | `/api/youtube-library/links/[id]/approve` | POST | `auth` | Approve a pending ISRC release link (owner only) |
 | `/api/youtube-library/links/[id]/reject` | POST | `auth` | Reject a pending ISRC release link with a reason (owner only) |
 | `/api/youtube-library/videos/[videoId]/optimization` | GET | `auth` | Evidence-backed YouTube thumbnail, metric, and experiment snapshot |
@@ -413,7 +426,6 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/pre-save/apple` | POST | `auth` | Submit Apple Music pre-save |
-| `/api/pre-save/spotify/start` | GET | `public` | Initiate Spotify OAuth for pre-save |
 | `/api/pre-save/spotify/callback` | GET | `public` | Handle Spotify OAuth callback |
 
 ### Profile
@@ -421,14 +433,6 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/profile/view` | POST | `public` | Increment profile view count (bot-filtered) |
-
-### Referrals
-
-| Route | Methods | Auth | Description |
-|-------|---------|------|-------------|
-| `/api/referrals/apply` | POST | `auth` | Apply a referral code |
-| `/api/referrals/code` | GET, POST | `auth` | Get or generate referral code |
-| `/api/referrals/stats` | GET | `auth` | Get referral statistics and earnings |
 
 ### Revalidate
 

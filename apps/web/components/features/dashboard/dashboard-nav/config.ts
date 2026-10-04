@@ -20,9 +20,11 @@ import {
   UserCircle,
   Users,
 } from 'lucide-react';
+import type { SettingsAdmission } from '@/components/features/settings/settings-decision-admission';
 
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
+import type { AppFlagName } from '@/lib/flags/contracts';
 
 import { CUSTOMER_NAV_CAPACITY, partitionCustomerNavigation } from './capacity';
 import type { NavItem } from './types';
@@ -80,7 +82,7 @@ export const contactsNavItem: NavItem = {
   icon: IdCard,
   iconName: 'IdCard',
   tier: 'core',
-  description: 'Manage artist contacts',
+  description: 'Manage contacts',
 };
 
 export const presenceNavItem: NavItem = {
@@ -91,7 +93,17 @@ export const presenceNavItem: NavItem = {
   iconName: 'User',
   tier: 'core',
   description: PRODUCT_ONTOLOGY.identity.definition,
+  requiredFlag: 'PROFILES_WORKSPACE',
 };
+
+/** Drop destinations whose required flag is off. Missing values stay hidden. */
+export function navigationVisibleForFlags<
+  T extends { requiredFlag?: AppFlagName },
+>(items: readonly T[], flags: Partial<Record<AppFlagName, boolean>>): T[] {
+  return items.filter(
+    item => !item.requiredFlag || flags[item.requiredFlag] === true
+  );
+}
 
 export const linksNavItem: NavItem = {
   name: 'Links',
@@ -164,18 +176,41 @@ export const settingsNavItem: NavItem = {
   icon: Settings,
 };
 
+export type SettingsNavItem = NavItem & { admission: SettingsAdmission };
+
 /** User-level settings: account, preferences, billing */
-export const userSettingsNavigation: NavItem[] = [
+export const userSettingsNavigation: SettingsNavItem[] = [
   {
     name: 'Account',
     href: APP_ROUTES.SETTINGS_ACCOUNT,
     id: 'account',
+    admission: {
+      userJob:
+        'Manage account identity, security and display theme for legibility',
+      scope: 'account',
+      roles: ['account-control', 'preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_ACCOUNT,
+      screenRationale:
+        'Account identity, security and display preferences share a stable destination.',
+      defaultBehavior: 'Follow the system theme',
+      overrideReason:
+        'People can choose Light, Dark or System for visual comfort and legibility',
+    },
     icon: ShieldCheck,
   },
   {
     name: 'Connections',
     href: APP_ROUTES.SETTINGS_CONNECTORS,
     id: 'connections',
+    admission: {
+      userJob:
+        'Review connected services, permissions and scopes; repair access',
+      scope: 'account',
+      roles: ['status', 'consent', 'account-control'],
+      canonicalRoute: APP_ROUTES.SETTINGS_CONNECTORS,
+      screenRationale:
+        'Service access, consent and recovery belong together; individual task approvals belong in their workflow.',
+    },
     icon: Plug,
     description: 'Manage account-authorized services',
   },
@@ -183,60 +218,133 @@ export const userSettingsNavigation: NavItem[] = [
     name: 'Usage Stats',
     href: APP_ROUTES.SETTINGS_USAGE,
     id: 'usage',
+    admission: {
+      userJob:
+        'Understand message allowance, remaining capacity and reset timing',
+      scope: 'account',
+      roles: ['status'],
+      canonicalRoute: APP_ROUTES.SETTINGS_USAGE,
+      screenRationale:
+        'A direct usage destination supports an informed capacity decision using the same snapshot as contextual usage.',
+    },
     icon: Gauge,
   },
   {
     name: 'Billing & Subscription',
     href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
+    admission: {
+      userJob: 'Review subscription terms and manage the current plan',
+      scope: 'account',
+      roles: ['status', 'account-control'],
+      canonicalRoute: APP_ROUTES.SETTINGS_BILLING,
+      screenRationale:
+        'Subscription terms and consequential plan controls require a stable destination.',
+    },
     icon: Banknote,
   },
   {
     name: 'Data & Privacy',
     href: APP_ROUTES.SETTINGS_DATA_PRIVACY,
     id: 'data-privacy',
+    admission: {
+      userJob: 'Review privacy choices and export personal data',
+      scope: 'account',
+      roles: ['consent', 'account-control'],
+      canonicalRoute: APP_ROUTES.SETTINGS_DATA_PRIVACY,
+      screenRationale:
+        'Privacy decisions and consequential data controls must remain discoverable.',
+    },
     icon: Lock,
   },
 ];
 
 /** Payments settings item — feature-gated, included conditionally */
-export const paymentsNavItem: NavItem = {
+export const paymentsNavItem: SettingsNavItem = {
   name: 'Payments',
   href: APP_ROUTES.SETTINGS_PAYMENTS,
   id: 'payments',
+  admission: {
+    userJob: 'Review payment connection status and manage payout setup',
+    scope: 'account',
+    roles: ['status', 'consent', 'account-control'],
+    canonicalRoute: APP_ROUTES.SETTINGS_PAYMENTS,
+    screenRationale:
+      'Feature-gated payment setup needs explicit access and financial context.',
+  },
   icon: HandCoins,
 };
 
 /** Artist-level settings: profile, links, branding, tracking */
-export const artistSettingsNavigation: NavItem[] = [
+export const artistSettingsNavigation: SettingsNavItem[] = [
   {
     name: 'Profile',
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    href: APP_ROUTES.SETTINGS_PROFILE,
     id: 'artist-profile',
+    admission: {
+      userJob: 'Edit artist identity and public profile details',
+      scope: 'profile',
+      roles: ['preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      screenRationale:
+        'Related public identity controls share one profile destination.',
+    },
     icon: UserCircle,
   },
   {
     name: 'Contacts',
     href: APP_ROUTES.SETTINGS_CONTACTS,
     id: 'contacts',
+    admission: {
+      userJob: 'Manage public contact details and contact visibility',
+      scope: 'profile',
+      roles: ['preference', 'consent'],
+      canonicalRoute: APP_ROUTES.SETTINGS_CONTACTS,
+      screenRationale:
+        'Contact methods and their visibility need a coherent review context.',
+    },
     icon: IdCard,
   },
   {
     name: 'Touring',
     href: APP_ROUTES.SETTINGS_TOURING,
     id: 'touring',
+    admission: {
+      userJob: 'Review tour-date service access and synchronization choices',
+      scope: 'workspace',
+      roles: ['status', 'consent', 'preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_TOURING,
+      screenRationale:
+        'Related touring integration choices share a recovery and configuration context.',
+    },
     icon: CalendarDays,
   },
   {
     name: 'Analytics',
     href: APP_ROUTES.SETTINGS_ANALYTICS,
     id: 'analytics',
+    admission: {
+      userJob: 'Control whether personal visits appear in analytics',
+      scope: 'profile',
+      roles: ['preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_ANALYTICS,
+      screenRationale:
+        'The existing analytics destination provides context for measurement preferences.',
+    },
     icon: PieChart,
   },
   {
     name: 'Audience & Tracking',
     href: APP_ROUTES.SETTINGS_AUDIENCE,
     id: 'audience-tracking',
+    admission: {
+      userJob: 'Review fan verification, opt-ins and audience tracking',
+      scope: 'profile',
+      roles: ['consent', 'preference'],
+      canonicalRoute: APP_ROUTES.SETTINGS_AUDIENCE,
+      screenRationale:
+        'Verification and tracking decisions need a coherent privacy context.',
+    },
     icon: MailCheck,
   },
 ];
@@ -297,3 +405,14 @@ export {
   customerNavVisibleCap,
   partitionCustomerNavigation,
 } from './capacity';
+
+/** Read metadata from the live navigation, including its gated entry. */
+export function getSettingsAdmission(id: string): SettingsAdmission {
+  const item = [
+    ...userSettingsNavigation,
+    ...artistSettingsNavigation,
+    paymentsNavItem,
+  ].find(item => item.id === id);
+  if (!item) throw new Error(`Missing settings admission: ${id}`);
+  return item.admission;
+}
