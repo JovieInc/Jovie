@@ -309,7 +309,12 @@ describe('visual CI harness', () => {
     expect(source.match(/waitUntil: 'domcontentloaded'/g)).toHaveLength(3);
     expect(source).not.toContain("waitUntil: 'networkidle'");
     expect(helper).toContain("await page.waitForLoadState('networkidle'");
-    expect(helper).toContain('page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`)');
+    expect(helper).toMatch(
+      /page\s*\.locator\(`a\[href="\$\{APP_ROUTES\.SIGNIN\}"\]:visible`\)/
+    );
+    expect(helper).toContain("name: 'Open menu'");
+    expect(helper).toContain('await mobileMenuButton.isVisible()');
+    expect(helper).toContain('await mobileMenuButton.click()');
     expect(helper).not.toContain("getByRole('link', { name:");
   });
 

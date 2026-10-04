@@ -13,6 +13,24 @@ function renderInTable(child: React.ReactNode) {
 }
 
 describe('TableCell', () => {
+  it('allows multiline wrapping without removing the fixed content ceiling', () => {
+    renderInTable(
+      <TableCell multiline>
+        <div>Investor</div>
+        <button type='button'>Copy token</button>
+      </TableCell>
+    );
+
+    const content = screen.getByRole('button', {
+      name: 'Copy token',
+    }).parentElement;
+    expect(content).toHaveClass('h-8', 'max-h-8', 'whitespace-normal');
+    expect(content).not.toHaveClass(
+      'h-auto',
+      'max-h-none',
+      'whitespace-nowrap'
+    );
+  });
   it('uses the canonical table cell density and typography preset', () => {
     renderInTable(<TableCell>Title</TableCell>);
 

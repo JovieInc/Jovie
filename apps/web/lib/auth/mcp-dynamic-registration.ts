@@ -2,9 +2,10 @@ import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { isAllowedMcpRedirectUri } from '@/lib/oauth/mcp-redirect-allowlist';
 
 /**
- * Better Auth dynamic client registration for the Ovie MCP OAuth flow.
+ * Better Auth dynamic client registration.
  * Default off. Override with FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true.
- * Read at Better Auth startup; discovery metadata reads it per request.
+ * Read at Better Auth startup; Better Auth discovery reads it per request.
+ * The founder Ovie issuer advertises /api/ovie/oauth/register independently.
  */
 export const OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION_FLAG =
   'OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION' as const;

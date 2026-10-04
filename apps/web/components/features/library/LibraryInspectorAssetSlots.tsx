@@ -1,13 +1,15 @@
 'use client';
 
 // @coverage-via apps/web/components/features/library/StatefulAssetSlot.test.tsx
+import { Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import {
   getLibraryItemKind,
   type LibraryReleaseAsset,
 } from '@/app/app/(shell)/library/library-data';
 import { toast } from '@/components/feedback';
-import { DrawerSection } from '@/components/molecules/drawer';
+import { InspectorSection } from '@/components/molecules/inspector';
 import {
   buildLibraryViewRoute,
   buildReleaseDownloadsRoute,
@@ -91,62 +93,97 @@ export function LibraryInspectorAssetSlots({
     [asset.id, onArtworkUploaded, releaseId]
   );
 
-  return (
-    <div data-testid='library-inspector-asset-slots'>
-      {SLOT_SECTIONS.map(([kind, title, acquireLabel, acquireHint]) => {
-        const slot = projectLibraryInspectorAssetSlot(
-          kind,
-          { ...asset, artworkUrl },
-          stems.length
-        );
-        const acquireHref =
-          kind === 'video'
-            ? buildLibraryViewRoute('videos')
-            : kind === 'docs'
-              ? buildLibraryViewRoute('documents')
-              : stemsHref;
+  const slots = SLOT_SECTIONS.map(
+    ([kind, title, acquireLabel, acquireHint]) => {
+      const slot = projectLibraryInspectorAssetSlot(
+        kind,
+        { ...asset, artworkUrl },
+        stems.length
+      );
+      const acquireHref =
+        kind === 'video'
+          ? buildLibraryViewRoute('videos')
+          : kind === 'docs'
+            ? buildLibraryViewRoute('documents')
+            : stemsHref;
+      return { kind, title, acquireLabel, acquireHint, slot, acquireHref };
+    }
+  );
+  const addTargets = slots.filter(
+    ({ kind, slot, acquireHref }) =>
+      slot.occupancy === 'empty' && kind !== 'artwork' && Boolean(acquireHref)
+  );
 
-        return (
-          <DrawerSection
-            key={kind}
-            sectionId={kind}
-            surface='card'
-            title={title}
-            defaultOpen={false}
-          >
-            <StatefulAssetSlot
-              kind={kind}
-              occupancy={slot.occupancy}
-              cardinality={slot.cardinality}
-              acquireMode={slot.acquireMode}
-              testIdPrefix={`library-${kind}`}
-              objectTitle={slot.objectTitle}
-              objectSubtitle={slot.objectSubtitle}
-              previewSrc={kind === 'artwork' ? artworkUrl : undefined}
-              accept={kind === 'artwork' ? IMAGE_ACCEPT : undefined}
-              disabled={disabled || (kind === 'artwork' && !releaseId)}
-              acquireLabel={acquireLabel}
-              acquireHint={acquireHint}
-              acquireHref={kind === 'artwork' ? undefined : acquireHref}
-              onFile={
-                kind === 'artwork' && releaseId ? handleArtworkFile : undefined
-              }
-              addHref={kind === 'stems' ? stemsHref : undefined}
-            >
-              {kind === 'stems'
-                ? stems.map(stem => (
-                    <p
-                      key={stem.id}
-                      className='truncate text-2xs text-secondary-token'
-                    >
-                      {stem.fileName}
-                    </p>
-                  ))
-                : null}
-            </StatefulAssetSlot>
-          </DrawerSection>
-        );
-      })}
+  return (
+    <div data-testid='library-inspector-asset-slots' className='space-y-4'>
+      {slots.map(
+        ({ kind, title, acquireLabel, acquireHint, slot, acquireHref }) => {
+          // Empty media-type buckets disappear; only artwork keeps its inline
+          // upload affordance because it is the object's primary visual file.
+          if (slot.occupancy === 'empty' && kind !== 'artwork') {
+            return null;
+          }
+
+          return (
+            <InspectorSection key={kind} title={title}>
+              <StatefulAssetSlot
+                kind={kind}
+                occupancy={slot.occupancy}
+                cardinality={slot.cardinality}
+                acquireMode={slot.acquireMode}
+                testIdPrefix={`library-${kind}`}
+                objectTitle={slot.objectTitle}
+                objectSubtitle={slot.objectSubtitle}
+                previewSrc={kind === 'artwork' ? artworkUrl : undefined}
+                accept={kind === 'artwork' ? IMAGE_ACCEPT : undefined}
+                disabled={disabled || (kind === 'artwork' && !releaseId)}
+                acquireLabel={acquireLabel}
+                acquireHint={acquireHint}
+                acquireHref={kind === 'artwork' ? undefined : acquireHref}
+                onFile={
+                  kind === 'artwork' && releaseId
+                    ? handleArtworkFile
+                    : undefined
+                }
+                addHref={kind === 'stems' ? stemsHref : undefined}
+              >
+                {kind === 'stems'
+                  ? stems.map(stem => (
+                      <p
+                        key={stem.id}
+                        className='truncate text-2xs text-secondary-token'
+                      >
+                        {stem.fileName}
+                      </p>
+                    ))
+                  : null}
+              </StatefulAssetSlot>
+            </InspectorSection>
+          );
+        }
+      )}
+      {addTargets.length > 0 ? (
+        <InspectorSection title='Add File'>
+          <div className='space-y-0.5'>
+            {addTargets.map(({ kind, acquireLabel, acquireHref }) => (
+              <Link
+                key={kind}
+                href={acquireHref ?? '#'}
+                data-testid={`library-${kind}-acquisition`}
+                data-asset-slot-mode='acquisition'
+                tabIndex={disabled ? -1 : undefined}
+                className='group flex min-h-8 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+              >
+                <Plus
+                  className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                  aria-hidden='true'
+                />
+                <span className='min-w-0 flex-1 truncate'>{acquireLabel}</span>
+              </Link>
+            ))}
+          </div>
+        </InspectorSection>
+      ) : null}
     </div>
   );
 }

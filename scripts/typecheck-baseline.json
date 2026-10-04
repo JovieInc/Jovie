@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-09-26T22:13:02.420Z",
-  "totalErrors": 119,
+  "generatedAt": "2026-10-04T01:10:59.356Z",
+  "totalErrors": 114,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -75,9 +75,6 @@
     "scripts/lib/github-update-branch.mjs": {
       "TS2339": 1
     },
-    "scripts/lib/merge-group-admission.mjs": {
-      "TS2339": 2
-    },
     "scripts/lib/merge-queue-guard.mjs": {
       "TS2339": 2,
       "TS2362": 1,
@@ -93,9 +90,6 @@
       "TS2339": 3
     },
     "scripts/linear-query-todo.mjs": {
-      "TS2339": 3
-    },
-    "scripts/linear-transition-issue.mjs": {
       "TS2339": 3
     },
     "scripts/observability-issue-github.mjs": {

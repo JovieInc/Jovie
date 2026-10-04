@@ -228,11 +228,10 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     expect(css).toContain('var(--space-');
     expect(css).toContain('max-width: 15rem');
     expect(css).toContain('object-fit: contain');
-    expect(css).toContain('background: var(--system-b-bg-surface-0)');
-    expect(css).toContain('box-shadow: none');
     expect(css).not.toContain('!important');
-    expect(css).toContain('ap-phone-frame__overlay');
-    expect(css).toContain('ap-phone-frame__notch');
+    // Device policy 2026-09-29: web previews are bezel-free.
+    expect(css).not.toContain('ap-phone-frame__overlay');
+    expect(css).not.toContain('ap-phone-frame__notch');
     expect(css).toContain('@media (max-width: 767px)');
     expect(css).not.toContain('.homepage-artist-outcome {');
     expect(css).not.toContain('--homepage-artist-outcome-copy-track');

@@ -101,7 +101,10 @@ export { SkeletonCell } from './atoms/SkeletonCell';
 export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
 export type { TableCellProps } from './atoms/TableCell';
-export { TableCell } from './atoms/TableCell';
+export {
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+  TableCell,
+} from './atoms/TableCell';
 export type {
   TableCheckboxCellLegacyProps,
   TableCheckboxCellProps,
@@ -219,8 +222,18 @@ export { UnifiedTableSkeleton } from './organisms/UnifiedTableSkeleton';
 // Hooks
 // =============================================================================
 
+export {
+  COLUMN_PRIORITY_HYSTERESIS_PX,
+  type ColumnPriorityLayout,
+  type ColumnPrioritySpec,
+  columnPrioritySpecsFromDefs,
+  resolveColumnPriorityLayout,
+  stabilizeColumnPriorityLayout,
+} from './column-priority';
 export type { UseAmbientListSelectionParams } from './hooks/useAmbientListSelection';
 export { useAmbientListSelection } from './hooks/useAmbientListSelection';
+export { useColumnPriorityLayout } from './hooks/useColumnPriorityLayout';
+export { useContainerWidth } from './hooks/useContainerWidth';
 export type {
   UseRowKeyboardOptions,
   UseRowKeyboardResult,

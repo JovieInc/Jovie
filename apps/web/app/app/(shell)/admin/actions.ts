@@ -10,6 +10,7 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
+import { claimAndEnqueueCustomerRecovery } from '@/lib/db/customer-recovery';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
@@ -192,6 +193,23 @@ export async function bulkRerunCreatorIngestionAction(
     .from(creatorProfiles)
     .where(inArray(creatorProfiles.id, profileIds));
 
+  const queuedCount = await enqueueCreatorIngestionProfiles(profiles);
+
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
+
+  return { queuedCount };
+}
+
+interface CreatorIngestionCandidate {
+  readonly id: string;
+  readonly spotifyId: string | null;
+  readonly spotifyUrl: string | null;
+}
+
+async function enqueueCreatorIngestionProfiles(
+  profiles: readonly CreatorIngestionCandidate[]
+): Promise<number> {
   const BATCH_SIZE = 25;
   let queuedCount = 0;
 
@@ -210,7 +228,15 @@ export async function bulkRerunCreatorIngestionAction(
           return null;
         }
 
-        // Enqueue DSP artist discovery alongside MusicFetch enrichment
+        const musicFetchJobId = await enqueueMusicFetchEnrichmentJob({
+          creatorProfileId: profile.id,
+          spotifyUrl,
+        });
+        if (!musicFetchJobId) {
+          return null;
+        }
+
+        // Enqueue supplemental DSP discovery only after the primary job exists.
         const spotifyArtistId =
           (profile.spotifyId?.trim() || null) ??
           (profile.spotifyUrl
@@ -232,20 +258,14 @@ export async function bulkRerunCreatorIngestionAction(
           });
         }
 
-        return enqueueMusicFetchEnrichmentJob({
-          creatorProfileId: profile.id,
-          spotifyUrl,
-        });
+        return musicFetchJobId;
       })
     );
 
     queuedCount += jobIds.filter(Boolean).length;
   }
 
-  revalidatePath(APP_ROUTES.ADMIN);
-  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
-
-  return { queuedCount };
+  return queuedCount;
 }
 
 export async function bulkSetCreatorsVerifiedAction(
@@ -667,4 +687,125 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
   }
 
   revalidatePath(APP_ROUTES.ADMIN);
+}
+
+export type CustomerIngestionRecoveryState =
+  | 'requested'
+  | 'already-running'
+  | 'missing-source'
+  | 'not-failed'
+  | 'not-found';
+
+export interface CustomerIngestionRecoveryReceipt {
+  readonly state: CustomerIngestionRecoveryState;
+  readonly queuedCount: number;
+  readonly checkedAt: string;
+}
+
+/**
+ * Customer recovery (JOV-7482): re-run failed artist ingestion for one
+ * creator profile through the same enrichment jobs as the Creators bulk
+ * action. Read-only refusal when the run is already in flight or the profile
+ * has no Spotify source — a duplicate retry could duplicate downstream
+ * enrichment work, so only a 'failed' profile with a source is eligible.
+ */
+export async function rerunCustomerIngestionAction(
+  formData: FormData
+): Promise<CustomerIngestionRecoveryReceipt> {
+  await requireAdmin();
+
+  const profileId = formData.get('profileId');
+  if (typeof profileId !== 'string' || profileId.length === 0) {
+    throw new TypeError('profileId is required');
+  }
+
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      spotifyId: creatorProfiles.spotifyId,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      ingestionStatus: creatorProfiles.ingestionStatus,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (!profile) {
+    return {
+      state: 'not-found',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (
+    profile.ingestionStatus === 'pending' ||
+    profile.ingestionStatus === 'processing'
+  ) {
+    return {
+      state: 'already-running',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (profile.ingestionStatus !== 'failed') {
+    return {
+      state: 'not-failed',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (!profile.spotifyId?.trim() && !profile.spotifyUrl?.trim()) {
+    return {
+      state: 'missing-source',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  const spotifyUrl =
+    profile.spotifyUrl?.trim() ||
+    `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId?.trim() ?? '')}`;
+
+  let jobId: string | null;
+  try {
+    jobId = await claimAndEnqueueCustomerRecovery({
+      creatorProfileId: profile.id,
+      spotifyUrl,
+    });
+  } catch (error) {
+    await captureError('Customer ingestion recovery enqueue failed', error, {
+      creatorProfileId: profile.id,
+    });
+    throw error;
+  }
+
+  if (!jobId) {
+    return {
+      state: 'already-running',
+      queuedCount: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  const spotifyArtistId =
+    (profile.spotifyId?.trim() || null) ??
+    extractSpotifyArtistId(profile.spotifyUrl ?? '');
+  if (spotifyArtistId) {
+    fireDspDiscovery({
+      creatorProfileId: profile.id,
+      spotifyArtistId,
+      onError: error =>
+        void captureError('DSP discovery enqueue failed', error, {
+          creatorProfileId: profile.id,
+        }),
+    });
+  }
+
+  revalidatePath(APP_ROUTES.ADMIN_PEOPLE);
+
+  return {
+    state: 'requested',
+    queuedCount: 1,
+    checkedAt: new Date().toISOString(),
+  };
 }

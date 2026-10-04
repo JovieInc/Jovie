@@ -5,7 +5,12 @@ import { RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
-import { PageToolbar, TableEmptyState } from '@/components/organisms/table';
+import {
+  PageToolbar,
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+  TableEmptyState,
+} from '@/components/organisms/table';
+import { TableDescription } from '@/components/organisms/table/molecules/TableDescription';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -172,9 +177,7 @@ function FlagNameCell({
       >
         {flagKey}
       </Button>
-      <span className='line-clamp-2 block text-xs leading-snug text-secondary-token'>
-        {description}
-      </span>
+      <TableDescription text={description} label={`${name} description`} />
     </div>
   );
 }
@@ -290,7 +293,10 @@ export function AdminFeaturesTable({
               flagKey={info.row.original.flagKey}
             />
           ),
-          meta: { className: 'min-w-70' },
+          meta: {
+            className: 'min-w-70',
+            cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+          },
         }),
         ...TIERS.map(tier =>
           columnHelper.accessor(tier.key, {
@@ -330,7 +336,11 @@ export function AdminFeaturesTable({
                 }
               />
             ),
-            meta: { className: 'w-32 min-w-32 text-center' },
+            meta: {
+              className: 'w-32 min-w-32',
+              align: 'center',
+              cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+            },
           })
         ),
       ] as ColumnDef<FeatureFlagRow, unknown>[],
@@ -354,6 +364,7 @@ export function AdminFeaturesTable({
       <AdminTableShell testId='admin-features-table' toolbar={toolbar}>
         {() => (
           <AdminDataTable
+            rowMode='controls'
             data={rows}
             columns={columns}
             enableVirtualization={false}

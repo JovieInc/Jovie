@@ -14,7 +14,7 @@ function release(
   date: string,
   sections: Partial<ChangelogRelease['sections']>
 ): ChangelogRelease {
-  return {
+  const value: ChangelogRelease = {
     version,
     kind: 'release',
     date,
@@ -28,6 +28,12 @@ function release(
       ...sections,
     },
   };
+  value.customerOutcomes = Object.fromEntries(
+    Object.values(value.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  );
+  return value;
 }
 
 describe('customer changelog projection', () => {
@@ -38,7 +44,7 @@ describe('customer changelog projection', () => {
           '**Review qualified brand deals in your Inbox:** See the buyer, budget, and source.',
         ],
         fixed: [
-          'Jovie Local no longer says you are offline while compiling (JOV-5339): first compile waits.',
+          'Signing in stays recoverable: Retry without losing your place.',
         ],
       }),
     ]);
@@ -50,13 +56,13 @@ describe('customer changelog projection', () => {
       category: 'new',
       prominence: 'featured',
       technicalVersion: '26.8.1',
-      availability: 'ga',
+      availability: 'unverified',
       media: null,
       capabilities: ['inbox'],
     });
     expect(entries[1]).toMatchObject({
-      title: 'Jovie Local no longer says you are offline while compiling',
-      technical: ['JOV-5339'],
+      title: 'Signing in stays recoverable',
+      technical: [],
       category: 'fixed',
       prominence: 'small',
     });
@@ -118,8 +124,7 @@ describe('customer changelog projection', () => {
     expect(entries[1]?.title).not.toContain('#15488');
     expect(entries[1]?.technical).toEqual(expect.arrayContaining(['#15488']));
 
-    expect(entries[2]?.title).not.toContain('JOV-5339');
-    expect(entries[2]?.technical).toEqual(expect.arrayContaining(['JOV-5339']));
+    expect(entries).toHaveLength(2); // Local development is not a customer outcome.
   });
 
   it('keeps Redis, admission, and synthetic identities on Level 3', () => {
@@ -146,6 +151,45 @@ describe('customer changelog projection', () => {
       title: 'Library is one catalog with Ideas, In Progress, and Out',
       explanation: 'documents share filters.',
     });
+  });
+
+  it('carries the publication action and supporting copy, defaulting safely', () => {
+    const bullet = 'Get updates from an artist: sign up on eligible profiles.';
+    const source = release('2026-10-02', '2026-10-02', {
+      changed: [bullet],
+    });
+    source.customerOutcomes = {
+      [bullet]: {
+        availability: 'limited',
+        prerequisites: ['Claimed artist profiles with updates enabled'],
+        supporting: [
+          'Fans opt in per artist; nothing is sent without a signup.',
+        ],
+        action: {
+          label: 'See it on a demo profile',
+          href: '/demo/showcase/tim-white-profile?mode=subscribe',
+        },
+      },
+    };
+
+    const [entry] = projectCustomerChangelog([source]);
+    expect(entry).toMatchObject({
+      title: 'Get updates from an artist',
+      availability: 'limited',
+      prerequisites: ['Claimed artist profiles with updates enabled'],
+      supporting: ['Fans opt in per artist; nothing is sent without a signup.'],
+      action: {
+        label: 'See it on a demo profile',
+        href: '/demo/showcase/tim-white-profile?mode=subscribe',
+      },
+    });
+    expect(CustomerChangelogEntrySchema.parse(entry)).toEqual(entry);
+
+    const [plain] = projectCustomerChangelog([
+      release('2026-10-02', '2026-10-02', { added: [bullet] }),
+    ]);
+    expect(plain.action).toBeNull();
+    expect(plain.supporting).toEqual([]);
   });
 
   it('groups outcomes by month newest first and formats tertiary version', () => {

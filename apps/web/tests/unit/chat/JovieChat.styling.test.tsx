@@ -12,8 +12,10 @@ import {
   vi,
 } from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
+import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
+import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 const virtualizerSpy = vi.hoisted(() => ({
@@ -137,8 +139,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       reject: vi.fn(),
       isActioning: false,
     }),
-    useJovieChat: () => ({
-      input: '',
+    useJovieChatController: () => ({
+      draft: createComposerDraft(''),
       setInput: vi.fn(),
       messages: mockChatState.messages,
       chatError: null,
@@ -198,7 +200,16 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
 
 vi.mock('@/components/jovie/components', async importOriginal => ({
   ...(await importOriginal<typeof import('@/components/jovie/components')>()),
-  ChatInput: () => <div data-testid='chat-input' />,
+  ChatInput: ({
+    desktopConversationReady,
+  }: {
+    desktopConversationReady?: boolean;
+  }) => (
+    <div
+      data-testid='chat-input'
+      data-desktop-conversation-ready={desktopConversationReady}
+    />
+  ),
   ChatMessage: (props: { isThinking?: boolean }) =>
     props.isThinking ? (
       <div data-testid='chat-message-thinking'>
@@ -290,6 +301,24 @@ afterAll(() => {
 });
 
 describe('JovieChat styling regressions', () => {
+  it('publishes live conversation work and revokes idle evidence on route unmount', () => {
+    const streaming = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    expect(getDesktopWorkState()?.isStreaming).toBe(true);
+    streaming.unmount();
+    expect(getDesktopWorkState()).toBeNull();
+    mockChatState.isLoading = false;
+    mockChatState.status = 'ready';
+    mockChatState.isSubmitting = true;
+    const submitting = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    expect(getDesktopWorkState()?.hasPendingAction).toBe(true);
+    expect(getDesktopWorkState()?.isStreaming).toBe(false);
+    submitting.unmount();
+    expect(getDesktopWorkState()).toBeNull();
+  });
   it('renders thinking placeholder as a ChatMessage with isThinking when loading', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
@@ -333,6 +362,31 @@ describe('JovieChat styling regressions', () => {
       container.querySelector('[data-testid="chat-content"]')
     ).toBeTruthy();
     expect(container.querySelector('[data-testid="chat-input"]')).toBeTruthy();
+  });
+
+  it('enables passive desktop composer observation only after initial history loading ends', () => {
+    mockChatState.isLoadingConversation = true;
+    const loadingView = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    expect(
+      loadingView.container
+        .querySelector('[data-testid="chat-input"]')
+        ?.getAttribute('data-desktop-conversation-ready')
+    ).toBe('false');
+    loadingView.unmount();
+
+    mockChatState.isLoadingConversation = false;
+    const readyView = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    // Streaming remains active: observation concerns editable UI, not response completion.
+    expect(mockChatState.status).toBe('streaming');
+    expect(
+      readyView.container
+        .querySelector('[data-testid="chat-input"]')
+        ?.getAttribute('data-desktop-conversation-ready')
+    ).toBe('true');
   });
 
   it('windows the transcript once the thread exceeds the shared threshold', () => {
@@ -416,7 +470,7 @@ describe('JovieChat styling regressions', () => {
     expect(jovieChatSource).not.toContain('<SuggestedPrompts');
   });
 
-  it('marks an empty conversation-load shell as busy for assistive technology', () => {
+  it('keeps loading accessibility and composer readiness live across mounted history transitions', () => {
     mockChatState.isLoadingConversation = true;
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
@@ -424,7 +478,7 @@ describe('JovieChat styling regressions', () => {
     mockChatState.status = 'ready';
     mockChatState.messages = [];
 
-    const { container } = renderWithQueryClient(
+    const { container, rerender } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
@@ -434,6 +488,36 @@ describe('JovieChat styling regressions', () => {
 
     expect(loadingShell?.getAttribute('aria-busy')).toBe('true');
     expect(loadingShell?.getAttribute('aria-live')).toBe('polite');
+    expect(container.querySelector('[data-testid="chat-input"]')).toBeNull();
+
+    mockChatState.isLoadingConversation = false;
+    rerender(<JovieChat profileId='profile-1' />);
+    const composer = container.querySelector('[data-testid="chat-input"]');
+    expect(composer?.getAttribute('data-desktop-conversation-ready')).toBe(
+      'true'
+    );
+    expect(
+      container.querySelector(
+        '[data-testid="chat-loading-conversation-skeleton"]'
+      )
+    ).toBeNull();
+
+    mockChatState.isLoadingConversation = true;
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(container.querySelector('[data-testid="chat-input"]')).toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="chat-loading-conversation-skeleton"]')
+        ?.getAttribute('aria-busy')
+    ).toBe('true');
+
+    mockChatState.isLoadingConversation = false;
+    rerender(<JovieChat profileId='profile-1' />);
+    expect(
+      container
+        .querySelector('[data-testid="chat-input"]')
+        ?.getAttribute('data-desktop-conversation-ready')
+    ).toBe('true');
   });
 
   it('re-measures and re-anchors a pinned transcript when a hidden viewport gains layout (JOV-6702)', () => {
@@ -638,6 +722,38 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="ovie-editorial-briefing"]')
     ).toBeNull();
+  });
+
+  it.each([
+    { profileId: 'profile-2', conversationId: 'one' },
+    { profileId: 'profile-1', conversationId: 'two' },
+    { profileId: 'profile-1', conversationId: 'one', chatMode: 'ov' as const },
+  ])('resets navigation hover for a new chat scope: %j', nextScope => {
+    mockChatState.messages = Array.from({ length: 14 }, (_, index) => ({
+      id: `message-${index}`,
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      parts: [{ type: 'text', text: `Message ${index}` }],
+    }));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { getByRole, rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat profileId='profile-1' conversationId='one' />
+      </QueryClientProvider>
+    );
+    const firstMarker = getByRole('button', { name: /Jump to turn 1:/ });
+    fireEvent.mouseEnter(firstMarker);
+    expect(firstMarker).toHaveClass('is-hovered');
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <JovieChat {...nextScope} />
+      </QueryClientProvider>
+    );
+    expect(getByRole('button', { name: /Jump to turn 1:/ })).not.toHaveClass(
+      'is-hovered'
+    );
   });
 
   it('publishes rail context only when its meaning changes during streaming', () => {

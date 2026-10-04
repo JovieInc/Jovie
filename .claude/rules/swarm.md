@@ -153,9 +153,10 @@ The correct pattern is for the lead to pre-create worktrees sequentially before 
 
 ```bash
 # Lead creates worktrees SEQUENTIALLY (never in parallel -- they race on branch config)
-git worktree add /private/tmp/jovie-worktrees/chunk-a -b tim/chunk-a origin/main
-git worktree add /private/tmp/jovie-worktrees/chunk-b -b tim/chunk-b origin/main
-git worktree add /private/tmp/jovie-worktrees/chunk-c -b tim/chunk-c origin/main
+# worktree-new takes pre-installed slots from ~/.cache/jovie (falls back to git worktree add + install)
+scripts/agent/worktree-new /private/tmp/jovie-worktrees/chunk-a -b tim/chunk-a
+scripts/agent/worktree-new /private/tmp/jovie-worktrees/chunk-b -b tim/chunk-b
+scripts/agent/worktree-new /private/tmp/jovie-worktrees/chunk-c -b tim/chunk-c
 # ... then spawn all agents in parallel
 ```
 

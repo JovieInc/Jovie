@@ -44,7 +44,9 @@ describe('jovie CLI', () => {
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
     expect(stdout.read()).toContain('profile create <url>');
-    expect(stdout.read()).toContain('No login or API key');
+    expect(stdout.read()).toContain(
+      'No login or API key is needed for public commands.'
+    );
   });
 
   it('prints the source fallback version before command validation', async () => {
@@ -66,6 +68,13 @@ describe('jovie CLI', () => {
   });
 
   it.each([
+    {
+      args: ['creator', 'lookup', 'https://youtube.com/@creator'],
+      body: '{"platform":"youtube","displayName":"Creator"}',
+      expectedPath:
+        '/api/agents/creator-lookup?url=https%3A%2F%2Fyoutube.com%2F%40creator',
+      expectedOutput: { platform: 'youtube', displayName: 'Creator' },
+    },
     {
       args: ['artist', 'get', 'demo'],
       body: '{"artist":{"username":"demo"}}',
@@ -155,8 +164,10 @@ describe('jovie CLI', () => {
     expect(JSON.parse(stdout.read())).toEqual({
       error: {
         code: 'REQUEST_FAILED',
-        message: 'GET https://jov.ie/api/v1/demo returned HTTP 404',
+        apiCode: 'ARTIST_NOT_FOUND',
+        message: 'No public Jovie artist named "demo". Check the username.',
         responseBody: 'missing',
+        retryable: false,
         status: 404,
       },
     });

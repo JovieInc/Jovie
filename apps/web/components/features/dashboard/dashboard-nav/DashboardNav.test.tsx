@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { NAVIGATION_DROP_OFF_MS } from '@/lib/tracking/navigation-telemetry';
 import {
   mockUsePathname,
   renderDashboardNav,
@@ -47,8 +48,42 @@ describe('Linear-scale density (founder lock 2026-09-25)', () => {
 
 describe('DashboardNav route warming', () => {
   afterEach(() => {
+    vi.useRealTimers();
     runtimeUpdateState.available = false;
     resetDashboardNavTestMocks();
+  });
+
+  it('leaves Inbox to the brand-row bell without removing other destinations', () => {
+    const destinations = () =>
+      screen.getAllByRole('link').map(link => ({
+        label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
+        href: link.getAttribute('href'),
+      }));
+    const baseline = renderDashboardNav({ renderFn: render });
+    const before = destinations();
+    expect(before.filter(link => link.label === 'Inbox')).toEqual([
+      { label: 'Inbox', href: APP_ROUTES.DASHBOARD },
+    ]);
+    const retained = before.filter(link => link.label !== 'Inbox');
+    expect(retained.length).toBeGreaterThan(0);
+    baseline.unmount();
+    renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
+    expect(
+      screen.queryByRole('link', { name: 'Inbox' })
+    ).not.toBeInTheDocument();
+    expect(destinations()).toEqual(retained);
+    expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
+  });
+
+  it('keeps the divider when a search surface precedes navigation actions', () => {
+    renderDashboardNav({
+      renderFn: render,
+      navChildren: <button type='button'>Search</button>,
+    });
+    expect(screen.getByRole('button', { name: 'Search' })).toBeVisible();
+    expect(
+      document.querySelector('[data-sidebar-search-divider]')
+    ).toBeInTheDocument();
   });
 
   it('fully prefetches every canonical dynamic customer route', () => {
@@ -134,6 +169,45 @@ describe('DashboardNav route warming', () => {
     }
   });
 
+  it.each(['Inbox', 'New Chat', 'Home'])(
+    'clears a stalled %s acknowledgment and accepts a retry without replacing the source content',
+    label => {
+      vi.useFakeTimers();
+      mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
+      renderDashboardNav({
+        renderFn: render,
+        children: <main data-testid='retained-route'>Source content</main>,
+      });
+      const link = screen.getByRole('link', { name: label });
+      link.addEventListener('click', event => event.preventDefault());
+      fireEvent.click(link);
+      expect(link).toHaveAttribute('aria-busy', 'true');
+
+      act(() => vi.advanceTimersByTime(NAVIGATION_DROP_OFF_MS));
+
+      expect(link).not.toHaveAttribute('aria-busy');
+      expect(link).not.toHaveAttribute('data-navigation-pending');
+      expect(screen.getByTestId('retained-route')).toHaveTextContent(
+        'Source content'
+      );
+      fireEvent.click(link);
+      expect(link).toHaveAttribute('aria-busy', 'true');
+    }
+  );
+
+  it('clears a pending acknowledgment immediately when connectivity is lost', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    renderDashboardNav({ renderFn: render });
+    const link = screen.getByRole('link', { name: 'New Chat' });
+    link.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(link);
+    expect(link).toHaveAttribute('aria-busy', 'true');
+
+    act(() => globalThis.dispatchEvent(new Event('offline')));
+
+    expect(link).not.toHaveAttribute('aria-busy');
+  });
+
   it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {
     runtimeUpdateState.available = true;
     const pending = renderDashboardNav({
@@ -201,6 +275,17 @@ describe('DashboardNav route warming', () => {
         expect(el.className).not.toContain('mask-image');
       }
     }
+  });
+
+  it('stages the search slot exit on the shared rail-motion contract (JOV-4522)', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
+    );
+    // The search pill collapses vertically (max-height + fade) in lockstep
+    // with the rail instead of snapping to display:none at frame one.
+    const slot = source.slice(source.indexOf('data-sidebar-search-slot'));
+    expect(slot).toContain('SHELL_RAIL_BLOCK_LABEL');
+    expect(slot).not.toContain('group-data-[collapsible=icon]:hidden');
   });
 
   it('imports sidebar chrome from the modular sidebar specifier', () => {

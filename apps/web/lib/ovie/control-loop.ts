@@ -70,6 +70,59 @@ export interface FounderDecisionPacket {
   readonly artifactRevision: string;
 }
 
+function hasDecisionText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Missing context must be repaired before the binding request reaches Tim. */
+function isCompleteFounderDecisionPacket(
+  packet: FounderDecisionPacket | null | undefined
+): packet is FounderDecisionPacket {
+  if (
+    typeof packet !== 'object' ||
+    packet === null ||
+    ![
+      packet.decision,
+      packet.whyNow,
+      packet.blocked,
+      packet.expectedMetricEffect,
+      packet.artifactRef,
+      packet.artifactRevision,
+    ].every(hasDecisionText) ||
+    !Number.isFinite(packet.confidence) ||
+    packet.confidence < 0 ||
+    packet.confidence > 1 ||
+    !['fresh', 'stale', 'unknown'].includes(packet.freshness) ||
+    (packet.defaultIfSilent !== null &&
+      !hasDecisionText(packet.defaultIfSilent)) ||
+    !Array.isArray(packet.evidence) ||
+    packet.evidence.length === 0 ||
+    !packet.evidence.every(hasDecisionText) ||
+    !Array.isArray(packet.options) ||
+    packet.options.length === 0
+  ) {
+    return false;
+  }
+
+  const identities = new Set<string>();
+  const labels = new Set<string>();
+  return packet.options.every(option => {
+    if (
+      typeof option !== 'object' ||
+      option === null ||
+      ![option.id, option.label, option.tradeoff].every(hasDecisionText)
+    ) {
+      return false;
+    }
+    const identity = option.id.trim();
+    const label = option.label.trim().toLowerCase();
+    if (identities.has(identity) || labels.has(label)) return false;
+    identities.add(identity);
+    labels.add(label);
+    return true;
+  });
+}
+
 /**
  * A candidate binding constraint. Extends the JOV-5924 signal contract so the
  * same score ranks certification, shipping, funnel, and coverage defects in
@@ -306,9 +359,11 @@ export function reconcileControlLoop(input: ReconcileInput): ControlLoopState {
   // Machine exhaustion before founder attention: a packet materializes only
   // when the binding constraint is a founder-authority boundary carrying a
   // complete JOV-7080 packet.
+  const decisionPacket = binding?.candidate.decisionPacket;
   const founderDecision =
-    binding?.candidate.requiresFounder === true
-      ? (binding.candidate.decisionPacket ?? null)
+    binding?.candidate.requiresFounder === true &&
+    isCompleteFounderDecisionPacket(decisionPacket)
+      ? decisionPacket
       : null;
 
   return {

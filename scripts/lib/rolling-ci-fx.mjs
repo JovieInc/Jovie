@@ -1692,7 +1692,24 @@ const HOSTED_CANARY_HOLD_LABELS = new Set([
   'needs-conflict-resolution',
   'needs-manual-rebase',
 ]);
-const HOSTED_HA_RECEIPT_CONTEXT = 'ha-ci-remediator-poke';
+const SYMPHONY_REMEDIATION_CONTEXT = 'symphony-remediation';
+
+export function symphonyRemediationEvent(plan) {
+  const checks = [...(plan?.failedChecks ?? [])]
+    .map(name => String(name))
+    .sort();
+  const workflow = String(plan?.workflow ?? plan?.workflowName ?? 'CI');
+  const pr = plan?.prNumber ?? plan?.pr ?? null;
+  return {
+    schema: 'jovie.remediation-event/v1',
+    source: pr ? 'pr' : 'main-ci',
+    fingerprint: [...checks, workflow].join('\n'),
+    subject: { pr, sha: plan?.expectedHeadOid ?? plan?.sha ?? null, workflow },
+    evidence: { excerpt: checks.join(', ') },
+    ws: 'ci',
+    intake: pr ? 'lane-fix-red' : 'symphony-remediation',
+  };
+}
 
 function classifyHostedCiRunInventory(plan, runs) {
   const workflowRuns = runs?.workflow_runs;
@@ -1802,16 +1819,16 @@ export async function revalidateHostedCanaryState({
     { token }
   );
   if (!Array.isArray(statuses) || statuses.length >= 100) {
-    return { allowed: false, reason: 'ha-receipt-inventory-incomplete' };
+    return { allowed: false, reason: 'symphony-receipt-inventory-incomplete' };
   }
   if (
     statuses.some(
       status =>
-        status?.context === HOSTED_HA_RECEIPT_CONTEXT &&
+        status?.context === SYMPHONY_REMEDIATION_CONTEXT &&
         ['success', 'pending'].includes(status?.state)
     )
   ) {
-    return { allowed: false, reason: 'ha-remediation-receipt-present' };
+    return { allowed: false, reason: 'symphony-remediation-receipt-present' };
   }
 
   const ciAttempt = await revalidateHostedCiAttempt({ plan, token, request });

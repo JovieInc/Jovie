@@ -271,6 +271,21 @@ describe('TourDateSidebar analytics section', () => {
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
   });
 
+  it('renders the shared DatePicker wired to the tour start date', () => {
+    mockUseTourDateAnalyticsQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    });
+
+    renderSidebar();
+
+    const dateTrigger = screen.getByLabelText('Date');
+    expect(dateTrigger.tagName).toBe('BUTTON');
+    expect(dateTrigger).toHaveAttribute('type', 'button');
+    expect(dateTrigger).toHaveTextContent(/\w{3} \d{1,2}, \d{4}/);
+  });
+
   it('shows error message when analytics fail to load', () => {
     mockUseTourDateAnalyticsQuery.mockReturnValue({
       data: undefined,

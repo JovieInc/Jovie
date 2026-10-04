@@ -19,13 +19,141 @@ import {
   buildSelectedTestCommands,
   buildVerificationEnv,
   CONTROL_TEST_CONCURRENCY,
+  classifyBlogContentForAffectedTests,
   controlCoverageReportsDirectory,
   formatAffectedTestPlanDiagnostic,
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
+import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+
+describe('lane Python qualification coverage', () => {
+  it.each([
+    ['lane source', ['scripts/lanes/hyperagent_lane.py']],
+    ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['falsy inputs', [null, false, '', 'scripts/lanes/execution_attempt.py']],
+    ['missing pinned dependencies', ['scripts/lanes/hyperagent_lane.py'], true],
+    [
+      'mixed full fallback',
+      ['scripts/lanes/hyperagent_lane.py', 'apps/web/lib/unknown.ts'],
+    ],
+    [
+      'global full fallback',
+      ['scripts/lanes/execution_attempt.py', 'package.json'],
+    ],
+    [
+      'unknown Python peer',
+      ['scripts/lanes/hyperagent_lane.py', 'scripts/lanes/unknown-new.py'],
+    ],
+  ])(
+    'fails the real %s qualifier when lane Python coverage fails',
+    async (_, files, missingDependencies = false) => {
+      const dir = mkdtempSync(resolve(tmpdir(), 'lane-python-qualification-'));
+      const marker = resolve(dir, 'python-covered');
+      try {
+        for (const binary of ['node', 'pnpm']) {
+          writeFileSync(resolve(dir, binary), '#!/bin/sh\nexit 0\n', {
+            mode: 0o755,
+          });
+        }
+        writeFileSync(
+          resolve(dir, 'python3'),
+          missingDependencies
+            ? '#!/bin/sh\nexit 1\n'
+            : '#!/bin/sh\ncase "$*" in *"coverage run"*) touch "$LANE_PYTHON_MARKER"; exit 73;; esac\nexit 0\n',
+          { mode: 0o755 }
+        );
+        const child = spawn(
+          process.execPath,
+          [
+            resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+            '--changed-files-json',
+            JSON.stringify(files),
+            '--shard-concurrency',
+            '1',
+          ],
+          {
+            env: {
+              ...process.env,
+              PATH: `${dir}:${process.env.PATH}`,
+              LANE_PYTHON_MARKER: marker,
+            },
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
+        );
+        // Drain output so a child cannot block on an inherited pipe buffer.
+        child.stdout.resume();
+        child.stderr.resume();
+        const status = await new Promise((resolveExit, reject) => {
+          child.once('error', reject);
+          child.once('exit', resolveExit);
+        });
+        expect(status).toBe(missingDependencies ? 1 : 73);
+        expect(existsSync(marker)).toBe(!missingDependencies);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+});
+
+describe('lane coverage full fallback', () => {
+  it('does not treat an unknown Python peer as covered by the known lane suite', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/lanes/hyperagent_lane.py',
+      'scripts/lanes/unknown-new.py',
+    ]);
+    expect(plan.mode).toBe('full');
+  });
+});
 
 describe('affected-test selector inventory', () => {
+  it('fails closed to the full suite when the real blog Git diff cannot be classified', () => {
+    const receipt = classifyBlogContentForAffectedTests(
+      '0'.repeat(40),
+      'HEAD',
+      { prerequisitesAvailable: true }
+    );
+    expect(
+      buildAffectedTestPlan(['apps/web/content/blog/article.md'], {
+        blogContentReceipt: receipt,
+      }).mode
+    ).toBe('full');
+  });
+  it('selects publication, certification, and candidate-build proof for a status-qualified post', () => {
+    const path = 'apps/web/content/blog/a-safe-article.md';
+    const plan = buildAffectedTestPlan([path], {
+      blogContentReceipt: classifyBlogContentChanges([{ status: 'M', path }]),
+      isFileAvailable: () => true,
+    });
+
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      blogCandidateBuild: true,
+      selectedTests: [
+        'apps/web/tests/unit/lib/blog/publication.test.ts',
+        'apps/web/scripts/marketing-factory/blog-adapter.test.ts',
+      ],
+    });
+    expect(buildSelectedTestCommands(plan, '1').at(-1)).toEqual([
+      'env',
+      expect.arrayContaining(['pnpm', 'build', '--filter=@jovie/web']),
+    ]);
+  });
+
+  it('fails closed without status evidence or with a mixed renderer change', () => {
+    const post = 'apps/web/content/blog/a-safe-article.md';
+    expect(buildAffectedTestPlan([post]).mode).toBe('full');
+    expect(
+      buildAffectedTestPlan([post, 'apps/web/lib/blog/getBlogPosts.ts'], {
+        blogContentReceipt: classifyBlogContentChanges([
+          { status: 'M', path: post },
+          { status: 'M', path: 'apps/web/lib/blog/getBlogPosts.ts' },
+        ]),
+        isFileAvailable: () => true,
+      }).mode
+    ).toBe('full');
+  });
   const certificationSource = 'apps/web/lib/ovie/certifications/normalize.ts';
   const certificationTests = [
     'apps/web/lib/ovie/certifications/normalize.test.ts',
@@ -182,6 +310,8 @@ describe('affected-test selector inventory', () => {
     );
     expect(args).toContain('--coverage');
     expect(args).toContain('--coverage.include=lib/linear-sync-on-merge.mjs');
+    expect(args).toContain('--coverage.include=lib/validation-lifecycle.mjs');
+    expect(args).toContain('--coverage.include=lib/validation-sync.mjs');
     expect(args).toContain('--coverage.thresholds.lines=85');
     expect(args).toContain('--coverage.thresholds.branches=70');
   });
@@ -208,6 +338,22 @@ describe('affected-test selector inventory', () => {
 });
 
 describe('structural control stage execution', () => {
+  it('enforces coverage for public CLI artifact routing in the canonical control stage', () => {
+    const [nativeControl] = buildControlCoverageCommands();
+    expect(nativeControl[1]).toContain(
+      'lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(nativeControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=lib/product-lane-classifier.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.branches=75',
+        '--coverage.thresholds.functions=82',
+      ])
+    );
+  });
+
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
     expect(stages).toHaveLength(23);
@@ -472,9 +618,10 @@ describe('structural control stage execution', () => {
     const diagnostics = [];
     const writes = [];
     const originalWrite = process.stdout.write;
-    process.stdout.write = chunk => {
-      writes.push(String(chunk));
-      return true;
+    process.stdout.write = (chunk, callback) => {
+      if (chunk.length > 0) writes.push(String(chunk));
+      if (callback) queueMicrotask(callback);
+      return false;
     };
     let status;
     try {
@@ -497,6 +644,71 @@ describe('structural control stage execution', () => {
     expect(writes[0]).toContain('first');
     expect(writes[0]).toContain('second');
     expect(diagnostics.at(-1)).toContain('status=3');
+  });
+
+  it('preserves a failing stage diagnostic tail when the CLI exits immediately', async () => {
+    const payloadBytes = 1024 * 1024;
+    const sentinel = '\nFAILURE_DIAGNOSTIC_END\n';
+    const completion = 'PARENT_DIAGNOSTIC_END\n';
+    const childCode = `
+      process.stdout.write('x'.repeat(${payloadBytes}) + ${JSON.stringify(sentinel)});
+      process.exitCode = 3;
+    `;
+    const wrapperCode = `
+      import { runCommandStatus } from ${JSON.stringify(
+        new URL('../../run-affected-tests.mjs', import.meta.url).href
+      )};
+      const status = await runCommandStatus(process.execPath, ['-e', ${JSON.stringify(childCode)}], {
+        bufferOutput: true,
+        logger: message => {
+          if (message.includes('complete')) process.stdout.write(${JSON.stringify(completion)});
+        },
+      });
+      process.exit(status);
+    `;
+    const wrapper = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', wrapperCode],
+      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 }
+    );
+    const output = [];
+    const errors = [];
+    wrapper.stdout.on('data', chunk => output.push(chunk));
+    wrapper.stderr.on('data', chunk => errors.push(chunk));
+    const status = await new Promise((resolveExit, rejectExit) => {
+      wrapper.once('error', rejectExit);
+      wrapper.once('close', resolveExit);
+    });
+    const stdout = Buffer.concat(output);
+    expect(Buffer.concat(errors).toString()).toBe('');
+    expect(status).toBe(3);
+    expect(stdout.byteLength).toBe(
+      payloadBytes + Buffer.byteLength(sentinel + completion)
+    );
+    expect(stdout.toString().endsWith(sentinel + completion)).toBe(true);
+  });
+
+  it('cleans up signal handlers before a buffered output write rejects', async () => {
+    const interruptListeners = process.listenerCount('SIGINT');
+    const terminateListeners = process.listenerCount('SIGTERM');
+    const error = new Error('parent output unavailable');
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (_chunk, callback) => {
+      queueMicrotask(() => callback(error));
+      return false;
+    };
+    try {
+      await expect(
+        runCommandStatus(process.execPath, ['-e', 'process.exit(3)'], {
+          bufferOutput: true,
+          logger: () => {},
+        })
+      ).rejects.toBe(error);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    expect(process.listenerCount('SIGINT')).toBe(interruptListeners);
+    expect(process.listenerCount('SIGTERM')).toBe(terminateListeners);
   });
 });
 
@@ -3062,6 +3274,8 @@ describe('linear sync on merge selection', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+      'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+      'scripts/lib/__tests__/validation-sync.test.mjs',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });

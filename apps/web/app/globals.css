@@ -219,6 +219,30 @@ html[data-desktop-runtime="electron"]
   }
 }
 
+/* Headerless media routes retain a safe area below window controls. */
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:not(
+    :has([data-top-spacing-owner="shell-header"])
+  )
+  [data-app-shell-content-column="true"] {
+  padding-top: var(--electron-titlebar-height);
+}
+
+/* Settings now supplies the shared desktop header inside its route panel. */
+html[data-desktop-runtime="electron"]
+[data-app-shell-content-inset="true"]:has(
+  [data-testid="settings-shell-content"]
+) {
+  padding-top: 0;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-testid="settings-shell-content"]
+  > div {
+  padding-top: 0;
+  padding-inline: 0;
+}
+
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
   -webkit-app-region: drag;
 }
@@ -259,9 +283,10 @@ html[data-desktop-runtime="electron"]
   padding-left: var(--app-shell-gap);
 }
 
-/* Marketing pages use document scrolling rather than app-shell scroll panes.
+/* Public pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
+html:has([data-public-page-shell]),
 html:has(.system-b-marketing),
 html:has(.home-viewport) {
   height: auto;
@@ -269,6 +294,7 @@ html:has(.home-viewport) {
   overflow-y: auto;
   overscroll-behavior: auto;
 }
+body:has([data-public-page-shell]),
 body:has(.system-b-marketing),
 body:has(.home-viewport) {
   height: auto;
@@ -1457,14 +1483,10 @@ body {
     color: var(--linear-text-quaternary);
   }
 
-  .hero-stagger {
-    animation: hero-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
+  /* Hero entrance: children rise in sequence on load. Starts at 0.01 so the
+     hero headline stays LCP-eligible (JOV-7286). */
   .hero-stagger > * {
-    animation: hero-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  .hero-stagger > *:nth-child(1) {
-    animation-delay: 0ms;
+    animation: hero-fade-up var(--duration-cinematic) var(--ease-out) both;
   }
   .hero-stagger > *:nth-child(2) {
     animation-delay: 60ms;
@@ -1480,11 +1502,8 @@ body {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hero-stagger,
     .hero-stagger > * {
-      animation: none !important;
-      opacity: 1 !important;
-      transform: none !important;
+      animation: none;
     }
   }
 }
@@ -1515,54 +1534,94 @@ body {
 }
 
 /* ============================================
-   SCROLL-REVEAL ANIMATION
-   Triggered by IntersectionObserver (ScrollRevealInit client component).
-   .reveal-on-scroll starts hidden; .revealed plays the entrance.
+   SCROLL-REVEAL (marketing motion system, JOV-7757)
+   `.reveal-on-scroll` fades in with a short rise as it enters the viewport.
+
+   1. Browsers with scroll-driven animations (Chrome 115+, Safari 26+) run it
+      on the compositor from CSS alone: no JS, no observer, and content that
+      is already in view at load is simply visible. The range is a fixed
+      distance past the viewport edge so tall sections are never half-faded.
+   2. Elsewhere ScrollRevealInit adds `.reveal-js` and toggles `.revealed`
+      with an IntersectionObserver. Without JS, content stays visible.
+   3. Reduced motion keeps the opacity change and drops the movement.
+   `data-delay="80|160|240"` staggers siblings in both paths.
    ============================================ */
 
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* reveal-on-scroll: only hide elements once JS has confirmed it's available.
-   Without the .reveal-js root class (set by ScrollRevealInit), content stays
-   visible so JS-blocked or slow-hydration users always see the page. */
-.reveal-js .reveal-on-scroll {
-  opacity: 0;
-  transform: translateY(20px);
-  transition:
-    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
-}
-
-.reveal-js .reveal-on-scroll.revealed {
-  opacity: 1;
-  transform: translateY(0);
+.reveal-on-scroll {
+  --reveal-distance: 12px;
+  --reveal-offset: 0vh;
 }
 
 .reveal-on-scroll[data-delay="80"] {
-  transition-delay: 80ms;
+  --reveal-offset: 3vh;
 }
 .reveal-on-scroll[data-delay="160"] {
-  transition-delay: 160ms;
+  --reveal-offset: 6vh;
 }
 .reveal-on-scroll[data-delay="240"] {
-  transition-delay: 240ms;
+  --reveal-offset: 9vh;
 }
 
-@media (prefers-reduced-motion: reduce) {
+/* 0.01, not 0: content that first paints fully transparent is never an LCP
+   candidate (see homepage-hero-content-reveal, JOV-7286). */
+@keyframes reveal-rise {
+  from {
+    opacity: 0.01;
+    transform: translateY(var(--reveal-distance));
+  }
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0.01;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .reveal-on-scroll {
+    animation: reveal-rise linear both;
+    animation-timeline: view();
+    animation-range: cover var(--reveal-offset) cover
+      calc(var(--reveal-offset) + 18vh);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-on-scroll {
+      animation-name: reveal-fade;
+    }
+  }
+}
+
+@supports not (animation-timeline: view()) {
   .reveal-js .reveal-on-scroll {
+    opacity: 0;
+    transform: translateY(var(--reveal-distance));
+    transition:
+      opacity var(--duration-cinematic) var(--ease-out),
+      transform var(--duration-cinematic) var(--ease-out);
+  }
+
+  .reveal-js .reveal-on-scroll.revealed {
     opacity: 1;
     transform: none;
-    transition: none;
+  }
+
+  .reveal-on-scroll[data-delay="80"] {
+    transition-delay: 80ms;
+  }
+  .reveal-on-scroll[data-delay="160"] {
+    transition-delay: 160ms;
+  }
+  .reveal-on-scroll[data-delay="240"] {
+    transition-delay: 240ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-js .reveal-on-scroll {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
   }
 }
 
@@ -2342,12 +2401,8 @@ body {
 
 @keyframes hero-fade-up {
   from {
-    opacity: 0;
+    opacity: 0.01;
     transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 

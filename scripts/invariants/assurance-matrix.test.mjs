@@ -11,6 +11,9 @@ import {
   matrixFindings,
   readAssuranceMatrix,
   rowCertification,
+  UI_FAILURE_CLASSES,
+  uiAssuranceReport,
+  uiEvidenceRequirements,
   validateAssuranceMatrix,
 } from './assurance-matrix.mjs';
 
@@ -175,6 +178,150 @@ describe('assurance matrix (JOV-6064)', () => {
     mutated.rows[0].owner = 'operations';
     const changed = assuranceMatrixReceipt(mutated);
     assert.notEqual(receipt.digest, changed.digest);
-    assert.equal(receipt.matrixRevision, '2026-09-27.1');
+    assert.equal(receipt.matrixRevision, '2026-10-03.3');
+  });
+});
+
+// JOV-7713: UI assurance rows. The neighbor case is a fully certified UI row
+// (GREEN); each deliberate red injects one false-green shape into that row.
+describe('UI assurance matrix (JOV-7713)', () => {
+  const PROOF = 'scripts/invariants/assurance-matrix.test.mjs';
+
+  function certifiedUiMatrix() {
+    const matrix = healthy();
+    const row = matrix.rows.find(
+      item => item.failureClass === 'ui-interaction-state-machine'
+    );
+    for (const layer of Object.keys(row.layers))
+      row.layers[layer] = {
+        state: 'proven',
+        evidence: [{ kind: 'test', ref: PROOF }],
+      };
+    row.ui.detectors = [
+      { ref: PROOF, enforcement: 'pr-blocking', deliberateRed: PROOF },
+    ];
+    row.ui.exactBuildEvidence = row.ui.requiredEvidence.map(target => ({
+      target,
+      ref: 'runtime:exact-build',
+      observedAt: matrix.asOf,
+    }));
+    for (const entry of matrix.uiEscapeCorpus)
+      if (entry.row === row.id)
+        Object.assign(entry, { caught: true, fixture: PROOF });
+    return { matrix, row };
+  }
+
+  const classReport = (matrix, row) =>
+    uiAssuranceReport(matrix).classes.find(item => item.row === row.id);
+
+  it('reports every UI class from exactly one checked-in row', () => {
+    const matrix = healthy();
+    assert.deepEqual(validateAssuranceMatrix(matrix), []);
+    const report = uiAssuranceReport(matrix);
+    assert.deepEqual(
+      report.classes.map(item => item.failureClass),
+      [...UI_FAILURE_CLASSES]
+    );
+    assert.ok(report.classes.every(item => item.row !== null));
+    assert.equal(report.totals.green, 0, 'current gaps stay visible');
+    assert.ok(report.escapes.total > report.escapes.caught);
+  });
+
+  it('deliberate red: a dropped UI class is UNKNOWN and fails validation', () => {
+    const matrix = healthy();
+    matrix.rows = matrix.rows.filter(row => row.failureClass !== 'ui-motion');
+    matrix.uiEscapeCorpus = matrix.uiEscapeCorpus.filter(entry =>
+      matrix.rows.some(row => row.id === entry.row)
+    );
+    assert.ok(
+      validateAssuranceMatrix(matrix).includes('ui:class:ui-motion:missing-row')
+    );
+    const motion = uiAssuranceReport(matrix).classes.find(
+      item => item.failureClass === 'ui-motion'
+    );
+    assert.equal(motion.status, 'UNKNOWN');
+  });
+
+  it('certifies the neighbor row GREEN when every proof is present', () => {
+    const { matrix, row } = certifiedUiMatrix();
+    assert.deepEqual(validateAssuranceMatrix(matrix), []);
+    assert.equal(classReport(matrix, row).status, 'GREEN');
+  });
+
+  it('deliberate red: a scheduled or not-wired detector is false-green risk', () => {
+    for (const enforcement of ['scheduled', 'not-wired', 'advisory']) {
+      const { matrix, row } = certifiedUiMatrix();
+      row.ui.detectors.push({ ref: PROOF, enforcement });
+      const verdict = classReport(matrix, row);
+      assert.equal(verdict.status, 'RED');
+      assert.ok(verdict.falseGreenRisks.includes(`${PROOF}:${enforcement}`));
+    }
+  });
+
+  it('deliberate red: a blocking detector without deliberate red or with a red lane', () => {
+    const { matrix, row } = certifiedUiMatrix();
+    row.ui.detectors = [{ ref: PROOF, enforcement: 'merge-group-blocking' }];
+    assert.equal(classReport(matrix, row).status, 'RED');
+    const live = certifiedUiMatrix();
+    live.row.ui.detectors[0].liveStatus = 'red';
+    assert.ok(
+      classReport(live.matrix, live.row).falseGreenRisks.includes(
+        `${PROOF}:live-red`
+      )
+    );
+  });
+
+  it('deliberate red: stale or missing exact-build evidence', () => {
+    const { matrix, row } = certifiedUiMatrix();
+    row.ui.exactBuildEvidence[0].observedAt = '2020-01-01T00:00:00Z';
+    const verdict = classReport(matrix, row);
+    assert.equal(verdict.status, 'RED');
+    assert.deepEqual(verdict.missingEvidence, [row.ui.requiredEvidence[0]]);
+  });
+
+  it('deliberate red: an uncaught escape keeps its class RED', () => {
+    const { matrix, row } = certifiedUiMatrix();
+    const entry = matrix.uiEscapeCorpus.find(item => item.row === row.id);
+    entry.caught = false;
+    const verdict = classReport(matrix, row);
+    assert.equal(verdict.status, 'RED');
+    assert.ok(verdict.uncaughtEscapes.includes(entry.id));
+  });
+
+  it('deliberate red: invalid UI inventory, detectors and corpus are rejected', () => {
+    const matrix = healthy();
+    const inventory = matrix.scope.requiredObjects.find(
+      item => item.kind === 'ui-inventory'
+    );
+    inventory.source = inventory.source.replace(/#.*/, '#NOT_AN_EXPORT');
+    const row = matrix.rows.find(item => item.ui);
+    row.ui.detectors[0].ref = 'apps/web/does-not-exist.test.ts';
+    matrix.uiEscapeCorpus[0].caught = true;
+    delete matrix.uiEscapeCorpus[0].fixture;
+    matrix.rows.push({ ...clone(row), id: 'AM-999' });
+    const errors = validateAssuranceMatrix(matrix);
+    for (const expected of [
+      `ui-inventory:${inventory.id}:export-missing:NOT_AN_EXPORT`,
+      `ui:${row.id}:detector:apps/web/does-not-exist.test.ts:ref-missing`,
+      `ui-escape:${matrix.uiEscapeCorpus[0].id}:caught-requires-fixture`,
+      `ui:class:${row.failureClass}:duplicate-row`,
+    ])
+      assert.ok(
+        errors.includes(expected),
+        `expected ${expected}, got ${errors.join('; ')}`
+      );
+  });
+
+  it('names the exact-build UI evidence a changed path owes before Done', () => {
+    const matrix = healthy();
+    const owed = uiEvidenceRequirements(matrix, [
+      'apps/web/components/atoms/RailToggleButton.tsx',
+    ]);
+    const row = owed.find(
+      item => item.failureClass === 'ui-interaction-state-machine'
+    );
+    assert.ok(row, 'reversible-control row is invalidated');
+    assert.ok(row.targets.includes('macos-electron'));
+    assert.deepEqual(uiEvidenceRequirements(matrix, ['docs/README.md']), []);
   });
 });

@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ComposerAttachButton,
@@ -65,7 +66,9 @@ describe('ComposerMicButton', () => {
   it('when unsupported WITH a hint (Electron system-dictation path) the mic stays enabled and press surfaces the hint via onUnavailable', () => {
     const onUnavailable = vi.fn();
     const onToggle = vi.fn();
-    MicButton({
+    const buttonRef = createRef<HTMLButtonElement>();
+    const view = MicButton({
+      buttonRef,
       isSupported: false,
       unavailableHint: 'Use macOS dictation (press Fn twice).',
       onUnavailable,
@@ -74,6 +77,9 @@ describe('ComposerMicButton', () => {
 
     const mic = screen.getByTestId('dictation-toggle');
     expect(mic).toBeEnabled();
+    expect(buttonRef.current).toBe(mic);
+    buttonRef.current?.focus({ preventScroll: true });
+    expect(mic).toHaveFocus();
     expect(
       screen.getByRole('button', { name: /dictation unavailable/i })
     ).toBeTruthy();
@@ -82,6 +88,8 @@ describe('ComposerMicButton', () => {
     expect(onUnavailable).toHaveBeenCalledTimes(1);
     // An unsupported mic never starts dictation.
     expect(onToggle).not.toHaveBeenCalled();
+    view.unmount();
+    expect(buttonRef.current).toBeNull();
   });
 });
 

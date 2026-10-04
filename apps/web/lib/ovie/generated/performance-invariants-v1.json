@@ -30,7 +30,7 @@
     "apps/web/.lighthouserc.admin.pr.json": "sha256:2a7005e95160aac1fd25246e167ab5b50c304588bdd48b69cd2540b8eec5d17d",
     "apps/web/.lighthouserc.public-launch.json": "sha256:e90313e4d493b49363dc8fe32c3037037576029ca9c635a4b96cf9d166c9b63c",
     "apps/web/.lighthouserc.build.json": "sha256:5e7077deac09a048ee7620ea8fac550f3c34ad52563bb5e854a261e7ca92322b",
-    "apps/web/scripts/performance-route-manifest.ts": "sha256:84a3ed8ec1635414dbe21751cf6d3bf24b54fc598ee0f69d6dcf4d349d7069d4"
+    "apps/web/scripts/performance-route-manifest.ts": "sha256:c34e7ed3c5bb19388d1a929b911f9e6cef1714e5b1cec5178fc61f95346ff7a2"
   },
   "budgets": [
     {
@@ -3053,5 +3053,5 @@
       ]
     }
   ],
-  "fingerprint": "sha256:6686979d369f6c944c88faf94a6ab53c77652f6b4aabc000f5c45063729c2d16"
+  "fingerprint": "sha256:255bc3b5af13a2a42c7ca3d68fa58d96b507f72aa8e304e4fe75bf31c2250dce"
 }

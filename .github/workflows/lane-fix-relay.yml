@@ -12,8 +12,19 @@ name: Lane Fix Relay
 
 on:
   workflow_run:
-    workflows: [Source Validation, Fork PR Gate, PR Size Guard]
+    workflows:
+      - Source Validation
+      - Fork PR Gate
+      - PR Size Guard
+      - CI
+      - Golden Path Nightly
+      - Golden Path Prod Autofix
+      - Production Controller
+      - Changed-Evidence Test Suites
     types: [completed]
+  deployment_status:
+  repository_dispatch:
+    types: [sentry-issue]
   pull_request_target:
     types: [dequeued]
   pull_request_review:
@@ -35,12 +46,24 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
+  # A `green` signal only readies a lane draft (`<lane>/jov-<id>-<date>`, pr_events.in_scope),
+  # so success on any other branch is skipped before a runner starts: 129 of ~170 executed
+  # relays in the hour to 01:30Z on 2026-10-04 were such no-ops, each spending GITHUB_TOKEN quota
+  # that Merge Group Admission needs. pr_events.py still applies the exact LANE_BRANCH match.
   relay:
     name: Queue lane repair
     if: >-
-      github.event_name != 'workflow_run' ||
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'failure') ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'sentry-issue') ||
+      (github.event_name != 'workflow_run' && github.event_name != 'deployment_status' && github.event_name != 'repository_dispatch') ||
       (github.event.workflow_run.event == 'pull_request' &&
-       contains(fromJSON('["failure","timed_out","startup_failure","success"]'), github.event.workflow_run.conclusion))
+       contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion)) ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       contains(github.event.workflow_run.head_branch, '/jov-')) ||
+      (github.event.workflow_run.head_branch == 'main' &&
+       contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event.workflow_run.event) &&
+       contains(fromJSON('["failure","timed_out","startup_failure","cancelled"]'), github.event.workflow_run.conclusion))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

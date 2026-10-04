@@ -60,19 +60,18 @@ export function storybookStyleAliasesForEnvironment(
 }
 
 export function storybookFrameworkForEnvironment(
-  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+  _isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
 ) {
+  // Live certification uses the same Next.js Vite framework as the catalog.
+  // Naming @storybook/react-vite here required a direct dependency that Knip
+  // cannot see, because this directory is ignored.
   return {
-    name: isLiveStorybookCert
-      ? '@storybook/react-vite'
-      : '@storybook/nextjs-vite',
-    options: isLiveStorybookCert
-      ? {}
-      : {
-          builder: {
-            viteConfigPath: undefined,
-          },
-        },
+    name: '@storybook/nextjs-vite',
+    options: {
+      builder: {
+        viteConfigPath: undefined,
+      },
+    },
   } as const;
 }
 
@@ -253,6 +252,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dev-test-auth-identity-mock.ts'),
         },
         {
+          find: '@/app/app/(shell)/admin/actions',
+          replacement: require.resolve('./admin-actions-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
@@ -379,6 +382,8 @@ const config: StorybookConfig = {
           'react/jsx-runtime',
           'react/jsx-dev-runtime',
           'react-dom/client',
+          // Sentry's browser entry imports this CommonJS module by name.
+          'next/constants.js',
         ]),
       ],
       esbuildOptions: {

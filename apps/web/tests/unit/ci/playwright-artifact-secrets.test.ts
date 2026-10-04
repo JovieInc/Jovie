@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import type { PlaywrightTestConfig } from '@playwright/test';
+import { load as parseYaml } from 'js-yaml';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -68,53 +69,180 @@ const localTrace = Object.fromEntries(
     .split('|')
     .map(value => value.split('='))
 );
-const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-visual-review-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ matrix.shard }}-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:route-dom-certification-${{ github.sha }}|screenshots.yml:screen-browser-proof|screenshots.yml:screen-browser-proof-artists|screenshots.yml:screen-browser-proof-smartlink-release|screenshots.yml:screen-browser-proof-smartlink-track|screenshots.yml:screen-browser-proof-hud-isolated|screenshots.yml:screen-browser-proof-tasks|screenshots.yml:screen-browser-proof-contacts|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
-    '|'
-  );
-const imageUploads =
-  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:golden-path-visual-review-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|screenshots.yml:screen-browser-proof-artists|screenshots.yml:screen-browser-proof-smartlink-release|screenshots.yml:screen-browser-proof-smartlink-track|screenshots.yml:screen-browser-proof-hud-isolated|screenshots.yml:screen-browser-proof-tasks|screenshots.yml:screen-browser-proof-contacts|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
-    '|'
-  );
-const markdownUploads = [
-  'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
-  'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
-  'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
-  'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
-  'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
-  'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
-  'production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}',
-  'visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}',
+type PolicyStep = {
+  readonly id?: string;
+  readonly name?: string;
+  readonly uses?: string;
+  readonly run?: string;
+  readonly if?: string;
+  readonly env?: Record<string, unknown>;
+  readonly with?: Record<string, unknown>;
+  readonly 'continue-on-error'?: unknown;
+};
+type PolicyJob = {
+  readonly env?: Record<string, unknown>;
+  readonly permissions?: unknown;
+  readonly steps?: readonly PolicyStep[];
+};
+type PolicyWorkflow = {
+  readonly env?: Record<string, unknown>;
+  readonly jobs?: Record<string, PolicyJob>;
+};
+const safeUploadUses = './.github/actions/upload-safe-playwright-artifact';
+// Commands that make Playwright (or its telemetry normalizers) write the
+// browser-derived files the guard scans before any upload can read them.
+const playwrightProducer =
+  /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/;
+// Reviewed producers that run without guard-playwright-artifacts.mjs, keyed
+// `file:job` to one step name or '*' for the whole job.
+const unguardedProducerSteps = new Map([
+  // Captures publish through the catalog integrity/budget verifier instead.
+  ['screenshots.yml:generate', '*'],
+  // Mutation telemetry is normalized from Stryker output, not browser files.
+  [
+    'nightly-testing-agent.yml:mutation-hotspots',
+    'Normalize mutation telemetry',
+  ],
+  // JOV-7737: pull_request job with no secrets; uploads
+  // pr-visual-artifacts/ raw. Route it through the guard, then drop this.
+  ['pr-visual-review.yml:capture', 'Certify marketing route DOM invariants'],
+]);
+// Producer jobs whose safe uploads predate the staged-producer receipt.
+const producerStageExempt = new Set([
+  'ci.yml:ci-profile-admission-browser',
+  'nightly-testing-agent.yml:mutation-hotspots',
+  'screenshots.yml:generate',
+]);
+// Jobs that must keep the receipt even if their uploads move elsewhere.
+const producerStageRequired = [
+  'agent-tick.yml:synthetic-monitoring',
+  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+    .split(' ')
+    .map(job => `ci.yml:${job}`),
+  'e2e-full-matrix.yml:e2e-full-matrix',
+  'nightly-tests.yml:e2e-tests',
+  'nightly-testing-agent.yml:deterministic',
+  'nightly-testing-agent.yml:report',
+  'postdeploy-probes.yml:auth-smoke',
+  'production-controller.yml:ci-post-deploy-auth-smoke',
+  'production-release.yml:alias-staging',
+  'production-release.yml:production-oauth-gate',
+  'synthetic-monitoring.yml:synthetic-test',
+  'visual-regression.yml:visual-regression',
 ];
-const protectedJobs: Record<string, string[]> = {
-  'agent-tick.yml': ['synthetic-monitoring'],
-  'ci.yml':
-    'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
-      ' '
-    ),
-  'e2e-full-matrix.yml': ['e2e-full-matrix'],
-  'nightly-tests.yml': ['e2e-tests'],
-  'nightly-testing-agent.yml': ['deterministic', 'report'],
-  'postdeploy-probes.yml': ['auth-smoke'],
-  'production-controller.yml': ['ci-post-deploy-auth-smoke'],
-  'production-release.yml': ['alias-staging', 'production-oauth-gate'],
-  'synthetic-monitoring.yml': ['synthetic-test'],
-  'visual-regression.yml': ['visual-regression'],
+// Image and Markdown evidence widen what an artifact may carry; each job
+// that opts in is reviewed here.
+// An expression-valued flag can evaluate true, so anything but an explicit
+// false counts as an allowance.
+const allowanceEnabled = (value: unknown) =>
+  value !== undefined &&
+  value !== false &&
+  !['', 'false'].includes(String(value));
+const imageAllowedJobs = new Set([
+  'agent-tick.yml:synthetic-monitoring',
+  'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-golden-path',
+  'ci.yml:ci-lighthouse-pr',
+  'ci.yml:ci-storybook-surfaces',
+  'ci.yml:ci-visual-snapshot-compare',
+  // Manual public-profile CTA identity captures only (dispatch-gated flag).
+  'e2e-full-matrix.yml:e2e-full-matrix',
+  'screenshots.yml:generate',
+  'synthetic-monitoring.yml:synthetic-test',
+  'visual-regression.yml:visual-regression',
+]);
+const markdownAllowedJobs = new Set([
+  'ci.yml:ci-build-layout',
+  'ci.yml:ci-e2e-smoke',
+  'ci.yml:ci-e2e-tests',
+  'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-smoke-required',
+  'ci.yml:ci-storybook-surfaces',
+  'ci.yml:ci-visual-snapshot-compare',
+  'nightly-testing-agent.yml:report',
+  'postdeploy-probes.yml:auth-smoke',
+  'production-controller.yml:ci-post-deploy-auth-smoke',
+  'visual-regression.yml:visual-regression',
+]);
+// Workflow-level secrets a Playwright child may inherit (remote build cache).
+const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);
+const policyWorkflow = (file: string) =>
+  parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
+const policyJob = (source: string): PolicyJob =>
+  Object.values((parseYaml(source) as PolicyWorkflow).jobs ?? {})[0] ?? {};
+let parsedWorkflowJobs:
+  | {
+      readonly file: string;
+      readonly id: string;
+      readonly job: PolicyJob;
+      readonly workflow: PolicyWorkflow;
+    }[]
+  | undefined;
+const workflowJobs = () =>
+  (parsedWorkflowJobs ??= readdirSync(workflowsRoot)
+    .filter(name => /\.ya?ml$/.test(name))
+    .flatMap(file => {
+      const workflow = policyWorkflow(file);
+      return Object.entries(workflow.jobs ?? {}).map(([id, job]) => ({
+        file,
+        id,
+        job,
+        workflow,
+      }));
+    }));
+const isProducerLine = (line: string) =>
+  playwrightProducer.test(line) &&
+  !/playwright install/.test(line) &&
+  !line.trimStart().startsWith('echo');
+const producerSteps = (job: PolicyJob) =>
+  (job.steps ?? []).flatMap((step, index) =>
+    typeof step.run === 'string' && step.run.split('\n').some(isProducerLine)
+      ? [{ step, index }]
+      : []
+  );
+// Each producer command needs its own guard: on its line, or inside a guarded
+// `--run -- bash -c` wrapper opened earlier in the same step.
+const unguardedProducerLines = (run: string) => {
+  let wrapped = false;
+  // Join shell continuations so a guard and its producer form one command.
+  return run
+    .replace(/\\\n\s*/g, ' ')
+    .split('\n')
+    .flatMap(line => {
+      if (line.includes(guardScriptName) && /--run -- (?:ba)?sh -c/.test(line))
+        wrapped = true;
+      return isProducerLine(line) && !wrapped && !line.includes(guardScriptName)
+        ? [line.trim()]
+        : [];
+    });
 };
-const producerCounts: Record<string, number> = {
-  'agent-tick.yml': 6,
-  'canary-health-gate.yml': 1,
-  'ci.yml': 16,
-  'e2e-full-matrix.yml': 2,
-  'nightly-testing-agent.yml': 2,
-  'nightly-tests.yml': 4,
-  'postdeploy-probes.yml': 1,
-  'production-controller.yml': 1,
-  'production-release.yml': 3,
-  'screenshots.yml': 11,
-  'synthetic-monitoring.yml': 6,
-  'visual-regression.yml': 6,
+const uploadViolations = (step: PolicyStep): string[] => {
+  const path = String(step.with?.path ?? '');
+  const condition = String(step.if ?? '');
+  if (/^actions\/upload-artifact@/.test(step.uses ?? ''))
+    return /apps\/web\/(?:playwright-report|test-results)/.test(path)
+      ? ['raw-playwright-upload']
+      : [];
+  if (step.uses !== safeUploadUses) return [];
+  return [
+    ...(path.includes('apps/web/playwright-report/')
+      ? ['html-report-upload']
+      : []),
+    ...(/^(?:ignore|warn)$/.test(String(step.with?.['if-no-files-found'] ?? ''))
+      ? ['missing-files-tolerated']
+      : []),
+    ...(/(?:always|failure)\(\)/.test(condition) &&
+    !condition.includes('hashFiles(')
+      ? ['failure-upload-without-hashfiles']
+      : []),
+  ];
 };
+const secretNames = (env: Record<string, unknown> | undefined) =>
+  Object.values(env ?? {}).flatMap(value =>
+    [...String(value).matchAll(/\$\{\{\s*secrets\.([A-Za-z0-9_]+)/g)].map(
+      match => match[1] ?? ''
+    )
+  );
 
 function fixture(prefix = 'jovie-artifact-', parent = tmpdir()) {
   const path = realpathSync(mkdtempSync(join(parent, prefix)));
@@ -258,10 +386,6 @@ const gitPushAuthViolations = (source: string): string[] => [
     : ['missing-command-scoped-push-auth']),
   ...persistentGitCredentialViolations(source),
 ];
-const secretReferenceViolations = (...sources: string[]) =>
-  [...sources.join('\n').matchAll(/\$\{\{\s*secrets\.[^}]+}}/g)].map(
-    match => match[0]
-  );
 const reporterNames = (reporter: unknown) =>
   typeof reporter === 'string'
     ? [reporter]
@@ -896,102 +1020,123 @@ describe('Playwright artifact secret boundary', () => {
     expect(upload).toContain("allow-markdown: 'true'");
   });
 
-  it('routes the exact upload and producer inventory through staged-only guards', () => {
-    const uploads: string[] = [];
-    const images: string[] = [];
-    const markdown: string[] = [];
-    const safeUploadJobs: (WorkflowJobBlock & { readonly file: string })[] = [];
-    for (const file of readdirSync(workflowsRoot).filter(name =>
-      /\.ya?ml$/.test(name)
-    )) {
-      const source = readFileSync(join(workflowsRoot, file), 'utf8');
-      safeUploadJobs.push(
-        ...workflowJobBlocks(source)
+  it('redacts smoke and full E2E error context and keeps golden-path keyframes off the failure upload', () => {
+    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    for (const [jobId, stepName] of [
+      ['ci-e2e-smoke', 'Run E2E Smoke (Chromium)'],
+      ['ci-smoke-required', 'Run Required Smoke Tests'],
+      ['ci-e2e-tests', 'E2E Full (Main Branch)'],
+      ['ci-e2e-tests', 'E2E Quarantine (retries)'],
+    ] as const) {
+      const job = jobBlock(source, jobId);
+      const step = stepBlock(job, stepName);
+      expect(step, `${jobId}:${stepName}`).toContain(
+        "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+      );
+      expect(yamlPropertyBlock(job, 'env', 4), jobId).not.toContain(
+        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+      );
+    }
+    const golden = jobBlock(source, 'ci-golden-path');
+    const failureUpload = stepBlock(
+      golden,
+      'Upload Playwright Artifacts on Failure'
+    );
+    expect(failureUpload).toContain('!apps/web/test-results/**/*.png');
+    expect(failureUpload).not.toMatch(/allow-images:\s*['"]?true/);
+    const visualUpload = stepBlock(
+      golden,
+      'Upload golden-path visual review evidence'
+    );
+    expect(visualUpload).toContain("allow-images: 'true'");
+    expect(visualUpload).toContain("public-images: 'true'");
+  });
+
+  // JOV-7707: the artifact boundary is enforced as policy over parsed workflow
+  // YAML. New producers, uploads and jobs are held to these rules by default,
+  // so adding one needs no inventory edit; only exemptions are listed.
+  it('guards every Playwright producer step outside the reviewed exemptions', () => {
+    const violations = workflowJobs().flatMap(({ file, id, job }) =>
+      producerSteps(job).flatMap(({ step }) => {
+        const exempt = unguardedProducerSteps.get(`${file}:${id}`);
+        if (exempt === '*' || exempt === step.name) return [];
+        return unguardedProducerLines(String(step.run)).map(
+          line => `${file}:${id}:${step.name}:${line}`
+        );
+      })
+    );
+    expect(violations).toEqual([]);
+    const unguarded = policyJob(`jobs:
+  probe:
+    steps:
+      - name: Run smoke
+        run: pnpm exec playwright test tests/e2e/smoke.spec.ts`);
+    expect(producerSteps(unguarded)).toHaveLength(1);
+    expect(
+      unguardedProducerLines(String(producerSteps(unguarded)[0]?.step.run))
+    ).toEqual(['pnpm exec playwright test tests/e2e/smoke.spec.ts']);
+    expect(
+      unguardedProducerLines(
+        `node ${guardScriptName} --run -- pnpm playwright test a\npnpm playwright test b`
+      )
+    ).toEqual(['pnpm playwright test b']);
+    expect(
+      unguardedProducerLines(
+        `node "${guardScriptName}" --run -- bash -c "\n  pnpm playwright test a\n"`
+      )
+    ).toEqual([]);
+  });
+
+  it('routes every Playwright output upload through the staged safe uploader', () => {
+    const violations = workflowJobs().flatMap(({ file, id, job }) =>
+      (job.steps ?? []).flatMap((step, index) =>
+        uploadViolations(step).map(
+          violation => `${file}:${id}:${step.name ?? index}:${violation}`
+        )
+      )
+    );
+    expect(violations).toEqual([]);
+    for (const [unsafe, violation] of [
+      [
+        {
+          uses: 'actions/upload-artifact@0123',
+          with: { path: 'apps/web/test-results/' },
+        },
+        'raw-playwright-upload',
+      ],
+      [
+        { uses: safeUploadUses, with: { path: 'apps/web/playwright-report/' } },
+        'html-report-upload',
+      ],
+      [
+        {
+          uses: safeUploadUses,
+          with: { path: 'x', 'if-no-files-found': 'ignore' },
+        },
+        'missing-files-tolerated',
+      ],
+      [
+        { uses: safeUploadUses, if: 'failure()', with: { path: 'x' } },
+        'failure-upload-without-hashfiles',
+      ],
+    ] as const)
+      expect(uploadViolations(unsafe)).toContain(violation);
+  });
+
+  it('keeps checkout and git credentials out of every safe-upload job', () => {
+    const safeUploadJobs = readdirSync(workflowsRoot)
+      .filter(name => /\.ya?ml$/.test(name))
+      .flatMap(file =>
+        workflowJobBlocks(readFileSync(join(workflowsRoot, file), 'utf8'))
           .filter(job => job.source.includes(safeUploadAction))
           .map(job => ({ ...job, file }))
       );
-      for (const block of source.split(/(?=^ {6}- (?:name:|uses:))/m)) {
-        if (
-          block.includes(
-            'uses: ./.github/actions/upload-safe-playwright-artifact'
-          )
-        ) {
-          expect(block, file).not.toContain('apps/web/playwright-report/');
-          expect(block, file).not.toMatch(
-            /if-no-files-found:\s*(?:ignore|warn)/
-          );
-          if (/^ {8}if:.*(?:always|failure)\(\)/m.test(block))
-            expect(block, file).toContain('hashFiles(');
-        }
-        if (
-          !/apps\/web\/(?:playwright-report|test-results)/.test(block) ||
-          !/uses:\s*(?:actions\/upload-artifact@|\.\/\.github\/actions\/upload-safe-playwright-artifact)/.test(
-            block
-          )
-        )
-          continue;
-        expect(block, file).toContain(
-          'uses: ./.github/actions/upload-safe-playwright-artifact'
-        );
-        const artifact = `${file}:${block.match(/^ {10}name:\s*(.+)$/m)?.[1]}`;
-        uploads.push(artifact);
-        if (/^ {10}allow-images:\s*['"]?true/m.test(block))
-          images.push(artifact);
-        if (/^ {10}allow-markdown:\s*['"]?true/m.test(block))
-          markdown.push(artifact);
-      }
-    }
-    expect(uploads.sort()).toEqual(uploadInventory.sort());
-    expect(images.sort()).toEqual(imageUploads.sort());
-    expect(markdown.sort()).toEqual(markdownUploads.sort());
-    expect(safeUploadJobs).toHaveLength(29);
-    expect(
-      safeUploadJobs.reduce(
-        (count, job) => count + safeUploadJobAudit(job).uploadCount,
-        0
-      )
-    ).toBe(43);
-    for (const job of safeUploadJobs) {
-      const audit = safeUploadJobAudit(job);
+    expect(safeUploadJobs.length).toBeGreaterThan(0);
+    for (const job of safeUploadJobs)
       expect(
-        audit.uploadCount,
-        `${job.file}:${job.id}:safe uploads`
-      ).toBeGreaterThan(0);
-      expect(audit.violations, `${job.file}:${job.id}`).toEqual([]);
-    }
-
-    for (const [file, jobId, artifactName] of [
-      [
-        'postdeploy-probes.yml',
-        'auth-smoke',
-        'postdeploy-auth-smoke-${{ github.run_id }}',
-      ],
-      [
-        'production-controller.yml',
-        'ci-post-deploy-auth-smoke',
-        'post-deploy-auth-smoke-${{ github.run_id }}',
-      ],
-    ] as const) {
-      const workflow = readFileSync(join(workflowsRoot, file), 'utf8');
-      const job = workflowJobBlocks(workflow).find(block => block.id === jobId);
-      expect(job, `${file}:${jobId}`).toBeDefined();
-      if (!job) continue;
-      const producer = workflowStepBlocks(job.source).find(block =>
-        block.startsWith('      - name: Run production auth smoke tests\n')
-      );
-      const uploader = workflowStepBlocks(job.source).find(block =>
-        block.includes(safeUploadAction)
-      );
-      expect(producer, `${file}:${jobId}:producer`).toBeDefined();
-      expect(uploader, `${file}:${jobId}:uploader`).toBeDefined();
-      if (!producer || !uploader) continue;
-      expect(producer).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
-      expect(yamlPropertyBlock(job.source, 'env', 4)).not.toContain(
-        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
-      );
-      expect(uploader).toContain(`name: ${artifactName}`);
-      expect(uploader).toContain("allow-markdown: 'true'");
-    }
+        safeUploadJobAudit(job).violations,
+        `${job.file}:${job.id}`
+      ).toEqual([]);
 
     const fixtureCheckout = `      - uses: actions/checkout@0123456789abcdef
         with:
@@ -1006,13 +1151,12 @@ ${fixtureCheckout}
         with:
           name: fixture
           path: apps/web/test-results/result.json`;
-    const safeFixtureJobs = workflowJobBlocks(safeUploadFixture);
-    expect(safeFixtureJobs).toHaveLength(1);
-    const safeFixtureJob = safeFixtureJobs.at(0);
-    if (!safeFixtureJob)
-      throw new Error('safe upload fixture job was not parsed');
-    expect(safeUploadJobAudit(safeFixtureJob).uploadCount).toBe(1);
-    expect(safeUploadJobAudit(safeFixtureJob).violations).toEqual([]);
+    const [safeFixtureJob] = workflowJobBlocks(safeUploadFixture);
+    if (!safeFixtureJob) throw new Error('safe upload fixture was not parsed');
+    expect(safeUploadJobAudit(safeFixtureJob)).toEqual({
+      uploadCount: 1,
+      violations: [],
+    });
     const withoutFixtureCheckout = safeUploadFixture.replace(
       `${fixtureCheckout}\n`,
       ''
@@ -1041,379 +1185,10 @@ ${fixtureCheckout}
         '        run: git remote set-url origin https://x-access-token:$GH_TOKEN@github.com/JovieInc/Jovie.git'
       ),
     ]) {
-      const unsafeJobs = workflowJobBlocks(unsafe);
-      expect(unsafeJobs, unsafe).toHaveLength(1);
-      const unsafeJob = unsafeJobs.at(0);
-      if (!unsafeJob)
-        throw new Error('unsafe upload fixture job was not parsed');
+      const [unsafeJob] = workflowJobBlocks(unsafe);
+      if (!unsafeJob) throw new Error('unsafe upload fixture was not parsed');
       expect(safeUploadJobAudit(unsafeJob).violations, unsafe).not.toEqual([]);
     }
-    for (const [file, jobs] of Object.entries(protectedJobs)) {
-      const source = readFileSync(join(workflowsRoot, file), 'utf8');
-      for (const job of jobs) {
-        const protectedJob = jobBlock(source, job);
-        expect(protectedJob, `${file}:${job}`).not.toBe('');
-        const protectedJobEnv = yamlPropertyBlock(protectedJob, 'env', 4);
-        expect(protectedJobEnv, `${file}:${job}:job.env`).toContain(
-          "PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'"
-        );
-        expect(
-          protectedJob.indexOf(protectedJobEnv),
-          `${file}:${job}:job.env-before-steps`
-        ).toBeLessThan(protectedJob.indexOf('\n    steps:'));
-      }
-    }
-    const imageJobs =
-      'agent-tick.yml:synthetic-monitoring|synthetic-monitoring.yml:synthetic-test|ci.yml:ci-lighthouse-pr|visual-regression.yml:visual-regression';
-    for (const item of imageJobs.split('|')) {
-      const [file, job] = item.split(':');
-      const imageJob = jobBlock(
-        readFileSync(join(workflowsRoot, file), 'utf8'),
-        job
-      );
-      expect(imageJob, item).not.toBe('');
-      const imageJobEnv = yamlPropertyBlock(imageJob, 'env', 4);
-      expect(imageJobEnv, `${item}:job.env`).toContain(
-        "PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'"
-      );
-      expect(
-        imageJob.indexOf(imageJobEnv),
-        `${item}:job.env-before-steps`
-      ).toBeLessThan(imageJob.indexOf('\n    steps:'));
-    }
-    for (const [file, count] of Object.entries(producerCounts)) {
-      const producers = readFileSync(join(workflowsRoot, file), 'utf8')
-        .split(/(?=^ {6}- (?:name:|uses:))/m)
-        .flatMap(block => {
-          const stepName = block.match(/^      - name: (.+)$/m)?.[1];
-          return block
-            .split('\n')
-            .filter(
-              line =>
-                !line.trimStart().startsWith('echo') &&
-                /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/.test(
-                  line
-                ) &&
-                !/playwright install/.test(line) &&
-                (!line.includes('test:nightly-agent:normalize') ||
-                  stepName === 'Normalize unit telemetry')
-            )
-            .map(line => ({ block, line }));
-        });
-      expect(producers, file).toHaveLength(count);
-      for (const { block, line } of producers) {
-        const exception =
-          (file === 'canary-health-gate.yml' &&
-            line.includes('BASE_URL="https://staging.jov.ie"')) ||
-          file === 'screenshots.yml';
-        if (!exception)
-          expect(block, `${file}:${line}`).toContain(
-            'guard-playwright-artifacts.mjs'
-          );
-      }
-    }
-    const waitlistDopplerCommand =
-      'run: doppler run --project jovie-web --config prd --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist';
-    for (const file of ['agent-tick.yml', 'synthetic-monitoring.yml']) {
-      const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
-        .split('\n')
-        .filter(line => line.includes('doppler run --'));
-      const guarded = doppler.filter(line => line.includes(guardScriptName));
-      expect(guarded).toHaveLength(6);
-      expect(
-        guarded.every(
-          line =>
-            line.includes(
-              'doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm'
-            ) || line.trim() === waitlistDopplerCommand
-        )
-      ).toBe(true);
-      expect(
-        guarded.filter(line => line.trim() === waitlistDopplerCommand)
-      ).toHaveLength(1);
-      const expectedNonPlaywrightCommands = [
-        expect.stringContaining('scripts/check-signup-readiness.ts'),
-        ...(file === 'synthetic-monitoring.yml'
-          ? [
-              expect.stringContaining(
-                '--only-secrets=CRON_SECRET --no-fallback'
-              ),
-              // JOV-6870: limiter-store probe of /api/health/redis.
-              expect.stringContaining(
-                '--only-secrets=CRON_SECRET --no-fallback'
-              ),
-            ]
-          : []),
-      ];
-      expect(doppler).toHaveLength(
-        guarded.length + expectedNonPlaywrightCommands.length
-      );
-      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual(
-        expectedNonPlaywrightCommands
-      );
-    }
-    const screenshots = readFileSync(
-      join(workflowsRoot, 'screenshots.yml'),
-      'utf8'
-    );
-    const screenshotJob = jobBlock(screenshots, 'generate');
-    const screenshotPublisherJob = jobBlock(screenshots, 'publish');
-    const screenshotCapture = stepBlock(
-      screenshots,
-      'Capture screenshot catalog'
-    );
-    const screenshotServing = stepBlock(
-      screenshots,
-      'Verify public screenshot exports from production build'
-    );
-    const screenshotStart = stepBlock(screenshots, 'Start production server');
-    const screenshotStop = stepBlock(screenshots, 'Stop production server');
-    const screenshotIntegrity = stepBlock(
-      screenshots,
-      'Verify screenshot catalog integrity and budgets'
-    );
-    const screenshotDiff = stepBlock(screenshots, 'Check for changes');
-    const screenshotStage = stepBlock(
-      screenshots,
-      'Stage generated screenshot catalog for transfer'
-    );
-    const screenshotUpload = stepBlock(
-      screenshots,
-      'Upload generated screenshot catalog'
-    );
-    const screenshotDownload = stepBlock(
-      screenshots,
-      'Download generated screenshot catalog'
-    );
-    const screenshotDownloadedIntegrity = stepBlock(
-      screenshots,
-      'Verify downloaded screenshot catalog'
-    );
-    const screenshotToken = stepBlock(screenshots, 'Generate Jovie Bot token');
-    const screenshotPush = stepBlock(
-      screenshots,
-      'Create or update screenshot PR'
-    );
-    expect(screenshotJob).not.toBe('');
-    expect(screenshotPublisherJob).not.toBe('');
-    expect(screenshotCapture).not.toBe('');
-    expect(screenshotServing).not.toBe('');
-    expect(screenshotJob).toMatch(
-      /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
-    );
-    expect(screenshotPublisherJob).toMatch(
-      /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
-    );
-    expect(screenshotJob.indexOf('actions/checkout@')).toBeLessThan(
-      screenshotJob.indexOf(screenshotCapture)
-    );
-    const screenshotWorkflowEnv = yamlPropertyBlock(screenshots, 'env', 0);
-    const screenshotJobEnv = yamlPropertyBlock(screenshotJob, 'env', 4);
-    const screenshotCaptureEnv = yamlPropertyBlock(screenshotCapture, 'env', 8);
-    expect(screenshotWorkflowEnv).toBe('');
-    expect(screenshotCaptureEnv).not.toBe('');
-    expect(screenshotJob).toContain(screenshotServing);
-    expect(screenshotJob.indexOf(screenshotServing)).toBeLessThan(
-      screenshotJob.indexOf(screenshotCapture)
-    );
-    expect(screenshotServing).toContain(
-      'tests/product-screenshots/public-export-serving.spec.ts'
-    );
-    expect(screenshotServing).toContain(
-      '--config=playwright.config.screenshots.ts'
-    );
-    expect(screenshotServing).toContain('--project=screenshots');
-    expect(screenshotServing).toContain('BASE_URL: http://localhost:3000');
-    expect(screenshotServing).toContain('SCREENSHOT_BUILD_MODE: production');
-    expect(
-      secretReferenceViolations(
-        screenshotWorkflowEnv,
-        screenshotJobEnv,
-        screenshotServing
-      )
-    ).toEqual([]);
-    expect(screenshotServing).not.toContain('JOVIE_BOT_PRIVATE_KEY');
-    expect(
-      secretReferenceViolations(
-        screenshotWorkflowEnv,
-        screenshotJobEnv,
-        screenshotCapture
-      )
-    ).toEqual([]);
-    expect(screenshotCapture).not.toContain('JOVIE_BOT_PRIVATE_KEY');
-    expect(screenshots.match(/JOVIE_BOT_PRIVATE_KEY/g)).toHaveLength(1);
-    expect(screenshotJobEnv).not.toBe('');
-    expect(screenshotJob.indexOf(screenshotJobEnv)).toBeLessThan(
-      screenshotJob.indexOf('\n    steps:')
-    );
-    expect(screenshotJobEnv).not.toContain('${{ secrets.');
-    expect(
-      screenshotJobEnv
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line =>
-          isCredentialBearingName(line.match(/^([A-Z0-9_]+):/)?.[1] ?? '')
-        )
-    ).toEqual([
-      'DATABASE_URL: postgresql://localhost/noop',
-      'CLERK_SECRET_KEY: sk_test_mock',
-    ]);
-    for (const block of [
-      screenshotStart,
-      screenshotCapture,
-      screenshotStop,
-      screenshotIntegrity,
-      screenshotDiff,
-      screenshotStage,
-      screenshotUpload,
-      screenshotDownload,
-      screenshotDownloadedIntegrity,
-      screenshotToken,
-      screenshotPush,
-    ])
-      expect(block).not.toBe('');
-    expect(screenshotJob.indexOf(screenshotCapture)).toBeLessThan(
-      screenshotJob.indexOf(screenshotStop)
-    );
-    expect(screenshotJob.indexOf(screenshotStop)).toBeLessThan(
-      screenshotJob.indexOf(screenshotIntegrity)
-    );
-    expect(screenshotJob.indexOf(screenshotIntegrity)).toBeLessThan(
-      screenshotJob.indexOf(screenshotDiff)
-    );
-    expect(screenshotJob.indexOf(screenshotDiff)).toBeLessThan(
-      screenshotJob.indexOf(
-        '- name: Stage generated screenshot catalog for transfer'
-      )
-    );
-    expect(screenshotJob.indexOf(screenshotStage)).toBeLessThan(
-      screenshotJob.indexOf('- name: Upload generated screenshot catalog')
-    );
-    expect(screenshotUpload).toContain(
-      'path: .artifacts/screenshot-catalog-transfer/'
-    );
-    expect(screenshotJob).not.toContain('${{ secrets.');
-    expect(screenshotJob).not.toContain('Create or update screenshot PR');
-    expect(
-      screenshotPublisherJob.indexOf(
-        '- name: Download generated screenshot catalog'
-      )
-    ).toBeLessThan(
-      screenshotPublisherJob.indexOf(
-        '- name: Verify downloaded screenshot catalog'
-      )
-    );
-    expect(screenshotDownload).toContain('path: .');
-    expect(
-      screenshotPublisherJob.indexOf(
-        '- name: Verify downloaded screenshot catalog'
-      )
-    ).toBeLessThan(
-      screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
-    );
-    expect(
-      screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
-    ).toBeLessThan(
-      screenshotPublisherJob.indexOf('- name: Create or update screenshot PR')
-    );
-    expect(
-      screenshotPublisherJob.slice(
-        0,
-        screenshotPublisherJob.indexOf('- name: Generate Jovie Bot token')
-      )
-    ).not.toContain('${{ secrets.');
-    expect(
-      persistentGitCredentialViolations(
-        screenshotJob.slice(0, screenshotJob.indexOf(screenshotCapture))
-      )
-    ).toEqual([]);
-    expect(gitPushAuthViolations(screenshotPush)).toEqual([]);
-    const screenshotWithWorkflowSecret =
-      'env:\n  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}\n\n' + screenshots;
-    expect(
-      secretReferenceViolations(
-        yamlPropertyBlock(screenshotWithWorkflowSecret, 'env', 0),
-        yamlPropertyBlock(
-          jobBlock(screenshotWithWorkflowSecret, 'generate'),
-          'env',
-          4
-        ),
-        stepBlock(screenshotWithWorkflowSecret, 'Capture screenshot catalog')
-      )
-    ).not.toEqual([]);
-
-    const visual = readFileSync(
-      join(workflowsRoot, 'visual-regression.yml'),
-      'utf8'
-    );
-    const visualJob = jobBlock(visual, 'visual-regression');
-    const visualResolve = stepBlock(
-      visual,
-      'Resolve DATABASE_URL from Neon branch (early)'
-    );
-    const visualExport = stepBlock(visual, 'Export DATABASE_URL');
-    const visualRun = stepBlock(visual, 'Run visual regression suite');
-    const visualUpload = stepBlock(
-      visual,
-      'Upload Playwright results on failure'
-    );
-    const visualToken = stepBlock(
-      visual,
-      'Generate Jovie Bot token (refresh only)'
-    );
-    const visualPush = stepBlock(
-      visual,
-      'Create or update baseline PR (refresh only)'
-    );
-    for (const block of [
-      visualJob,
-      visualResolve,
-      visualExport,
-      visualRun,
-      visualUpload,
-      visualToken,
-      visualPush,
-    ])
-      expect(block).not.toBe('');
-    expect(visualJob).toMatch(
-      /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
-    );
-    expect(visualJob.indexOf('actions/checkout@')).toBeLessThan(
-      visualJob.indexOf(visualRun)
-    );
-    expect(visualExport).toContain(
-      'DATABASE_URL=${{ steps.resolve-visual-neon-db-url-early.outputs.database_url }}'
-    );
-    expect(visualExport).toContain('>> "$GITHUB_ENV"');
-    expect(visualRun).toContain(
-      'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
-    );
-    expect(visualRun).toContain('DATABASE_URL: ${{ env.DATABASE_URL }}');
-    expect(yamlPropertyBlock(visualJob, 'env', 4)).toContain(
-      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
-    );
-    expect(visualUpload).toContain("allow-markdown: 'true'");
-    expect(visualJob.indexOf(visualResolve)).toBeLessThan(
-      visualJob.indexOf(visualExport)
-    );
-    expect(visualJob.indexOf(visualExport)).toBeLessThan(
-      visualJob.indexOf(visualRun)
-    );
-    expect(visualJob.indexOf(visualRun)).toBeLessThan(
-      visualJob.indexOf(visualUpload)
-    );
-    expect(visualJob.indexOf(visualUpload)).toBeLessThan(
-      visualJob.indexOf(visualToken)
-    );
-    expect(visualJob.slice(0, visualJob.indexOf(visualToken))).not.toContain(
-      'JOVIE_BOT_PRIVATE_KEY'
-    );
-    expect(
-      persistentGitCredentialViolations(
-        visualJob.slice(0, visualJob.indexOf(visualRun))
-      )
-    ).toEqual([]);
-    expect(gitPushAuthViolations(visualPush)).toEqual([]);
     for (const unsafePush of [
       'git push --force origin branch',
       'git config --global credential.helper store\ngit push origin branch',
@@ -1422,261 +1197,259 @@ ${fixtureCheckout}
       'git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push https://x-access-token:$GH_TOKEN@github.com/JovieInc/Jovie.git branch',
     ])
       expect(gitPushAuthViolations(unsafePush), unsafePush).not.toEqual([]);
-
-    const canary = readFileSync(
-      join(workflowsRoot, 'canary-health-gate.yml'),
-      'utf8'
-    );
-    const canaryJob = jobBlock(canary, 'canary-health-gate');
-    const publicAuthProbe = stepBlock(
-      canary,
-      'Verify public auth controls are interactive'
-    );
-    const productionRelease = readFileSync(
-      join(workflowsRoot, 'production-release.yml'),
-      'utf8'
-    );
-    const aliasJob = jobBlock(productionRelease, 'alias-staging');
-    const productionOauthJob = jobBlock(
-      productionRelease,
-      'production-oauth-gate'
-    );
-    const oauthProbe = stepBlock(
-      aliasJob,
-      'Verify aliased staging OAuth redirect URIs'
-    );
-    expect(canaryJob).not.toBe('');
-    expect(publicAuthProbe).not.toBe('');
-    expect(oauthProbe).not.toBe('');
-    expect(canaryJob).toMatch(
-      /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
-    );
-    expect(canaryJob.indexOf('actions/checkout@')).toBeLessThan(
-      canaryJob.indexOf(publicAuthProbe)
-    );
-    const canaryWorkflowEnv = yamlPropertyBlock(canary, 'env', 0);
-    const canaryJobEnv = yamlPropertyBlock(canaryJob, 'env', 4);
-    expect(canaryWorkflowEnv).toBe('');
-    expect(canaryJobEnv).toBe('');
-    const canaryInherited = canaryWorkflowEnv + canaryJobEnv;
-    expect(canaryInherited).not.toContain('${{ secrets.');
-    expect(
-      [...canaryInherited.matchAll(/\b([A-Z][A-Z0-9_]*)\s*(?::|=)/g)]
-        .map(match => match[1])
-        .filter(isCredentialBearingName)
-    ).toEqual([]);
-    expect(publicAuthProbe).toContain(
-      'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
-    );
-    expect(publicAuthProbe).toContain(
-      'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
-    );
-    expect(publicAuthProbe).not.toContain('$GITHUB_ENV');
-    expect(canaryJob).not.toContain('oauth-providers.spec.ts');
-    expect(aliasJob.indexOf('Prove staging alias owns')).toBeLessThan(
-      aliasJob.indexOf(oauthProbe)
-    );
-    expect(oauthProbe).toContain('oauth-providers.spec.ts');
-    expect(oauthProbe).toContain(
-      'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
-    );
-    expect(oauthProbe).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
-    expect(productionOauthJob).toContain(
-      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
-    );
-    expect(
-      productionRelease.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(3);
-    const action = readFileSync(
-      join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
-      'utf8'
-    );
-    expect(action).toMatch(/pending[\s\S]*blocked[\s\S]*current/);
-    expect(action).toContain('path: ${{ steps.guard.outputs.path }}');
-    expect(action).not.toContain('path: ${{ inputs.path }}');
-    expect(action).toContain('echo "$artifact_stage/"');
-    expect(action).not.toContain('${path#!}');
-    expect(action).toContain('include-hidden-files: true');
-    expect(action).toContain(
-      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
-    );
-    expect(
-      readFileSync(join(workflowsRoot, 'eval-real-model.yml'), 'utf8')
-    ).not.toContain('upload-safe-playwright-artifact');
-    const nightly = readFileSync(
-      join(workflowsRoot, 'nightly-tests.yml'),
-      'utf8'
-    );
-    const chaosSweep = stepBlock(nightly, 'Run full surface chaos sweep');
-    const chaosUpload = stepBlock(nightly, 'Upload full surface chaos report');
-    expect(chaosSweep).not.toBe('');
-    expect(chaosUpload).not.toBe('');
-    expect(chaosSweep).toContain(
-      'guard-playwright-artifacts.mjs" --run -- bash -c'
-    );
-    expect(chaosSweep).toContain('status=\\$?');
-    expect(chaosSweep).toContain(
-      'if [ -f test-results/nightly-results.json ]; then'
-    );
-    expect(chaosSweep).toContain(
-      'cp test-results/nightly-results.json test-results/full-surface-chaos-report.json || exit \\$?'
-    );
-    expect(chaosSweep).toContain('exit \\"\\$status\\"');
-    expect(chaosSweep).not.toMatch(
-      /if\s+\[[^\n]*\\?\$status[^\n]*(?:-eq|={1,3})\s*["']?0/
-    );
-    expect(
-      chaosSweep.indexOf('guard-playwright-artifacts.mjs" --run -- bash -c')
-    ).toBeLessThan(chaosSweep.indexOf('pnpm playwright test'));
-    expect(chaosSweep.indexOf('pnpm playwright test')).toBeLessThan(
-      chaosSweep.indexOf('status=\\$?')
-    );
-    expect(chaosSweep.indexOf('status=\\$?')).toBeLessThan(
-      chaosSweep.indexOf('if [ -f test-results/nightly-results.json ]; then')
-    );
-    expect(
-      chaosSweep.indexOf(
-        'cp test-results/nightly-results.json test-results/full-surface-chaos-report.json'
-      )
-    ).toBeLessThan(chaosSweep.indexOf('exit \\"\\$status\\"'));
-    expect(nightly.indexOf(chaosSweep)).toBeLessThan(
-      nightly.indexOf(chaosUpload)
-    );
-    expect(stepBlock(nightly, 'Upload route QA ledger')).toMatch(
-      /workflow_dispatch[\s\S]*suite != 'design-v1'[\s\S]*route-matrix\.json[\s\S]*findings-ledger\.json/
-    );
-    expect(chaosUpload).toMatch(
-      /suite != 'design-v1'[\s\S]*hashFiles\('apps\/web\/test-results\/full-surface-chaos-report\.json'/
-    );
-    const nightlyAgent = readFileSync(
-      join(workflowsRoot, 'nightly-testing-agent.yml'),
-      'utf8'
-    );
-    const normalizeTelemetry = stepBlock(
-      nightlyAgent,
-      'Normalize unit telemetry'
-    );
-    const uploadTelemetry = stepBlock(
-      nightlyAgent,
-      'Upload deterministic telemetry'
-    );
-    expect(normalizeTelemetry).not.toBe('');
-    expect(uploadTelemetry).not.toBe('');
-    expect(normalizeTelemetry).toContain(
-      'node .github/scripts/guard-playwright-artifacts.mjs --run --'
-    );
-    expect(normalizeTelemetry).not.toContain(
-      'UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}'
-    );
-    expect(normalizeTelemetry).not.toContain(
-      'UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}'
-    );
-    expect(normalizeTelemetry).toContain(
-      '--out apps/web/test-results/nightly-agent/deterministic'
-    );
-    expect(normalizeTelemetry).toContain('--name normalized-results.json');
-    expect(uploadTelemetry).toContain(
-      "hashFiles('apps/web/test-results/nightly-agent/deterministic/normalized-results.json') != ''"
-    );
-    expect(uploadTelemetry).toContain(
-      'path: apps/web/test-results/nightly-agent/deterministic/'
-    );
-    expect(nightlyAgent.indexOf(normalizeTelemetry)).toBeLessThan(
-      nightlyAgent.indexOf(uploadTelemetry)
-    );
-    const publishReport = stepBlock(
-      nightlyAgent,
-      'Publish evidence report and ops status'
-    );
-    const commitReport = stepBlock(nightlyAgent, 'Open nightly evidence PR');
-    const reportToken = stepBlock(
-      nightlyAgent,
-      'Generate report publication token'
-    );
-    const uploadReport = stepBlock(nightlyAgent, 'Upload final report');
-    const reportJob = jobBlock(nightlyAgent, 'report');
-    for (const block of [
-      publishReport,
-      commitReport,
-      reportToken,
-      uploadReport,
-      reportJob,
-    ])
-      expect(block).not.toBe('');
-    const reportPaths = [
-      'apps/web/test-results/nightly-agent/nightly-report.md',
-      'apps/web/test-results/nightly-agent/skill-delta.json',
-      'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
-      'apps/web/reports/nightly-agent/last-run.json',
-    ];
-    expect(publishReport).toContain(
-      'node .github/scripts/guard-playwright-artifacts.mjs --run --'
-    );
-    expect(publishReport).toContain(
-      'UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}'
-    );
-    expect(publishReport).toContain(
-      'UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}'
-    );
-    expect(publishReport).toContain(
-      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
-    );
-    for (const path of reportPaths) {
-      expect(publishReport, path).toContain(path);
-      expect(uploadReport, path).toContain(path);
-      expect(uploadReport, path).toContain(`hashFiles('${path}') != ''`);
-    }
-    expect(nightlyAgent.indexOf(publishReport)).toBeLessThan(
-      nightlyAgent.indexOf(stepBlock(nightlyAgent, 'Add report to job summary'))
-    );
-    expect(nightlyAgent.indexOf(publishReport)).toBeLessThan(
-      nightlyAgent.indexOf(commitReport)
-    );
-    expect(nightlyAgent.indexOf(publishReport)).toBeLessThan(
-      nightlyAgent.indexOf(uploadReport)
-    );
-    expect(nightlyAgent.indexOf(uploadReport)).toBeLessThan(
-      nightlyAgent.indexOf(reportToken)
-    );
-    expect(nightlyAgent.indexOf(reportToken)).toBeLessThan(
-      nightlyAgent.indexOf(commitReport)
-    );
-    expect(yamlPropertyBlock(reportJob, 'permissions', 4)).toContain(
-      'contents: read'
-    );
-    expect(reportToken).toContain('uses: actions/create-github-app-token@');
-    expect(reportToken).toContain('permission-contents: write');
-    expect(reportToken).toContain('permission-pull-requests: write');
-    expect(commitReport).toContain(
-      'GH_TOKEN: ${{ steps.report-token.outputs.token }}'
-    );
-    expect(commitReport).toContain(
-      "import { publishNightlyReport } from './scripts/lib/publish-coverage-report.mjs'"
-    );
-    expect(commitReport).toContain('console.log(publishNightlyReport())');
-    expect(commitReport).not.toContain('secrets.GITHUB_TOKEN');
-    expect(commitReport).not.toContain('$GITHUB_ENV');
-    expect(commitReport).not.toMatch(/\bgit\s+(?:pull|push)\b/);
-    expect(yamlPropertyBlock(reportJob, 'env', 4)).not.toContain('GH_TOKEN');
-    expect(persistentGitCredentialViolations(commitReport)).toEqual([]);
-    expect(
-      persistentGitCredentialViolations(
-        reportJob.slice(0, reportJob.indexOf(publishReport))
-      )
-    ).toEqual([]);
-    expect(readFileSync(guardScript, 'utf8')).toContain(
-      "binding() + '|' + stageName + '\\n'"
-    );
-    const unitJob = jobBlock(nightly, 'unit-tests');
-    expect(unitJob).not.toBe('');
-    expect(unitJob).toContain('uses: ./.github/actions/setup-playwright');
-    expect(
-      unitJob.indexOf('uses: ./.github/actions/setup-node-pnpm')
-    ).toBeLessThan(unitJob.indexOf('uses: ./.github/actions/setup-playwright'));
-    expect(
-      unitJob.indexOf('uses: ./.github/actions/setup-playwright')
-    ).toBeLessThan(unitJob.indexOf('Run full unit test suite'));
   });
+
+  it('requires a staged producer receipt and reviewed image/Markdown allowances', () => {
+    const violations = workflowJobs().flatMap(({ file, id, job }) => {
+      const key = `${file}:${id}`;
+      const uploads = (job.steps ?? []).filter(
+        step => step.uses === safeUploadUses
+      );
+      const env = job.env ?? {};
+      return [
+        ...(producerSteps(job).length > 0 &&
+        uploads.length > 0 &&
+        !producerStageExempt.has(key) &&
+        String(env.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE) !== 'true'
+          ? [`${key}:missing-producer-stage`]
+          : []),
+        ...(allowanceEnabled(env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES) &&
+        !imageAllowedJobs.has(key)
+          ? [`${key}:unreviewed-job-image-allowance`]
+          : []),
+        ...uploads.flatMap(step => [
+          ...(allowanceEnabled(step.with?.['allow-images']) &&
+          !imageAllowedJobs.has(key)
+            ? [`${key}:${step.with?.name}:unreviewed-image-upload`]
+            : []),
+          ...(allowanceEnabled(step.with?.['allow-markdown']) &&
+          !markdownAllowedJobs.has(key)
+            ? [`${key}:${step.with?.name}:unreviewed-markdown-upload`]
+            : []),
+        ]),
+      ];
+    });
+    expect(violations).toEqual([]);
+    expect(
+      allowanceEnabled("${{ github.event_name == 'workflow_dispatch' }}")
+    ).toBe(true);
+    expect(allowanceEnabled(true)).toBe(true);
+    for (const disabled of [undefined, false, 'false', ''])
+      expect(allowanceEnabled(disabled)).toBe(false);
+    for (const key of producerStageRequired) {
+      const [file, id] = key.split(':');
+      const job = workflowJobs().find(
+        entry => entry.file === file && entry.id === id
+      );
+      expect(job, key).toBeDefined();
+      expect(
+        String(job?.job.env?.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE),
+        key
+      ).toBe('true');
+    }
+  });
+
+  it('keeps repository secrets out of the env Playwright producers inherit', () => {
+    const violations = workflowJobs().flatMap(({ file, id, job, workflow }) =>
+      producerSteps(job).length === 0
+        ? []
+        : [
+            ...secretNames(workflow.env).filter(
+              name => !inheritedSecretAllowlist.has(name)
+            ),
+            ...secretNames(job.env),
+          ].map(name => `${file}:${id}:${name}`)
+    );
+    expect(violations).toEqual([]);
+    expect(
+      secretNames({ A: '${{ secrets.OPENAI_API_KEY }}', B: 'literal' })
+    ).toEqual(['OPENAI_API_KEY']);
+  });
+
+  it('mints publication tokens only after every producer and upload', () => {
+    const violations = workflowJobs().flatMap(({ file, id, job }) => {
+      const steps = job.steps ?? [];
+      const tokenIndex = steps.findIndex(step =>
+        /create-github-app-token@/.test(step.uses ?? '')
+      );
+      if (tokenIndex < 0) return [];
+      const lastArtifactStep = Math.max(
+        -1,
+        ...steps.flatMap((step, index) =>
+          step.uses === safeUploadUses ||
+          producerSteps({ steps: [step] }).length > 0
+            ? [index]
+            : []
+        )
+      );
+      const preToken = JSON.stringify(steps.slice(0, tokenIndex));
+      return [
+        ...(lastArtifactStep > tokenIndex
+          ? [`${file}:${id}:token-before-artifacts`]
+          : []),
+        ...(lastArtifactStep >= 0 && /JOVIE_BOT_PRIVATE_KEY/.test(preToken)
+          ? [`${file}:${id}:bot-key-before-token`]
+          : []),
+        ...(lastArtifactStep >= 0
+          ? persistentGitCredentialViolations(
+              steps
+                .slice(0, lastArtifactStep + 1)
+                .map(step => String(step.run ?? ''))
+                .join('\n')
+            ).map(violation => `${file}:${id}:${violation}`)
+          : []),
+      ];
+    });
+    expect(violations).toEqual([]);
+    const reportJob = policyWorkflow('nightly-testing-agent.yml').jobs?.report;
+    expect(reportJob?.permissions).toEqual({ contents: 'read' });
+    const reportToken = reportJob?.steps?.find(
+      step => step.id === 'report-token'
+    );
+    expect(reportToken?.with).toMatchObject({
+      'permission-contents': 'write',
+      'permission-pull-requests': 'write',
+    });
+    const commitReport = reportJob?.steps?.find(
+      step => step.name === 'Open nightly evidence PR'
+    );
+    expect(commitReport?.env?.GH_TOKEN).toBe(
+      '${{ steps.report-token.outputs.token }}'
+    );
+    expect(String(commitReport?.run)).not.toMatch(/\bgit\s+(?:pull|push)\b/);
+    expect(reportJob?.env?.GH_TOKEN).toBeUndefined();
+    for (const [file, jobId, stepName] of [
+      ['screenshots.yml', 'publish', 'Create or update screenshot PR'],
+      [
+        'visual-regression.yml',
+        'visual-regression',
+        'Create or update baseline PR (refresh only)',
+      ],
+    ] as const) {
+      const push = policyWorkflow(file).jobs?.[jobId]?.steps?.find(
+        step => step.name === stepName
+      );
+      expect(push, `${file}:${stepName}`).toBeDefined();
+      expect(gitPushAuthViolations(String(push?.run))).toEqual([]);
+    }
+  });
+
+  it('keeps the screenshot generator secret-free and publication separate', () => {
+    const screenshots = policyWorkflow('screenshots.yml');
+    const generate = screenshots.jobs?.generate;
+    const publish = screenshots.jobs?.publish;
+    expect(JSON.stringify(generate)).not.toContain('secrets.');
+    expect(screenshots.env).toBeUndefined();
+    expect(
+      Object.entries(generate?.env ?? {})
+        .filter(([name]) => isCredentialBearingName(name))
+        .map(([name, value]) => `${name}: ${value}`)
+    ).toEqual([
+      'DATABASE_URL: postgresql://localhost/noop',
+      'CLERK_SECRET_KEY: sk_test_mock',
+    ]);
+    const publishSteps = publish?.steps ?? [];
+    const tokenIndex = publishSteps.findIndex(step =>
+      /create-github-app-token@/.test(step.uses ?? '')
+    );
+    expect(tokenIndex).toBeGreaterThan(
+      publishSteps.findIndex(
+        step => step.name === 'Verify downloaded screenshot catalog'
+      )
+    );
+    expect(JSON.stringify(publishSteps.slice(0, tokenIndex))).not.toContain(
+      'secrets.'
+    );
+  });
+
+  it('pins the safe upload action to the staged guard output', () => {
+    const action = parseYaml(
+      readFileSync(
+        join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
+        'utf8'
+      )
+    ) as { runs: { steps: PolicyStep[] } };
+    const upload = action.runs.steps.find(step =>
+      /^actions\/upload-artifact@/.test(step.uses ?? '')
+    );
+    expect(upload?.uses).toMatch(/^actions\/upload-artifact@[0-9a-f]{40}$/);
+    expect(upload?.with?.path).toBe('${{ steps.guard.outputs.path }}');
+    expect(upload?.with?.['include-hidden-files']).toBe(true);
+  });
+
+  it('scopes release auth probes to their step and orders the OAuth gate after the alias', () => {
+    const canary = policyWorkflow('canary-health-gate.yml');
+    const canaryJob = canary.jobs?.['canary-health-gate'];
+    expect(canary.env).toBeUndefined();
+    expect(canaryJob?.env).toBeUndefined();
+    expect(JSON.stringify(canaryJob)).not.toContain('oauth-providers.spec.ts');
+    const authProbe = canaryJob?.steps?.find(
+      step => step.name === 'Verify public auth controls are interactive'
+    );
+    expect(String(authProbe?.run)).toContain(guardScriptName);
+    expect(authProbe?.env?.PLAYWRIGHT_VERCEL_BYPASS_SECRET).toBe(
+      '${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
+    );
+    expect(String(authProbe?.run)).not.toContain('$GITHUB_ENV');
+
+    const aliasSteps =
+      policyWorkflow('production-release.yml').jobs?.['alias-staging']?.steps ??
+      [];
+    const proveAlias = aliasSteps.findIndex(step =>
+      String(step.name).startsWith('Prove staging alias owns')
+    );
+    const oauthProbe = aliasSteps.findIndex(step =>
+      String(step.run).includes('oauth-providers.spec.ts')
+    );
+    expect(proveAlias).toBeGreaterThanOrEqual(0);
+    expect(oauthProbe).toBeGreaterThan(proveAlias);
+    expect(aliasSteps[oauthProbe]?.env).toMatchObject({
+      PLAYWRIGHT_VERCEL_BYPASS_SECRET:
+        '${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}',
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+    });
+  });
+
+  it.each([
+    [3, true],
+    [0, false],
+  ])(
+    'keeps the chaos sweep exit %i and copies its report when present',
+    (producerExit, writesResults) => {
+      const sweep = policyWorkflow('nightly-tests.yml').jobs?.[
+        'e2e-tests'
+      ]?.steps?.find(step => step.name === 'Run full surface chaos sweep');
+      expect(String(sweep?.run)).toContain(guardScriptName);
+      expect(sweep?.['continue-on-error']).toBe(true);
+      const root = fixture('jovie-chaos-sweep-');
+      const bin = join(root, 'bin');
+      write(
+        join(bin, 'node'),
+        '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
+      );
+      write(
+        join(bin, 'pnpm'),
+        `#!/bin/sh\n${writesResults ? 'mkdir -p test-results && echo {} > test-results/nightly-results.json\n' : ''}exit ${producerExit}\n`
+      );
+      spawnSync('chmod', ['+x', join(bin, 'node'), join(bin, 'pnpm')]);
+      mkdirSync(join(root, 'apps/web'), { recursive: true });
+      const result = spawnSync('bash', ['-c', String(sweep?.run)], {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_WORKSPACE: root,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+        },
+      });
+      expect(result.status, result.stderr).toBe(producerExit);
+      expect(
+        existsSync(
+          join(root, 'apps/web/test-results/full-surface-chaos-report.json')
+        )
+      ).toBe(writesResults);
+    }
+  );
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
     const expected = [
