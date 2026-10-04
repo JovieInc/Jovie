@@ -53,6 +53,15 @@ describe('isNavigationItemActive', () => {
         new URLSearchParams('tab=contacts')
       )
     ).toBe(false);
+
+    for (const route of [
+      APP_ROUTES.INSIGHTS,
+      `${APP_ROUTES.INSIGHTS}/priority/high`,
+    ]) {
+      expect(
+        isNavigationItemActive(audienceNavItem, route, new URLSearchParams())
+      ).toBe(true);
+    }
   });
 
   it('matches Presence throughout its workspace', () => {
@@ -71,6 +80,7 @@ describe('isNavigationItemActive', () => {
       APP_ROUTES.LEGACY_DASHBOARD_LIBRARY,
       APP_ROUTES.RELEASES,
       APP_ROUTES.DASHBOARD_RELEASES,
+      APP_ROUTES.YOUTUBE_REVIVAL,
     ]) {
       expect(
         isNavigationItemActive(

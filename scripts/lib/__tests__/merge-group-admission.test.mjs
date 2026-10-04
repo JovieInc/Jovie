@@ -491,8 +491,9 @@ describe('merge-group admission evidence', () => {
       },
     });
 
-    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(3);
-    expect(loadQueueRef).toHaveBeenCalledTimes(3);
+    // First proof plus the final reread; the pending poll reads only checks.
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(2);
+    expect(loadQueueRef).toHaveBeenCalledTimes(2);
     expect(loadCheckRuns).toHaveBeenCalledTimes(4);
     expect(statuses).toHaveLength(2);
     expect(statuses.at(-1)).toMatch(/admission passed/);
@@ -760,6 +761,58 @@ describe('merge-group admission evidence', () => {
     ).toBe(true);
   });
 
+  it('backs off pending polls exponentially with bounded jitter', async () => {
+    const delays = [];
+    let elapsed = 0;
+    const loadLiveQueueEntries = vi.fn(async () => [liveEntry()]);
+    const loadQueueRef = vi.fn(async () => queueRef());
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns: async ({ checkName }) =>
+        elapsed < 300_000
+          ? checkPage(checkName, 'in_progress')
+          : checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries,
+      loadQueueRef,
+      now: () => elapsed,
+      onStatus: () => {},
+      random: () => 1,
+      sleep: async delayMs => {
+        delays.push(delayMs);
+        elapsed += delayMs;
+      },
+    });
+    expect(result.admitted).toBe(true);
+    // 15 s, then doubling with +20% jitter, capped at 60 s (+20%).
+    expect(delays.slice(0, 5)).toEqual([
+      15_000, 36_000, 72_000, 72_000, 72_000,
+    ]);
+    expect(Math.max(...delays)).toBe(72_000);
+    // Twelve concurrent groups at 15 s each used to read the live queue every poll.
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(2);
+    expect(loadQueueRef).toHaveBeenCalledTimes(2);
+
+    const low = [];
+    elapsed = 0;
+    await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns: async ({ checkName }) =>
+        elapsed < 100_000
+          ? checkPage(checkName, 'in_progress')
+          : checkPage(checkName, 'completed', 'success'),
+      loadLiveQueueEntries,
+      loadQueueRef,
+      now: () => elapsed,
+      onStatus: () => {},
+      random: () => 0,
+      sleep: async delayMs => {
+        low.push(delayMs);
+        elapsed += delayMs;
+      },
+    });
+    expect(low.slice(0, 3)).toEqual([15_000, 24_000, 48_000]);
+  });
+
   it('still fails fast when an in_progress check concludes with failure', async () => {
     let elapsed = 0;
     await expect(
@@ -777,6 +830,7 @@ describe('merge-group admission evidence', () => {
         now: () => elapsed,
         onStatus: () => {},
         pollIntervalMs: 3,
+        random: () => 0.5,
         sleep: async delayMs => {
           elapsed += delayMs;
         },
@@ -1314,7 +1368,8 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
           state.requests
             .filter(request => request.kind === 'graphql')
             .map(request => request.at)
-        ).toEqual([0, 15_000, 30_000, 45_000, 60_000, 60_000]);
+          // The pending poll at 60 s reads only check pages; the final proof rereads.
+        ).toEqual([0, 15_000, 30_000, 45_000, 60_000]);
       }
     );
   });
@@ -1558,3 +1613,297 @@ it.each([502, 503, 504])(
     );
   }
 );
+
+describe('bounded GraphQL admission diagnostics', () => {
+  const diagnosticEntry = (
+    kind,
+    typeCategory,
+    exactLegacyQuotaMessageMatch
+  ) => ({
+    kind,
+    typeCategory,
+    exactLegacyQuotaMessageMatch,
+  });
+
+  function captureNormalizationError(errors) {
+    try {
+      normalizeLiveQueueEntriesPage({ errors });
+    } catch (error) {
+      expect(error).toBeInstanceOf(MergeGroupAdmissionError);
+      return error;
+    }
+    throw new Error('Expected a structured GraphQL admission error');
+  }
+
+  it.each(
+    /** @type {Array<[{ type?: string, message: string }, string, boolean, boolean]>} */ ([
+      [STRUCTURED_QUOTA, 'RATE_LIMITED', false, true],
+      [{ message: INSTALLATION_QUOTA }, 'absent', true, true],
+      [
+        {
+          message: 'API rate limit already exceeded for installation ID 12345.',
+        },
+        'absent',
+        true,
+        true,
+      ],
+      [{ message: `${INSTALLATION_QUOTA} extra text` }, 'absent', false, false],
+    ])
+  )(
+    'adds diagnostic metadata without changing normalized quota semantics: %j',
+    (entry, typeCategory, legacyMatch, retryable) => {
+      const error = captureNormalizationError([entry]);
+      expect(error).toMatchObject({
+        message: `live merge queue GraphQL returned errors: ${entry.message}`,
+        path: null,
+        status: null,
+        rateLimit: retryable,
+        graphqlDiagnostic: {
+          httpStatus: null,
+          errorCount: 1,
+          entries: [diagnosticEntry('object', typeCategory, legacyMatch)],
+          omittedEntries: 0,
+          retryable,
+        },
+      });
+      expect(isTransientApiError(error)).toBe(retryable);
+    }
+  );
+
+  it.each([200, 403, 429, 502, 503, 504])(
+    'reports actual HTTP %s and rejected shapes without retrying mixed errors',
+    async status => {
+      await withQuotaResponses(
+        () =>
+          Response.json(
+            {
+              ...liveQueuePayload([liveQueueNode()]),
+              errors: [
+                { type: 'FORBIDDEN', message: INSTALLATION_QUOTA },
+                { type: null, message: INSTALLATION_QUOTA },
+                { type: 'private-type-marker', message: 'private-body-marker' },
+                INSTALLATION_QUOTA,
+                null,
+                7,
+                true,
+                [],
+              ],
+            },
+            {
+              status,
+              headers: {
+                'retry-after': '120',
+                'x-private-marker': 'private-header-marker',
+              },
+            }
+          ),
+        async state => {
+          const error = await state.run().catch(failure => failure);
+          expect(error).toBeInstanceOf(MergeGroupAdmissionError);
+          expect(error.message).toBe(
+            `live merge queue GraphQL returned errors: ${INSTALLATION_QUOTA}; ${INSTALLATION_QUOTA}; private-body-marker; ${INSTALLATION_QUOTA}; null; 7; true; `
+          );
+          expect(error.rateLimit).toBe(false);
+          expect(isTransientApiError(error)).toBe(false);
+          expect(error.graphqlDiagnostic).toEqual({
+            httpStatus: status,
+            errorCount: 8,
+            entries: [
+              diagnosticEntry('object', 'other', true),
+              diagnosticEntry('object', 'null', true),
+              diagnosticEntry('object', 'other', false),
+              diagnosticEntry('string', 'absent', false),
+              diagnosticEntry('null', 'absent', false),
+              diagnosticEntry('other', 'absent', false),
+              diagnosticEntry('other', 'absent', false),
+              diagnosticEntry('other', 'absent', false),
+            ],
+            omittedEntries: 0,
+            retryable: false,
+          });
+          expect(JSON.stringify(error.graphqlDiagnostic)).not.toContain(
+            'private-'
+          );
+          expect(state.requests).toHaveLength(1);
+          expect(state.sleeps).toEqual([]);
+          await state.noOutput();
+        }
+      );
+    }
+  );
+
+  it('caps diagnostic entries without hiding a terminal error beyond the cap', async () => {
+    const errors = Array.from({ length: 100 }, () => ({
+      type: 'RATE_LIMITED',
+      message: 'private-quota-message',
+      extensions: { token: 'private-extension-marker' },
+    }));
+    errors[8] = {
+      type: 'private-terminal-type',
+      message: INSTALLATION_QUOTA,
+      extensions: { token: 'private-terminal-extension' },
+    };
+    await withQuotaResponses(
+      () =>
+        Response.json(
+          { ...liveQueuePayload([liveQueueNode()]), errors },
+          {
+            status: 503,
+            headers: {
+              'retry-after': '120',
+              'x-private-marker': 'private-header-marker',
+            },
+          }
+        ),
+      async state => {
+        const error = await state.run().catch(failure => failure);
+        expect(error).toBeInstanceOf(MergeGroupAdmissionError);
+        expect(error.message).toContain('private-quota-message');
+        expect(error.rateLimit).toBe(false);
+        expect(isTransientApiError(error)).toBe(false);
+        expect(error.graphqlDiagnostic).toEqual({
+          httpStatus: 503,
+          errorCount: 100,
+          entries: Array.from({ length: 8 }, () =>
+            diagnosticEntry('object', 'RATE_LIMITED', false)
+          ),
+          omittedEntries: 92,
+          retryable: false,
+        });
+        const serialized = JSON.stringify(error.graphqlDiagnostic);
+        expect(serialized).not.toContain('private-');
+        expect(serialized.length).toBeLessThan(1_500);
+        expect(state.requests).toHaveLength(1);
+        expect(state.sleeps).toEqual([]);
+        await state.noOutput();
+      }
+    );
+  });
+
+  it.each(
+    /** @type {Array<[number, { type?: string, message: string }]>} */ ([
+      [200, STRUCTURED_QUOTA],
+      [429, { message: INSTALLATION_QUOTA }],
+      [503, STRUCTURED_QUOTA],
+    ])
+  )(
+    'preserves cooldown and complete proof after diagnostic-capable HTTP %s quota',
+    async (status, error) => {
+      await withQuotaResponses(
+        (_, state) => {
+          if (state.requests.length === 1) {
+            return Response.json(
+              { ...liveQueuePayload([liveQueueNode()]), errors: [error] },
+              { status, headers: { 'retry-after': '120' } }
+            );
+          }
+        },
+        async state => {
+          await expect(state.run()).resolves.toMatchObject({ admitted: true });
+          expect(state.sleeps).toEqual([121_000]);
+          expect(state.requests.slice(1).map(request => request.kind)).toEqual(
+            completeProofKinds
+          );
+          expect(
+            state.requests.slice(1).every(request => request.at === 121_000)
+          ).toBe(true);
+          await expect(state.output()).resolves.toContain(
+            'admitted=true\nobsolete=false'
+          );
+        }
+      );
+    }
+  );
+});
+
+it('keeps one failure annotation and a bounded notice compatible with the failure hold', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'admission-diagnostic-cli-'));
+  const eventPath = join(directory, 'event.json');
+  const outputPath = join(directory, 'output.txt');
+  const preloadPath = join(directory, 'fetch.mjs');
+  try {
+    await writeFile(eventPath, JSON.stringify(event()));
+    await writeFile(
+      preloadPath,
+      `globalThis.fetch = async () => Response.json({ errors: [{ type: 'private-type-marker', message: ${JSON.stringify(INSTALLATION_QUOTA)} }] }, { status: 503 });`
+    );
+    let stderr = '';
+    try {
+      execFileSync(
+        process.execPath,
+        ['--import', preloadPath, ADMISSION_SCRIPT],
+        {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 5_000,
+          env: {
+            PATH: process.env.PATH,
+            GITHUB_TOKEN: 'diagnostic-fixture-token',
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            GITHUB_SHA: HEAD,
+            GITHUB_EVENT_PATH: eventPath,
+            GITHUB_OUTPUT: outputPath,
+          },
+        }
+      );
+      throw new Error('Expected terminal CLI failure');
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !('status' in error) ||
+        !('stderr' in error)
+      ) {
+        throw error;
+      }
+      expect(error.status).toBe(1);
+      stderr = String(error.stderr);
+    }
+    const lines = stderr.trim().split('\n');
+    const failureAnnotations = lines.filter(line =>
+      line.startsWith('::error::')
+    );
+    expect(failureAnnotations).toEqual([
+      `::error::live merge queue GraphQL returned errors: ${INSTALLATION_QUOTA}`,
+    ]);
+    expect(lines).toHaveLength(2);
+    const prefix = '::notice::merge-group GraphQL diagnostic ';
+    expect(lines[1].startsWith(prefix)).toBe(true);
+    expect(JSON.parse(lines[1].slice(prefix.length))).toEqual({
+      httpStatus: 503,
+      errorCount: 1,
+      entries: [
+        {
+          kind: 'object',
+          typeCategory: 'other',
+          exactLegacyQuotaMessageMatch: true,
+        },
+      ],
+      omittedEntries: 0,
+      retryable: false,
+    });
+    expect(lines[1]).not.toContain('private-');
+    expect(lines[1]).not.toContain('diagnostic-fixture-token');
+    await expect(readFile(outputPath, 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    const { classifyMergeGroupFailure } = await import(
+      '../../merge-group-failure-hold.mjs'
+    );
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [
+          'Require live queue membership and external admission checks',
+          'Evaluate combined-head checks',
+        ],
+        admissionText: [
+          ...failureAnnotations.map(line => line.slice('::error::'.length)),
+          'Process completed with exit code 1.',
+        ].join('\n'),
+      })
+    ).toBe('transient-admission');
+  } finally {
+    // execFileSync has already terminated/joined the child, including failures.
+    await rm(directory, { recursive: true, force: true });
+  }
+});

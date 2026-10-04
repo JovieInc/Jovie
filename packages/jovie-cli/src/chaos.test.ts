@@ -31,6 +31,7 @@ import {
   isEntrypoint,
   reportFatal,
   runCli,
+  timeoutFromEnv,
   unsupportedNodeMessage,
 } from './cli.js';
 import type { FetchImplementation } from './client.js';
@@ -709,6 +710,13 @@ describe('platform and runtime', () => {
       quiet.output
     );
     expect(applied).toBe(true);
+  });
+
+  it('bounds JOVIE_TIMEOUT_MS and rejects a typo in one line', async () => {
+    expect(timeoutFromEnv(undefined)).toBeUndefined();
+    expect(timeoutFromEnv('1500')).toBe(1500);
+    for (const bad of ['10', '999999', '1.5s', 'abc'])
+      expect(() => timeoutFromEnv(bad)).toThrow('JOVIE_TIMEOUT_MS');
   });
 
   it('names the Node version to install on an unsupported runtime', () => {

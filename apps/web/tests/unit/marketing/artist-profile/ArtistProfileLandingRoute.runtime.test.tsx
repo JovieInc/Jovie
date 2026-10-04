@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ImgHTMLAttributes } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MarketingLayout from '@/app/(marketing)/layout';
 import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile/ArtistProfileLandingRoute';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
@@ -43,15 +43,39 @@ vi.mock('next/image', () => ({
  * header, footer, and client marketing enhancements.
  */
 describe('ArtistProfileLandingRoute runtime composition', () => {
+  let idleCallback: IdleRequestCallback | undefined;
+
+  beforeEach(() => {
+    idleCallback = undefined;
+    vi.stubGlobal('requestIdleCallback', (callback: IdleRequestCallback) => {
+      idleCallback = callback;
+      return 1;
+    });
+    vi.stubGlobal('cancelIdleCallback', vi.fn());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const settleEnhancements = async () => {
+    // Drive the real idle callback and imports. Wall-clock polling races the
+    // deferred import transforms when coverage workers are busy.
+    expect(idleCallback).toBeTypeOf('function');
+    await act(async () => {
+      idleCallback?.({ didTimeout: false, timeRemaining: () => 50 });
+      await vi.dynamicImportSettled();
+    });
+  };
+
   it('renders the full public marketing shell without a Radix Slot boundary', async () => {
     const layout = await MarketingLayout({
       children: <ArtistProfileLandingRoute />,
     });
 
     expect(() => render(layout)).not.toThrow();
-    // MarketingEnhancements is intentionally client-idle loaded. Let that
-    // route-only hydration path settle instead of treating the static shell as
-    // sufficient runtime coverage.
+    await settleEnhancements();
     await waitFor(
       () => expect(document.documentElement.style.overflowY).toBe('auto'),
       { timeout: 1_000 }
@@ -101,18 +125,24 @@ describe('ArtistProfileLandingRoute runtime composition', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    const root = hydrateRoot(container, layout);
-    await waitFor(
-      () => expect(document.documentElement.style.overflowY).toBe('auto'),
-      { timeout: 1_000 }
-    );
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, layout);
+      });
+      await settleEnhancements();
+      await waitFor(
+        () => expect(document.documentElement.style.overflowY).toBe('auto'),
+        { timeout: 1_000 }
+      );
 
-    expect(consoleError).not.toHaveBeenCalledWith(
-      expect.stringContaining('Slot failed to slot onto its children')
-    );
-
-    root.unmount();
-    consoleError.mockRestore();
-    container.remove();
+      expect(consoleError).not.toHaveBeenCalledWith(
+        expect.stringContaining('Slot failed to slot onto its children')
+      );
+    } finally {
+      await act(async () => root?.unmount());
+      consoleError.mockRestore();
+      container.remove();
+    }
   });
 });
