@@ -109,6 +109,17 @@ struct AppShellChatFirstTests {
     #expect(profile.displayName != MobileMeResponse.previewReady.displayName)
   }
 
+  @Test func uiTestingStorefrontReleasesShowsOnlyLinkedReleases() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-storefront-releases"], isXCTest: false)
+        == .uiTestingStorefrontReleases
+    )
+    #expect(LaunchMode.uiTestingStorefrontReleases.defaultInitialTab == .library)
+    let assets = LibraryFeed.storefrontReleaseAssets
+    #expect(assets.count >= 4)
+    #expect(assets.allSatisfy { $0.type == .release && $0.publicURL != nil })
+  }
+
   @Test func uiTestingAudienceYieldsChatDefault() {
     #expect(LaunchMode.uiTestingAudience.defaultInitialTab == .chat)
   }

@@ -77,6 +77,7 @@ private struct AppContentView: View {
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingLibrary,
+         .uiTestingStorefrontReleases,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxOffline,
@@ -89,7 +90,10 @@ private struct AppContentView: View {
   }
 
   private static func previewLibraryAssets(for launchMode: LaunchMode) -> [LibraryAsset] {
-    launchMode.usesEmptyLibraryPreview ? [] : LibraryFeed.previewAssets
+    if launchMode == .uiTestingStorefrontReleases {
+      return LibraryFeed.storefrontReleaseAssets
+    }
+    return launchMode.usesEmptyLibraryPreview ? [] : LibraryFeed.previewAssets
   }
 
   var body: some View {
@@ -459,6 +463,7 @@ private struct AppContentView: View {
          .uiTestingVenueMode,
          .uiTestingAuthCallback,
          .uiTestingLibrary,
+         .uiTestingStorefrontReleases,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxOffline,

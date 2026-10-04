@@ -298,6 +298,56 @@ enum LibraryFeed {
     }
   }
 
+  /// App Store "Drive streams" shot (JOV-4481): releases only, each with its
+  /// smart link and visits. Fictional titles.
+  static let storefrontReleaseAssets: [LibraryAsset] = [
+    LibraryAsset(
+      id: "lib-storefront-1",
+      name: "Midnight Drive",
+      type: .release,
+      isPublic: true,
+      coverURL: nil,
+      liveStatLabel: "1.2k visits",
+      publicURL: "https://jov.ie/a/midnight-drive"
+    ),
+    LibraryAsset(
+      id: "lib-storefront-2",
+      name: "Afterglow",
+      type: .release,
+      isPublic: true,
+      coverURL: nil,
+      liveStatLabel: "Out Aug 1",
+      publicURL: "https://jov.ie/a/afterglow"
+    ),
+    LibraryAsset(
+      id: "lib-storefront-3",
+      name: "Low Tide",
+      type: .release,
+      isPublic: true,
+      coverURL: nil,
+      liveStatLabel: "860 visits",
+      publicURL: "https://jov.ie/a/low-tide"
+    ),
+    LibraryAsset(
+      id: "lib-storefront-4",
+      name: "Paper Lanterns",
+      type: .release,
+      isPublic: true,
+      coverURL: nil,
+      liveStatLabel: "412 visits",
+      publicURL: "https://jov.ie/a/paper-lanterns"
+    ),
+    LibraryAsset(
+      id: "lib-storefront-5",
+      name: "Summer Run (Live)",
+      type: .release,
+      isPublic: true,
+      coverURL: nil,
+      liveStatLabel: "298 visits",
+      publicURL: "https://jov.ie/a/summer-run-live"
+    ),
+  ]
+
   /// Preview storefront feed used until a dedicated mobile library API ships.
   /// Smart links are not rows. Every catalog asset already carries `publicURL`.
   static let previewAssets: [LibraryAsset] = [

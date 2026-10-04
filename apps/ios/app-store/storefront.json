@@ -44,7 +44,7 @@
   "layout": {
     "canvas": "canvas",
     "marginX": 110,
-    "headlineTop": 176,
+    "headlineTop": 260,
     "headlineSize": 96,
     "deviceTop": 600,
     "deviceWidth": 1220,
@@ -60,31 +60,32 @@
     {
       "id": "chat",
       "launchArgument": "-ui-testing-storefront-chat",
-      "headline": "Merch ideas,\nready in one chat.",
+      "headline": "Make merch.",
       "accent": "ion"
     },
     {
       "id": "audience",
       "launchArgument": "-ui-testing-audience",
-      "headline": "Your fans,\nat a glance.",
-      "accent": "ultra"
+      "headline": "Capture fans.",
+      "accent": "ultra",
+      "scroll": 0.235
+    },
+    {
+      "id": "work",
+      "launchArgument": "-ui-testing-storefront-releases",
+      "headline": "Drive streams.",
+      "accent": "pulse"
     },
     {
       "id": "calendar",
       "launchArgument": "-ui-testing-calendar",
-      "headline": "Shows and releases\non one calendar.",
-      "accent": "pulse"
-    },
-    {
-      "id": "work",
-      "launchArgument": "-ui-testing-library",
-      "headline": "All your work\nin one place.",
+      "headline": "Plan shows.",
       "accent": "orange"
     },
     {
       "id": "identity",
       "launchArgument": "-ui-testing-storefront-identity",
-      "headline": "Share your profile\nwith one scan.",
+      "headline": "Share one link.",
       "accent": "ion"
     }
   ]

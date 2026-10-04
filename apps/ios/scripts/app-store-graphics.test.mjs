@@ -15,6 +15,7 @@ import {
   RECEIPT_SCHEMA,
   REPO_ROOT,
   renderHtml,
+  screenBackground,
   screenFile,
   sourceHash,
   validateStorefront,
@@ -114,9 +115,10 @@ test('the committed storefront is valid', async () => {
 
 test('storefront validation rejects banned copy, fake fixtures and off-rotation accents', async () => {
   const base = loadStorefront().screens;
+  const [first, second, third, fourth, fifth] = base.map(screen => screen.id);
   const problems = await validateStorefront(
     withScreens([
-      { ...base[0], headline: 'Merch ideas — ready now.' },
+      { ...base[0], headline: 'Merch — now.' },
       { ...base[1], launchArgument: '-ui-testing-invented' },
       { ...base[2], accent: 'orange' },
       { ...base[3], accent: 'ion' },
@@ -125,16 +127,19 @@ test('storefront validation rejects banned copy, fake fixtures and off-rotation 
     context
   );
   const text = problems.join('\n');
-  assert.match(text, /chat: headline em-dash/);
+  assert.match(text, new RegExp(`${first}: headline em-dash`));
   assert.match(text, /-ui-testing-invented is not a LaunchMode fixture/);
   // Rotation is positional: blue, purple, pink, orange, then repeat.
   assert.match(
     text,
-    /calendar: accent must be pulse \(rotation ion, ultra, pulse, orange\)/
+    new RegExp(
+      `${third}: accent must be pulse \\(rotation ion, ultra, pulse, orange\\)`
+    )
   );
-  assert.match(text, /work: accent must be orange/);
-  assert.match(text, /work: accent must be ion/);
+  assert.match(text, new RegExp(`${fourth}: accent must be orange`));
+  assert.match(text, new RegExp(`${fourth}: accent must be ion`));
   assert.match(text, /duplicate id/);
+  assert.ok(second && fifth);
 });
 
 test('a bound Pen section names frame, headline and capture nodes for every screen', async () => {
@@ -170,21 +175,28 @@ test('a bound Pen section names frame, headline and capture nodes for every scre
   );
 });
 
-test('headlines mirror the Pen line breaks: at most two non-empty lines', async () => {
+test('headlines are two or three words on at most two lines, with a bounded scroll', async () => {
   const base = loadStorefront().screens;
-  assert.ok(base.every(screen => screen.headline.split('\n').length === 2));
   const problems = await validateStorefront(
     withScreens([
-      { ...base[0], headline: 'One\ntwo\nthree' },
-      { ...base[1], headline: 'Trailing\n' },
-      ...base.slice(2),
+      { ...base[0], headline: 'Merch.' },
+      { ...base[1], headline: 'Capture every single fan.' },
+      { ...base[2], headline: 'Drive\nstreams\nnow.' },
+      { ...base[3], scroll: 0.5 },
+      { ...base[4], headline: 'Share one\nlink.' },
     ]),
     context
   );
   assert.deepEqual(problems, [
-    'chat: headline must be one or two non-empty lines',
-    'audience: headline must be one or two non-empty lines',
+    `${base[0].id}: headline must be two or three words`,
+    `${base[1].id}: headline must be two or three words`,
+    `${base[2].id}: headline must be one or two non-empty lines`,
+    `${base[3].id}: scroll must be between 0 and 0.3`,
   ]);
+});
+
+test('screenBackground samples the app background near the bottom left', () => {
+  assert.equal(screenBackground(blankCapture), '#07080a');
 });
 
 test('storefront validation enforces the App Store screenshot count', async () => {

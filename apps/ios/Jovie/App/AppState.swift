@@ -191,6 +191,7 @@ final class AppState {
          .uiTestingVenueMode,
          .uiTestingAudience,
          .uiTestingLibrary,
+         .uiTestingStorefrontReleases,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxLoading,

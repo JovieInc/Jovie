@@ -168,8 +168,16 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
     for (const finding of copy.blocking) {
       problems.push(`${label}: headline ${finding.rule} (${finding.message})`);
     }
-    if (!screen.headline || screen.headline.length > 40) {
-      problems.push(`${label}: headline must be 1 to 40 characters`);
+    // Apple-simple: a short outcome, two or three words (Tim, 2026-10-04).
+    const words = lines.join(' ').trim().split(/\s+/).length;
+    if (!screen.headline || words < 2 || words > 3) {
+      problems.push(`${label}: headline must be two or three words`);
+    }
+    if (
+      screen.scroll !== undefined &&
+      !(screen.scroll >= 0 && screen.scroll <= 0.3)
+    ) {
+      problems.push(`${label}: scroll must be between 0 and 0.3`);
     }
   });
   return problems;
@@ -299,6 +307,19 @@ export function frameDifference(a, b) {
   return changed / samples;
 }
 
+/**
+ * App background colour near the bottom-left of a capture. A scrolled screen
+ * reveals this colour below the capture, so the shift reads as a real scroll.
+ */
+export function screenBackground(buffer) {
+  const { width, height, channels, pixels } = decodePng(buffer);
+  const i = (Math.round(height * 0.93) * width + 8) * channels;
+  const hex = [0, 1, 2]
+    .map(c => pixels[i + c].toString(16).padStart(2, '0'))
+    .join('');
+  return `#${hex}`;
+}
+
 function escapeHtml(text) {
   return text.replace(
     /[&<>"]/g,
@@ -318,6 +339,7 @@ export function renderHtml({
   colorSot,
   captureDataUri,
   fontDataUri,
+  screenFill = '#000',
 }) {
   const { width, height } = spec.device;
   const layout = spec.layout;
@@ -348,11 +370,13 @@ border-radius:${layout.deviceRadius}px;
 background:linear-gradient(${card},${card}) padding-box,
 linear-gradient(135deg,rgb(255 255 255 / .34),${floating} 32%,${floating} 70%,rgb(0 0 0 / .4)) border-box;
 box-shadow:40px 72px 160px rgb(0 0 0 / .62),12px 20px 48px rgb(0 0 0 / .4)}
-.device img{display:block;width:${screenWidth}px;height:${screenHeight}px;
-border-radius:${layout.deviceRadius - layout.bezel}px}
+.screen{width:${screenWidth}px;height:${screenHeight}px;overflow:hidden;
+background:${screenFill};border-radius:${layout.deviceRadius - layout.bezel}px}
+.screen img{display:block;width:${screenWidth}px;height:${screenHeight}px;
+margin-top:${-Math.round((screen.scroll ?? 0) * screenHeight)}px}
 </style></head><body><div class="stage" data-screen="${screen.id}">
 <h1>${escapeHtml(screen.headline)}</h1>
-<div class="device"><img alt="" src="${captureDataUri}"></div>
+<div class="device"><div class="screen"><img alt="" src="${captureDataUri}"></div></div>
 </div></body></html>`;
 }
 
@@ -517,6 +541,7 @@ async function render({ out }) {
           colorSot,
           fontDataUri,
           captureDataUri: `data:image/png;base64,${raw.toString('base64')}`,
+          screenFill: screenBackground(raw),
         }),
         { waitUntil: 'load' }
       );
