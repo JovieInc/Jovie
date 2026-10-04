@@ -65,10 +65,14 @@ describe('getSummerRevenue', () => {
     await expect(getSummerRevenue(NOW)).resolves.toEqual({
       observedAt: NOW.toISOString(),
       jovie: {
+        metricScope: 'customer_only',
         mrrUsd: 120,
         activeSubscriptions: 3,
         excludedInternal: 1,
         excludedInternalMrrUsd: 199,
+        rawMrrUsd: 319,
+        rawActiveSubscriptions: 4,
+        syntheticHealth: { mrrUsd: 199, activeSubscriptions: 1 },
         source: 'stripe',
       },
       lyb: lybRecord,
@@ -158,8 +162,12 @@ describe('getSummerCohort', () => {
       [{ total: 50 }]
     );
     await expect(getSummerCohort('claimed_artists', 10)).resolves.toEqual({
+      metricScope: 'customer_only',
       total: 7,
       excludedInternal: 50,
+      customerTotal: 7,
+      rawTotal: 57,
+      syntheticHealth: { total: 50 },
       rows: [
         {
           id: 'p1',
@@ -186,8 +194,12 @@ describe('getSummerCohort', () => {
       [{ total: 2 }]
     );
     await expect(getSummerCohort('churned', 10)).resolves.toEqual({
+      metricScope: 'customer_only',
       total: 1,
       excludedInternal: 2,
+      customerTotal: 1,
+      rawTotal: 3,
+      syntheticHealth: { total: 2 },
       rows: [
         {
           id: 'u1',
@@ -254,8 +266,12 @@ describe('getSummerCohort', () => {
       expect.objectContaining({ status: 'expired' })
     );
     expect(cohort).toEqual({
+      metricScope: 'customer_only',
       total: 1,
       excludedInternal: 2,
+      customerTotal: 1,
+      rawTotal: 3,
+      syntheticHealth: { total: 2 },
       rows: [
         {
           id: 'u1',
@@ -271,6 +287,14 @@ describe('getSummerCohort', () => {
     hoisted.sessionsList.mockResolvedValue({ has_more: false, data: [] });
     await expect(
       getSummerCohort('checkout_abandoned', 10, NOW)
-    ).resolves.toEqual({ total: 0, excludedInternal: 0, rows: [] });
+    ).resolves.toEqual({
+      metricScope: 'customer_only',
+      total: 0,
+      excludedInternal: 0,
+      customerTotal: 0,
+      rawTotal: 0,
+      syntheticHealth: { total: 0 },
+      rows: [],
+    });
   });
 });
