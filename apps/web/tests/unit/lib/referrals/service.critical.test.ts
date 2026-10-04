@@ -802,4 +802,29 @@ describe('@critical referrals/service.ts', () => {
       });
     });
   });
+
+  // =========================================================================
+  // getInternalUserId
+  // =========================================================================
+  describe('getInternalUserId', () => {
+    it('returns internal user ID for a valid Clerk ID', async () => {
+      const chain = selectChain([{ id: 'internal-123' }]);
+      mockDbSelect.mockReturnValue(chain);
+
+      const { getInternalUserId } = await import('@/lib/referrals/service');
+      const result = await getInternalUserId('clerk_abc');
+
+      expect(result).toBe('internal-123');
+    });
+
+    it('returns null when Clerk ID is not found', async () => {
+      const chain = selectChain([]);
+      mockDbSelect.mockReturnValue(chain);
+
+      const { getInternalUserId } = await import('@/lib/referrals/service');
+      const result = await getInternalUserId('clerk_nonexistent');
+
+      expect(result).toBeNull();
+    });
+  });
 });

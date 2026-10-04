@@ -507,6 +507,21 @@ export async function getReferralStats(userId: string) {
   };
 }
 
+/**
+ * Look up the internal user ID from a Clerk user ID.
+ */
+export async function getInternalUserId(
+  clerkUserId: string
+): Promise<string | null> {
+  const result = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  return result[0]?.id ?? null;
+}
+
 // --- Helpers ---
 
 function generateRandomCode(): string {

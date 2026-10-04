@@ -610,9 +610,7 @@ export function appScreenConceptToStoryId(conceptId: string): string {
   return `app-screens-${slug}--reference`;
 }
 
-const RECIPE_BY_ID: Readonly<
-  Record<AppScreenRecipeId, AppScreenRecipeRegistryEntry>
-> = Object.fromEntries(
+const RECIPE_BY_ID = new Map<AppScreenRecipeId, AppScreenRecipeRegistryEntry>(
   APP_SCREEN_RECIPE_REGISTRY.map(recipe => [recipe.id, recipe])
 );
 
@@ -629,7 +627,8 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
       kind === 'alias' || kind === 'legacy'
         ? ALIAS_LEGACY_CONCEPT_MAP[source]
         : undefined;
-    const recipe = RECIPE_BY_ID[recipeId];
+    const recipe = RECIPE_BY_ID.get(recipeId);
+    if (!recipe) throw new Error(`Missing app-screen recipe: ${recipeId}`);
     return {
       id: routeToId(route),
       route,
