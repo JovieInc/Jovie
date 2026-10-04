@@ -49,9 +49,10 @@ describe('resumeOnboardingTranscript', () => {
     expect(result.filter(message => message.role === 'user')).toHaveLength(2);
   });
 
-  it('drops empty persisted rows', () => {
+  it('drops empty persisted rows and keeps roles alternating', () => {
+    const latest = user('c3', 'next', { onboardingEvent: 'x' });
     const result = resumeOnboardingTranscript({
-      clientMessages: [user('c3', 'next')],
+      clientMessages: [latest],
       latestClientMessageId: 'c3',
       persisted: [
         { id: 'p1', role: 'user', content: 'hi', clientMessageId: 'c1' },
@@ -60,6 +61,34 @@ describe('resumeOnboardingTranscript', () => {
         { id: 'p4', role: 'user', content: 'next', clientMessageId: 'c3' },
       ],
     });
-    expect(result.map(message => message.id)).toEqual(['p1', 'p3', 'c3']);
+    // The tool-call-only assistant turn is gone; both unanswered user turns
+    // fold into the client's message, which keeps its id and metadata.
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('c3');
+    expect(result[0]?.metadata).toEqual({ onboardingEvent: 'x' });
+    expect(result[0]?.parts).toEqual([
+      { type: 'text', text: 'hi\n\nyo' },
+      { type: 'text', text: 'next' },
+    ]);
+  });
+
+  it('folds adjacent assistant turns left by a dropped user row', () => {
+    const result = resumeOnboardingTranscript({
+      clientMessages: [user('c3', 'next')],
+      latestClientMessageId: 'c3',
+      persisted: [
+        { id: 'p1', role: 'user', content: 'hi', clientMessageId: 'c1' },
+        { id: 'p2', role: 'assistant', content: 'one', clientMessageId: null },
+        { id: 'p3', role: 'user', content: ' ', clientMessageId: 'c2' },
+        { id: 'p4', role: 'assistant', content: 'two', clientMessageId: null },
+        { id: 'p5', role: 'user', content: 'next', clientMessageId: 'c3' },
+      ],
+    });
+    expect(result.map(message => message.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+    ]);
+    expect(result[1]?.parts).toEqual([{ type: 'text', text: 'one\n\ntwo' }]);
   });
 });

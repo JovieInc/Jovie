@@ -568,4 +568,62 @@ describe('GET /auth/start', () => {
     const body = await response.json();
     expect(body).toEqual({ error: 'Too many auth attempts' });
   });
+  it.each([
+    ['ios', ''],
+    ['ios', 'short'],
+    ['ios', 'a'.repeat(44)],
+    ['ios', `${'a'.repeat(43)}&native_attempt=${'a'.repeat(43)}`],
+    ['electron', 'a'.repeat(43)],
+    ['web', 'a'.repeat(43)],
+  ])(
+    'rejects invalid %s correlation before storing state (%s)',
+    async (client, attempt) => {
+      const response = await GET(
+        new Request(
+          `https://jov.ie/auth/start?client=${client}&intent=sign_in&return_to=%2Fapp&code_challenge=c&code_challenge_method=S256&native_attempt=${attempt}`
+        )
+      );
+      expect(response.status).toBe(400);
+      expect(hoisted.createStoredAuthState).not.toHaveBeenCalled();
+    }
+  );
+
+  it('stores correlation once and ignores an account-choice form override', async () => {
+    const nativeAttempt = 'a'.repeat(43);
+    const state = 'state_1234567890123456';
+    hoisted.createStoredAuthState.mockResolvedValue({ state });
+    hoisted.readStoredAuthState.mockResolvedValue({
+      state,
+      client: 'ios',
+      intent: 'sign_in',
+      nativeAttempt,
+    });
+    const response = await GET(
+      new Request(
+        `https://jov.ie/auth/start?client=ios&intent=sign_in&return_to=%2Fapp&code_challenge=c&code_challenge_method=S256&native_attempt=${nativeAttempt}`
+      )
+    );
+    expect(response.status).toBe(200);
+    expect(hoisted.createStoredAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({ nativeAttempt })
+    );
+    const continued = await POST(
+      new Request('https://jov.ie/auth/start', {
+        method: 'POST',
+        headers: { origin: 'https://jov.ie' },
+        body: new URLSearchParams({
+          auth_state: state,
+          intent: 'sign_in',
+          choice: 'continue',
+          native_attempt: 'b'.repeat(43),
+        }),
+      })
+    );
+    expect(continued.status).toBe(303);
+    expect(continued.headers.get('location')).toBe(
+      `https://jov.ie/auth/callback?state=${state}`
+    );
+    expect(hoisted.readStoredAuthState).toHaveBeenCalledWith({ state });
+    expect(hoisted.createStoredAuthState).toHaveBeenCalledTimes(1);
+  });
 });
