@@ -97,7 +97,11 @@ def main(argv=None, call=None, clock=time.time):
         if not executable:
             print("available: false reason=transport-missing")
             return 1
-        call = runpy.run_path(executable)["mcp_call"]
+        try:
+            call = runpy.run_path(executable)["mcp_call"]
+        except (Exception, SystemExit):
+            print("available: false reason=transport-unreadable")
+            return 1
     proof, reason = refresh_proof(spec, call, clock())
     if proof is None:
         print(f"available: false reason={reason}")

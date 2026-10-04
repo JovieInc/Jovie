@@ -496,8 +496,15 @@ class ProofRefreshTest(unittest.TestCase):
             self.assertEqual(remote.main(["health"], call=self.call, clock=lambda: self.now), 1)
             with patch("shutil.which", return_value=None):
                 self.assertEqual(remote.main(["health"]), 1)
+            executable = Path(self.tmp.name) / "hyperagent"
+            for source in ("pass", "raise RuntimeError('private-fixture')", "raise SystemExit(7)"):
+                executable.write_text(source)
+                with patch("shutil.which", return_value=str(executable)):
+                    self.assertEqual(remote.main(["health"]), 1)
         self.assertIn("available: true agent=GLM 5.3 Developer", out.getvalue())
         self.assertIn("reason=transport-missing", out.getvalue())
+        self.assertIn("reason=transport-unreadable", out.getvalue())
+        self.assertNotIn("private-fixture", out.getvalue())
         with redirect_stdout(io.StringIO()), patch("sys.stderr", io.StringIO()):
             self.assertEqual(remote.main(["nope"]), 2)
 
