@@ -123,6 +123,11 @@ export function storedZip(files) {
  * `route(pathWithQuery)` returns `{ status?, body }` (string, Buffer or JSON
  * value) or null for a 404. Resolves with exit code, output and the API paths
  * gh actually requested.
+ * @param {object} opts
+ * @param {string} opts.script
+ * @param {Record<string, string | undefined>} [opts.env]
+ * @param {(path: string) => { status?: number, body: unknown } | null} opts.route
+ * @param {string} [opts.gh]
  */
 export async function runWithRealGh({ script, env = {}, route, gh }) {
   const binary = gh ?? resolveRealGh();
