@@ -97,3 +97,20 @@ export function useOutboundFactReviewMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.outbound() }),
   });
 }
+
+/** Re-collect public evidence (surfaces, DSP enrichment) for one lead. */
+export function useOutboundRefreshEvidenceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (leadId: string) =>
+      fetchWithTimeout<{
+        ok: boolean;
+        musicFetch: boolean;
+        dspDiscovery: boolean;
+      }>(`/api/admin/leads/${encodeURIComponent(leadId)}/refresh-evidence`, {
+        method: 'POST',
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.outbound() }),
+  });
+}

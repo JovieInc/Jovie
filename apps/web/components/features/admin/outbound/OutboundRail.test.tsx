@@ -36,6 +36,7 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
     onClose: vi.fn(),
     onFact: vi.fn(async () => {}),
     onCertify: vi.fn(),
+    onRefreshEvidence: vi.fn(),
     onApprove: vi.fn(),
     onSaveCopy: vi.fn(),
     onHold: vi.fn(),
@@ -101,5 +102,11 @@ describe('OutboundRail', () => {
         'No email or Instagram on file, so there is no way to reach them.'
       )
     ).toBeInTheDocument();
+  });
+
+  it('offers a refresh while evidence is missing on a built profile', () => {
+    const props = renderRail({ certification: certification('needs_review') });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Evidence' }));
+    expect(props.onRefreshEvidence).toHaveBeenCalledOnce();
   });
 });

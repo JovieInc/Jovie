@@ -19,6 +19,7 @@ import {
   useOutboundDecisionMutation,
   useOutboundFactReviewMutation,
   useOutboundQueueQuery,
+  useOutboundRefreshEvidenceMutation,
 } from '@/lib/queries/useOutboundQuery';
 
 function setup() {
@@ -117,5 +118,19 @@ describe('outbound queries', () => {
     expect(getOutboundDecisionErrorMessage(new Error('x'))).toBe(
       'The decision could not be recorded. Try again.'
     );
+  });
+
+  it('refreshes evidence through the lead route and reloads the queue', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const { wrapper, invalidate } = setup();
+    const { result } = renderHook(() => useOutboundRefreshEvidenceMutation(), {
+      wrapper,
+    });
+    await act(() => result.current.mutateAsync('lead-1'));
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/admin/leads/lead-1/refresh-evidence',
+      { method: 'POST' }
+    );
+    expect(invalidate).toHaveBeenCalled();
   });
 });
