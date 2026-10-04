@@ -181,12 +181,20 @@ function boundRunEvidenceCache(dir, keep = RUN_EVIDENCE_CACHE_KEEP) {
   }
   const runId = name => Number(name.split('-')[1]) || 0;
   names.sort((a, b) => runId(b) - runId(a) || a.localeCompare(b));
-  for (const name of names.slice(keep)) fs.rmSync(path.join(dir, name));
-  const hash = crypto.createHash('sha256');
-  for (const name of names.slice(0, keep).sort()) {
-    hash.update(name).update(fs.readFileSync(path.join(dir, name)));
+  try {
+    for (const name of names.slice(keep)) fs.rmSync(path.join(dir, name));
+    const hash = crypto.createHash('sha256');
+    for (const name of names.slice(0, keep).sort()) {
+      hash.update(name).update(fs.readFileSync(path.join(dir, name)));
+    }
+    return hash.digest('hex').slice(0, 16);
+  } catch {
+    // A broken optional cache must not suppress the report's workflow outputs.
+    console.warn(
+      'Run evidence cache maintenance failed; skip saving this wake.'
+    );
+    return null;
   }
-  return hash.digest('hex').slice(0, 16);
 }
 
 /** Test seam: route run evidence through a cache rooted at dir. */

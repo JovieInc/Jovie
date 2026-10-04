@@ -544,6 +544,40 @@ for (const failure of ['mkdir', 'write']) {
   });
 }
 
+for (const failure of ['eviction', 'digest']) {
+  test(`a cache ${failure} failure skips the save key and self heals when the filesystem recovers`, t => {
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const path = require('node:path');
+    const { boundRunEvidenceCache } = require('./analyze-test-flakiness');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flaky-maintenance-'));
+    const corrupt = path.join(
+      dir,
+      `jobs-${failure === 'eviction' ? 1 : 2}-1.json`
+    );
+    const valid = path.join(
+      dir,
+      `jobs-${failure === 'eviction' ? 2 : 1}-1.json`
+    );
+    const warn = t.mock.method(console, 'warn', () => {});
+    try {
+      fs.mkdirSync(corrupt);
+      fs.writeFileSync(valid, '[]');
+      assert.equal(boundRunEvidenceCache(dir, 1), null);
+      assert.equal(warn.mock.callCount(), 1);
+      assert.ok(fs.statSync(corrupt).isDirectory());
+      fs.rmSync(corrupt, { recursive: true });
+      fs.writeFileSync(valid, '[]');
+      const digest = boundRunEvidenceCache(dir, 1);
+      assert.match(digest, /^[0-9a-f]{16}$/);
+      assert.equal(boundRunEvidenceCache(dir, 1), digest);
+      assert.equal(warn.mock.callCount(), 1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
 test('the evidence cache keeps the newest runs and keys on content', () => {
   const fs = require('node:fs');
   const os = require('node:os');
