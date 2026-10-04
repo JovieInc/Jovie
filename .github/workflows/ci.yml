@@ -6352,6 +6352,10 @@ jobs:
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
           export MUSICFETCH_API_TOKEN="${{ secrets.MUSICFETCH_API_TOKEN }}"
+          # ICP auto-accept reads the cohort's open learnings from Linear and
+          # fails closed without it (JOV-3379); the stranger artist is
+          # admitted by that product rule, not by a test DB write (JOV-7701).
+          export LINEAR_API_KEY="${{ secrets.LINEAR_API_KEY }}"
           # In-memory rate limiter and cache (NODE_ENV=test / E2E_TEST_MODE / CI /
           # VERCEL_ENV=development). Do not export UPSTASH_REDIS_REST_*.
           # The loopback-IP shared-bucket OTP race is handled app-side instead —
