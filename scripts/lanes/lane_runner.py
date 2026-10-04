@@ -43,6 +43,7 @@ import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
+import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
@@ -96,7 +97,8 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py"]
+              "scripts/tests/test_remediation.py", "scripts/tests/test_claude_lane.py",
+              "scripts/tests/test_issue_routing.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
@@ -513,8 +515,11 @@ def issue_hits_red_line(issue: Issue) -> bool:
 
 def admission_rejection(issue: Issue, failures: dict, now: float,
                         in_flight: frozenset[str] = frozenset(),
-                        provider: str | None = None) -> str | None:
-    """Final claim predicate; in_flight contains normalized lowercase identifiers."""
+                        provider: str | None = None, route=None) -> str | None:
+    """Final claim predicate; in_flight contains normalized lowercase identifiers.
+
+    `route(issue)` is the cost-aware router (JOV-7706): an issue whose cheapest qualifying
+    available route belongs to another lane is that lane's; none qualifying holds it."""
     labels = {label.lower() for label in issue.labels}
     excluded = sorted(HARD_EXCLUDED_LABELS & labels)
     # `remediation:*` outranks `no-symphony` (JOV-7540, JOV-7551). Other hard
@@ -535,6 +540,13 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
         return "retry-backoff"
     if issue.identifier.lower() in in_flight:
         return "in-flight-pr"
+    if route is not None:
+        decision = route(issue)
+        chosen = decision.get("chosen")
+        if chosen is None:
+            return "route-held:" + decision["required"]
+        if chosen["lane"] != provider:
+            return "routed:" + chosen["lane"]
     return None
 
 
@@ -624,7 +636,7 @@ def admission_order(issue: Issue, now: float) -> tuple:
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset(), provider: str | None = None,
                holds: dict[str, int] | None = None,
-               held_back: frozenset[str] = frozenset()) -> Issue | None:
+               held_back: frozenset[str] = frozenset(), route=None) -> Issue | None:
     """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
@@ -639,9 +651,156 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
     eligible = [issue for issue in issues
                 if issue.identifier not in duplicates
                 and issue.identifier not in held_back
-                and admission_rejection(issue, failures, now, in_flight, provider) is None]
+                and admission_rejection(issue, failures, now, in_flight, provider, route) is None]
     eligible.sort(key=lambda issue: admission_order(issue, now))
     return eligible[0] if eligible else None
+
+
+# ---------------------------------------------------------------- routing (JOV-7706)
+
+ROUTING_POLICY = HERE / "routing.json"
+# A lane whose last worker stopped for a reason other than an empty pool cannot take new work.
+IDLE_BLOCK_S = 600
+
+
+def read_json(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def slot_free(host: "Host", name: str, slots: int) -> bool:
+    for index in range(slots):
+        lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
+        held = lock.held
+        lock.release()
+        if held:
+            return True
+    return False
+
+
+def recent_lane_runs(host: "Host", name: str, window_s: float, now: float, tail_bytes: int = 4_000_000) -> int:
+    """Issue runs this lane started inside the window, from the tail of the shared ledger."""
+    try:
+        with open(host.state / "runs" / "ledger.jsonl", "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - tail_bytes))
+            lines = handle.read().decode(errors="replace").splitlines()
+    except OSError:
+        return 0
+    count = 0
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        started = created_at_epoch(str(row.get("startedAt") or "")) if isinstance(row, dict) else None
+        if row.get("provider") == name and not row.get("kind") and started and now - started < window_s:
+            count += 1
+    return count
+
+
+def quota_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
+    """{ok, why, pressure}: how much of the lane's quota window is spent. Pressure raises the
+    effective cost of subscription and credit lanes as they fill; a bank removes them."""
+    quota = spec.get("quota") or {}
+    source = quota.get("source")
+    if source == "claude-lane":
+        state = claude_lane.read_state(host.state / "claude-quota.json")
+        bank = claude_lane.banked(state, now)
+        if bank:
+            return {"ok": False, "why": f"banked:{bank.get('kind')}", "pressure": 0}
+        used = len(claude_lane.window_runs(state, now, int(quota.get("windowS", claude_lane.WINDOW_S))))
+        return {"ok": True, "why": f"window {used}/{quota.get('softRuns', 0)}",
+                "pressure": used / max(1, int(quota.get("softRuns", 1)))}
+    if source == "codex-accounts":
+        try:
+            rows = list((codex_lane_module().status(now).get("accounts") or {}).values())
+        except Exception:
+            rows = []
+        if not rows:
+            return {"ok": True, "why": "accounts unread", "pressure": 0}
+        spent = sum(1 for row in rows if not row.get("available"))
+        if spent >= len(rows):
+            return {"ok": False, "why": "all-accounts-banked", "pressure": 0}
+        return {"ok": True, "why": f"{spent}/{len(rows)} accounts banked", "pressure": spent / len(rows)}
+    if source == "ledger":
+        used = recent_lane_runs(host, name, float(quota.get("windowS", 86400)), now)
+        hard = quota.get("maxRuns")
+        if hard is not None and used >= int(hard):
+            return {"ok": False, "why": f"window-cap {used}/{hard}", "pressure": 0}
+        return {"ok": True, "why": f"window {used}/{quota.get('softRuns', 0)}",
+                "pressure": used / max(1, int(quota.get("softRuns", 1)))}
+    return {"ok": True, "why": "free", "pressure": 0}
+
+
+def lane_availability(host: "Host", self_name: str, providers: dict, now: float | None = None):
+    """Availability of every lane as this worker sees it. Its own lane holds a slot already."""
+    now = time.time() if now is None else now
+    tick = read_json(host.state / "tick.json")
+    unhealthy = set(tick.get("unhealthy") or []) if isinstance(tick, dict) else set()
+    idle = read_json(host.state / "worker-idle.json")
+    cache = {}
+
+    def availability(name: str, _route: dict) -> dict:
+        if name in cache:
+            return cache[name]
+        spec = providers.get(name) or {}
+        quota = quota_pressure(host, name, spec, now)
+        verdict = quota
+        if name != self_name and quota["ok"]:
+            slots = host.slots(name, spec.get("slots", 1))
+            last = (idle.get(name) if isinstance(idle, dict) else None) or {}
+            last_at = created_at_epoch(str(last.get("at") or ""))
+            if slots <= 0:
+                verdict = {"ok": False, "why": "no-slots-on-host", "pressure": 0}
+            elif cooling(host, name):
+                verdict = {"ok": False, "why": "cooling", "pressure": 0}
+            elif name in unhealthy:
+                verdict = {"ok": False, "why": "unhealthy", "pressure": 0}
+            elif (last.get("reason") not in (None, "none-eligible") and last_at is not None
+                  and now - last_at < IDLE_BLOCK_S):
+                verdict = {"ok": False, "why": f"blocked:{last['reason']}", "pressure": 0}
+            elif not slot_free(host, name, slots):
+                verdict = {"ok": False, "why": "saturated", "pressure": quota["pressure"]}
+        cache[name] = verdict
+        return verdict
+
+    return availability
+
+
+def issue_router(host: "Host", name: str, providers: dict | None = None, policy: dict | None = None):
+    """The router as `admission_rejection` consumes it; decisions are memoized per issue.
+    A registry that declares no `routes` keeps first-come lane admission (None)."""
+    providers = load_providers() if providers is None else providers
+    if not any(isinstance(spec, dict) and spec.get("routes") for spec in providers.values()):
+        return None
+    policy = read_json(ROUTING_POLICY) if policy is None else policy
+    availability = lane_availability(host, name, providers)
+    decisions = {}
+
+    def route(issue: Issue) -> dict:
+        if issue.identifier not in decisions:
+            decisions[issue.identifier] = remediation.route_issue(
+                {"identifier": issue.identifier, "title": issue.title, "description": issue.description,
+                 "labels": issue.labels}, providers, policy, availability,
+                only_lanes={SENSITIVE_PROVIDER} if issue_is_sensitive(issue) else None)
+        return decisions[issue.identifier]
+
+    route.decisions = decisions
+    return route
+
+
+def log_route(host: "Host", lane_name: str, decision: dict) -> None:
+    """Append-only routing receipts: what was required, what it cost, why this lane."""
+    try:
+        (host.state / "runs").mkdir(parents=True, exist_ok=True)
+        with open(host.state / "runs" / "routing.jsonl", "a") as out:
+            out.write(json.dumps({**decision, "at": now_iso(), "host": HOST, "claimedBy": lane_name}) + "\n")
+    except OSError as error:
+        print(f"routing log unavailable: {type(error).__name__}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------- prompt
@@ -871,10 +1030,17 @@ CANONICAL_GATE = ["bash", "scripts/hooks/pre-push-gate.sh", "affected"]
 SENSITIVE_PR_LABEL = "sensitive-surface"
 
 
-def check_commands(paths: list[str]) -> list[list[str]]:
-    """Code changes run the canonical gate; docs-only changes need nothing locally."""
+def funnel_gate(pr: dict) -> list[str]:
+    """JOV-7765: judge the funnel on this exact head's preview. The script owns the funnel
+    path list and exits 0 when no funnel surface changed; no preview or exit 2 holds."""
+    return ["node", "scripts/funnel-judge/preview-gate.mjs", "--pr", str(pr["number"]),
+            "--sha", pr["headRefOid"], "--ref", pr["headRefName"]]
+
+
+def check_commands(paths: list[str], pr: dict | None = None) -> list[list[str]]:
+    """Code changes run the canonical gate, then the funnel gate; docs-only changes need nothing locally."""
     if any(not DOC_FILE.search(p) for p in paths):
-        return [CANONICAL_GATE]
+        return [CANONICAL_GATE, *([funnel_gate(pr)] if pr else [])]
     return []
 
 
@@ -1139,45 +1305,156 @@ def _cooldown_deadline_s(headers, now: float) -> float:
     return deadline
 
 
-def linear_cooldown_path(key: str) -> Path | None:
+def _linear_scope_id(key: str) -> str:
+    """Same token the JS clients use: sha256(API URL + NUL + key)."""
+    return hashlib.sha256(f"{LINEAR_API_URL}\0{key}".encode()).hexdigest()
+
+
+def linear_cooldown_root() -> Path | None:
+    """Directory of per-key cooldown scopes. None when a test must not touch the host."""
+    explicit = os.environ.get("LINEAR_COOLDOWN_STATE_DIR")
+    if explicit:
+        return Path(explicit)
+    configured = os.environ.get("LANES_STATE")
+    if configured:
+        return Path(configured) / "linear-cooldown"
+    legacy = os.environ.get("LINEAR_BACKOFF_STATE_DIR")
+    if legacy:
+        return Path(legacy)
     state = lane_state_dir()
-    if state is None:
+    return state / "linear-cooldown" if state is not None else None
+
+
+def linear_cooldown_scope(key: str) -> Path | None:
+    root = linear_cooldown_root()
+    if root is None:
         return None
-    return state / "linear-cooldown" / f"{_linear_key_id(key)}.json"
+    return root / _linear_scope_id(key)
+
+
+def _legacy_cooldown_roots(canonical: Path | None) -> list[Path]:
+    roots = [Path.home() / ".local" / "state" / "jovie-linear-backoff"]
+    extra = os.environ.get("LINEAR_BACKOFF_STATE_DIR")
+    if extra:
+        roots.append(Path(extra))
+    seen = []
+    for root in roots:
+        if canonical is not None and root == canonical:
+            continue
+        if root not in seen:
+            seen.append(root)
+    return seen
+
+
+def _reset_ms(record: object) -> int | None:
+    if not isinstance(record, dict) or record.get("schema") != 1:
+        return None
+    reset_ms = record.get("resetAt")
+    if type(reset_ms) is not int or reset_ms <= 0:
+        return None
+    return reset_ms
+
+
+def _scan_scope(scope: Path, now_ms: int, *, limit: int = 1000) -> int:
+    """Latest future deadline in a scope directory. Malformed records are ignored."""
+    try:
+        names = list(scope.iterdir())
+    except OSError:
+        return 0
+    latest = 0
+    for path in names[:limit]:
+        if path.is_symlink() or not path.is_file() or not re.fullmatch(r"\d+-[0-9a-f-]+\.json", path.name):
+            continue
+        try:
+            reset_ms = _reset_ms(json.loads(path.read_text()))
+        except (OSError, ValueError, TypeError):
+            continue
+        if reset_ms is None or not path.name.startswith(f"{reset_ms}-"):
+            continue
+        if reset_ms > now_ms:
+            latest = max(latest, reset_ms)
+        else:
+            try:
+                metadata = path.lstat()
+                if metadata.st_uid == os.getuid() and not metadata.st_mode & 0o077:
+                    path.unlink()
+            except OSError:
+                pass  # Cleanup is advisory; another worker may have already pruned it.
+    return latest
+
+
+def _legacy_file_reset_ms(root: Path, key: str, now_ms: int) -> int:
+    """The single-file cooldown shipped before the shared directory."""
+    path = root / f"{_linear_key_id(key)}.json"
+    try:
+        reset_ms = _reset_ms(json.loads(path.read_text()))
+    except (OSError, ValueError, TypeError):
+        return 0
+    if reset_ms is None or reset_ms <= now_ms:
+        return 0
+    return reset_ms
 
 
 def linear_cooldown_until(key: str, now: float | None = None) -> float | None:
-    path = linear_cooldown_path(key)
-    if path is None:
-        return None
+    root = linear_cooldown_root()
     now = time.time() if now is None else now
-    try:
-        record = json.loads(path.read_text())
-        reset_ms = record["resetAt"]
-        if record.get("schema") != 1 or type(reset_ms) is not int or reset_ms <= 0:
-            return None
-        reset_s = reset_ms / 1000
-    except (OSError, ValueError, TypeError, KeyError):
+    now_ms = int(now * 1000)
+    latest = 0
+    if root is not None:
+        scope = root / _linear_scope_id(key)
+        latest = max(latest, _scan_scope(scope, now_ms), _legacy_file_reset_ms(root, key, now_ms))
+    for legacy in _legacy_cooldown_roots(root):
+        latest = max(latest, _scan_scope(legacy / _linear_scope_id(key), now_ms),
+                     _legacy_file_reset_ms(legacy, key, now_ms))
+    if latest <= now_ms:
         return None
-    return reset_s if reset_s > now else None
+    return latest / 1000
+
+
+def linear_cooldown_path(key: str) -> Path | None:
+    """Newest canonical record, for tests. None when this process has no state dir."""
+    scope = linear_cooldown_scope(key)
+    if scope is None or not scope.is_dir():
+        return None
+    records = sorted(path for path in scope.iterdir()
+                     if path.is_file() and re.fullmatch(r"\d+-[0-9a-f-]+\.json", path.name))
+    return records[-1] if records else None
+
+
+def _chmod_private(path: Path, mode: int) -> None:
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
 
 
 def publish_linear_cooldown(key: str, headers, now: float | None = None) -> float:
     """Extend the shared deadline. A later writer must not shorten an earlier one."""
     now = time.time() if now is None else now
     reset_s = _cooldown_deadline_s(headers, now)
-    path = linear_cooldown_path(key)
-    if path is None:
+    root = linear_cooldown_root()
+    if root is None:
         return reset_s
+    scope = root / _linear_scope_id(key)
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path.with_suffix(".lock"), "a") as handle:
+        root.mkdir(parents=True, exist_ok=True)
+        _chmod_private(root, 0o700)
+        scope.mkdir(parents=True, exist_ok=True)
+        _chmod_private(scope, 0o700)
+        with open(root / f"{scope.name}.lock", "a") as handle:
             fcntl.flock(handle, fcntl.LOCK_EX)
             try:
                 existing = linear_cooldown_until(key, now)
                 if existing is not None and existing > reset_s:
                     reset_s = existing
-                _write_state_json(path, {"schema": 1, "resetAt": int(reset_s * 1000)})
+                reset_ms = int(reset_s * 1000)
+                record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
+                fd = os.open(record, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                try:
+                    os.write(fd, json.dumps({"schema": 1, "resetAt": reset_ms}).encode())
+                finally:
+                    os.close(fd)
+                _chmod_private(record, 0o600)
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
     except Exception:
@@ -1185,16 +1462,7 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
     return reset_s
 
 
-def _body_is_rate_limited(status: int, raw: bytes) -> bool:
-    """HTTP 429, or HTTP 400 whose GraphQL body carries extensions.code RATELIMITED."""
-    if status == 429:
-        return True
-    if status != 400:
-        return False
-    try:
-        data = json.loads(raw.decode() or "{}")
-    except (UnicodeError, ValueError):
-        return False
+def _data_is_rate_limited(data: object) -> bool:
     if not isinstance(data, dict):
         return False
     if str(data.get("code") or "").upper() == "RATELIMITED":
@@ -1211,6 +1479,19 @@ def _body_is_rate_limited(status: int, raw: bytes) -> bool:
         if str(extensions.get("code") or "").upper() == "RATELIMITED" or extensions.get("statusCode") == 429:
             return True
     return False
+
+
+def _body_is_rate_limited(status: int, raw: bytes) -> bool:
+    """HTTP 429, or HTTP 200/400 whose GraphQL body carries extensions.code RATELIMITED."""
+    if status == 429:
+        return True
+    if status not in (200, 400):
+        return False
+    try:
+        data = json.loads(raw.decode() or "{}")
+    except (UnicodeError, ValueError):
+        return False
+    return _data_is_rate_limited(data)
 
 
 class Linear:
@@ -1245,8 +1526,13 @@ class Linear:
                 raise LinearRateLimited(publish_linear_cooldown(self.key, getattr(error, "headers", None))) from None
             raise
         with response as handle:
-            record_linear_budget(getattr(handle, "headers", None), rate_limited=False)
-            payload = json.load(handle)
+            raw = handle.read()
+            headers = getattr(handle, "headers", None)
+        payload = json.loads(raw.decode() or "{}")
+        if _data_is_rate_limited(payload):
+            record_linear_budget(headers, rate_limited=True)
+            raise LinearRateLimited(publish_linear_cooldown(self.key, headers))
+        record_linear_budget(headers, rate_limited=False)
         if payload.get("errors"):
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
@@ -1337,7 +1623,9 @@ class Linear:
 def notify_issue_claim(linear: Linear, issue: Issue, name: str, spec: dict) -> None:
     """An informational comment cannot prevent durable ownership from being recorded."""
     try:
-        linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
+        route = spec.get("route") or {}
+        why = f"\nRoute ({route.get('required')} floor): {route['rationale']}" if route.get("rationale") else ""
+        linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).{why}")
     except Exception as error:
         print(f"lane claim comment unavailable: {type(error).__name__}", file=sys.stderr)
 
@@ -1663,10 +1951,23 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": "hyperagent", "model": spec.get("model"),
                "origin": AUTONOMOUS_ORIGIN, "issue": issue.identifier, "linearIssueId": issue.id,
                "branch": branch, "startedAt": now_iso(), "offer": {"eligible": True, "accepted": False},
-               "attribution": {"category": "autonomous-created", "originProvider": "hyperagent", "finalProvider": "hyperagent"}}
+               "attribution": {"category": "autonomous-created", "originProvider": "hyperagent", "finalProvider": "hyperagent"},
+               **({"route": spec["route"]} if spec.get("route") else {})}
     def hold(reason):
         return {"verdict": "remote-held", "reasons": [reason], "next_action": "reconcile-existing-remote-attempt"}
     claimed = None
+    try:
+        executable = shutil.which("hyperagent")
+        api = runpy.run_path(executable) if executable else None
+        if not isinstance(api, dict) or not callable(api.get("mcp_call")):
+            api = None
+    except Exception:  # a broken transport is a hold, never a crashed worker
+        api = None
+    refresh = (lambda current, now: hyperagent_lane.refresh_proof(current, api["mcp_call"], now)) if api else None
+    if refresh and not hyperagent_lane.verified(spec, time.time()):
+        proof, reason = refresh(spec, time.time())
+        spec = {**spec, "verifiedRemote": proof} if proof else spec
+        receipt["proofRefresh"] = reason or "fresh"
     if not hyperagent_lane.verified(spec, time.time()):
         receipt.update(hold("remote-preflight-unverified"))
     else:
@@ -1688,10 +1989,8 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
             if not claimed["admitted"]:
                 receipt.update(hold(claimed["reason"]))
             else:
-                executable = shutil.which("hyperagent")
-                if not executable:
+                if api is None:
                     raise OSError("Hyperagent transport unavailable")
-                api = runpy.run_path(executable)
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent")
                 (runs / f"{run_id}.prompt.md").write_text(prompt)
                 def boundary(spend, mutations):
@@ -1711,7 +2010,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                 receipt["offer"]["accepted"] = True
                 receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
                     evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
-                    before_dispatch=lambda: boundary(1, 1)))
+                    before_dispatch=lambda: boundary(1, 1), refresh=refresh))
                 if receipt["verdict"] != "remote-held":
                     result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
                     receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
@@ -1743,7 +2042,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                "issue": issue.identifier, "linearIssueId": issue.id, "branch": branch,
                "worktree": str(worktree), "offer": {"eligible": True, "accepted": False},
                "attribution": {"category": "autonomous-created", "originProvider": name,
-                               "finalProvider": name}, "startedAt": now_iso()}
+                               "finalProvider": name}, "startedAt": now_iso(),
+               **({"route": spec["route"]} if spec.get("route") else {})}
     ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
                                        {"title": issue.title, "description": issue.description})
     coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
@@ -1820,7 +2120,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                        {"spend": 1, "mutations": 1}, coordination=coordination)
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
-                                                       "provider_receipt": str(provider_evidence)}),
+                                                       "provider_receipt": str(provider_evidence),
+                                                       "model": str(spec.get("model"))}),
                               worktree, log, host.agent_timeout,
                               guard=lambda: run_guard("agent-running"), on_kill=revoke_run)
             # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
@@ -1847,7 +2148,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
                                                              "cwd": str(worktree),
-                                                             "provider_receipt": str(provider_evidence)}),
+                                                             "provider_receipt": str(provider_evidence),
+                                                             "model": str(nxt_spec.get("model"))}),
                                   worktree, log, host.agent_timeout,
                                   guard=lambda: run_guard("handoff-agent-running"), on_kill=revoke_run)
                 current = nxt_name
@@ -2179,7 +2481,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
     # The caller retains this same receipt if a later authority read refuses.
     result.update(changedFiles=len(changes), reasons=reasons)
     if not reasons:
-        commands = check_commands([change.path for change in changes])
+        commands = check_commands([change.path for change in changes], pr)
         seat = None
         if commands:
             seat, waited = gate_slot(host)
@@ -2470,6 +2772,59 @@ def post_claim(number: int, sha: str, kind: str) -> None:
 
 def held_path(host: Host) -> Path:
     return host.state / "held.json"
+
+
+HELD_PRUNE_LIMIT = 200
+HELD_STALE_HEAD_S = 24 * 3600
+
+
+def held_drop_keys(held: dict, open_prs: list[dict] | None, now: float, *, complete: bool) -> list[str]:
+    """Keys safe to drop. Closed PRs and holds whose head moved more than a day ago are
+    terminal or expired. A partial open-PR read never drops a numbered hold. Corrupt
+    records are always dropped. At most HELD_PRUNE_LIMIT keys, oldest first."""
+    heads = {}
+    if complete and open_prs is not None:
+        for pr in open_prs:
+            number = pr.get("number")
+            if isinstance(number, int):
+                heads[number] = pr.get("headRefOid")
+    ranked = []
+    for key, entry in (held or {}).items():
+        if not str(key).isdigit() or not isinstance(entry, dict):
+            ranked.append((0, str(key)))
+            continue
+        if not complete:
+            continue
+        number = int(key)
+        at = entry.get("at") if isinstance(entry, dict) else None
+        stamp = at if isinstance(at, (int, float)) else 0
+        if number not in heads:
+            ranked.append((stamp, str(key)))
+            continue
+        sha = entry.get("sha")
+        current = heads[number]
+        if sha and current and sha != current and isinstance(at, (int, float)) and now - at >= HELD_STALE_HEAD_S:
+            ranked.append((stamp, str(key)))
+    ranked.sort()
+    return [key for _, key in ranked[:HELD_PRUNE_LIMIT]]
+
+
+def prune_held(host: Host, open_prs: list[dict] | None, now: float, *, complete: bool) -> int:
+    """Drop expired or terminal held.json rows under the file lock. Never raises."""
+    dropped = 0
+
+    def change(data: dict) -> None:
+        nonlocal dropped
+        for key in held_drop_keys(data, open_prs, now, complete=complete):
+            if key in data:
+                del data[key]
+                dropped += 1
+
+    try:
+        update_json(held_path(host), change)
+    except (OSError, ValueError, TypeError):
+        return 0
+    return dropped
 
 
 def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None:
@@ -3119,26 +3474,31 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
-LOCKFILES = frozenset({"pnpm-lock.yaml"})
-
-
-def resolve_lockfile_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """JOV-6837: a PR that conflicts with main only in pnpm-lock.yaml needs no model. Merge
-    main, take its lockfile, regenerate it from the merged manifests, push (no force). Any
-    other conflict, or a failed regeneration, aborts and leaves the PR to the agent."""
+def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
+    no model. Merge main, take its copy of each conflicted generated file, run each file's
+    canonical regenerator (remediation.GENERATED_RESOLVERS: `pnpm install --lockfile-only`
+    for pnpm-lock.yaml, `pnpm ci:topology:write` for workflow-topology.gen.yml), push (no
+    force). Any other conflict, or a failed regeneration, aborts and leaves the PR to the
+    agent."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= LOCKFILES:
+        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
         guard()
-        regenerated = sh(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], cwd=worktree, timeout=900, log=log)
-        if regenerated.returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-            return False
+        commands = []
+        for path in sorted(conflicted):
+            command = list(remediation.GENERATED_RESOLVERS[path])
+            if command not in commands:
+                commands.append(command)
+        for command in commands:
+            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
         sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
@@ -3640,14 +4000,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
-            lockfile_only = False
+            resolved_generated = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 0, "mutations": 1}, coordination=coordination)
-                lockfile_only = resolve_lockfile_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
-            if lockfile_only:
-                receipt.update(resolution="lockfile-regenerated")
+            if resolved_generated:
+                receipt.update(resolution="generated-regenerated")
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
@@ -3664,7 +4024,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
-                                                         "provider_receipt": str(provider_evidence)}),
+                                                         "provider_receipt": str(provider_evidence),
+                                                         "model": str(spec.get("model"))}),
                                   worktree, log, host.agent_timeout,
                                   guard=lambda: boundary("agent-running", allow_local_push=True),
                                   on_kill=revoke_fix)
@@ -3829,7 +4190,8 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list
     """This lane's open PRs (its recognized run branches), plus the orphaned PRs of disabled lanes:
     nobody else will fix or gate those, and any enabled lane can."""
     providers = load_providers() if providers is None else providers
-    names = [name] + [other for other, spec in providers.items() if not spec.get("enabled", True) and other != name]
+    names = [name] + [other for other, spec in providers.items()
+                      if (not spec.get("enabled", True) or spec.get("repairs") is False) and other != name]
     prs = []
     for owner in names:
         if fields:
@@ -4134,6 +4496,12 @@ def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[l
     return superseded, stale
 
 
+def cached_issue_state(linear, issue_id: str) -> str:
+    """One state read per minute per issue. The claim path still calls state_of directly."""
+    return shared(f"claim-issue-state-{_cache_token(issue_id)}", CLAIM_SCAN_TTL_S,
+                  lambda: linear.state_of(issue_id))
+
+
 def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
     """Retire explicitly labeled duplicate lane PRs on the existing bounded sweep tick."""
     now = time.time() if now is None else now
@@ -4152,7 +4520,7 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
         issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
         closed = pr_events.close_duplicate(THIS, pr, "stale draft explicitly labeled duplicate", host=host, now=now)
         # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
-        if closed and linear.state_of(issue) == "In Progress":
+        if closed and cached_issue_state(linear, issue) == "In Progress":
             linear.move(issue, "Todo")
             linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
                                   "no push for 24 h); back to Todo.")
@@ -4367,22 +4735,28 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     claim = Locked(host.state / "claim.lock", blocking=True)
     # The claim lock serializes the scan, so the shared cache fill happens once. A rate
     # limit skips the API for every worker until the cooldown file expires.
-    red = adopt = issue = None
+    red = adopt = issue = route_decision = None
     rate_limited = False
     try:
         # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
         # then ungated lane drafts, then new issues.
-        prs = lane_prs(name)
-        candidates = fix_candidates(name)
-        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
-        escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-        red = (pr_events.claim_event_pr(host, THIS, name, events)
-               or claim_escalation_pr(host, name, candidates)
-               or claim_red_pr(host, name, candidates))
-        adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs, candidates)
-        labeled = None if red or adopt else claim_labeled_event(host, name, linear)
+        # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
+        # and the local lanes repair its PRs like any orphan (`repairs: false`).
+        local = spec.get("repairs") is not False
+        prs = lane_prs(name) if local else []
+        candidates = fix_candidates(name) if local else []
+        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if local else []
+        if local:
+            escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+        red = local and (pr_events.claim_event_pr(host, THIS, name, events)
+                         or claim_escalation_pr(host, name, candidates)
+                         or claim_red_pr(host, name, candidates)) or None
+        adopt = None if red or not local or not provider_may_run(name, "adopt") \
+            else claim_adoptable_pr(host, name, prs, candidates)
+        labeled = None if red or adopt or not local else claim_labeled_event(host, name, linear)
         issue = labeled
-        sweep_lane_prs(host, name, linear)
+        if local:
+            sweep_lane_prs(host, name, linear)
         budget = None if red or adopt or labeled else read_new_issue_budget(name, host.slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
@@ -4397,10 +4771,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
             overlap_inventory_rows = overlap_inventory(host, linear)
             overlap_unreadable = overlap_inventory_rows is None
             overlap_prs, overlap_tasks = overlap_inventory_rows or ([], [])
+            router = issue_router(host, name)
             while pool and not overlap_unreadable:
                 issue = design_gate.pick_build_issue(
                     pool, failures, in_flight=in_flight, provider=name,
-                    pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, held_back=held_back, **kwargs),
+                    pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, held_back=held_back,
+                                                            route=router, **kwargs),
                     linear=linear, repo=host.repo)
                 if issue is None:
                     break
@@ -4413,6 +4789,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
                     pool = [candidate for candidate in pool if candidate.identifier != rejected]
                     continue
                 overlap_prediction = admission
+                route_decision = router.decisions.get(issue.identifier) if router else None
                 if linear.state_of(issue.id) != "Todo":
                     issue = None  # another host claimed it between our read and now
                     break
@@ -4449,6 +4826,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
                          "file-overlap-blocked" if overlap_blocked else "none-eligible")
         slot.release()
         return 0
+    if route_decision and route_decision.get("chosen"):
+        log_route(host, name, route_decision)
+        spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
     notify_issue_claim(linear, issue, name, spec)
     runner = run_brief if design_gate.wants_brief(issue, host.repo) else run_issue
     try:
@@ -4840,7 +5220,7 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     # App installation tokens cannot touch user gists (403), and the status feed is Tim's gist:
     # `gh gist` keeps the host's own login.
     shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
-                    f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"})" || exit 1\n'
+                    f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
                     f'export GH_TOKEN\nexec {real} "$@"\n')
     shim.chmod(0o755)
     os.environ["PATH"] = f"{shim_dir}{os.pathsep}{os.environ.get('PATH', '')}"

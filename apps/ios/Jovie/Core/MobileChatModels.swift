@@ -1,5 +1,6 @@
 import Foundation
 import JovieKit
+import UIKit
 
 /// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
 /// (JOV-3608). Exercises entity mentions (all four kinds), a skill
@@ -184,6 +185,67 @@ enum MobileChatAllComponentsFixture {
       content: videoProposal,
       status: .completed,
       clientTurnId: "turn_all_video",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+  ]
+}
+
+/// Deterministic fixture for `.uiTestingStorefrontChat`, the App Store chat
+/// shot (JOV-4481). One finished exchange whose reply delivers merch option
+/// cards, so the graphic shows what its headline claims. Fictional designs
+/// only: no real artist, venue, or event names.
+enum MobileChatStorefrontFixture {
+  static let conversationID = "conv_ui_testing_storefront"
+
+  static let userProse = "Make merch for my summer tour."
+
+  /// Bundled mockups (Assets.xcassets) keyed by the fixture URLs below.
+  /// Generated artwork for fictional designs, not real merch.
+  static let mockupAssets: [(url: String, asset: String)] = [
+    ("https://fixtures.jov.ie/storefront/night-drive-tee.jpg", "StorefrontMerchNightDriveTee"),
+    ("https://fixtures.jov.ie/storefront/summer-run-hoodie.jpg", "StorefrontMerchSummerRunHoodie"),
+    ("https://fixtures.jov.ie/storefront/afterglow-cap.jpg", "StorefrontMerchAfterglowCap"),
+  ]
+
+  static let merchOptionsJSON =
+    #"{"success":true,"generationId":"gen-storefront","options":[{"id":"opt-1","option_number":1,"design_name":"Night Drive Tee","product_type":"Tee","concept":"Chrome road lines under a night sky.","mockup_urls":["https://fixtures.jov.ie/storefront/night-drive-tee.jpg"],"price_recommendation":{"sale_price":"$38.00"}},{"id":"opt-2","option_number":2,"design_name":"Summer Run Hoodie","product_type":"Hoodie","concept":"Sunset arc with sleeve marks.","mockup_urls":["https://fixtures.jov.ie/storefront/summer-run-hoodie.jpg"],"price_recommendation":{"sale_price":"$68.00"}},{"id":"opt-3","option_number":3,"design_name":"Afterglow Cap","product_type":"Cap","concept":"Embroidered sunset mark.","mockup_urls":["https://fixtures.jov.ie/storefront/afterglow-cap.jpg"],"price_recommendation":{"sale_price":"$32.00"}}]}"#
+
+  /// Seeds the image cache so the merch cards paint the bundled mockups on
+  /// their first frame with no network. UI-testing launch mode only.
+  static func primeMockupImages() {
+    for mockup in mockupAssets {
+      guard let url = URL(string: mockup.url), let image = UIImage(named: mockup.asset) else {
+        continue
+      }
+      AvatarImageCache.store(image, for: url)
+    }
+  }
+
+  static var assistantReply: String {
+    """
+    Here are three designs from your tour artwork. Pick one to save it to Work.
+    <tool_call><name>createMerch</name><parameters></parameters></tool_call>
+    <tool_result><name>createMerch</name><state>success</state><json>\(merchOptionsJSON)</json></tool_result>
+    """
+  }
+
+  static let `default`: [MobileChatTimelineItem] = [
+    MobileChatTimelineItem(
+      id: "msg_storefront_user",
+      role: .user,
+      content: userProse,
+      status: .completed,
+      clientTurnId: "turn_storefront",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+    MobileChatTimelineItem(
+      id: "msg_storefront_merch",
+      role: .assistant,
+      content: assistantReply,
+      status: .completed,
+      clientTurnId: "turn_storefront",
       requiresWebHandoff: false,
       handoffURL: nil
     ),

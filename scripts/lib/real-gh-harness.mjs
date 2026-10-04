@@ -27,29 +27,28 @@ import { crc32 } from 'node:zlib';
 export const GH_FAKE_HOST = 'github.localhost';
 
 /**
- * A shebang means the PATH entry is a wrapper script, not the real binary.
- * Lane environments prepend a `gh` shim that mints a GitHub App token from
- * the caller's real HOME; the harness replaces HOME for hermeticity, so the
- * shim cannot work here even when it resolves first in PATH.
+ * A `#!` wrapper is not the real CLI. Hosts may prepend a shim that injects
+ * state the harness deliberately isolates (e.g. lane_runner's `gh` shim mints
+ * a GitHub App token from `~/.config/jovie-lanes/jovie-bot.pem`, which does
+ * not exist under the harness HOME and makes every `gh` call fail).
  */
-function isScript(path) {
+function isScriptWrapper(path) {
+  let fd;
   try {
-    const fd = openSync(path, 'r');
-    try {
-      const head = Buffer.alloc(2);
-      return readSync(fd, head, 0, 2, 0) === 2 && head.toString() === '#!';
-    } finally {
-      closeSync(fd);
-    }
+    fd = openSync(path, 'r');
+    const head = Buffer.alloc(2);
+    return readSync(fd, head, 0, 2, 0) === 2 && head.toString() === '#!';
   } catch {
     return false;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 
 /** Absolute path of the real gh binary, or null when it is not installed. */
 export function resolveRealGh() {
-  const names =
-    process.platform === 'win32' ? ['gh.exe', 'gh.cmd', 'gh.bat'] : ['gh'];
+  const names = process.platform === 'win32' ? ['gh.exe', 'gh'] : ['gh'];
+  const candidates = [];
   for (const dir of (process.env.PATH ?? '').split(delimiter)) {
     if (!dir) continue;
     for (const name of names) {
@@ -59,10 +58,19 @@ export function resolveRealGh() {
       } catch {
         continue;
       }
-      if (!isScript(candidate)) return candidate;
+      if (!candidates.includes(candidate)) candidates.push(candidate);
     }
   }
-  return null;
+  if (!candidates.length)
+    try {
+      const found = execFileSync('sh', ['-c', 'command -v gh'], {
+        encoding: 'utf8',
+      }).trim();
+      if (found) candidates.push(found);
+    } catch {
+      return null;
+    }
+  return candidates.find(path => !isScriptWrapper(path)) ?? candidates[0];
 }
 
 /** First line of `gh --version`, recorded as the exercised boundary version. */
