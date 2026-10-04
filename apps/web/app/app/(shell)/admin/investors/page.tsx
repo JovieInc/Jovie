@@ -12,6 +12,7 @@ import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import type { ColumnDef } from '@/lib/tanstack-table';
@@ -94,7 +95,7 @@ const INVESTOR_TABLE_SKELETON_COLUMNS = [
 
 const INVESTOR_TABLE_SKELETON_COLUMN_CONFIG = [
   { variant: 'release' as const, width: '100%' },
-  { variant: 'text' as const, width: '100%' },
+  { variant: 'person' as const, width: '100%' },
   { variant: 'badge' as const, width: '72px' },
   { variant: 'text' as const, width: '40px' },
   { variant: 'text' as const, width: '40px' },
@@ -195,7 +196,7 @@ async function InvestorPipelineTable() {
                 </div>
               </InvestorTableCell>
               <InvestorTableCell className='w-investor-name'>
-                {link.investorName || 'Unknown investor'}
+                <PersonCell name={link.investorName || 'Unknown investor'} />
               </InvestorTableCell>
               <InvestorTableCell className='w-investor-stage'>
                 <StageBadge stage={link.stage} />
@@ -308,9 +309,8 @@ function TableSkeleton() {
         columns={INVESTOR_TABLE_SKELETON_COLUMNS}
         skeletonRows={5}
         skeletonColumnConfig={INVESTOR_TABLE_SKELETON_COLUMN_CONFIG}
-        rowHeight={40}
+        rowMode='two-line'
         minWidth={INVESTOR_TABLE_MIN_WIDTH}
-        containerClassName='px-3 py-3'
       />
     </ContentSurfaceCard>
   );
