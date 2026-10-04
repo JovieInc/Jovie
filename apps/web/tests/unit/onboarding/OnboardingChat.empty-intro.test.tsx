@@ -179,6 +179,12 @@ describe('OnboardingChat empty intro', () => {
       );
       expect(scrollRegion).not.toBeNull();
       expect(scrollRegion).toHaveClass(expected);
+      // Content scrolled under the floating sign-in fades rather than
+      // hard-clipping into a cut-off bubble; at rest, content below the 4rem
+      // clearance stays fully opaque.
+      expect(scrollRegion?.className.includes('mask-image')).toBe(
+        headerOverlay === true
+      );
     }
   );
 
