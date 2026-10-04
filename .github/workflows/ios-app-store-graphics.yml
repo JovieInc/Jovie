@@ -17,6 +17,12 @@ on:
       - 'apps/web/public/fonts/Satoshi-Variable.woff2'
       - 'packages/copy/**'
       - '.github/workflows/ios-app-store-graphics.yml'
+  # Changes to the pipeline itself prove a full render before merge.
+  pull_request:
+    paths:
+      - 'apps/ios/app-store/**'
+      - 'apps/ios/scripts/app-store-graphics.mjs'
+      - '.github/workflows/ios-app-store-graphics.yml'
   workflow_call:
     inputs:
       checkout-ref:

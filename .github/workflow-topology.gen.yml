@@ -600,6 +600,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - pull_request
       - push
       - workflow_call
       - workflow_dispatch
