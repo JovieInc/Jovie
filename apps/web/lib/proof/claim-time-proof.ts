@@ -25,6 +25,11 @@ export const COMPUTED_PROOF_SLOTS = {
     step: 'research_artist',
     proves: 'Jovie found the visitor’s real public identity and sources.',
   },
+  'link-drift': {
+    step: 'check_link_drift',
+    proves:
+      'Jovie found something stale or broken on the visitor’s own link-in-bio page.',
+  },
   'work-opportunities': {
     step: 'surface_library_opportunities',
     proves: 'Jovie found open work for this visitor in their own catalog.',

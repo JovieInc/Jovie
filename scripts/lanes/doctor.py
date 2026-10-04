@@ -98,11 +98,13 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     qualified, rejected = {}, {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
+        # Work the router sends to another lane is not this lane's idle capacity (JOV-7706).
+        route = lane.issue_router(host, name, specs) if hasattr(lane, "issue_router") else None
         duplicates = lane.pool_rejections(candidates.get(name, []))
         for issue in candidates.get(name, []):
             # Census key stays bounded: one bucket for all duplicate candidates.
             reason = ("duplicate-candidate" if issue.identifier in duplicates
-                      else lane.admission_rejection(issue, failures, now, in_flight, name))
+                      else lane.admission_rejection(issue, failures, now, in_flight, name, route))
             if reason is None:
                 qualified[name].append(issue)
             else:
