@@ -226,7 +226,7 @@ class AutoscaleTest(unittest.TestCase):
                     patch.object(lane.doctor, "run", return_value={}), \
                     patch.object(lane.urllib.request, "urlopen", side_effect=AssertionError("network")):
                 self.assertEqual(lane.dispatch(host), 0)
-            tick = json.loads((host.state / "tick.json").read_text()); self.assertIn("boom", tick["autoscaleError"]); self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex"]); self.assertEqual(spawned, tick["spawned"])
+            tick = json.loads((host.state / "tick.json").read_text()); self.assertIn("boom", tick["autoscaleError"]); self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent"]); self.assertEqual(spawned, tick["spawned"])
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp)
             (root / "doctor.json").write_text(json.dumps({"observed": {"now": time.time(), "capacityByProvider": {"devin": {"running": 4}},
