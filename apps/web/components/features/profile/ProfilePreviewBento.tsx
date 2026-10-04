@@ -28,8 +28,10 @@ export interface ProfilePreviewBentoProps {
   /** Top-right node (e.g. the More dropdown trigger). */
   readonly topRight?: ReactNode;
   /**
-   * In-flow content under the phone (e.g. the onboarding DSP strip).
-   * Kept out of the phone box so it cannot cover the preview CTA.
+   * Top-left node over the hero (e.g. the onboarding DSP strip), mirroring
+   * `topRight`. It sits beside the phone's empty status area, never in the
+   * band of the preview's bottom CTA, whatever the rail height. Do not
+   * combine with `showLiveBadge`, which uses the same corner.
    */
   readonly overlay?: ReactNode;
   /** Caption under the phone (e.g. "Your live profile"). */
@@ -100,13 +102,7 @@ export function ProfilePreviewBento({
   surfaceTestId,
 }: ProfilePreviewBentoProps) {
   const phone = (
-    <PhoneFrame
-      className={cn(
-        'relative z-10',
-        overlay ? 'max-h-full' : null,
-        phoneFrameClassName
-      )}
-    >
+    <PhoneFrame className={cn('relative z-10', phoneFrameClassName)}>
       <div
         className='h-full w-full'
         style={coverVars ?? DEFAULT_COVER_VARS}
@@ -151,7 +147,6 @@ export function ProfilePreviewBento({
         className={cn(
           'relative flex justify-center overflow-hidden',
           phoneAlign === 'top' ? 'items-start' : 'flex-1 items-center',
-          overlay && 'min-h-0 flex-col items-stretch justify-start',
           heroClassName
         )}
         style={heroStyle ?? DEFAULT_HERO_STYLE}
@@ -168,16 +163,11 @@ export function ProfilePreviewBento({
           <div className='absolute right-3.5 top-3.5 z-20'>{topRight}</div>
         )}
 
-        {overlay ? (
-          <div className='flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-3'>
-            <div className='flex min-h-0 w-full flex-auto items-center justify-center'>
-              {phone}
-            </div>
-            <div className='relative z-20 shrink-0'>{overlay}</div>
-          </div>
-        ) : (
-          phone
+        {overlay && (
+          <div className='absolute left-3.5 top-3.5 z-20'>{overlay}</div>
         )}
+
+        {phone}
 
         {showBottomFade && (
           <div

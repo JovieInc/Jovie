@@ -99,7 +99,8 @@ describe('keyboard-shortcuts definitions', () => {
       expect(ids).toContain('nav-calendar');
       expect(ids).toContain('nav-tour-dates');
       expect(ids).not.toContain('nav-audience');
-      expect(ids).toContain('nav-earnings');
+      expect(ids).not.toContain('nav-earnings');
+      expect(sequential.map(s => s.href)).not.toContain(APP_ROUTES.EARNINGS);
       expect(ids).toContain('nav-chat');
       expect(ids).toContain('nav-settings');
     });
@@ -117,10 +118,11 @@ describe('keyboard-shortcuts definitions', () => {
       expect(NAV_SHORTCUTS.calendar.href).toBe(APP_ROUTES.CALENDAR);
     });
 
-    it('opens earnings on the profile pay tab', () => {
-      expect(NAV_SHORTCUTS.earnings.href).toBe(
-        `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
-      );
+    it('keeps the uncertified earnings chord out of global navigation', () => {
+      expect(
+        KEYBOARD_SHORTCUTS.find(shortcut => shortcut.keys === 'G then E')
+      ).toBeUndefined();
+      expect(NAV_SHORTCUTS.earnings).toBeUndefined();
     });
   });
 
@@ -174,7 +176,7 @@ describe('keyboard-shortcuts definitions', () => {
       expect(NAV_SHORTCUTS.calendar).toBeDefined();
       expect(NAV_SHORTCUTS.touring).toBeDefined();
       expect(NAV_SHORTCUTS.audience).toBeUndefined();
-      expect(NAV_SHORTCUTS.earnings).toBeDefined();
+      expect(NAV_SHORTCUTS.earnings).toBeUndefined();
       expect(NAV_SHORTCUTS.chat).toBeDefined();
       expect(NAV_SHORTCUTS.account).toBeDefined();
     });
