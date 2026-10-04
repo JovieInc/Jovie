@@ -334,6 +334,16 @@ export const WANTED_CLAIMS: readonly WantedClaim[] = [
     owner: 'JOV-7807',
   },
   {
+    id: 'dogfood.launch-loop',
+    statement:
+      'Each Jovie launch grows the audience for the next one, measured send over send.',
+    answers: 'Tim: each launch grows the audience for the next',
+    unlocks: ['homepage', 'pricing'],
+    kind: 'metric',
+    generator: 'dogfood',
+    owner: 'JOV-7834',
+  },
+  {
     id: 'computed.link-drift-finding',
     statement:
       'A drift finding about the visitor: a public link that points somewhere stale.',
@@ -353,6 +363,7 @@ export const CLAIM_STATUSES = [
   'invented-number',
   'unbacked-offer',
   'checkable-positioning',
+  'weak-proof-rendered',
 ] as const;
 
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
@@ -454,6 +465,16 @@ function auditOutcome(
       fresh(item)
   );
   if (valid.length > 0 && valid.length === evidence.proofIds.length) {
+    // Persona judges read weak receipts as anti-proof ("my free page beats
+    // that"): they may back a claim, never appear as its number.
+    const weak = valid.filter(item => item.strength === 'weak');
+    if (weak.length > 0 && HAS_DIGIT.test(claim.copy)) {
+      return {
+        evidenceClass: evidence.class,
+        status: 'weak-proof-rendered',
+        detail: `renders a number backed by weak proof: ${weak.map(item => item.id).join(', ')}`,
+      };
+    }
     return {
       evidenceClass: evidence.class,
       status: 'admissible',
@@ -629,4 +650,5 @@ export const HARD_FAIL_STATUSES: readonly ClaimStatus[] = [
   'invented-number',
   'unbacked-offer',
   'checkable-positioning',
+  'weak-proof-rendered',
 ];

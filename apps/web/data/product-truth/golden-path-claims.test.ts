@@ -171,6 +171,36 @@ describe('golden-path proof audit', () => {
     expect(asPilot?.request?.generator).toBe('pilot');
   });
 
+  it('fails a rendered number backed only by weak dogfood proof', () => {
+    const weak = {
+      ...dogfoodMetric('2026-10-01T00:00:00.000Z'),
+      strength: 'weak',
+    } as ProofCandidate;
+    const report = audit(
+      [
+        {
+          ...base,
+          id: 'weak-number',
+          copy: '61 clicks on our own profile',
+          nature: 'outcome',
+          evidence: { class: 'dogfood', proofIds: ['dogfood-fixture'] },
+        },
+        {
+          ...base,
+          id: 'weak-backing',
+          copy: 'Be found.',
+          nature: 'outcome',
+          evidence: { class: 'dogfood', proofIds: ['dogfood-fixture'] },
+        },
+      ],
+      [weak]
+    );
+    expect(report.claims.map(claim => claim.status)).toEqual([
+      'weak-proof-rendered',
+      'admissible',
+    ]);
+  });
+
   it('admits computed slots and flags uncertified capabilities', () => {
     const report = audit([
       {
