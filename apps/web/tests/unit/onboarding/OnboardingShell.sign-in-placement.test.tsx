@@ -102,14 +102,18 @@ describe('onboarding sign-in placement', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
-  it.each(['prompt_handoff', 'spotify_handoff'] as const)(
+  it.each([
+    ['prompt_handoff', 'Getting this ready'],
+    ['spotify_handoff', 'Getting your artist ready'],
+  ] as const)(
     'keeps the %s intro free of verification theater (JOV-3379)',
-    mode => {
+    (mode, title) => {
       const { container } = render(<OnboardingChatEmptyIntro mode={mode} />);
 
       expect(container.textContent ?? '').not.toMatch(
         /verif|browser check|human/i
       );
+      expect(screen.getByText(title)).toBeTruthy();
       expect(screen.getByText('Your message is on its way.')).toBeTruthy();
     }
   );
