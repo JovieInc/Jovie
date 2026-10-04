@@ -13,6 +13,11 @@ import { parseArgs } from 'node:util';
 import { captureFunnel } from './capture.mjs';
 import { JUDGES, judgeCoherence, judgePersona } from './judge.mjs';
 import {
+  evaluateProofGate,
+  PROOF_REPORT_PATH,
+  readProofReport,
+} from './proof-gate.mjs';
+import {
   calibrationHolds,
   evaluatePassBar,
   PERSONAS,
@@ -186,6 +191,18 @@ async function main() {
     metrics: /** @type {any} */ (captures),
     coherence,
   });
+  // JOV-7750: a step that renders an unproven claim fails, whatever the
+  // personas felt. Unfilled gaps are listed as ProofRequests on the receipt.
+  const proofGate = evaluateProofGate(
+    readProofReport(join(ROOT, PROOF_REPORT_PATH)),
+    { judgedStepIds: judgeSteps.map(step => step.id) }
+  );
+  if (!proofGate.pass) {
+    result.pass = false;
+    result.failures.unshift(
+      ...proofGate.failures.map(failure => `proof gate: ${failure}`)
+    );
+  }
   if (judgeErrors.length > 0) {
     result.pass = false;
     result.failures.unshift(
@@ -206,6 +223,7 @@ async function main() {
     verdicts,
     coherence,
     result,
+    proofGate,
     worst: worstStep(result.aggregates),
     calibration: values.calibrate
       ? {

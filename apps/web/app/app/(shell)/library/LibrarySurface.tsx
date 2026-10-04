@@ -23,6 +23,7 @@ import {
   ArrowUpDown,
   Check,
   ChevronDown,
+  ExternalLink,
   FileAudio2,
   FileText,
   Filter,
@@ -57,6 +58,14 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  archiveLibraryRelease,
+  restoreRelease,
+} from '@/app/app/(shell)/dashboard/releases/actions';
+import {
+  archiveLibraryMerchCard,
+  restoreLibraryMerchCard,
+} from '@/app/app/(shell)/library/actions';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -150,6 +159,7 @@ import {
 import {
   EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
   type LibraryPostReleaseBundle,
+  type LibraryPresenceFindingView,
 } from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
@@ -158,7 +168,11 @@ import {
 } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
-import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
+import {
+  deriveWorkInspectorPresentation,
+  scopeWorkInspectorBundle,
+} from '@/lib/library/work-inspector-read-model';
+import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -166,11 +180,6 @@ import {
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
-import {
-  archiveLibraryRelease,
-  restoreRelease,
-} from '../dashboard/releases/actions';
-import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import {
   LIBRARY_LIST_ROW_MODE,
   LIBRARY_TABLE_MIN_WIDTH,
@@ -2011,17 +2020,6 @@ function MetadataRow({
   return <InspectorRow label={label} value={value} />;
 }
 
-function objectScopedPostReleaseBundle(
-  bundle: LibraryPostReleaseBundle
-): LibraryPostReleaseBundle {
-  return {
-    ...bundle,
-    findings: bundle.findings.filter(
-      finding => finding.subjectType !== 'artist'
-    ),
-  };
-}
-
 function PreviewActionButton({
   asset,
   isPreviewPlaying,
@@ -2215,17 +2213,69 @@ function AssetDrawer({
     if (asset) setStickyAsset(asset);
   }, [asset]);
 
-  const current = asset ?? stickyAsset;
-  const isMerch = current ? getLibraryItemKind(current) === 'merch' : false;
+  // Keep the last object only while the drawer closes for its exit animation.
+  // An open drawer with no resolved selection must never show the prior work.
+  const current = asset ?? (open ? null : stickyAsset);
+  const workKind = current ? getLibraryItemKind(current) : null;
+  const isMerch = workKind === 'merch';
   const isYouTubeVideo = current?.source?.provider === 'youtube';
-  const [activeTab, setActiveTab] = useState<WorkInspectorTabId>('overview');
+  const [tabSelection, setTabSelection] = useState<{
+    readonly objectId: string | null;
+    readonly tab: WorkInspectorTabId;
+  }>({ objectId: null, tab: 'overview' });
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
-  const inspectorBundle = objectScopedPostReleaseBundle(postReleaseBundle);
-
-  useEffect(() => {
-    setActiveTab('overview');
-  }, [currentId]);
+  const activeTab =
+    tabSelection.objectId === currentId ? tabSelection.tab : 'overview';
+  const handleTabChange = useCallback(
+    (tab: WorkInspectorTabId) => {
+      if (!currentId) return;
+      setTabSelection({ objectId: currentId, tab });
+    },
+    [currentId]
+  );
+  const [findingState, setFindingState] = useState({
+    source: postReleaseBundle.findings,
+    findings: postReleaseBundle.findings,
+  });
+  const findings =
+    findingState.source === postReleaseBundle.findings
+      ? findingState.findings
+      : postReleaseBundle.findings;
+  const handleFindingChange = useCallback(
+    (next: LibraryPresenceFindingView) => {
+      setFindingState(previous => ({
+        source: postReleaseBundle.findings,
+        findings: (previous.source === postReleaseBundle.findings
+          ? previous.findings
+          : postReleaseBundle.findings
+        ).map(finding => (finding.id === next.id ? next : finding)),
+      }));
+    },
+    [postReleaseBundle.findings]
+  );
+  const inspectorBundle = useMemo(
+    () =>
+      current
+        ? scopeWorkInspectorBundle(current, { ...postReleaseBundle, findings })
+        : EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+    [current, postReleaseBundle, findings]
+  );
+  const presentation = useMemo(
+    () => (current ? deriveWorkInspectorPresentation(current) : null),
+    [current]
+  );
+  const contextualBlockers = inspectorBundle.findings.filter(
+    finding =>
+      finding.primitive === 'blocker' &&
+      finding.blocksSelectedObject &&
+      finding.status !== 'resolved' &&
+      finding.status !== 'dismissed'
+  );
+  const hasPostReleaseActivity =
+    inspectorBundle.downloads.length > 0 ||
+    inspectorBundle.findings.length > 0 ||
+    inspectorBundle.rightsholders.length > 0;
   const isPreviewPlaying =
     currentId !== null &&
     currentId === playingPreviewId &&
@@ -2240,7 +2290,14 @@ function AssetDrawer({
   );
   const drawerHeaderActions = current ? (
     <DrawerHeaderActions
-      primaryActions={[]}
+      primaryActions={[
+        {
+          id: 'open-full-view',
+          label: 'Open Full View',
+          icon: ExternalLink,
+          href: current.primaryActionHref ?? current.smartLinkPath,
+        },
+      ]}
       menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
       onClose={onClose}
       searchable
@@ -2263,7 +2320,7 @@ function AssetDrawer({
       emptyMessage='Select a release, product, or file to view details.'
       tabs={WORK_INSPECTOR_TABS}
       activeTab={activeTab}
-      onTabChange={setActiveTab}
+      onTabChange={handleTabChange}
       tabsAriaLabel='Inspector tabs'
       objectHeader={
         current ? (
@@ -2276,13 +2333,14 @@ function AssetDrawer({
             title={current.title}
             subtitle={current.artist}
             meta={
-              <div className='flex min-w-0 items-center gap-1.5'>
+              <div className='system-b-library-status-bar flex min-w-0 items-center gap-1.5 text-tertiary-token'>
+                <span className='truncate'>
+                  {formatLibraryItemType(current)}
+                </span>
+                <span aria-hidden='true'>·</span>
                 <span
                   role='status'
-                  className={cn(
-                    'system-b-library-status-pill inline-flex h-6 max-w-full items-center truncate rounded-full border px-2',
-                    releaseStatusClasses(current.status)
-                  )}
+                  className='truncate'
                   data-testid={`library-release-status-${current.id}`}
                   aria-label={`Release Status: ${formatLibraryStatus(current)}`}
                 >
@@ -2310,29 +2368,19 @@ function AssetDrawer({
           searchPlaceholder='Search actions'
           searchMode='recursive'
         >
-          <div className='space-y-2.5'>
+          <div
+            key={current.id}
+            data-inspector-object-id={current.id}
+            className={cn(
+              activeTab === 'overview'
+                ? 'divide-y divide-subtle'
+                : 'space-y-2.5'
+            )}
+          >
             {activeTab === 'overview' ? (
               <>
-                {isMerch ? (
-                  <InspectorSection title='Merch'>
-                    <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
-                      {current.description ?? 'Merch card saved from chat.'}
-                    </p>
-                    <dl className='mt-2'>
-                      <MetadataRow
-                        label='Sale Price'
-                        value={current.salePriceLabel ?? 'No Price'}
-                      />
-                      <MetadataRow
-                        label='Profit'
-                        value={current.profitLabel ?? 'No Estimate'}
-                      />
-                    </dl>
-                  </InspectorSection>
-                ) : null}
-
                 {!isMerch && hasVerifiedLibraryAudioPreview(current) ? (
-                  <InspectorSection title='Preview'>
+                  <InspectorSection title='Preview' className='pb-3 first:pt-0'>
                     <div className='flex items-center justify-between gap-2'>
                       <span className='system-b-library-drawer-panel-copy min-w-0 flex-1 truncate text-secondary-token'>
                         {current.title}
@@ -2355,28 +2403,94 @@ function AssetDrawer({
                       launches={workLaunches}
                       canPublish={profileId !== null}
                       disabled={!open}
-                      onSharePrivately={() => setActiveTab('files')}
+                      onSharePrivately={() => handleTabChange('files')}
                     />
                   </InspectorSection>
                 ) : null}
 
-                {!isMerch ? (
-                  <InspectorSection title='Sharing'>
-                    <LibraryAssetSharePanel
-                      asset={current}
-                      profileId={profileId}
-                      artistHandle={artistHandle}
-                      disabled={!open}
-                      initialShare={current.share}
-                      onShareChange={onShareChange}
-                    />
+                {presentation ? (
+                  <InspectorSection
+                    title='Public presentation'
+                    className='py-3 first:pt-0'
+                    data-testid='work-inspector-presentation'
+                  >
+                    <dl>
+                      <MetadataRow
+                        label='Lifecycle'
+                        value={formatLibraryStatus(current)}
+                      />
+                      <MetadataRow
+                        label='Public Page'
+                        value={
+                          presentation.pagePublication === 'live'
+                            ? 'Live'
+                            : presentation.pagePublication === 'not_public'
+                              ? 'Not public'
+                              : 'Unknown'
+                        }
+                      />
+                      <MetadataRow
+                        label='Profile'
+                        value={
+                          presentation.profileVisibility === 'visible'
+                            ? 'Shown on profile'
+                            : 'Hidden from profile'
+                        }
+                      />
+                      <MetadataRow
+                        label='Visitor Action'
+                        value={presentation.primaryVisitorAction}
+                      />
+                      <MetadataRow
+                        label='Destinations'
+                        value={
+                          presentation.destinationState === 'connected'
+                            ? presentation.destinations.join(', ')
+                            : presentation.destinationState === 'disconnected'
+                              ? 'Disconnected'
+                              : 'Not supported'
+                        }
+                      />
+                    </dl>
+                    {contextualBlockers.length > 0 ? (
+                      <div className='space-y-1 border-l-2 border-warning pl-2'>
+                        {contextualBlockers.map(blocker => (
+                          <p
+                            key={blocker.id}
+                            className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'
+                          >
+                            {blocker.title}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                    {!isMerch ? (
+                      <LibraryAssetSharePanel
+                        key={current.id}
+                        asset={current}
+                        profileId={profileId}
+                        artistHandle={artistHandle}
+                        disabled={!open}
+                        initialShare={current.share}
+                        onShareChange={onShareChange}
+                      />
+                    ) : null}
                   </InspectorSection>
                 ) : null}
 
-                <InspectorSection title='Details'>
+                <InspectorSection
+                  title='About'
+                  className='py-3'
+                  data-testid='work-inspector-about'
+                >
+                  {current.description ? (
+                    <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
+                      {current.description}
+                    </p>
+                  ) : null}
                   <dl>
                     <MetadataRow
-                      label='Approval Status'
+                      label='Review Status'
                       value={
                         <ApprovalStatusEditor
                           asset={current}
@@ -2388,75 +2502,123 @@ function AssetDrawer({
                       }
                     />
                     <MetadataRow
-                      label={isMerch ? 'Updated' : 'Release Date'}
-                      value={
-                        <span
-                          title={formatLibraryReleaseDateTitle(
-                            current.releaseDate
-                          )}
-                        >
-                          {formatLibraryReleaseDate(current.releaseDate)}
-                        </span>
-                      }
-                    />
-                    <MetadataRow
                       label='Type'
                       value={formatLibraryItemType(current)}
                     />
-                    {isMerch ? (
+                    {current.releaseDate ? (
                       <MetadataRow
-                        label='Sellability'
-                        value={current.sellabilityLabel ?? 'Not Checked'}
+                        label={
+                          workKind === 'video'
+                            ? 'Published'
+                            : isMerch || workKind === 'document'
+                              ? 'Updated'
+                              : 'Release Date'
+                        }
+                        value={
+                          <span
+                            title={formatLibraryReleaseDateTitle(
+                              current.releaseDate
+                            )}
+                          >
+                            {formatLibraryReleaseDate(current.releaseDate)}
+                          </span>
+                        }
                       />
+                    ) : null}
+                    {isMerch ? (
+                      <>
+                        {current.productType ? (
+                          <MetadataRow
+                            label='Product'
+                            value={capitalizeFirst(current.productType)}
+                          />
+                        ) : null}
+                        {current.sellabilityLabel ? (
+                          <MetadataRow
+                            label='Availability'
+                            value={current.sellabilityLabel}
+                          />
+                        ) : null}
+                        {current.salePriceLabel ? (
+                          <MetadataRow
+                            label='Price'
+                            value={current.salePriceLabel}
+                          />
+                        ) : null}
+                        {current.profitLabel ? (
+                          <MetadataRow
+                            label='Estimated Profit'
+                            value={current.profitLabel}
+                          />
+                        ) : null}
+                      </>
                     ) : (
                       <>
-                        <MetadataRow
-                          label='Tracks'
-                          value={current.trackCount}
-                        />
-                        <MetadataRow
-                          label='Duration'
-                          value={formatLibraryDuration(current.totalDurationMs)}
-                        />
-                        <MetadataRow
-                          label='Popularity'
-                          value={
-                            current.spotifyPopularity == null
-                              ? 'No Score'
-                              : `${current.spotifyPopularity}/100`
-                          }
-                        />
-                        <MetadataRow
-                          label='Genres'
-                          value={
-                            current.genres.length > 0
-                              ? current.genres.join(', ')
-                              : 'No Genres'
-                          }
-                        />
-                        <MetadataRow
-                          label='Label'
-                          value={
-                            current.label ?? current.distributor ?? 'No Label'
-                          }
-                        />
-                        <MetadataRow
-                          label='UPC'
-                          value={current.upc ?? 'No UPC'}
-                        />
-                        <MetadataRow
-                          label='Pitch Targets'
-                          value={current.targetPlaylistCount}
-                        />
+                        {(workKind === 'release' || workKind === 'audio') &&
+                        current.trackCount > 0 ? (
+                          <MetadataRow
+                            label='Tracks'
+                            value={current.trackCount}
+                          />
+                        ) : null}
+                        {current.totalDurationMs != null ? (
+                          <MetadataRow
+                            label='Duration'
+                            value={formatLibraryDuration(
+                              current.totalDurationMs
+                            )}
+                          />
+                        ) : null}
+                        {current.genres.length > 0 ? (
+                          <MetadataRow
+                            label='Genres'
+                            value={current.genres.join(', ')}
+                          />
+                        ) : null}
+                        {current.label || current.distributor ? (
+                          <MetadataRow
+                            label='Label'
+                            value={current.label ?? current.distributor}
+                          />
+                        ) : null}
+                        {current.upc ? (
+                          <MetadataRow label='UPC' value={current.upc} />
+                        ) : null}
+                        {current.primaryIsrc ? (
+                          <MetadataRow
+                            label='ISRC'
+                            value={current.primaryIsrc}
+                          />
+                        ) : null}
+                        {workKind === 'video' && current.privacyStatus ? (
+                          <MetadataRow
+                            label='Video Access'
+                            value={capitalizeFirst(current.privacyStatus)}
+                          />
+                        ) : null}
+                        {workKind === 'document' && current.documentStage ? (
+                          <MetadataRow
+                            label='Stage'
+                            value={capitalizeFirst(
+                              current.documentStage.replaceAll('_', ' ')
+                            )}
+                          />
+                        ) : null}
                       </>
                     )}
+                    {!isMerch && current.source ? (
+                      <MetadataRow
+                        label='Source'
+                        value={`${capitalizeFirst(current.source.provider)} · ${current.source.canonicalId}`}
+                      />
+                    ) : null}
                   </dl>
                 </InspectorSection>
 
                 {!isMerch &&
-                isDspQuietListScope(getLibraryItemKind(current)) &&
+                isDspQuietListScope(workKind ?? 'release') &&
                 current.providers.length > 0 ? (
-                  <InspectorSection title='Providers'>
+                  <InspectorSection title='Destinations' className='py-3'>
                     <div className='space-y-0.5'>
                       {current.providers.map(provider => (
                         <DspQuietRow
@@ -2477,9 +2639,16 @@ function AssetDrawer({
                   </InspectorSection>
                 ) : null}
 
-                {isYouTubeVideo && current.source ? (
-                  <InspectorSection title='Relationships'>
+                {isYouTubeVideo &&
+                current.source &&
+                (merchProducts.length > 0 ||
+                  relationships.some(
+                    relationship =>
+                      relationship.subjectId === current.source?.canonicalId
+                  )) ? (
+                  <InspectorSection title='Related work' className='py-3'>
                     <YouTubeMerchRelationshipEditor
+                      key={current.id}
                       profileId={profileId}
                       videoId={current.source.canonicalId}
                       merchProducts={merchProducts}
@@ -2490,8 +2659,9 @@ function AssetDrawer({
                 ) : null}
 
                 {isYouTubeVideo && current.source ? (
-                  <InspectorSection title='Optimization'>
+                  <InspectorSection title='Results' className='py-3'>
                     <YouTubeOptimizationPanel
+                      key={current.id}
                       profileId={profileId}
                       videoId={current.source.canonicalId}
                       disabled={!open}
@@ -2499,14 +2669,14 @@ function AssetDrawer({
                   </InspectorSection>
                 ) : null}
 
-                {!isMerch &&
-                (getLibraryItemKind(current) === 'release' ||
-                  current.linkedReleaseId) ? (
-                  <InspectorSection title='Rights'>
+                {!isMerch && hasPostReleaseActivity ? (
+                  <InspectorSection title='Activity' className='pt-3 last:pb-0'>
                     <PostReleasePanel
+                      key={current.id}
                       asset={current}
                       creatorProfileId={profileId}
                       bundle={inspectorBundle}
+                      onFindingChange={handleFindingChange}
                       disabled={!open}
                     />
                   </InspectorSection>

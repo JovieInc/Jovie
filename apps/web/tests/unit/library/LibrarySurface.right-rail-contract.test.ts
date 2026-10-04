@@ -25,7 +25,8 @@ describe('LibrarySurface shared right rail contract', () => {
     expect(source).toContain("data-testid='library-asset-entity-header'");
     expect(source).not.toContain('DrawerSectionGroup');
     expect(source).not.toContain('<DrawerSection');
-    expect(source).toContain("finding.subjectType !== 'artist'");
+    expect(source).toContain('scopeWorkInspectorBundle');
+    expect(source).not.toContain('objectScopedPostReleaseBundle');
   });
 
   it('does not retain the route-local drawer layout implementation', () => {

@@ -8,6 +8,7 @@ MEM_HEADROOM_BYTES, MEM_EMERGENCY_BYTES = 8 * GIB, 4 * GIB; GITHUB_INCREASE_MIN,
 LINEAR_INCREASE_RATIO, LINEAR_DECREASE_RATIO = 0.25, 0.10; LOAD_INCREASE_MAX, LOAD_DECREASE_MIN = 0.75, 1.0
 PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK, PSI_CPU_SEVERE, PSI_MEM_SEVERE, PSI_IO_SEVERE = 20, 2, 10, 40, 5, 20
 GATE_WAIT_INCREASE_MAX, GATE_WAIT_DECREASE, PRODUCTIVE_MIN, PRODUCTIVE_MIN_STARTS = 600, 1200, 0.5, 5; DISK_INCREASE_MIN, DISK_SOFT, DISK_HARD = 15, 10, 5
+MERGE_QUEUE_WAIT_BRAKE_MIN = 30
 _OFF, _OBSERVE, _APPLY = frozenset({"0", "off", "false"}), frozenset({"observe", "shadow"}), frozenset({"1", "on", "true", "apply"})
 _AVG10, _PSI = re.compile(r"avg10=([0-9.]+)"), ("cpuSomeAvg10", "memoryFullAvg10", "ioFullAvg10")
 _HARD_REASONS = ("over-budget", "terminal-pr-backlog", "provider-disabled", "pr-inventory-unavailable")
@@ -144,6 +145,7 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
         if isinstance(metric, dict):
             productive[name], starts[name] = metric.get("productiveRunRate"), metric.get("workerStarts")
     disk, attribution = _obj(_obj(tick).get("disk")), _obj(observed.get("codexAttribution")); maintenance = observed.get("maintenanceQueueByProvider")
+    merge = _obj(observed.get("mergeThroughput")); merge_at = _num(merge.get("observedAt"))
     return {"doctorFresh": stamp is not None and 0 <= now - stamp <= STALE_S,
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
             "newIssueBudgetByProvider": _obj(observed.get("newIssueBudgetByProvider")),
@@ -159,6 +161,8 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
             "githubRemaining": _int(observed.get("githubRemaining")),
             "linearRemaining": _budget_int(api["remaining"] if "remaining" in api else api.get("linearRemaining")), "linearLimit": _budget_int(api["limit"] if "limit" in api else api.get("linearLimit")),
             "linearRateLimitedAt": _epoch(api["rateLimitedAt"] if "rateLimitedAt" in api else api.get("linearRateLimitedAt")),
+            "mergeThroughputFresh": merge_at is not None and 0 <= now - merge_at <= STALE_S,
+            "mergeThroughput": {key: merge.get(key) for key in ("queueDepth", "queueWaitP50Minutes", "mergedPerHour", "openedPerHour", "ejectionRate")},
             "disk": {"admitted": disk.get("admitted"), "freePct": disk.get("freePct")}}
 def _load_ratio(sample: dict) -> float | None:
     load, cpu = _num(sample.get("load1")), _int(sample.get("cpuCount")); return None if load is None or cpu is None or cpu <= 0 else load / cpu
@@ -207,7 +211,25 @@ def _additive_reason(obs: dict, sample: dict) -> str | None:
     alerts, gate = set(obs.get("alerts") or []), _num(obs.get("gateWaitMedianS24h"))
     if "failed-runs" in alerts or "gate-timeouts" in alerts or (gate is not None and gate > GATE_WAIT_DECREASE):
         return "gate-pressure"
+    if _obj(obs.get("throughputBrake")).get("sustained"):
+        return "merge-throughput"
     return None
+def _throughput_brake(previous: dict, obs: dict, now: float, interval: int) -> dict:
+    signal = _obj(obs.get("mergeThroughput")); depth = _count(signal.get("queueDepth")); wait = _num(signal.get("queueWaitP50Minutes"))
+    merged, opened, ejections = _num(signal.get("mergedPerHour")), _num(signal.get("openedPerHour")), _num(signal.get("ejectionRate"))
+    known = bool(obs.get("mergeThroughputFresh")) and depth is not None and merged is not None and opened is not None and (depth == 0 or wait is not None)
+    reasons = []
+    if known and merged < opened:
+        reasons.append("merge-deficit")
+    if known and wait is not None and wait >= MERGE_QUEUE_WAIT_BRAKE_MIN:
+        reasons.append("queue-wait")
+    prior = _obj(previous.get("throughputBrake")); active = bool(reasons); prior_since = _num(prior.get("since"))
+    since = (prior_since if active and prior.get("active") and prior_since is not None else now if active else None)
+    held = max(0, now - since) if since is not None else 0
+    return {"known": known, "active": active, "reasons": reasons, "since": since, "heldForS": held,
+            "intervalS": interval, "sustained": active and held >= interval,
+            "signal": {"queueDepth": depth, "queueWaitP50Minutes": wait, "mergedPerHour": merged,
+                       "openedPerHour": opened, "ejectionRate": ejections}}
 def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     reason = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason")
     github, gate = _int(obs.get("githubRemaining")), obs.get("gateWaitMedianS24h")
@@ -217,6 +239,8 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     disk, free = _obj(obs.get("disk")), _num(_obj(obs.get("disk")).get("freePct"))
     starts, rate = _int(_obj(obs.get("starts")).get(name)), _obj(obs.get("productiveRunRate")).get(name)
     pairs = (
+        (not _obj(obs.get("throughputBrake")).get("known"), "merge-throughput-unknown"),
+        (bool(_obj(obs.get("throughputBrake")).get("active")), "merge-throughput"),
         (reason in ("over-budget", "terminal-pr-backlog"), reason),
         (demand is None or demand <= 0, "unknown-demand" if demand is None else "zero-demand"),
         (name in set(obs.get("unhealthy") or []), "unhealthy"),
@@ -248,7 +272,8 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
     cpu = _int(sample.get("cpuCount")) or 1; cpu = cpu if cpu > 0 else 1; enabled = [base for base in bases.values() if _int(base) is not None and base > 0]
     base_sum, host_max = sum(enabled), config.get("hostMax")
     host_cap = max(min(host_max if isinstance(host_max, int) and host_max > 0 else 2 * base_sum, cpu), base_sum); fresh = bool(obs.get("doctorFresh"))
-    unknown = _budget_unknown(obs) if fresh else None; rows, pending = {}, []
+    unknown = _budget_unknown(obs) if fresh else None; brake = _throughput_brake(previous, obs, now, interval)
+    obs = {**obs, "throughputBrake": brake}; rows, pending = {}, []
     for order, (name, raw_base) in enumerate(bases.items()):
         base, prev = _int(raw_base) or 0, _obj(prev_lanes.get(name)); changed = _num(prev.get("lastChangeAt"))
         running = _int(_obj(obs.get("runningByProvider")).get(name))
@@ -262,15 +287,19 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
         effective, reason, blockers, want = current, "hold:steady", [], False; lane_ready = changed is None or now - changed >= interval
         host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
-        # JOV-7587: scale-up above the configured base is held until the merge-queue brake lands. Signals: merged/hour vs opened/hour, queue p50 wait, entries per merge.
         if multi:
             effective, reason, blockers, up, idle = max(MIN_SLOTS, math.ceil(current / 2)), multi, [multi], 0, 0
         elif additive:
             up = idle = 0
-            if host_ready and current > MIN_SLOTS:
+            floor = idle_floor(base) if additive == "merge-throughput" else MIN_SLOTS
+            ready = host_ready and (additive != "merge-throughput" or lane_ready)
+            if ready and current > floor:
                 effective, reason, blockers = current - 1, additive, [additive]
+            elif additive == "merge-throughput" and current <= floor:
+                reason, blockers = "hold:throughput-floor", ["throughput-floor"]
             else:
-                reason, blockers = "hold:host-cooldown", [additive, "host-cooldown"]
+                cooldown = "lane-cooldown" if additive == "merge-throughput" and not lane_ready else "host-cooldown"
+                reason, blockers = "hold:" + cooldown, [additive, cooldown]
         else:
             floor = idle_floor(base); idle_signal = demand == 0 and running is not None and running <= current - 2
             idle = min(need, idle + 1) if idle_signal else 0
@@ -312,8 +341,8 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             row.update(lastReason="hold:host-ceiling", blockers=["host-ceiling"])
     for name, row in rows.items():
         base = row["base"]
-        if base > 0 and row["effective"] > base:
-            token = unknown if fresh and unknown else "scale-up-held"
+        if base > 0 and row["effective"] > base and (unknown or not brake["known"]):
+            token = unknown if fresh and unknown else "merge-throughput-unknown"
             row.update(effective=base, lastReason="hold:" + token, blockers=[token], upStreak=0)
         before = _int(_obj(prev_lanes.get(name)).get("effective")); before = base if before is None else before
         if row["effective"] != before:
@@ -322,6 +351,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
     changed = host_last == now and any(row.get("lastChangeAt") == now for row in rows.values())
     return {"schema": SCHEMA, "mode": config.get("mode") or "apply", "observedAt": now,
             "host": {"lastChangeAt": host_last, "ceiling": host_cap, "cpuCount": cpu}, "lanes": rows, "hostSample": host_sample,
+            "throughputBrake": brake,
             "apiBudget": {"githubRemaining": _int(obs.get("githubRemaining")), "linearRemaining": _int(obs.get("linearRemaining")),
                           "linearLimit": _int(obs.get("linearLimit")), "linearRateLimitedAt": _num(obs.get("linearRateLimitedAt"))},
             "history": history[-HISTORY_CAP:], "_changed": bool(changed)}
@@ -356,4 +386,5 @@ def public_block(state_dir) -> dict:
     lanes = {name: {"base": row.get("base"), "effective": row.get("effective"), "reason": row.get("lastReason"),
                     "blockers": list(row.get("blockers") or [])} for name, row in state["lanes"].items() if isinstance(row, dict)}
     history = state.get("history") if isinstance(state.get("history"), list) else []
-    return {"mode": state.get("mode") or mode(), "lanes": lanes, "history": history[-10:]}
+    return {"mode": state.get("mode") or mode(), "lanes": lanes, "history": history[-10:],
+            "throughputBrake": _obj(state.get("throughputBrake"))}
