@@ -84,7 +84,13 @@ Same contract as `CLAUDE.md`: query gbrain before architectural decisions and fo
 
 If gbrain is unreachable, continue with repo tools and record `gbrain-unavailable`. Do not invent coordination state.
 
-Tools: MCP `gbrain__search` and `gbrain__recall`. CLI: `gbrain search` and `gbrain query`. After a durable decision, write a short gbrain page. ruflo agentdb is swarm-session memory; gbrain is long-term founder memory.
+Tools (MCP server `gbrain`):
+
+- `query`: any natural-language or multi-concept question. Hybrid vector plus keyword; LLM expansion is off in brain config, so it costs no model call.
+- `search`: exact tokens only (JOV ids, slugs, file names, 1-3 distinctive words). Over MCP it is keyword-only (`search.mcp_keyword_only`), so a long multi-concept string returns 0 results even when matching pages exist. Treat that as a wrong-tool miss and rerun with `query`.
+- `get_page` for a known slug, `recall` for saved facts, and `code_def` / `code_callers` / `code_refs` / `code_blast` for code symbols before grep.
+
+Calls take 2-15s against the remote database, so one good `query` beats several `search` calls. CLI fallback (`gbrain search`, `gbrain query`) needs a hard timeout. After a durable decision, write a short gbrain page. To add to a large page, write a new dated page and link it. Do not rewrite the whole page. ruflo agentdb is swarm-session memory; gbrain is long-term founder memory.
 
 ## Skill File Hygiene
 

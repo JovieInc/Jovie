@@ -50,6 +50,14 @@ export function isNavigationItemActive(
     return true;
   }
 
+  if (
+    item.id === 'audience' &&
+    (normalizedPathname === APP_ROUTES.INSIGHTS ||
+      normalizedPathname.startsWith(`${APP_ROUTES.INSIGHTS}/`))
+  ) {
+    return true;
+  }
+
   const target = new URL(item.href, 'https://jovie.local');
   const targetPathname = normalizePathname(target.pathname);
   if (

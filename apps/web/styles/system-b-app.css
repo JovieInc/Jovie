@@ -3421,6 +3421,21 @@
   color: var(--color-error);
 }
 
+/* Fade scrolled-away thread content under a floating header row instead of
+   hard-clipping at the panel edge (JOV-7192). */
+:where(.system-b-chat-thread-top-fade) {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent var(--space-6),
+    black var(--space-16)
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent var(--space-6),
+    black var(--space-16)
+  );
+}
+
 :where(.system-b-chat-prompt-rail-scroll) {
   width: 100%;
   overflow-x: auto;

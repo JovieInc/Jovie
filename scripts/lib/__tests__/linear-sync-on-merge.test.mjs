@@ -3,12 +3,22 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
-  decideLinearCloseOnMerge,
   extractMergeIssueRef,
+  lifecycleHolds,
   listOpenPullRequests,
+  parentHoldReason,
   pullRequestLinksIssue,
   syncLinearIssueOnMerge,
 } from '../linear-sync-on-merge.mjs';
+import {
+  createWorld,
+  HARNESS_MANIFEST,
+  intercept,
+  json,
+  MAIN,
+  REPO,
+  receiptComment,
+} from './fixtures/validation-world.mjs';
 
 const MERGE_URL = 'https://github.com/JovieInc/Jovie/pull/18275';
 const MERGE_SHA = 'eb6a0a68c92750dca7cd378732abf71c24c5558e';
@@ -69,139 +79,37 @@ const MERGING_FOUNDATION = {
   sha: MERGE_SHA,
 };
 
+const BASE_ENV = {
+  LINEAR_API_KEY: 'lin_test',
+  GITHUB_TOKEN: 'gh_test',
+  GITHUB_REPOSITORY: REPO,
+};
+
+function mergeEvent(fetchImpl, number, identifier = 'JOV-1', env = {}) {
+  return syncLinearIssueOnMerge({
+    env: {
+      ...BASE_ENV,
+      PR_NUMBER: String(number),
+      PR_BODY: `<!-- linear-issue-identifier:${identifier} -->`,
+      HEAD_REF: 'feature/no-ticket',
+      ...env,
+    },
+    fetchImpl,
+    harnessManifest: HARNESS_MANIFEST,
+    log: () => {},
+  });
+}
+
+function sweep(fetchImpl) {
+  return syncLinearIssueOnMerge({
+    env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+    fetchImpl,
+    harnessManifest: HARNESS_MANIFEST,
+    log: () => {},
+  });
+}
+
 describe('linear sync on merge', () => {
-  it.each([
-    [
-      {
-        title: 'Codex goal: increase verified shipping throughput',
-        description: '/goal Deliver six outcomes',
-      },
-      'skip',
-    ],
-    [{ title: 'Implementation repair', description: '' }, 'close'],
-    [
-      {
-        title: 'Implementation repair',
-        description: '',
-        children: { nodes: [{ id: 'child', identifier: 'JOV-7286' }] },
-      },
-      'skip',
-    ],
-    [
-      { title: 'Implementation repair', description: '', children: null },
-      'skip',
-    ],
-    [
-      {
-        title: 'Implementation repair',
-        description: '',
-        labels: { nodes: [null] },
-      },
-      'skip',
-    ],
-    [
-      {
-        title: 'Implementation repair',
-        description: '',
-        labels: { nodes: [{ name: null }] },
-      },
-      'skip',
-    ],
-  ])(
-    'reads canonical acceptance metadata before merge-sync mutation: %j',
-    async (metadata, action) => {
-      const calls = [];
-      const result = await syncLinearIssueOnMerge({
-        env: {
-          LINEAR_API_KEY: 'test',
-          GITHUB_TOKEN: 'test',
-          GITHUB_REPOSITORY: 'JovieInc/Jovie',
-          PR_NUMBER: '19587',
-          PR_URL: MERGE_URL,
-          HEAD_REF: 'codex/jov-7227-repair',
-          PR_BODY:
-            'Refs JOV-7227.\n\n<!-- linear-issue-id:uuid -->\n<!-- linear-issue-identifier:JOV-7227 -->',
-          MERGE_SHA,
-        },
-        log: () => {},
-        fetchImpl: async (url, init) => {
-          const body = JSON.parse(String(init?.body ?? '{}'));
-          calls.push(body.query ?? 'GitHub');
-          if (String(url).includes('api.github.com'))
-            return {
-              ok: true,
-              headers: { get: () => '' },
-              json: async () => [],
-            };
-          if (body.query.includes('IssueDoneState')) {
-            expect(body.query).toContain('title');
-            expect(body.query).toContain('description');
-            return {
-              ok: true,
-              json: async () => ({
-                data: {
-                  issue: {
-                    id: 'uuid',
-                    identifier: 'JOV-7227',
-                    labels: { nodes: [] },
-                    children: { nodes: [] },
-                    team: {
-                      states: {
-                        nodes: [
-                          { id: 'done', name: 'Done', type: 'completed' },
-                        ],
-                      },
-                    },
-                    ...metadata,
-                  },
-                },
-              }),
-            };
-          }
-          return {
-            ok: true,
-            json: async () => ({
-              data: {
-                issueUpdate: { success: true },
-                commentCreate: { success: true },
-              },
-            }),
-          };
-        },
-      });
-      expect(result.action).toBe(action);
-      expect(calls.some(query => query.includes('issueUpdate'))).toBe(
-        action === 'close'
-      );
-    }
-  );
-
-  it.each([
-    {
-      title: 'Codex goal: increase verified shipping throughput',
-      description:
-        '/goal Increase shipping\n## Done means\n1. Production verified\n2. Hyperagent canary',
-    },
-    {
-      title: 'Repair throughput',
-      description: '/goal Deliver multiple outcomes',
-    },
-    { title: 'Epic: Marketing Page Factory' },
-    { title: 'Commission Summer: operational readiness' },
-    { labels: ['type:epic'] },
-  ])(
-    'holds unlabeled goal and parent acceptance beyond a supporting merge: %j',
-    metadata => {
-      const result = decideLinearCloseOnMerge({
-        issue: { ...JOV_6586_ISSUE, identifier: 'JOV-7227', ...metadata },
-        pullRequests: [],
-        mergingPull: MERGING_FOUNDATION,
-      });
-      expect(result.action).toBe('skip');
-      expect(result.comment).toContain('stays open');
-    }
-  );
-
   it('reads the JOV-6586 branch the way the merge workflow did', () => {
     expect(
       extractMergeIssueRef({
@@ -264,558 +172,225 @@ describe('linear sync on merge', () => {
     ).toBe(false);
   });
 
-  it('keeps JOV-6586 open when the foundation merges and the final layer is still draft', () => {
-    const decision = decideLinearCloseOnMerge({
-      issue: JOV_6586_ISSUE,
+  it('holds JOV-6586 while later stack layers are open, ignoring the merging PR', () => {
+    const issue = JOV_6586_ISSUE;
+    const held = lifecycleHolds({
+      issue,
       pullRequests: JOV_6586_STACK,
-      mergingPull: MERGING_FOUNDATION,
+      mergingNumber: MERGING_FOUNDATION.number,
     });
-
-    expect(decision.action).toBe('skip');
-    expect(decision.blockingNumbers).toEqual([18277, 18286, 18293]);
-    expect(decision.comment).toContain(
-      `Did not mark JOV-6586 Done after ${MERGE_URL} merged`
-    );
-    expect(decision.comment).toContain('#18293 (draft)');
-    expect(decision.comment).not.toContain('PR merged for JOV-6586');
+    expect(held.blockingNumbers).toEqual([18277, 18286, 18293]);
+    expect(held.holds[0]).toContain('#18293 (draft)');
+    expect(
+      lifecycleHolds({
+        issue: { ...issue, labels: ['remediation:golden-path-nightly'] },
+        pullRequests: [],
+        scanComplete: false,
+      }).holds.join('\n')
+    ).toMatch(/stopped before the last page[\s\S]*while the check is red/);
   });
 
-  it('keeps JOV-6586 open when only the final draft layer is still open', () => {
-    const decision = decideLinearCloseOnMerge({
-      issue: JOV_6586_ISSUE,
-      pullRequests: [
-        JOV_6586_STACK[0],
-        { ...JOV_6586_STACK[1], state: 'closed', draft: false },
-        { ...JOV_6586_STACK[2], state: 'closed', draft: false },
-        JOV_6586_STACK[3],
-      ],
-      mergingPull: MERGING_FOUNDATION,
-    });
-
-    expect(decision.action).toBe('skip');
-    expect(decision.blockingNumbers).toEqual([18293]);
+  it('keeps commissioning parents as outcome acceptance, not a merge hold', () => {
+    expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-5853')).toBe(true);
+    expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-6004')).toBe(true);
+    expect(parentHoldReason({ identifier: 'JOV-5853' })).toContain('allowlist');
+    expect(
+      parentHoldReason(
+        { identifier: 'JOV-7000', labels: ['commissioning'] },
+        new Set()
+      )
+    ).toContain('label commissioning');
   });
 
-  it('marks JOV-6586 Done only after every linked pull request has merged', () => {
-    const decision = decideLinearCloseOnMerge({
-      issue: JOV_6586_ISSUE,
-      pullRequests: JOV_6586_STACK.map(pull => ({
-        ...pull,
-        state: 'closed',
-        draft: false,
-      })),
-      mergingPull: {
-        number: 18293,
-        url: 'https://github.com/JovieInc/Jovie/pull/18293',
-        sha: 'terminal-sha',
-      },
+  it('moves a merge to Merging, then Done after the deploy sweep', async () => {
+    const { world, fetchImpl } = createWorld({ served: MAIN[0].slice(0, 7) });
+    expect((await mergeEvent(fetchImpl, 101)).action).toBe('moved');
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+    world.served = MAIN[2].slice(0, 7);
+    let pages = 0;
+    const paged = intercept(fetchImpl, async (_url, body, next) => {
+      if (!body?.query?.includes('LifecycleSweep')) return null;
+      pages += 1;
+      if (pages > 1) return next();
+      return json({
+        data: {
+          issues: {
+            nodes: [],
+            pageInfo: { hasNextPage: true, endCursor: 'p1' },
+          },
+        },
+      });
     });
-
-    expect(decision.action).toBe('close');
-    expect(decision.comment).toBe(
-      'PR merged for JOV-6586: https://github.com/JovieInc/Jovie/pull/18293 (merge SHA: terminal-sha)'
-    );
-  });
-
-  it('does not auto-close a remediation issue while the check is red', () => {
-    const issue = {
-      id: 'issue-red',
-      identifier: 'JOV-7206',
-      labels: ['remediation:golden-path-nightly'],
-      children: [],
-      hasChildren: false,
-    };
-    const mergingPull = {
-      number: 1,
-      url: 'https://github.com/JovieInc/Jovie/pull/1',
-      sha: 'abc',
-    };
-    const red = decideLinearCloseOnMerge({
-      issue,
-      pullRequests: [],
-      mergingPull,
-    });
-    expect(red.action).toBe('skip');
-    expect(red.comment).toContain('while the check is red');
-    const green = decideLinearCloseOnMerge({
-      issue,
-      pullRequests: [],
-      mergingPull,
-      checkGreen: true,
-    });
-    expect(green.action).toBe('close');
-  });
-
-  it('moves an escaped defect to Validating for exact-build product and detector proof', () => {
-    const decision = decideLinearCloseOnMerge({
-      issue: {
-        id: 'issue-7200',
-        identifier: 'JOV-7200',
-        labels: ['escaped-defect'],
-        description: 'The product fix merged, but no deployment proof exists.',
-        comments: [],
-        children: [],
-        hasChildren: false,
-      },
-      pullRequests: [],
-      mergingPull: {
-        number: 19000,
-        url: 'https://github.com/JovieInc/Jovie/pull/19000',
-        sha: 'merged-is-not-deployed',
-      },
-    });
-
-    expect(decision.action).toBe('validate');
-    expect(decision.blockingNumbers).toEqual([]);
-    expect(decision.comment).toContain('Moved JOV-7200 to Validating');
-    expect(decision.comment).toContain('Escaped defects stay open at merge');
-    expect(decision.comment).toContain('Closure evidence is incomplete');
-    expect(decision.comment).toContain('escaped-defect-closure:v1');
+    await sweep(paged);
+    expect(pages).toBe(2);
+    expect(world.updates).toEqual(['JOV-1:Merging', 'JOV-1:Done']);
   });
 
   it('moves the real escaped-defect merge path to Validating and never Done', async () => {
-    const calls = [];
-    const result = await syncLinearIssueOnMerge({
-      env: {
-        LINEAR_API_KEY: 'lin_test',
-        GITHUB_TOKEN: 'gh_test',
-        GITHUB_REPOSITORY: 'JovieInc/Jovie',
-        PR_NUMBER: '19546',
-        PR_URL: 'https://github.com/JovieInc/Jovie/pull/19546',
-        PR_BODY:
-          '<!-- linear-issue-id:issue-7207 -->\n<!-- linear-issue-identifier:JOV-7207 -->',
-        HEAD_REF: 'codex/jov-7207-sidebar-repair',
-        MERGE_SHA,
-      },
-      log: () => {},
-      fetchImpl: async (url, init) => {
-        const body = JSON.parse(String(init?.body ?? '{}'));
-        calls.push({
-          query: body.query ?? 'GitHub',
-          variables: body.variables,
-        });
-        if (String(url).includes('api.github.com')) {
-          return {
-            ok: true,
-            headers: { get: () => '' },
-            json: async () => [],
-          };
-        }
-        if (body.query.includes('IssueDoneState')) {
-          return {
-            ok: true,
-            json: async () => ({
-              data: {
-                issue: {
-                  id: 'issue-7207',
-                  identifier: 'JOV-7207',
-                  title: 'Sidebar works only in one state',
-                  description: 'The product repair merged.',
-                  labels: { nodes: [{ name: 'escaped-defect' }] },
-                  comments: { nodes: [] },
-                  children: { nodes: [] },
-                  team: {
-                    states: {
-                      nodes: [
-                        {
-                          id: 'validating-id',
-                          name: 'Validating',
-                          type: 'started',
-                        },
-                        { id: 'done-id', name: 'Done', type: 'completed' },
-                      ],
-                    },
-                  },
-                },
-              },
-            }),
-          };
-        }
-        return {
-          ok: true,
-          json: async () => ({
-            data: {
-              issueUpdate: { success: true },
-              commentCreate: { success: true },
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].labels = ['escaped-defect'];
+    await mergeEvent(fetchImpl, 101);
+    await sweep(fetchImpl);
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    expect(world.updates).toEqual(['JOV-1:Validating']);
+    expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+      'escaped-defect-dual-closure'
+    );
+  });
+
+  it('reads every comment page, bounded, so the latest receipt wins', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].description = 'validation-required: outcome';
+    world.issues['JOV-1'].comments.push(
+      receiptComment('JOV-1', { status: 'fail' }, '2026-10-03T11:00:00Z'),
+      receiptComment('JOV-1', {}, '2026-10-03T11:30:00Z')
+    );
+    const page = (nodes, hasNextPage) => ({
+      nodes,
+      pageInfo: { hasNextPage, endCursor: 'c' },
+    });
+    const paged = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycleComments')) {
+        return json({
+          data: {
+            issue: {
+              comments: page(world.issues['JOV-1'].comments.slice(1), false),
             },
-          }),
-        };
-      },
-    });
-
-    expect(result.action).toBe('validate');
-    const update = calls.find(call =>
-      String(call.query).includes('SetIssueValidating')
-    );
-    expect(update?.variables).toEqual({
-      issueId: 'issue-7207',
-      stateId: 'validating-id',
-    });
-    expect(
-      calls.some(call => String(call.query).includes('SetIssueDone'))
-    ).toBe(false);
-  });
-
-  it('does not close commissioning parent JOV-5853 when a child pull request merges', () => {
-    expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-5853')).toBe(true);
-    const decision = decideLinearCloseOnMerge({
-      issue: {
-        id: 'issue-5853',
-        identifier: 'JOV-5853',
-        labels: [],
-        children: [],
-        hasChildren: false,
-      },
-      pullRequests: [
-        {
-          number: 18010,
-          title: 'fix(symphony): retain execution delivery',
-          body: '',
-          state: 'closed',
-          draft: false,
-          headRef: 'codex/jov-5853-execution-journal',
-        },
-      ],
-      mergingPull: {
-        number: 18010,
-        url: 'https://github.com/JovieInc/Jovie/pull/18010',
-        sha: 'parent-child-sha',
-      },
-    });
-
-    expect(decision.action).toBe('skip');
-    expect(decision.blockingNumbers).toEqual([]);
-    expect(decision.comment).toContain(
-      'JOV-5853 is a commissioning or parent issue'
-    );
-    expect(decision.comment).toContain('allowlist');
-    expect(decision.comment).toContain('Did not mark JOV-5853 Done');
-  });
-
-  it('does not close proof-gated liveness owner JOV-6004 from a merge', () => {
-    expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-6004')).toBe(true);
-    const decision = decideLinearCloseOnMerge({
-      issue: {
-        id: 'issue-6004',
-        identifier: 'JOV-6004',
-        labels: [],
-        children: [],
-        hasChildren: false,
-      },
-      pullRequests: [],
-      mergingPull: {
-        number: 19317,
-        url: 'https://github.com/JovieInc/Jovie/pull/19317',
-        sha: 'merged-but-not-runtime-proven',
-      },
-    });
-
-    expect(decision.action).toBe('skip');
-    expect(decision.blockingNumbers).toEqual([]);
-    expect(decision.comment).toContain(
-      'JOV-6004 is a commissioning or parent issue'
-    );
-    expect(decision.comment).toContain('allowlist');
-    expect(decision.comment).toContain('Did not mark JOV-6004 Done');
-  });
-
-  it('holds a parent by commissioning label or sub-issues without the allowlist', () => {
-    const labeled = decideLinearCloseOnMerge({
-      issue: {
-        id: 'issue-parent',
-        identifier: 'JOV-7000',
-        labels: ['commissioning'],
-        children: [],
-        hasChildren: false,
-      },
-      pullRequests: [],
-      mergingPull: MERGING_FOUNDATION,
-      allowlist: new Set(),
-    });
-    const withChildren = decideLinearCloseOnMerge({
-      issue: {
-        id: 'issue-parent',
-        identifier: 'JOV-7001',
-        labels: [],
-        children: ['JOV-6586'],
-        hasChildren: true,
-      },
-      pullRequests: [],
-      mergingPull: MERGING_FOUNDATION,
-      allowlist: new Set(),
-    });
-
-    expect(labeled.action).toBe('skip');
-    expect(labeled.comment).toContain('label commissioning');
-    expect(withChildren.action).toBe('skip');
-    expect(withChildren.comment).toContain('sub-issues JOV-6586');
-  });
-
-  it('ignores the merging pull request if the open list is stale', () => {
-    const decision = decideLinearCloseOnMerge({
-      issue: {
-        id: 'issue-1',
-        identifier: 'JOV-100',
-        labels: [],
-        children: [],
-      },
-      pullRequests: [
-        {
-          number: 5,
-          title: 'JOV-100',
-          body: '',
-          state: 'open',
-          draft: false,
-          headRef: 'codex/jov-100-fix',
-        },
-      ],
-      mergingPull: {
-        number: 5,
-        url: 'https://github.com/JovieInc/Jovie/pull/5',
-        sha: 'abc',
-      },
-    });
-
-    expect(decision.action).toBe('close');
-  });
-
-  it('posts the hold comment and does not transition JOV-6586 while #18293 is draft', async () => {
-    const calls = [];
-    const result = await syncLinearIssueOnMerge({
-      env: {
-        LINEAR_API_KEY: 'lin_test',
-        GITHUB_TOKEN: 'gh_test',
-        GITHUB_REPOSITORY: 'JovieInc/Jovie',
-        PR_NUMBER: '18275',
-        PR_URL: MERGE_URL,
-        PR_BODY: 'No marker, branch carries the issue.',
-        HEAD_REF: 'codex/jov-6586-shipping-lead-consumer',
-        MERGE_SHA,
-      },
-      log: () => {},
-      fetchImpl: async (url, init) => {
-        const body = String(init?.body ?? '');
-        calls.push({ url: String(url), body });
-        if (
-          String(url).includes('api.linear.app') &&
-          body.includes('IssueDoneState')
-        ) {
-          return {
-            ok: true,
-            json: async () => ({
-              data: {
-                issue: {
-                  id: 'uuid-6586',
-                  identifier: 'JOV-6586',
-                  title: 'Implementation repair',
-                  description: '',
-                  labels: { nodes: [] },
-                  children: { nodes: [] },
-                  team: {
-                    states: {
-                      nodes: [
-                        { id: 'done-state', name: 'Done', type: 'completed' },
-                      ],
-                    },
-                  },
-                },
-              },
-            }),
-          };
-        }
-        if (String(url).includes('api.github.com')) {
-          return {
-            ok: true,
-            headers: { get: () => '' },
-            json: async () =>
-              JOV_6586_STACK.filter(pull => pull.state === 'open').map(
-                pull => ({
-                  number: pull.number,
-                  title: pull.title,
-                  body: pull.body,
-                  state: pull.state,
-                  draft: pull.draft,
-                  head: { ref: pull.headRef },
-                })
-              ),
-          };
-        }
-        return {
-          ok: true,
-          json: async () => ({ data: { commentCreate: { success: true } } }),
-        };
-      },
-    });
-
-    expect(result.action).toBe('skip');
-    expect(result.identifier).toBe('JOV-6586');
-    expect(result.comment).toContain('#18293 (draft)');
-    expect(calls.some(call => call.body.includes('issueUpdate'))).toBe(false);
-    expect(calls.some(call => call.body.includes('commentCreate'))).toBe(true);
-    expect(calls.some(call => call.body.includes('#18293 (draft)'))).toBe(true);
-  });
-
-  it('does not transition commissioning parent JOV-5853', async () => {
-    const calls = [];
-    const result = await syncLinearIssueOnMerge({
-      env: {
-        LINEAR_API_KEY: 'lin_test',
-        GITHUB_TOKEN: 'gh_test',
-        GITHUB_REPOSITORY: 'JovieInc/Jovie',
-        PR_NUMBER: '18010',
-        PR_URL: 'https://github.com/JovieInc/Jovie/pull/18010',
-        PR_BODY: '',
-        HEAD_REF: 'codex/jov-5853-execution-journal',
-        MERGE_SHA: 'parent-child-sha',
-      },
-      log: () => {},
-      fetchImpl: async (url, init) => {
-        const body = String(init?.body ?? '');
-        calls.push(body);
-        if (
-          String(url).includes('api.linear.app') &&
-          body.includes('IssueDoneState')
-        ) {
-          return {
-            ok: true,
-            json: async () => ({
-              data: {
-                issue: {
-                  id: 'uuid-5853',
-                  identifier: 'JOV-5853',
-                  title: 'Commission Summer',
-                  description: '',
-                  labels: { nodes: [{ name: 'commissioning' }] },
-                  children: { nodes: [{ identifier: 'JOV-6586' }] },
-                  team: {
-                    states: {
-                      nodes: [
-                        { id: 'done-state', name: 'Done', type: 'completed' },
-                      ],
-                    },
-                  },
-                },
-              },
-            }),
-          };
-        }
-        if (String(url).includes('api.github.com')) {
-          return {
-            ok: true,
-            headers: { get: () => '' },
-            json: async () => [],
-          };
-        }
-        return {
-          ok: true,
-          json: async () => ({ data: { commentCreate: { success: true } } }),
-        };
-      },
-    });
-
-    expect(result.action).toBe('skip');
-    expect(result.comment).toContain('allowlist');
-    expect(result.comment).toContain('label commissioning');
-    expect(result.comment).toContain('sub-issues JOV-6586');
-    expect(calls.some(body => body.includes('issueUpdate'))).toBe(false);
-  });
-
-  it('follows GitHub pagination and holds when the scan is incomplete', async () => {
-    const pages = [];
-    const listed = await listOpenPullRequests({
-      token: 'gh_test',
-      repository: 'JovieInc/Jovie',
-      maxPages: 1,
-      fetchImpl: async url => {
-        pages.push(String(url));
-        return {
-          ok: true,
-          headers: {
-            get: () =>
-              '<https://api.github.com/repos/JovieInc/Jovie/pulls?page=2>; rel="next"',
           },
-          json: async () => [
-            {
-              number: 18293,
-              title: 'final (JOV-6586)',
-              body: '',
-              state: 'open',
-              draft: true,
-              head: { ref: 'codex/jov-6586-shipping-terminal' },
-            },
-          ],
-        };
-      },
+        });
+      }
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      const response = await (await next()).json();
+      response.data.issue.comments = page(
+        response.data.issue.comments.nodes.slice(0, 1),
+        true
+      );
+      return json(response);
     });
-    expect(pages).toHaveLength(1);
-    expect(listed.complete).toBe(false);
-    expect(listed.pulls[0].draft).toBe(true);
+    await mergeEvent(paged, 101);
+    expect(world.issues['JOV-1'].state).toBe('Done');
 
-    const decision = decideLinearCloseOnMerge({
-      issue: JOV_6586_ISSUE,
-      pullRequests: [],
-      mergingPull: MERGING_FOUNDATION,
-      scanComplete: false,
-    });
-    expect(decision.action).toBe('skip');
-    expect(decision.comment).toContain('stopped before the last page');
+    world.issues['JOV-1'].state = 'Validating';
+    const endless = intercept(paged, async (_url, body) =>
+      body?.query?.includes('IssueLifecycleComments')
+        ? json({ data: { issue: { comments: page([], true) } } })
+        : null
+    );
+    await expect(mergeEvent(endless, 101)).rejects.toThrow(
+      /exceeds the read bound/
+    );
+  });
+
+  it('holds a parent with open sub-issues and a reopened issue needs an outcome', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].children = [['JOV-2', 'started']];
+    expect((await mergeEvent(fetchImpl, 101)).action).toBe('hold');
+    world.issues['JOV-1'].children = [['JOV-2', 'completed']];
+    world.issues['JOV-1'].history = [
+      { fromState: { type: 'completed' }, toState: { type: 'started' } },
+    ];
+    await mergeEvent(fetchImpl, 101);
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+  });
+
+  it('isolates a failing issue in the sweep and still evaluates the rest', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      attachments: [`https://github.com/${REPO}/pull/999`],
+    };
+    await expect(sweep(fetchImpl)).rejects.toThrow(/JOV-2: GitHub HTTP 404/);
+    expect(world.issues['JOV-1'].state).toBe('Done');
   });
 
   it('comments and fails closed when the open pull request scan errors', async () => {
-    await expect(
-      syncLinearIssueOnMerge({
-        env: {
-          LINEAR_API_KEY: 'lin_test',
-          GITHUB_TOKEN: 'gh_test',
-          GITHUB_REPOSITORY: 'JovieInc/Jovie',
-          PR_NUMBER: '18275',
-          PR_URL: MERGE_URL,
-          PR_BODY: '',
-          HEAD_REF: 'codex/jov-6586-shipping-lead-consumer',
-          MERGE_SHA,
-        },
-        log: () => {},
-        fetchImpl: async (url, init) => {
-          const body = String(init?.body ?? '');
-          if (String(url).includes('api.github.com')) {
-            return { ok: false, status: 503, json: async () => ({}) };
-          }
-          if (body.includes('IssueDoneState')) {
-            return {
-              ok: true,
-              json: async () => ({
-                data: {
-                  issue: {
-                    id: 'uuid-6586',
-                    identifier: 'JOV-6586',
-                    title: 'Implementation repair',
-                    description: '',
-                    labels: { nodes: [] },
-                    children: { nodes: [] },
-                    team: {
-                      states: {
-                        nodes: [
-                          { id: 'done-state', name: 'Done', type: 'completed' },
-                        ],
-                      },
-                    },
-                  },
-                },
-              }),
-            };
-          }
-          expect(body.includes('issueUpdate')).toBe(false);
-          expect(body).toContain('stopped before the last page');
-          return {
-            ok: true,
-            json: async () => ({ data: { commentCreate: { success: true } } }),
-          };
-        },
-      })
-    ).rejects.toThrow(/open pull request scan failed/);
+    const { world, fetchImpl } = createWorld();
+    const failing = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=open')
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : null
+    );
+    await expect(mergeEvent(failing, 101)).rejects.toThrow(
+      /open pull request scan failed/
+    );
+    expect(world.updates).toEqual([]);
+    expect(world.issues['JOV-1'].comments[0].body).toContain(
+      'stopped before the last page'
+    );
   });
 
-  it('delegates the workflow close to the script', () => {
+  it('surfaces Linear HTTP and GraphQL errors, and skips unknown issues', async () => {
+    for (const [response, error] of [
+      [{ ok: false, status: 500, json: async () => ({}) }, /Linear HTTP 500/],
+      [
+        json({ errors: [{ message: 'rate limited' }, 'x'] }),
+        /rate limited; Linear request failed/,
+      ],
+    ]) {
+      const { fetchImpl } = createWorld();
+      const failing = intercept(fetchImpl, async (_url, body) =>
+        body?.query?.includes('IssueLifecycle(') ? response : null
+      );
+      await expect(mergeEvent(failing, 101)).rejects.toThrow(error);
+    }
+    const { fetchImpl } = createWorld();
+    expect((await mergeEvent(fetchImpl, 101, 'JOV-404')).action).toBe('skip');
+  });
+
+  it('skips without a marker or Linear key and requires GitHub credentials', async () => {
+    const { fetchImpl } = createWorld();
+    const run = env =>
+      syncLinearIssueOnMerge({ env, fetchImpl, log: () => {} });
+    expect(
+      (await run({ ...BASE_ENV, PR_BODY: '', HEAD_REF: 'x' })).action
+    ).toBe('skip');
+    const marker = { PR_BODY: '<!-- linear-issue-identifier:JOV-1 -->' };
+    expect((await run(marker)).action).toBe('skip');
+    await expect(run({ ...marker, LINEAR_API_KEY: 'k' })).rejects.toThrow(
+      /GITHUB_TOKEN are required/
+    );
+  });
+
+  it('loads the harness manifest from the workspace; a missing one is unknown risk', async () => {
+    for (const [workspace, expected] of [
+      [resolve(import.meta.dirname, '../../..'), 'Done'],
+      ['/nonexistent-workspace', 'Validating'],
+    ]) {
+      const { world, fetchImpl } = createWorld();
+      await syncLinearIssueOnMerge({
+        env: {
+          ...BASE_ENV,
+          GITHUB_WORKSPACE: workspace,
+          LIFECYCLE_DRY_RUN: '',
+          PR_NUMBER: '101',
+          PR_BODY: '<!-- linear-issue-identifier:JOV-1 -->',
+        },
+        fetchImpl,
+        log: () => {},
+      });
+      expect(world.issues['JOV-1'].state).toBe(expected);
+    }
+  });
+
+  it('follows GitHub pagination and reports an incomplete scan', async () => {
+    const listed = await listOpenPullRequests({
+      token: 'gh_test',
+      repository: REPO,
+      maxPages: 1,
+      fetchImpl: async () => ({
+        ok: true,
+        headers: { get: () => '<https://api.github.com/x?page=2>; rel="next"' },
+        json: async () => [{ number: 18293, state: 'open', draft: true }],
+      }),
+    });
+    expect(listed.complete).toBe(false);
+    expect(listed.pulls[0].draft).toBe(true);
+  });
+
+  it('delegates every lifecycle event to the script with its dependencies', () => {
     const workflow = readFileSync(
       resolve(
         import.meta.dirname,
@@ -824,20 +399,26 @@ describe('linear sync on merge', () => {
       'utf8'
     );
     expect(workflow).toContain('node scripts/lib/linear-sync-on-merge.mjs');
-    expect(workflow).toContain('sync_done:');
     expect(workflow).toContain('runs-on: ubuntu-latest');
     expect(workflow).not.toContain('issueUpdate');
-
-    const script = readFileSync(
-      resolve(import.meta.dirname, '../linear-sync-on-merge.mjs'),
-      'utf8'
+    for (const trigger of [
+      'pull_request:',
+      'workflow_run:',
+      'schedule:',
+      'workflow_dispatch:',
+      'Production Controller',
+      'actions: read',
+      '.github/ci-harness/manifest.json',
+    ]) {
+      expect(workflow).toContain(trigger);
+    }
+    const modules = ['linear-sync-on-merge.mjs', 'validation-sync.mjs'].map(
+      name => readFileSync(resolve(import.meta.dirname, '..', name), 'utf8')
     );
-    const localImports = [
-      ...script.matchAll(/from '\.\/([a-z0-9-]+\.mjs)'/g),
-    ].map(match => `scripts/lib/${match[1]}`);
-    expect(localImports.length).toBeGreaterThan(0);
-    for (const dependency of localImports) {
-      expect(workflow).toContain(dependency);
+    for (const script of modules) {
+      for (const match of script.matchAll(/from '\.\/([a-z0-9-]+\.mjs)'/g)) {
+        expect(workflow).toContain(`scripts/lib/${match[1]}`);
+      }
     }
   });
 });
