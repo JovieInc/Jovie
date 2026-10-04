@@ -1,0 +1,20 @@
+Implemented and published as draft PR [#19834](https://github.com/JovieInc/Jovie/pull/19834), exact head `6b35c2f8ef`.
+
+Changes include:
+
+- 3-second bounded reads within the 6s poll / 10s budget.
+- Local stale transition at the freshness deadline.
+- Replay, duplicate, gap, contradiction, unsupported-schema, partial, cache-expiry, and clock-uncertainty visibility.
+- Flat last-success retention without stale-over-fresh or sequence regression.
+- Normal, cold-relaunch, timeout, auth-failure, and background/resume regression coverage.
+- No actuation or legacy dispatch path.
+
+Verification:
+
+- 155 shipping-state boundary tests passed.
+- Focused coverage: 91.36% statements, 81.49% branches, 100% functions, 94.95% lines.
+- Monorepo and test typechecks passed.
+- Biome, ESLint, staged accessibility, desktop door, and desktop shell contracts passed.
+- Hosted Source Validation, exact-head coverage, security, visual capture, size, documentation, and story checks are green.
+
+The PR remains draft as required—no merge-queue entry or merge. Live Ubuntu latency samples, packaged Mac dogfood, deployment identity, recurrence, and independent verification remain acceptance evidence tracked by JOV-5249; none are claimed from source tests. GBrain and local CodeRabbit were unavailable, as recorded in the PR.
