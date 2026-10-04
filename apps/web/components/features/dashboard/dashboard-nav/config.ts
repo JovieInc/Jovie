@@ -23,6 +23,7 @@ import {
 
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
+import type { AppFlagName } from '@/lib/flags/contracts';
 
 import { CUSTOMER_NAV_CAPACITY, partitionCustomerNavigation } from './capacity';
 import type { NavItem } from './types';
@@ -80,7 +81,7 @@ export const contactsNavItem: NavItem = {
   icon: IdCard,
   iconName: 'IdCard',
   tier: 'core',
-  description: 'Manage artist contacts',
+  description: 'Manage contacts',
 };
 
 export const presenceNavItem: NavItem = {
@@ -91,7 +92,17 @@ export const presenceNavItem: NavItem = {
   iconName: 'User',
   tier: 'core',
   description: PRODUCT_ONTOLOGY.identity.definition,
+  requiredFlag: 'PROFILES_WORKSPACE',
 };
+
+/** Drop destinations whose required flag is off. Missing values stay hidden. */
+export function navigationVisibleForFlags<
+  T extends { requiredFlag?: AppFlagName },
+>(items: readonly T[], flags: Partial<Record<AppFlagName, boolean>>): T[] {
+  return items.filter(
+    item => !item.requiredFlag || flags[item.requiredFlag] === true
+  );
+}
 
 export const linksNavItem: NavItem = {
   name: 'Links',

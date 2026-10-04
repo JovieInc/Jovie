@@ -18,6 +18,7 @@ const mockLt = vi.hoisted(() => vi.fn(() => 'lt-clause'));
 const mockNe = vi.hoisted(() => vi.fn(() => 'ne-clause'));
 const mockOr = vi.hoisted(() => vi.fn(() => 'or-clause'));
 const mockSql = vi.hoisted(() => vi.fn(() => 'sql-clause'));
+const mockReadOutboundLedger = vi.hoisted(() => vi.fn());
 
 const {
   mockDb,
@@ -168,7 +169,61 @@ vi.mock('@/lib/error-tracking', () => ({
   getSafeErrorMessage: () => 'safe-error',
 }));
 
+vi.mock('@/lib/outbound/ledger.server', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/outbound/ledger.server')>()),
+  readOutboundLedger: mockReadOutboundLedger,
+}));
+
 import { GET, POST } from '@/app/api/admin/outreach/route';
+import {
+  draftOutboundCopy,
+  outboundCopyEvidenceKey,
+  outboundCopyRevision,
+  outboundTargetEvidenceKey,
+  outboundTargetRevision,
+} from '@/lib/outbound/approval';
+import { outboundTargetFromLead } from '@/lib/outbound/ledger.server';
+
+/** Tim's approval of a claimed lead and its default email copy. */
+function approvedLedger(lead: {
+  id: string;
+  linktreeHandle: string;
+  displayName: string;
+  contactEmail: string;
+  claimToken: string;
+}) {
+  const target = outboundTargetFromLead(lead as never);
+  const targetRevision = outboundTargetRevision(target);
+  const copy = draftOutboundCopy({
+    channel: 'email',
+    displayName: target.displayName,
+    claimUrl: target.claimUrl ?? '',
+    dmCopy: null,
+  });
+  return new Map([
+    [
+      lead.id,
+      [
+        {
+          evidenceKey: outboundTargetEvidenceKey(lead.id),
+          evidenceRevision: targetRevision,
+          decision: 'yes',
+          snapshot: {},
+          actorUserId: 'tim',
+          createdAt: new Date('2026-10-04T00:00:00Z'),
+        },
+        {
+          evidenceKey: outboundCopyEvidenceKey(lead.id),
+          evidenceRevision: outboundCopyRevision(targetRevision, copy),
+          decision: 'yes',
+          snapshot: { targetRevision, ...copy },
+          actorUserId: 'tim',
+          createdAt: new Date('2026-10-04T00:01:00Z'),
+        },
+      ],
+    ],
+  ]);
+}
 
 describe('GET /api/admin/outreach', () => {
   beforeEach(() => {
@@ -193,6 +248,8 @@ describe('GET /api/admin/outreach', () => {
       verdict: 'ELIGIBLE',
       firstBlocker: null,
     });
+    mockReadOutboundLedger.mockReset();
+    mockReadOutboundLedger.mockResolvedValue(new Map());
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: true,
@@ -338,6 +395,15 @@ describe('GET /api/admin/outreach', () => {
       }));
 
     mockPushLeadToInstantly.mockResolvedValue('instantly-123');
+    mockReadOutboundLedger.mockResolvedValue(
+      approvedLedger({
+        id: 'lead-1',
+        linktreeHandle: 'artist',
+        displayName: 'Artist',
+        contactEmail: 'artist@example.com',
+        claimToken: 'claim-token',
+      })
+    );
 
     const response = await POST(
       new Request('http://localhost/api/admin/outreach', {
@@ -364,6 +430,7 @@ describe('GET /api/admin/outreach', () => {
       queued: 1,
       failed: 0,
       dismissed: 0,
+      unapproved: 0,
       remainingPending: 0,
     });
   });
@@ -434,6 +501,7 @@ describe('GET /api/admin/outreach', () => {
       queued: 0,
       failed: 0,
       dismissed: 0,
+      unapproved: 0,
       remainingPending: 1,
     });
   });
