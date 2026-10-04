@@ -1,0 +1,11 @@
+STATUS: BLOCKED
+
+The failure is unrelated infrastructure, so the contract requires no branch changes or push.
+
+- [Auto-merge run](https://github.com/JovieInc/Jovie/actions/runs/37196978556) failed because the Jovie Bot installation exceeded its GraphQL API rate limit.
+- The “failure hold” text was printed workflow source, not the executed failure.
+- SHA `9ce41f2a` has no `jovie-queue-failure-hold/v1` status.
+- PR #20596 remains open, mergeable, and outside the merge queue.
+- Worktree is clean and matches `origin/fix/pen-par-xargs-long-lines`.
+
+NOT-SHIPPABLE: The only failing required check is an external GitHub App GraphQL rate-limit failure, not a defect in PR #20596.
