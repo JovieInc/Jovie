@@ -56,6 +56,25 @@ describe('getCanonicalProfileDSPs', () => {
     expect(result.map(d => d.key)).toContain('spotify');
   });
 
+  it('keeps social links for non-DSP platforms as generic platform links', () => {
+    // S-05/M-04: the link model is generic platform links (URL + label);
+    // platforms outside the DSP registry must not be dropped.
+    const result = getCanonicalProfileDSPs({}, [
+      { platform: 'discord', url: 'https://discord.gg/abc' },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Discord');
+    expect(result[0].url).toBe('https://discord.gg/abc');
+    expect(result[0].platformKey).toBeNull();
+  });
+
+  it('still drops social links with invalid URLs on non-DSP platforms', () => {
+    const result = getCanonicalProfileDSPs({}, [
+      { platform: 'discord', url: 'not-a-url' },
+    ]);
+    expect(result).toHaveLength(0);
+  });
+
   it('returns empty array when all URLs are invalid', () => {
     const result = getCanonicalProfileDSPs({
       spotify_url: 'not-valid',
