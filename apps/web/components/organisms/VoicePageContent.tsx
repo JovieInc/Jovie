@@ -54,7 +54,8 @@ export function VoicePageContent() {
         }}
         headingId='voice-hero-heading'
         titleTestId='voice-hero-title'
-        // JOV-7772: the two-sentence headline fits two lines at 32/48px.
+        // JOV-7772: lg splits the hero into two columns, so use 40px in its
+        // narrower text column; xl restores 48px as the column widens.
         titleClassName='text-3xl md:text-5xl lg:text-4xl xl:text-5xl'
         sectionTestId='voice-hero-section'
         primaryCtaLabel='Start voice cloning'
