@@ -172,6 +172,8 @@ describe('factory:run --dry end to end', () => {
 });
 
 const REJECTION = 'mobile@390: the subhead line breaks strand one word';
+/** The finding as the harness hands it back: tagged with its dimension. */
+const TAGGED = `[copy] ${REJECTION}`;
 const dryCopy = brief.dry?.copy as { slots: { slot: string; text: string }[] };
 
 /**
@@ -181,6 +183,7 @@ const dryCopy = brief.dry?.copy as { slots: { slot: string; text: string }[] };
 function reworkProviders(input: {
   readonly copyHearsFindings: boolean;
   readonly judgeRejects: (review: number) => boolean;
+  readonly finding?: string;
 }) {
   const reviewed: string[][] = [];
   const providers = dryProviders(brief, {
@@ -189,7 +192,7 @@ function reworkProviders(input: {
         return { status: 'ok', value: brief.dry?.[request.stage] };
       }
       const shorten =
-        input.copyHearsFindings && request.feedback.includes(REJECTION);
+        input.copyHearsFindings && request.feedback.includes(TAGGED);
       const slots = dryCopy.slots.map(slot =>
         shorten && slot.slot === 'subhead'
           ? {
@@ -236,7 +239,7 @@ function reworkProviders(input: {
         judgeModel: 'fixture:google/gemini-3-pro',
         verdict: reject ? 'fail' : 'pass',
         score: reject ? 0.3 : 0.9,
-        findings: reject ? [REJECTION] : [],
+        findings: reject ? [input.finding ?? REJECTION] : [],
         judges: [],
       };
     },
@@ -391,12 +394,12 @@ describe('factory:run visual rework', () => {
         rejectedAt: 'adversarial-trust',
         reworkFrom: 'copy',
         rejectedRenderDigest: expect.stringMatching(/^sha256:/),
-        findings: [REJECTION],
+        findings: [TAGGED],
       },
     ]);
     // The owning stage reran with the judge's findings as its feedback.
     expect(record('05-copy.rework-1.attempt-1.json').feedbackIn).toContain(
-      REJECTION
+      TAGGED
     );
     const first = record('13-render.attempt-1.json').receipt.outputDigest;
     const second = record('13-render.rework-1.attempt-1.json').receipt
@@ -413,6 +416,30 @@ describe('factory:run visual rework', () => {
     expect(
       existsSync(join(runDir(), '15-adversarial-trust.attempt-2.json'))
     ).toBe(false);
+  });
+
+  it('routes an imagery finding to the asset stage, not copy', async () => {
+    const { providers } = reworkProviders({
+      copyHearsFindings: true,
+      judgeRejects: () => true,
+      finding: 'desktop@1440: the hero image reads as generic stock',
+    });
+    const manifest = await run({ providers });
+
+    expect(manifest.reworks?.[0]).toMatchObject({
+      reworkFrom: 'asset',
+      findings: [
+        '[imagery] desktop@1440: the hero image reads as generic stock',
+      ],
+    });
+    // Copy did not rerun; the asset stage did, and the unchanged page failed.
+    expect(existsSync(join(runDir(), '05-copy.rework-1.attempt-1.json'))).toBe(
+      false
+    );
+    expect(existsSync(join(runDir(), '12-asset.rework-1.attempt-1.json'))).toBe(
+      true
+    );
+    expect(manifest.reason).toMatch(/no new render/);
   });
 
   it('fails when a rework renders the rejected page again', async () => {

@@ -413,13 +413,70 @@ async function seoStage(ctx: StageContext): Promise<StageResult> {
   );
 }
 
+/** What a visual finding is about; each dimension has one owning stage. */
+export type VisualDimension = 'copy' | 'imagery' | 'layout';
+
 /**
- * The stage a visual rejection reworks. Layout, hero, media and refs are
- * deterministic resolvers of the brief, so rerunning them renders the same
- * page; copy is the generative stage the screenshots show, and it takes the
- * judge's findings as feedback.
+ * The stage each dimension reworks. Copy and assets are generative and take
+ * the findings as feedback; layout is a deterministic resolver of the brief,
+ * so a layout rework that renders the same page fails `no new render`
+ * instead of looping.
  */
-export const VISUAL_REWORK_STAGE: FactoryStage = 'copy';
+export const VISUAL_DIMENSION_STAGE: Readonly<
+  Record<VisualDimension, FactoryStage>
+> = { copy: 'copy', imagery: 'asset', layout: 'layout' };
+
+const DIMENSION_CUES: readonly [VisualDimension, RegExp][] = [
+  // An explicit `[dimension]` tag from the judge wins.
+  ['copy', /^\[copy\]/iu],
+  ['imagery', /^\[imagery\]|^ref-copy:/iu],
+  ['layout', /^\[layout\]/iu],
+  [
+    'imagery',
+    /\b(?:image|imagery|photo|illustration|artwork|picture|graphic|stock|asset|background art)\b/iu,
+  ],
+  [
+    'copy',
+    /\b(?:headline|subhead|copy|text|wording|word|line break|wraps?|orphan|truncat\w*|clipped text|typo)\b/iu,
+  ],
+  [
+    'layout',
+    /\b(?:layout|alignment|aligned|spacing|whitespace|grid|hierarchy|focal|competing|composition|section order|density|crowded)\b/iu,
+  ],
+];
+
+/** Tags a finding by its first matching cue; untagged findings are copy. */
+export function visualDimensionOf(finding: string): VisualDimension {
+  const text = finding.replace(/^[\w-]+@\d+:\s*/u, '');
+  return DIMENSION_CUES.find(([, cue]) => cue.test(text))?.[0] ?? 'copy';
+}
+
+/**
+ * The rework for a rejection: the earliest stage owning any finding's
+ * dimension, so one rewind covers them all, with each finding tagged.
+ */
+export function visualRework(findings: readonly string[]): {
+  readonly stage: FactoryStage;
+  readonly findings: readonly string[];
+} {
+  const tagged = findings.map(finding => {
+    const dimension = visualDimensionOf(finding);
+    return {
+      dimension,
+      text: `[${dimension}] ${finding.replace(/^\[\w+\]\s*/u, '')}`,
+    };
+  });
+  const stages = [
+    ...new Set(
+      tagged.map(({ dimension }) => VISUAL_DIMENSION_STAGE[dimension])
+    ),
+  ];
+  const stage =
+    stages.toSorted(
+      (a, b) => FACTORY_STAGES.indexOf(a) - FACTORY_STAGES.indexOf(b)
+    )[0] ?? VISUAL_DIMENSION_STAGE.copy;
+  return { stage, findings: tagged.map(({ text }) => text) };
+}
 
 /**
  * Visual taste admission: cross-family vision review of the render stage's
@@ -546,9 +603,7 @@ async function trustStage(ctx: StageContext): Promise<StageResult> {
         [verdict.unavailable, visual.unavailable].filter(Boolean).join('; ') ||
         null,
       notes: { tasteReceipts: visual.receipts },
-      rework: visual.rejection
-        ? { stage: VISUAL_REWORK_STAGE, findings: visual.rejection }
-        : null,
+      rework: visual.rejection ? visualRework(visual.rejection) : null,
     }
   );
 }
