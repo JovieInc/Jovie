@@ -233,12 +233,14 @@
   "proofDigests": {
     "dogfood-tim-human-link-clicks-90d": "3c934602603eac7f",
     "dogfood-tim-known-contacts": "d89e65b373959a95",
+    "product-agent-profile-api-launch": "dba2b110659a9983",
     "product-profile-pay-capture": "80c4f4f9d2fac56b",
     "product-profile-subscribe-capture": "bb1811a129b3983b"
   },
   "proofCapabilities": {
     "dogfood-tim-human-link-clicks-90d": "smart-links",
     "dogfood-tim-known-contacts": "artist-profiles",
+    "product-agent-profile-api-launch": "agent-readable-profile-summary",
     "product-profile-pay-capture": "pay",
     "product-profile-subscribe-capture": "artist-profiles"
   }
