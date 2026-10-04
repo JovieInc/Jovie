@@ -206,6 +206,11 @@ export function OnboardingShell({
 
             <OnboardingShellStatus
               kind='error'
+              message='This Spotify artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow. Choosing another handle will not resolve this conflict.'
+              visible={claimStatus === 'identity-conflict'}
+            />
+            <OnboardingShellStatus
+              kind='error'
               message={turnstileFailureMessage}
               visible={Boolean(turnstileFailureMessage)}
             />

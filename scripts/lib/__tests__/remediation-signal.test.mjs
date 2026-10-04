@@ -64,8 +64,24 @@ describe('decideLoginSignal', () => {
         evidenceText: 'dashboard.spec.ts\nexpected heading',
       }).action
     ).toBe('skip');
+    // Dev-server route logs must not pair with an unrelated test timeout.
+    expect(
+      decideLoginSignal({
+        conclusion: 'failure',
+        evidenceText:
+          '[WebServer]  GET /signin 200 in 90ms\n[WebServer]  GET /signin?redirect_url=%2Fapp%2Fchat 200 in 89ms\ndashboard.spec.ts\nTimeout:  60000ms',
+      }).action
+    ).toBe('skip');
     expect(decideLoginSignal({ conclusion: 'success' }).action).toBe('green');
     expect(decideLoginSignal({ conclusion: 'cancelled' }).action).toBe('skip');
+    // A cancelled run never files, even with login-timeout-looking evidence:
+    // shutdown timeouts are artifacts and the superseding run reports itself.
+    expect(
+      decideLoginSignal({
+        conclusion: 'cancelled',
+        evidenceText: 'auth.setup.ts\nTest timeout of 90000ms exceeded',
+      }).action
+    ).toBe('skip');
   });
 });
 

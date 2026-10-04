@@ -169,6 +169,8 @@ test('computeMetrics measures first pass, ejections, latency, intake and duplica
   assert.equal(m.ejections.mergeGroupRunsPerMergedPr, 1);
   assert.equal(m.ejections.revisionFailureHolds, 1);
   assert.equal(m.ejections.deterministicFailureRecurrence, 1);
+  assert.equal(m.queueEntries, 6);
+  assert.equal(m.queueEntriesPerMerge, 2);
   assert.deepEqual(m.occupancy, {
     inQueue: 1,
     maxEntriesToBuild: 10,
@@ -192,6 +194,7 @@ test('computeMetrics measures first pass, ejections, latency, intake and duplica
   assert.match(text, /first-pass rate \| 50% \(2\/4 entries\)/);
   assert.match(text, /failed_checks 2/);
   assert.match(text, /Current queue wait min p50\/p75 \(n\) \| 60 \/ 60 \(1\)/);
+  assert.match(text, /Queue entries \/ per merged PR \| 6 \/ 2/);
   assert.match(
     text,
     /failure holds \/ deterministic same-head recurrence \| 1 \/ 1/
@@ -211,6 +214,7 @@ test('computeMetrics degrades to n/a on an empty window', () => {
   assert.equal(m.ejections.rate, null);
   assert.deepEqual(m.queueWaitMinutes, { n: 0, p50: null, p75: null });
   assert.equal(m.ejections.mergeGroupRunsPerMergedPr, null);
+  assert.equal(m.queueEntriesPerMerge, null);
   assert.equal(m.runnerMinutesPerMergedPr.pullRequest, null);
   const text = renderMarkdown(m);
   assert.match(text, /first-pass rate \| n\/a/);

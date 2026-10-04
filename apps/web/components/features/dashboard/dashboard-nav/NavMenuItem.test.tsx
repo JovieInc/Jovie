@@ -126,6 +126,33 @@ describe('NavMenuItem', () => {
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
   });
 
+  it('stages the label exit out of the collapsed grid flow (JOV-4522)', () => {
+    render(
+      <NavMenuItem
+        item={{
+          id: 'library',
+          name: 'Library',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive={false}
+      />
+    );
+
+    const label = screen.getByText('Library');
+    // Absolute positioning in the collapsed rail lifts the label out of the
+    // single-column grid so it fades/drifts instead of wrapping a phantom row
+    // or snapping to display:none.
+    expect(label.className).toContain('group-data-[collapsible=icon]:absolute');
+    expect(label.className).toContain(
+      'group-data-[collapsible=icon]:opacity-0'
+    );
+    expect(label.className).toContain('duration-cinematic');
+    expect(label.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
+    );
+  });
+
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource(
       'components/features/dashboard/dashboard-nav/NavMenuItem.tsx'
