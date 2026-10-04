@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-// Founder-labeled UI calibration set (HumanHoldoutSet v1) for vision and
+// UI judge calibration set (HumanHoldoutSet v1) for vision and
 // coherence judges (JOV-7713, JOV-7765). Fails render the UI escape corpus.
 const root = join(
   dirname(fileURLToPath(import.meta.url)),
