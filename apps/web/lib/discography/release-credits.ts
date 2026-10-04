@@ -380,7 +380,11 @@ export function reconcilePrimaryArtists(input: {
       continue;
     }
 
-    if (storedPrimaries.some(credit => credit.name === providerArtist.name)) {
+    if (
+      storedPrimaries.some(credit =>
+        namesEquivalent(credit.name, providerArtist.name)
+      )
+    ) {
       continue;
     }
 
@@ -403,13 +407,15 @@ export function reconcilePrimaryArtists(input: {
 
   const providerNames = providerArtists.map(artist => artist.name);
   const storedNames = storedPrimaries.map(credit => credit.name);
-  const storedNameSet = new Set(storedNames);
-  const providerNameSet = new Set(providerNames);
+  const storedNameSet = new Set(storedNames.map(comparableCreditName));
+  const providerNameSet = new Set(providerNames.map(comparableCreditName));
   const setsDiffer =
     added.length > 0 ||
     skippedFeaturedNames.length > 0 ||
-    providerNames.some(name => !storedNameSet.has(name)) ||
-    storedNames.some(name => !providerNameSet.has(name));
+    providerNames.some(
+      name => !storedNameSet.has(comparableCreditName(name))
+    ) ||
+    storedNames.some(name => !providerNameSet.has(comparableCreditName(name)));
 
   return {
     primaryArtists: [...storedPrimaries, ...added],
