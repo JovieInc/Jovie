@@ -394,19 +394,21 @@ describe('bounded coordination in the existing fleet', () => {
     expect(
       (
         data(await f.invoke('fleet.status', {}, requester)).requests as {
+          requestId: string;
           state: string;
           reason?: string;
         }[]
-      )[0]
+      ).find(r => r.requestId === inputs[0].requestId)
     ).toMatchObject({ state: 'rejected', reason: 'capacity' });
     f.advance(300001);
     await expect(f.accept(inputs[1].requestId)).rejects.toThrow('CONFLICT');
     expect(
       (
         data(await f.invoke('fleet.status', {}, requester)).requests as {
+          requestId: string;
           state: string;
         }[]
-      )[1].state
+      ).find(r => r.requestId === inputs[1].requestId)?.state
     ).toBe('expired');
   });
   it('keeps temporary helper unavailability inside the pending quota until rejection or expiry', async () => {

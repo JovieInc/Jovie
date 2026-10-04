@@ -280,6 +280,40 @@ describe('evaluateDailyWindow', () => {
     expect(first.contentKey).toBe(second.contentKey);
     expect(dailyIdempotencyKey(WINDOW)).toBe(first.idempotencyKey);
   });
+
+  it('carries an approved next-step action into the story', () => {
+    const action = {
+      label: 'See it on a demo profile',
+      href: '/demo/showcase/tim-white-profile?mode=subscribe',
+    };
+    const result = evaluateDailyWindow({
+      windowKey: WINDOW,
+      sources: [source()],
+      drafts: [draft({ action })],
+      evaluatedAt: '2026-09-28T00:15:00Z',
+    });
+    expect(result.passed).toBe(true);
+    expect(result.stories[0].action).toEqual(action);
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'https://example.com/x',
+    'https://jov.ie.evil.example/x',
+    '//evil.example/x',
+    'https://user:pw@jov.ie/x',
+    'http://jov.ie/x',
+  ])('fails closed on an unsafe action destination: %s', href => {
+    const result = evaluateDailyWindow({
+      windowKey: WINDOW,
+      sources: [source()],
+      drafts: [draft({ action: { label: 'Next', href } })],
+    });
+    expect(result.passed).toBe(false);
+    expect(result.findings.map(finding => finding.rule)).toContain(
+      'story-contract'
+    );
+  });
 });
 
 describe('digest rendering and persistence', () => {

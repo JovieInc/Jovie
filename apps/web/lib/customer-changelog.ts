@@ -74,6 +74,12 @@ export const CustomerChangelogEntrySchema = z.object({
   surfaces: z.array(z.string()),
   availability: z.enum(CUSTOMER_CHANGELOG_AVAILABILITY),
   prerequisites: z.array(z.string()).optional(),
+  action: z
+    .object({
+      label: z.string().min(1),
+      href: z.string().min(1),
+    })
+    .nullable(),
   media: CustomerChangelogMediaSchema,
   technicalVersion: z.string().min(1),
   explanation: z.string(),
@@ -348,10 +354,11 @@ export function projectCustomerChangelogArchive(
             surfaces: inferSurfaces(haystack),
             availability: publication.availability,
             prerequisites: publication.prerequisites,
+            action: publication.action ?? null,
             media: null,
             technicalVersion: release.version,
             explanation,
-            supporting: [],
+            supporting: publication.supporting ?? [],
             technical,
             prominence: SECTION_PROMINENCE[section],
           })

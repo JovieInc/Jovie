@@ -1,18 +1,13 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import {
-  ArrowRight,
-  CircleMinus,
-  type LucideIcon,
-  Sparkles,
-  TrendingUp,
-  Wrench,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
+import { isSafeChangelogActionHref } from '@/lib/changelog-parser';
 import {
   CUSTOMER_CHANGELOG_CATEGORIES,
   CUSTOMER_CHANGELOG_CATEGORY_LABELS,
@@ -26,30 +21,80 @@ import {
 } from '@/lib/customer-changelog';
 
 const INITIAL_MONTH_COUNT = 1;
+const MONTH_FRAGMENT_PREFIX = 'changelog-month-';
 
 type CategoryFilter = 'all' | CustomerChangelogCategory;
+
+type FragmentTarget =
+  | {
+      readonly kind: 'entry';
+      readonly entry: CustomerChangelogEntry;
+      readonly monthKey: string;
+    }
+  | { readonly kind: 'month'; readonly monthKey: string };
+
+/**
+ * JOV-7489 adds persistent `aliases` to published entries; tolerate their
+ * absence until that contract lands so legacy links keep resolving.
+ */
+function entryFragments(entry: CustomerChangelogEntry): readonly string[] {
+  const aliases = (entry as { readonly aliases?: readonly string[] }).aliases;
+  return aliases?.length ? [entry.slug, ...aliases] : [entry.slug];
+}
+
+/**
+ * One entry-navigation resolver (JOV-7490): maps a URL fragment to the entry
+ * or month section that owns it, regardless of pagination or the active
+ * category filter. Unknown or removed fragments resolve to null so callers
+ * never land on a different entry.
+ */
+function locateChangelogFragment(
+  months: readonly CustomerChangelogMonthGroup[],
+  rawFragment: string
+): FragmentTarget | null {
+  let fragment = rawFragment.startsWith('#')
+    ? rawFragment.slice(1)
+    : rawFragment;
+  try {
+    fragment = decodeURIComponent(fragment);
+  } catch {
+    // Undecodable fragments cannot match a target.
+  }
+  if (!fragment) return null;
+
+  if (fragment.startsWith(MONTH_FRAGMENT_PREFIX)) {
+    const monthKey = fragment.slice(MONTH_FRAGMENT_PREFIX.length);
+    return months.some(group => group.monthKey === monthKey)
+      ? { kind: 'month', monthKey }
+      : null;
+  }
+
+  for (const group of months) {
+    for (const entry of group.entries) {
+      if (entryFragments(entry).includes(fragment)) {
+        return { kind: 'entry', entry, monthKey: group.monthKey };
+      }
+    }
+  }
+  return null;
+}
+
+function filterMonthsByCategory(
+  months: readonly CustomerChangelogMonthGroup[],
+  category: CategoryFilter
+): readonly CustomerChangelogMonthGroup[] {
+  if (category === 'all') return months;
+  return months
+    .map(group => ({
+      ...group,
+      entries: group.entries.filter(entry => entry.category === category),
+    }))
+    .filter(group => group.entries.length > 0);
+}
 
 const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
   all: 'All',
   ...CUSTOMER_CHANGELOG_CATEGORY_LABELS,
-};
-
-/**
- * Compact source-backed fallback artwork. Customer entries do not currently
- * carry an approved media asset, so the archive uses an icon, a neutral
- * product-update label, and the entry title instead of an empty visual block.
- */
-const ENTRY_MEDIA_TONES = ['ion', 'pulse', 'ultra'] as const;
-type EntryMediaTone = (typeof ENTRY_MEDIA_TONES)[number];
-
-const ENTRY_MEDIA_ICONS: Record<
-  CustomerChangelogEntry['category'],
-  LucideIcon
-> = {
-  new: Sparkles,
-  improved: TrendingUp,
-  fixed: Wrench,
-  removed: CircleMinus,
 };
 
 export interface CustomerChangelogArchiveProps {
@@ -131,39 +176,92 @@ function versionHref(version: string): string {
   return `${APP_ROUTES.CHANGELOG}/${encodeURIComponent(version)}`;
 }
 
+/**
+ * One approved feature visual per entry, rendered only when the projected
+ * media contract supplies an asset. Null, unsupported, or failed media
+ * yields no region at all — the entry stays compact and text-first rather
+ * than showing decorative placeholder artwork.
+ */
 function EntryMedia({
-  entry,
-  tone,
-  variant,
+  media,
 }: {
-  readonly entry: CustomerChangelogEntry;
-  readonly tone: EntryMediaTone;
-  readonly variant: 'feature' | 'card';
+  readonly media: NonNullable<CustomerChangelogEntry['media']>;
 }) {
-  const Icon = ENTRY_MEDIA_ICONS[entry.category];
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
 
   return (
-    <div
-      aria-hidden='true'
-      className={`changelog-entry-media changelog-entry-media--${variant} changelog-entry-media--${tone}`}
-    >
-      <Icon
-        className='changelog-entry-media__icon'
-        size={variant === 'feature' ? 28 : 22}
-      />
-      <span className='changelog-entry-media__label'>Product update</span>
-      <span className='changelog-entry-media__title'>{entry.title}</span>
+    <div className='changelog-entry-media'>
+      {media.kind === 'video' ? (
+        <video
+          className='changelog-entry-media__asset'
+          controls
+          muted
+          playsInline
+          preload='metadata'
+          src={media.src}
+          aria-label={media.alt || undefined}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        // Unoptimized: media srcs come from the receipt-backed contract and
+        // are not limited to the optimizer's allowlisted hosts. The 16:9
+        // frame reserves the box so fill+lazy loading never shifts layout.
+        <Image
+          className='changelog-entry-media__asset'
+          src={media.src}
+          alt={media.alt}
+          fill
+          sizes='(min-width: 1024px) 56rem, 100vw'
+          unoptimized
+          onError={() => setFailed(true)}
+        />
+      )}
     </div>
   );
 }
 
-function EntryRow({
-  entry,
-  tone,
+/**
+ * Receipt-approved next step (JOV-7493). The parser already fails closed on
+ * unsafe destinations; the render re-checks so a stale or hand-built entry
+ * can never mint an arbitrary link.
+ */
+function EntryActionLink({
+  action,
 }: {
-  readonly entry: CustomerChangelogEntry;
-  readonly tone: EntryMediaTone;
+  readonly action: NonNullable<CustomerChangelogEntry['action']>;
 }) {
+  if (!isSafeChangelogActionHref(action.href)) return null;
+  const content = (
+    <>
+      {action.label}
+      <ArrowRight
+        aria-hidden='true'
+        size={16}
+        className='changelog-archive-nav__link-arrow'
+      />
+    </>
+  );
+  if (action.href.startsWith('/')) {
+    return (
+      <Link href={action.href} className='changelog-entry__action'>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <a
+      href={action.href}
+      target='_blank'
+      rel='noopener noreferrer'
+      className='changelog-entry__action'
+    >
+      {content}
+    </a>
+  );
+}
+
+function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
   const tertiary = formatCustomerChangelogTertiary(
     entry.date,
     entry.technicalVersion
@@ -173,10 +271,15 @@ function EntryRow({
     entry.supporting.length > 0 ||
     Boolean(entry.prerequisites?.length);
   const hasLevel3 = entry.technical.length > 0;
+  const action =
+    entry.action && isSafeChangelogActionHref(entry.action.href)
+      ? entry.action
+      : null;
 
   return (
     <article
       id={entry.slug}
+      tabIndex={-1}
       className='changelog-entry'
       data-changelog-entry-id={entry.id}
       data-changelog-prominence={entry.prominence}
@@ -200,7 +303,7 @@ function EntryRow({
             </p>
           ) : null}
           <h3 className='changelog-entry__title'>{entry.title}</h3>
-          <EntryMedia entry={entry} tone={tone} variant='feature' />
+          {entry.media ? <EntryMedia media={entry.media} /> : null}
           {hasLevel2 ? (
             <div className='space-y-2'>
               {entry.explanation ? (
@@ -225,6 +328,11 @@ function EntryRow({
               ) : null}
             </div>
           ) : null}
+          {action ? (
+            <p className='changelog-entry__action-row'>
+              <EntryActionLink action={action} />
+            </p>
+          ) : null}
           <p className='changelog-entry__tertiary'>
             <Link href={versionHref(entry.technicalVersion)}>{tertiary}</Link>
           </p>
@@ -239,14 +347,6 @@ function EntryRow({
             </details>
           ) : null}
         </div>
-        <div className='changelog-entry__card'>
-          <EntryMedia entry={entry} tone={tone} variant='card' />
-          <p className='changelog-entry__card-title'>{entry.title}</p>
-          <p className='changelog-entry__card-meta'>
-            {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]} ·{' '}
-            {formatCustomerChangelogDate(entry.date)}
-          </p>
-        </div>
       </div>
     </article>
   );
@@ -254,14 +354,13 @@ function EntryRow({
 
 function MonthSection({
   group,
-  toneOffset,
 }: {
   readonly group: CustomerChangelogMonthGroup;
-  readonly toneOffset: number;
 }) {
   return (
     <section
       id={`changelog-month-${group.monthKey}`}
+      tabIndex={-1}
       aria-labelledby={`changelog-month-${group.monthKey}-heading`}
       className='changelog-month-section'
     >
@@ -272,14 +371,8 @@ function MonthSection({
         {group.label}
       </h2>
       <div>
-        {group.entries.map((entry, index) => (
-          <EntryRow
-            key={entry.id}
-            entry={entry}
-            tone={
-              ENTRY_MEDIA_TONES[(toneOffset + index) % ENTRY_MEDIA_TONES.length]
-            }
-          />
+        {group.entries.map(entry => (
+          <EntryRow key={entry.id} entry={entry} />
         ))}
       </div>
     </section>
@@ -323,22 +416,16 @@ function CategoryFilterToolbar({
 
 function ArchiveJumpNav({
   months,
-  visibleMonthCount,
 }: {
   readonly months: readonly CustomerChangelogMonthGroup[];
-  readonly visibleMonthCount: number;
 }) {
   return (
     <nav aria-label='Changelog Archive' className='changelog-archive-nav'>
-      {months.map((group, index) => (
+      {months.map(group => (
         <div key={group.monthKey} className='changelog-archive-nav__row'>
           <div className='changelog-archive-nav__rail'>
             <Link
-              href={
-                index < visibleMonthCount
-                  ? `#changelog-month-${group.monthKey}`
-                  : versionHref(group.entries[0].technicalVersion)
-              }
+              href={`#changelog-month-${group.monthKey}`}
               className='changelog-archive-nav__month'
             >
               {group.label}
@@ -348,9 +435,6 @@ function ArchiveJumpNav({
           <ul className='changelog-archive-nav__links'>
             {group.entries.map(entry => (
               <li key={entry.id}>
-                {index >= visibleMonthCount ? (
-                  <PermalinkAnchors entry={entry} includeCanonical />
-                ) : null}
                 <Link
                   href={customerChangelogEntryPath(entry)}
                   className='changelog-archive-nav__link'
@@ -389,23 +473,77 @@ export function CustomerChangelogArchive({
   const [visibleMonthCount, setVisibleMonthCount] =
     useState(INITIAL_MONTH_COUNT);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
+  const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
 
   const filteredMonths = useMemo(
-    () =>
-      activeCategory === 'all'
-        ? months
-        : months
-            .map(group => ({
-              ...group,
-              entries: group.entries.filter(
-                entry => entry.category === activeCategory
-              ),
-            }))
-            .filter(group => group.entries.length > 0),
+    () => filterMonthsByCategory(months, activeCategory),
     [months, activeCategory]
   );
 
+  const revealFragment = useCallback(
+    (rawFragment: string) => {
+      const target = locateChangelogFragment(months, rawFragment);
+      if (!target) return;
+
+      const targetId =
+        target.kind === 'month'
+          ? `${MONTH_FRAGMENT_PREFIX}${target.monthKey}`
+          : target.entry.slug;
+      // Reconcile an excluding filter explicitly: a deep link target must
+      // never stay hidden behind the active category.
+      const nextCategory =
+        target.kind === 'entry' &&
+        activeCategory !== 'all' &&
+        target.entry.category !== activeCategory
+          ? 'all'
+          : activeCategory;
+      const list = filterMonthsByCategory(months, nextCategory);
+      const monthIndex = list.findIndex(
+        group => group.monthKey === target.monthKey
+      );
+      if (monthIndex < 0) return;
+
+      if (nextCategory !== activeCategory) setActiveCategory(nextCategory);
+      setVisibleMonthCount(current => Math.max(current, monthIndex + 1));
+      setPendingTargetId(targetId);
+    },
+    [months, activeCategory]
+  );
+
+  // Resolve deep links on fresh loads, hash changes (in-page links,
+  // Back/Forward, legacy aliases), and clicks on same-page fragment links
+  // such as the hero timeline, which may not emit a hashchange.
+  useEffect(() => {
+    const onHashChange = () => revealFragment(globalThis.location.hash);
+    const onClick = (event: MouseEvent) => {
+      const anchor = (event.target as Element | null)?.closest?.('a[href]');
+      const href = anchor?.getAttribute('href') ?? '';
+      if (href.startsWith('#')) revealFragment(href);
+      else if (href.startsWith(`${APP_ROUTES.CHANGELOG}#`))
+        revealFragment(href.slice(APP_ROUTES.CHANGELOG.length));
+    };
+    document.addEventListener('click', onClick, true);
+    globalThis.addEventListener('hashchange', onHashChange);
+    onHashChange();
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      globalThis.removeEventListener('hashchange', onHashChange);
+    };
+  }, [revealFragment]);
+
+  // Scroll and focus the resolved target once it mounts. Focus only moves in
+  // response to an explicit fragment navigation, never on passive renders.
+  useEffect(() => {
+    if (!pendingTargetId) return;
+    const element = document.getElementById(pendingTargetId);
+    if (!element) return;
+    element.scrollIntoView?.({ block: 'start' });
+    element.focus({ preventScroll: true });
+    setPendingTargetId(null);
+  }, [pendingTargetId, visibleMonthCount, activeCategory]);
+
   function handleCategoryChange(next: CategoryFilter) {
+    setPendingTargetId(null);
     setActiveCategory(next);
     setVisibleMonthCount(INITIAL_MONTH_COUNT);
   }
@@ -429,12 +567,6 @@ export function CustomerChangelogArchive({
   const visibleMonths = filteredMonths.slice(0, visibleCount);
   const remainingCount = filteredMonths.length - visibleCount;
 
-  const monthToneOffsets = visibleMonths.map((_, index) =>
-    visibleMonths
-      .slice(0, index)
-      .reduce((sum, group) => sum + group.entries.length, 0)
-  );
-
   return (
     <div data-reduced-motion='static'>
       <TombstoneNotices tombstones={tombstones} />
@@ -448,27 +580,11 @@ export function CustomerChangelogArchive({
           {`No ${CATEGORY_FILTER_LABELS[activeCategory].toLowerCase()} updates yet.`}
         </p>
       ) : (
-        <>
-          <details className='mb-6'>
-            <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
-              Browse all updates
-            </summary>
-            <ArchiveJumpNav
-              months={filteredMonths}
-              visibleMonthCount={visibleCount}
-            />
-            <TechnicalReleaseNav releases={technicalReleases} />
-          </details>
-          <div id='changelog-outcome-list'>
-            {visibleMonths.map((group, index) => (
-              <MonthSection
-                key={group.monthKey}
-                group={group}
-                toneOffset={monthToneOffsets[index] ?? 0}
-              />
-            ))}
-          </div>
-        </>
+        <div id='changelog-outcome-list'>
+          {visibleMonths.map(group => (
+            <MonthSection key={group.monthKey} group={group} />
+          ))}
+        </div>
       )}
 
       {remainingCount > 0 ? (
@@ -487,6 +603,16 @@ export function CustomerChangelogArchive({
             Load Earlier Updates
           </Button>
         </div>
+      ) : null}
+
+      {filteredMonths.length > 0 ? (
+        <details className='mt-6'>
+          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+            Browse all updates
+          </summary>
+          <ArchiveJumpNav months={filteredMonths} />
+          <TechnicalReleaseNav releases={technicalReleases} />
+        </details>
       ) : null}
     </div>
   );

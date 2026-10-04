@@ -1,13 +1,17 @@
 name: Source Validation
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
     branches: [main, 'integration/**']
 permissions:
   contents: read
 concurrency:
-  group: source-validation-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  # A synchronize and body/base edit can arrive together on the same head.
+  # Canceling the newer suite leaves admission blocked even if its peer passes.
+  # Retain every validation receipt; a new source head has its own queue.
+  group: source-validation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+  queue: max
 jobs:
   deterministic:
     name: Source Validation
@@ -25,6 +29,19 @@ jobs:
           persist-credentials: false
       - &source-setup
         uses: ./.github/actions/setup-node-pnpm
+      - name: Validate performance policy source bindings
+        run: node scripts/invariants/performance-factory.mjs
+      - name: Measure actual installed source dependency graph
+        env:
+          DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
+        run: node .github/scripts/dependency-parity-evidence.mjs write
+      - name: Preserve exact source dependency evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-digest-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/jovie-dependency-parity/dep-digest.json
+          if-no-files-found: error
+          retention-days: 14
       # component-ship-gate's live-storybook-cert launches Chromium when the
       # diff touches in-scope UI components; without browsers the gate fails
       # closed before any story is measured.
@@ -44,6 +61,19 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      - name: Check agent-context size after merge onto base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/agent-context-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/agent-context | tar -x -C "$guard_root"
+          node "$guard_root/scripts/agent-context/merge-budget.mjs" --base "$trusted_ref" --head "$EXPECTED_HEAD"
       - name: Run deterministic source contract
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}

@@ -1,3 +1,5 @@
+import { RELATED_CREATORS_LABEL } from '@/lib/creator/vocabulary';
+
 export type ToolUiRenderer = 'artifact' | 'status';
 export type ToolUiHint = 'artifact' | 'status';
 
@@ -84,12 +86,14 @@ export const TOOL_UI_REGISTRY = {
     errorTitle: "Couldn't check Canvas",
   },
   suggestRelatedArtists: {
-    label: 'Related artists',
+    // Source-neutral chrome (JOV-7635): music-specific framing lives in the
+    // tool result, which carries artist language only for music sources.
+    label: RELATED_CREATORS_LABEL,
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Finding related artists…',
-    successTitle: 'Found related artists',
-    errorTitle: "Couldn't find related artists",
+    loadingTitle: 'Finding related creators…',
+    successTitle: 'Found related creators',
+    errorTitle: "Couldn't find related creators",
   },
   writeWorldClassBio: {
     label: 'Bio',

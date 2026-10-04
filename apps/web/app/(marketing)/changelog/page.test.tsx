@@ -160,14 +160,7 @@ describe('public changelog page', () => {
     expect(
       screen.getByLabelText('Subscribe To Changelog Updates')
     ).toBeVisible();
-    expect(screen.getAllByText('Product update')).toHaveLength(2);
-    const entryLinks = screen.getAllByRole('link', {
-      name: /Library filters/,
-    });
-    expect(entryLinks).toHaveLength(2);
-    for (const link of entryLinks) {
-      expect(link).toHaveAttribute('href', '/changelog#update-26-8-2-added-0');
-    }
+    expect(screen.queryByText('Product update')).not.toBeInTheDocument();
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {

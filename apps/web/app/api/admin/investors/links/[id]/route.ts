@@ -38,7 +38,10 @@ export async function PATCH(
 
   if ('expiresAt' in body) {
     if (body.expiresAt === null) {
-      updates.expiresAt = null;
+      return NextResponse.json(
+        { error: 'Claim links must expire' },
+        { status: 400 }
+      );
     } else if (typeof body.expiresAt === 'string') {
       const expiresAt = new Date(body.expiresAt);
       if (Number.isNaN(expiresAt.getTime())) {

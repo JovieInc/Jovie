@@ -62,6 +62,30 @@ function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+const SAFE_ACTION_HOSTS = new Set(['jov.ie', 'docs.jov.ie']);
+
+/**
+ * Customer next-step destinations stay first-party: an internal path or
+ * https on jov.ie/docs.jov.ie. Everything else fails closed (JOV-7493).
+ * Kept in parity with apps/web/lib/changelog-parser.ts.
+ */
+export function isSafeActionHref(href) {
+  if (typeof href !== 'string') return false;
+  if (/^\/(?!\/)\S*$/.test(href)) return true;
+  try {
+    const url = new URL(href);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      SAFE_ACTION_HOSTS.has(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isStringArray(value) {
   return (
     Array.isArray(value) &&
@@ -234,6 +258,24 @@ export function validateDailyDraft(draft, eligibleById) {
       message: `${prefix} must carry at most ${DAILY_MAX_BULLETS} bullets.`,
     });
     return findings;
+  }
+
+  if (draft.action !== undefined) {
+    const action = draft.action;
+    if (
+      !isPlainObject(action) ||
+      typeof action.label !== 'string' ||
+      !action.label.trim() ||
+      action.label.length > 80 ||
+      /[\r\n<>]/.test(action.label) ||
+      !isSafeActionHref(action.href)
+    ) {
+      findings.push({
+        rule: 'story-contract',
+        storyId: draft.id,
+        message: `${prefix} has an invalid action destination.`,
+      });
+    }
   }
 
   const mapped = draft.sourceIds.map(id => eligibleById.get(id));
@@ -428,6 +470,7 @@ export function evaluateDailyWindow({
     lateArrival: (Array.isArray(draft.sourceIds) ? draft.sourceIds : []).some(
       id => eligibleById.get(id)?.lateArrival === true
     ),
+    ...(draft.action !== undefined ? { action: draft.action } : {}),
   }));
   stories.sort((a, b) => a.id.localeCompare(b.id));
 

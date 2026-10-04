@@ -1,8 +1,11 @@
 /**
  * Spotify Algorithmic Neighbour Scoring
  *
- * Scores "Fans Also Like" artists relative to a target artist
- * to diagnose algorithmic positioning health.
+ * Scores the artists in Spotify's "Fans Also Like" section relative to a
+ * target creator to diagnose algorithmic positioning health. "Fans Also
+ * Like" and similar-artist language is scoped to this Spotify music
+ * source; Jovie-facing recommendation surfaces use "Related creators"
+ * unless their source is music (JOV-7635).
  *
  * Scoring model:
  *   - popularity (0-100) is primary signal
@@ -223,8 +226,8 @@ export function scoreNeighbour(
  * Compute the Algorithm Health Score.
  * = (count of BIGGER neighbours / total neighbours) * 100
  *
- * Higher = more of your FAL is bigger artists = better algorithmic position.
- * Lower = you're stuck in a small-artist loop.
+ * Higher = more of the creator's FAL is bigger artists = better algorithmic
+ * position. Lower = the creator is stuck in a small-artist loop.
  */
 export function computeHealthScore(neighbours: ScoredNeighbour[]): number {
   if (neighbours.length === 0) return 0;

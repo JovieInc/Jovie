@@ -197,6 +197,52 @@ jobs:
           node scripts/backlog-orchestrator/delivery-state-machine.mjs \
             --event-file="$event_file"
 
+  remediation:
+    name: File production continuity remediation
+    needs: observe
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: File or resolve production-monitor-continuity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-continuity
+          REMEDIATION_SOURCE: production-continuity.yml
+          REMEDIATION_CONCLUSION: ${{ (needs.observe.result != 'success' || needs.observe.outputs.status == 'unhealthy') && 'failure' || 'success' }}
+          REMEDIATION_DETAIL: ${{ needs.observe.outputs.incident_key }} ${{ needs.observe.outputs.incident_classes }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REMEDIATION_GATE_STEADY_GREEN: '1'
+          REMEDIATION_FAIL_OPEN: '1'
+          REMEDIATION_PREVIOUS_FILE: remediation-state/previous
+          REMEDIATION_STATE_FILE: remediation-state/status
+        run: |
+          mkdir -p remediation-state
+          id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=remediation-continuity-state&per_page=100" --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty' || true)"
+          if [ -n "$id" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > remediation-state/prior.zip || true
+            entry="$(unzip -Z1 remediation-state/prior.zip 2>/dev/null | head -1 || true)"
+            if [ -n "$entry" ]; then
+              unzip -p remediation-state/prior.zip "$entry" > remediation-state/previous || true
+            fi
+          fi
+          node scripts/remediation-signal-intake.mjs
+      - name: Save continuity remediation state
+        if: ${{ hashFiles('remediation-state/status') != '' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: remediation-continuity-state
+          path: remediation-state/status
+          if-no-files-found: ignore
+          retention-days: 90
+
   preserve-incident:
     name: Preserve production incident
     needs: [observe, founder-alert, agent-ingress]

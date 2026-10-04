@@ -459,8 +459,6 @@ export {
 } from './usePixelSettingsQuery';
 // Plan gate hook
 export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
-// Pre-save mutation
-export { useApplePreSaveMutation } from './usePreSaveMutation';
 export {
   useDeletePressPhotoMutation,
   usePressPhotosQuery,

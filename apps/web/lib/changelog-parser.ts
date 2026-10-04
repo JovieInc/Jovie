@@ -48,6 +48,8 @@ export interface CustomerChangelogPublication {
   readonly section: keyof ChangelogSection;
   readonly availability: 'ga' | 'preview' | 'limited' | 'unverified';
   readonly prerequisites: readonly string[];
+  readonly supporting?: readonly string[];
+  readonly action?: { readonly label: string; readonly href: string };
 }
 
 export interface ChangelogRelease {
@@ -425,6 +427,7 @@ const CustomerPermalinkMigrationSchema = z.object({
     CustomerPermalinkSchema.extend({
       releaseKey: z.string().min(1),
       storyId: z.string().min(1),
+      sourceIds: z.array(z.string()).min(1),
     })
   ),
 });
@@ -434,13 +437,22 @@ const customerPermalinkMigrations =
 
 const PublicationStorySchema = z
   .object({
-    id: z.string().min(1),
+    id: z.string().min(1).optional(),
     entryId: z.string().regex(CUSTOMER_ENTRY_ID_RE).optional(),
     slug: z.string().regex(CUSTOMER_FRAGMENT_RE).optional(),
     aliases: z.array(z.string().regex(CUSTOMER_FRAGMENT_RE)).max(20).optional(),
     summary: z.string().min(1),
     section: z.enum(['Added', 'Changed', 'Fixed', 'Removed']),
     sourceIds: z.array(z.string()).min(1),
+    bullets: z.array(z.string().trim().min(1)).max(5).optional(),
+    action: z
+      .object({
+        label: z.string().trim().min(1).max(80),
+        href: z.string().trim().min(1).max(400),
+      })
+      .refine(value => isSafeChangelogActionHref(value.href))
+      .optional()
+      .catch(undefined),
     availability: z
       .object({
         status: z.enum(['ga', 'preview', 'limited']),
@@ -462,6 +474,28 @@ const PublicationStorySchema = z
         story.aliases !== undefined),
     { message: 'Customer permalink identity must be complete' }
   );
+
+const SAFE_ACTION_HOSTS = new Set(['jov.ie', 'docs.jov.ie']);
+
+/**
+ * Next-step destinations must stay customer-reachable: internal paths or
+ * https on first-party hosts. Anything else fails closed, never rendered.
+ */
+export function isSafeChangelogActionHref(href: string): boolean {
+  if (/^\/(?!\/)\S*$/.test(href)) return true;
+  try {
+    const url = new URL(href);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      SAFE_ACTION_HOSTS.has(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
 
 const PublicationReceiptSchema = z.object({
   schema: z.literal('daily-changelog-receipt/v1'),
@@ -491,7 +525,11 @@ function customerStoryPermalink(
   return (
     customerPermalinkMigrations.find(
       migration =>
-        migration.releaseKey === releaseKey && migration.storyId === story.id
+        migration.releaseKey === releaseKey &&
+        (story.id
+          ? migration.storyId === story.id
+          : migration.sourceIds.length === story.sourceIds.length &&
+            migration.sourceIds.every(id => story.sourceIds.includes(id)))
     ) ?? null
   );
 }
@@ -532,12 +570,14 @@ function readCustomerPublication(
         continue;
       }
       outcomes.push({
-        storyId: story.id,
+        storyId: story.id ?? permalink.entryId.slice('customer-update:'.length),
         ...permalink,
         summary: story.summary,
         section: story.section.toLowerCase() as keyof ChangelogSection,
         availability: story.availability?.status ?? 'unverified',
         prerequisites: story.availability?.prerequisites ?? [],
+        supporting: story.bullets ?? [],
+        ...(story.action ? { action: story.action } : {}),
       });
     }
     release.customerOutcomes = outcomes;

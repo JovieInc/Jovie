@@ -75,6 +75,30 @@ describe('customer changelog projection', () => {
     });
   });
 
+  it('recovers a legacy story without an id from its recorded publication sources', () => {
+    const markdown = readFileSync(resolveMonorepoPath('CHANGELOG.md'), 'utf8');
+    const legacy = markdown.replace(
+      /<!-- daily-changelog-receipt\/v1 (.+) -->/g,
+      (_line, json: string) => {
+        const receipt = JSON.parse(json);
+        for (const story of receipt.stories) delete story.id;
+        return `<!-- daily-changelog-receipt/v1 ${JSON.stringify(receipt)} -->`;
+      }
+    );
+    const projection = projectCustomerChangelogArchive(
+      parseChangelogDocument(legacy).sourceReleases
+    );
+    expect(
+      resolveCustomerChangelogFragment(
+        projection,
+        'get-updates-from-an-artist-2026-10-02-1'
+      )
+    ).toMatchObject({
+      status: 'published',
+      entry: { id: 'customer-update:fan-updates', slug: 'update-fan-updates' },
+    });
+  });
+
   it('keeps a published URL through copy edits, insertion, section moves, reordering, and fresh parsing', () => {
     const sourceId = 'JovieInc/Jovie#1@' + 'b'.repeat(40);
     const target = {
@@ -384,6 +408,46 @@ describe('customer changelog projection', () => {
       title: 'Library is one catalog with Ideas, In Progress, and Out',
       explanation: 'documents share filters.',
     });
+  });
+
+  it('carries the publication action and supporting copy, defaulting safely', () => {
+    const bullet = 'Get updates from an artist: sign up on eligible profiles.';
+    const source = release('2026-10-02', '2026-10-02', {
+      changed: [bullet],
+    });
+    source.customerOutcomes = [
+      {
+        ...source.customerOutcomes![0],
+        availability: 'limited',
+        prerequisites: ['Claimed artist profiles with updates enabled'],
+        supporting: [
+          'Fans opt in per artist; nothing is sent without a signup.',
+        ],
+        action: {
+          label: 'See it on a demo profile',
+          href: '/demo/showcase/tim-white-profile?mode=subscribe',
+        },
+      },
+    ];
+
+    const [entry] = projectCustomerChangelog([source]);
+    expect(entry).toMatchObject({
+      title: 'Get updates from an artist',
+      availability: 'limited',
+      prerequisites: ['Claimed artist profiles with updates enabled'],
+      supporting: ['Fans opt in per artist; nothing is sent without a signup.'],
+      action: {
+        label: 'See it on a demo profile',
+        href: '/demo/showcase/tim-white-profile?mode=subscribe',
+      },
+    });
+    expect(CustomerChangelogEntrySchema.parse(entry)).toEqual(entry);
+
+    const [plain] = projectCustomerChangelog([
+      release('2026-10-02', '2026-10-02', { added: [bullet] }),
+    ]);
+    expect(plain.action).toBeNull();
+    expect(plain.supporting).toEqual([]);
   });
 
   it('groups outcomes by month newest first and formats tertiary version', () => {

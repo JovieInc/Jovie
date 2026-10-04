@@ -1,4 +1,8 @@
-import { FLEET_ACTION_IDS, type FleetActionId } from '@jovie/action-contracts';
+import {
+  FLEET_ACTION_IDS,
+  type FleetActionId,
+  workerIdSchema,
+} from '@jovie/action-contracts';
 import { z } from 'zod';
 import type { FleetDispatcher } from './dispatcher';
 
@@ -6,7 +10,16 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
 const controlSchema = z
   .object({
     profileId: z.uuid(),
-    operation: z.enum(['provision', 'revoke', 'assign', 'accept', 'reject']),
+    operation: z.enum([
+      'provision',
+      'rotate',
+      'delegate',
+      'undelegate',
+      'revoke',
+      'assign',
+      'accept',
+      'reject',
+    ]),
     input: z.unknown(),
     approvalId: z.uuid().optional(),
   })
@@ -17,11 +30,22 @@ export interface FleetHttpDependencies {
   founder: (request: Request, profileId: string) => Promise<string | null>;
   /** Verify canonical issue, owner and existing work before admission. */
   validateMission?: (input: unknown) => Promise<boolean>;
+  /** Exact configured founder, independent of general admin privileges. */
+  summerFounder?: (actor: string) => boolean;
+  /** Post-commit, durable outbox wake only; its failure cannot undo a receipt. */
+  scheduleSummerWake?: (profileId: string) => void;
+}
+function scheduleWake(deps: FleetHttpDependencies, profileId: string) {
+  try {
+    deps.scheduleSummerWake?.(profileId);
+  } catch {
+    /* Durable outbox remains pending for the independent recovery path. */
+  }
 }
 function response(body: unknown, status = 200) {
   return Response.json(body, { status, headers: NO_STORE });
 }
-async function body(request: Request): Promise<unknown> {
+export async function readFleetHttpBody(request: Request): Promise<unknown> {
   // Bounded payload, independent of an untrusted Content-Length header.
   const reader = request.body?.getReader();
   if (!reader) throw new Error('missing_body');
@@ -72,9 +96,16 @@ export async function handleFleetInvocation(
     const token = bearer?.match(/^Bearer (\S+)$/)?.[1];
     const result = await deps.dispatcher.invoke(
       id as FleetActionId,
-      await body(request),
+      await readFleetHttpBody(request),
       token
     );
+    if (
+      result.status === 'completed' &&
+      ['work.request', 'work.report', 'fleet.register'].includes(id)
+    ) {
+      const profileId = token?.split('.')[1];
+      if (profileId) scheduleWake(deps, profileId);
+    }
     // Canonical action status/code is preserved, including on denial.
     const code = 'error' in result ? result.error.code : undefined;
     const status =
@@ -105,16 +136,44 @@ export async function handleFleetControl(
       return response({ error: { code: 'FORBIDDEN' } }, 403);
     if (request.headers.get('origin') !== new URL(request.url).origin)
       return response({ error: { code: 'FORBIDDEN' } }, 403);
-    const raw = await body(request);
+    const raw = await readFleetHttpBody(request);
     const parsed =
       kind === 'status'
-        ? z.object({ profileId: z.uuid() }).strict().parse(raw)
+        ? z
+            .object({
+              profileId: z.uuid(),
+              history: z
+                .object({
+                  workerId: workerIdSchema,
+                  after: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(Number.MAX_SAFE_INTEGER)
+                    .optional(),
+                  limit: z.number().int().min(1).max(100).optional(),
+                })
+                .strict()
+                .optional(),
+            })
+            .strict()
+            .parse(raw)
         : controlSchema.parse(raw);
     const actor = await deps.founder(request, parsed.profileId);
     if (!actor) return response({ error: { code: 'FORBIDDEN' } }, 403);
     if (kind === 'status')
-      return response(await deps.dispatcher.inspect(parsed.profileId));
+      return response(
+        await deps.dispatcher.inspect(
+          parsed.profileId,
+          'history' in parsed ? parsed.history : undefined
+        )
+      );
     const command = controlSchema.parse(parsed);
+    if (
+      ['delegate', 'undelegate'].includes(command.operation) &&
+      deps.summerFounder?.(actor) !== true
+    )
+      return response({ error: { code: 'FORBIDDEN' } }, 403);
     if (
       (command.operation === 'assign' || command.operation === 'accept') &&
       (!deps.validateMission ||
@@ -146,6 +205,7 @@ export async function handleFleetControl(
       command.operation,
       command.input
     );
+    if (command.operation === 'delegate') scheduleWake(deps, command.profileId);
     return response(result);
   } catch {
     return response(
