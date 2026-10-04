@@ -16,10 +16,11 @@ import {
   type ResolvedDspLink,
 } from './in-house-contracts';
 import { verifyArtistUrl } from './verified-artist';
+import { verifyCatalogUrl } from './verified-catalog';
 
 /**
  * Official DSP and MusicBrainz calls only. A third-party link aggregator
- * is omitted: its terms do not allow us to cache and republish matches.
+ * is omitted: its terms restrict use to build a competing aggregation service.
  */
 
 const TIMEOUT_MS = 8_000;
@@ -322,100 +323,11 @@ export function createDefaultInHouseSources(
       return tracks;
     },
     async trackByUrl(url, territory) {
-      const provider = providerForListenUrl(url);
       const href = httpsUrl(url);
-      if (!provider || !href) return null;
-      if (provider === 'apple_music') {
-        const parsed = new URL(href);
-        const id =
-          parsed.searchParams.get('i') ??
-          parsed.pathname.match(/\/(\d+)\/?$/)?.[1];
-        if (!id) return null;
-        const [row] = await appleLookup(
-          `id=${encodeURIComponent(id)}&entity=song&country=${(territory ?? parsed.pathname.split('/')[1] ?? 'US').toLowerCase()}`
-        );
-        return row ? appleTrack(row) : null;
-      }
-      if (provider === 'deezer') {
-        const id = href.match(/\/track\/(\d+)/)?.[1];
-        if (!id) return null;
-        const payload = await readJson(
-          `https://api.deezer.com/track/${encodeURIComponent(id)}`
-        );
-        if (!payload || typeof payload !== 'object' || 'error' in payload) {
-          return null;
-        }
-        const record = payload as Record<string, unknown>;
-        const title = text(record.title);
-        const artist = text(
-          (record.artist as { name?: unknown } | undefined)?.name
-        );
-        const link = httpsUrl(text(record.link));
-        if (!title || !artist || !link) return null;
-        return {
-          provider: 'deezer',
-          title,
-          artist,
-          url: link,
-          isrc: text(record.isrc)?.toUpperCase() ?? null,
-          upc: null,
-          provenance: 'input_url',
-          confidence: PROVENANCE_CONFIDENCE.input_url,
-        };
-      }
-      if (provider === 'spotify') {
-        const id = href.match(/\/track\/([A-Za-z0-9]{22})/)?.[1];
-        const { isSpotifyAvailable, spotifyClient } = await import(
-          '@/lib/spotify/client'
-        );
-        if (id && isSpotifyAvailable()) {
-          try {
-            const track = await spotifyClient.requestJson<{
-              name?: string;
-              external_ids?: { isrc?: string };
-              artists?: Array<{ name?: string }>;
-            }>(
-              `/tracks/${id}${territory ? `?market=${territory.toUpperCase()}` : ''}`
-            );
-            const title = text(track.name);
-            const artist = text(track.artists?.[0]?.name);
-            if (title && artist) {
-              return {
-                provider: 'spotify',
-                title,
-                artist,
-                url: href,
-                isrc: text(track.external_ids?.isrc)?.toUpperCase() ?? null,
-                upc: null,
-                provenance: 'input_url',
-                confidence: PROVENANCE_CONFIDENCE.input_url,
-              };
-            }
-          } catch {
-            // The pasted Spotify URL still stands when credentials are absent.
-          }
-        }
-        return {
-          provider: 'spotify',
-          title: id ?? 'Spotify track',
-          artist: '',
-          url: href,
-          isrc: null,
-          upc: null,
-          provenance: 'input_url',
-          confidence: PROVENANCE_CONFIDENCE.input_url,
-        };
-      }
-      return {
-        provider,
-        title: provider,
-        artist: '',
-        url: href,
-        isrc: null,
-        upc: null,
-        provenance: 'input_url',
-        confidence: PROVENANCE_CONFIDENCE.input_url,
-      };
+      const provider = href ? providerForListenUrl(href) : null;
+      return href && provider
+        ? verifyCatalogUrl(href, provider, 'track', territory, signal)
+        : null;
     },
     async searchTracks(artist, title, territory = 'US') {
       const term = `${artist} ${title}`;
@@ -499,31 +411,9 @@ export function createDefaultInHouseSources(
     async albumByUrl(url, territory) {
       const href = httpsUrl(url);
       const provider = href ? providerForListenUrl(href) : null;
-      if (!href || !provider) return null;
-      if (provider === 'apple_music') {
-        const id = new URL(href).pathname.match(/\/(\d+)\/?$/)?.[1];
-        if (!id) return null;
-        const [row] = await appleLookup(
-          `id=${encodeURIComponent(id)}&entity=album&country=${(territory ?? new URL(href).pathname.split('/')[1] ?? 'US').toLowerCase()}`
-        );
-        const album = row ? appleAlbum(row) : null;
-        return album
-          ? {
-              ...album,
-              provenance: 'input_url',
-              confidence: PROVENANCE_CONFIDENCE.input_url,
-            }
-          : null;
-      }
-      return {
-        provider,
-        title: provider,
-        artist: '',
-        url: href,
-        upc: null,
-        provenance: 'input_url',
-        confidence: PROVENANCE_CONFIDENCE.input_url,
-      };
+      return href && provider
+        ? verifyCatalogUrl(href, provider, 'album', territory, signal)
+        : null;
     },
     async searchAlbums(artist, title, territory = 'US') {
       const payload = await readJson(
