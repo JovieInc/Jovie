@@ -192,7 +192,12 @@ describe('VirtualizedTableBody', () => {
 
     render(
       <table>
-        <VirtualizedTableBody {...baseProps} rows={rows} focusedIndex={1} />
+        <VirtualizedTableBody
+          {...baseProps}
+          rows={rows}
+          shouldVirtualize={false}
+          focusedIndex={1}
+        />
       </table>
     );
 
@@ -213,7 +218,12 @@ describe('VirtualizedTableBody', () => {
 
     render(
       <table>
-        <VirtualizedTableBody {...baseProps} rows={rows} columnSnap />
+        <VirtualizedTableBody
+          {...baseProps}
+          rows={rows}
+          shouldVirtualize={false}
+          columnSnap
+        />
       </table>
     );
 
