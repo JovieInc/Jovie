@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   queue: vi.fn(),
   linear: vi.fn(),
   readFile: vi.fn(),
+  liveBuild: vi.fn(),
   results: [] as unknown[][],
 }));
 
@@ -27,6 +28,9 @@ vi.mock('@/lib/ovie/linear-coordination-live', () => ({
   linearGraphql: mocks.linear,
 }));
 vi.mock('node:fs/promises', () => ({ readFile: mocks.readFile }));
+vi.mock('@/lib/ovie/shipping-state/configured.server', () => ({
+  readConfiguredLiveBuild: mocks.liveBuild,
+}));
 
 import { getOutboundReadiness } from './readiness.server';
 
@@ -52,6 +56,16 @@ describe('getOutboundReadiness', () => {
       },
       loop: { children: { nodes: [{ identifier: 'JOV-1' }] } },
     });
+    mocks.liveBuild.mockResolvedValue({
+      status: 'ok',
+      delivery: {
+        production: {
+          sha: 'c16157e0000000000000000000000000000000000',
+          deployedAt: '2026-10-04T03:33:00Z',
+          behindMain: { state: 'measured-nonzero', value: 41 },
+        },
+      },
+    });
     mocks.readFile.mockResolvedValue(
       '{"at":"2026-10-03T23:00:34.076Z","pass":false,"payers":0}\n'
     );
@@ -74,6 +88,7 @@ describe('getOutboundReadiness', () => {
     );
     expect(byId['send-path'].detail).toContain('6 routed');
     expect(byId.backlog.detail).toBe('1 open child issues');
+    expect(byId.production.status).toBe('red');
     expect(
       byId.backlog.children?.find(child => child.id === 'issue:JOV-7192')
         ?.status
@@ -86,6 +101,7 @@ describe('getOutboundReadiness', () => {
     );
     mocks.eligibility.mockRejectedValue(new Error('redis down'));
     mocks.readFile.mockRejectedValue(new Error('ENOENT'));
+    mocks.liveBuild.mockResolvedValue({ status: 'unavailable' });
     const readiness = await getOutboundReadiness();
     const byId = Object.fromEntries(
       readiness.items.map(item => [item.id, item.status])
@@ -94,6 +110,7 @@ describe('getOutboundReadiness', () => {
       cone: 'unknown',
       funnel: 'unknown',
       backlog: 'unknown',
+      production: 'unknown',
     });
   });
 });
