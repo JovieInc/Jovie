@@ -7,10 +7,20 @@ import {
   within,
 } from '@testing-library/react';
 import * as navigation from 'next/navigation';
-import type { ReactElement, ReactNode } from 'react';
+import {
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+  useRef,
+} from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   FIXTURE_NOW,
   fixtureInventory,
@@ -33,9 +43,7 @@ vi.mock('@/lib/queries/useOvieCertificationsQuery', () => ({
   getCertificationDecisionErrorMessage: () => 'The evidence changed.',
 }));
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
-  useRegisterRightPanel: (panel: ReactElement) => {
-    mocks.panels.push(panel);
-  },
+  useRegisterRightPanel: vi.fn(),
 }));
 vi.mock('@/components/feedback', () => ({
   toast: { success: mocks.toastSuccess, error: vi.fn() },
@@ -86,9 +94,55 @@ describe('OvieCertificationsWorkspace', () => {
         ) as ReturnType<typeof navigation.useSearchParams>
     );
     vi.clearAllMocks();
+    vi.mocked(useRegisterRightPanel).mockImplementation(panel => {
+      if (isValidElement(panel)) mocks.panels.push(panel);
+    });
     mocks.panels.length = 0;
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(FIXTURE_NOW));
+  });
+
+  it('keeps the live detail rail stable when its host renders the registered panel', async () => {
+    const actual = await vi.importActual<
+      typeof import('@/hooks/useRegisterRightPanel')
+    >('@/hooks/useRegisterRightPanel');
+    vi.mocked(useRegisterRightPanel).mockImplementation(
+      actual.useRegisterRightPanel
+    );
+    mockQuery({ data: fixtureInventory() });
+
+    function WorkspaceAndRail() {
+      const panel = useRightPanel();
+      const renders = useRef(0);
+      if (++renders.current > 20) {
+        throw new Error('Detail rail registration entered a render loop');
+      }
+      return (
+        <>
+          <OvieCertificationsWorkspace />
+          {panel}
+        </>
+      );
+    }
+
+    render(
+      <RightPanelProvider>
+        <WorkspaceAndRail />
+      </RightPanelProvider>
+    );
+    expect(screen.getByTestId('certification-detail-rail')).toHaveTextContent(
+      'Select a certification to review its evidence.'
+    );
+    fireEvent.click(screen.getByText('Flow signup-golden-path'));
+    expect(screen.getByTestId('certification-detail-rail')).toHaveTextContent(
+      'Flow signup-golden-path'
+    );
+    expect(
+      within(screen.getByTestId('certification-detail-rail')).getByRole(
+        'button',
+        { name: 'Certify' }
+      )
+    ).toBeEnabled();
   });
 
   it('renders skeleton rows and reserves count slots while loading', () => {

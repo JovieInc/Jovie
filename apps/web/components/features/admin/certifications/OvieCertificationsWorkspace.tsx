@@ -321,7 +321,7 @@ function FreshnessMeta({
 
 export function OvieCertificationsWorkspace() {
   const query = useOvieCertificationsQuery();
-  const decision = useOvieCertificationDecisionMutation();
+  const { mutateAsync } = useOvieCertificationDecisionMutation();
   const [stateFilter, setStateFilter] =
     useState<CertificationStateFilter>('all');
   const [domainFilter, setDomainFilter] =
@@ -370,7 +370,7 @@ export function OvieCertificationsWorkspace() {
       setPendingDecision(kind);
       setDecisionError(null);
       try {
-        await decision.mutateAsync({
+        await mutateAsync({
           rowId: selected.id,
           evidenceDigest: selected.decision.evidenceDigest,
           decision: kind,
@@ -386,7 +386,7 @@ export function OvieCertificationsWorkspace() {
         setPendingDecision(null);
       }
     },
-    [decision, selected]
+    [mutateAsync, selected]
   );
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
