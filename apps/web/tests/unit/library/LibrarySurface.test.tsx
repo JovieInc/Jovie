@@ -1689,6 +1689,35 @@ describe('LibrarySurface', () => {
     }
   );
 
+  it('preserves the opener while changing assets with focus inside the inspector', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Another release' }),
+    ]);
+    const opener = screen.getByTestId('library-release-row-release-1');
+    const next = screen.getByTestId('library-release-row-release-2');
+    opener.focus();
+    fireEvent.click(opener);
+    const drawer = screen.getByTestId('library-asset-drawer');
+    const files = within(drawer).getByRole('tab', { name: 'Files' });
+    files.focus();
+    expect(files).toHaveFocus();
+
+    fireEvent.click(next);
+    expect(
+      within(drawer).getAllByText('Another release').length
+    ).toBeGreaterThan(0);
+    fireEvent.keyDown(files, { key: 'Escape' });
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+    expect(opener).toHaveFocus();
+
+    next.focus();
+    fireEvent.click(next);
+    within(drawer).getByRole('tab', { name: 'Files' }).focus();
+    fireEvent.keyDown(drawer, { key: 'Escape' });
+    expect(next).toHaveFocus();
+  });
+
   it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
     renderLibrary([buildAsset()]);
     fireEvent.click(screen.getByRole('radio', { name: 'List View' }));

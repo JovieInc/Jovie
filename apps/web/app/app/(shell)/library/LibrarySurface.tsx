@@ -2915,9 +2915,13 @@ export function LibrarySurface({
       );
       return;
     }
-    const opener = document.activeElement;
-    inspectorOpenerRef.current =
-      opener instanceof HTMLElement && opener !== document.body ? opener : null;
+    if (!drawerOpen) {
+      const opener = document.activeElement;
+      inspectorOpenerRef.current =
+        opener instanceof HTMLElement && opener !== document.body
+          ? opener
+          : null;
+    }
     setSelectedId(id);
     setDrawerOpen(true);
   }
