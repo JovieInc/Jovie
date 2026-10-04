@@ -5,6 +5,18 @@ import { ReleaseTable } from '@/features/dashboard/organisms/release-provider-ma
 import type { ProviderKey } from '@/lib/discography/types';
 import { createMockRelease } from '@/tests/test-utils/factories';
 
+const tableCapture = vi.hoisted(() => ({
+  columns: [] as Array<{
+    id?: string;
+    meta?: {
+      primary?: boolean;
+      priority?: number;
+      minWidth?: number;
+      compact?: (row: { releaseDate?: string | null }) => string | null;
+    };
+  }>,
+}));
+
 const expandedTrackRows = [
   {
     id: 'track-1',
@@ -123,28 +135,31 @@ vi.mock('@/components/organisms/table', () => ({
       columnCount: number
     ) => ReactNode;
     emptyState?: ReactNode;
-  }) => (
-    <div data-testid='unified-table'>
-      {data.length === 0
-        ? emptyState
-        : data.map((row, index) => {
-            const rowId = getRowId(row);
-            return (
-              <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
-                <div
-                  data-testid={getRowTestId?.(row, index)}
-                  className={getRowClassName(row)}
-                />
-                {expandedRowIds?.has(rowId) ? (
-                  <div data-testid={`expanded-row-${rowId}`}>
-                    {renderExpandedContent?.(row, columns.length)}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-    </div>
-  ),
+  }) => {
+    tableCapture.columns = columns as typeof tableCapture.columns;
+    return (
+      <div data-testid='unified-table'>
+        {data.length === 0
+          ? emptyState
+          : data.map((row, index) => {
+              const rowId = getRowId(row);
+              return (
+                <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
+                  <div
+                    data-testid={getRowTestId?.(row, index)}
+                    className={getRowClassName(row)}
+                  />
+                  {expandedRowIds?.has(rowId) ? (
+                    <div data-testid={`expanded-row-${rowId}`}>
+                      {renderExpandedContent?.(row, columns.length)}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+      </div>
+    );
+  },
 }));
 
 vi.mock('@/components/atoms/Icon', () => ({
@@ -230,6 +245,22 @@ describe('ReleaseTable', () => {
       'data-state',
       'selected'
     );
+  });
+
+  it('keeps the title essential and folds the date when the meta column hides', () => {
+    render(<ReleaseTable {...commonProps} showTracks={false} />);
+
+    const release = tableCapture.columns.find(
+      column => column.id === 'release'
+    );
+    const meta = tableCapture.columns.find(column => column.id === 'meta');
+
+    expect(release?.meta).toMatchObject({ primary: true, minWidth: 200 });
+    expect(meta?.meta).toMatchObject({ priority: 1, minWidth: 260 });
+    expect(
+      meta?.meta?.compact?.({ releaseDate: '2025-06-01T00:00:00.000Z' })
+    ).toBe('Jun 2025');
+    expect(meta?.meta?.compact?.({ releaseDate: null })).toBeNull();
   });
 
   it('shows an actionable empty state when there are no releases', () => {

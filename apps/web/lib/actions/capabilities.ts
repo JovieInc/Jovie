@@ -74,6 +74,14 @@ function resolveRequirement(
     };
   }
 
+  if (requirement.type === 'worker_scope') {
+    // Session/product discovery never grants internal fleet authority.
+    return {
+      state: { requirement, satisfied: false, reasonCode: 'FORBIDDEN' },
+      retryable: false,
+    };
+  }
+
   // entitlement requirement
   const value = (entitlements as unknown as Record<string, unknown>)[
     requirement.key

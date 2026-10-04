@@ -1269,12 +1269,17 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
     """Main pushes outpace the serial matrix; only the freshest run should
     survive, and supersession must be a workflow-level cancellation rather
-    than an external mid-test runner kill (JOV-7167)."""
+    than an external mid-test runner kill (JOV-7167, JOV-7569)."""
     workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
 
+    triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+    push_trigger = triggers.split("  push:\n", 1)[1].split(
+        "  workflow_dispatch:\n", 1
+    )[0]
     concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
         "\njobs:\n", 1
     )[0]
+    assert "paths:" not in push_trigger
     assert "group: e2e-full-matrix-" in concurrency
     assert "github.event_name" in concurrency
     assert "cancel-in-progress: true" in concurrency
@@ -1290,18 +1295,42 @@ def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     assert "pnpm --filter=@jovie/web run test" in job
 
 
-def test_nightly_bypass_server_warms_auth_landing_route() -> None:
-    """The chaos sweep's first navigation must not eat a cold dev compile.
+def test_nightly_bypass_server_is_seeded_built_and_shared() -> None:
+    """External BASE_URL skips Playwright seeding and dev-route warmup.
 
-    Playwright global setup skips route warmup when BASE_URL is external, so
-    the readiness step has to compile /app via the test-auth enter route or
-    auth.setup times out on page.goto (JOV-6818).
+    Every run, including a filtered dispatch, must prepare the shared server.
     """
-    step = _step_block("nightly-tests.yml", "Start route QA bypass server")
+    job = _job_block("nightly-tests.yml", "e2e-tests")
+    seed = _step_block("nightly-tests.yml", "Seed nightly QA data")
+    build = _step_block("nightly-tests.yml", "Build nightly QA standalone server")
+    start = _step_block("nightly-tests.yml", "Start route QA bypass server")
+    chaos = _step_block("nightly-tests.yml", "Run full surface chaos sweep")
+    nightly = _step_block("nightly-tests.yml", "Run nightly E2E tests")
+    stop = _step_block("nightly-tests.yml", "Stop route QA bypass server")
 
-    assert "api/dev/test-auth/enter?persona=creator&redirect=/app" in step
-    assert "curl -fsSL" in step
-    assert "--max-time" in step
+    assert "pnpm run seed:test-data" in seed
+    assert not re.search(r"^        if:", seed, re.MULTILINE)
+    assert job.index(seed) < job.index(build) < job.index(start)
+    assert "pnpm turbo build --filter=@jovie/web" in build
+    assert "NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100" in build
+    assert "NEXT_PUBLIC_E2E_MODE: '1'" in build
+    assert "PORT=3100 node .next/standalone/apps/web/server.js" in start
+    assert "cp -r .next/static .next/standalone/apps/web/.next/static" in start
+    assert "cp -r public .next/standalone/apps/web/public" in start
+    assert "HOSTNAME: localhost" in start
+    assert "VERCEL_ENV: development" in start
+    assert "E2E_USE_TEST_AUTH_BYPASS: '1'" in start
+    assert "curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session" in start
+    assert 'echo $! > "$RUNNER_TEMP/nightly-qa-web.pid"' in start
+    assert "curl -fsS -X POST http://127.0.0.1:3100/api/dev/test-auth/session" in start
+    assert "for persona in creator creator-ready; do" in start
+    for consumer in (start, chaos, nightly):
+        assert "BASE_URL: http://127.0.0.1:3100" in consumer
+    assert "dev:local:playwright" not in job
+    assert job.index(start) < job.index(chaos) < job.index(nightly) < job.index(stop)
+    assert "if: always()" in stop
+    assert 'cat "$RUNNER_TEMP/nightly-qa-web.pid"' in stop
+    assert 'kill "$pid"' in stop
 
 
 def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
@@ -1323,6 +1352,14 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     assert "SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}" in job
     assert "SLACK_CI_CHANNEL_ID: ${{ vars.SLACK_CI_CHANNEL_ID }}" in job
     assert "SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}" in job
+    notice = _step_block(
+        "nightly-tests.yml", "Skip Slack when bot token or channel is unset"
+    )
+    assert "env.SLACK_BOT_TOKEN == ''" in notice
+    assert "env.SLACK_CI_CHANNEL_ID == ''" in notice
+    assert "SLACK_BOT_TOKEN or SLACK_CI_CHANNEL_ID is unset" in notice
+    assert "Skipping Slack. Tim sets these later." in notice
+    assert "exit 0" in notice
     for step, result in (
         (knip_failure, "needs.knip.result == 'failure'"),
         (unit_failure, "needs.unit-tests.result == 'failure'"),
@@ -1599,31 +1636,35 @@ def test_background_controllers_never_consume_fixed_ci_capacity() -> None:
 
 
 def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
-    """Cancelled CI and non-hold labels must not occupy a jovie-fixed slot."""
+    """PR, check, and status fan-out must not occupy a jovie-fixed slot."""
     workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
     trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
-    assert "schedule:" not in trigger
+    assert "schedule:" in trigger
+    assert "cron: '*/5 * * * *'" in trigger
     assert "workflow_run:" not in trigger
-    assert "opened" in trigger
-    assert "edited" in trigger
-    assert "synchronize" in trigger
+    assert "pull_request:" not in trigger
+    assert "pull_request_target:" not in trigger
+    assert "check_run:" not in trigger
+    assert "check_suite:" not in trigger
+    assert "\n  status:" not in trigger
+    assert "opened" not in trigger
+    assert "synchronize" not in trigger
     assert "Production Marker Recovery]" not in trigger
-    assert "group: fleet-gate-event-refresh" in workflow
-    assert "cancel-in-progress: false" in workflow
-    assert "github.event.pull_request.merged != true" in block
-    assert "github.event.label.name == 'hold'" in block
-    assert "github.event.label.name == 'gated'" in block
-    assert "github.event.label.name == 'queue-deferred'" in block
+    assert "fleet-gate-receipt" in workflow
+    assert "fleet-gate-triage-" in workflow
+    assert "cancel-in-progress: true" in workflow
     assert "github.event.label.name == 'needs-human'" not in block
-    assert "github.event.label.name == 'duplicate'" in block
+    assert "0 <= age < 120" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
     assert "Persist stack policy repair actions" in block
     assert "--closure-health-file=" in block
     assert "delivery-state-machine.mjs" in block
-    assert "\n  pull_request_target:\n" in workflow and "\n  pull_request:\n" not in workflow and "converted_to_draft" in trigger and "github.event_name != 'pull_request_target'" in block and "steps.refresh.outputs.receipt_path" in block and "state/gem-priority-gate/latest.json" not in block
+    assert "steps.refresh.outputs.receipt_path" in block
+    assert "state/gem-priority-gate/latest.json" not in block
     assert "steps.stack-actions.outcome == 'success'" in block
+    assert "push:" in trigger and "branches: [main]" in trigger
 
 
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:
@@ -1673,9 +1714,11 @@ def test_one_workflow_owns_automatic_issue_admission() -> None:
     assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
 
     workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-    # One file-level concurrency group serializes every admission event.
+    # One file-level concurrency block. Receipt refreshes share a group;
+    # triage assessments coalesce per issue and do not cancel a receipt write.
     assert workflow.count("concurrency:") == 1
-    assert "group: fleet-gate-event-refresh" in workflow
+    assert "fleet-gate-receipt" in workflow
+    assert "github.event.client_payload.issue_identifier" in workflow
     assert workflow.index("concurrency:") < workflow.index("jobs:")
 
 
@@ -1717,7 +1760,15 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
         assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
-    assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production
+    assert (
+        "expected-sha: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}"
+        in production
+    )
+    source = (REPO_ROOT / ".github/scripts/staging-release-source.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "exactRun(ci, repository, CI_PATH, 'push')" in source
+    assert "ci.head_sha === completion.sha" in source
 
 
 def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:

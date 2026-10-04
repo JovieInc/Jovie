@@ -55,6 +55,13 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
   getDashboardDataEssential: mockGetDashboardData,
 }));
 
+// The release-matrix loader imports getDashboardDataEssential from the
+// dashboard-data submodule directly (not the barrel), so both module paths
+// must resolve to the mock or the real fetch runs and redirects to /start.
+vi.mock('@/app/app/(shell)/dashboard/actions/dashboard-data', () => ({
+  getDashboardDataEssential: mockGetDashboardData,
+}));
+
 vi.mock('next/cache', () => ({
   unstable_noStore: vi.fn(),
   unstable_cache: vi.fn((fn: Function) => fn),
@@ -215,6 +222,9 @@ const MOCK_PROFILE = {
   spotifyId: 'spotify_artist_1',
   username: 'testartist',
   usernameNormalized: 'testartist',
+  displayName: 'Test Artist',
+  isPublic: true,
+  onboardingCompletedAt: new Date('2025-01-01'),
   settings: {},
 };
 

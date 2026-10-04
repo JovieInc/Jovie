@@ -23,6 +23,14 @@ const RELEASE_FIXTURE = {
   },
 };
 
+Object.assign(RELEASE_FIXTURE, {
+  customerOutcomes: Object.fromEntries(
+    Object.values(RELEASE_FIXTURE.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  ),
+});
+
 describe('changelog customer feeds (RSS + JSON share the web page object)', () => {
   beforeEach(() => {
     getChangelogSnapshot.mockResolvedValue({

@@ -118,20 +118,27 @@ describe('standalone CLI proxy support', () => {
     expect(JSON.parse(stdout)).toEqual({ openapi: '3.1.0' });
   });
 
-  it('reports invalid proxy configuration without exposing credentials', async () => {
-    const result = await run(
-      ['docs', 'llms', '--json'],
-      proxyEnvironment('http://user:private-value@[invalid')
-    ).catch(error => error);
-    expect(result.code).toBe(2);
-    expect(result.stderr).toBe('');
-    expect(JSON.parse(result.stdout)).toEqual({
-      error: {
-        code: 'INVALID_INPUT',
-        message:
-          'Invalid proxy configuration. Check HTTP_PROXY and HTTPS_PROXY.',
-      },
-    });
-    expect(result.stdout).not.toContain('private-value');
-  });
+  it.each([
+    { args: ['docs', 'llms'], exit: 2 },
+    { args: ['fleet', 'status'], exit: 3 },
+    { args: ['--base-url', 'fleet', 'artist', 'get'], exit: 2 },
+  ])(
+    'reports invalid proxy configuration safely with exit $exit: $args',
+    async ({ args, exit }) => {
+      const result = await run(
+        [...args, '--json'],
+        proxyEnvironment('http://user:private-value@[invalid')
+      ).catch(error => error);
+      expect(result.code).toBe(exit);
+      expect(result.stderr).toBe('');
+      expect(JSON.parse(result.stdout)).toEqual({
+        error: {
+          code: 'INVALID_INPUT',
+          message:
+            'Invalid proxy configuration. Check HTTP_PROXY and HTTPS_PROXY.',
+        },
+      });
+      expect(result.stdout).not.toContain('private-value');
+    }
+  );
 });

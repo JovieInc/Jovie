@@ -8,6 +8,7 @@ export type FetchImplementation = (
 ) => Promise<Response>;
 
 export type ResourceOptions = {
+  readonly workerToken?: string;
   readonly baseUrl?: string;
   readonly fetchImpl?: FetchImplementation;
   readonly signal?: AbortSignal;
@@ -34,7 +35,8 @@ export class JovieRequestError extends Error {
     readonly responseBody?: string,
     readonly retryAfterSeconds?: number,
     /** Stable server error code (e.g. RATE_LIMITED) when the API sent one. */
-    readonly apiCode?: string
+    readonly apiCode?: string,
+    readonly retryable?: boolean
   ) {
     super(message);
     this.name = 'JovieRequestError';
@@ -140,7 +142,7 @@ function getFetch(options: ResourceOptions): FetchImplementation {
   return options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
 }
 
-function parseRetryAfterSeconds(
+export function parseRetryAfterSeconds(
   value: string | null,
   nowMs = Date.now()
 ): number | undefined {
@@ -338,6 +340,35 @@ export function createProfile(
     );
   }
   return requestJson('/api/agents/profiles', options, { url: url.toString() });
+}
+
+/** Extract public creator fields without creating or modifying a profile. */
+export function lookupCreator(
+  creatorUrl: string,
+  options: ResourceOptions = {}
+): Promise<unknown> {
+  const candidate = creatorUrl.trim();
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new JovieInputError(`Invalid URL: ${creatorUrl}`);
+  }
+  if (
+    candidate.length > 2048 ||
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password
+  ) {
+    throw new JovieInputError(
+      'Expected an HTTPS YouTube, Instagram, TikTok, or Linktree profile URL.'
+    );
+  }
+
+  return requestJson(
+    `/api/agents/creator-lookup?url=${encodeURIComponent(url.toString())}`,
+    options
+  );
 }
 
 export type ReportKind = 'bug' | 'feedback';

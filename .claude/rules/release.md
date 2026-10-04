@@ -254,14 +254,22 @@ gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --paginate \
 
 For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 
-1. **Outdated** — `position` is null (code was force-pushed past it) → skip
-2. **Addressed** — another comment exists with `in_reply_to_id` equal to this comment's `id`, from a non-bot author → skip
-3. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → warning only, not blocking
-4. **Unaddressed** — none of the above → **BLOCKER**
+1. **Stale** — `position` is null (code moved past it) → skip
+2. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → skip in the report
+3. **Open** — none of the above → list it as advisory
+
+A reply, from a human or an agent, is not evidence of a fix. Close a finding only
+with evidence on the current head: `fixed-and-reverified` (a regression test or
+re-review on the new head) or `dismissed-with-evidence` (code or test shows the
+claim is false). The Jovie review kernel uses the same states
+(`candidate | verified | fixed-and-reverified | dismissed-with-evidence | stale |
+not-assessed`); see [pr-review-kernel](../../docs/evaluations/pr-review-kernel.md).
+The author fixes verified findings on the same PR before requesting merge; none of
+these states is a merge gate.
 
 ### When flagged
 
-- List each unaddressed comment: `file:line` — first 80 chars of body — permalink
+- List each open comment: `file:line` — first 80 chars of body — permalink
 - Recommend: "Run `/review` to triage bot comments, or reply to each comment on GitHub"
 - These are **advisory** — they do not block merge
 
@@ -269,8 +277,8 @@ For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 
 ```
 BOT REVIEWS
-├─ CodeRabbit:   N unaddressed (advisory)
-└─ Greptile:     N unaddressed (advisory)
+├─ CodeRabbit:   N open (advisory)
+└─ Greptile:     N open (advisory)
 ```
 
 ## Deploy Configuration
@@ -308,7 +316,7 @@ BOT REVIEWS
 - Pre-merge: typecheck + lint (CI fast path, ~10–15s)
 - DB migrations: run before staging deploy (production DB, additive only)
 - Deploy trigger: automatic after successful exact-attempt `main` CI authorization
-- Health check: https://jov.ie/api/health/deploy (returns `{"status":"healthy"}`)
+- Health check: https://jov.ie/api/health/deploy (anonymous `{healthy:true}` or legacy `{"status":"healthy"}`; checks require admin or `CRON_SECRET`)
 
 ## Version Stamping (main-only)
 
@@ -419,7 +427,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group), `Lighthouse (dashboard gate)` (merge-group), `Lighthouse (onboarding gate)` (merge-group), `Database Certification (isolated Neon)` (merge-group) |
+| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Blog Content Qualification` (both), `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group), `Lighthouse (dashboard gate)` (merge-group), `Lighthouse (onboarding gate)` (merge-group), `Database Certification (isolated Neon)` (merge-group) |
 | Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. Lineage is forward-only: after authorization a generation that is still an ancestor of main ships even though main advanced, yields only to a generation already queued behind it, and never yields once main has carried unshipped commits past the starvation bound (release-lineage-gate.sh, 90 min). | none |
 | Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. JOV-INV-033 rescans Done-sprint HTML (JOV-6218 pricing truth, JOV-6260 directory hygiene) against that same URL before the `Production Verified` marker. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. The five-minute continuity guard also reports production-stale (main has carried unshipped commits for 2 h) to the founder Slack path without admitting a provider-recovery task. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -432,6 +440,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | --- | --- | --- | --- |
 | `Path Changes` | both | fast-gate | `git diff --name-only origin/main...HEAD` |
 | `ci-fast` | both | fast-gate | `pnpm run typecheck && pnpm run biome:check && pnpm component-ship-gate` |
+| `Blog Content Qualification` | both | combined-integration | `node scripts/run-affected-tests.mjs --base origin/main` |
 | `CI Risk Classifier` | both | structural-contract | `pnpm ci:harness:check` |
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
@@ -445,7 +454,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
 | `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
-| `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test` |
+| `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
 | `Lighthouse (dashboard gate)` | merge-group | combined-integration | `pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr` |

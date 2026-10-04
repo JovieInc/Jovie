@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingShell } from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
@@ -72,11 +72,34 @@ vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
   resolveTurnstileSiteKey: () => null,
 }));
 
+const claimState = vi.hoisted(() => ({ value: 'error' }));
 vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
-  useOnboardingClaim: () => 'error',
+  useOnboardingClaim: () => claimState.value,
 }));
 
 describe('OnboardingShell status', () => {
+  beforeEach(() => {
+    claimState.value = 'error';
+  });
+
+  it('explains identity recovery without suggesting another handle or a blind retry', () => {
+    claimState.value = 'identity-conflict';
+    render(<OnboardingShell sessionLabel='pending' />);
+    const alert = screen.getByText(
+      /This Spotify artist already has a Jovie profile/
+    );
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(alert).toHaveTextContent('Sign in with the original account');
+    expect(alert).toHaveTextContent(
+      'Choosing another handle will not resolve this conflict'
+    );
+    expect(
+      screen.queryByText(
+        "We couldn't save your request. Refresh this page to try again."
+      )
+    ).not.toBeInTheDocument();
+  });
+
   it('renders the claim-error status with the error token, not raw red-* (JOV-6773)', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 

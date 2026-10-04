@@ -1364,6 +1364,30 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
+    id: 'creator-links-workspace',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.LINKS,
+    requiresAuth: true,
+    // The Links workspace is a contextual route, not a desktop-rail destination.
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
+    readySelectors: {
+      content: ['[data-testid="links-page"]'],
+    },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1600 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
+    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    priority: 13,
+    seedProfile: 'active-user',
+  },
+  {
     id: 'creator-chat-thread',
     group: 'creator-shell',
     surface: 'creator-app',
@@ -1865,8 +1889,8 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['a[href="/app/chat"]', '[placeholder*="ask jovie" i]'],
-      redirectDestinations: [APP_ROUTES.CHAT, APP_ROUTES.CHAT_PROFILE_PANEL],
+      content: ['[data-testid="links-page"]'],
+      redirectDestinations: [APP_ROUTES.LINKS],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },

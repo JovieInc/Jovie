@@ -14,6 +14,19 @@ describe('AUTH_CLASSES', () => {
 });
 
 describe('sanitizeRedirectUrl', () => {
+  it.each([
+    '/\t/evil.com',
+    '/\n/evil.com',
+    '/\r/evil.com',
+    '/%09/evil.com',
+    '/%0a/evil.com',
+  ])('rejects browser-normalized authority bypass %j', path => {
+    // The browser strips controls before resolving the authority component.
+    if (path.includes('\t') || path.includes('\n') || path.includes('\r')) {
+      expect(new URL(path, 'https://jov.ie').origin).toBe('https://evil.com');
+    }
+    expect(sanitizeRedirectUrl(path)).toBeNull();
+  });
   describe('valid redirect URLs', () => {
     it('should accept valid relative paths', () => {
       expect(sanitizeRedirectUrl('/dashboard')).toBe('/dashboard');

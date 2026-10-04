@@ -6,7 +6,9 @@ name: PR targets main
 # This job is a required context on main and also runs on every other PR
 # base so agents cannot "succeed" by targeting a side branch.
 #
-# merge_group only exists for the main queue, so it passes.
+# Read the current PR base: a queued synchronize event can still name a parent
+# branch after the PR has been retargeted to main. Bind that read to this event's
+# exact source head so an older run cannot validate a newer revision.
 
 on:
   pull_request:
@@ -16,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: pr-targets-main-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
@@ -28,16 +31,35 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Refuse any base other than main
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            echo "merge_group only exists for main"
-            exit 0
-          fi
-          base="${{ github.event.pull_request.base.ref }}"
-          if [[ "$base" != "main" ]]; then
-            echo "::error::PRs must target main. Base '$base' is forbidden. Retarget the pull request base to main, fetch origin/main, and rebase."
-            exit 1
-          fi
-          echo "PR targets main"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const sha = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+            if (repository !== 'JovieInc/Jovie') {
+              throw new Error('Base guard requires the canonical Jovie repository');
+            }
+            if (context.eventName === 'merge_group') {
+              const group = context.payload.merge_group;
+              if (group?.base_ref !== 'refs/heads/main' || !sha(group.base_sha) || !sha(group.head_sha)) {
+                throw new Error('Merge group must target main with exact base and head SHAs');
+              }
+              core.info('Merge group targets main');
+              return;
+            }
+            const eventPR = context.payload.pull_request;
+            if (context.eventName !== 'pull_request' || !Number.isSafeInteger(eventPR?.number) || eventPR.number <= 0 || !sha(eventPR.head?.sha)) {
+              throw new Error('Expected a pull_request event with an exact source head');
+            }
+            const { data: live } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: eventPR.number,
+              headers: { 'Cache-Control': 'no-cache' },
+            });
+            if (live.number !== eventPR.number || live.state !== 'open' || live.base?.repo?.full_name !== repository || !eventPR.head.repo?.full_name || live.head?.repo?.full_name !== eventPR.head.repo.full_name || live.head?.sha !== eventPR.head.sha) {
+              throw new Error('PR source identity changed or current metadata is incomplete');
+            }
+            if (live.base.ref !== 'main') {
+              throw new Error('PRs must target main. Retarget the pull request base to main, fetch origin/main, and rebase.');
+            }
+            core.info(`PR #${live.number} targets main at ${live.head.sha}`);

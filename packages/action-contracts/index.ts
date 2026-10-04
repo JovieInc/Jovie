@@ -1,5 +1,6 @@
 export * from './actions/chat-start';
 export * from './actions/contact-create';
+export * from './actions/fleet';
 export * from './actions/release-create';
 export * from './actions/task-create';
 export * from './client-version';

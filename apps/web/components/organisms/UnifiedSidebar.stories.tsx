@@ -1,10 +1,14 @@
+import { RenderedSidebarFamily } from '@/.storybook/rendered-family';
+import '../../styles/system-b-app.css';
 import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
@@ -12,6 +16,15 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { queryKeys } from '@/lib/queries/keys';
 import { UnifiedSidebar } from './UnifiedSidebar';
+
+function StorySidebarProvider({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <SidebarProvider open={open} onOpenChange={setOpen}>
+      {children}
+    </SidebarProvider>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -92,17 +105,22 @@ const meta: Meta<typeof UnifiedSidebar> = {
         <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
           <DashboardDataProvider value={dashboardData}>
             <TooltipProvider>
-              <SidebarProvider>
+              <StorySidebarProvider>
                 <JovieAuthValuesProvider>
                   <HeaderActionsProvider>
                     <ShellSidebarOverrideProvider>
-                      <div className='h-screen w-(--app-shell-sidebar-width)'>
-                        <Story />
-                      </div>
+                      <RenderedSidebarFamily
+                        name='unified-sidebar'
+                        owner='UnifiedSidebar'
+                      >
+                        <div className='h-screen w-(--app-shell-sidebar-width)'>
+                          <Story />
+                        </div>
+                      </RenderedSidebarFamily>
                     </ShellSidebarOverrideProvider>
                   </HeaderActionsProvider>
                 </JovieAuthValuesProvider>
-              </SidebarProvider>
+              </StorySidebarProvider>
             </TooltipProvider>
           </DashboardDataProvider>
         </AppFlagProvider>
@@ -119,6 +137,17 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Dashboard: Story = {};
+
+export const LegacyAdmin: Story = {
+  args: { section: 'admin' },
+  parameters: {
+    nextjs: { navigation: { pathname: APP_ROUTES.LEGACY_ADMIN } },
+  },
+};
+
+export const Demo: Story = {
+  parameters: { nextjs: { navigation: { pathname: APP_ROUTES.DEMO } } },
+};
 
 export const Settings: Story = {
   args: {
