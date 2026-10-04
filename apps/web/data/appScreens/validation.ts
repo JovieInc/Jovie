@@ -1,4 +1,4 @@
-import type { SettingsSidebarItem } from '@/components/features/settings/settings-sidebar-config';
+import type { SettingsAdmissionItem } from '@/components/features/settings/settings-decision-admission';
 import {
   APP_SCREEN_ARCHETYPE_IDS,
   APP_SCREEN_ARCHETYPE_REGISTRY,
@@ -685,7 +685,7 @@ export function buildAppScreenArchetypeReceipt(input: {
 /** Existing screen authority validates settings admission; this is not a second registry. */
 export function validateSettingsAdmission(
   groups: readonly {
-    items: readonly Pick<SettingsSidebarItem, 'id' | 'href' | 'admission'>[];
+    items: readonly Pick<SettingsAdmissionItem, 'id' | 'href' | 'admission'>[];
   }[],
   screens: readonly AppScreenRegistryEntry[] = APP_SCREEN_REGISTRY
 ): { itemId: string; code: string }[] {

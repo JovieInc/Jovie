@@ -2,7 +2,10 @@
 
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import { UnifiedTableSkeleton } from '@/components/organisms/table/organisms/UnifiedTableSkeleton';
-import { alignment } from '@/components/organisms/table/table.styles';
+import {
+  alignment,
+  type TableRowMode,
+} from '@/components/organisms/table/table.styles';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ColumnDef } from '@/lib/tanstack-table';
@@ -18,7 +21,12 @@ import type { LibraryReleaseAsset, LibraryView } from './library-data';
  * skeleton reads. `LibraryLoadingState.test.ts` pins them to the live table.
  */
 
-export const LIBRARY_TABLE_ROW_HEIGHT = 56;
+/**
+ * List rows carry two lines (title + artist), so they use the canonical
+ * two-line row mode. A bare `rowHeight` sizes virtualization only; the 40px
+ * row class and 32px cell clamp still apply, which clipped the artist line.
+ */
+export const LIBRARY_LIST_ROW_MODE = 'two-line' satisfies TableRowMode;
 export const LIBRARY_TABLE_MIN_WIDTH = '0';
 
 export const LIBRARY_VIEW_FILTER_CHIP_KEYS: readonly LibraryView[] = [
@@ -144,7 +152,7 @@ export function LibraryLoadingState() {
       <UnifiedTableSkeleton<LibraryReleaseAsset>
         columns={LIBRARY_TABLE_SKELETON_COLUMNS}
         hideHeader
-        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
+        rowMode={LIBRARY_LIST_ROW_MODE}
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}

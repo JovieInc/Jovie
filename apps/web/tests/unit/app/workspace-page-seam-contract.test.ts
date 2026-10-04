@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { resolveShrinkOnlyCountEvent } from '@/lib/design/shrink-only-count-ratchet';
 
@@ -80,9 +81,40 @@ describe('workspace page optical seam contract', () => {
       'components/features/library/library-catalog-columns.tsx'
     );
 
-    expect(librarySurface).toContain(
-      "import { alignment } from '@/components/organisms/table/table.styles';"
+    const parsed = ts.createSourceFile(
+      'LibrarySurface.tsx',
+      librarySurface,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX
     );
+    const tableStylesImport = parsed.statements.find(
+      statement =>
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text ===
+          '@/components/organisms/table/table.styles'
+    );
+    expect(
+      tableStylesImport && ts.isImportDeclaration(tableStylesImport)
+        ? tableStylesImport.importClause?.isTypeOnly
+        : true
+    ).toBe(false);
+    const bindings =
+      tableStylesImport && ts.isImportDeclaration(tableStylesImport)
+        ? tableStylesImport.importClause?.namedBindings
+        : undefined;
+    expect(
+      bindings && ts.isNamedImports(bindings)
+        ? bindings.elements.some(
+            element =>
+              !element.isTypeOnly &&
+              (element.propertyName?.text ?? element.name.text) ===
+                'alignment' &&
+              element.name.text === 'alignment'
+          )
+        : false
+    ).toBe(true);
     const seamOccurrences = [
       ...librarySurface.matchAll(/alignment\.workspaceSeamX/g),
       ...catalogColumns.matchAll(/alignment\.workspaceSeamX/g),

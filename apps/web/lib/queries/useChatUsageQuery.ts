@@ -16,7 +16,9 @@ export interface ChatUsageData {
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
-  /** Present when billing was unavailable and the snapshot is cached or degraded. */
+  /** Epoch milliseconds of the quota observation, when supplied by the API. */
+  observedAt?: number;
+  /** A validated historical observation served when billing or quota reads fail. */
   _stale?: boolean;
 }
 
