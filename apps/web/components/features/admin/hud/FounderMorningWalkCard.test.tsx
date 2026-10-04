@@ -1,4 +1,5 @@
 import { act, fireEvent, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fastRender } from '@/tests/utils/fast-render';
 import { FounderMorningWalkCard } from './FounderMorningWalkCard';
@@ -84,6 +85,7 @@ describe('FounderMorningWalkCard', () => {
     view.rerender(<FounderMorningWalkCard compact defaultStatus='Idle' />);
     expect(screen.queryByText('Morning walk')).toBeNull();
     expect(screen.getByTestId('founder-morning-walk')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Record walk' })).toBeDisabled();
   });
 
   it('cancels one pending selection and discards its late result without replacing a newer attempt', async () => {
@@ -144,7 +146,11 @@ describe('FounderMorningWalkCard', () => {
     await act(async () => start());
     expect(h.upload).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
-    expect(screen.getByRole('button', { name: 'Storing…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Storing…' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Storing…' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await act(async () => stopping.resolve(recording));
     expect(active.stop).toHaveBeenCalledOnce();
     expect(h.upload).toHaveBeenCalledExactlyOnceWith(recording.file, 'owner-a');
@@ -153,6 +159,98 @@ describe('FounderMorningWalkCard', () => {
     expect(
       screen.getByRole('link', { name: 'Last walk stored' })
     ).toBeInTheDocument();
+  });
+
+  it.each([
+    [false, true],
+    [false, false],
+    [true, true],
+    [true, false],
+  ])(
+    'keeps keyboard focus and blocks duplicate storage (compact=%s, success=%s)',
+    async (compact, ok) => {
+      const user = userEvent.setup();
+      const active = session(),
+        stopping = deferred<typeof recording>(),
+        uploading = deferred<{ url: string }>(),
+        confirming = deferred<{ ok: boolean }>();
+      active.stop.mockReturnValue(stopping.promise);
+      h.start.mockResolvedValueOnce(active);
+      h.upload.mockReturnValueOnce(uploading.promise);
+      h.fetch.mockReturnValueOnce(confirming.promise);
+      fastRender(
+        <FounderMorningWalkCard compact={compact} defaultStatus='Idle' />
+      );
+      const button = screen.getByRole('button', { name: 'Record walk' });
+      await user.click(button);
+      expect(
+        screen.getByRole('button', { name: compact ? 'Stop Walk' : 'Stop' })
+      ).toBe(button);
+      expect(button).toHaveFocus();
+      await user.keyboard('{Enter}');
+      expect(screen.getByRole('button', { name: 'Storing…' })).toBe(button);
+      expect(button).toHaveFocus();
+      expect(button).toBeEnabled();
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(button).toHaveAttribute('aria-busy', 'true');
+      await user.keyboard('{Enter} ');
+      expect(active.stop).toHaveBeenCalledOnce();
+      expect(h.start).toHaveBeenCalledOnce();
+      await act(async () => stopping.resolve(recording));
+      await user.keyboard('{Enter} ');
+      expect(h.upload).toHaveBeenCalledExactlyOnceWith(
+        recording.file,
+        'owner-a'
+      );
+      await act(async () =>
+        uploading.resolve({ url: 'https://blob.example/walk.webm' })
+      );
+      expect(button).toHaveFocus();
+      expect(screen.queryByRole('link')).toBeNull();
+      expect(h.fetch).toHaveBeenCalledOnce();
+      await act(async () => confirming.resolve({ ok }));
+      expect(screen.getByRole('button', { name: 'Record walk' })).toBe(button);
+      expect(button).toHaveFocus();
+      expect(button).not.toHaveAttribute('aria-disabled');
+      expect(button).not.toHaveAttribute('aria-busy');
+      if (ok) {
+        expect(screen.getByRole('link')).toHaveAttribute(
+          'href',
+          'https://blob.example/walk.webm'
+        );
+        expect(h.success).toHaveBeenCalledOnce();
+      } else {
+        expect(screen.queryByRole('link')).toBeNull();
+        expect(h.error).toHaveBeenCalledWith(
+          'Could not store the walk. Try again.'
+        );
+      }
+    }
+  );
+
+  it('does not steal focus back after the user leaves a storing action', async () => {
+    const user = userEvent.setup();
+    const active = session(),
+      pending = deferred<{ url: string }>();
+    h.start.mockResolvedValueOnce(active);
+    h.upload.mockReturnValueOnce(pending.promise);
+    fastRender(
+      <>
+        <FounderMorningWalkCard defaultStatus='Idle' />
+        <button type='button'>Other action</button>
+      </>
+    );
+    await user.click(screen.getByRole('button', { name: 'Record walk' }));
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Storing…' })).toHaveFocus();
+    await user.tab();
+    const other = screen.getByRole('button', { name: 'Other action' });
+    expect(other).toHaveFocus();
+    await act(async () =>
+      pending.resolve({ url: 'https://blob.example/walk.webm' })
+    );
+    expect(other).toHaveFocus();
+    expect(h.success).toHaveBeenCalledOnce();
   });
 
   it.each(['stop', 'upload'])(

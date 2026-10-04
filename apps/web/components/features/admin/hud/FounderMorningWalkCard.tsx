@@ -158,57 +158,83 @@ export function FounderMorningWalkCard(props: {
     }
   };
   const primaryAction = () => {
+    if (!userId || phase === 'uploading') return;
     if (phase === 'selecting') {
       discard();
       setPhase('idle');
-    } else void startRecording();
+    } else if (phase === 'recording') void stopRecording();
+    else void startRecording();
   };
+  const stopLabel = props.compact ? 'Stop Walk' : 'Stop';
   const recordLabel =
     phase === 'selecting'
       ? 'Cancel selection'
-      : phase === 'uploading'
-        ? 'Storing…'
-        : 'Record walk';
+      : phase === 'recording'
+        ? stopLabel
+        : phase === 'uploading'
+          ? 'Storing…'
+          : 'Record walk';
+  const action = (
+    <Button
+      type='button'
+      size='sm'
+      variant={props.compact ? 'secondary' : undefined}
+      onClick={primaryAction}
+      disabled={!userId}
+      aria-disabled={phase === 'uploading' || undefined}
+      aria-busy={phase === 'uploading' || undefined}
+      title={props.compact ? props.defaultStatus : undefined}
+    >
+      {phase === 'recording' ? (
+        <Square className='h-3.5 w-3.5' aria-hidden='true' />
+      ) : (
+        <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
+      )}
+      <span className='grid'>
+        {['Record walk', 'Cancel selection', stopLabel, 'Storing…'].map(
+          label => (
+            <span
+              key={label}
+              aria-hidden='true'
+              className='invisible col-start-1 row-start-1'
+            >
+              {label}
+            </span>
+          )
+        )}
+        <span className='col-start-1 row-start-1'>{recordLabel}</span>
+      </span>
+    </Button>
+  );
+  const linkLabel = props.compact ? 'Last walk' : 'Last walk stored';
+  const storedLink = (
+    <span
+      className={`grid min-w-0 text-secondary-token ${props.compact ? 'text-2xs' : 'text-xs'}`}
+    >
+      <span aria-hidden='true' className='invisible col-start-1 row-start-1'>
+        {linkLabel}
+      </span>
+      {lastUrl ? (
+        <a
+          href={lastUrl}
+          className='col-start-1 row-start-1 truncate underline'
+          target='_blank'
+          rel='noreferrer'
+        >
+          {linkLabel}
+        </a>
+      ) : null}
+    </span>
+  );
 
   if (props.compact) {
     return (
       <div
-        className='flex items-center gap-2'
+        className='flex flex-wrap items-center gap-2'
         data-testid='founder-morning-walk'
       >
-        {phase === 'recording' ? (
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={() => void stopRecording()}
-          >
-            <Square className='h-3.5 w-3.5' aria-hidden='true' />
-            Stop Walk
-          </Button>
-        ) : (
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={primaryAction}
-            disabled={phase === 'uploading' || !userId}
-            title={props.defaultStatus}
-          >
-            <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
-            {recordLabel}
-          </Button>
-        )}
-        {lastUrl ? (
-          <a
-            href={lastUrl}
-            className='truncate text-2xs text-secondary-token underline'
-            target='_blank'
-            rel='noreferrer'
-          >
-            Last walk
-          </a>
-        ) : null}
+        {action}
+        {storedLink}
       </div>
     );
   }
@@ -225,38 +251,9 @@ export function FounderMorningWalkCard(props: {
             Record the web path. Same account video store as creator capture.
             Classification is later. Nothing is admitted from this dump.
           </p>
-          {lastUrl ? (
-            <a
-              href={lastUrl}
-              className='block truncate text-xs text-secondary-token underline'
-              target='_blank'
-              rel='noreferrer'
-            >
-              Last walk stored
-            </a>
-          ) : null}
+          {storedLink}
         </div>
-        {phase === 'recording' ? (
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={() => void stopRecording()}
-          >
-            <Square className='h-3.5 w-3.5' aria-hidden='true' />
-            Stop
-          </Button>
-        ) : (
-          <Button
-            type='button'
-            size='sm'
-            onClick={primaryAction}
-            disabled={phase === 'uploading' || !userId}
-          >
-            <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
-            {recordLabel}
-          </Button>
-        )}
+        {action}
       </div>
     </ContentSurfaceCard>
   );
