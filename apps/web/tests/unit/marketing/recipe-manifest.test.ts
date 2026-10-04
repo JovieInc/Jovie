@@ -702,9 +702,9 @@ describe('marketing route manifest integrity', () => {
     expect(pricingReport.matches).toBe(false);
 
     const artistReport = getRouteRecipeParity(artistProfiles!);
+    // logo-cloud waits for a brand permission (JOV-7795).
     expect(artistReport.actualSectionIds).toEqual([
       'hero',
-      'logo-cloud',
       'feature-split',
       'feature-grid',
       'capture',

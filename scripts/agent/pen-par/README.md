@@ -15,14 +15,17 @@ Measured 2026-10-03 on pen CLI 0.3.10, file format 2.20, 18 MB / 19,758 nodes:
 | Slice, new homepage frames | 8 | 8/8 | 600 s | 31 |
 
 Cost from `--usage`: Sonnet 5.5 about $0.28 per restyle run and $0.62 per new
-page, Opus 5.5 about $1.10 per new page. Billing goes to the pen.dev account;
-no model API keys are involved.
+page, Opus 5.5 about $1.10 per new page. `--agent claude` runs through the
+machine's Claude Code login, so these runs draw on that subscription and its
+session limit (a limit hit fails fast with `rate_limit`). No model API keys are
+involved.
 
 ## Setup
 
 ```bash
 npm i -g @pen.dev/cli@latest   # check `pen version`; an old CLI parses a newer file as EMPTY
 pen login                      # once per machine
+claude                         # /login once per machine: the claude agent rides this session
 pen codex-login                # only for --agent codex (ChatGPT subscription)
 ```
 
@@ -33,6 +36,8 @@ Pen resolves image paths relative to the file:
 WS=$TMPDIR/pen-par/ws/"Jovie Marketing Workspace"; mkdir -p "$WS"
 SRC=~/Documents/Jovie/"Jovie Marketing Workspace"
 for d in assets images proof-art product-screenshots hero-studies fonts; do cp -cR "$SRC/$d" "$WS/"; done
+find "$SRC" -maxdepth 1 -type f \( -name '*.png' -o -name '*.jp*g' -o -name '*.webp' -o -name '*.glsl' \) \
+  -exec cp -c {} "$WS/" \;   # root-level images too: frames reference e.g. generated-54.png
 cp -c "$SRC/<file>.pen" "$WS/src.pen"; chmod a-w "$WS/src.pen"
 ```
 
@@ -77,6 +82,9 @@ only as reference. The default mode duplicates the target and restyles the copy.
 - A full 18 MB input costs every process about 30 s of CPU just to load. Above
   roughly 3 parallel jobs, slice first.
 - Remote: every `pen` command, including agent-free export, needs `pen login`
-  or `PEN_CLI_KEY` on that machine.
+  or `PEN_CLI_KEY` on that machine, and `--agent claude` also needs a Claude
+  Code login there ("Not logged in · Please run /login" otherwise).
+- A checkerboard where an image should be means the scratch copy is missing
+  that asset; check the frame's image `url` against the workspace.
 
 Tests: `node --test scripts/agent/pen-par/pen-par.test.mjs`.
