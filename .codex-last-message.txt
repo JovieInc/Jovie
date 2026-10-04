@@ -1,0 +1,8 @@
+PR [#20629](https://github.com/JovieInc/Jovie/pull/20629) is green and conflict-free.
+
+- Merged latest `origin/main`; resolved the harness conflict while preserving both behaviors.
+- Strengthened case-insensitive credit reconciliation and provider-ID conflict handling.
+- Added regression coverage for discography and GitHub harness behavior.
+- Pushed head `31350f6a5d722c44716273130c741d36b8ed856f`.
+- All local tests, typechecks, formatting, coverage, security, migration, source-validation, and hosted CI checks pass.
+- PR status: `OPEN`, `MERGEABLE`, `CLEAN`, not queued. It remains draft, unchanged.
