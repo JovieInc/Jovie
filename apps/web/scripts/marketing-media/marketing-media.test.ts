@@ -287,6 +287,18 @@ describe('generation pipeline', () => {
       fs: memoryFs(),
     });
     expect(surface).toMatchObject({ status: 'rejected' });
+    const unknown = await generateMarketingImage({
+      request: { ...request, recipeId: 'pen:N8WMP' as never },
+      adapter,
+      assetId: 'x',
+      outDir: '/out',
+      artGate: passGate,
+      fs: memoryFs(),
+    });
+    expect(unknown).toMatchObject({
+      status: 'rejected',
+      reason: 'pen:N8WMP is not a marketing media recipe',
+    });
     const person = await generateMarketingImage({
       request: { ...request, characterId: 'C99' },
       adapter,

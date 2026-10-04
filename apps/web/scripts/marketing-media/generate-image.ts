@@ -171,11 +171,20 @@ export async function generateMarketingImage(
   input: GenerateMarketingImageInput
 ): Promise<MarketingImageResult> {
   const { request, adapter } = input;
-  if (
-    !MARKETING_MEDIA_RECIPE_SOURCE_MATRIX[request.recipeId].includes(
-      'generated-artwork'
-    )
-  ) {
+  // Unknown ids (a Pen ref, a typo) are refused like capture-only recipes.
+  const sources = Object.hasOwn(
+    MARKETING_MEDIA_RECIPE_SOURCE_MATRIX,
+    request.recipeId
+  )
+    ? MARKETING_MEDIA_RECIPE_SOURCE_MATRIX[request.recipeId]
+    : null;
+  if (!sources) {
+    return {
+      status: 'rejected',
+      reason: `${String(request.recipeId)} is not a marketing media recipe`,
+    };
+  }
+  if (!sources.includes('generated-artwork')) {
     return {
       status: 'rejected',
       reason: `${request.recipeId} only accepts real captures; product UI is never generated`,
