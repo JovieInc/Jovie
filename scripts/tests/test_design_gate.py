@@ -326,6 +326,11 @@ class FakeLinear:
 class AdmissionTest(unittest.TestCase):
     def setUp(self):
         self.lane = load_lane()
+        # wants_brief() reads the wall clock; pin it near NOW so the 24h hold escape
+        # (HOLD_LIMIT_S) never fires just because the suite runs a day after NOW.
+        clock = mock.patch.object(design_gate, "time", SimpleNamespace(time=lambda: NOW + 3600))
+        clock.start()
+        self.addCleanup(clock.stop)
 
     def task(self, identifier, title, description, priority, labels):
         return self.lane.Issue(f"id-{identifier}", identifier, title, description, priority,

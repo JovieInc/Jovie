@@ -3443,6 +3443,13 @@ class UpdateTest(unittest.TestCase):
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 
+    def test_release_selftest_never_sees_host_tuning(self):
+        knobs = {"LANES_SLOTS_DEVIN": "2", "SYMPHONY_FILE_OVERLAP_GUARD": "flag", "LANES_PARKED_RETIRE": "0"}
+        with patch.dict(os.environ, {**knobs, "PATH": "/bin"}):
+            env = lane.selftest_env(Path("/scratch"))
+        self.assertFalse(set(knobs) & set(env))
+        self.assertEqual((env["PATH"], env["LANES_SELFTEST"], env["LANES_STATE"]), ("/bin", "1", "/scratch"))
+
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp).resolve()  # macOS /var -> /private/var must match .resolve() below

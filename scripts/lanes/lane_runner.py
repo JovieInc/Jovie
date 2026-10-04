@@ -4738,6 +4738,16 @@ def release_identity(host: Host) -> dict:
             "bundleDigest": digest, "objects": manifest}
 
 
+# Per-host tuning (LANES_SLOTS_DEVIN=2, SYMPHONY_FILE_OVERLAP_GUARD=flag, ...) must not reach the
+# release self-test: the fixtures assume defaults, so a tuned host refused every release.
+HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_")
+
+
+def selftest_env(scratch: Path) -> dict:
+    env = {key: value for key, value in os.environ.items() if not key.startswith(HOST_KNOB_PREFIXES)}
+    return {**env, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+
+
 def install_release(host: Host) -> int:
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
@@ -4771,7 +4781,7 @@ def install_release(host: Host) -> int:
         try:
             test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                                   cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                                  env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+                                  env=selftest_env(scratch))
         except subprocess.TimeoutExpired:
             refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
             raise
