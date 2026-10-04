@@ -937,7 +937,7 @@ def brief_due(issue, decision: dict) -> bool:
             and find_brief_link(description) is None and brief_attempts(description) < 2)
 
 
-def wants_brief(issue, repo=None, now: float | None = None) -> bool:
+def wants_brief(issue, repo=None, now=None) -> bool:
     """The runner's mode switch: True means run the brief lane, not a build."""
     return brief_due(issue, build_admission(issue, read_text=repo_reader(repo), now=now))
 

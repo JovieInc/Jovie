@@ -274,6 +274,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'editorial',
         'structure'
       ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'structured-data-list'
+      ),
       approvedBinding(
         'apps/web/components/homepage/HomepageIdentityClose.tsx',
         'cta',
@@ -283,7 +288,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'JOV-6220 source owner reconciliation 2026-09-29; HomepageIdentityHero and HomepageIdentitySections render tests',
+        'JOV-6220 source owner reconciliation 2026-09-29; JOV-7795 homepage anatomy contract; HomepageIdentityHero and HomepageIdentitySections render tests',
       notes:
         'Identity v3 supersedes the legacy relationships/changelog composition (Tim 2026-09-28). Source inventory only; exact deployed mounted-section, visual, and outcome receipts remain separate. Pen identity is unknown.',
     },

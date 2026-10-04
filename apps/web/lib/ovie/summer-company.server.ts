@@ -85,10 +85,20 @@ export async function getSummerRevenue(now = new Date()) {
     : !stripeMetrics.isAvailable
       ? unavailable('stripe_request_failed')
       : {
+          metricScope: 'customer_only' as const,
           mrrUsd: stripeMetrics.mrrUsd,
           activeSubscriptions: stripeMetrics.activeSubscribers,
           excludedInternal: stripeMetrics.excludedInternalSubscribers,
           excludedInternalMrrUsd: stripeMetrics.excludedInternalMrrUsd,
+          rawMrrUsd:
+            stripeMetrics.mrrUsd + stripeMetrics.excludedInternalMrrUsd,
+          rawActiveSubscriptions:
+            stripeMetrics.activeSubscribers +
+            stripeMetrics.excludedInternalSubscribers,
+          syntheticHealth: {
+            mrrUsd: stripeMetrics.excludedInternalMrrUsd,
+            activeSubscriptions: stripeMetrics.excludedInternalSubscribers,
+          },
           source: 'stripe' as const,
         };
   return { observedAt: now.toISOString(), jovie, lyb };
@@ -111,11 +121,31 @@ export type SummerCohortRow = {
 };
 
 type Cohort = {
+  readonly metricScope: 'customer_only';
   readonly total: number;
   /** Internal/test accounts excluded from this cohort (JOV-6673). */
   readonly excludedInternal: number;
+  readonly customerTotal: number;
+  readonly rawTotal: number;
+  readonly syntheticHealth: Readonly<{ total: number }>;
   readonly rows: SummerCohortRow[];
 };
+
+function cohortResult(
+  total: number,
+  excludedInternal: number,
+  rows: SummerCohortRow[]
+): Cohort {
+  return {
+    metricScope: 'customer_only',
+    total,
+    excludedInternal,
+    customerTotal: total,
+    rawTotal: total + excludedInternal,
+    syntheticHealth: { total: excludedInternal },
+    rows,
+  };
+}
 
 /** Reachable account: not deleted and not suppressed from outbound. */
 const reachableUser = () =>
@@ -169,10 +199,10 @@ async function claimedArtists(limit: number): Promise<Cohort> {
       .innerJoin(users, eq(users.id, userProfileClaims.userId))
       .where(and(baseWhere, internalAccount())),
   ]);
-  return {
-    total: totals?.total ?? 0,
-    excludedInternal: excluded?.total ?? 0,
-    rows: rows.map(row => ({
+  return cohortResult(
+    totals?.total ?? 0,
+    excluded?.total ?? 0,
+    rows.map(row => ({
       id: row.id,
       displayName: row.displayName || row.username,
       profileUrl: getProfileUrl(row.username),
@@ -180,8 +210,8 @@ async function claimedArtists(limit: number): Promise<Cohort> {
       ...(row.claimedAt
         ? { detail: `claimed ${row.claimedAt.toISOString()}` }
         : {}),
-    })),
-  };
+    }))
+  );
 }
 
 /** Users whose subscription was deleted and who have not paid again since. */
@@ -218,18 +248,18 @@ async function churned(limit: number): Promise<Cohort> {
       .innerJoin(users, eq(users.id, billingAuditLog.userId))
       .where(and(baseWhere, internalAccount())),
   ]);
-  return {
-    total: totals?.total ?? 0,
-    excludedInternal: excluded?.total ?? 0,
-    rows: rows.map(row => ({
+  return cohortResult(
+    totals?.total ?? 0,
+    excluded?.total ?? 0,
+    rows.map(row => ({
       id: row.id,
       displayName: row.name || row.email || row.id,
       ...withEmail(row.email),
       detail: row.cancelledAt
         ? `subscription cancelled ${row.cancelledAt.toISOString()}`
         : 'subscription cancelled',
-    })),
-  };
+    }))
+  );
 }
 
 const ABANDONED_WINDOW_DAYS = 30;
@@ -268,7 +298,7 @@ async function checkoutAbandoned(limit: number, now: Date): Promise<Cohort> {
     if (!sessions.has_more || !startingAfter) break;
   }
   if (latestByCustomer.size === 0) {
-    return { total: 0, excludedInternal: 0, rows: [] };
+    return cohortResult(0, 0, []);
   }
 
   const matched = await db
@@ -296,16 +326,16 @@ async function checkoutAbandoned(limit: number, now: Date): Promise<Cohort> {
       expiredAt: latestByCustomer.get(row.stripeCustomerId ?? '') ?? 0,
     }))
     .sort((left, right) => right.expiredAt - left.expiredAt);
-  return {
-    total: rows.length,
+  return cohortResult(
+    rows.length,
     excludedInternal,
-    rows: rows.slice(0, limit).map(({ row, expiredAt }) => ({
+    rows.slice(0, limit).map(({ row, expiredAt }) => ({
       id: row.id,
       displayName: row.name || row.email || row.id,
       ...withEmail(row.email),
       detail: `checkout expired ${new Date(expiredAt * 1000).toISOString()}`,
-    })),
-  };
+    }))
+  );
 }
 
 export async function getSummerCohort(

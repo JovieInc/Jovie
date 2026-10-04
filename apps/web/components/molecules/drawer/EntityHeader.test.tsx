@@ -76,7 +76,8 @@ describe('EntityHeader', () => {
       <EntityHeader title='Long entity name' stableLayout reserveFooterSlot />
     );
     const title = screen.getByText('Long entity name');
-    expect(title).toHaveClass('line-clamp-1', 'min-h-6');
+    expect(title).toHaveClass('truncate', 'min-h-6');
+    expect(title).not.toHaveClass('line-clamp-1');
     expect(screen.getByTestId('entity-header-meta-slot')).toHaveClass(
       'invisible'
     );

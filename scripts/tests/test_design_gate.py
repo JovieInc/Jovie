@@ -325,7 +325,15 @@ class FakeLinear:
 
 class AdmissionTest(unittest.TestCase):
     def setUp(self):
+        # Keep default-time helpers on the same clock as the simulated hold window.
+        clock = mock.patch.object(design_gate.time, "time", return_value=NOW)
+        clock.start()
+        self.addCleanup(clock.stop)
         self.lane = load_lane()
+        # Keep default-time helpers on the same clock as the simulated hold window.
+        clock = mock.patch.object(design_gate.time, "time", return_value=NOW)
+        clock.start()
+        self.addCleanup(clock.stop)
 
     def task(self, identifier, title, description, priority, labels):
         return self.lane.Issue(f"id-{identifier}", identifier, title, description, priority,
@@ -431,7 +439,7 @@ class BriefLaneTest(unittest.TestCase):
         self.assertNotIn(design_gate.NEEDS_BRIEF_LABEL, linear.labels[gated.id])
         gated.description = linear.descriptions[gated.id]
         self.assertTrue(design_gate.build_admission(gated)["admit"])
-        self.assertFalse(design_gate.wants_brief(gated))
+        self.assertFalse(design_gate.wants_brief(gated, now=NOW))
         again = design_gate.publish_brief(linear, gated, app_brief())
         self.assertEqual(again["reasons"], ["brief-already-published"])
         self.assertEqual(gated.description.count(design_gate.BRIEF_MARKER), 1)
