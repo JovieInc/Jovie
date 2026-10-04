@@ -121,8 +121,8 @@ async function assertDashboardRouteLoaded(
   if (path === APP_ROUTES.DASHBOARD_EARNINGS) {
     await expect(
       page,
-      'Legacy earnings route did not redirect to artist profile tips'
-    ).toHaveURL(/\/app\/settings\/artist-profile\?tab=earn/);
+      'Legacy earnings route did not redirect to profile payment settings'
+    ).toHaveURL(/\/app\/settings\/profile\?tab=earn#pay$/);
     return;
   }
 }

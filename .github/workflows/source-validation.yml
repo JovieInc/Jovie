@@ -141,6 +141,7 @@ jobs:
           pnpm typecheck
           pnpm run typecheck:scripts
           pnpm --filter @jovie/web run typecheck:tests
+          pnpm --filter @jovie/web run typecheck:stories
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm component-ship-gate

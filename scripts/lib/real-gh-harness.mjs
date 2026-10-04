@@ -3,16 +3,16 @@ import {
   accessSync,
   closeSync,
   constants,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   openSync,
   readSync,
   rmSync,
-  symlinkSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { basename, delimiter, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -128,8 +128,17 @@ export function storedZip(files) {
  * @param {Record<string, string | undefined>} [opts.env]
  * @param {(path: string) => { status?: number, body: unknown } | null} opts.route
  * @param {string} [opts.gh]
+ * @param {boolean} [opts.allowCallerGhOverride] Let a deliberate caller `gh`
+ * fixture win for negative-control tests. Normal harness runs must leave this
+ * false so host shims cannot replace the resolved real CLI.
  */
-export async function runWithRealGh({ script, env = {}, route, gh }) {
+export async function runWithRealGh({
+  script,
+  env = {},
+  route,
+  gh,
+  allowCallerGhOverride = false,
+}) {
   const binary = gh ?? resolveRealGh();
   if (!binary) throw new Error('real gh binary is not installed');
   const requests = [];
@@ -161,20 +170,22 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
-  // `gh` in the script must be the resolved real binary, but caller PATH
-  // fixtures (e.g. a deliberate fake `gh` stub) must still win. So the real
-  // binary goes after any directories the caller prepended to PATH and
-  // before the inherited PATH, where lane-level `gh` wrapper shims live.
-  const realBin = join(home, 'bin');
-  mkdirSync(realBin);
-  symlinkSync(binary, join(realBin, 'gh'));
+  // The resolved binary must win `gh` lookup even when the caller supplies its
+  // own PATH (e.g. to shadow `node`): a harness-owned dir holding only the
+  // real gh is prepended after the caller's env is merged. Caller dirs still
+  // shadow everything else. Copy, don't symlink, so wrapper detection and
+  // platform quirks can't resurrect a shim.
+  const ghDir = mkdtempSync(join(tmpdir(), 'real-gh-bin-'));
   const basePath = process.env.PATH ?? '';
   const callerPath = env.PATH ?? basePath;
   const callerPrefix = callerPath.endsWith(basePath)
     ? callerPath.slice(0, callerPath.length - basePath.length)
     : '';
-  const childPath = `${callerPrefix}${realBin}${delimiter}${basePath}`;
+  const childPath = allowCallerGhOverride
+    ? `${callerPrefix}${ghDir}${delimiter}${basePath}`
+    : `${ghDir}${delimiter}${callerPath}`;
   try {
+    copyFileSync(binary, join(ghDir, basename(binary)));
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
@@ -209,5 +220,6 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   } finally {
     server.close();
     rmSync(home, { recursive: true, force: true });
+    rmSync(ghDir, { recursive: true, force: true });
   }
 }

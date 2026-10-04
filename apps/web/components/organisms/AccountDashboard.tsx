@@ -62,9 +62,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href={APP_ROUTES.SETTINGS_ARTIST_PROFILE}>
-                Edit Profile
-              </Link>
+              <Link href={APP_ROUTES.SETTINGS_PROFILE}>Edit Profile</Link>
             </Button>
           </div>
         </ContentSurfaceCard>

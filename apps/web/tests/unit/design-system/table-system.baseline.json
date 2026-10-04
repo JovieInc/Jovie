@@ -1,0 +1,29 @@
+{
+  "note": "One table system (JOV-7701 tables workstream, 2026-10-03). Every app table renders through components/organisms/table (UnifiedTable and its row modes). rawTable lists files that still hand-roll <table> markup; rawRowHeight lists table files that pass a pixel rowHeight instead of a rowMode (dense | compact | two-line | description | controls). Per-file counts may only go down and new files may not appear. Marketing and email content tables are content, not app tables, and are listed so the scan stays honest. Lower or delete an entry in the SAME PR that migrates it.",
+  "rawTable": {
+    "app/(marketing)/launch/page.tsx": 1,
+    "app/app/(shell)/admin/_components/AdminScoreboardSection.tsx": 1,
+    "app/app/(shell)/admin/activity/loading.tsx": 1,
+    "app/app/(shell)/admin/features/FeatureFlagAuditSection.tsx": 1,
+    "app/app/(shell)/admin/revenue-lift/RevenueLiftDashboardView.tsx": 3,
+    "app/app/(shell)/admin/shipping/ShippingMatrix.tsx": 1,
+    "app/app/(shell)/admin/shipping/ShippingStatistics.tsx": 1,
+    "components/features/admin/ShippingVelocityCanvas.tsx": 1,
+    "components/features/admin/contacts-table/AdminContactsTable.tsx": 1,
+    "components/features/admin/hud/FounderFunnelDrilldown.tsx": 1,
+    "components/features/dev/NoirIonSpecimen.tsx": 1,
+    "components/features/home/demo/DashboardAudienceDemo.tsx": 1,
+    "components/features/pricing/PricingComparisonChart.tsx": 2,
+    "components/molecules/ContentTable.tsx": 1,
+    "components/organisms/ComparisonPageContent.tsx": 1
+  },
+  "rawRowHeight": {
+    "app/app/(shell)/admin/investors/page.tsx": 1,
+    "app/app/(shell)/admin/presence/CompanyPresenceWorkspace.tsx": 1,
+    "app/app/(shell)/dashboard/contacts/loading.tsx": 1,
+    "app/app/(shell)/profiles/ProfilesWorkspace.tsx": 1,
+    "components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": 1,
+    "components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": 1,
+    "components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx": 1
+  }
+}

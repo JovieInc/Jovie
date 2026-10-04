@@ -51,7 +51,7 @@ const baseProps = {
   rowRefsMap: new Map<number, HTMLTableRowElement>(),
   shouldEnableKeyboardNav: false,
   shouldVirtualize: false,
-  focusedIndex: -1,
+  isFocused: false,
   onFocusChange: vi.fn(),
   onKeyDown: vi.fn(),
 };
@@ -223,7 +223,7 @@ describe('VirtualizedTableRow', () => {
           <VirtualizedTableRow
             {...baseProps}
             shouldEnableKeyboardNav
-            focusedIndex={1}
+            isFocused={false}
           />
         </tbody>
       </table>

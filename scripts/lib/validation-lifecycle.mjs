@@ -29,11 +29,23 @@ export const COMPUTED_RECEIPT_KINDS = Object.freeze([
   'deployment',
   'escaped-defect-dual-closure',
 ]);
-/** Kinds an owner records with a receipt comment. */
+/**
+ * Kinds an owner records with a receipt comment. For UI changes (JOV-7759)
+ * machines review correctness and the founder reviews taste:
+ * `screen-audit` is the JOV-7713 screen-audit ledger showing every changed
+ * screen green on the exact production build; `founder-taste` is the
+ * founder's decision on that build, recorded from the Ovie taste card
+ * (JOV-7739), and a rejection carries a note.
+ */
 export const RECORDED_RECEIPT_KINDS = Object.freeze([
   'outcome',
   'human-certification',
+  'screen-audit',
+  'founder-taste',
 ]);
+/** Matrix judgments that owe the founder; every other judgment owes machines. */
+const TASTE_JUDGMENTS = new Set(['taste', 'mixed']);
+const MAX_NOTE_LENGTH = 2000;
 
 const RECEIPT_MARKER = /<!--\s*validation-receipt:v1\s*\n?([\s\S]*?)\n?\s*-->/g;
 const STATUS_MARKER = /<!--\s*validation-lifecycle:v1\s+([0-9a-f]{16})\s*-->/;
@@ -178,6 +190,12 @@ function hasOpenAcceptanceSection(description) {
  * }} RiskSummary
  * @typedef {{ kind: string, reason: string }} RequiredReceipt
  * @typedef {{
+ *   row: string,
+ *   failureClass: string,
+ *   judgment: string,
+ *   targets: readonly string[],
+ * }} UiEvidence
+ * @typedef {{
  *   schema: string,
  *   issue: string,
  *   bindingSha: string,
@@ -185,6 +203,7 @@ function hasOpenAcceptanceSection(description) {
  *   mergedPulls: string[],
  *   riskLevel: string,
  *   required: RequiredReceipt[],
+ *   uiEvidence?: UiEvidence[],
  * }} ValidationManifest
  */
 
@@ -225,6 +244,7 @@ export function selectBindingPull(pulls) {
  *   readonly risk: RiskSummary | null,
  *   readonly parentReason?: string,
  *   readonly escapedDefect?: boolean,
+ *   readonly uiEvidence?: readonly UiEvidence[] | null,
  * }} input
  * @returns {ValidationManifest | null}
  */
@@ -270,6 +290,49 @@ export function deriveValidationManifest(input) {
       reason: 'the issue declares validation-required: human-certification',
     });
   }
+  // JOV-7713 names the UI rows a change invalidates, each with a judgment.
+  // Deterministic rows owe machine evidence, taste rows owe the founder, and
+  // mixed rows owe both, so ordinary UI work never waits on Tim. `null` means
+  // the merged files or the matrix could not be read: unknown machine
+  // evidence, never "no UI".
+  const uiEvidence = input.uiEvidence === undefined ? [] : input.uiEvidence;
+  /** @param {(judgment: string) => boolean} owes */
+  const owing = owes =>
+    (uiEvidence ?? []).filter(entry => owes(String(entry.judgment)));
+  /** @param {readonly UiEvidence[]} rows */
+  const describe = rows =>
+    `${rows.map(entry => `${entry.row} ${entry.failureClass}`).join(', ')} on ${[...new Set(rows.flatMap(entry => entry.targets))].join(', ')}`;
+  const machine = owing(judgment => judgment !== 'taste');
+  const taste = owing(judgment => TASTE_JUDGMENTS.has(judgment));
+  if (uiEvidence === null) {
+    required.push({
+      kind: 'screen-audit',
+      reason:
+        'UI evidence is unknown (merged files or the assurance matrix were unreadable); the screen-audit ledger must show the exact build green',
+    });
+  } else if (machine.length > 0) {
+    required.push({
+      kind: 'screen-audit',
+      reason: `UI change invalidates ${describe(machine)}; the screen-audit ledger (JOV-7713) must show every changed screen green on the exact production build`,
+    });
+  }
+  if (taste.length > 0) {
+    required.push({
+      kind: 'founder-taste',
+      reason: `UI change invalidates ${describe(taste)}; the founder accepts the exact production build (Ovie taste card, JOV-7739)`,
+    });
+  }
+  if (
+    !required.some(entry => entry.kind === 'founder-taste') &&
+    declaredRequirements(input.issue.description ?? '').includes(
+      'founder-taste'
+    )
+  ) {
+    required.push({
+      kind: 'founder-taste',
+      reason: 'the issue declares validation-required: founder-taste',
+    });
+  }
   return {
     schema: VALIDATION_MANIFEST_SCHEMA,
     issue: input.issue.identifier.toUpperCase(),
@@ -280,6 +343,16 @@ export function deriveValidationManifest(input) {
       .map(pull => pull.url),
     riskLevel,
     required,
+    ...(uiEvidence && uiEvidence.length > 0
+      ? {
+          uiEvidence: uiEvidence.map(entry => ({
+            row: entry.row,
+            failureClass: entry.failureClass,
+            judgment: entry.judgment,
+            targets: [...entry.targets],
+          })),
+        }
+      : {}),
   };
 }
 
@@ -289,6 +362,7 @@ export function deriveValidationManifest(input) {
  *   status: 'pass' | 'fail',
  *   sha: string,
  *   evidence: string,
+ *   note?: string,
  *   recordedAt: string,
  * }} ValidationReceipt
  */
@@ -331,11 +405,16 @@ export function parseValidationReceipts(comments, identifier) {
       ) {
         continue;
       }
+      const note =
+        typeof parsed.note === 'string'
+          ? parsed.note.trim().slice(0, MAX_NOTE_LENGTH)
+          : '';
       receipts.push({
         kind,
         status,
         sha,
         evidence: parsed.evidence.trim(),
+        ...(note ? { note } : {}),
         recordedAt,
       });
     }
@@ -353,6 +432,7 @@ export function parseValidationReceipts(comments, identifier) {
  *   status: 'pass' | 'fail',
  *   sha: string,
  *   evidence: string,
+ *   note?: string,
  * }} receipt
  * @returns {string}
  */
@@ -374,6 +454,12 @@ export function formatValidationReceipt(receipt) {
   if (String(receipt.evidence ?? '').trim().length < 8) {
     throw new Error('receipt evidence must reference the proof');
   }
+  const note = String(receipt.note ?? '').trim();
+  if (note.length > MAX_NOTE_LENGTH) {
+    throw new Error(
+      `receipt note must be at most ${MAX_NOTE_LENGTH} characters`
+    );
+  }
   const payload = {
     schema: VALIDATION_RECEIPT_SCHEMA,
     issue: receipt.issue.toUpperCase(),
@@ -381,9 +467,11 @@ export function formatValidationReceipt(receipt) {
     status: receipt.status,
     sha: receipt.sha.toLowerCase(),
     evidence: receipt.evidence.trim(),
+    ...(note ? { note } : {}),
   };
   return [
     `Validation receipt: ${payload.kind} ${payload.status} for ${payload.sha.slice(0, 12)}. Evidence: ${payload.evidence}`,
+    ...(note ? [`Note: ${note}`] : []),
     '',
     `<!-- validation-receipt:v1\n${JSON.stringify(payload)}\n-->`,
   ].join('\n');
@@ -475,7 +563,7 @@ export function decideValidationTransition(input) {
       failing,
       explanation: failing.map(
         receipt =>
-          `Required ${receipt.kind} failed at ${receipt.sha.slice(0, 12)}: ${receipt.evidence}`
+          `Required ${receipt.kind} failed at ${receipt.sha.slice(0, 12)}: ${receipt.evidence}${receipt.note ? `. Note: ${receipt.note}` : ''}`
       ),
     };
   }
