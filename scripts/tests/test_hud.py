@@ -13,6 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("hud", ROOT / "scripts/lanes/hud.py")
@@ -74,6 +75,55 @@ def model(**overrides) -> dict:
     }
     base.update(overrides)
     return base
+
+
+class MergeEvidenceTest(unittest.TestCase):
+    def test_initial_remote_state_does_not_claim_zero_merges(self):
+        sample = model(github=hud.Remote(None).github)
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("not-read-yet", text)
+        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("landed unknown", text)
+
+    def test_complete_empty_window_remains_true_zero(self):
+        sample = model()
+        sample["github"]["merged24h"] = []
+        sample["github"]["mergedWindow"] = {"complete": True}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("total 0 in 24h", text)
+        self.assertIn("landed 0", text)
+
+    def test_explicit_incomplete_receipt_suppresses_stale_rows(self):
+        sample = model()
+        sample["github"]["mergedWindow"] = {"complete": False, "reason": "unstable_snapshot"}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 2 in 24h", text)
+        self.assertNotIn("#18671", text)
+
+    def test_unreadable_merge_evidence_is_unknown_not_zero(self):
+        sample = model()
+        sample["github"]["errors"]["merged"] = "merged-pr-evidence:unstable_snapshot"
+        sample["github"]["merged24h"] = []
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("landed unknown", text)
+
+    def test_github_model_uses_shared_reader_and_retains_incomplete_reason(self):
+        evidence = {"complete": False, "reason": "max_pages_reached", "prs": [],
+                    "window": {"since": 1, "until": 2}, "pages": 20, "scans": 1}
+        with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "load_providers", return_value={}), \
+                mock.patch.object(hud, "promotion_model", return_value={"error": "fixture"}), \
+                mock.patch.object(hud, "gh_json", side_effect=RuntimeError("fixture")), \
+                mock.patch.object(hud.merge_evidence, "collect", return_value=evidence) as collect:
+            result = hud.github_model()
+        self.assertEqual(result["mergedWindow"]["reason"], "max_pages_reached")
+        self.assertIn("max_pages_reached", result["errors"]["merged"])
+        self.assertNotIn("merged24h", result)
+        self.assertEqual(collect.call_count, 1)
 
 
 class ParseTest(unittest.TestCase):
