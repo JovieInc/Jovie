@@ -1,0 +1,10 @@
+Fixed and published as draft PR [#19848](https://github.com/JovieInc/Jovie/pull/19848).
+
+- Corrected Sentry SDK 11’s `withSentryConfig` import.
+- Added production-config regression coverage.
+- Verified Vitest 11/11, monorepo typecheck 17/17, Biome, and commit/push hooks.
+- Commit: `c4bb6c3317beae87c835dd793627e4410613562a`
+- JOV-7384 transitioned to In Review.
+- PR remains draft and unmerged as required; hosted checks are running.
+
+Deviation: the host defaulted to Node 22/pnpm 9.15.4, so final checks and publication ran explicitly with Node 24.21.0/pnpm 9.15.9. GBrain was unavailable as reported.
