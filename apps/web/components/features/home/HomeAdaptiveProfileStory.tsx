@@ -81,7 +81,7 @@ export function HomeAdaptiveProfileStory() {
   return (
     <div data-testid='homepage-shell'>
       <HomeHero />
-      {showLogoBar ? <HomeTrustSection /> : null}
+      {showLogoBar ? <HomeTrustSection placement={{ page: '/' }} /> : null}
     </div>
   );
 }

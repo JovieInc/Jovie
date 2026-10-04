@@ -71,7 +71,11 @@ describe('ArtistProfileLandingRoute runtime composition', () => {
 
   it('renders the full public marketing shell without a Radix Slot boundary', async () => {
     const layout = await MarketingLayout({
-      children: <ArtistProfileLandingRoute />,
+      children: (
+        <ArtistProfileLandingRoute
+          logoPlacement={{ page: '/artist-profiles' }}
+        />
+      ),
     });
 
     expect(() => render(layout)).not.toThrow();
@@ -116,7 +120,11 @@ describe('ArtistProfileLandingRoute runtime composition', () => {
 
   it('hydrates the full artist-profile route without a Slot exception', async () => {
     const layout = await MarketingLayout({
-      children: <ArtistProfileLandingRoute />,
+      children: (
+        <ArtistProfileLandingRoute
+          logoPlacement={{ page: '/artist-profiles' }}
+        />
+      ),
     });
     const container = document.createElement('div');
     container.innerHTML = renderToString(layout);

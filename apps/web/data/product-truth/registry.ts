@@ -747,7 +747,16 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   },
   IN_HOUSE_RESOLVER: {
     nonMarketing:
-      'JOV-7323 cross-DSP resolver cutover; MusicFetch stays a dormant fallback',
+      'legacy JOV-7323 umbrella rollback override for resolver families',
+  },
+  MUSICFETCH_FALLBACK: {
+    nonMarketing: 'reversible JOV-7323 MusicFetch vendor-off switch',
+  },
+  MUSIC_RESOLVER_PROVIDER_LINKS: {
+    nonMarketing: 'JOV-7323 provider-link resolver family cutover',
+  },
+  MUSIC_RESOLVER_RELEASE_FACTS: {
+    nonMarketing: 'JOV-7323 release-facts resolver family cutover',
   },
   AUTH_OFFER_SUMMARY: {
     nonMarketing:

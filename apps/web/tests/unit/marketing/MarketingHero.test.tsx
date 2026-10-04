@@ -163,7 +163,7 @@ describe('MarketingHero — shell mode', () => {
 });
 
 describe('MarketingHero — content mode', () => {
-  it('renders headline, subtitle, CTAs, and the default logo-bar proof', () => {
+  it('renders headline, subtitle and CTAs with no default logo bar', () => {
     render(
       <MarketingHero
         headline='Drop more music, with less work.'
@@ -185,7 +185,8 @@ describe('MarketingHero — content mode', () => {
       'href',
       '/pricing'
     );
-    expect(screen.getByTestId('home-trust-section')).toBeInTheDocument();
+    // No default logo bar: logos need a page permission (JOV-7795).
+    expect(screen.queryByTestId('home-trust-section')).not.toBeInTheDocument();
   });
 
   it('omits the proof element when logos is false', () => {
