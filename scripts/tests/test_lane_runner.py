@@ -1157,12 +1157,16 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
 
     def test_hyperagent_without_actual_dispatch_proof_holds_before_any_provider_process(self):
-        receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
-                                 FakeLinear([]), issue("JOV-6871"))
-        self.assertEqual(receipt["verdict"], "remote-held")
-        self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
-        self.assertNotIn("agentExit", receipt)
-        self.assertFalse((self.host.state / "worktrees").exists())
+        for api in ({"__name__": "hyperagent"}, {"mcp_call": None}, ["invalid-api"]):
+            with self.subTest(api=api), patch("runpy.run_path", return_value=api), \
+                    patch.object(lane.shutil, "which", return_value="/fake/hyperagent"):
+                receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"], "model": "z-ai/glm-5.3"},
+                                         FakeLinear([]), issue("JOV-6871"))
+                self.assertEqual(receipt["verdict"], "remote-held")
+                self.assertEqual(receipt["reasons"], ["remote-preflight-unverified"])
+                self.assertNotIn("agentExit", receipt)
+                self.assertFalse((self.host.state / "worktrees").exists())
+                self.assertEqual(self.ledger()[-1]["verdict"], "remote-held")
 
     def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}

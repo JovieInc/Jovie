@@ -325,6 +325,10 @@ class FakeLinear:
 
 class AdmissionTest(unittest.TestCase):
     def setUp(self):
+        # Keep default-time helpers on the same clock as the simulated hold window.
+        clock = mock.patch.object(design_gate.time, "time", return_value=NOW)
+        clock.start()
+        self.addCleanup(clock.stop)
         self.lane = load_lane()
 
     def task(self, identifier, title, description, priority, labels):

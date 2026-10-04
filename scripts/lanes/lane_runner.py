@@ -101,6 +101,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_issue_routing.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
+                  "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -1812,6 +1813,8 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
     try:
         executable = shutil.which("hyperagent")
         api = runpy.run_path(executable) if executable else None
+        if not isinstance(api, dict) or not callable(api.get("mcp_call")):
+            api = None
     except Exception:  # a broken transport is a hold, never a crashed worker
         api = None
     refresh = (lambda current, now: hyperagent_lane.refresh_proof(current, api["mcp_call"], now)) if api else None

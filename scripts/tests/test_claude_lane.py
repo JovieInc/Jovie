@@ -140,11 +140,9 @@ class ClaudeLaneTest(unittest.TestCase):
 
     def test_login_reads_auth_status_without_api_env(self):
         seen = {}
-
         def fake(cmd, **kwargs):
             seen.update(kwargs)
             return completed(json.dumps({"loggedIn": True, "authMethod": "claude.ai"}))
-
         with patch.object(claude.subprocess, "run", side_effect=fake):
             self.assertTrue(claude.login({"ANTHROPIC_API_KEY": "k"})["loggedIn"])
         self.assertNotIn("ANTHROPIC_API_KEY", seen["env"])
