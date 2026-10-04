@@ -415,7 +415,11 @@ function SectionIntro({
   return (
     <div className='system-b-launch-section-intro'>
       <p className='system-b-launch-kicker'>{eyebrow}</p>
-      <h2 id={headingId} className='system-b-launch-section-title'>
+      <h2
+        id={headingId}
+        data-wrap='editorial-title'
+        className='system-b-launch-section-title'
+      >
         {title}
       </h2>
       <p className='system-b-launch-section-copy'>{body}</p>
@@ -521,7 +525,11 @@ export default function LaunchPage() {
         >
           <MarketingContainer width='page'>
             <div className='system-b-launch-thesis'>
-              <h2 id='thesis-heading' className='system-b-launch-thesis-title'>
+              <h2
+                id='thesis-heading'
+                data-wrap='editorial-title'
+                className='system-b-launch-thesis-title'
+              >
                 {/* ui-casing-allow: marketing display headline */}
                 Paste one Spotify link. Get smart links, fan notifications, and
                 a link-in-bio that converts in seconds.
@@ -856,7 +864,7 @@ export default function LaunchPage() {
           className='system-b-launch-final'
         >
           <MarketingContainer width='page'>
-            <h2 id='cta-heading'>
+            <h2 id='cta-heading' data-wrap='editorial-title'>
               {/* ui-casing-allow: marketing display headline */}
               Your music deserves better than a stack of links.
             </h2>
