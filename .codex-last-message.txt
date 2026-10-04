@@ -1,0 +1,9 @@
+STATUS: BLOCKED
+
+- Merged `origin/main` locally; clean head is `f3e99039c3`.
+- Required gate failed in `screenshots-workflow-provenance.test.ts`.
+- Reproduced failure with the lane `gh` shim; the unchanged test passes with a sanitized PATH: 7/7.
+- Failing files are identical to `origin/main` and absent from this PR’s nine-file diff.
+- No unrelated fix or push was made. Remote remains `a11f8b5769`.
+
+NOT-SHIPPABLE: origin/main’s real-gh test harness allows the lane PATH to reintroduce the GitHub App shim, causing deterministic OpenSSL signing failure.
