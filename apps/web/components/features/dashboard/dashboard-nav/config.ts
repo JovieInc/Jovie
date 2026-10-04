@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CheckSquare,
   Gauge,
+  Gift,
   HandCoins,
   Home,
   IdCard,
@@ -190,6 +191,13 @@ export const userSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
     icon: Banknote,
+  },
+  {
+    name: 'Referral',
+    href: APP_ROUTES.SETTINGS_REFERRAL,
+    id: 'referral',
+    icon: Gift,
+    description: 'Share your link and earn on referred artists',
   },
   {
     name: 'Data & Privacy',

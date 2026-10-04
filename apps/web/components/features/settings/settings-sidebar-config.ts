@@ -10,9 +10,9 @@ import type { NavItem } from '@/components/features/dashboard/dashboard-nav/type
  *
  * `userSettingsNavigation` and `artistSettingsNavigation` in
  * `dashboard-nav/config.ts` are the only settings list DashboardNav renders.
- * This module must not declare a second set of hrefs. Appearance, Referral,
- * Retargeting, and Delete Account stayed in an unused snapshot and are not
- * part of the live rail.
+ * This module must not declare a second set of hrefs. Appearance, Retargeting,
+ * and Delete Account stayed in an unused snapshot and are not part of the
+ * live rail.
  */
 
 export interface SettingsSidebarItem {
