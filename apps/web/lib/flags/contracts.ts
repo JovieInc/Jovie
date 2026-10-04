@@ -54,7 +54,7 @@ export const APP_FLAG_DEFAULTS = {
    * Default off in prod; enable via env override, admin dogfood, or FEATURE gate.
    */
   INBOX_HOME: false,
-  PROFILES_WORKSPACE: false,
+  PROFILES_WORKSPACE: true,
   PROFILE_SEARCH_MONITORING: false,
   /**
    * Post-signup wow-moment: seed real presence-build tasks into workflow_runs

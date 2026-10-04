@@ -100,7 +100,6 @@ describe('feature flag registry integrity', () => {
         ([name]) =>
           ![
             'INBOX_HOME',
-            'PROFILES_WORKSPACE',
             'PROFILE_SEARCH_MONITORING',
             'PAID_WELCOME_EMAIL',
             'MERCH_QA_GATE',
@@ -112,7 +111,7 @@ describe('feature flag registry integrity', () => {
       .map(([, value]) => value);
     expect(defaultsExcludingRolloutGates.every(Boolean)).toBe(true);
     expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
-    expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
+    expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(true);
     expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);
     expect(APP_FLAG_DEFAULTS.PAID_WELCOME_EMAIL).toBe(false);
     expect(APP_FLAG_DEFAULTS.MERCH_QA_GATE).toBe(false);
