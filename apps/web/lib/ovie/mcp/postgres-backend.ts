@@ -1,5 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import {
+  compareAndSetOperatingRecords,
+  listOperatingRecords,
+} from '@/lib/db/ovie-record-archive';
 import { ovieOperatingKv } from '@/lib/db/schema/ovie';
 import { OVIE_MCP_INDEX_CAP, type RecordBackend } from './store';
 
@@ -45,6 +49,8 @@ export function postgresRecordBackend(): RecordBackend {
         .returning({ key: ovieOperatingKv.key });
       return rows.length === 1;
     },
+    compareAndSetWithRecords: compareAndSetOperatingRecords,
+    listRecords: listOperatingRecords,
     async lpush(key, value) {
       const current = await backend.get(key);
       const list = Array.isArray(current) ? current.map(String) : [];

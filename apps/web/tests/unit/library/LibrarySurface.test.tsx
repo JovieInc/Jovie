@@ -1399,6 +1399,30 @@ describe('LibrarySurface', () => {
     expect(drawer.getByText('2 stem files')).toBeInTheDocument();
   });
 
+  it('opens the Files tab for the selected work from Share Privately', () => {
+    renderLibrary([
+      buildAsset({
+        id: 'release-a',
+        title: 'Release A',
+        profileVisibility: 'hidden',
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    fireEvent.click(drawer.getByRole('button', { name: 'Share Privately' }));
+
+    expect(drawer.getByRole('tab', { name: 'Files' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
   it('uses shell focus tokens for library cards and drawer actions', () => {
     renderLibrary([buildAsset()]);
     clickGridView();

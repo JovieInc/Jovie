@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
@@ -8,6 +8,21 @@ import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-
 vi.mock('@/app/app/(shell)/dashboard/actions/creator-profile', () => ({
   updateAllowProfilePhotoDownloads: vi.fn(),
   updateShowOldReleases: vi.fn(),
+}));
+
+vi.mock('@/components/hooks/useAvatarUpload', () => ({
+  useAvatarUpload: ({
+    onError,
+  }: {
+    readonly onError?: (message: string) => void;
+  }) => ({
+    handleFileUpload: vi.fn(async () => {
+      onError?.('Upload failed. Please try again.');
+    }),
+    isUploading: false,
+    previewUrl: null,
+    uploadProgress: null,
+  }),
 }));
 
 vi.mock('@/components/molecules/GenrePicker', () => ({
@@ -37,6 +52,9 @@ vi.mock('@/components/molecules/drawer', () => ({
   ),
   DrawerAsyncToggle: ({ label }: { label: string }) => (
     <div data-testid='async-toggle'>{label}</div>
+  ),
+  DrawerSectionHeading: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
   ),
 }));
 
@@ -234,6 +252,28 @@ describe('ProfileAboutTab', () => {
 
       expect(onGenresChange).toHaveBeenCalledWith(['electronic']);
     });
+  });
+
+  it('renders a failed press-photo upload in the canonical error token', async () => {
+    const { container } = render(
+      <ProfileAboutTab
+        {...baseProps}
+        onPressPhotoUpload={vi.fn(async () => {
+          throw new Error('upload failed');
+        })}
+      />
+    );
+
+    const input =
+      container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    fireEvent.change(input!, {
+      target: { files: [new File(['x'], 'press.png', { type: 'image/png' })] },
+    });
+
+    const error = await screen.findByText('Upload failed. Please try again.');
+    expect(error).toHaveClass('text-error');
+    expect(error).not.toHaveClass('text-danger');
   });
 
   it('imports LINEAR_SURFACE from the canonical token module', () => {

@@ -41,28 +41,6 @@ const SETTINGS_POLISHED = findSourceFile(
   )
 );
 
-const RETARGETING_ROUTE_FILES = [
-  findSourceFile(
-    resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/page.tsx'),
-    resolve(
-      process.cwd(),
-      'apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx'
-    )
-  ),
-] as const;
-
-const RETARGETING_ROUTE_CANDIDATES = [
-  resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/page.tsx'),
-] as const;
-
-const RETARGETING_LAYOUT = findSourceFile(
-  resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/layout.tsx'),
-  resolve(
-    process.cwd(),
-    'apps/web/app/app/(shell)/settings/retargeting-ads/layout.tsx'
-  )
-);
-
 const SETTINGS_ALIAS_ROUTES = [
   {
     route: 'settings root',
@@ -84,17 +62,6 @@ const SETTINGS_ALIAS_ROUTES = [
     ),
   },
   {
-    route: 'settings appearance',
-    expectedDestination: 'APP_ROUTES.SETTINGS_ACCOUNT',
-    filePath: findSourceFile(
-      resolve(process.cwd(), 'app/app/(shell)/settings/appearance/page.tsx'),
-      resolve(
-        process.cwd(),
-        'apps/web/app/app/(shell)/settings/appearance/page.tsx'
-      )
-    ),
-  },
-  {
     route: 'settings delete-account',
     expectedDestination: 'APP_ROUTES.SETTINGS_DATA_PRIVACY',
     filePath: findSourceFile(
@@ -108,6 +75,14 @@ const SETTINGS_ALIAS_ROUTES = [
       )
     ),
   },
+] as const;
+
+const SETTINGS_APPEARANCE_PAGE_CANDIDATES = [
+  resolve(process.cwd(), 'app/app/(shell)/settings/appearance/page.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/settings/appearance/page.tsx'
+  ),
 ] as const;
 
 const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
@@ -279,39 +254,6 @@ describe('settings shell normalization', () => {
     expect(sidebarSource).toContain('function SettingsNavigation');
   });
 
-  it('keeps focused settings subroutes inside the parent shell', () => {
-    const missingFiles = RETARGETING_ROUTE_FILES.filter(filePath => !filePath);
-    expect(missingFiles).toEqual([]);
-
-    for (const filePath of RETARGETING_ROUTE_FILES) {
-      if (!filePath) {
-        throw new Error(
-          `Could not find retargeting settings source. Checked: ${RETARGETING_ROUTE_CANDIDATES.join(', ')}`
-        );
-      }
-      const source = readFileSync(filePath, 'utf8');
-      expect(source).not.toMatch(/<PageShell\b/);
-      expect(source).not.toMatch(/import\s*\{[^}]*PageShell/);
-      expect(source).not.toMatch(/<PageContent\b/);
-      expect(source).not.toMatch(/import\s*\{[^}]*PageContent/);
-    }
-  });
-
-  it('keeps retargeting admin auth on the shared shell route context path', () => {
-    expect(RETARGETING_LAYOUT).toBeDefined();
-
-    if (!RETARGETING_LAYOUT) {
-      throw new Error('Could not find retargeting settings layout source');
-    }
-
-    const source = readFileSync(RETARGETING_LAYOUT, 'utf8');
-    expect(source).toContain('loadAppShellRouteContext');
-    expect(source).toContain('getCurrentUserEntitlements');
-    expect(source).not.toContain('getCachedAuth');
-    expect(source).not.toContain('getDashboardDataEssential');
-    expect(source).not.toContain('getDashboardShellData');
-  });
-
   it('keeps legacy settings aliases as lightweight route redirects', () => {
     for (const aliasRoute of SETTINGS_ALIAS_ROUTES) {
       expect(aliasRoute.filePath).toBeDefined();
@@ -327,6 +269,12 @@ describe('settings shell normalization', () => {
       expect(source).not.toContain('getCachedAuth');
       expect(source).not.toContain('DashboardSettings');
       expect(source).not.toContain('redirect_url=/app/settings');
+    }
+  });
+
+  it('leaves the legacy appearance alias to the Next.js redirect config', () => {
+    for (const filePath of SETTINGS_APPEARANCE_PAGE_CANDIDATES) {
+      expect(existsSync(filePath), filePath).toBe(false);
     }
   });
 

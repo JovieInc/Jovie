@@ -16,6 +16,14 @@ const CONTROLLER_BOUNDARY_JOB =
   'Production Release / Check current main before release';
 const CONTROLLER_VERIFIED_JOB = 'Production Verified';
 const CONTROLLER_ROLLBACK_SUFFIX = 'Centralized production rollback';
+// Jobs that run only after Production Verified succeeded and never touch
+// production. Their failure files its own remediation; it must not turn a
+// verified generation into an interrupted one and freeze every later release
+// (JOV-7724, run 37144574062).
+const POST_VERIFICATION_JOBS = new Set([
+  'Publish verified customer changelog',
+  'File customer changelog remediation',
+]);
 const INTERRUPTED_CONCLUSIONS = new Set([
   'cancelled',
   'failure',
@@ -288,6 +296,41 @@ function classifyRecoveredMarkerEntry(entry, context) {
   };
 }
 
+/**
+ * A failed attempt still verified its generation when Production Verified
+ * succeeded, the rollback stayed skipped, and every unsuccessful job is a
+ * post-verification publication job. Any other failure stays interrupted.
+ */
+function verifiedBeforePublicationFailure(jobs, context, attempt) {
+  if (!jobs.every(job => validateControllerJob(job, context, attempt))) {
+    return false;
+  }
+  const verified = jobs.filter(job => job.name === CONTROLLER_VERIFIED_JOB);
+  const rollback = jobs.filter(job =>
+    job.name.endsWith(CONTROLLER_ROLLBACK_SUFFIX)
+  );
+  const unsuccessful = jobs.filter(
+    job =>
+      job.status !== 'completed' ||
+      (job.conclusion !== 'success' && job.conclusion !== 'skipped')
+  );
+  return (
+    verified.length === 1 &&
+    verified[0].status === 'completed' &&
+    verified[0].conclusion === 'success' &&
+    rollback.length === 1 &&
+    rollback[0].status === 'completed' &&
+    rollback[0].conclusion === 'skipped' &&
+    unsuccessful.length > 0 &&
+    unsuccessful.every(
+      job =>
+        POST_VERIFICATION_JOBS.has(job.name) &&
+        job.status === 'completed' &&
+        INTERRUPTED_CONCLUSIONS.has(job.conclusion)
+    )
+  );
+}
+
 function classifyMarkerEntry(entry, context) {
   if (!entry || typeof entry !== 'object') {
     return { error: 'malformed_marker_entry' };
@@ -342,6 +385,20 @@ function classifyMarkerEntry(entry, context) {
     ) {
       return { error: 'successful_attempt_without_verified_job' };
     }
+    return {
+      kind: 'verified',
+      attempt,
+      controllerRun,
+      deploymentId: entry.payload.deploymentId,
+      markerContext,
+      normalRerun,
+    };
+  }
+  if (
+    status === 'completed' &&
+    conclusion === 'failure' &&
+    verifiedBeforePublicationFailure(entry.attemptJobs, markerContext, attempt)
+  ) {
     return {
       kind: 'verified',
       attempt,

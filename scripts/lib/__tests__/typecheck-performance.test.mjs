@@ -1,11 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { evaluateRatchet, statistics } from '../../typecheck-performance.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
+const require = createRequire(import.meta.url);
 
 describe('typecheck performance', () => {
   it('reports stable distribution statistics and noisy ratchet outcomes', () => {
@@ -37,8 +39,13 @@ describe('typecheck performance', () => {
 
   it('keeps ignored tests out of the product cache while retaining ambient types and package edges', () => {
     const run = spawnSync(
-      'corepack',
-      ['pnpm', 'turbo', 'typecheck', '--filter=@jovie/web', '--dry=json'],
+      process.execPath,
+      [
+        require.resolve('turbo/bin/turbo'),
+        'typecheck',
+        '--filter=@jovie/web',
+        '--dry=json',
+      ],
       { cwd: ROOT, encoding: 'utf8' }
     );
     expect(run.status).toBe(0);

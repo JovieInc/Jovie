@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => {
   return {
     captureWarningMock: vi.fn().mockResolvedValue(undefined),
-    searchGoogleCSEMock: vi.fn(),
+    searchWebMock: vi.fn(),
   };
 });
 
@@ -12,7 +12,7 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/leads/google-cse', () => ({
-  searchGoogleCSE: hoisted.searchGoogleCSEMock,
+  searchWeb: hoisted.searchWebMock,
 }));
 
 const VALID_HTML = `
@@ -38,11 +38,11 @@ describe('featured playlist fallback discovery', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     hoisted.captureWarningMock.mockClear();
-    hoisted.searchGoogleCSEMock.mockReset();
+    hoisted.searchWebMock.mockReset();
   });
 
   it('discovers a candidate from search results and playlist HTML', async () => {
-    hoisted.searchGoogleCSEMock.mockResolvedValue([
+    hoisted.searchWebMock.mockResolvedValue([
       {
         link: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
         title: 'This Is Tim White',
@@ -72,7 +72,7 @@ describe('featured playlist fallback discovery', () => {
   });
 
   it('returns null when page fetch fails', async () => {
-    hoisted.searchGoogleCSEMock.mockResolvedValue([
+    hoisted.searchWebMock.mockResolvedValue([
       {
         link: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
         title: 'This Is Tim White',
@@ -93,8 +93,8 @@ describe('featured playlist fallback discovery', () => {
     ).resolves.toBeNull();
   });
 
-  it('escapes quotes in artist names before querying Google CSE', async () => {
-    hoisted.searchGoogleCSEMock.mockResolvedValue([]);
+  it('escapes quotes in artist names before querying web search', async () => {
+    hoisted.searchWebMock.mockResolvedValue([]);
 
     const { discoverThisIsPlaylistCandidate } = await import(
       '@/lib/profile/featured-playlist-fallback-discovery'
@@ -107,14 +107,14 @@ describe('featured playlist fallback discovery', () => {
       })
     ).resolves.toBeNull();
 
-    expect(hoisted.searchGoogleCSEMock).toHaveBeenCalledWith(
+    expect(hoisted.searchWebMock).toHaveBeenCalledWith(
       'site:open.spotify.com/playlist "This Is Tim TJ White"',
       1
     );
   });
 
-  it('returns null and captures a warning when Google CSE throws', async () => {
-    hoisted.searchGoogleCSEMock.mockRejectedValue(new Error('search failed'));
+  it('returns null and captures a warning when web search throws', async () => {
+    hoisted.searchWebMock.mockRejectedValue(new Error('search failed'));
 
     const { discoverThisIsPlaylistCandidate } = await import(
       '@/lib/profile/featured-playlist-fallback-discovery'
@@ -128,7 +128,7 @@ describe('featured playlist fallback discovery', () => {
     ).resolves.toBeNull();
 
     expect(hoisted.captureWarningMock).toHaveBeenCalledWith(
-      'Google CSE discovery failed',
+      'Web search discovery failed',
       expect.any(Error),
       expect.objectContaining({
         query: 'site:open.spotify.com/playlist "This Is Tim White"',
@@ -138,7 +138,7 @@ describe('featured playlist fallback discovery', () => {
   });
 
   it('does not capture a warning for expected 404 playlist responses', async () => {
-    hoisted.searchGoogleCSEMock.mockResolvedValue([
+    hoisted.searchWebMock.mockResolvedValue([
       {
         link: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
         title: 'This Is Tim White',

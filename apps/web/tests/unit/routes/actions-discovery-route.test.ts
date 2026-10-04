@@ -98,7 +98,7 @@ describe('GET /api/v1/actions', () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.actions).toHaveLength(10);
+    expect(body.actions).toHaveLength(12);
     const ids = body.actions.map(
       (capability: { action: { id: string } }) => capability.action.id
     );
@@ -113,6 +113,8 @@ describe('GET /api/v1/actions', () => {
       'work.claim',
       'work.report',
       'defect.report',
+      'fleet.directory',
+      'work.request',
     ]);
     for (const capability of body.actions) {
       const workerScope = capability.requirements.find(

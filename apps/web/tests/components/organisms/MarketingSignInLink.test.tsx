@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { APP_ROUTES } from '@/constants/routes';
@@ -54,3 +54,30 @@ describe('MarketingSignInLink', () => {
     expect(container.querySelector('button')).toBeNull();
   });
 });
+
+vi.mock('next/link', async () => {
+  const { createElement, forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      import('react').ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, href, ...props }, ref) {
+      return createElement('a', {
+        ...props,
+        href: href ?? '#',
+        ref,
+        'data-test-prefetch': String(prefetch),
+      });
+    }),
+  };
+});
+
+it.each(['ghost', 'pill'] as const)(
+  'preserves %s intercepted sign-in navigation without speculative prefetch',
+  variant => {
+    render(<MarketingSignInLink variant={variant} />);
+    const link = screen.getByRole('link', { name: 'Sign in' });
+    expect(link).toHaveAttribute('href', APP_ROUTES.SIGNIN);
+    expect(link).toHaveAttribute('data-test-prefetch', 'false');
+  }
+);

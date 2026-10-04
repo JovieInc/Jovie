@@ -2,6 +2,7 @@
 
 import { IconButton, TooltipShortcut } from '@jovie/ui';
 import { Icon, type IconName } from '@/components/atoms/Icon';
+import { railIconName } from '@/components/atoms/rail-icons';
 import { cn } from '@/lib/utils';
 
 export const RAIL_TOGGLE_BUTTON_CLASS =
@@ -22,7 +23,8 @@ interface RailToggleButtonProps {
 
 /**
  * Canonical shell-rail control. Left and right rails share the same chrome,
- * hit target, focus behavior, and mirrored Lucide icon family.
+ * hit target, focus behavior, and the Jovie-owned mirrored rail icon family
+ * (open and closed art per side, no arrows; see rail-icons.ts).
  */
 export function RailToggleButton({
   side,
@@ -37,14 +39,7 @@ export function RailToggleButton({
   iconTestId,
 }: RailToggleButtonProps) {
   const label = open ? openLabel : closedLabel;
-  const iconName: IconName =
-    side === 'left'
-      ? open
-        ? 'PanelLeftClose'
-        : 'PanelLeftOpen'
-      : open
-        ? 'PanelRightClose'
-        : 'PanelRightOpen';
+  const iconName: IconName = railIconName(side, open);
 
   const button = (
     <IconButton

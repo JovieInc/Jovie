@@ -799,7 +799,10 @@ describe('UserButton billing actions', () => {
     );
     expect(
       loading.querySelector('[data-user-button-loading-copy]')
-    ).toHaveClass('group-data-[collapsible=icon]:hidden');
+    ).toHaveClass(
+      'group-data-[collapsible=icon]:max-w-0',
+      'group-data-[collapsible=icon]:opacity-0'
+    );
   });
 
   it('only offers manual workspace lock inside Ovie', async () => {
@@ -1029,7 +1032,10 @@ describe('UserButton billing actions', () => {
     );
     expect(
       trigger.querySelector('[data-user-button-display-name]')
-    ).toHaveClass('group-data-[collapsible=icon]:hidden');
+    ).toHaveClass(
+      'group-data-[collapsible=icon]:max-w-0',
+      'group-data-[collapsible=icon]:opacity-0'
+    );
     expect(trigger).toHaveClass('group/user-button');
     expect(trigger.querySelector('[data-user-button-chevron]')).toHaveClass(
       'group-data-[collapsible=icon]:hidden',

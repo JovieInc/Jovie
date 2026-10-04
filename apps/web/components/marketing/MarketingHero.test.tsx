@@ -422,3 +422,61 @@ describe('MarketingHero photo stacking', () => {
     );
   });
 });
+
+vi.mock('next/link', async () => {
+  const { createElement, forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      import('react').ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, href, ...props }, ref) {
+      return createElement('a', {
+        ...props,
+        href: href ?? '#',
+        ref,
+        'data-test-prefetch': String(prefetch),
+      });
+    }),
+  };
+});
+
+it('defers auth prefetch while preserving public hero defaults and explicit choices', () => {
+  const view = render(
+    <MarketingHero
+      headline='Release your work'
+      subtitle='Choose a destination'
+      logos={false}
+      primaryCta={{ label: 'Start', href: '/start' }}
+      secondaryCta={{ label: 'Pricing', href: '/pricing' }}
+    />
+  );
+  expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
+    'data-test-prefetch',
+    'false'
+  );
+  expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+    'data-test-prefetch',
+    'undefined'
+  );
+  view.rerender(
+    <MarketingHero
+      headline='Release your work'
+      subtitle='Choose a destination'
+      logos={false}
+      primaryCta={{ label: 'Start', href: '/start', prefetch: true }}
+      secondaryCta={{ label: 'Pricing', href: '/pricing', prefetch: false }}
+    />
+  );
+  expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
+    'href',
+    '/start'
+  );
+  expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
+    'data-test-prefetch',
+    'true'
+  );
+  expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+    'data-test-prefetch',
+    'false'
+  );
+});

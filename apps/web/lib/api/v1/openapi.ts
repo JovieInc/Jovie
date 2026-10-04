@@ -175,7 +175,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     title: 'Jovie Artist API',
     version: '1.0.0',
     description:
-      'Anonymous, read-only API for public Jovie artist profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; artist data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported. Versioning and deprecation policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. See the canonical policy page before any retirement. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
+      'Anonymous, read-only API for public Jovie profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; profile data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported. Versioning and deprecation policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. See the canonical policy page before any retirement. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
     contact: { url: `${BASE_URL}/llms.txt` },
   },
   servers: [{ url: BASE_URL, description: 'Production API origin' }],
@@ -188,9 +188,9 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     '/api/v1': {
       get: {
         operationId: 'getArtistApiIndex',
-        summary: 'Discover public artist API capabilities',
+        summary: 'Discover public profile API capabilities',
         description:
-          'Stable, non-enumerating capability document. It identifies the anonymous read-only scope, supported GET resources, profile rate-limit metadata, active version/lifecycle policy, and canonical discovery links without depending on a particular artist handle.',
+          'Stable, non-enumerating capability document. It identifies the anonymous read-only scope, supported GET resources, profile rate-limit metadata, active version/lifecycle policy, and canonical discovery links without depending on a particular profile handle.',
         parameters: [
           {
             name: 'Accept',
@@ -203,7 +203,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         ],
         responses: {
           '200': {
-            description: 'Public artist API capability document',
+            description: 'Public profile API capability document',
             headers: API_LIFECYCLE_HEADERS,
             content: {
               'application/json': {
@@ -217,9 +217,9 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     '/api/v1/{username}': {
       get: {
         operationId: 'getArtist',
-        summary: 'Get artist profile with releases, events, and merch',
+        summary: 'Get profile with releases, events, and merch',
         description:
-          'Anonymous read-only lookup for one public independent artist. Returns profile fields, releases, upcoming tour events, merch, and related resource links. The artist-profile bucket is limited by client IP. Responds 404 when the username is unknown or not public. Use the /api/v1 capability index or sitemap to discover a current handle; this contract does not enumerate artists.',
+          'Anonymous read-only lookup for one public profile. Returns profile fields, releases, upcoming tour events, merch, and related resource links. The artist-profile bucket is limited by client IP. Responds 404 when the username is unknown or not public. Use the /api/v1 capability index or sitemap to discover a current handle; this contract does not enumerate profiles.',
         parameters: [
           {
             name: 'username',
@@ -227,12 +227,12 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
             required: true,
             schema: { type: 'string', examples: ['public-handle'] },
             description:
-              'Current public Jovie artist handle. The generic example is intentionally not a provisioned profile.',
+              'Current public Jovie profile handle. The generic example is intentionally not a provisioned profile.',
           },
         ],
         responses: {
           '200': {
-            description: 'Artist data',
+            description: 'Profile data',
             headers: API_PROFILE_HEADERS,
             content: {
               'application/json': {
@@ -241,7 +241,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
             },
           },
           '404': {
-            description: 'Artist not found',
+            description: 'Profile not found',
             headers: API_PROFILE_HEADERS,
             content: {
               'application/json': {
@@ -432,7 +432,15 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
       },
       Artist: {
         type: 'object',
-        required: ['id', 'username', 'name', 'profileUrl'],
+        required: [
+          'id',
+          'username',
+          'name',
+          'profileUrl',
+          'creatorType',
+          'links',
+          'platformIds',
+        ],
         properties: {
           id: { type: 'string' },
           username: { type: 'string' },
@@ -445,6 +453,63 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           spotifyUrl: { type: 'string', format: 'uri', nullable: true },
           appleMusicUrl: { type: 'string', format: 'uri', nullable: true },
           youtubeUrl: { type: 'string', format: 'uri', nullable: true },
+          creatorType: {
+            type: 'string',
+            enum: ['artist', 'podcaster', 'influencer', 'creator'],
+          },
+          audience: {
+            $ref: '#/components/schemas/Audience',
+            nullable: true,
+          },
+          links: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ArtistLink' },
+          },
+          platformIds: { $ref: '#/components/schemas/PlatformIds' },
+        },
+      },
+      Audience: {
+        type: 'object',
+        required: ['platform', 'count', 'countText', 'observedAt'],
+        properties: {
+          platform: { type: 'string', enum: ['youtube', 'spotify'] },
+          count: { type: 'integer' },
+          countText: { type: 'string' },
+          observedAt: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+          },
+        },
+      },
+      ArtistLink: {
+        type: 'object',
+        required: ['platform', 'url'],
+        properties: {
+          platform: { type: 'string' },
+          url: { type: 'string', format: 'uri' },
+          displayText: { type: 'string', nullable: true },
+        },
+      },
+      PlatformIds: {
+        type: 'object',
+        required: [
+          'spotify',
+          'appleMusic',
+          'youtube',
+          'deezer',
+          'tidal',
+          'soundcloud',
+          'musicbrainz',
+        ],
+        properties: {
+          spotify: { type: 'string', nullable: true },
+          appleMusic: { type: 'string', nullable: true },
+          youtube: { type: 'string', nullable: true },
+          deezer: { type: 'string', nullable: true },
+          tidal: { type: 'string', nullable: true },
+          soundcloud: { type: 'string', nullable: true },
+          musicbrainz: { type: 'string', nullable: true },
         },
       },
       Release: {

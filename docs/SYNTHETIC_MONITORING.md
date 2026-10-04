@@ -211,6 +211,8 @@ The endpoint should return `404` or `204` while no fresh code is available, or
 
 The workflow reads application, database, and mailbox secrets through `DOPPLER_TOKEN_PRD`. The production waitlist canary uses `--only-secrets` with fallback disabled, so it receives only its six named mailbox and receipt values and never receives `DATABASE_URL`. Web AI health similarly receives only `CRON_SECRET`; the model calls use the deployed production app's Gateway identity. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
 
+Those six Doppler `jovie-web/prd` names are absent today. See [Current production blocker](#current-production-blocker-october-2-2026). Adding them is an operational decision; this document does not store secret values.
+
 ## GitHub Actions Workflow
 
 The synthetic monitoring runs automatically via GitHub Actions:
@@ -231,6 +233,40 @@ The synthetic monitoring runs automatically via GitHub Actions:
 2. **Multiple Environment Failure**: Critical alert sent to `#alerts-critical`
 3. **Daily Success Summary**: Sent to `#monitoring` at 9 PM PST
 4. **Web AI Failure**: High-priority Linear bug signal with per-surface cause and Gateway allowlist attribution
+
+### Current production blocker (October 2, 2026)
+
+JOV-4855 is correct: the deep synthetic job fails because production canary secrets are missing. This is a secret-provisioning gap, not a product assertion bug. Adding the secrets is Tim's call. Do not paper over it by skipping the canary, loosening the result parser, or adding workflow retries.
+
+`Production Synthetic Tests` runs on `17 */6 * * *` and on `workflow_dispatch`. The daily `47 7 * * *` run is Web AI health only, so a green workflow conclusion on that cron does not exercise the waitlist canary.
+
+The waitlist step runs:
+
+```bash
+doppler run --project jovie-web --config prd \
+  --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN \
+  --no-fallback -- …
+```
+
+On [run 37071206285](https://github.com/JovieInc/Jovie/actions/runs/37071206285) (2026-10-02T22:13Z) Doppler exited 1 with:
+
+```text
+Doppler Error: the following secrets you are trying to include do not exist in your config:
+- E2E_PROD_SIGNUP_EMAIL_BASE
+- E2E_PROD_MAILBOX_PROVIDER
+- E2E_PROD_OTP_CHECK_ORIGIN
+- E2E_PROD_OTP_CHECK_TOKEN
+- E2E_PROD_OTP_CHECK_URL
+- PRODUCTION_WAITLIST_CANARY_READ_TOKEN
+```
+
+Playwright never starts, so `apps/web/test-results/synthetic-production-waitlist-results.json` is never written. The parser treats that missing required file as `error` and fails the job. The same six names were missing on [run 36431588956](https://github.com/JovieInc/Jovie/actions/runs/36431588956) (2026-09-28).
+
+The onboarding robot on the same run skips with annotation `Clerk testing setup was not successful`. Production robot auth is enabled only when `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_SIGNUP_EMAIL_BASE` is set. The full `doppler run` for that step also lacked the email base, so the required skip is the same missing secret. The parser counts that required skip as a failure.
+
+`workers/canary-otp/README.md` already records the provisioning order and that the Doppler GitHub sync 100-secret cap (JOV-7237) blocks adding these values. JOV-6813 still requires a passing scheduled run. A `workflow_dispatch` from this checkout would stay red until `jovie-web/prd` contains the six names. Five consecutive green deep runs were not produced.
+
+Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public profile smoke, and limiter store health passed on run 37071206285. The Slack step on that run posted the missing-file and skipped-onboarding text. Recurrence filing for the fingerprinted Linear issue is a separate intake change and is unchanged here.
 
 ## Synthetic Account Management
 

@@ -2,6 +2,10 @@ import '../../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { type ComponentProps, useEffect, useState } from 'react';
 import { fn } from 'storybook/test';
+import type { ElectronAPI } from '@/lib/desktop/electron-bridge';
+import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
+import { ChatEmptyStateGreeting } from './ChatEmptyStateGreeting';
+import { ChatEmptyStateOpportunityCards } from './ChatEmptyStateOpportunityCards';
 import { ChatInput } from './ChatInput';
 
 type ChatInputStoryProps = ComponentProps<typeof ChatInput>;
@@ -37,6 +41,7 @@ const meta = {
         'containerRef',
         'hiddenDivRef',
         'internalTextareaRef',
+        'micButtonRef',
         'handleKeyDown',
         'isAtMaxHeight',
         'measuredHeight',
@@ -127,4 +132,88 @@ export const Docked: Story = {
       </div>
     ),
   ],
+};
+
+function DesktopGuidanceFixture({
+  args,
+  centered = false,
+}: {
+  readonly args: ChatInputStoryProps;
+  readonly centered?: boolean;
+}) {
+  const [ready, setReady] = useState(false);
+  const [draft, setDraft] = useState(args.value);
+  useEffect(() => {
+    const previous = Object.getOwnPropertyDescriptor(window, 'electronAPI');
+    const bridge = {
+      platform: 'darwin',
+      getDictationStatus: async () => ({
+        ok: true,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: false,
+        mode: 'unavailable',
+        reason: 'storybook-system-dictation-guidance',
+      }),
+    } satisfies Partial<ElectronAPI>;
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: bridge,
+    });
+    setReady(true);
+    return () => {
+      if (previous) Object.defineProperty(window, 'electronAPI', previous);
+      else Reflect.deleteProperty(window, 'electronAPI');
+    };
+  }, []);
+  if (!ready) return null;
+  return (
+    <div className='h-screen p-4'>
+      <ChatEmptyStateComposerRegion
+        stableDocked={!centered}
+        onSelectSample={fn()}
+        above={
+          centered ? undefined : (
+            <div className='space-y-4'>
+              <ChatEmptyStateGreeting firstName='Tim' insight={null} />
+              <ChatEmptyStateOpportunityCards
+                cards={[
+                  {
+                    id: 'release-checklist',
+                    signalType: 'other',
+                    typeLabel: 'Suggestion',
+                    title: 'Review your release checklist',
+                    why: 'Check artwork, credits and links before the release.',
+                    createdAt: '2026-01-15T12:00:00.000Z',
+                    primaryActionLabel: 'Review',
+                    status: 'pending',
+                    category: 'suggestion',
+                  },
+                ]}
+                onSelect={card => setDraft(card.title)}
+              />
+            </div>
+          )
+        }
+      >
+        <ChatInput {...args} value={draft} onChange={setDraft} />
+      </ChatEmptyStateComposerRegion>
+    </div>
+  );
+}
+
+export const DesktopGuidanceDocked: Story = {
+  parameters: { layout: 'fullscreen' },
+  args: { dictationEnabled: true },
+  render: args => <DesktopGuidanceFixture args={args} />,
+};
+
+export const DesktopGuidanceCentered: Story = {
+  parameters: { layout: 'fullscreen' },
+  args: { dictationEnabled: true },
+  render: args => <DesktopGuidanceFixture args={args} centered />,
+};
+
+export const DesktopGuidanceLight: Story = {
+  ...DesktopGuidanceDocked,
+  parameters: { layout: 'fullscreen', themes: { themeOverride: 'light' } },
 };
