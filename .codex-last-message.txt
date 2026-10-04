@@ -1,0 +1,11 @@
+STATUS: BLOCKED
+
+PR #19824’s failure is unrelated to its desktop changes:
+
+- Unchanged `merge-queue-backend.test.mjs` timed out after 3168 ms against a 3000 ms limit.
+- The focused test passed locally in 471 ms.
+- Worktree is clean; local HEAD matches the remote branch.
+- No commit or push was made. JOV-4401 was restored to Backlog.
+- gbrain was unavailable due to timeout.
+
+NOT-SHIPPABLE: Source Validation failed from an unrelated load-sensitive merge-queue test timeout.
