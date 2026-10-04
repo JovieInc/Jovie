@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, matchesGlob, resolve } from 'node:path';
+import { dirname, join, matchesGlob, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as realGhHarness from '../../../../../scripts/lib/real-gh-harness.mjs';
@@ -216,7 +216,10 @@ describe('Product Screenshots provenance', () => {
           runWithRealGh({
             script: String(proof.bind?.run),
             env: {
-              PATH: `${bin}:${process.env.PATH ?? ''}`,
+              // The harness-resolved real gh's directory must lead the host
+              // PATH: hosts like lane_runner prepend a `#!` gh shim that
+              // mints a token the harness HOME cannot provide.
+              PATH: `${dirname(String(gh))}:${bin}:${process.env.PATH ?? ''}`,
               GITHUB_REPOSITORY: 'JovieInc/Jovie',
               GITHUB_RUN_ID: '900',
               GITHUB_RUN_ATTEMPT: '2',
