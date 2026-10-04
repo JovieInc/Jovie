@@ -21,11 +21,12 @@ import {
   PageToolbarTabButton,
   TableEmptyState,
 } from '@/components/organisms/table';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { AdminStepUp } from '@/features/admin/AdminStepUp';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
-import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import {
   type AdminLead,
   type AdminLeadsSortBy,
@@ -140,20 +141,21 @@ function LeadActionsCell({
 function renderNameHandleCell({ row }: { row: { original: AdminLead } }) {
   const lead = row.original;
   return (
-    <div className='flex flex-col'>
-      <span className='font-medium text-primary-token'>
-        {lead.displayName || lead.linktreeHandle}
-      </span>
-      <a
-        href={lead.linktreeUrl}
-        target='_blank'
-        rel='noopener noreferrer'
-        className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
-      >
-        @{lead.linktreeHandle}
-        <ExternalLink className='h-3 w-3' />
-      </a>
-    </div>
+    <PersonCell
+      name={lead.displayName || lead.linktreeHandle}
+      secondary={
+        <a
+          href={lead.linktreeUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='inline-flex items-center gap-1 hover:text-primary-token'
+          onClick={event => event.stopPropagation()}
+        >
+          @{lead.linktreeHandle}
+          <ExternalLink className='h-3 w-3' aria-hidden='true' />
+        </a>
+      }
+    />
   );
 }
 
@@ -423,7 +425,7 @@ export function LeadTable({
         enableFiltering
         globalFilterFn={leadFilterFn}
         getRowId={row => row.id}
-        rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+        rowMode='dense'
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}

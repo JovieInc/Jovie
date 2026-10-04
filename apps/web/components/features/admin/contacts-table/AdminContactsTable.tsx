@@ -18,6 +18,8 @@ import {
   EntityHeader,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
@@ -31,7 +33,7 @@ import {
   type ContactLifecycleStage,
   getContactLifecycleStageLabel,
 } from '@/lib/contacts/lifecycle';
-import { cn } from '@/lib/utils';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 
 /** Serialized canonical contact row (dates as ISO strings for the client). */
 export interface AdminContactRow {
@@ -123,6 +125,50 @@ function StageBadge({ stage }: { readonly stage: ContactLifecycleStage }) {
     </Badge>
   );
 }
+
+const adminContactColumn = createColumnHelper<AdminContactRow>();
+
+const ADMIN_CONTACT_COLUMNS = [
+  adminContactColumn.display({
+    id: 'name',
+    header: 'Name',
+    cell: ({ row }) => (
+      <PersonCell
+        name={row.original.displayName ?? row.original.email ?? '—'}
+        avatarUrl={row.original.avatarUrl}
+      />
+    ),
+    size: 260,
+  }),
+  adminContactColumn.accessor('email', {
+    header: 'Email',
+    cell: ({ getValue }) => getValue() ?? '—',
+    size: 240,
+  }),
+  adminContactColumn.accessor('handle', {
+    header: 'Handle',
+    cell: ({ getValue }) => {
+      const handle = getValue();
+      return handle ? `@${handle}` : '—';
+    },
+    size: 140,
+  }),
+  adminContactColumn.accessor('stage', {
+    header: 'Stage',
+    cell: ({ getValue }) => <StageBadge stage={getValue()} />,
+    size: 120,
+  }),
+  adminContactColumn.accessor('sources', {
+    header: 'Sources',
+    cell: ({ getValue }) => getValue().join(', '),
+    size: 160,
+  }),
+  adminContactColumn.accessor('activityAt', {
+    header: 'Last Activity',
+    cell: ({ getValue }) => formatDate(getValue()),
+    size: 120,
+  }),
+] as ColumnDef<AdminContactRow, unknown>[];
 
 function EvidenceItemCard({
   item,
@@ -638,89 +684,29 @@ export function AdminContactsTable({
         </div>
       }
     >
-      {({ stickyTopPx }) => (
-        <table
-          className='w-full table-fixed text-sm'
-          data-testid='admin-contacts-table'
-        >
-          <thead
-            className='sticky z-10 bg-surface-1 text-left text-xs text-secondary-token'
-            style={{ top: stickyTopPx }}
-          >
-            <tr>
-              <th className='w-1/4 whitespace-nowrap px-app-header py-2 font-medium'>
-                Name
-              </th>
-              <th className='w-1/4 whitespace-nowrap px-2 py-2 font-medium'>
-                Email
-              </th>
-              <th className='w-1/8 whitespace-nowrap px-2 py-2 font-medium'>
-                Handle
-              </th>
-              <th className='w-1/8 whitespace-nowrap px-2 py-2 font-medium'>
-                Stage
-              </th>
-              <th className='w-1/8 whitespace-nowrap px-2 py-2 font-medium'>
-                Sources
-              </th>
-              <th className='w-1/8 whitespace-nowrap px-2 py-2 pr-app-header font-medium'>
-                Last activity
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className='px-app-header py-10 text-center text-sm text-secondary-token'
-                >
-                  {search
-                    ? `No contacts matching “${search}”.`
-                    : 'No contacts at this stage yet.'}
-                </td>
-              </tr>
-            ) : (
-              rows.map(row => (
-                <tr
-                  key={row.dedupeKey}
-                  onClick={() =>
-                    setSelectedId(previous =>
-                      previous === row.dedupeKey ? null : row.dedupeKey
-                    )
-                  }
-                  aria-selected={selectedId === row.dedupeKey}
-                  className={cn(
-                    'h-14 cursor-pointer border-t border-(--app-shell-frame-seam)',
-                    selectedId === row.dedupeKey
-                      ? 'bg-surface-2'
-                      : 'hover:bg-surface-1'
-                  )}
-                  data-testid='admin-contact-row'
-                >
-                  <td className='truncate px-app-header py-2 font-medium text-primary-token'>
-                    {row.displayName ?? '—'}
-                  </td>
-                  <td className='truncate px-2 py-2 text-secondary-token'>
-                    {row.email ?? '—'}
-                  </td>
-                  <td className='truncate px-2 py-2 text-secondary-token'>
-                    {row.handle ? `@${row.handle}` : '—'}
-                  </td>
-                  <td className='px-2 py-2'>
-                    <StageBadge stage={row.stage} />
-                  </td>
-                  <td className='truncate px-2 py-2 text-xs text-secondary-token'>
-                    {row.sources.join(', ')}
-                  </td>
-                  <td className='px-2 py-2 pr-app-header text-xs text-secondary-token'>
-                    {formatDate(row.activityAt)}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {() => (
+        <AdminDataTable
+          data={rows}
+          columns={ADMIN_CONTACT_COLUMNS}
+          rowMode='dense'
+          getRowId={row => row.dedupeKey}
+          getRowTestId={() => 'admin-contact-row'}
+          isRowSelected={row => selectedId === row.dedupeKey}
+          onRowClick={row =>
+            setSelectedId(previous =>
+              previous === row.dedupeKey ? null : row.dedupeKey
+            )
+          }
+          // Page-level useAdminTableKeyboardNavigation owns j/k here.
+          enableKeyboardNavigation={false}
+          emptyState={
+            <div className='px-app-header py-10 text-center text-sm text-secondary-token'>
+              {search
+                ? `No contacts matching “${search}”.`
+                : 'No contacts at this stage yet.'}
+            </div>
+          }
+        />
       )}
     </AdminTableShell>
   );
