@@ -363,9 +363,9 @@ export function OnboardingProfileRail({
             'w-full rounded-3xl',
             isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 p-5'
           )}
-          phoneFrameClassName={
-            isInline ? 'h-105 w-50 sm:h-120 sm:w-57' : 'h-148 w-71'
-          }
+          // Width only: the screen keeps its 402:874 aspect, so a fixed frame
+          // height let it overflow the frame (JOV-7192).
+          phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
           topRight={
             <span
               className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/50 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'

@@ -13,12 +13,12 @@ export type NotificationChannel = 'sms' | 'email';
  * App-wide outbound delivery channel — the transports `sendNotification()`
  * can target. Superset of `NotificationChannel`:
  *   - `email`, `sms` overlap with `NotificationChannel` (fan-facing)
- *   - `push`, `in_app` are creator-facing only
+ *   - `push` is creator-facing only
  *
  * Both fan and creator code paths converge on this enum for outbound
  * dispatch; there is no shadow type. See `docs/NOTIFICATION_GUIDELINES.md`.
  */
-export type NotificationDeliveryChannel = 'email' | 'sms' | 'push' | 'in_app';
+export type NotificationDeliveryChannel = 'email' | 'sms' | 'push';
 
 export type NotificationCategory = 'transactional' | 'product' | 'marketing';
 

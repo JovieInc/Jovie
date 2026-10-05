@@ -7,7 +7,8 @@ No login or API key is required.
 
 ## Install
 
-Requires Node.js `>=24.21.0 <25`. Install an exact public release globally from npm:
+Requires Node.js 24.21 or newer (tested on 24 and 26; Node 22.13+ also runs,
+without proxy support). Install an exact public release globally from npm:
 
 ```sh
 npm install --global @jovie/cli@26.9.16
@@ -24,7 +25,7 @@ automated install. A repository build is not proof that npm has the package.
 
 | Command | Request |
 | --- | --- |
-| `creator lookup <url>` | `GET /api/agents/creator-lookup`; supports YouTube channels, Instagram profiles, TikTok profiles, and Linktree |
+| `creator lookup <url-or-handle>` | `GET /api/agents/creator-lookup`; accepts a profile URL or `platform:handle` (youtube, instagram, tiktok, linktree); resolves an existing Jovie profile first, then extracts YouTube channels; Instagram, TikTok, and Linktree sources return `SOURCE_UNSUPPORTED` |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
@@ -41,20 +42,33 @@ has `profileUrl` and, when unclaimed, a `claimUrl`. The claim URL is not an
 ownership token: the artist still verifies that they own the Spotify artist.
 Creation is anonymous and rate limited per IP.
 
-`creator lookup` is read-only. It returns the display name, bio, avatar URL,
-and public links extracted by the existing ingestion strategy without creating
-or changing a Jovie profile.
+`creator lookup` is read-only and never creates or changes a Jovie profile.
+When a public Jovie profile already holds that channel (matched by channel
+identity, not a username guess), the response is
+`{"exists":true,"username":...,"profileUrl":...}` and no source page is
+fetched. Otherwise it is `{"exists":false,...}` with the display name, bio,
+avatar URL, and public links extracted by the existing ingestion strategy.
 
 `--json` emits JSON for API responses and wraps text resources as
 `{"content":"..."}`. Failures print `{"error":{...}}`, and API failures carry
-the server's stable `apiCode` (for example `RATE_LIMITED`). Successful commands
+the server's stable `apiCode` (for example `RATE_LIMITED` or
+`ARTIST_NOT_FOUND`). Successful commands
 exit `0`, request/response failures exit `1`, and invalid usage exits `2`.
 
 `--help --json` returns `{ "content": "..." }`; `--version --json` returns `{ "version": "..." }`.
 
-Reads retry one transport failure. Writes never retry automatically: a timeout may
-have occurred after the server committed. Report tools therefore do not advertise
-idempotency. Responses share a 30-second request deadline and a 1 MiB body limit.
+Reads make up to three attempts with backoff for transient failures (connection
+resets, 502 without an error code, 503, 504, and 429 with `Retry-After` of 5 seconds
+or less). A longer `Retry-After` is reported, not slept through. Writes never retry
+automatically: a timeout may have occurred after the server committed. Report tools
+therefore do not advertise idempotency. Every attempt, backoff, and body read share
+one 30-second deadline, so no command waits longer; set `JOVIE_TIMEOUT_MS`
+(1000-120000) to change it. Bodies are capped at 1 MiB.
+
+Errors are one line on stderr that says what to do next (for example
+`Could not resolve jov.ie. Check your internet connection or --base-url.`). Add
+`--debug` to also print the stack and cause chain; secrets are redacted either way.
+Closing the output pipe early (`jovie docs llms | head`) exits quietly.
 
 Every command accepts `--base-url <url>` for a compatible deployment origin.
 The value must be an `http` or `https` origin without a path, credentials, or
@@ -64,7 +78,8 @@ query parameters.
 
 The standalone CLI and MCP server honor `HTTP_PROXY`, `HTTPS_PROXY`, and
 `NO_PROXY` (and their lowercase equivalents) through Node's built-in proxy
-support. No extra Node flags are needed. Existing TLS certificate settings
+support on Node.js 24 and newer (Node 22 warns and connects directly). No extra
+Node flags are needed. Existing TLS certificate settings
 remain in effect. A proxy must allow the deployment host (normally `jov.ie`);
 installing the CLI does not grant network access.
 
@@ -87,6 +102,7 @@ Tools: `lookup_creator`, `create_profile`, `get_artist`, `get_artist_guide`, `ge
 import { createProfile, fetchArtist, lookupCreator } from '@jovie/cli';
 
 const creator = await lookupCreator('https://www.youtube.com/@creator');
+// or by handle: await lookupCreator('youtube:@creator');
 const profile = await createProfile('https://open.spotify.com/artist/<id>');
 const artist = await fetchArtist('artist-username');
 ```
@@ -194,6 +210,27 @@ CLI or merging this source. Live commissioning remains tracked in
 [JOV-7393](https://linear.app/jovie/issue/JOV-7393).
 
 Docs: [Jovie CLI](https://jov.ie/cli), [developer resources](https://jov.ie/developers).
+
+## Chaos gate
+
+Every change ships through the same black-box chaos gate. The gate runs the
+real `jovie` binary against a hostile local server and requires one actionable
+line, the right exit code, no stack trace, no secret, and no hang.
+
+| When | What runs | Where |
+| --- | --- | --- |
+| Every PR touching this package or an API route it calls | `src/chaos.test.ts`, then `chaos:gate` (black-box against `dist`, plus the deliberate-red proof) | Source Validation, which is required via PR Ready |
+| Every npm release | The packed tarball is installed into a clean directory and gated on macOS, Linux, and Windows with Node 22.13, 24.21, and 26 using heavier fuzzing. Publish refuses bytes that differ from the tested tarball | `npm-publish.yml` |
+| Nightly | `@jovie/cli@latest` from npm on all three OSes, plus read-only production probes. A red run files a remediation issue; the next green run resolves it | `cli-chaos-nightly.yml` |
+
+`scripts/chaos-mutation-proof.mjs` puts a stack trace, a hang, and a secret
+leak back into a copy of the build. It fails unless the gate catches each one,
+so the gate cannot quietly stop working. Run the gate locally:
+
+```sh
+pnpm --filter @jovie/cli run build
+pnpm --filter @jovie/cli run chaos:gate
+```
 
 ## Release boundary
 

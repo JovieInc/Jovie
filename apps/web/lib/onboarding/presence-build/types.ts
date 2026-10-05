@@ -14,6 +14,10 @@ export type PresenceBuildStepStatus =
 export interface PresenceBuildFact {
   readonly label: string;
   readonly value: string;
+  /** Where a computed-proof fact came from (JOV-7750). */
+  readonly source?: string;
+  /** When that source was observed, ISO 8601. */
+  readonly observedAt?: string;
 }
 
 export interface PresenceBuildArtifact {

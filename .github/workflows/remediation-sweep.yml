@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: A hosted schedule reads pull requests, public Summer health, and an optional read-only Vercel deployment list, then files or reopens Linear issues. It never closes, edits, or labels pull requests.
+# necessary-trust-boundary: A hosted schedule reads Jovie and summer-config pull requests, public Summer health, public whois/RDAP for company domains, an optional read-only Vercel deployment list, and the latest main Product Screenshots artifacts, then files or reopens Linear issues. It never closes, edits, or labels pull requests.
 # removal-trigger: Remove when the lanes host files these same fingerprinted remediation issues on the event that makes each condition true.
 name: Remediation Sweep
 
@@ -8,6 +8,7 @@ name: Remediation Sweep
 # JOV-7552: age is the signal. Drafts, exhausted labels, idle holds, and
 # Summer receipts are stale only after a deadline. Vercel production ERROR
 # has no repository event, so the same daily read is the reconciliation.
+# Domain expiry is a calendar deadline too: jov.ie lapsed on 2025-11-23.
 
 on:
   schedule:
@@ -32,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
+      actions: read
       contents: read
       pull-requests: read
     steps:
@@ -45,14 +47,31 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - name: Generate cross-repository read token
+        id: github-read-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          owner: JovieInc
+          repositories: |
+            Jovie
+            summer-config
+          permission-checks: read
+          permission-issues: read
+          permission-pull-requests: read
+
       - name: Resolve dry run
         id: mode
         if: github.event_name == 'workflow_dispatch'
         run: echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
 
+      - name: Install whois
+        run: command -v whois >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq whois)
+
       - name: File returning conditions
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.github-read-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           VERCEL_READONLY_TOKEN: ${{ secrets.VERCEL_READONLY_TOKEN }}
@@ -75,5 +94,42 @@ jobs:
             run_mode exhausted
             run_mode holds
             run_mode summer
+            run_mode summer-config
             run_mode vercel
+            run_mode domains
           fi
+
+      # JOV-7713: nightly full-inventory screen audit. Composes the latest
+      # main Product Screenshots receipts (route DOM + screen proofs) over
+      # every SCREEN_REGISTRY screen and files one fingerprinted issue per
+      # red screen plus uncovered/missing-evidence rollups.
+      - name: Download latest screen evidence
+        id: screens
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '11 8 * * *'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow screenshots.yml --branch main --event push --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          if [ -z "$run_id" ]; then
+            echo "::error::No completed Product Screenshots run on main; the screen audit has no evidence."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/screen-evidence"
+          gh run download "$run_id" -R "$GITHUB_REPOSITORY" -D "$RUNNER_TEMP/screen-evidence" \
+            -p 'route-dom-certification-*' -p 'screen-browser-proof*'
+          echo "dir=$RUNNER_TEMP/screen-evidence" >> "$GITHUB_OUTPUT"
+
+      - name: File screen audit findings
+        if: steps.screens.outcome == 'success'
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+          EVIDENCE_DIR: ${{ steps.screens.outputs.dir }}
+        run: |
+          set -euo pipefail
+          flag=
+          if [ "$DRY_RUN" = "true" ]; then flag=--dry-run; fi
+          node scripts/invariants/screen-audit.mjs --artifacts "$EVIDENCE_DIR" \
+            --out "$RUNNER_TEMP/screen-audit.json" --file $flag

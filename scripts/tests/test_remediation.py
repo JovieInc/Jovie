@@ -94,6 +94,13 @@ class ClassifierFixtureTest(unittest.TestCase):
     def test_lockfile_only_and_main_red_and_events(self):
         lock = pr(mergeStateStatus="DIRTY", conflictFiles=["pnpm-lock.yaml"])
         self.assertEqual(remediation.classify_blocker(lock)["subtype"], "lockfile-only")
+        generated = pr(mergeStateStatus="DIRTY", conflictFiles=[".github/workflow-topology.gen.yml"])
+        self.assertEqual(remediation.classify_blocker(generated)["subtype"], "generated-only")
+        self.assertEqual(remediation.plan_ladder(remediation.classify_blocker(generated), {}, providers(), 0, "h")["action"],
+                         "resolve-lockfile")
+        mixed = pr(mergeStateStatus="DIRTY",
+                   conflictFiles=[".github/workflow-topology.gen.yml", "src/a.ts"])
+        self.assertEqual(remediation.classify_blocker(mixed)["subtype"], "semantic")
         overlap = pr(statusCheckRollup=[{"name": "CI", "status": "COMPLETED", "conclusion": "FAILURE"}])
         main = [{"name": "CI", "conclusion": "FAILURE"}]
         self.assertEqual(remediation.classify_blocker(overlap, main_rollup=main)["subtype"], "main-red")
@@ -226,14 +233,23 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIsNone(remediation.non_pr_event("workflow_run", {"workflow_run": {
             "event": "pull_request", "conclusion": "failure", "pull_requests": [{"number": 1}]}}))
 
-    def test_registry_keeps_hyperagent_disabled(self):
+    def test_registry_hyperagent_is_a_remote_only_regular_lane(self):
+        # JOV-7706: Hyperagent is enabled, on a deliberate auto-mode agent id, but it cannot
+        # continue a local worktree, so handoff and escalation never pick it.
         catalog = json_providers()
-        self.assertFalse(catalog["hyperagent"]["enabled"])
+        hyperagent = catalog["hyperagent"]
+        self.assertTrue(hyperagent.get("enabled", True))
+        self.assertIs(hyperagent["repairs"], False)
+        self.assertEqual(hyperagent["agentId"], "cmtj3n2q901i407adklzzq01t")
+        self.assertEqual(hyperagent["agentName"], "GLM 5.3 Developer")
         self.assertFalse(catalog["grok"]["enabled"])
         self.assertFalse(catalog["kimi"]["enabled"])
-        chosen = remediation.route_lane(catalog, healthy=lambda name, spec: True)
-        self.assertNotEqual(chosen["lane"], "hyperagent")
-        self.assertNotIn("hyperagent", {spec and name for name, spec in catalog.items() if not spec.get("enabled", True)} & {chosen["lane"]})
+        for skip in ([], ["devin"], ["devin", "codex"], ["devin", "codex", "claude"]):
+            chosen = remediation.route_lane(catalog, exclude=set(skip), healthy=lambda name, spec: True)
+            self.assertNotEqual((chosen or {}).get("lane"), "hyperagent")
+        top = remediation.select_escalation_lane(catalog, {"devin", "codex", "claude"},
+                                                 healthy=lambda name, spec: True)
+        self.assertNotEqual(top["lane"], "hyperagent")
 
     def test_ha_ci_remediator_poke_is_gone(self):
         needle = "ha-" + "ci-remediator-poke"

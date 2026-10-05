@@ -691,6 +691,14 @@ export type FlagCapabilityBinding =
   | { readonly nonMarketing: string };
 
 export const PRODUCT_FLAG_CAPABILITIES = {
+  YOUTUBE_WORKSPACE_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
+  JOVIE_WORK_NAV: {
+    nonMarketing:
+      'default-off workspace navigation; no public capability claim',
+  },
   BILLING_UPGRADE_DIRECT: { nonMarketing: 'billing checkout routing' },
   SMARTLINK_PRE_SAVE: { capabilityId: 'smart-links' },
   IOS_APPLE_MUSIC_PRIORITY: { nonMarketing: 'platform ordering heuristic' },
@@ -713,7 +721,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   PROFILE_SEARCH_MONITORING: { capabilityId: 'profile-monitoring' },
   ONBOARDING_WOW_TASK_QUEUE: { nonMarketing: 'onboarding orchestration' },
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
-  MERCH_QA_GATE: { capabilityId: 'instant-merch' },
   AGENT_PROFILE_CREATE: { capabilityId: 'cli' },
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
@@ -727,6 +734,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CHAT_COMPOSER_V2: { nonMarketing: 'UI layout toggle' },
   MEMORY_STUDIO_SESSION_V0: { nonMarketing: 'internal memory loop' },
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
+  MARKETING_GENERIC_CREATOR_NAV: {
+    nonMarketing:
+      'marketing copy presentation; default off; does not change smart-link certification (JOV-7580)',
+  },
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
     nonMarketing: 'OAuth dynamic client registration kill switch',
   },
@@ -741,6 +752,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   AUTH_OFFER_SUMMARY: {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',
+  },
+  SOCIAL_HTML_ISOLATED_PROVIDER: {
+    nonMarketing:
+      'internal ingestion routing kill switch; reserved for future isolated provider rollout',
   },
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:

@@ -78,6 +78,8 @@ def fake_lane(shell, claimed=False):
             return runner.publish_verified(host, target)
     module.publish_verified = publish
     module.posted = posted
+    module.pruned = []
+    module.prune_held = lambda host, prs, now, complete=False: module.pruned.append(complete)
     return module
 
 
@@ -219,8 +221,9 @@ class RetirementAuthorityTest(unittest.TestCase):
         self.assertEqual(shell.made("gh", "pr", "close"), [])
 
 
-class ParkedRetirementTest(unittest.TestCase):
-    """JOV-7708 (JOV-INV-011 v5): parked work past 48h is closed and rebuilt from main."""
+class ParkedRequeueTest(unittest.TestCase):
+    """JOV-7708: parked work past 48h sends its issue back to rebuild from main. The PR stays
+    open; only an explicit duplicate label retires it (JOV-INV-011)."""
     OLD = "2033-05-10T00:00:00Z"  # created eight days before NOW
 
     def setUp(self):
@@ -236,33 +239,6 @@ class ParkedRetirementTest(unittest.TestCase):
         at = datetime.fromtimestamp(NOW - hours * 3600, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         return f"lane-fix-conflict\t2033-05-01T00:00:00Z\n{label}\t{at}\n"
 
-    def test_only_unheld_agent_owned_parked_prs_older_than_48h_are_candidates(self):
-        young = pr(number=6, labels=["lane-fix-exhausted"], createdAt="2033-05-17T00:00:00Z")
-        keep = [young,
-                self.parked(7, labels=("lane-fix-exhausted", "hold")),
-                self.parked(8, labels=("lane-fix-conflict",)),
-                self.parked(9, branch="feat/founder-work"),
-                self.parked(10, isCrossRepository=True),
-                self.parked(11, isInMergeQueue=True)]
-        take = [self.parked(5), self.parked(12, labels=("queue-poison",), branch="cursor/agent-fix-ab12")]
-        self.assertEqual([row["number"] for row in events.parked_candidates(keep + take, NOW)], [5, 12])
-
-    def test_parked_since_uses_the_latest_labeling_of_each_parked_label(self):
-        out = ("lane-fix-exhausted\t2033-05-01T00:00:00Z\nqueue-poison\t2033-05-16T00:00:00Z\n"
-               "lane-fix-exhausted\t2033-05-15T00:00:00Z\nhold\t2033-05-02T00:00:00Z\n")
-        shell = Shell({("gh", "api", "--paginate"): out})
-        self.assertEqual(events.parked_since(5, {"lane-fix-exhausted", "queue-poison"}, shell),
-                         events.iso_ts("2033-05-15T00:00:00Z"))
-        # A relabel restarts the clock; a label the PR no longer carries never counts.
-        self.assertEqual(events.parked_since(5, {"queue-poison"}, shell), events.iso_ts("2033-05-16T00:00:00Z"))
-        self.assertIsNone(events.parked_since(5, {"lane-fix-exhausted"}, Shell({("gh", "api", "--paginate"): (1, "")})))
-
-    def test_issue_identity_comes_from_lane_branch_head_or_title(self):
-        self.assertEqual(events.pr_issue({"headRefName": "devin/jov-7-20261001t0900"}), "JOV-7")
-        self.assertEqual(events.pr_issue({"headRefName": "cursor/jov-7580-nav-857c"}), "JOV-7580")
-        self.assertEqual(events.pr_issue({"headRefName": "codex/x", "title": "fix(nav): thing (JOV-12)"}), "JOV-12")
-        self.assertIsNone(events.pr_issue({"headRefName": "codex/x", "title": "fix thing"}))
-
     def linear(self, state="started"):
         calls = []
         def gql(query, variables):
@@ -277,47 +253,79 @@ class ParkedRetirementTest(unittest.TestCase):
                                move=lambda issue_id, state_name: moved.append((issue_id, state_name)),
                                comment=lambda issue_id, body: comments.append((issue_id, body)))
 
-    def test_sweep_closes_parked_pr_and_returns_issue_to_pool_with_rebuild_note(self):
+    def test_only_unheld_unrequeued_agent_owned_parked_prs_older_than_48h_are_candidates(self):
+        young = pr(number=6, labels=["lane-fix-exhausted"], createdAt="2033-05-17T00:00:00Z")
+        keep = [young,
+                self.parked(7, labels=("lane-fix-exhausted", "hold")),
+                self.parked(8, labels=("lane-fix-conflict",)),
+                self.parked(9, branch="feat/founder-work"),
+                self.parked(10, isCrossRepository=True),
+                self.parked(11, isInMergeQueue=True),
+                self.parked(13, labels=("lane-fix-exhausted", events.REBUILD_LABEL))]
+        take = [self.parked(5), self.parked(12, labels=("queue-poison",), branch="cursor/agent-fix-ab12")]
+        self.assertEqual([row["number"] for row in events.parked_candidates(keep + take, NOW)], [5, 12])
+
+    def test_parked_since_uses_the_latest_labeling_of_each_parked_label(self):
+        out = ("lane-fix-exhausted\t2033-05-01T00:00:00Z\nqueue-poison\t2033-05-16T00:00:00Z\n"
+               "lane-fix-exhausted\t2033-05-15T00:00:00Z\nhold\t2033-05-02T00:00:00Z\n")
+        shell = Shell({("gh", "api", "--paginate"): out})
+        self.assertEqual(events.parked_since(5, {"lane-fix-exhausted", "queue-poison"}, shell),
+                         events.iso_ts("2033-05-15T00:00:00Z"))
+        self.assertEqual(events.parked_since(5, {"queue-poison"}, shell), events.iso_ts("2033-05-16T00:00:00Z"))
+        self.assertIsNone(events.parked_since(5, {"lane-fix-exhausted"}, Shell({("gh", "api", "--paginate"): (1, "")})))
+
+    def test_issue_identity_comes_from_lane_branch_head_or_title(self):
+        self.assertEqual(events.pr_issue({"headRefName": "devin/jov-7-20261001t0900"}), "JOV-7")
+        self.assertEqual(events.pr_issue({"headRefName": "cursor/jov-7580-nav-857c"}), "JOV-7580")
+        self.assertEqual(events.pr_issue({"headRefName": "codex/x", "title": "fix(nav): thing (JOV-12)"}), "JOV-12")
+        self.assertIsNone(events.pr_issue({"headRefName": "codex/x", "title": "fix thing"}))
+
+    def test_sweep_requeues_the_issue_and_never_closes_the_pr(self):
         candidate = self.parked()
         shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
                        ("gh", "api", "--paginate"): self.events_since(60)})
         linear = self.linear()
         with patch.object(events, "open_prs_state", return_value=[candidate]):
             record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
-        self.assertEqual(record["parkedRetired"], [5])
-        close = shell.made("gh", "pr", "close")
-        self.assertEqual(len(close), 1)
-        self.assertIn("parked (`lane-fix-exhausted`) for 60h", close[0][-1])
-        self.assertIn("branch `devin/jov-7-20261001t0900` is kept", close[0][-1])
+        self.assertEqual(record["parkedRequeued"], [5])
+        self.assertEqual(record["closed"], [])
+        self.assertEqual(shell.made("gh", "pr", "close"), [], "JOV-INV-011: age and exhaustion never close")
+        labeled = shell.made("gh", "api", "-X", "POST", "repos/JovieInc/Jovie/issues/5/labels")
+        self.assertEqual(labeled[0][-1], f"labels[]={events.REBUILD_LABEL}")
+        self.assertIn("this PR stays open", shell.made("gh", "pr", "comment")[0][-1])
         self.assertEqual(linear.moved, [("issue-7", "Todo")])
         self.assertTrue(any("issueAddLabel" in query and variables["l"] == "label-agent-ready"
                             for query, variables in linear.calls))
         self.assertIn("Rebuild from current main", linear.comments[0][1])
         row = next(row for row in record["dispositions"] if row["pr"] == 5)
-        self.assertEqual(row["state"], "closing")
-        ledger = (self.host.state / "runs" / "ledger.jsonl").read_text()
-        self.assertIn('"kind": "parked-retire"', ledger)
+        self.assertNotEqual(row["state"], "closing")
+        self.assertIn("issue requeued", row["reason"])
+        self.assertIn('"kind": "parked-requeue"', (self.host.state / "runs" / "ledger.jsonl").read_text())
 
-    def test_inside_48h_parked_window_nothing_closes(self):
-        candidate = self.parked()
-        shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
-                       ("gh", "api", "--paginate"): self.events_since(47)})
-        with patch.object(events, "open_prs_state", return_value=[candidate]):
-            record = events.reconcile(self.host, fake_lane(shell), lambda: self.linear(), NOW, force=True)
-        self.assertEqual(record["parkedRetired"], [])
-        self.assertEqual(shell.made("gh", "pr", "close"), [])
-
-    def test_kill_switch_disables_parked_retirement(self):
-        candidate = self.parked()
+    def test_a_requeued_pr_is_not_requeued_again(self):
+        candidate = self.parked(labels=("lane-fix-exhausted", events.REBUILD_LABEL))
         shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
                        ("gh", "api", "--paginate"): self.events_since(60)})
-        with patch.dict(os.environ, {"LANES_PARKED_RETIRE": "0"}), \
-                patch.object(events, "open_prs_state", return_value=[candidate]):
-            record = events.reconcile(self.host, fake_lane(shell), lambda: self.linear(), NOW, force=True)
-        self.assertEqual(record["parkedRetired"], [])
-        self.assertEqual(shell.made("gh", "pr", "close"), [])
+        linear = self.linear()
+        with patch.object(events, "open_prs_state", return_value=[candidate]):
+            record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertEqual(record["parkedRequeued"], [])
+        self.assertEqual(linear.moved, [])
 
-    def test_live_revalidation_and_repair_claims_preserve_the_pr(self):
+    def test_inside_48h_or_kill_switch_nothing_happens(self):
+        candidate = self.parked()
+        for hours, env in ((47, {}), (60, {"LANES_PARKED_REQUEUE": "0"})):
+            with self.subTest(hours=hours, env=env):
+                shell = Shell({("gh", "api", "graphql"): retirement_page(candidate),
+                               ("gh", "api", "--paginate"): self.events_since(hours)})
+                linear = self.linear()
+                with patch.dict(os.environ, env), patch.object(events, "open_prs_state", return_value=[candidate]):
+                    record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+                self.assertEqual(record["parkedRequeued"], [])
+                self.assertEqual(linear.moved, [])
+                self.assertEqual(shell.made("gh", "pr", "close"), [])
+
+    def test_live_revalidation_and_repair_claims_leave_everything_as_is(self):
         candidate = self.parked()
         nodes = lambda *names: {"nodes": [{"name": n} for n in names], "pageInfo": {"hasNextPage": False}}
         cases = [({}, False, "unreadable"),
@@ -331,26 +339,27 @@ class ParkedRetirementTest(unittest.TestCase):
             with self.subTest(why=why):
                 shell = Shell({("gh", "api", "graphql"): response})
                 linear = self.linear()
-                self.assertFalse(events.retire_parked(fake_lane(shell, claimed=claimed), linear, candidate,
-                                                      NOW - 60 * 3600, [candidate], host=self.host, now=NOW))
-                self.assertEqual(shell.made("gh", "pr", "close"), [])
+                self.assertFalse(events.requeue_parked(fake_lane(shell, claimed=claimed), linear, candidate,
+                                                       NOW - 60 * 3600, [candidate], host=self.host, now=NOW))
+                self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
                 self.assertEqual(linear.moved, [])
         (self.host.state / "fix-attempts.json").write_text(json.dumps({"5": {"sha": "h1", "count": 1, "at": NOW - 60}}))
         shell = Shell({("gh", "api", "graphql"): retirement_page(candidate)})
-        self.assertFalse(events.retire_parked(fake_lane(shell), self.linear(), candidate, NOW - 60 * 3600,
-                                              [candidate], host=self.host, now=NOW), "local repair in flight")
-        self.assertEqual(shell.made("gh", "pr", "close"), [])
+        linear = self.linear()
+        self.assertFalse(events.requeue_parked(fake_lane(shell), linear, candidate, NOW - 60 * 3600,
+                                               [candidate], host=self.host, now=NOW), "local repair in flight")
+        self.assertEqual(linear.moved, [])
 
-    def test_done_issue_or_sibling_pr_closes_without_requeueing(self):
+    def test_done_issue_or_sibling_pr_is_not_requeued(self):
         candidate = self.parked()
         sibling = pr(number=9, branch="codex/jov-7-20261002t0900")
         for linear, open_prs, why in ((self.linear(state="completed"), [candidate], "issue done"),
                                       (self.linear(), [candidate, sibling], "another PR carries the issue")):
             with self.subTest(why=why):
                 shell = Shell({("gh", "api", "graphql"): retirement_page(candidate)})
-                self.assertTrue(events.retire_parked(fake_lane(shell), linear, candidate, NOW - 60 * 3600,
-                                                     open_prs, host=self.host, now=NOW))
-                self.assertEqual(len(shell.made("gh", "pr", "close")), 1)
+                self.assertFalse(events.requeue_parked(fake_lane(shell), linear, candidate, NOW - 60 * 3600,
+                                                       open_prs, host=self.host, now=NOW))
+                self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
                 self.assertEqual(linear.moved, [])
 
     def test_pool_label_matches_the_runner_shared_label(self):
@@ -433,7 +442,9 @@ class RelayTest(unittest.TestCase):
         self.assertTrue(events.in_scope(pr(branch="claude/jov-9-20260926t0100", draft=True), "orphan", disabled))
         self.assertFalse(events.in_scope(pr(draft=True), "orphan", disabled))
         self.assertEqual(events.disabled_lanes(PROVIDERS), {"claude", "hyperagent"})
-        self.assertIn("claude", events.disabled_lanes())
+        # JOV-7706: claude repairs locally; remote-only Hyperagent's drafts stay orphan-maintained.
+        self.assertNotIn("claude", events.disabled_lanes())
+        self.assertIn("hyperagent", events.disabled_lanes())
 
     def test_relay_labels_only_the_current_head_once(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h1",
@@ -450,6 +461,13 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(labeled.made("gh", "api"), [], "an already queued PR is not relabeled")
         missing = Shell({("gh", "pr", "view"): (1, "")})
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, missing, set()), [])
+
+        exhausted = Shell({("gh", "pr", "view"): {
+            **view, "labels": [{"name": "lane-fix-exhausted"}],
+        }})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, exhausted, set()), [])
+        self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
+                         "a terminal head never gets another repair signal")
 
     def test_a_second_failed_ejection_in_a_day_marks_the_pr_queue_poison(self):
         now = time.time()
@@ -537,15 +555,33 @@ class RelayTest(unittest.TestCase):
 
     def test_a_push_to_main_labels_newly_conflicting_prs_after_mergeability_settles(self):
         reads = iter([
-            [{"number": 5, "headRefName": "tim/fix", "isDraft": False, "mergeable": "UNKNOWN", "labels": []}],
-            [{"number": 5, "headRefName": "tim/fix", "isDraft": False, "mergeable": "CONFLICTING", "labels": []},
-             {"number": 6, "headRefName": "tim/other", "isDraft": False, "mergeable": "CONFLICTING",
-              "labels": [{"name": "lane-fix-conflict"}]}],
+            [{"number": 5, "headRefName": "tim/fix", "headRefOid": "h5", "isDraft": False,
+              "mergeable": "UNKNOWN", "labels": []}],
+            [{"number": 5, "headRefName": "tim/fix", "headRefOid": "h5", "isDraft": False,
+              "mergeable": "CONFLICTING", "labels": []},
+             {"number": 6, "headRefName": "tim/other", "headRefOid": "h6", "isDraft": False,
+              "mergeable": "CONFLICTING", "labels": [{"name": "lane-fix-conflict"}]}],
         ])
         shell = Shell({("gh", "pr", "list"): lambda args: next(reads)})
         added = events.label_backlog(shell, set(), kinds=("conflict",), settle_s=0.01)
         self.assertEqual(added, [(5, "conflict")])
         self.assertEqual(len(shell.made("gh", "pr", "list")), 2)
+
+    def test_conflict_detector_skips_terminal_and_claimed_heads(self):
+        claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        terminal = pr(number=5, branch="tim/terminal", mergeable="CONFLICTING",
+                      labels=["lane-fix-exhausted"])
+        claimed = pr(number=6, branch="tim/claimed", sha="claimed-head", mergeable="CONFLICTING")
+        claim_url = (f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc")
+        shell = Shell({
+            ("gh", "pr", "list"): [terminal, claimed],
+            ("gh", "api", claim_url):
+                f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
+        })
+        with patch.object(events.time, "time", return_value=NOW):
+            added = events.label_backlog(shell, set(), kinds=("conflict",), settle_s=0)
+        self.assertEqual(added, [])
+        self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
 
     def test_backfill_labels_green_lane_drafts_and_orphans(self):
         prs = [
@@ -620,7 +656,7 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual(search, "label:lane-fix-red,lane-fix-conflict,lane-fix-dequeued,lane-fix-review,lane-fix-stale")
         self.assertEqual(events.queued_prs(fake_lane(Shell({("gh", "pr", "list"): (1, "")})), events.FIX_KINDS), [])
 
-    def test_an_event_pr_is_claimed_first_recorded_and_its_label_consumed(self):
+    def test_an_event_pr_is_claimed_first_recorded_and_retains_its_label(self):
         shell = Shell()
         lane = fake_lane(shell)
         runner.record_held(self.host, 5, "h1", ["check-failed:x", "boom"])
@@ -628,8 +664,8 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual((claimed["number"], claimed["gateEvidence"][1]), (5, "boom"))
         self.assertEqual(self.attempts()["5"], {"sha": "h1", "count": 1, "lane": "devin", "at": NOW})
         self.assertEqual(lane.posted, [5])
-        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
-                         [["gh", "api", "-X", "DELETE", f"repos/{runner.REPO_SLUG}/issues/5/labels/lane-fix-red"]])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [],
+                         "the repair signal remains until the worker publishes a new head")
 
     def test_an_unfixable_hold_retains_the_label_without_an_attempt(self):
         shell = Shell()
@@ -1061,7 +1097,9 @@ class GapTest(unittest.TestCase):
         shell = Shell({("gh", "api", "graphql"): page})
         (self.host.state / "fix-attempts.json").write_text(json.dumps({"4": {"count": 2}, "10": {"count": 2}}))
         linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}}, move=None, comment=None)
-        record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW)
+        lane = fake_lane(shell)
+        record = events.reconcile(self.host, lane, lambda: linear, NOW)
+        self.assertEqual(lane.pruned, [True], "a complete open-PR page prunes held.json")
         self.assertEqual(record["counts"]["dirty"], 1)
         self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/1/labels", "-f", "labels[]=lane-fix-conflict"],
                       shell.calls)
@@ -1074,6 +1112,19 @@ class GapTest(unittest.TestCase):
         no_linear = Shell({("gh", "api", "graphql"): page})
         events.reconcile(self.host, fake_lane(no_linear), lambda: (_ for _ in ()).throw(OSError("x")), NOW, force=True)
         self.assertEqual(len(no_linear.made("gh", "pr", "close")), 0, "terminal work is preserved even with Linear unavailable")
+
+    def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
+        target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
+        claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        claim_url = f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc"
+        shell = Shell({
+            ("gh", "api", claim_url):
+                f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
+        })
+        with patch.object(events, "open_prs_state", return_value=[target]):
+            record = events.reconcile(self.host, fake_lane(shell), lambda: None, NOW, force=True)
+        self.assertEqual(record["labeled"], [])
+        self.assertEqual(shell.made("gh", "api", "-X", "POST"), [])
 
     def hold_ctx(self, events_list, notes=(), committed="2033-05-18T00:00:00Z", oid="h"):
         """A canned hold_context GraphQL reply: labeled events, comments, last commit."""
@@ -1198,14 +1249,34 @@ class GapTest(unittest.TestCase):
     def test_open_prs_are_read_page_by_page(self):
         pages = iter([
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"},
-                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]}}]}}}},
+                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]},
+                                                                 "files": {"totalCount": 1, "nodes": [
+                                                                     {"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}]}}]}}}},
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
                                                       "nodes": [{"number": 2}]}}}},
         ])
         shell = Shell({("gh", "api", "graphql"): lambda args: next(pages)})
         prs = events.open_prs_state(fake_lane(shell))
         self.assertEqual([(p["number"], p["labels"], p["rollup"]) for p in prs], [(1, [{"name": "hold"}], None), (2, [], None)])
+        self.assertEqual(prs[0]["files"], [{"path": "scripts/lanes/hud.py", "changeType": "MODIFIED"}])
+        self.assertTrue(prs[0]["filesComplete"])
+        self.assertIn("files(first:100)", next(arg for arg in shell.calls[0] if arg.startswith("query=")))
         self.assertIn("cursor=c1", shell.calls[1])
+
+    def test_unreadable_large_file_list_preserves_metadata_without_certifying_overlap_inventory(self):
+        page = {"data": {"repository": {"pullRequests": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [{"number": 1, "files": {"totalCount": 101, "nodes": []}},
+                      {"number": 2, "files": {"totalCount": 1, "nodes": [{"path": "README.md"}]}}]}}}}
+        shell = Shell({("gh", "api", "graphql"): page,
+                       ("gh", "api", "--paginate"): (1, "unavailable")})
+        prs = events.open_prs_state(fake_lane(shell))
+        self.assertEqual([row["number"] for row in prs], [1, 2])
+        self.assertFalse(prs[0]["filesComplete"])
+        self.assertTrue(prs[1]["filesComplete"])
+        with patch.object(runner, "open_prs_summary", return_value=prs), \
+                patch.dict(runner._SUMMARY, {"readable": True}):
+            self.assertIsNone(runner.overlap_prs_summary())
 
     def test_fix_prompt_carries_stale_and_queue_log_and_lockfile_recipe(self):
         prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "stale"], merge="DIRTY"), "title": "t",
@@ -1213,6 +1284,7 @@ class GapTest(unittest.TestCase):
         self.assertIn("boom", prompt)
         self.assertIn("no activity for 48 hours", prompt)
         self.assertIn("pnpm install --lockfile-only", prompt)
+        self.assertIn("Never hand-merge generated files", prompt)
 
 
 class RunnerHookTest(unittest.TestCase):
@@ -1686,6 +1758,8 @@ class TerminalPreservationTest(unittest.TestCase):
                 return super(ReceiptShell,inner).__call__(args,**kwargs)
         shell=ReceiptShell();lane=fake_lane(shell)
         self.assertEqual(events.claim_event_pr(self.host,lane,'devin',[target],NOW)['number'],5)
+        self.assertFalse(any(call[-1].endswith('/lane-fix-conflict') for call in shell.calls),
+                         'the repair signal remains until the worker publishes a new head')
         saved=json.loads((self.host.state/'fix-attempts.json').read_text())
         receipt=saved['5']['reentry']
         saved['5'].update(endedAt=NOW+1,pushedHead='h2',pushed=True)
