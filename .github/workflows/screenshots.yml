@@ -724,7 +724,8 @@ jobs:
   publish:
     name: Publish Screenshot Catalog
     needs: generate
-    if: ${{ needs.generate.result == 'success' && needs.generate.outputs.catalog-changed == 'true' }}
+    # Captures from a dispatch on any other ref describe unmerged source.
+    if: ${{ github.ref == 'refs/heads/main' && needs.generate.result == 'success' && needs.generate.outputs.catalog-changed == 'true' }}
     # Publishing generated assets is deliberately non-authoritative. The
     # repository's normal commit/push gates still block unsafe publication,
     # while a publication failure cannot retroactively invalidate the trusted
