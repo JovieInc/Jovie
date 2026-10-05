@@ -281,7 +281,7 @@ def provider_throughput(receipts: list[dict], provider_names=(), merged_prs: lis
             metric["remediationRuns"] += 1
         for evidence in row.get("providerEvidence") or []:
             evidence_provider = evidence.get("provider")
-            if evidence_provider in metrics:
+            if evidence_provider in metrics and evidence.get("event") == "account-leased":
                 metrics[evidence_provider]["accountLeases"] += 1
         if row.get("verdict") in ("failed", "provider-error", "fix-no-change"):
             metric["terminalFailures"] += 1
