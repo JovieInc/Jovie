@@ -29,7 +29,7 @@ export function PresenceLockAffordance({
           aria-haspopup='dialog'
           data-testid='presence-lock'
           className={cn(
-            'inline-flex h-7 w-7 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50',
+            'inline-flex h-11 w-11 items-center justify-center rounded-full text-tertiary-token sm:h-8 sm:w-8 transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50',
             className
           )}
           onClick={event => event.stopPropagation()}

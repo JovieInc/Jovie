@@ -9,6 +9,12 @@ import type {
 import { cn } from '@/lib/utils';
 
 /**
+ * JOV-5063: Presence desktop density lock — 32px visible controls with no
+ * 44px hit target above the sm breakpoint; mobile keeps the 44px target.
+ */
+export const PRESENCE_BUTTON_DESKTOP_DENSITY = 'min-h-8 sm:before:min-h-8';
+
+/**
  * Presence status primitives shared by the creator Presence workspace and
  * Ovie's company Presence page (JOV-6770), so both render one status
  * vocabulary instead of forked badges.
@@ -35,7 +41,7 @@ export function PresenceStatusBadge({
     >
       <span
         className={cn(
-          'inline-flex min-h-7 items-center gap-1.5 text-xs text-tertiary-token',
+          'inline-flex min-h-8 items-center gap-1.5 text-xs text-tertiary-token',
           status.tone === 'success' && 'text-success',
           status.tone === 'warning' && 'text-warning',
           status.tone === 'error' && 'text-error'
