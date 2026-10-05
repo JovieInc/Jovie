@@ -9,6 +9,7 @@
 # - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
 #
 name: Security Scanning
+# clock-class: upstream-advisory
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Devin
 # necessary-trust-boundary: A hosted weekly schedule runs Semgrep CE and osv-scanner against the default branch and uploads SARIF with only the built-in read-contents/security-events token; no merge, deploy, or credential authority is added.
