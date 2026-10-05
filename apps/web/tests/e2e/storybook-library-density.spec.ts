@@ -97,17 +97,20 @@ for (const story of ['dense-scan-with-inspector', 'virtualized-dense-scan']) {
       'data-revision',
       '1'
     );
-    const transforms = await page.locator('table').evaluate(async table => {
-      const moved: string[] = [];
-      for (let frame = 0; frame < 12; frame++) {
-        await new Promise(requestAnimationFrame);
-        for (const cell of table.querySelectorAll('td')) {
-          if (getComputedStyle(cell).transform !== 'none')
-            moved.push('animated cell');
+    const transforms = await page
+      .getByTestId('library-surface')
+      .locator('table')
+      .evaluate(async table => {
+        const moved: string[] = [];
+        for (let frame = 0; frame < 12; frame++) {
+          await new Promise(requestAnimationFrame);
+          for (const cell of table.querySelectorAll('td')) {
+            if (getComputedStyle(cell).transform !== 'none')
+              moved.push('animated cell');
+          }
         }
-      }
-      return moved;
-    });
+        return moved;
+      });
     expect(transforms).toEqual([]);
     const after = await first.boundingBox();
     expect(after).toEqual(before);
@@ -148,12 +151,28 @@ test('loading reserves the same dense row and title geometry', async ({
     path: testInfo.outputPath('dense-loading-mounted.png'),
     fullPage: true,
   });
-  const heights = await loading
-    .locator('tbody tr')
-    .evaluateAll(rows => rows.map(row => row.getBoundingClientRect().height));
-  expect(heights.length).toBeGreaterThan(0);
-  for (const height of heights)
-    expect(Math.abs(height - 32)).toBeLessThanOrEqual(1);
+  await expect.poll(async () => loading.locator('thead th').count()).toBe(5);
+  const layout = await loading.locator('table').evaluate(table => {
+    const headers = [...table.querySelectorAll('thead th')].map(header =>
+      header.getBoundingClientRect()
+    );
+    return [...table.querySelectorAll('tbody tr')].map(row => ({
+      height: row.getBoundingClientRect().height,
+      cells: [...row.querySelectorAll('td')].map((cell, index) => ({
+        leftDelta: cell.getBoundingClientRect().left - headers[index]?.left,
+        rightDelta: cell.getBoundingClientRect().right - headers[index]?.right,
+      })),
+    }));
+  });
+  expect(layout.length).toBeGreaterThan(0);
+  for (const row of layout) {
+    expect(Math.abs(row.height - 32)).toBeLessThanOrEqual(1);
+    expect(row.cells).toHaveLength(5);
+    for (const cell of row.cells) {
+      expect(Math.abs(cell.leftDelta)).toBeLessThanOrEqual(1);
+      expect(Math.abs(cell.rightDelta)).toBeLessThanOrEqual(1);
+    }
+  }
   await page.screenshot({
     path: testInfo.outputPath('dense-loading.png'),
     fullPage: true,

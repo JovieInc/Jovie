@@ -1,15 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LIBRARY_LIFECYCLE_STAGES } from '@/lib/library/lifecycle-stage';
 import {
   LIBRARY_CATALOG_SKELETON_COLUMNS,
+  LIBRARY_STAGE_CHIP_KEYS,
   LIBRARY_TABLE_SKELETON_COLUMNS,
-  LIBRARY_VIEW_FILTER_CHIP_KEYS,
+  LibraryLoadingState,
 } from './LibraryLoadingState';
 import {
   LIBRARY_CATALOG_SCAN_COLUMNS,
   LIBRARY_TABLE_COLUMNS,
-  PRESETS,
 } from './LibrarySurface';
 
 function geometry(
@@ -38,6 +40,56 @@ function geometry(
 }
 
 describe('LibraryLoadingState', () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps placeholder cells aligned with headers when the inspector narrows the table', async () => {
+    let width = 532;
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({
+        width,
+        height: 900,
+        top: 0,
+        left: 0,
+        right: width,
+        bottom: 900,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      })
+    );
+    render(<LibraryLoadingState />);
+    const table = screen.getByRole('table', { name: 'Loading table data' });
+    const assertColumnCount = (expected: number) => {
+      expect(within(table).getAllByRole('columnheader')).toHaveLength(expected);
+      const rows = table.querySelectorAll('tbody tr');
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows)
+        expect(within(row as HTMLElement).getAllByRole('cell')).toHaveLength(
+          expected
+        );
+    };
+    expect(screen.getByTestId('library-surface-loading')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(
+      within(table).queryByRole('columnheader', { name: 'Artist' })
+    ).not.toBeInTheDocument();
+    assertColumnCount(5);
+    await act(async () => {
+      width = 1000;
+      globalThis.dispatchEvent(new Event('resize'));
+    });
+    expect(
+      within(table).getByRole('columnheader', { name: 'Artist' })
+    ).toBeInTheDocument();
+    assertColumnCount(7);
+  });
   it('matches the loaded Library table geometry so the swap cannot shift', () => {
     expect(geometry(LIBRARY_TABLE_SKELETON_COLUMNS)).toEqual(
       geometry(LIBRARY_TABLE_COLUMNS)
@@ -50,10 +102,11 @@ describe('LibraryLoadingState', () => {
     );
   });
 
-  it('reserves one filter chip per Library view preset', () => {
-    expect(LIBRARY_VIEW_FILTER_CHIP_KEYS).toEqual(
-      PRESETS.map(preset => preset.id)
-    );
+  it('reserves one filter chip per visible Library stage', () => {
+    expect(LIBRARY_STAGE_CHIP_KEYS).toEqual([
+      'all',
+      ...LIBRARY_LIFECYCLE_STAGES,
+    ]);
   });
 
   it('stays out of the Library feature module graph', () => {
