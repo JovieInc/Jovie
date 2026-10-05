@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -251,5 +257,30 @@ describe('UnifiedTable column priority', () => {
     expect(document.querySelector('[data-column-snap="on"]')).toBeNull();
     reduced.unmount();
     vi.unstubAllGlobals();
+  });
+
+  it('plays on Space and opens on Enter when a row toggle is given', () => {
+    const onRowClick = vi.fn();
+    const onRowToggle = vi.fn();
+    render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        getRowTestId={row => `demo-row-${row.id}`}
+        onRowClick={onRowClick}
+        onRowToggle={onRowToggle}
+        minWidth='0'
+      />
+    );
+    const row = screen.getByTestId('demo-row-1');
+
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onRowToggle).toHaveBeenCalledWith(rows[0]);
+    expect(onRowClick).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
   });
 });

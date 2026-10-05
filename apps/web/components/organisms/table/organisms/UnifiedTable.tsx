@@ -133,6 +133,12 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly onRowClick?: (row: TData) => void;
 
   /**
+   * Space on a focused row. Defaults to `onRowClick`; media tables pass a
+   * preview toggle so Space plays and Enter inspects.
+   */
+  readonly onRowToggle?: (row: TData) => void;
+
+  /**
    * Called when the row is shift-clicked (for range selection).
    * The consumer should call rangeSelect from useRowSelection.
    * @param rowIndex - The index of the clicked row
@@ -447,6 +453,7 @@ function UnifiedTableContent<TData extends RowData>({
   renderRow,
   getRowId,
   onRowClick,
+  onRowToggle,
   onRowShiftClick,
   onToggleRowSelection,
   onRowContextMenu,
@@ -706,6 +713,7 @@ function UnifiedTableContent<TData extends RowData>({
     rowRefsMap: rowRefs,
     setFocusedIndex,
     onRowClick,
+    onRowToggle,
     onToggleSelection: hasKeyboardSelection ? toggleRowSelection : undefined,
     onExtendSelection: canExtendKeyboardSelection
       ? extendRowSelection

@@ -65,8 +65,8 @@ function profileRow(overrides: ProfileRowOverrides = {}) {
     isClaimed: false,
     claimedAt: null,
     onboardingCompletedAt: null,
-    claimToken: null,
-    claimTokenExpiresAt: null,
+    claimToken: 'current-token',
+    claimTokenExpiresAt: new Date('2026-04-01T00:00:00.000Z'),
     ...overrides,
   };
 }
@@ -162,7 +162,66 @@ describe('claimPrebuiltProfileForUser', () => {
     expectedUsername: 'ArtistName', // mixed case: must be lowercased before compare
     displayName: 'Artist Name',
     source: 'token_backed_onboarding' as const,
+    claimTokenHash: 'current-token',
   };
+
+  it.each([
+    ['rotated token', { claimToken: 'rotated-token' }],
+    ['revoked token', { claimToken: null }],
+    [
+      'expired token',
+      { claimTokenExpiresAt: new Date(FIXED_NOW.getTime() - 1) },
+    ],
+    ['expiry boundary', { claimTokenExpiresAt: FIXED_NOW }],
+    ['missing expiry', { claimTokenExpiresAt: null }],
+  ] satisfies [string, ProfileRowOverrides][])(
+    'rejects an ordinary profile with %s under the lock before writes',
+    async (_label, profile) => {
+      const mocks = createTxMock([[profileRow(profile)]]);
+
+      await expect(
+        claimPrebuiltProfileForUser(mocks.tx, baseParams)
+      ).rejects.toThrow('[CLAIM_EXPIRED]');
+      expect(mocks.forMock).toHaveBeenCalledWith('update');
+      expect(mocks.limitMock).toHaveBeenCalledTimes(1);
+      assertNoWrites(mocks);
+    }
+  );
+
+  it.each([null, undefined])(
+    'rejects a missing bearer token (%s) before writes',
+    async claimTokenHash => {
+      const mocks = createTxMock([[profileRow()]]);
+
+      await expect(
+        claimPrebuiltProfileForUser(mocks.tx, {
+          ...baseParams,
+          claimTokenHash,
+        })
+      ).rejects.toThrow('[CLAIM_EXPIRED]');
+      assertNoWrites(mocks);
+    }
+  );
+
+  it('accepts a current token just before expiry and records the exact owner', async () => {
+    const mocks = createTxMock([
+      [profileRow({ claimTokenExpiresAt: new Date(FIXED_NOW.getTime() + 1) })],
+      [],
+    ]);
+
+    await expect(
+      claimPrebuiltProfileForUser(mocks.tx, baseParams)
+    ).resolves.toMatchObject({
+      profileId: 'profile-1',
+      username: 'artistname',
+    });
+    expect(mocks.insertValuesMock).toHaveBeenCalledWith({
+      userId: 'user-1',
+      creatorProfileId: 'profile-1',
+      role: 'owner',
+      claimedAt: FIXED_NOW,
+    });
+  });
 
   it('throws CLAIM_NOT_FOUND when the target profile row does not exist', async () => {
     const mocks = createTxMock([[]]); // getClaimTargetProfile finds nothing

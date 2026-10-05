@@ -60,6 +60,7 @@ jobs:
           permission-checks: read
           permission-issues: read
           permission-pull-requests: read
+          permission-statuses: read
 
       - name: Resolve dry run
         id: mode
