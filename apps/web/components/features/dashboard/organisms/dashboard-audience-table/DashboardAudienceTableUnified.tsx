@@ -13,6 +13,7 @@ import {
   AudienceMobileCard,
   type ContextMenuItemType,
   convertToCommonDropdownItems,
+  TableBulkActionsToolbar,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { columnPrioritySpecsFromDefs } from '@/components/organisms/table/column-priority';
@@ -35,7 +36,11 @@ import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-m
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
-import { type OnChangeFn, type SortingState } from '@/lib/tanstack-table';
+import type {
+  OnChangeFn,
+  RowSelectionState,
+  SortingState,
+} from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/utils/download';
 import {
@@ -199,6 +204,9 @@ export const DashboardAudienceTableUnified = memo(
       selectedIds,
       selectedCount,
       toggleSelect,
+      clearSelection,
+      selectRows,
+      bulkActions,
       handleCopyProfileLink,
     } = useDashboardAudienceTable({
       mode,
@@ -208,6 +216,17 @@ export const DashboardAudienceTableUnified = memo(
       direction,
       profileUrl,
     });
+
+    // Mirror the hook's selection for the table: x, Shift+J/K, shift-click.
+    const rowSelectionState = React.useMemo(() => {
+      const state: RowSelectionState = {};
+      for (const id of selectedIds) state[id] = true;
+      return state;
+    }, [selectedIds]);
+    const toggleMemberSelection = React.useCallback(
+      (member: AudienceMember) => toggleSelect(member.id),
+      [toggleSelect]
+    );
 
     const [desktopTableNode, setDesktopTableNode] =
       React.useState<HTMLDivElement | null>(null);
@@ -814,17 +833,24 @@ export const DashboardAudienceTableUnified = memo(
               data-testid={testId}
               surfaceMode='table'
               toolbar={
-                <AudienceTableSubheader
-                  view={view}
-                  onViewChange={onViewChange}
-                  filters={filters}
-                  onFiltersChange={onFiltersChange}
-                  rows={rows}
-                  selectedIds={selectedIds}
-                  subscriberCount={subscriberCount}
-                  totalAudienceCount={totalAudienceCount}
-                  total={total}
-                />
+                <div className='relative'>
+                  <TableBulkActionsToolbar
+                    selectedCount={selectedCount}
+                    onClearSelection={clearSelection}
+                    actions={bulkActions}
+                  />
+                  <AudienceTableSubheader
+                    view={view}
+                    onViewChange={onViewChange}
+                    filters={filters}
+                    onFiltersChange={onFiltersChange}
+                    rows={rows}
+                    selectedIds={selectedIds}
+                    subscriberCount={subscriberCount}
+                    totalAudienceCount={totalAudienceCount}
+                    total={total}
+                  />
+                </div>
               }
             >
               <h1 className='sr-only'>
@@ -888,6 +914,9 @@ export const DashboardAudienceTableUnified = memo(
                           enableVirtualization={true}
                           enableKeyboardNavigation={true}
                           rowMode='dense'
+                          rowSelection={rowSelectionState}
+                          onToggleRowSelection={toggleMemberSelection}
+                          onSelectRowRange={selectRows}
                           sorting={sorting}
                           onSortingChange={handleSortingChange}
                           columnVisibility={columnVisibility}

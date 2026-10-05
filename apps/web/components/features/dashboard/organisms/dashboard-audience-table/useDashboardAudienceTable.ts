@@ -5,6 +5,7 @@ import { useRowSelection } from '@/components/organisms/table';
 import { useTableMeta } from '@/contexts/TableMetaContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { getAudienceVisibleEmail } from './row-contract';
 import type {
   AudienceRow,
   BulkAction,
@@ -24,6 +25,8 @@ export interface UseDashboardAudienceTableReturn {
   toggleSelect: (id: string) => void;
   toggleSelectAll: () => void;
   clearSelection: () => void;
+  /** Adds rows to the selection (shift-click range, Shift+J/K). */
+  selectRows: (rows: readonly AudienceRow[]) => void;
   bulkActions: BulkAction[];
   handleCopyProfileLink: () => Promise<void>;
 }
@@ -65,7 +68,15 @@ export function useDashboardAudienceTable({
     toggleSelect,
     toggleSelectAll,
     clearSelection,
+    setSelection,
   } = useRowSelection(rowIds);
+
+  const selectRows = React.useCallback(
+    (rangeRows: readonly AudienceRow[]) => {
+      setSelection(new Set([...selectedIds, ...rangeRows.map(row => row.id)]));
+    },
+    [selectedIds, setSelection]
+  );
 
   React.useEffect(() => {
     clearSelection();
@@ -95,8 +106,9 @@ export function useDashboardAudienceTable({
   );
 
   const copySelectedEmails = React.useCallback(async (): Promise<void> => {
+    // Only emails the fan shared with the artist; hidden emails never leave.
     const emails = selectedRows
-      .map(row => row.email)
+      .map(row => getAudienceVisibleEmail(row))
       .filter(
         (value): value is string =>
           typeof value === 'string' && value.length > 0
@@ -116,28 +128,6 @@ export function useDashboardAudienceTable({
     notifications.error('Failed to copy emails');
   }, [selectedRows, notifications]);
 
-  const copySelectedPhones = React.useCallback(async (): Promise<void> => {
-    const phones = selectedRows
-      .map(row => row.phone)
-      .filter(
-        (value): value is string =>
-          typeof value === 'string' && value.length > 0
-      );
-
-    if (phones.length === 0) {
-      notifications.error('No phone numbers available for selected rows');
-      return;
-    }
-
-    const success = await copyTextToClipboard(phones.join('\n'));
-    if (success) {
-      notifications.success(`Copied ${phones.length} phone number(s)`);
-      return;
-    }
-
-    notifications.error('Failed to copy phone numbers');
-  }, [selectedRows, notifications]);
-
   const bulkActions: BulkAction[] = React.useMemo(
     () => [
       {
@@ -150,21 +140,12 @@ export function useDashboardAudienceTable({
         disabled: selectedCount === 0,
       },
       {
-        label: 'Copy Phone Numbers',
-        onClick: () => {
-          copySelectedPhones().catch(error => {
-            console.error('[AudienceTable] Failed to copy phones:', error);
-          });
-        },
-        disabled: selectedCount === 0,
-      },
-      {
         label: 'Clear Selection',
         onClick: () => clearSelection(),
         disabled: selectedCount === 0,
       },
     ],
-    [copySelectedEmails, copySelectedPhones, clearSelection, selectedCount]
+    [copySelectedEmails, clearSelection, selectedCount]
   );
 
   const handleCopyProfileLink = React.useCallback(async () => {
@@ -207,6 +188,7 @@ export function useDashboardAudienceTable({
     toggleSelect,
     toggleSelectAll,
     clearSelection,
+    selectRows,
     bulkActions,
     handleCopyProfileLink,
   };

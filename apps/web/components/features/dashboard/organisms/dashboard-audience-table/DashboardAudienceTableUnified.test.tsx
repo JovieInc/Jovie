@@ -1,6 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
@@ -108,5 +108,13 @@ describe('DashboardAudienceTableUnified', () => {
     expect(
       person?.querySelector('[data-slot="app-avatar-frame"]')
     ).toHaveAttribute('data-size', 'sm');
+    // x selects the focused row and raises the bulk bar over the toolbar.
+    const bulkBar = () =>
+      document.querySelector('[data-state][aria-hidden]') as HTMLElement;
+    expect(bulkBar()).toHaveAttribute('data-state', 'hidden');
+    const row = person?.closest('tr') as HTMLElement;
+    fireEvent.keyDown(row, { key: 'x' });
+    expect(bulkBar()).toHaveAttribute('data-state', 'visible');
+    expect(row).toHaveAttribute('aria-selected', 'true');
   });
 });

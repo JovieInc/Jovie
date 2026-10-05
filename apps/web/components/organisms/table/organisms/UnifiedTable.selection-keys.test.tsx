@@ -181,4 +181,26 @@ describe('UnifiedTable keyboard selection', () => {
       '24px'
     );
   });
+
+  it('shift-click selects the range from the focused row in visible order', () => {
+    const onSelectRowRange = vi.fn();
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        getRowTestId={row => `row-${row.id}`}
+        onRowClick={() => undefined}
+        onSelectRowRange={onSelectRowRange}
+        focusedRowIndex={1}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('row-d'), { shiftKey: true });
+    expect(onSelectRowRange).toHaveBeenCalledWith([data[1], data[2], data[3]]);
+
+    fireEvent.click(screen.getByTestId('row-a'), { shiftKey: true });
+    expect(onSelectRowRange).toHaveBeenLastCalledWith([data[0], data[1]]);
+  });
 });
