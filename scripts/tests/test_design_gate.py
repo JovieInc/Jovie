@@ -339,6 +339,29 @@ class AdmissionTest(unittest.TestCase):
         return self.lane.Issue(f"id-{identifier}", identifier, title, description, priority,
                                "2026-09-01T00:00:00Z", list(labels))
 
+    def test_designated_buildable_issue_precedes_another_due_brief(self):
+        target = self.task("JOV-7896", "Repair account claim conversion", "body", 2,
+                           ["agent-ready", "dispatch-next", "devin"])
+        held = self.task("JOV-4258", "Homepage hero", "no brief", 1, ["ws:ui-ia"])
+        linear = FakeLinear([target, held])
+        picked = design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
+                                             linear=linear, provider="devin", now=NOW)
+        self.assertIs(picked, target)
+        self.assertEqual(linear.calls, [])
+        target.labels.remove("dispatch-next")
+        self.assertIs(design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
+                         linear=linear, provider="devin", now=NOW), held)
+
+    def test_designation_does_not_bypass_design_or_worker_admission(self):
+        target = self.task("JOV-7896", "Homepage hero", "no brief", 2,
+                           ["agent-ready", "dispatch-next", "ws:ui-ia"])
+        other = self.task("JOV-4258", "Homepage banner", "no brief", 1, ["ws:ui-ia"])
+        picked = design_gate.pick_build_issue([target, other], {}, pick=self.lane.pick_issue,
+                                             provider="hyperagent", now=NOW)
+        self.assertIsNone(picked)
+        self.assertIs(design_gate.pick_build_issue([target, other], {"JOV-7896": 3},
+                      pick=self.lane.pick_issue, provider="devin", now=NOW), other)
+
     def test_a_held_issue_gets_its_brief_run_on_the_next_claim(self):
         build = self.task("JOV-2", "Tab indicator collapses JOV-2", "body", 1, [])
         held = self.task("JOV-1", "Homepage hero", "no brief yet", 4, ["ws:ui-ia"])

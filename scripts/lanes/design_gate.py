@@ -966,6 +966,22 @@ def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
             decisions[issue.identifier] = build_admission(issue, read_text=reader, now=now)
         return decisions[issue.identifier]
 
+    # Explicit bottleneck work must also win this wrapper's brief-priority pass.
+    # Only already build-admissible pool issues qualify; the ordinary brief path
+    # remains responsible for a designated issue whose design evidence is missing.
+    designated = [issue for issue in issues
+                  if {"agent-ready", "dispatch-next"} <= {label.lower() for label in issue.labels}
+                  and admission(issue)["admit"]]
+    chosen = pick(designated, failures, now=now, in_flight=in_flight, provider=provider) if designated else None
+    if chosen is not None:
+        decision = admission(chosen)
+        if decision["auto"] and linear is not None:
+            try:
+                ensure_brief_auto(linear, chosen, decision, now=now)
+            except Exception as error:
+                sys.stderr.write(f"brief-auto record skipped: {type(error).__name__}: {error}\n")
+        return chosen
+
     if provider not in BRIEF_SKIP_PROVIDERS:
         due = [issue for issue in issues
                if is_design_gated(issue) and brief_due(issue, admission(issue))]
