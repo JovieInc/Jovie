@@ -395,7 +395,14 @@ export function RightDrawer({
         railPhase === 'closed' ? 'invisible' : 'visible',
         isOpen
           ? 'opacity-100 translate-x-0'
-          : cn('opacity-0 pointer-events-none', SHELL_RAIL_TRAVEL.right),
+          : cn(
+              'opacity-0 pointer-events-none',
+              SHELL_RAIL_TRAVEL.right,
+              // Below lg this branch only renders before hydration resolves
+              // the mobile overlay; a closed in-flow rail there would hold
+              // space the fixed overlay then releases, shifting the page.
+              'max-lg:hidden'
+            ),
         className
       )}
       style={{

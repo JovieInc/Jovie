@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
 import {
   DEFAULT_RELEASE_FILTERS,
   ReleaseTableSubheader,
@@ -17,6 +18,7 @@ const meta = {
     releaseView: 'releases' as const,
     onReleaseViewChange: () => {},
   },
+  decorators: [withDashboardProviders],
 } satisfies Meta<typeof ReleaseTableSubheader>;
 
 export default meta;

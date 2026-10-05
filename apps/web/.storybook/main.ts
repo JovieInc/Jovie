@@ -185,6 +185,12 @@ const config: StorybookConfig = {
           replacement: require.resolve('./markdown-document-mock.ts'),
         },
         {
+          // lib/recent-releases reads CHANGELOG.md through node:fs for the
+          // homepage Recently Shipped section; serve fixture releases instead.
+          find: '@/lib/recent-releases',
+          replacement: require.resolve('./recent-releases-mock.ts'),
+        },
+        {
           find: '@/lib/releases/release-matrix-loader',
           replacement: require.resolve('./composer-catalog-actions-mock.ts'),
         },
@@ -199,6 +205,10 @@ const config: StorybookConfig = {
         {
           find: '@/app/app/(shell)/dashboard/releases/task-actions',
           replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/lib/leads/reporting',
+          replacement: require.resolve('./leads-reporting-mock.ts'),
         },
         {
           find: '@/app/app/(shell)/dashboard/releases/actions',

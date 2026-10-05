@@ -20,6 +20,7 @@ import {
   MediaThumb,
 } from '@/components/organisms/media-canvas/MediaCanvasViewer';
 import { TableEmptyState } from '@/components/organisms/table';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -189,6 +190,26 @@ export function FounderReviewRegistry({
   const selectedDecision = selected
     ? validDecisionForItem(selected, decisions)
     : undefined;
+
+  const headerActions = useMemo(
+    () => (
+      <AppSegmentControl<RegistryFilter>
+        aria-label='Registry Filter'
+        value={filter}
+        onValueChange={setFilter}
+        layout='hug'
+        size='sm'
+        options={[
+          { value: 'all', label: 'All' },
+          { value: 'ready', label: 'Ready' },
+          { value: 'certified', label: 'Certified' },
+          { value: 'needs-work', label: 'Needs Work' },
+        ]}
+      />
+    ),
+    [filter]
+  );
+  useRegisterHeaderActions(headerActions);
 
   const recordDecision = useCallback(
     (outcome: ReviewOutcome) => {
@@ -443,22 +464,6 @@ export function FounderReviewRegistry({
 
   return (
     <div className='space-y-4' data-testid={`${kind}-review-registry`}>
-      <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end'>
-        <AppSegmentControl<RegistryFilter>
-          aria-label='Registry Filter'
-          value={filter}
-          onValueChange={setFilter}
-          layout='hug'
-          size='sm'
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'ready', label: 'Ready' },
-            { value: 'certified', label: 'Certified' },
-            { value: 'needs-work', label: 'Needs Work' },
-          ]}
-        />
-      </div>
-
       {kind === 'feature' ? (
         <p className='text-2xs text-tertiary-token'>
           {behaviorCount} source-audited atomic behavior · inventory

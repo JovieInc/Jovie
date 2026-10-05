@@ -1,21 +1,18 @@
 import * as React from 'react';
+import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { type TableMeta, TableMetaContext } from '@/contexts/TableMetaContext';
 
-type TableMeta = {
-  rowCount: number | null;
-  toggle?: (() => void) | null;
-  rightPanelWidth?: number | null;
-};
+export { TableMetaProvider } from '@/contexts/TableMetaContext';
 
-type TableMetaContextValue = {
-  tableMeta: TableMeta;
-  setTableMeta: (meta: TableMeta) => void;
-};
-
-const TableMetaContext = React.createContext<TableMetaContextValue | null>(
-  null
-);
-
-export function useTableMeta(): TableMetaContextValue {
+// Provide the app's real TableMetaContext: components import useTableMeta
+// from '@/contexts/TableMetaContext' directly, and a private mock context
+// left them throwing "useTableMeta must be used within AuthShellWrapper"
+// inside aliased shells (DemoReleasesExperience, FounderDemoRecordingSurface).
+export function useTableMeta(): NonNullable<
+  React.ContextType<typeof TableMetaContext>
+> {
   const ctx = React.useContext(TableMetaContext);
   if (!ctx) {
     return {
@@ -30,10 +27,6 @@ export function useTableMeta(): TableMetaContextValue {
 
 export interface DashboardLayoutClientProps {
   readonly children: React.ReactNode;
-}
-
-export function TableMetaProvider({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
 }
 
 export default function DashboardLayoutClient({
@@ -52,7 +45,13 @@ export default function DashboardLayoutClient({
 
   return (
     <TableMetaContext.Provider value={contextValue}>
-      {children}
+      {/* The same registries the real shell owns, so aliased shell content
+          (ReleaseProviderMatrix) can register header actions and rails. */}
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <PreviewPanelProvider>{children}</PreviewPanelProvider>
+        </RightPanelProvider>
+      </HeaderActionsProvider>
     </TableMetaContext.Provider>
   );
 }
