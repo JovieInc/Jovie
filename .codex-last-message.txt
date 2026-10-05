@@ -1,0 +1,24 @@
+Implemented and shipped as draft PR [#20035](https://github.com/JovieInc/Jovie/pull/20035) at commit `452b228b498b8667135195bb6d00dc32cc8a7b18`.
+
+What changed:
+
+- Replaced legacy tabs with exactly **Overview | Files**, defaulting to Overview.
+- Added the compact, persistent inspector header and flat Overview sections without accordions or nested cards.
+- Separated lifecycle, page publication, profile visibility, visitor action, and destination connection states.
+- Added type-aware facts and object-scoped downloads, findings, rights, and source references.
+- Removed fabricated statistics and empty optional sections.
+- Added deterministic desktop/mobile Storybook coverage and regression tests for selection switching and public-state semantics.
+
+Verification:
+
+- 80 focused unit/interaction tests passed.
+- 2 Storybook browser tests passed.
+- Web, test, and story typechecks passed.
+- Biome and ESLint passed.
+- All hosted PR checks are green, including Source Validation, Exact-head Coverage, Security Evidence, PR Size Guard, and UI capture.
+- Diff is 1,201 lines across 13 files, within the 1,500-line limit.
+- Before/after desktop and mobile screenshots plus Files proof were attached to [JOV-7471](https://linear.app/jovie/issue/JOV-7471/work-inspector-v2-overview-files-no-accordions-launch-native-press).
+
+The PR remains draft, open, and unmerged. The temporary proof worktree was removed and the working tree is clean.
+
+Limitations: GBrain was unavailable, so repository evidence was used. The generic CI visual route does not directly expose the authenticated inspector; inspector-specific proof comes from the deterministic Storybook states attached to Linear. No deployed-runtime claim is being made.
