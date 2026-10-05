@@ -59,7 +59,12 @@ export type { BadgeProps } from './atoms/badge';
 export { Badge, badgeVariants } from './atoms/badge';
 // Button
 export type { ButtonProps } from './atoms/button';
-export { Button, buttonVariants } from './atoms/button';
+export {
+  Button,
+  buttonVariants,
+  ICON_HIT_TARGET_44,
+  TEXT_HIT_TARGET_44,
+} from './atoms/button';
 export {
   ACTION_BUTTON_LABEL_WEIGHT,
   ACTION_BUTTON_MOBILE_HIT_TARGET_PX,

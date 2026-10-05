@@ -6,6 +6,7 @@ import {
   ComposerAttachButton,
   ComposerMicButton,
   type ComposerMicButtonProps,
+  ComposerSendButton,
 } from './ChatComposerToolbar';
 
 function MicButton(overrides: Partial<ComposerMicButtonProps> = {}) {
@@ -133,5 +134,27 @@ describe('ComposerAttachButton', () => {
     expect(
       screen.getByRole('button', { name: 'Attachment options' })
     ).toBeDisabled();
+  });
+});
+
+describe('ComposerSendButton', () => {
+  // JOV-4411: the 36px send face must keep a 44px mobile hit target via the
+  // canonical invisible pseudo-element (same contract as Button size="icon").
+  it('keeps a 44px hit target around the 36px send face', () => {
+    render(
+      <TooltipProvider>
+        <ComposerSendButton
+          canSend
+          isStreaming={false}
+          reducedMotion
+          onMouseDown={vi.fn()}
+          onSend={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+
+    const send = screen.getByRole('button', { name: 'Send message' });
+    expect(send).toHaveClass('h-9', 'w-9');
+    expect(send).toHaveClass('before:h-11', 'before:w-11');
   });
 });

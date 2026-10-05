@@ -31,9 +31,17 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
 };
 
 // 44px minimum hit target for icon buttons below 44px (WCAG 2.5.5 / Apple HIG),
-// rendered as an invisible pseudo-element so layout stays compact.
-const ICON_HIT_TARGET_44 =
+// rendered as an invisible pseudo-element so layout stays compact. Exported for
+// interactive elements that render through a non-Button primitive (raw button,
+// inline link) but must keep the same canonical target.
+export const ICON_HIT_TARGET_44 =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+
+// 44px minimum hit target for inline text controls that keep their own box
+// metrics (links, compact triggers): the pseudo-element covers the element and
+// stretches to at least 44x44.
+export const TEXT_HIT_TARGET_44 =
+  'before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
 // Every text size name is a compatibility alias for the founder-selected
 // 28px minimum face, with one typography/padding contract and a 44px minimum

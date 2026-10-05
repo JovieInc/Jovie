@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Skeleton } from '@jovie/ui';
+import { Skeleton, TEXT_HIT_TARGET_44 } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
@@ -225,7 +225,10 @@ export function OnboardingShell({
                 data-testid='onboarding-sign-in-header'
               >
                 <Link
-                  className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+                  className={cn(
+                    'btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap',
+                    TEXT_HIT_TARGET_44
+                  )}
                   href={APP_ROUTES.SIGNIN}
                 >
                   Sign in

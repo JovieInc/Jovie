@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, SimpleTooltip } from '@jovie/ui';
+import { Button, ICON_HIT_TARGET_44, SimpleTooltip } from '@jovie/ui';
 import { ArrowUp, Loader2, Mic, MicOff, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useRef } from 'react';
@@ -97,7 +97,8 @@ export function ComposerSendButton({
           }
           disabled={!showStop && !canSend && !canInterruptAndSend}
           className={cn(
-            'system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            'system-b-chat-composer-primary-action relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            ICON_HIT_TARGET_44,
             !isInteractive && 'cursor-not-allowed'
           )}
           aria-label={actionLabel}

@@ -52,6 +52,15 @@ describe('onboarding sign-in placement', () => {
     );
   });
 
+  it('gives the compact sign-in link a 44px hit target (JOV-4411)', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveClass(
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+  });
+
   it('keeps sign-in reachable when a taken handle tells the owner to sign in (JOV-7753)', () => {
     render(
       <OnboardingShell

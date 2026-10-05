@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, TEXT_HIT_TARGET_44 } from '@jovie/ui';
 import {
   Camera,
   DollarSign,
@@ -136,7 +136,8 @@ function SuggestionPill({
       }}
       disabled={disabled}
       className={cn(
-        'chat-pill',
+        'chat-pill relative',
+        TEXT_HIT_TARGET_44,
         disabled ? 'cursor-not-allowed opacity-55' : 'cursor-pointer',
         getChatPromptPillClass(density),
         className
