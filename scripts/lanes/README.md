@@ -368,6 +368,12 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
+**Ship now:** the gate timeout defaults to 3,600 seconds on macOS and remains 2,400 seconds
+elsewhere; `LANES_GATE_TIMEOUT_S` still overrides either default. **Re-evaluate when:** the mac
+records five gate timeouts in a 24-hour window after a full day on this release. **Then:** use the
+recorded gate waits and receipts to decide whether to reduce `LANES_GATE_SLOTS` before extending
+the timeout again.
+
 `SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. The
 doctor samples one-hour merge throughput every five minutes: queue depth,
 current queue-wait p50, merged/hour, opened/hour, and queue-entry ejection rate.

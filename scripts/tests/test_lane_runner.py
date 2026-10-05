@@ -66,6 +66,19 @@ def publication_response(args):
     return ""
 
 
+class HostConfigurationTest(unittest.TestCase):
+    def test_gate_timeout_defaults_to_one_hour_on_macos_only(self):
+        for platform, expected in (("darwin", 3600), ("linux", 2400)):
+            with self.subTest(platform=platform), patch.object(lane.sys, "platform", platform), \
+                    patch.dict(os.environ, {}, clear=True):
+                self.assertEqual(lane.Host().gate_timeout, expected)
+
+    def test_gate_timeout_environment_override_wins_on_macos(self):
+        with patch.object(lane.sys, "platform", "darwin"), \
+                patch.dict(os.environ, {"LANES_GATE_TIMEOUT_S": "3000"}):
+            self.assertEqual(lane.Host().gate_timeout, 3000)
+
+
 def repair_target_page(pr, **overrides):
     checks = [{"__typename": "CheckRun", **check} for check in pr.get("statusCheckRollup", [])]
     live = {"state": "OPEN", "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
