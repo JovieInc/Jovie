@@ -174,6 +174,36 @@ describe('HomepageIdentityHero', () => {
     );
   });
 
+  it('keeps the copy and claim in the direct scoped grid slots', () => {
+    render(<HomepageIdentityHero />);
+
+    const layout = screen.getByTestId('marketing-section-hero');
+    const heading = screen.getByRole('heading', { level: 1 });
+    const copy = heading.parentElement;
+    const card = screen.getByTestId('homepage-claim-card');
+    if (!copy) throw new Error('Missing hero copy slot');
+
+    // Grid placement depends on these being direct children of the shared
+    // hero. A new wrapper must not detach either slot from its scoped rules.
+    expect(layout).toHaveClass('homepage-claim-hero__layout');
+    expect(copy).toHaveClass('homepage-claim-hero__copy');
+    expect(card).toHaveClass('homepage-claim-hero__card');
+    expect(Array.from(layout.children)).toEqual([copy, card]);
+    expect(
+      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.kicker)
+    ).toBeInTheDocument();
+    expect(
+      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
+    ).toBeInTheDocument();
+    expect(within(copy).queryByRole('textbox')).toBeNull();
+    expect(within(card).getByTestId('homepage-claim-form')).toContainElement(
+      screen.getByRole('textbox')
+    );
+    expect(
+      within(card).getByTestId('homepage-hero-real-profile')
+    ).toBeInTheDocument();
+  });
+
   it('keeps hero copy generic and free of em dashes', () => {
     const { hero, seo } = HOMEPAGE_IDENTITY_COPY;
     const copy = [
