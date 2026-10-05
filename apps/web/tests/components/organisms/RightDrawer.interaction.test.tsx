@@ -44,6 +44,9 @@ describe('RightDrawer', () => {
 
     const aside = screen.getByLabelText('Details drawer');
     expect(aside).toHaveAttribute('aria-hidden', 'true');
+    // Pre-hydration on small screens the closed rail must not hold layout
+    // space that the mobile overlay later releases (CLS on /hud?fs=1).
+    expect(aside).toHaveClass('max-lg:hidden');
 
     rerender(
       <RightDrawer isOpen={true} width={360} ariaLabel='Details drawer'>
@@ -52,6 +55,7 @@ describe('RightDrawer', () => {
     );
 
     expect(aside).toHaveAttribute('aria-hidden', 'false');
+    expect(aside).not.toHaveClass('max-lg:hidden');
     expect(aside).toHaveStyle({ width: '360px' });
     expect(aside).not.toHaveClass('border-l');
     expect(aside).not.toHaveClass('bg-surface-0');

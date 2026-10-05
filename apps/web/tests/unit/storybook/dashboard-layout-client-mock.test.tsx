@@ -8,6 +8,7 @@ import DashboardLayoutClient, {
 import storybookConfig, {
   resolvePrivacyBoundaryShellAlias,
 } from '../../../.storybook/main';
+import { useTableMeta as useAppTableMeta } from '../../../contexts/TableMetaContext';
 
 function TableMetaProbe() {
   const { tableMeta, setTableMeta } = useTableMeta();
@@ -97,5 +98,18 @@ describe('Storybook dashboard shell mock contract', () => {
     const rowCount = screen.getByRole('button', { name: 'null' });
     fireEvent.click(rowCount);
     expect(screen.getByRole('button', { name: '4' })).toBeInTheDocument();
+  });
+
+  it('provides the app TableMetaContext that real components read', () => {
+    function AppConsumer() {
+      const { tableMeta } = useAppTableMeta();
+      return <span>{String(tableMeta.rowCount)}</span>;
+    }
+    render(
+      <AuthShellWrapper>
+        <AppConsumer />
+      </AuthShellWrapper>
+    );
+    expect(screen.getByText('null')).toBeInTheDocument();
   });
 });

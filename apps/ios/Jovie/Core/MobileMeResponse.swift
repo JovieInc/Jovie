@@ -269,6 +269,20 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     continueOnWebURL: "https://jov.ie/app"
   )
 
+  /// App Store identity shot (JOV-4481): a fictional artist with every
+  /// share path available, including the shipped Apple Wallet pass.
+  static let previewStorefront = MobileMeResponse(
+    state: .ready,
+    displayName: "Tessa Vale",
+    username: "tessavale",
+    publicProfileURL: "https://jov.ie/tessavale",
+    qrPayload: "https://jov.ie/tessavale",
+    avatarURL: nil,
+    appleWalletProfilePassAvailable: true,
+    chatEnabled: true,
+    continueOnWebURL: "https://jov.ie/app"
+  )
+
   static let previewReadyWithoutQR = MobileMeResponse(
     state: .ready,
     displayName: "Tim White",

@@ -1,6 +1,23 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { LucideIcon } from 'lucide-react';
+import { isValidElement, type ReactNode } from 'react';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { buildDesktopUpdateMenuItem } from './UserButton';
+
+// Lucide icons are forwardRef objects, not functions, so a `typeof` check
+// rendered the component object itself as a React child.
+function MenuItemIcon({
+  icon,
+}: {
+  readonly icon: LucideIcon | ReactNode;
+}): ReactNode {
+  const isComponent =
+    typeof icon === 'function' ||
+    (typeof icon === 'object' && icon !== null && '$$typeof' in icon);
+  if (!isComponent || isValidElement(icon)) return icon as ReactNode;
+  const Icon = icon as LucideIcon;
+  return <Icon className='h-4 w-4' />;
+}
 
 function MenuItemPreview({
   state,
@@ -21,11 +38,7 @@ function MenuItemPreview({
               key={item.id}
               className='flex h-7 items-center gap-2.5 rounded-md px-2.5 text-app text-primary-token'
             >
-              {typeof item.icon === 'function' ? (
-                <item.icon className='h-4 w-4' />
-              ) : (
-                item.icon
-              )}
+              <MenuItemIcon icon={item.icon} />
               {item.label}
             </div>
           ) : (
