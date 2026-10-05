@@ -1,0 +1,13 @@
+Implemented and handed off in draft PR [#20079](https://github.com/JovieInc/Jovie/pull/20079).
+
+- Current entries now precede the crawlable archive directory in [CustomerChangelogArchive.tsx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T195147Z-JOV-7491-codex-038e80/apps/web/components/marketing/changelog/CustomerChangelogArchive.tsx:402).
+- Added 1/12/36-month DOM-order regression coverage in [CustomerChangelogArchive.test.tsx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T195147Z-JOV-7491-codex-038e80/apps/web/components/marketing/changelog/CustomerChangelogArchive.test.tsx:275).
+- Preserved archive link destinations, server-rendered crawlability, filtering, and load-earlier behavior.
+- Verified 16 focused tests, Biome, 17 typecheck tasks, SEO/orphan certification, five requested widths, keyboard traversal, semantic structure, and 200%-equivalent reflow.
+- Staging identity, local candidate identity, and four screenshot attachments are recorded on JOV-7491 and in the PR.
+- Commit: `5fa4f0f9fd61a87c1a664c9efce76dd02dd37687`.
+- Linear moved to In Review.
+
+At handoff, 13 hosted checks pass with no failures; Source Validation and visual capture remain in progress. This is not a deployed-completion claim.
+
+Deviation: `gh pr create --draft` was attempted but GitHub’s GraphQL installation quota was exhausted, so the same draft PR was created through authenticated `gh api` REST. GBrain also returned HTTP 400.
