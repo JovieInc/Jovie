@@ -1,21 +1,45 @@
 {
   "schema": "jovie-blog-publish-latency/v1",
-  "generatedAt": "2026-10-01T00:00:00.000Z",
+  "generatedAt": "2026-10-05T15:57:21.674Z",
   "sampleCount": 0,
+  "classification": {
+    "mergedPrCount": 300,
+    "classifiedPrCount": 0,
+    "unclassifiedPrCount": 300,
+    "complete": false
+  },
   "cohorts": {
     "legacy": {
       "sampleCount": 0,
       "completeSampleCount": 0,
-      "candidateToLiveSeconds": { "p50": null, "p95": null },
+      "candidateToLiveSeconds": {
+        "p50": null,
+        "p95": null
+      },
       "representative": []
     },
     "contentOnly": {
       "sampleCount": 0,
       "completeSampleCount": 0,
-      "candidateToLiveSeconds": { "p50": null, "p95": null },
+      "candidateToLiveSeconds": {
+        "p50": null,
+        "p95": null
+      },
+      "representative": []
+    },
+    "unknown": {
+      "sampleCount": 0,
+      "completeSampleCount": 0,
+      "candidateToLiveSeconds": {
+        "p50": null,
+        "p95": null
+      },
       "representative": []
     }
   },
   "samples": [],
-  "claims": { "measuredImprovement": null, "publishingSla": null }
+  "claims": {
+    "measuredImprovement": null,
+    "publishingSla": null
+  }
 }
