@@ -1,0 +1,21 @@
+Implemented and opened draft PR [#20074](https://github.com/JovieInc/Jovie/pull/20074).
+
+- Added immutable customer-entry IDs and canonical slugs.
+- Preserved historical fragments through persisted alias mappings.
+- Added collision protection, replay safety, and tombstones for removed/unpublished entries.
+- Updated archive, detail, hero, Atom/JSON feeds, and What’s New consumers while preserving daily dismissal semantics.
+- Added canonical parser/projector navigation regressions covering edits, insertion, section moves, reordering, duplicate/non-ASCII titles, aliases, and fresh reloads.
+
+Exact tested commit: `f869217364a9d76276a0df584553265e2770b498`
+
+Verification:
+
+- Before: focused suite failed 2/7 because the stable archive projector was absent.
+- After: customer changelog tests 67/67.
+- Publication tests with coverage: 43/43; thresholds passed.
+- Source-admission tests: 19/19.
+- CI control tests: 1,803 passed.
+- Typecheck, scripts typecheck, Biome, migration guard, security evidence, parity, UI capture, exact-head coverage, source validation, and PR-ready gate passed.
+- Working tree is clean; local and remote heads match.
+
+The existing [staging legacy URL](https://staging.jov.ie/changelog#get-updates-from-an-artist-2026-10-02-1) was confirmed against current staging. The draft branch has no staging deployment, so post-change fresh-navigation evidence remains for the deployment/commissioning gate; it is not claimed here. GBrain durable writeback was unavailable because its local embedding service could not be reached. No outbound sends occurred.
