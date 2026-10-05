@@ -164,9 +164,11 @@ class FakeTracker:
 
     def reopen(self, issue_id, text, key=None):
         self.reopened.append((issue_id, text))
+        return True
 
     def close(self, issue_id, key=None):
         self.closed.append(issue_id)
+        return True
 
     def contradict_invariant(self, event):
         self.contradicted.append(event["idempotencyKey"])
@@ -308,12 +310,17 @@ class ReconcileTest(unittest.TestCase):
                 if "issueAddLabel" in query:
                     added.append(variables)
                     return {"issueAddLabel": {"success": True}}
+                if "issue(id:$id){state{type}}" in query:
+                    return {"issue": {"state": {"type": "triage" if self.state_of("iss-1") == "Triage" else "completed"}}}
                 if "issueCreate" in query:
                     return {"issueCreate": {"issue": {"id": "iss-1", "identifier": "JOV-1"}}}
                 raise AssertionError(query)
 
             def move(self, issue_id, state):
-                return None
+                self.state = state
+
+            def state_of(self, issue_id):
+                return getattr(self, "state", "Done")
 
             def comment(self, issue_id, text):
                 return None
@@ -418,6 +425,132 @@ class ReconcileTest(unittest.TestCase):
         doctor.Tracker(linear, "gem").contradict_invariant(event)
         self.assertEqual(linear.moves, [("owner", "Triage")])
         self.assertIn("gem:provider-idle:devin:2", linear.comments[0][1])
+
+
+class TransitionAcknowledgmentTest(unittest.TestCase):
+    def set_states(self, linear, *states):
+        linear.state_of.side_effect = states
+        types = {"Triage": "triage", "Todo": "unstarted", "In Progress": "started", "Backlog": "backlog"}
+        linear.gql.side_effect = [state if isinstance(state, Exception) else
+                                 {"issue": {"state": {"type": types.get(state, "completed")}}} for state in states]
+
+    def test_failed_close_remains_pending_and_retries_the_same_issue(self):
+        for acknowledged in [False, None]:
+            with self.subTest(acknowledged=acknowledged):
+                previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}}
+                tracker = FakeTracker()
+                tracker.close = mock.Mock(side_effect=[acknowledged, True])
+                conditions = {"disk-low": {"state": "resolved"}}
+                failed = doctor.reconcile({}, previous, tracker, 10, conditions)
+                self.assertIsNone(failed["issues"]["disk-low"]["closedAt"])
+                self.assertEqual(failed["issues"]["disk-low"]["pendingAction"], "close")
+                self.assertEqual(failed["conditions"]["disk-low"]["summerEscalation"]["outcome"], "pending")
+                restored = doctor.reconcile({}, failed, tracker, 20, conditions)
+                self.assertEqual(restored["issues"]["disk-low"], {"id": "same", "closedAt": 20})
+                self.assertEqual(restored["conditions"]["disk-low"]["summerEscalation"]["outcome"], "cleared")
+                self.assertIsNone(previous["issues"]["disk-low"]["closedAt"])
+                self.assertIsNone(failed["issues"]["disk-low"]["closedAt"])
+                self.assertEqual(tracker.close.call_args_list, [mock.call("same", "disk-low")] * 2)
+                self.assertEqual(tracker.opened, [])
+
+    def test_missing_tracker_cannot_acknowledge_an_existing_issue(self):
+        previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}}
+        state = doctor.reconcile({}, previous, None, 10, {"disk-low": {"state": "resolved"}})
+        self.assertIsNone(state["issues"]["disk-low"]["closedAt"])
+        self.assertEqual(state["conditions"]["disk-low"]["summerEscalation"]["outcome"], "pending")
+
+    def test_failed_reopen_retries_past_cool_off_without_duplicate_or_false_receipt(self):
+        previous = {"issues": {"disk-low": {"id": "same", "closedAt": 1}}}
+        tracker = FakeTracker()
+        tracker.reopen = mock.Mock(side_effect=[False, True])
+        conditions = {"disk-low": {"state": "active", "idempotencyKey": "generation-2"}}
+        failed = doctor.reconcile({"disk-low": "again"}, previous, tracker, 10, conditions)
+        self.assertEqual(failed["issues"]["disk-low"]["closedAt"], 1)
+        self.assertEqual(failed["conditions"]["disk-low"]["summerEscalation"]["outcome"], "pending")
+        self.assertEqual(tracker.contradicted, [])
+        restored = doctor.reconcile({"disk-low": "again"}, failed, tracker, doctor.COOL_OFF_S + 20, conditions)
+        self.assertEqual(restored["issues"]["disk-low"], {"id": "same", "closedAt": None})
+        self.assertEqual(restored["conditions"]["disk-low"]["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(tracker.contradicted, ["generation-2"])
+        self.assertEqual(tracker.opened, [])
+        self.assertEqual(tracker.reopen.call_args_list, [mock.call("same", "again", "disk-low")] * 2)
+
+    def test_refire_after_uncertain_close_reopens_the_same_issue(self):
+        tracker = FakeTracker()
+        tracker.close = mock.Mock(return_value=False)
+        previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}}
+        failed = doctor.reconcile({}, previous, tracker, 10)
+        state = doctor.reconcile({"disk-low": "again"}, failed, tracker, 20)
+        self.assertEqual(tracker.reopened, [("same", "again")])
+        self.assertEqual(state["issues"]["disk-low"], {"id": "same", "closedAt": None})
+        self.assertEqual(tracker.opened, [])
+
+    def test_clearing_after_uncertain_reopen_requires_close_acknowledgment(self):
+        tracker = FakeTracker()
+        tracker.reopen = mock.Mock(return_value=False)
+        previous = {"issues": {"disk-low": {"id": "same", "closedAt": 1}}}
+        failed = doctor.reconcile({"disk-low": "again"}, previous, tracker, 10)
+        state = doctor.reconcile({}, failed, tracker, 20, {"disk-low": {"state": "resolved"}})
+        self.assertEqual(tracker.closed, ["same"])
+        self.assertEqual(state["issues"]["disk-low"], {"id": "same", "closedAt": 20})
+        self.assertEqual(state["conditions"]["disk-low"]["summerEscalation"]["outcome"], "cleared")
+
+    def test_tracker_requires_matching_readback_before_notification(self):
+        for action, target in [("close", "Done"), ("reopen", "Triage")]:
+            for readback in ["unchanged", RuntimeError("read failed")]:
+                with self.subTest(action=action, readback=readback):
+                    linear = mock.Mock()
+                    self.set_states(linear, "old", readback)
+                    linear.move.return_value = None
+                    tracker = doctor.Tracker(linear, "gem")
+                    args = ("same",) if action == "close" else ("same", "again")
+                    self.assertIs(getattr(tracker, action)(*args), False)
+                    linear.move.assert_called_once_with("same", target)
+                    linear.comment.assert_not_called()
+
+    def test_tracker_acknowledges_state_even_when_notification_fails(self):
+        for action, target in [("close", "Done"), ("reopen", "Triage")]:
+            with self.subTest(action=action):
+                linear = mock.Mock()
+                self.set_states(linear, "old", target)
+                linear.move.return_value = None
+                linear.comment.side_effect = RuntimeError("notification unavailable")
+                tracker = doctor.Tracker(linear, "gem")
+                args = ("same",) if action == "close" else ("same", "again")
+                self.assertIs(getattr(tracker, action)(*args), True)
+                linear.move.assert_called_once_with("same", target)
+
+    def test_retry_observes_already_applied_state_without_repeating_mutation(self):
+        linear = mock.Mock()
+        linear.state_of.return_value = "Done"
+        self.assertIs(doctor.Tracker(linear, "gem").close("same"), True)
+        linear.move.assert_not_called()
+
+    def test_reopen_preserves_work_already_claimed_or_deferred_by_intake(self):
+        for initial, readback in [("Done", "In Progress"), ("Todo", "Todo"), ("Backlog", "Backlog")]:
+            with self.subTest(initial=initial, readback=readback):
+                linear = mock.Mock()
+                self.set_states(linear, initial, readback)
+                self.assertIs(doctor.Tracker(linear, "gem").reopen("same", "again"), True)
+                if initial != "Done":
+                    linear.move.assert_not_called()
+                else:
+                    linear.move.assert_called_once_with("same", "Triage")
+
+    def test_real_linear_client_rejected_mutation_cannot_acknowledge_close(self):
+        lane = load("lane_runner")
+        linear = lane.Linear.__new__(lane.Linear)
+        def gql(query, variables):
+            if "issueUpdate" in query:
+                return {"issueUpdate": {"success": False}}
+            if "team{states" in query:
+                return {"issue": {"team": {"states": {"nodes": [{"id": "done", "name": "Done"}]}}}}
+            return {"issue": {"state": {"name": "Triage"}}}
+        linear.gql = mock.Mock(side_effect=gql)
+        linear.comment = mock.Mock()
+        self.assertIs(doctor.Tracker(linear, "gem").close("same"), False)
+        linear.comment.assert_not_called()
+        self.assertEqual(sum("issueUpdate" in call.args[0] for call in linear.gql.call_args_list), 1)
 
 
 class MergeThroughputSampleTest(unittest.TestCase):

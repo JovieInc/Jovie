@@ -14,6 +14,16 @@ tick="python3 $state/current/lane_runner.py update; python3 $state/current/codex
 # Pin timers to the Node selected by the installing shell.
 node_dir="$(dirname "$(command -v node)")"
 path="$node_dir:$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+# Preserve the installed brain CLI for detached reason/corpus workers. A login
+# shell may resolve it outside standard CLI directories (for example ~/.hermes/bin).
+# Discover the executable; do not copy credentials or activate another runtime.
+if brain_command="$(command -v gbrain)" && [[ "$brain_command" = /* ]]; then
+  brain_dir="$(dirname "$brain_command")"
+  case ":$path:" in
+    *":$brain_dir:"*) ;;
+    *) path="$path:$brain_dir" ;;
+  esac
+fi
 source_tree="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["objects"]["scripts/lanes"])' "$state/current/.release.json")"
 source_commit="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourceCommit"])' "$state/current/.release.json")"
 LANES_STATE="$state" python3 "$state/current/codex_lane.py" install-receipt \
