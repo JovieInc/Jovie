@@ -37,6 +37,14 @@ test('ignores git fetch updates with deprecation language in ref names', () => {
   assert.deepEqual(found, []);
 });
 
+test('ignores git ref updates whose branch name contains deprecated', () => {
+  const found = extractDeprecations(
+    'Build\tCheckout\t2026-09-21T12:56:42.5859549Z  * [new branch]          fix/sonarcloud-s1874-deprecated-app-url-batch1 -> origin/fix/sonarcloud-s1874-deprecated-app-url-batch1'
+  );
+
+  assert.deepEqual(found, []);
+});
+
 test('normalizes runner paths so fingerprints are stable', () => {
   assert.equal(
     normalizeWarning(
