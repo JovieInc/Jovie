@@ -13,7 +13,7 @@
  *     `onAdditionalSelect`
  */
 
-import { Dialog, DialogContent } from '@jovie/ui';
+import { Button, Dialog, DialogContent } from '@jovie/ui';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -111,7 +111,8 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     [commands]
   );
 
-  const { data: releaseData } = useReleasesQuery(profileId, { enabled: open });
+  const releases = useReleasesQuery(profileId, { enabled: open });
+  const releaseData = releases.data;
   const releaseEntities = useMemo<EntityRef[]>(
     () =>
       rankPaletteReleases(
@@ -141,7 +142,7 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     [artistSearch.results]
   );
 
-  return useMemo(
+  const sections = useMemo(
     () =>
       buildRegistrySections(
         query,
@@ -152,6 +153,25 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
       ),
     [query, skills, navs, releaseEntities, artistEntities]
   );
+
+  const hasArtistQuery = query.trim().length > 0;
+  const isSearching =
+    releases.isLoading ||
+    releases.isFetching ||
+    (hasArtistQuery &&
+      (artistSearch.query.trim() !== query.trim() ||
+        artistSearch.isPending ||
+        artistSearch.state === 'loading'));
+  const hasSearchError =
+    releases.isError || (hasArtistQuery && artistSearch.state === 'error');
+  const retrySearch = () => {
+    if (releases.isError) void releases.refetch();
+    if (hasArtistQuery && artistSearch.state === 'error') {
+      artistSearch.searchImmediate(query);
+    }
+  };
+
+  return { sections, isSearching, hasSearchError, retrySearch };
 }
 
 export function CmdKPalette({
@@ -182,7 +202,12 @@ export function CmdKPalette({
     if (presentation === 'dialog' && open) inputRef.current?.focus();
   }, [open, presentation]);
 
-  const registrySections = useCmdkData(profileId, query, open);
+  const {
+    sections: registrySections,
+    isSearching,
+    hasSearchError,
+    retrySearch,
+  } = useCmdkData(profileId, query, open);
   const filteredAdditional = useMemo(
     () => filterAdditionalSections(query, additionalSectionsAfter),
     [query, additionalSectionsAfter]
@@ -471,10 +496,35 @@ export function CmdKPalette({
         Type to search all matching items.
       </p>
       <div
+        role='status'
+        aria-live='polite'
+        className='flex h-10 shrink-0 items-center gap-2 px-3.5 text-sm text-secondary-token'
+      >
+        {hasSearchError ? (
+          <>
+            <span>Some results could not load.</span>
+            <Button
+              variant='ghost'
+              size='sm'
+              disabled={isSearching}
+              onClick={() => {
+                focusSearchInput();
+                retrySearch();
+              }}
+            >
+              Retry Search
+            </Button>
+          </>
+        ) : isSearching ? (
+          'Searching…'
+        ) : null}
+      </div>
+      <div
         ref={resultsRef}
         className='min-h-0 flex-1 overflow-y-auto pb-2 pt-1.5'
         role='listbox'
         aria-label='Command Palette Results'
+        aria-busy={isSearching}
         id={generatedListId}
       >
         <PaletteList
@@ -482,7 +532,7 @@ export function CmdKPalette({
           selectedIndex={activeIndex ?? -1}
           setSelectedIndex={setSelectedIndex}
           commitIndex={commitIndex}
-          emptyHint='No matches.'
+          emptyHint={isSearching || hasSearchError ? null : 'No matches.'}
           variant='cmdk'
           showIndexedShortcuts
           listId={generatedListId}

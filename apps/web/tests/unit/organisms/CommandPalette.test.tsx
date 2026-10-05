@@ -13,7 +13,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -66,12 +66,20 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
-  useArtistSearchQuery: () => ({
-    results: [],
-    state: 'idle',
-    search: vi.fn(),
-    clear: vi.fn(),
-  }),
+  useArtistSearchQuery: () => {
+    const [query, setQuery] = useState('');
+    const clear = useCallback(() => setQuery(''), []);
+    return {
+      results: [],
+      state: 'idle',
+      error: null,
+      query,
+      isPending: false,
+      search: setQuery,
+      searchImmediate: setQuery,
+      clear,
+    };
+  },
 }));
 
 vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
