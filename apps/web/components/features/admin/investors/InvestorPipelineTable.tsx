@@ -158,7 +158,7 @@ function ScoreBadge({ score }: Readonly<{ score: number }>) {
   return (
     <span
       className={cn(
-        'inline-flex min-w-[2.5rem] items-center justify-end font-mono text-xs font-semibold tabular-nums',
+        'inline-flex min-w-10 items-center justify-end font-mono text-xs font-semibold tabular-nums',
         toneClassName
       )}
     >
