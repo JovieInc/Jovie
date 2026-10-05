@@ -5119,6 +5119,10 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 # Redirect only service output destinations; keep HOME and the
                 # actual installer logic intact. No host timer is installed.
                 script = source.replace("$HOME/.config/systemd/user", str(units))
+                # Keep the installer algorithm real while preventing this host's
+                # CLI aliases from satisfying or shadowing the fixture lookup.
+                script = script.replace("$HOME/.local/bin", str(root / "local-bin"))
+                script = script.replace("$HOME/.npm-global/bin", str(root / "npm-bin"))
                 script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes.plist", str(plist))
                 installer = root / "install.sh"
                 installer.write_text(script)
