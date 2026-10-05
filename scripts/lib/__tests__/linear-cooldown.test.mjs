@@ -194,6 +194,7 @@ describe('shared linear cooldown', () => {
       const skipped = await linearRequest({
         key,
         query: 'query { viewer { id } }',
+        variables: {},
         fetchImpl: async () => {
           calls += 1;
           return new Response('{"data":{"ok":true}}', { status: 200 });
