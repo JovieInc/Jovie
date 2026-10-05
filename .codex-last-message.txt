@@ -1,0 +1,23 @@
+Implemented, committed, pushed, and opened [draft PR #20030](https://github.com/JovieInc/Jovie/pull/20030) at commit `493257f684900bed9d3cbc2a4c8b1ebfe187d0d6`.
+
+Key changes:
+
+- Restored authenticated LYB reviewed-plan admission through the existing Symphony architecture.
+- Materializes approval labels only after authoritative validation and readback; does not dispatch work.
+- Distinguishes safe fixture/artifact/checkout context from requested forbidden actions.
+- Preserves fail-closed identity, fingerprint, replay, owner, hold, PR, cap-1, and authority checks.
+- Added regressions for genuine, forged, stale, incomplete, replayed, and mismatched LYB events.
+
+Verification:
+
+- Biome passed on all changed files.
+- 410 backlog-orchestrator tests passed.
+- Focused tests: 71 passed.
+- Shipping gate coverage: 95.01% lines, 81.01% branches, 100% functions.
+- Contract coverage: 100% lines, 84.21% branches, 100% functions.
+- `pnpm turbo typecheck`: 17/17 successful.
+- Two independent exact-head Codex reviews found and drove fixes for negation-boundary and sensitive-action edge cases.
+- All completed hosted checks pass; Seer remained pending at handoff.
+- Working tree is clean.
+
+The PR was initially published as draft. The authorized `jovie-bot` parent watcher subsequently promoted it at `2026-10-02T17:13:10Z`; I did not mark it ready, enable auto-merge, or merge it. Native iOS certification and the first provider commissioning receipt remain with LYB-46/JOV-5008. Local CodeRabbit was unavailable, and the GBrain durable-write backend failed with `gbrain-unavailable`.
