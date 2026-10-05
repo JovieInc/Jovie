@@ -14,12 +14,15 @@
 
 import {
   Calendar,
+  CalendarDays,
   CheckSquare,
   Columns2,
   Image as ImageIcon,
   Layers,
+  LineChart,
   Link2Off,
   Link as LinkIcon,
+  ListTodo,
   type LucideIcon,
   Megaphone,
   MessageSquare,
@@ -27,6 +30,7 @@ import {
   Music2,
   Settings,
   Sparkles,
+  SquarePlay,
   User,
   UserCircle,
   Users,
@@ -55,6 +59,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Layers,
   Settings,
   Calendar,
+  CalendarDays,
+  LineChart,
+  ListTodo,
+  Youtube: SquarePlay,
 };
 
 export interface PickerSkillItem {

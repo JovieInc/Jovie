@@ -1,8 +1,18 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  accessSync,
+  closeSync,
+  constants,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, delimiter, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -16,17 +26,51 @@ import { crc32 } from 'node:zlib';
 
 export const GH_FAKE_HOST = 'github.localhost';
 
+/**
+ * A `#!` wrapper is not the real CLI. Hosts may prepend a shim that injects
+ * state the harness deliberately isolates (e.g. lane_runner's `gh` shim mints
+ * a GitHub App token from `~/.config/jovie-lanes/jovie-bot.pem`, which does
+ * not exist under the harness HOME and makes every `gh` call fail).
+ */
+function isScriptWrapper(path) {
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const head = Buffer.alloc(2);
+    return readSync(fd, head, 0, 2, 0) === 2 && head.toString() === '#!';
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
 /** Absolute path of the real gh binary, or null when it is not installed. */
 export function resolveRealGh() {
-  try {
-    return (
-      execFileSync('sh', ['-c', 'command -v gh'], {
-        encoding: 'utf8',
-      }).trim() || null
-    );
-  } catch {
-    return null;
+  const names = process.platform === 'win32' ? ['gh.exe', 'gh'] : ['gh'];
+  const candidates = [];
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    for (const name of names) {
+      const candidate = join(dir, name);
+      try {
+        accessSync(candidate, constants.X_OK);
+      } catch {
+        continue;
+      }
+      if (!candidates.includes(candidate)) candidates.push(candidate);
+    }
   }
+  if (!candidates.length)
+    try {
+      const found = execFileSync('sh', ['-c', 'command -v gh'], {
+        encoding: 'utf8',
+      }).trim();
+      if (found) candidates.push(found);
+    } catch {
+      return null;
+    }
+  return candidates.find(path => !isScriptWrapper(path)) ?? candidates[0];
 }
 
 /** First line of `gh --version`, recorded as the exercised boundary version. */
@@ -79,8 +123,22 @@ export function storedZip(files) {
  * `route(pathWithQuery)` returns `{ status?, body }` (string, Buffer or JSON
  * value) or null for a 404. Resolves with exit code, output and the API paths
  * gh actually requested.
+ * @param {object} opts
+ * @param {string} opts.script
+ * @param {Record<string, string | undefined>} [opts.env]
+ * @param {(path: string) => { status?: number, body: unknown } | null} opts.route
+ * @param {string} [opts.gh]
+ * @param {boolean} [opts.allowCallerGhOverride] Let a deliberate caller `gh`
+ * fixture win for negative-control tests. Normal harness runs must leave this
+ * false so host shims cannot replace the resolved real CLI.
  */
-export async function runWithRealGh({ script, env = {}, route, gh }) {
+export async function runWithRealGh({
+  script,
+  env = {},
+  route,
+  gh,
+  allowCallerGhOverride = false,
+}) {
   const binary = gh ?? resolveRealGh();
   if (!binary) throw new Error('real gh binary is not installed');
   const requests = [];
@@ -112,11 +170,25 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
+  // The resolved binary must win `gh` lookup even when the caller supplies its
+  // own PATH (e.g. to shadow `node`): a harness-owned dir holding only the
+  // real gh is prepended after the caller's env is merged. Caller dirs still
+  // shadow everything else. Copy, don't symlink, so wrapper detection and
+  // platform quirks can't resurrect a shim.
+  const ghDir = mkdtempSync(join(tmpdir(), 'real-gh-bin-'));
+  const basePath = process.env.PATH ?? '';
+  const callerPath = env.PATH ?? basePath;
+  const callerPrefix = callerPath.endsWith(basePath)
+    ? callerPath.slice(0, callerPath.length - basePath.length)
+    : '';
+  const childPath = allowCallerGhOverride
+    ? `${callerPrefix}${ghDir}${delimiter}${basePath}`
+    : `${ghDir}${delimiter}${callerPath}`;
   try {
+    copyFileSync(binary, join(ghDir, basename(binary)));
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
@@ -127,6 +199,7 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
           HTTP_PROXY: proxy,
           http_proxy: proxy,
           ...env,
+          PATH: childPath,
         },
       });
       let stdout = '';
@@ -147,5 +220,6 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   } finally {
     server.close();
     rmSync(home, { recursive: true, force: true });
+    rmSync(ghDir, { recursive: true, force: true });
   }
 }

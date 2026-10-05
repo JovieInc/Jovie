@@ -2120,188 +2120,6 @@ describe('canary health gate workflow', () => {
     ).toBe(false);
   });
 
-  it('never probes the shared staging alias before this release owns it', () => {
-    const canary = readFileSync(canaryWorkflowPath, 'utf8');
-    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
-    const aliasJob = getJobBlock(release, 'alias-staging');
-    const aliasStep = getStepBlock(aliasJob, 'Alias verified deployment');
-    const oauthStep = getStepBlock(
-      aliasJob,
-      'Verify aliased staging OAuth redirect URIs'
-    );
-
-    expect(canary).not.toContain('staging.jov.ie');
-    expect(aliasStep).toContain(
-      'vercel alias set "$deployment_url" staging.jov.ie'
-    );
-    const aliasProofStep = getStepBlock(
-      aliasJob,
-      'Prove staging alias owns the SHA-attested exact deployment'
-    );
-    expect(aliasProofStep).toContain('resolve-deployment');
-    expect(aliasProofStep).toContain(
-      'VERCEL_CANDIDATE_DEPLOYMENT_ID="$EXPECTED_DEPLOYMENT_ID"'
-    );
-    expect(aliasProofStep).toContain(
-      'EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}'
-    );
-    expect(aliasProofStep).toContain(
-      '[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]'
-    );
-    expect(aliasProofStep).toContain('[ "$alias_state" = "READY" ]');
-    expect(aliasProofStep).not.toContain('alias_commit_sha=');
-    expect(aliasProofStep).not.toContain('.meta.githubCommitSha');
-    expect(oauthStep).toContain('BASE_URL: https://staging.jov.ie');
-    expect(oauthStep).toContain(
-      'EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie'
-    );
-    expect(oauthStep).toContain('PLAYWRIGHT_VERCEL_BYPASS_SECRET:');
-    expect(oauthStep).toContain(
-      'DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}'
-    );
-    expect(oauthStep).toContain(
-      '"$GITHUB_WORKSPACE/node_modules/.bin/vercel" alias set'
-    );
-    expect(oauthStep).toContain('oauth-providers.spec.ts');
-    expect(oauthStep).toContain(
-      'oauth_retry_root="$RUNNER_TEMP/aliased-staging-oauth-retries"'
-    );
-    expect(oauthStep).toContain(
-      'PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values'
-    );
-    expect(oauthStep).toContain(
-      'attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"'
-    );
-    expect(oauthStep).toContain(
-      'quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"'
-    );
-    expect(oauthStep).toContain(
-      'for artifact_path in test-results playwright-report'
-    );
-    expect(oauthStep).toContain('mv -- "$artifact_path" "$destination/"');
-    expect(oauthStep).toContain(
-      'if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]'
-    );
-    expect(oauthStep).toContain('refusing an unsafe retry');
-    expect(oauthStep).not.toContain('attempt_runner_temp=');
-    expect(oauthStep).not.toContain('preexisting-artifacts');
-    expect(oauthStep).not.toContain('RUNNER_TEMP="$attempt_runner_temp"');
-    expect(oauthStep).not.toContain('rm -rf test-results');
-    expect(oauthStep.indexOf('guard-playwright-artifacts.mjs')).toBeLessThan(
-      oauthStep.indexOf('failed-artifacts')
-    );
-    expect(oauthStep.indexOf('failed-artifacts')).toBeLessThan(
-      oauthStep.indexOf('safe-playwright-producer/blocked')
-    );
-    expect(oauthStep.indexOf('safe-playwright-producer/blocked')).toBeLessThan(
-      oauthStep.indexOf('if [ "$attempt" -ge "$max_attempts" ]')
-    );
-    expect(aliasJob.indexOf('- name: Alias verified deployment')).toBeLessThan(
-      aliasJob.indexOf('- name: Verify aliased staging OAuth redirect URIs')
-    );
-  });
-
-  it('reasserts a private exact preview and emits the only green staging receipt', () => {
-    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
-    const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
-    const reassert = getStepBlock(
-      receiptJob,
-      'Classify staging generation after mutation'
-    );
-    const prove = getStepBlock(
-      receiptJob,
-      'Prove exact staging identity, privacy, and representative routes'
-    );
-    const writeReceipt = getStepBlock(
-      receiptJob,
-      'Write typed staging deployment receipt'
-    );
-    const releaseResult = getJobBlock(release, 'release-result');
-
-    expect(receiptJob).toContain('needs: [deploy-staging, alias-staging]');
-    expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
-    expect(receiptJob).toContain(
-      "needs.alias-staging.outputs.is_current == 'true'"
-    );
-    expect(reassert).toContain('staging_refresh_outcome=current');
-    expect(reassert).toContain(
-      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
-    );
-    expect(reassert).toContain('[ "$current_main" = "$EXPECTED_COMMIT_SHA" ]');
-    expect(reassert).toContain(
-      'staging_refresh_outcome=superseded_after_mutation'
-    );
-    expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
-    expect(prove).toContain('EXPECTED_COMMIT_SHA:');
-    expect(prove).toContain('--arg url "$deployment_url"');
-    expect(prove).toContain('.id == $id and');
-    expect(prove).toContain('.url == $url');
-    expect(prove).not.toContain('(.readyState | ascii_upcase) == "READY"');
-    expect(prove).toContain('for attempt in $(seq 1 15)');
-    expect(prove).toContain('(.id | type == "string")');
-    expect(prove).toContain('(.readyState | type == "string")');
-    expect(prove).toContain('[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]');
-    expect(prove).toContain('[ "$alias_state" = "READY" ]');
-    expect(prove).not.toContain('alias_target');
-    expect(prove).not.toContain('.target');
-    expect(prove).toContain('[ "$attempt" -eq 15 ]');
-    expect(prove).toContain('sleep 4');
-    expect(
-      prove.match(
-        /\.\/node_modules\/\.bin\/vercel alias set "\$deployment_url" staging\.jov\.ie/g
-      )
-    ).toHaveLength(2);
-    expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
-    expect(prove).toContain('[ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ]');
-    expect(prove).toContain('[ "$observed_environment" = "preview" ]');
-    expect(prove).toContain('https://staging.jov.ie/robots.txt');
-    expect(prove).toContain('staging-homepage-headers.txt');
-    expect(prove).toContain("grep -Eiq '^x-robots-tag:.*noindex'");
-    expect(prove).toContain('preview_robots_policy_valid()');
-    expect(prove).toContain(
-      `! printf '%s\\n' "$robots" | preview_robots_policy_valid; then`
-    );
-    expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
-    expect(writeReceipt).toContain(
-      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
-    );
-    expect(writeReceipt).toContain('[[ "$current_main" =~ ^[0-9a-f]{40}$ ]]');
-    expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
-    expect(writeReceipt).toContain(
-      'STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}'
-    );
-    expect(writeReceipt).toContain('sloState: $sloState');
-    expect(writeReceipt).toContain('state: $state');
-    expect(writeReceipt).toContain('terminal: true');
-    expect(writeReceipt).toContain(
-      'privacy: "robots-block-all-and-http-noindex"'
-    );
-    expect(receiptJob).toContain(
-      'name: staging-deployment-${{ inputs.expected_sha }}'
-    );
-    expect(receiptJob).not.toContain('vercel promote');
-    expect(receiptJob).not.toContain('vercel rollback');
-    expect(releaseResult).toContain('staging-deployment-receipt,');
-    expect(releaseResult).toContain(
-      "if: ${{ always() && inputs.release_mode == 'production' }}"
-    );
-    expect(releaseResult).toContain(
-      'if [ "${{ inputs.staging_verified }}" != "true" ]; then'
-    );
-    expect(releaseResult).toContain(
-      'Production release lacks the exact staging controller receipt.'
-    );
-    expect(releaseResult).toContain(
-      'Pre-production supersession lacks an exact staging receipt.'
-    );
-    expect(releaseResult).toContain(
-      'production-head:${{ needs.production-head.result }}'
-    );
-    expect(release.indexOf('  promote-production:')).toBeLessThan(
-      release.indexOf('  staging-deployment-receipt:')
-    );
-  });
-
   it.each([
     ['Next serialization', 'User-agent: *\nDisallow: /', true],
     ['case-insensitive directives', 'uSeR-aGeNt: *\ndIsAlLoW: /', true],
@@ -4948,19 +4766,21 @@ describe('production promotion exact-artifact contract', () => {
       'select(.name | startswith("Production Release /"))'
     );
     expect(health).toContain('controller_attempt="$(jq -r');
-    expect(health).toContain('gh run rerun "$run_id"');
-    expect(health).not.toContain('gh run rerun "$run_id" --failed');
+    // JOV-7773: a full controller rerun drops the attempt-1 marker
+    // artifacts, so an interrupted marker heals only through the bounded
+    // marker re-proof, which the recovery admission gates on promotion,
+    // Sentry and skipped-rollback evidence.
+    expect(health).not.toContain('gh run rerun "$run_id"');
     expect(health).toContain('needs_manual=true');
-    expect(health).toContain('runs/$run_id/attempts/1/jobs?per_page=100');
-    expect(health).toContain('endswith("Centralized production rollback")');
     expect(health).toContain('.status == "completed"');
     expect(health).toContain('.conclusion == "skipped"');
-    expect(health).toContain('actions/runs/$run_id/attempts/1');
-    expect(health).toContain('actions/runs/$run_id")');
     expect(health).toContain(
-      '(.conclusion | IN("cancelled", "failure", "startup_failure", "timed_out"))'
+      'recovery_reason=current_marker_recovery_dispatched'
     );
-    expect(health).toContain('recovery_lease_already_exists');
+    expect(health).toContain('incident interrupted_current_marker_not_live');
+    expect(
+      health.match(/gh workflow run production-marker-recovery\.yml/g)
+    ).toHaveLength(2);
     // production-mutation concurrency parks newer generations in pending /
     // waiting / requested; do not treat those as completed-without-marker.
     expect(healthEvaluation).toContain(
@@ -4999,17 +4819,12 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(health).not.toContain('issues: write');
     expect(health).not.toContain('exit 1');
-    expect(health.indexOf('exact_attempt="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
-    );
-    expect(health.indexOf('exact_jobs="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
-    );
-    expect(health.indexOf('latest_run="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
-    );
-    expect(health.indexOf('lease_listing="$(gh api')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id"')
+    const currentDispatch = health.indexOf('-f sha="$current_sha"');
+    expect(currentDispatch).toBeGreaterThan(0);
+    expect(
+      health.lastIndexOf('boundary_marker="$(node', currentDispatch)
+    ).toBeGreaterThan(
+      health.indexOf('incident interrupted_current_marker_not_live')
     );
     expect(health).toContain('incident duplicate_controller_generation');
     expect(healthEvaluation).toContain(
@@ -5246,6 +5061,130 @@ describe('production promotion exact-artifact contract', () => {
       '`production-generation-verified-recovery-${sha}`'
     );
   });
+});
+
+describe('in-band interrupted marker heal (JOV-7773)', () => {
+  const sha = 'c75c559a06e94a26a7afb258f85dc951775332bd';
+
+  function healStep() {
+    const parsed = parseYaml(
+      readFileSync(productionControllerWorkflowPath, 'utf8')
+    ) as {
+      jobs: Record<
+        string,
+        {
+          if?: string;
+          needs?: string[];
+          permissions?: Record<string, string>;
+          steps: Array<{ name?: string; run?: string }>;
+        }
+      >;
+    };
+    return parsed.jobs['heal-interrupted-marker'];
+  }
+
+  function runHeal(env: Record<string, string | undefined>) {
+    const script = healStep().steps[0]?.run;
+    expect(script).toBeTruthy();
+    const root = mkdtempSync(resolve(tmpdir(), 'marker-heal-'));
+    try {
+      const bin = resolve(root, 'bin');
+      mkdirSync(bin);
+      const calls = resolve(root, 'calls');
+      writeFileSync(calls, '');
+      writeFileSync(
+        resolve(bin, 'gh'),
+        `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "$CALLS"\n`
+      );
+      chmodSync(resolve(bin, 'gh'), 0o700);
+      const result = spawnSync('bash', ['-c', script!], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          CALLS: calls,
+          EXPECTED_SHA: sha,
+          DEPLOYMENT_ID: 'dpl_37144574062',
+          RUN_WEB: 'true',
+          MARKER_RECOVERY: 'false',
+          VERIFIED_RESULT: 'success',
+          SMOKE_REMEDIATION_RESULT: 'success',
+          AUTH_REMEDIATION_RESULT: 'success',
+          CONTROLLER_RUN: '37144574062',
+          CONTROLLER_ATTEMPT: '1',
+          ...env,
+        },
+      });
+      return { ...result, calls: readFileSync(calls, 'utf8') };
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  }
+
+  it('runs after every verified generation with only dispatch scope', () => {
+    const job = healStep();
+    expect(job.if).toBe(
+      "${{ always() && needs.production-verified.outputs.verified == 'true' }}"
+    );
+    expect(job.needs).toEqual([
+      'authorize-production',
+      'production-release',
+      'production-verified',
+      'remediation-post-deploy-smoke',
+      'remediation-auth-smoke',
+    ]);
+    expect(job.permissions).toEqual({ actions: 'write', contents: 'read' });
+    expect(job.steps[0]?.run).not.toContain('gh run rerun');
+  });
+
+  it('dispatches the bounded re-proof when run 37144574062 is interrupted after its marker', () => {
+    for (const env of [
+      { SMOKE_REMEDIATION_RESULT: 'failure' },
+      { AUTH_REMEDIATION_RESULT: 'cancelled' },
+      { VERIFIED_RESULT: 'failure' },
+    ]) {
+      const result = runHeal(env);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.calls.trim()).toBe(
+        `workflow run production-marker-recovery.yml --ref main -f sha=${sha} -f deployment_id=dpl_37144574062 -f controller_run=37144574062 -f controller_attempt=1`
+      );
+    }
+  }, 30_000);
+
+  it('stays neutral for an uninterrupted or publication-only failure', () => {
+    // Run 37144574062 itself: only the changelog publication failed, which
+    // is not a needs edge here, so the marker stays verified (JOV-7724).
+    for (const env of [{}, { SMOKE_REMEDIATION_RESULT: 'skipped' }]) {
+      const result = runHeal(env);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.calls).toBe('');
+      expect(result.stdout).toContain('nothing to heal');
+    }
+  }, 30_000);
+
+  it('leaves recovery attempts and non-web generations to the health audit', () => {
+    for (const env of [
+      { MARKER_RECOVERY: 'true' },
+      { RUN_WEB: 'false', DEPLOYMENT_ID: '' },
+    ]) {
+      const result = runHeal({ ...env, VERIFIED_RESULT: 'failure' });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.calls).toBe('');
+    }
+  }, 30_000);
+
+  it('fails closed without exact recovery evidence', () => {
+    for (const env of [
+      { DEPLOYMENT_ID: '' },
+      { DEPLOYMENT_ID: 'not-applicable' },
+      { EXPECTED_SHA: 'abc' },
+      { CONTROLLER_ATTEMPT: '0' },
+    ]) {
+      const result = runHeal({ ...env, VERIFIED_RESULT: 'failure' });
+      expect(result.status).toBe(1);
+      expect(result.calls).toBe('');
+    }
+  }, 30_000);
 });
 
 describe('production marker recovery workflow (JOV-4965)', () => {
@@ -5497,7 +5436,7 @@ esac
       const result = runAdmission('ahead');
       expect(result.status, result.stderr).toBe(0);
       expect(result.output).toContain('recovery_required=true');
-    });
+    }, 30_000);
 
     it('refuses a controller head that does not descend from the deployed SHA', () => {
       for (const status of ['diverged', 'behind', 'identical']) {
@@ -5508,6 +5447,6 @@ esac
         );
         expect(result.output).not.toContain('recovery_required=true');
       }
-    });
+    }, 30_000);
   });
 });

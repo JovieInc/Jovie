@@ -44,11 +44,20 @@ jobs:
           fi
 
   storybook-a11y:
-    name: Storybook A11y Checks
+    name: Storybook A11y Checks (${{ matrix.shard }}/16)
     needs: [ci-visual-path-changes]
     if: ${{ needs.ci-visual-path-changes.outputs.has_visual_changes == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # One Chromium page runs every story file in a shard. A single ~1,200-file
+    # run lost the browser ("Browser connection was closed") after 127-173
+    # files, so ~1,000 stories never ran while the lane looked like an a11y
+    # failure. Sixteen fresh browsers (~75 files each) keep each run well
+    # under the observed failure point.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -67,7 +76,7 @@ jobs:
       - run: pnpm --filter @jovie/web exec playwright install chromium --with-deps
       - name: Run Storybook A11y Tests
         id: a11y-test
-        run: pnpm --filter @jovie/web test:a11y
+        run: pnpm --filter @jovie/web test:a11y --shard=${{ matrix.shard }}/16
       - name: A11y Results Summary
         if: always()
         run: |

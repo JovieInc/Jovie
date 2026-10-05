@@ -83,6 +83,33 @@ describe('useProfileShell mode overrides', () => {
     );
   });
 
+  it('publishes raw URL mode across marked client history writes despite a mode override', () => {
+    const { result } = renderHook(() =>
+      useProfileShell({
+        artist: makeArtist(),
+        socialLinks: [],
+        contacts: [],
+        modeOverride: 'profile',
+      })
+    );
+    expect(result.current.locationMode).toBe('profile');
+
+    for (const mode of ['about', 'contact', 'profile', 'about', 'contact']) {
+      act(() => {
+        window.history.pushState(
+          { __NA: true },
+          '',
+          mode === 'profile' ? '/testartist' : `/testartist?mode=${mode}`
+        );
+      });
+      expect(result.current.locationMode).toBe(mode);
+    }
+    act(() => {
+      window.history.replaceState({ __NA: true }, '', '/testartist?mode=about');
+    });
+    expect(result.current.locationMode).toBe('about');
+  });
+
   it('uses modeOverride for non-profile notification routing', () => {
     window.history.replaceState(null, '', '/testartist?mode=profile');
 

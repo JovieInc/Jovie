@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
   MERGE_GROUP_FAILURE_CONCLUSIONS,
@@ -12,6 +13,9 @@ import {
 export const FAILURE_HOLD_SCHEMA = 'jovie-merge-group-failure-hold/v1';
 export const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 export const FAILURE_RETRY_CONTEXT = 'jovie-queue-failure-retry/v1';
+export const ADMISSION_RECOVERY_CONTEXT = 'jovie-queue-admission-recovery/v1';
+export const ADMISSION_RECOVERY_SCHEMA =
+  'jovie-merge-group-admission-recovery/v1';
 export const CI_WORKFLOW_ID = 178737329;
 export const FAILURE_CLASSES = Object.freeze([
   'deterministic-source',
@@ -36,6 +40,16 @@ const INSTRUCTION_CONTRACT_STEP = 'Evaluate repository instruction contracts';
 const INSTRUCTION_FAILURE_SUMMARIES = new Set([
   INSTRUCTION_CONTRACT_STEP,
   'Join exact lane results',
+  'Evaluate combined-head checks',
+]);
+// Merge Group Admission and the PR Ready summary that reports it. When the
+// admission step only gave up on API quota or a gateway error, the group says
+// nothing about the source revision (JOV-7780: run 37167458268).
+export const ADMISSION_STEP =
+  'Require live queue membership and external admission checks';
+export const TRANSIENT_ADMISSION_CLASS = 'transient-admission';
+const ADMISSION_FAILURE_SUMMARIES = new Set([
+  ADMISSION_STEP,
   'Evaluate combined-head checks',
 ]);
 const RETRY_DESCRIPTION =
@@ -137,6 +151,20 @@ function hasOnlyBudgetErrors(text) {
   return budgetFound;
 }
 
+function hasOnlyTransientAdmissionErrors(text) {
+  const errors = String(text ?? '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  let transientFound = false;
+  for (const error of errors) {
+    if (error === RUNNER_EXIT_FAILURE) continue;
+    if (!isTransientAdmissionFailureMessage(error)) return false;
+    transientFound = true;
+  }
+  return transientFound;
+}
+
 function instructionErrorsFromLog(log) {
   const errors = [];
   for (const line of log.split('\n')) {
@@ -155,12 +183,13 @@ function instructionErrorsFromLog(log) {
   return errors.includes(RUNNER_EXIT_FAILURE) ? errors : null;
 }
 
-/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[] }} [input] */
+/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string }} [input] */
 export function classifyMergeGroupFailure({
   conclusion,
   failedSteps = [],
   annotationText = '',
   changedFiles,
+  admissionText = '',
 } = {}) {
   if (!MERGE_GROUP_FAILURE_CONCLUSIONS.has(conclusion)) {
     fail(`unsupported terminal conclusion ${JSON.stringify(conclusion)}`);
@@ -178,6 +207,17 @@ export function classifyMergeGroupFailure({
     }
     if (steps.some(step => RETRYABLE_PRODUCT_FAILURE_STEPS.has(step))) {
       return 'retryable-product';
+    }
+    if (
+      steps.includes(ADMISSION_STEP) &&
+      steps.every(
+        step =>
+          ADMISSION_FAILURE_SUMMARIES.has(step) ||
+          INFRASTRUCTURE_STEP.test(step)
+      ) &&
+      hasOnlyTransientAdmissionErrors(admissionText)
+    ) {
+      return TRANSIENT_ADMISSION_CLASS;
     }
     // A capped instruction file that is already over on the queue base fails
     // every PR. That is repairable by moving main, not by holding the victim.
@@ -271,6 +311,129 @@ export function parseTrustedRetryStatus(status, repository) {
     released: match[1] === 'released',
     targetUrl: status.target_url ?? status.targetUrl,
   };
+}
+
+function admissionRecoveryDescription(receipt) {
+  return `pr=${receipt.prNumber};run=${receipt.workflowRunId};try=${receipt.workflowRunAttempt};at=${receipt.completedAt}`;
+}
+
+export function admissionRecoveryReceiptStatus(
+  raw,
+  { repository, prNumber, headSha }
+) {
+  if (raw === undefined || raw === '') return null;
+  if (typeof raw !== 'string')
+    fail('trusted admission recovery receipt is malformed');
+  const receipt = JSON.parse(raw);
+  if (
+    !receipt ||
+    receipt.schema !== ADMISSION_RECOVERY_SCHEMA ||
+    receipt.repository !== repository ||
+    !SHA.test(receipt.sourceHeadSha ?? '') ||
+    !SHA.test(receipt.mergeGroupHeadSha ?? '') ||
+    ![
+      receipt.prNumber,
+      receipt.workflowRunId,
+      receipt.workflowRunAttempt,
+      receipt.completedAt,
+    ].every(value => Number.isSafeInteger(value) && value > 0)
+  ) {
+    fail('trusted admission recovery receipt is malformed');
+  }
+  if (receipt.prNumber !== prNumber || receipt.sourceHeadSha !== headSha)
+    return null;
+  return {
+    context: ADMISSION_RECOVERY_CONTEXT,
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: admissionRecoveryDescription(receipt),
+    target_url: `https://github.com/${repository}/actions/runs/${receipt.workflowRunId}`,
+  };
+}
+
+function parseTrustedAdmissionRecoveryStatus(status, repository) {
+  if (
+    status?.context !== ADMISSION_RECOVERY_CONTEXT ||
+    String(status?.state ?? '').toLowerCase() !== 'success'
+  )
+    return null;
+  const creator = statusCreator(status);
+  if (
+    creator.type !== 'Bot' ||
+    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+  )
+    return null;
+  const match =
+    /^pr=([1-9][0-9]*);run=([1-9][0-9]*);try=([1-9][0-9]*);at=([1-9][0-9]*)$/.exec(
+      String(status.description ?? '')
+    );
+  if (!match) return null;
+  const [prNumber, runId, runAttempt, completedAt] = match.slice(1).map(Number);
+  if (
+    ![prNumber, runId, runAttempt, completedAt].every(
+      value => Number.isSafeInteger(value) && value > 0
+    ) ||
+    actionsRunId(status.target_url ?? status.targetUrl, repository) !== runId
+  )
+    return null;
+  return {
+    prNumber,
+    runId,
+    runAttempt,
+    completedAt,
+    targetUrl: status.target_url ?? status.targetUrl,
+  };
+}
+
+/** Recovery never replaces a source failure or revives cleared merge intent. */
+export function reenrollmentDisposition({
+  failure,
+  statuses,
+  repository,
+  prNumber,
+  lastRemoval,
+  headCommittedAt,
+  autoMergeEnabled,
+}) {
+  const removedAt = Date.parse(lastRemoval);
+  const committedAt = Date.parse(headCommittedAt);
+  if (
+    !lastRemoval ||
+    (Number.isFinite(committedAt) && committedAt > removedAt) ||
+    failure.action !== 'allow'
+  )
+    return failure;
+  const blocked = reason => ({ ...failure, action: 'block', reason });
+  if (!autoMergeEnabled || !Number.isFinite(removedAt))
+    return blocked('removed-without-recovery-intent');
+  const recoveries = statuses
+    .map(status => parseTrustedAdmissionRecoveryStatus(status, repository))
+    .filter(record => record?.prNumber === prNumber);
+  const latest = recoveries.reduce(
+    (current, candidate) =>
+      !current || candidate.completedAt > current.completedAt
+        ? candidate
+        : current,
+    null
+  );
+  if (!latest || latest.completedAt < removedAt)
+    return blocked('no-current-admission-recovery');
+  const retry = statuses
+    .map(status => parseTrustedRetryStatus(status, repository))
+    .find(
+      item =>
+        item &&
+        item.runId === latest.runId &&
+        item.runAttempt === latest.runAttempt
+    );
+  return retry && !retry.released
+    ? blocked('admission-retry-spent')
+    : {
+        ...failure,
+        action: 'retry-once',
+        reason: 'bounded-admission-recovery',
+        latest,
+      };
 }
 
 // The exact commit endpoint scopes failures: deterministic blocks immediately;
@@ -420,6 +583,13 @@ export function classifyDequeueDenial(error) {
   return null;
 }
 
+/** GitHub's answer to disablePullRequestAutoMerge when nothing is armed. */
+export function autoMergeWasNotArmed(error) {
+  return /can't disable auto-merge for this pull request/i.test(
+    errorText(error)
+  );
+}
+
 /** Only an explicit mutation rejection may release a reserved retry. */
 export function enqueueWasRejected(error) {
   if (!error || typeof error !== 'object') return false;
@@ -491,7 +661,7 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 /**
- * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string }} input
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string }} input
  * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
  */
 export async function applyMergeGroupFailure(
@@ -504,6 +674,7 @@ export async function applyMergeGroupFailure(
     annotationText = '',
     changedFiles,
     mainSha,
+    admissionText = '',
   },
   { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
 ) {
@@ -514,12 +685,64 @@ export async function applyMergeGroupFailure(
     failedSteps,
     annotationText,
     changedFiles,
+    admissionText,
   });
+  const groupHeadSha = String(run.head_sha).toLowerCase();
+  // Quota or gateway trouble spends no source-failure retry and removes no merge
+  // intent; GitHub already ejected the group and enrollment re-arms it.
+  if (classification === TRANSIENT_ADMISSION_CLASS) {
+    let admissionRecoveryReceipt;
+    const completedAt = Date.parse(run.updated_at);
+    if (
+      Number.isSafeInteger(completedAt) &&
+      completedAt >= Date.parse(run.created_at)
+    ) {
+      const current = await readPullRequest(front.prNumber);
+      if (
+        current?.state === 'OPEN' &&
+        String(current.headRefOid ?? '').toLowerCase() === sourceHeadSha &&
+        !supersededByLiveEntry(current, sourceHeadSha, groupHeadSha)
+      ) {
+        admissionRecoveryReceipt = {
+          schema: ADMISSION_RECOVERY_SCHEMA,
+          repository,
+          prNumber: front.prNumber,
+          sourceHeadSha,
+          mergeGroupHeadSha: groupHeadSha,
+          workflowRunId: run.id,
+          workflowRunAttempt: run.run_attempt,
+          completedAt,
+        };
+        await writeStatus({
+          sha: sourceHeadSha,
+          context: ADMISSION_RECOVERY_CONTEXT,
+          state: 'success',
+          description: admissionRecoveryDescription(admissionRecoveryReceipt),
+          targetUrl: run.html_url,
+        });
+      }
+    }
+    return {
+      schema: FAILURE_HOLD_SCHEMA,
+      repository,
+      prNumber: front.prNumber,
+      sourceHeadSha,
+      mergeGroupHeadSha: groupHeadSha,
+      workflowRunId: run.id,
+      workflowRunAttempt: run.run_attempt,
+      classification,
+      skipped: true,
+      statusWritten: false,
+      dequeued: false,
+      dequeueOutcome: 'not-attempted',
+      autoMergeDisabled: false,
+      admissionRecoveryReceipt,
+    };
+  }
   const recordedMainSha = String(mainSha ?? '').toLowerCase();
   if (classification === 'base-branch' && !SHA.test(recordedMainSha)) {
     fail('current main sha is unavailable');
   }
-  const groupHeadSha = String(run.head_sha).toLowerCase();
   let current = await readPullRequest(front.prNumber);
   // A run whose group GitHub already rebuilt says nothing about the live
   // entry. Disabling auto-merge then ejects the fresh group and rebuilds
@@ -591,11 +814,20 @@ export async function applyMergeGroupFailure(
       current = await readPullRequest(front.prNumber);
     }
   }
-  if (currentMatches() && current.autoMergeRequest) {
+  // A queued PR can read autoMergeRequest null, during and just after the
+  // dequeue, while its armed auto-merge re-enqueues the same head seconds
+  // later. On 2026-10-03 #20354 re-entered the queue 13 times and failed 8
+  // holds on one unchanged head (JOV-7708). Disable on every exact-head hold;
+  // "nothing to disable" is the only tolerated answer.
+  if (currentMatches()) {
     current = await readPullRequest(front.prNumber);
-    if (currentMatches() && current.autoMergeRequest) {
-      await disableAutoMerge(current.id);
-      autoMergeDisabled = true;
+    if (currentMatches()) {
+      try {
+        await disableAutoMerge(current.id);
+        autoMergeDisabled = true;
+      } catch (error) {
+        if (!autoMergeWasNotArmed(error)) throw error;
+      }
       current = await readPullRequest(front.prNumber);
     }
   }
@@ -715,6 +947,35 @@ function readPullRequest(repository, prNumber) {
   return pr;
 }
 
+// Failure annotations of the jobs whose admission step failed. Unreadable
+// evidence returns '' and leaves the failure to the source classes.
+function admissionEvidence(repository, jobs) {
+  const failedJobs = jobs.filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step => step?.name === ADMISSION_STEP && step?.conclusion === 'failure'
+      )
+  );
+  const messages = [];
+  for (const job of failedJobs) {
+    const checkRunId = String(job.check_run_url ?? '').match(
+      /\/check-runs\/([1-9][0-9]*)$/
+    )?.[1];
+    if (!checkRunId) return '';
+    try {
+      const notes = restPages(
+        `repos/${repository}/check-runs/${checkRunId}/annotations`
+      ).filter(note => note?.annotation_level === 'failure');
+      if (notes.some(note => typeof note.message !== 'string')) return '';
+      messages.push(...notes.map(note => note.message));
+    } catch {
+      return '';
+    }
+  }
+  return messages.join('\n');
+}
+
 function instructionContractEvidence(repository, run, jobs, baseSha) {
   const failedJobs = jobs.filter(
     job =>
@@ -830,11 +1091,15 @@ async function main(argv) {
     jobs,
     front.baseSha
   );
+  const admissionText = failedSteps.includes(ADMISSION_STEP)
+    ? admissionEvidence(repository, jobs)
+    : '';
   const preview = classifyMergeGroupFailure({
     conclusion: run.conclusion,
     failedSteps,
     annotationText: evidence.annotationText,
     changedFiles: evidence.changedFiles,
+    admissionText,
   });
   const mainSha =
     preview === 'base-branch'
@@ -856,6 +1121,7 @@ async function main(argv) {
       annotationText: evidence.annotationText,
       changedFiles: evidence.changedFiles,
       mainSha,
+      admissionText,
     },
     {
       writeStatus: async receipt =>
@@ -885,11 +1151,17 @@ async function main(argv) {
     }
   );
   const serialized = JSON.stringify(result);
-  // A superseded run holds nothing, so enrollment receives no receipt.
-  if (process.env.GITHUB_OUTPUT && !result.superseded) {
+  // Failure holds and admission recovery have separate trusted receipts.
+  if (process.env.GITHUB_OUTPUT && !result.superseded && !result.skipped) {
     appendFileSync(
       process.env.GITHUB_OUTPUT,
       `failure_receipt=${serialized}\n`
+    );
+  }
+  if (process.env.GITHUB_OUTPUT && result.admissionRecoveryReceipt) {
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `admission_recovery_receipt=${JSON.stringify(result.admissionRecoveryReceipt)}\n`
     );
   }
   process.stdout.write(`${serialized}\n`);

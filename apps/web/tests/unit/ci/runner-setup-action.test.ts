@@ -12,308 +12,426 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, resolve } from 'node:path';
+import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 
-describe('self-hosted runner setup action', () => {
-  const action = readFileSync(
+// JOV-7707: the setup action is checked from its parsed YAML. Step `if:`
+// expressions are evaluated for each event, and the prune shell runs against
+// a fixture .pnpm tree.
+type ActionStep = {
+  id?: string;
+  name?: string;
+  if?: string;
+  uses?: string;
+  run?: string;
+  env?: Record<string, string>;
+  with?: Record<string, unknown>;
+};
+const setupAction = parseYaml(
+  readFileSync(
     resolve(repoRoot, '.github/actions/setup-node-pnpm/action.yml'),
     'utf8'
-  );
-  const ciWorkflow = readFileSync(
-    resolve(repoRoot, '.github/workflows/ci.yml'),
-    'utf8'
-  );
+  )
+) as {
+  inputs: Record<string, { default?: string }>;
+  runs: { steps: ActionStep[] };
+};
+const actionSteps = setupAction.runs.steps;
+const actionStep = (name: string) => {
+  const found = actionSteps.find(step => step.name === name);
+  expect(found, name).toBeDefined();
+  return found as ActionStep;
+};
+const stepIndex = (name: string) =>
+  actionSteps.findIndex(step => step.name === name);
 
-  it('never saves pnpm stores from fixed or ephemeral self-hosted runners', () => {
-    expect(action).not.toContain('uses: actions/cache@');
-    expect(action).not.toContain('STORE_PATH=');
-    expect(action).not.toContain('steps.pnpm-cache.outputs.STORE_PATH');
-    expect(action).toContain('run: pnpm fetch --frozen-lockfile');
-    expect(action).toContain('pnpm install --frozen-lockfile');
+// Minimal GitHub Actions expression evaluator: literals, context paths,
+// ==, !=, !, &&, || and parentheses (all the setup action uses).
+function evaluateCondition(
+  expression: string | undefined,
+  context: Record<string, string>
+): boolean {
+  if (!expression) return true;
+  const tokens =
+    expression
+      .replace(/^\$\{\{|\}\}$/g, '')
+      .match(/'[^']*'|==|!=|&&|\|\||!|\(|\)|[A-Za-z_][\w.-]*/g) ?? [];
+  const source = tokens
+    .map(token => {
+      if (token.startsWith("'")) return JSON.stringify(token.slice(1, -1));
+      if (token === '==') return '===';
+      if (token === '!=') return '!==';
+      if (['&&', '||', '!', '(', ')'].includes(token)) return token;
+      if (token === 'true' || token === 'false') return `'${token}'`;
+      return `(ctx[${JSON.stringify(token)}] ?? '')`;
+    })
+    .join(' ');
+  return Boolean(new Function('ctx', `return (${source});`)(context));
+}
+
+describe('self-hosted runner setup action', () => {
+  const pruneRoots: string[] = [];
+  afterEach(() => {
+    for (const root of pruneRoots.splice(0))
+      rmSync(root, { recursive: true, force: true });
+  });
+  const coldHosted = {
+    'steps.runner-prereqs.outputs.dependencies_warm': 'false',
+    'runner.environment': 'github-hosted',
+    'runner.os': 'Linux',
+    'inputs.package_cache': 'true',
+    'inputs.reuse_merge_group_workspace': 'false',
+    'inputs.save_merge_group_workspace': 'false',
+    'steps.node-modules-cache.outcome': 'success',
+    'steps.node-modules-cache.outputs.cache-hit': 'false',
+    'github.event_name': 'push',
+    'github.repository': 'JovieInc/Jovie',
+    'github.event.pull_request.head.repo.full_name': 'JovieInc/Jovie',
+  };
+
+  it('uses the warning-free pinned installer without saving pnpm stores', () => {
+    expect(
+      actionSteps.filter(step => /^actions\/cache@/.test(step.uses ?? ''))
+    ).toEqual([]);
+    expect(JSON.stringify(setupAction)).not.toContain('STORE_PATH');
+    expect(actionStep('Warm pnpm store').run).toContain(
+      'pnpm fetch --frozen-lockfile'
+    );
+    expect(actionStep('Install dependencies').run).toContain(
+      'pnpm install --frozen-lockfile'
+    );
+    const pnpm = actionStep('Setup pnpm');
+    expect(pnpm.uses).toBe(
+      'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
+    );
+    expect(pnpm.with?.dest).toBe('${{ runner.temp }}/setup-pnpm');
+    expect(JSON.stringify(pnpm)).not.toContain('--no-deprecation');
   });
 
-  it('installs the pinned pnpm directly instead of downgrading a pnpm 11 bootstrap', () => {
-    expect(action).toContain(
-      'uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0'
+  it('checks the baked image first and skips setup and fetch when it is warm', () => {
+    const verify = stepIndex('Verify baked runner prerequisites');
+    expect(actionSteps[verify]?.id).toBe('runner-prereqs');
+    expect(actionSteps[verify]?.run).toContain(
+      'verify-prerequisites.mjs --component dependencies'
     );
-    expect(action).not.toContain(
-      'pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271'
-    );
-    expect(action).toContain('dest: ${{ runner.temp }}/setup-pnpm');
-  });
-
-  it('restores an exact baked installed tree and falls back when no marker exists', () => {
-    expect(action).toContain(
-      'node .github/runner-image/verify-prerequisites.mjs --component dependencies'
-    );
-    expect(action).toContain(
-      "if: steps.runner-prereqs.outputs.dependencies_warm != 'true'"
-    );
-    expect(action).toContain('.github/runner-image/restore-installed-tree.sh');
-    expect(action).toContain('installed_tree_archive_path');
-    expect(action).toContain('installed_tree_archive_sha256');
-  });
-
-  it('checks the image before and skips both setup actions when warm', () => {
-    const verifyIndex = action.indexOf('Verify baked runner prerequisites');
-    const pnpmIndex = action.indexOf('- name: Setup pnpm');
-    const nodeIndex = action.indexOf('- name: Setup Node.js with pnpm cache');
-    expect(verifyIndex).toBeGreaterThan(-1);
-    expect(verifyIndex).toBeLessThan(pnpmIndex);
-    expect(verifyIndex).toBeLessThan(nodeIndex);
-
-    for (const stepName of ['Setup pnpm', 'Setup Node.js with pnpm cache']) {
-      const step = action.match(
-        new RegExp(
-          `- name: ${stepName.replace('.', '\\.')}\\n(?<step>[\\s\\S]*?)(?=\\n    - name:|$)`
-        )
-      )?.groups?.step;
-      expect(step).toContain(
-        "if: steps.runner-prereqs.outputs.dependencies_warm != 'true'"
+    const warm = {
+      ...coldHosted,
+      'steps.runner-prereqs.outputs.dependencies_warm': 'true',
+    };
+    for (const name of [
+      'Setup pnpm',
+      'Restore installed node_modules (GitHub-hosted)',
+      'Setup Node.js with pnpm cache',
+      'Warm pnpm store',
+    ]) {
+      expect(stepIndex(name), name).toBeGreaterThan(verify);
+      expect(evaluateCondition(actionStep(name).if, warm), name).toBe(false);
+      expect(evaluateCondition(actionStep(name).if, coldHosted), name).toBe(
+        true
       );
     }
   });
 
-  it('preserves setup-node caching only for GitHub-hosted runners', () => {
-    const setupNodeStep = action.match(
-      /- name: Setup Node\.js with pnpm cache\n(?<step>[\s\S]*?)(?=\n    - name:)/
-    )?.groups?.step;
-
-    expect(setupNodeStep).toContain('uses: actions/setup-node@');
-    expect(setupNodeStep).toContain("node-version-file: '.nvmrc'");
-    expect(setupNodeStep).toContain(
-      "runner.environment == 'github-hosted' && inputs.package_cache == 'true' && github.event_name != 'merge_group' &&"
-    );
-    expect(setupNodeStep).toContain(
-      "cache-dependency-path: '**/pnpm-lock.yaml'"
-    );
-  });
-
-  describe('GitHub-hosted installed-tree cache', () => {
-    const stepBlock = (name: string) =>
-      action.match(
-        new RegExp(
-          `- name: ${name.replace(/[.()]/g, '\\$&')}\\n(?<step>[\\s\\S]*?)(?=\\n    - name:|$)`
-        )
-      )?.groups?.step ?? '';
-    const restoreStep = stepBlock(
+  it('restores an exact installed tree only on GitHub-hosted runners', () => {
+    const restore = actionStep(
       'Restore installed node_modules (GitHub-hosted)'
     );
-    const saveStep = stepBlock('Save installed node_modules (GitHub-hosted)');
-    const cachedPaths = [
-      '          node_modules',
-      '          apps/*/node_modules',
-      '          packages/*/node_modules',
-      '          workers/*/node_modules',
-    ].join('\n');
+    expect(restore.id).toBe('node-modules-cache');
+    expect(restore.uses).toBe(
+      'actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
+    );
+    expect(String(restore.with?.path).trim().split('\n')).toEqual([
+      'node_modules',
+      'apps/*/node_modules',
+      'packages/*/node_modules',
+      'workers/*/node_modules',
+    ]);
+    // The key binds OS, arch, Node pin, lockfile, workspace, patches and
+    // .npmrc, and no prefix match may restore a stale tree.
+    expect(restore.with?.key).toBe(
+      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}"
+    );
+    expect(restore.with).not.toHaveProperty('restore-keys');
+    for (const environment of ['self-hosted', ''])
+      expect(
+        evaluateCondition(restore.if, {
+          ...coldHosted,
+          'runner.environment': environment,
+        })
+      ).toBe(false);
+    expect(
+      evaluateCondition(restore.if, {
+        ...coldHosted,
+        'inputs.package_cache': 'false',
+      })
+    ).toBe(false);
+  });
 
-    it('restores only on GitHub-hosted runners, pinned, with an exact key', () => {
-      expect(restoreStep).toContain('id: node-modules-cache');
-      expect(restoreStep).toContain(
-        "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
-      );
-      expect(restoreStep).toContain(
-        'uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
-      );
-      expect(restoreStep).toContain(cachedPaths);
-      // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
-      // workspace, patches and .npmrc, and no prefix match may restore.
-      expect(restoreStep).toContain(
-        "key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}"
-      );
-      expect(restoreStep).not.toContain('restore-keys');
-    });
+  it('skips the pnpm store and fetch only on an exact installed-tree hit', () => {
+    const hit = {
+      ...coldHosted,
+      'steps.node-modules-cache.outputs.cache-hit': 'true',
+    };
+    expect(evaluateCondition(actionStep('Warm pnpm store').if, hit)).toBe(
+      false
+    );
+    const setupNode = actionStep('Setup Node.js with pnpm cache');
+    expect(setupNode.with?.['node-version-file']).toBe('.nvmrc');
+    expect(setupNode.with?.['cache-dependency-path']).toBe('**/pnpm-lock.yaml');
+    // setup-node's own cache: hosted, enabled, not merge groups, no tree hit.
+    const cacheExpression = String(setupNode.with?.cache).replace(
+      / && 'pnpm' \|\| ''/,
+      ''
+    );
+    expect(evaluateCondition(cacheExpression, coldHosted)).toBe(true);
+    for (const override of [
+      { 'steps.node-modules-cache.outputs.cache-hit': 'true' },
+      { 'runner.environment': 'self-hosted' },
+      { 'github.event_name': 'merge_group' },
+      { 'inputs.package_cache': 'false' },
+    ])
+      expect(
+        evaluateCondition(cacheExpression, { ...coldHosted, ...override }),
+        JSON.stringify(override)
+      ).toBe(false);
+    // Only validated merge-group consumers skip the frozen install.
+    const install = actionStep('Install dependencies');
+    expect(evaluateCondition(install.if, coldHosted)).toBe(true);
+    expect(
+      evaluateCondition(install.if, {
+        ...coldHosted,
+        'github.event_name': 'merge_group',
+        'inputs.reuse_merge_group_workspace': 'true',
+      })
+    ).toBe(false);
+  });
 
-    it('skips the store restore and pnpm fetch only on an exact hit', () => {
-      const setupNodeStep = stepBlock('Setup Node.js with pnpm cache');
-      expect(setupNodeStep).toContain(
-        "steps.node-modules-cache.outputs.cache-hit != 'true' && 'pnpm' || ''"
-      );
-      expect(stepBlock('Warm pnpm store')).toContain(
-        "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'"
-      );
-      // Only validated merge-group consumers skip the redundant frozen install.
-      const installStep = stepBlock('Install dependencies');
-      expect(installStep).toContain(
-        "inputs.reuse_merge_group_workspace != 'true'"
-      );
-      expect(installStep).toContain('pnpm install --frozen-lockfile');
-    });
+  it('saves the installed tree last, only from trusted same-repository refs', () => {
+    const save = actionStep('Save installed node_modules (GitHub-hosted)');
+    expect(actionSteps.at(-1)).toBe(save);
+    expect(stepIndex('Install dependencies')).toBeLessThan(
+      stepIndex('Save installed node_modules (GitHub-hosted)')
+    );
+    expect(save.uses).toBe(
+      'actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
+    );
+    expect(save.with?.path).toBe(
+      actionStep('Restore installed node_modules (GitHub-hosted)').with?.path
+    );
+    expect(save.with?.key).toBe(
+      '${{ steps.node-modules-cache.outputs.cache-primary-key }}'
+    );
+    const trusted: Record<string, string>[] = [
+      { 'github.event_name': 'push' },
+      { 'github.event_name': 'pull_request' },
+      {
+        'github.event_name': 'merge_group',
+        'inputs.save_merge_group_workspace': 'true',
+      },
+    ];
+    const untrusted: Record<string, string>[] = [
+      {
+        'github.event_name': 'pull_request',
+        'github.event.pull_request.head.repo.full_name': 'fork/Jovie',
+      },
+      { 'github.event_name': 'pull_request_target' },
+      { 'github.event_name': 'workflow_run' },
+      { 'github.event_name': 'merge_group' },
+      { 'steps.node-modules-cache.outputs.cache-hit': 'true' },
+      { 'steps.node-modules-cache.outcome': 'skipped' },
+    ];
+    for (const scenario of trusted)
+      expect(
+        evaluateCondition(save.if, { ...coldHosted, ...scenario }),
+        JSON.stringify(scenario)
+      ).toBe(true);
+    for (const scenario of untrusted)
+      expect(
+        evaluateCondition(save.if, { ...coldHosted, ...scenario }),
+        JSON.stringify(scenario)
+      ).toBe(false);
+    // The prune runs on exactly the saves that happen, Linux only.
+    const prune = actionStep('Drop unloadable binaries before save');
+    expect(stepIndex('Drop unloadable binaries before save')).toBeLessThan(
+      stepIndex('Save installed node_modules (GitHub-hosted)')
+    );
+    for (const scenario of [...trusted, ...untrusted])
+      expect(
+        evaluateCondition(prune.if, { ...coldHosted, ...scenario }),
+        JSON.stringify(scenario)
+      ).toBe(evaluateCondition(save.if, { ...coldHosted, ...scenario }));
+    expect(
+      evaluateCondition(prune.if, { ...coldHosted, 'runner.os': 'macOS' })
+    ).toBe(false);
+  });
 
-    it('saves right after install, only from trusted same-repository refs', () => {
-      expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
-        action.indexOf('- name: Save installed node_modules (GitHub-hosted)')
-      );
-      expect(action.trimEnd().endsWith(saveStep.trimEnd())).toBe(true);
-      expect(saveStep).toContain(
-        'uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
-      );
-      expect(saveStep).toContain(
-        "steps.node-modules-cache.outcome == 'success' &&"
-      );
-      expect(saveStep).toContain(
-        "steps.node-modules-cache.outputs.cache-hit != 'true' &&"
-      );
-      expect(saveStep).toContain("(github.event_name == 'push' ||");
-      expect(saveStep).toContain(
-        "(github.event_name == 'pull_request' &&\n        github.event.pull_request.head.repo.full_name == github.repository))"
-      );
-      expect(saveStep).toContain(
-        "github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true'"
-      );
-      for (const untrusted of ['pull_request_target', 'workflow_run']) {
-        expect(saveStep).not.toContain(`== '${untrusted}'`);
+  it('hollows only unloadable native payloads before a save', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'jovie-prune-'));
+    pruneRoots.push(root);
+    const store = resolve(root, 'node_modules/.pnpm');
+    const pkg = (dir: string, files: string[]) => {
+      for (const file of ['package.json', ...files]) {
+        const path = resolve(store, dir, 'node_modules', file);
+        mkdirSync(resolve(path, '..'), { recursive: true });
+        writeFileSync(path, file);
       }
-      expect(saveStep).toContain(cachedPaths);
-      expect(saveStep).toContain(
-        'key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}'
-      );
-    });
-
-    it('drops only unloadable binaries, on Linux, just before a save', () => {
-      const name = '- name: Drop unloadable binaries before save';
-      const prune = stepBlock('Drop unloadable binaries before save');
-      expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
-        action.indexOf(name)
-      );
-      expect(action.indexOf(name)).toBeLessThan(
-        action.indexOf('- name: Save installed node_modules (GitHub-hosted)')
-      );
-      expect(prune).toContain("runner.os == 'Linux' &&");
-      const saveIf = saveStep.match(/if: >-\n[\s\S]*?\)\)/)?.[0] ?? '';
-      expect(saveIf).not.toBe('');
-      expect(prune).toContain(saveIf.replace('if: >-\n', ''));
-      expect(prune.match(/rm -rf.*/g)).toEqual([
-        'rm -rf app-builder-bin@*/node_modules/app-builder-bin/{mac,win}',
-      ]);
-      // Hollow musl builds but keep package.json, so a restored tree stays
-      // "Already up to date" instead of refetching them on every hit.
-      const hollow =
-        '          -exec find {}/node_modules -type f ! -name package.json -delete \\;';
-      expect(prune).toContain(
-        "find . -maxdepth 1 \\( -name '*-musl@*' -o -name '*linuxmusl-*@*' \\) \\\n" +
-          hollow
-      );
-      // Promptfoo-only native payloads hollow the same way. These exact
-      // patterns leave the SDK wrappers (codex-sdk, claude-agent-sdk) and
-      // onnxruntime-common intact.
-      expect(prune).toContain(
-        "find . -maxdepth 1 \\( -name 'onnxruntime-node@*' -o -name 'onnxruntime-web@*' \\\n" +
-          "          -o -name '@openai+codex@*-linux-*' \\\n" +
-          "          -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \\) \\\n" +
-          hollow
-      );
-      expect(prune.match(/-exec find /g)).toHaveLength(2);
-    });
-  });
-
-  it('disables cache teardown only for the exact Mac product lane', () => {
-    expect(action).toMatch(
-      /package_cache:\n\s+description:[^\n]+\n\s+required: false\n\s+default: 'true'/
+    };
+    pkg('app-builder-bin@5.0.0', [
+      'app-builder-bin/mac/app-builder',
+      'app-builder-bin/win/app-builder.exe',
+      'app-builder-bin/linux/x64/app-builder',
+    ]);
+    pkg('@img+sharp-linuxmusl-x64@0.34.0', ['@img/sharp/lib/sharp.node']);
+    pkg('@rollup+rollup-linux-x64-musl@4.0.0', ['rollup.node']);
+    pkg('onnxruntime-node@1.20.0', ['onnxruntime-node/bin/runtime.node']);
+    pkg('onnxruntime-common@1.20.0', ['onnxruntime-common/dist/index.js']);
+    pkg('@openai+codex@0.1.0-linux-x64', ['codex/bin/codex']);
+    pkg('@openai+codex-sdk@0.1.0', ['codex-sdk/dist/index.js']);
+    pkg('@anthropic-ai+claude-agent-sdk-linux-x64@1.0.0', ['claude/cli']);
+    pkg('@anthropic-ai+claude-agent-sdk@1.0.0', ['sdk/dist/index.js']);
+    pkg('@rollup+rollup-linux-x64-gnu@4.0.0', ['rollup.node']);
+    const result = spawnSync(
+      'bash',
+      ['-c', String(actionStep('Drop unloadable binaries before save').run)],
+      { cwd: root, encoding: 'utf8' }
     );
-
-    const macStart = ciWorkflow.indexOf('  ci-macos:');
-    const crossProductStart = ciWorkflow.indexOf(
-      '  ci-cross-product-integration:',
-      macStart
-    );
-    const laneReceiptStart = ciWorkflow.indexOf(
-      '  ci-product-lane-receipt:',
-      crossProductStart
-    );
-    const laneReceiptEnd = ciWorkflow.indexOf(
-      '\n  ci-build-public:',
-      laneReceiptStart
-    );
-    const macJob = ciWorkflow.slice(macStart, crossProductStart);
-    const crossProductJob = ciWorkflow.slice(
-      crossProductStart,
-      laneReceiptStart
-    );
-    const laneReceiptJob = ciWorkflow.slice(laneReceiptStart, laneReceiptEnd);
-
-    expect(macJob).toMatch(
-      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+[^\n]*\n\s+[^\n]*\n\s+[^\n]*\n\s+with:\n\s+package_cache: 'false'/
-    );
-    expect(macJob).toContain('Test and package exact Mac head');
-    expect(macJob).toContain('Upload exact Mac staging package');
-    expect(crossProductJob).toContain('ci-macos');
-    expect(crossProductJob).toContain('[ "$MAC_RESULT" = \'success\' ]');
-    expect(laneReceiptJob).toContain('ci-cross-product-integration');
-    expect(laneReceiptJob).toContain('needs.ci-macos.result');
-  });
-
-  it('skips non-bundled onnxruntime downloads in both CI install phases', () => {
-    for (const stepName of ['Warm pnpm store', 'Install dependencies']) {
-      const step = action.match(
-        new RegExp(
-          `- name: ${stepName}\\n(?<step>[\\s\\S]*?)(?=\\n    - name:|$)`
-        )
-      )?.groups?.step;
-
-      expect(step).toContain('ONNXRUNTIME_NODE_INSTALL: skip');
+    expect(result.status, result.stderr).toBe(0);
+    const kept = (dir: string, file: string) =>
+      existsSync(resolve(store, dir, 'node_modules', file));
+    expect(
+      kept('app-builder-bin@5.0.0', 'app-builder-bin/mac/app-builder')
+    ).toBe(false);
+    expect(
+      kept('app-builder-bin@5.0.0', 'app-builder-bin/win/app-builder.exe')
+    ).toBe(false);
+    expect(
+      kept('app-builder-bin@5.0.0', 'app-builder-bin/linux/x64/app-builder')
+    ).toBe(true);
+    for (const [dir, file] of [
+      ['@img+sharp-linuxmusl-x64@0.34.0', '@img/sharp/lib/sharp.node'],
+      ['@rollup+rollup-linux-x64-musl@4.0.0', 'rollup.node'],
+      ['onnxruntime-node@1.20.0', 'onnxruntime-node/bin/runtime.node'],
+      ['@openai+codex@0.1.0-linux-x64', 'codex/bin/codex'],
+      ['@anthropic-ai+claude-agent-sdk-linux-x64@1.0.0', 'claude/cli'],
+    ] as const) {
+      expect(kept(dir, file), dir).toBe(false);
+      // package.json stays so a frozen install keeps them linked.
+      expect(kept(dir, 'package.json'), dir).toBe(true);
     }
-    expect(action.match(/ONNXRUNTIME_NODE_INSTALL: skip/g)).toHaveLength(2);
+    for (const [dir, file] of [
+      ['onnxruntime-common@1.20.0', 'onnxruntime-common/dist/index.js'],
+      ['@openai+codex-sdk@0.1.0', 'codex-sdk/dist/index.js'],
+      ['@anthropic-ai+claude-agent-sdk@1.0.0', 'sdk/dist/index.js'],
+      ['@rollup+rollup-linux-x64-gnu@4.0.0', 'rollup.node'],
+    ] as const)
+      expect(kept(dir, file), dir).toBe(true);
+  });
+
+  it('skips non-bundled onnxruntime downloads in both install phases', () => {
+    expect(
+      actionSteps
+        .filter(step => step.env?.ONNXRUNTIME_NODE_INSTALL === 'skip')
+        .map(step => step.name)
+    ).toEqual(['Warm pnpm store', 'Install dependencies']);
+  });
+
+  it('disables package cache teardown only for the exact Mac product lane', () => {
+    expect(setupAction.inputs.package_cache?.default).toBe('true');
+    const ci = parseYaml(
+      readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8')
+    ) as {
+      jobs: Record<string, { needs?: string[]; steps?: ActionStep[] }>;
+    };
+    const disabled = Object.entries(ci.jobs).flatMap(([id, job]) =>
+      (job.steps ?? [])
+        .filter(
+          step =>
+            step.uses === './.github/actions/setup-node-pnpm' &&
+            String(step.with?.package_cache) === 'false'
+        )
+        .map(() => id)
+    );
+    expect(disabled).toEqual(['ci-macos']);
+    expect(ci.jobs['ci-cross-product-integration']?.needs).toContain(
+      'ci-macos'
+    );
+    expect(ci.jobs['ci-product-lane-receipt']?.needs).toContain(
+      'ci-cross-product-integration'
+    );
   });
 });
 
 describe('full browser matrix setup routing', () => {
-  const workflow = readFileSync(
-    resolve(repoRoot, '.github/workflows/e2e-full-matrix.yml'),
-    'utf8'
+  const matrixWorkflow = parseYaml(
+    readFileSync(
+      resolve(repoRoot, '.github/workflows/e2e-full-matrix.yml'),
+      'utf8'
+    )
+  ) as {
+    jobs: Record<
+      string,
+      {
+        strategy?: { 'max-parallel'?: number; matrix?: { browser?: string[] } };
+        env?: Record<string, string>;
+        steps: ActionStep[];
+      }
+    >;
+  };
+  const matrixJob = matrixWorkflow.jobs['e2e-full-matrix'];
+  const setupSteps = (matrixJob?.steps ?? []).filter(step =>
+    /(?:Cache|Install|Setup) Playwright/.test(step.name ?? '')
   );
-  const setupSteps = workflow
-    .split(/\n      - /)
-    .filter(step => /(?:Cache|Install|Setup) Playwright/.test(step));
+  const forBrowser = (browser: string) =>
+    setupSteps.filter(step =>
+      evaluateCondition(step.if, { 'matrix.browser': browser })
+    );
 
   it('routes Chromium exclusively through the shared apt-free setup action', () => {
-    const chromiumSteps = setupSteps.filter(step =>
-      step.includes("if: matrix.browser == 'chromium'")
-    );
-    expect(chromiumSteps).toHaveLength(1);
-    expect(chromiumSteps[0]).toContain(
-      'uses: ./.github/actions/setup-playwright'
-    );
-    expect(chromiumSteps[0]).not.toContain('run:');
+    const chromium = forBrowser('chromium');
+    expect(chromium.map(step => step.uses)).toEqual([
+      './.github/actions/setup-playwright',
+    ]);
+    expect(chromium[0]?.run).toBeUndefined();
   });
 
-  it('keeps the existing browser cache and dependency installer Firefox-only', () => {
-    const firefoxSteps = setupSteps.filter(step =>
-      step.includes("if: matrix.browser == 'firefox'")
+  it('keeps the browser cache and dependency installer Firefox-only', () => {
+    const [cache, install, ...rest] = forBrowser('firefox');
+    expect(rest).toEqual([]);
+    expect(cache?.with?.path).toBe('~/.cache/ms-playwright');
+    expect(String(cache?.with?.key)).toMatch(
+      /^\$\{\{ runner\.os \}\}-playwright-\$\{\{ matrix\.browser \}\}-/
     );
-    expect(firefoxSteps).toHaveLength(2);
-    expect(firefoxSteps[0]).toContain('path: ~/.cache/ms-playwright');
-    expect(firefoxSteps[0]).toContain(
-      '${{ runner.os }}-playwright-${{ matrix.browser }}-'
+    expect(install?.run).toContain(
+      'playwright install chromium ${{ matrix.browser }} --with-deps'
     );
-    expect(firefoxSteps[1]).toContain(
-      'run: pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps'
-    );
-    // No unconditional installer may put Chromium back on the apt path.
-    expect(setupSteps).toHaveLength(3);
   });
 
-  it('preserves browser host validation and serialized execution', () => {
-    expect(workflow).toContain('browser: [chromium, firefox]');
-    expect(workflow).toContain('max-parallel: 1');
-    // Full suite at the default 4 workers starves the hosted runner and the
-    // job dies as "lost communication with the server" (JOV-7677).
-    expect(workflow).toContain("PLAYWRIGHT_WORKERS: '2'");
-    const action = readFileSync(
-      resolve(repoRoot, '.github/actions/setup-playwright/action.yml'),
-      'utf8'
+  it('serializes the matrix and never skips browser host validation', () => {
+    expect(matrixJob?.strategy?.matrix?.browser).toEqual([
+      'chromium',
+      'firefox',
+    ]);
+    expect(matrixJob?.strategy?.['max-parallel']).toBe(1);
+    // Four workers starve the hosted runner ("lost communication", JOV-7677).
+    expect(matrixJob?.env?.PLAYWRIGHT_WORKERS).toBe('2');
+    const playwrightAction = parseYaml(
+      readFileSync(
+        resolve(repoRoot, '.github/actions/setup-playwright/action.yml'),
+        'utf8'
+      )
+    ) as { runs: { steps: ActionStep[] } };
+    const runs = playwrightAction.runs.steps.map(step => step.run ?? '');
+    expect(runs[0]).toContain(
+      'verify-prerequisites.mjs --component playwright'
     );
-    expect(action).toContain(
-      'node .github/runner-image/verify-prerequisites.mjs --component playwright'
+    expect(runs).toContain(
+      'pnpm --filter=@jovie/web exec playwright install chromium'
     );
-    expect(action).toContain(
-      'run: pnpm --filter=@jovie/web exec playwright install chromium\n'
+    expect(JSON.stringify([matrixWorkflow, playwrightAction])).not.toContain(
+      'PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS'
     );
-    for (const source of [workflow, action]) {
-      expect(source).not.toMatch(/PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS/);
-    }
   });
 });
 

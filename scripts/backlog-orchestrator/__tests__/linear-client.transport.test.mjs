@@ -303,6 +303,42 @@ describe('Gem Linear rate-limit backoff', () => {
     });
   });
 
+  it('treats an HTTP 200 RATELIMITED body as a cooldown and does not call again while it holds', async () => {
+    await withKey('http-200-secret', async () => {
+      let attempts = 0;
+      await assert.rejects(
+        graphql(
+          'query RateLimited200 { viewer { id } }',
+          {},
+          {
+            rateLimitMaxAttempts: 1,
+            fetchImpl: async () => {
+              attempts += 1;
+              return rateLimitedResponse({ status: 200 });
+            },
+          }
+        ),
+        (/** @type {any} */ error) => error.code === 'RATE_LIMITED'
+      );
+      assert.equal(attempts, 1);
+      let second = 0;
+      await assert.rejects(
+        graphql(
+          'query RateLimited200 { viewer { id } }',
+          {},
+          {
+            fetchImpl: async () => {
+              second += 1;
+              return jsonResponse({ data: { ok: true } });
+            },
+          }
+        ),
+        (/** @type {any} */ error) => error.code === 'RATE_LIMITED'
+      );
+      assert.equal(second, 0);
+    });
+  });
+
   it('fails fast on a non-rate-limited 400 without retrying', async () => {
     await withKey('plain-400-secret', async () => {
       let attempts = 0;
@@ -613,7 +649,13 @@ describe('durable credential budget', () => {
         );
         assert.equal(child.status, 0, child.stderr);
         assert.equal(child.stdout.trim(), '1');
-        const root = join(home, '.local', 'state', 'jovie-linear-backoff');
+        const root = join(
+          home,
+          '.local',
+          'state',
+          'jovie-lanes',
+          'linear-cooldown'
+        );
         assert.equal(fs.statSync(root).mode & 0o777, 0o700);
         assert.equal(fs.readdirSync(root).length, 1);
       } finally {
@@ -654,7 +696,8 @@ describe('durable credential budget', () => {
     });
   });
 
-  it('fails closed on malformed or non-private state without making a request', async () => {
+  it('fails closed on malformed or non-private state without making a request', async t => {
+    const fetch = t.mock.method(globalThis, 'fetch', async () => limited());
     for (const variant of [
       'json',
       'schema',
@@ -689,21 +732,14 @@ describe('durable credential budget', () => {
           fs.unlinkSync(path);
           fs.symlinkSync('/dev/null', path);
         }
-        let calls = 0;
         await assert.rejects(
-          graphql(
-            query,
-            {},
-            {
-              fetchImpl: async () => {
-                calls++;
-                return limited();
-              },
-            }
+          (variant === 'json' ? linear.updateComment : linear.setIssueLabels)(
+            'issue-1',
+            variant === 'json' ? 'blocked' : ['label-1']
           ),
           (/** @type {any} */ error) => error.code === 'BACKOFF_STATE_INVALID'
         );
-        assert.equal(calls, 0);
+        assert.equal(fetch.mock.callCount(), 0);
       });
     }
   });

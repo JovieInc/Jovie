@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const pilot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const common = [
   'scripts/check-built-app.mjs',
-  'patches/eve@0.68.0.patch',
+  'patches/eve@0.70.0.patch',
   'tests/prompt-prefix-stability.test.ts',
   'package.json',
   'pnpm-lock.yaml',
@@ -81,6 +81,9 @@ const jovie = [
 ];
 // Eve 0.66 retired the default `ask_question` and `todo` tools; an orphan
 // disableTool stub for either fails discovery, so they are not listed here.
+// Eve 0.70 reserves `task_cancel` and `task_wait` for built-in task tools;
+// the compiler rejects an authored file at either path, even a disableTool
+// stub, so neither is listed here.
 export const disabledTools = [
   'agent',
   'bash',
@@ -89,7 +92,6 @@ export const disabledTools = [
   'web_fetch',
   'web_search',
   'load_skill',
-  'task_cancel',
 ];
 
 /** A one-time, explicit source export. Never reads runtime state or overwrites a destination. */

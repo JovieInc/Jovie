@@ -12,6 +12,13 @@ export interface TableKeyboardNavConfig<TData> {
   readonly onRowClick?: (row: TData) => void;
   /** Space; falls back to `onRowClick` when omitted. */
   readonly onRowToggle?: (row: TData) => void;
+  /** Toggles one row's selection (`x`). Omit when the table has no selection. */
+  readonly onToggleSelection?: (rowIndex: number) => void;
+  /**
+   * Adds both rows to the selection (Shift+J/K, Shift+Arrow) before focus
+   * moves, so repeated presses grow a contiguous range.
+   */
+  readonly onExtendSelection?: (fromIndex: number, toIndex: number) => void;
 }
 
 export interface TableKeyboardNavResult<TData> {
@@ -26,7 +33,8 @@ export interface TableKeyboardNavResult<TData> {
  * Unified keyboard navigation for UnifiedTable rows.
  *
  * Uses the shared tableKeyMap for consistent key bindings across all tables.
- * Supports: Arrow Up/Down, j/k, Home/End, Enter, Space.
+ * Supports: Arrow Up/Down, j/k, Home/End, Enter, Space, plus `x` to toggle
+ * selection and Shift+J/K (or Shift+Arrow) to extend it when selection exists.
  */
 export function useTableKeyboardNav<TData>({
   enabled,
@@ -36,6 +44,8 @@ export function useTableKeyboardNav<TData>({
   setFocusedIndex,
   onRowClick,
   onRowToggle,
+  onToggleSelection,
+  onExtendSelection,
 }: TableKeyboardNavConfig<TData>): TableKeyboardNavResult<TData> {
   const moveFocus = useCallback(
     (nextIndex: number) => {
@@ -49,18 +59,32 @@ export function useTableKeyboardNav<TData>({
     (event: React.KeyboardEvent, rowIndex: number, rowData: TData) => {
       if (!enabled) return;
 
-      const action = resolveTableNavAction(event.key, event.target);
+      // Shifted letter selection belongs to these rows. Other consumers of
+      // the shared mapper retain their ordinary j/k bindings.
+      const key =
+        event.shiftKey && (event.key === 'J' || event.key === 'K')
+          ? event.key.toLowerCase()
+          : event.key;
+      const action = resolveTableNavAction(key, event.target);
       if (!action) return;
+
+      const extend = event.shiftKey ? onExtendSelection : undefined;
 
       switch (action) {
         case 'next':
           event.preventDefault();
-          if (rowIndex < rowCount - 1) moveFocus(rowIndex + 1);
+          if (rowIndex < rowCount - 1) {
+            extend?.(rowIndex, rowIndex + 1);
+            moveFocus(rowIndex + 1);
+          }
           break;
 
         case 'prev':
           event.preventDefault();
-          if (rowIndex > 0) moveFocus(rowIndex - 1);
+          if (rowIndex > 0) {
+            extend?.(rowIndex, rowIndex - 1);
+            moveFocus(rowIndex - 1);
+          }
           break;
 
         case 'first':
@@ -82,9 +106,22 @@ export function useTableKeyboardNav<TData>({
           event.preventDefault();
           (onRowToggle ?? onRowClick)?.(rowData);
           break;
+        case 'select':
+          if (!onToggleSelection) return;
+          event.preventDefault();
+          onToggleSelection(rowIndex);
+          break;
       }
     },
-    [enabled, rowCount, moveFocus, onRowClick, onRowToggle]
+    [
+      enabled,
+      rowCount,
+      moveFocus,
+      onRowClick,
+      onRowToggle,
+      onToggleSelection,
+      onExtendSelection,
+    ]
   );
 
   // Scroll focused row into view when it changes

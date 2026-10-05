@@ -181,6 +181,19 @@ function creditMatchesProviderById(
   return providerKey ? creditIdentityKeys(credit).includes(providerKey) : false;
 }
 
+function canMatchProviderByName(
+  credit: CanonicalReleaseCredit,
+  providerArtist: ProviderPrimaryArtist
+): boolean {
+  if (!providerIdentityKey(providerArtist.provider, providerArtist.id)) {
+    return true;
+  }
+  const providerPrefix = `provider:${providerArtist.provider}:`;
+  return !creditIdentityKeys(credit).some(key =>
+    key.startsWith(providerPrefix)
+  );
+}
+
 const CREDIT_FRAGMENT_JOINS = [' and ', ' & ', ' x '] as const;
 const CREDIT_MISMATCH_WARN_TTL_MS = 60 * 60 * 1000;
 const CREDIT_MISMATCH_WARN_MAX = 500;
@@ -380,7 +393,13 @@ export function reconcilePrimaryArtists(input: {
       continue;
     }
 
-    if (storedPrimaries.some(credit => credit.name === providerArtist.name)) {
+    if (
+      storedPrimaries.some(
+        credit =>
+          canMatchProviderByName(credit, providerArtist) &&
+          namesEquivalent(credit.name, providerArtist.name)
+      )
+    ) {
       continue;
     }
 
@@ -403,13 +422,15 @@ export function reconcilePrimaryArtists(input: {
 
   const providerNames = providerArtists.map(artist => artist.name);
   const storedNames = storedPrimaries.map(credit => credit.name);
-  const storedNameSet = new Set(storedNames);
-  const providerNameSet = new Set(providerNames);
+  const storedNameSet = new Set(storedNames.map(comparableCreditName));
+  const providerNameSet = new Set(providerNames.map(comparableCreditName));
   const setsDiffer =
     added.length > 0 ||
     skippedFeaturedNames.length > 0 ||
-    providerNames.some(name => !storedNameSet.has(name)) ||
-    storedNames.some(name => !providerNameSet.has(name));
+    providerNames.some(
+      name => !storedNameSet.has(comparableCreditName(name))
+    ) ||
+    storedNames.some(name => !providerNameSet.has(comparableCreditName(name)));
 
   return {
     primaryArtists: [...storedPrimaries, ...added],

@@ -99,20 +99,14 @@ describe('admin ops shell normalization', () => {
     );
   });
 
-  it('mounts system health before WhatShipped', () => {
+  it('keeps the shared Inbox and health strip without a duplicate shipped feed', () => {
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
-
-    expect(hudSource).toContain('import { WhatShipped }');
-    expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
-    expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
-      hudSource.indexOf("case 'what-shipped'")
-    );
-    expect(hudSource.indexOf('<HudSystemHealthStrip')).toBeLessThan(
-      hudSource.indexOf('<WhatShipped')
-    );
+    expect(hudSource).toContain('<OvieInbox />');
+    expect(hudSource).toContain('<HudSystemHealthStrip');
+    expect(hudSource).not.toContain('WhatShipped');
   });
 
-  it('does not mount WhatShipped or ShippingVelocityChart above the need band', () => {
+  it('keeps velocity after the need band and omits the duplicate shipped feed', () => {
     const presentations: readonly HudPresentation[] = [
       'shell',
       'kiosk',
@@ -124,20 +118,14 @@ describe('admin ops shell normalization', () => {
       const lastNeedIndex = Math.max(
         ...HUD_NEED_SECTION_IDS.map(id => ids.indexOf(id))
       );
-      expect(ids.indexOf('what-shipped')).toBeGreaterThan(lastNeedIndex);
+      expect(ids).not.toContain('what-shipped');
       expect(ids.indexOf('velocity')).toBeGreaterThan(lastNeedIndex);
-      expect(ids.indexOf('what-shipped')).toBeGreaterThan(
-        ids.indexOf('morning-walk')
-      );
       expect(ids.indexOf('velocity')).toBeGreaterThan(ids.indexOf('cash-mrr'));
     }
 
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
     expect(hudSource).toContain('composeHudForPresentation(presentation)');
     expect(hudSource).not.toMatch(/if \(isShell\) \{/);
-    expect(hudSource.indexOf("case 'morning-walk'")).toBeLessThan(
-      hudSource.indexOf("case 'what-shipped'")
-    );
     expect(hudSource.indexOf("case 'cash-mrr'")).toBeLessThan(
       hudSource.indexOf("case 'velocity'")
     );
@@ -189,8 +177,7 @@ describe('admin ops shell normalization', () => {
 
     expect(source).not.toContain('uppercase');
     expect(source).not.toMatch(/\btracking-\[/);
-    expect(source).toContain('font-medium');
-    expect(source).toContain('getAccentCssVars');
-    expect(source).toContain('HUD_TONE_ACCENT');
+    expect(source).toContain('<Badge');
+    expect(source).toContain('data-status-tone');
   });
 });

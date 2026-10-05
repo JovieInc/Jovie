@@ -47,6 +47,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
       'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
     ],
   ],
+  [
+    'apps/web/lib/leads/qualification-decision.ts',
+    ['apps/web/tests/lib/leads/qualification-decision.test.ts'],
+  ],
+  [
+    'apps/web/lib/leads/qualify.ts',
+    ['apps/web/tests/lib/leads/qualify.test.ts'],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -1050,9 +1058,17 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
   '.github/workflows/linear-sync-on-merge.yml',
   'scripts/lib/linear-sync-on-merge.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/validation-lifecycle.mjs',
+  'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+  'scripts/lib/validation-sync.mjs',
+  'scripts/lib/__tests__/validation-sync.test.mjs',
+  'scripts/lib/__tests__/fixtures/validation-world.mjs',
+  'scripts/lib/founder-taste-order.mjs',
+  'scripts/lib/__tests__/founder-taste-order.test.mjs',
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
+  '.github/workflow-topology.gen.yml',
   '.claude/rules/linear.md',
   '.github/MERGE_QUEUE.md',
   '.github/workflows/README.md',
@@ -1075,21 +1091,25 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
   }
 }
 
-const LANE_PYTHON_COVERAGE_INPUTS = new Set(
-  [
+const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  ...[
     'lane_runner',
     'pr_events',
     'reason_lane',
     'doctor',
+    'hud',
     'disk_guard',
     'worktree_sweep',
     'hyperagent_lane',
     'execution_attempt',
+    'gh_app_token',
   ].flatMap(name => [
     `scripts/lanes/${name}.py`,
     `scripts/tests/test_${name}.py`,
-  ])
-);
+  ]),
+  // The merge reader is exercised by the doctor transport/window regressions.
+  'scripts/lanes/merge_evidence.py',
+]);
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1101,6 +1121,19 @@ export function buildAffectedTestPlan(changedFiles, options) {
     lanePythonCoverage &&
     files.some(
       file => file.endsWith('.py') && !LANE_PYTHON_COVERAGE_INPUTS.has(file)
+    );
+  const isFileAvailable =
+    options?.isFileAvailable ?? (file => existsSync(resolve(REPO_ROOT, file)));
+  const missingMergeEvidenceProof =
+    files.some(file =>
+      [
+        'scripts/lanes/merge_evidence.py',
+        'scripts/lanes/hud.py',
+        'scripts/tests/test_hud.py',
+      ].includes(file)
+    ) &&
+    !['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'].every(
+      isFileAvailable
     );
   // Global/full early returns need the same command fields as focused plans.
   // Retain lane coverage even when an unrelated input requires the full suite.
@@ -1118,16 +1151,20 @@ export function buildAffectedTestPlan(changedFiles, options) {
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
-          mode: unknownPythonPeer
-            ? 'full'
-            : plan.mode === 'none'
-              ? 'selected'
-              : plan.mode,
-          ...(unknownPythonPeer
-            ? {
-                fallbackReason: 'unmapped Python peer mixed with lane coverage',
-              }
-            : {}),
+          mode:
+            unknownPythonPeer || missingMergeEvidenceProof
+              ? 'full'
+              : plan.mode === 'none'
+                ? 'selected'
+                : plan.mode,
+          ...(missingMergeEvidenceProof
+            ? { fallbackReason: 'merge evidence coverage proof is unavailable' }
+            : unknownPythonPeer
+              ? {
+                  fallbackReason:
+                    'unmapped Python peer mixed with lane coverage',
+                }
+              : {}),
         }
       : {}),
   };
@@ -1202,11 +1239,17 @@ function planAffectedTests(
       pythonUnittestTests: [],
       scriptVitestTests: [
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+        'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+        'scripts/lib/__tests__/validation-sync.test.mjs',
+        'scripts/lib/__tests__/founder-taste-order.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
       scriptVitestCoverageArgs: [
         '--coverage',
         '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.include=lib/validation-lifecycle.mjs',
+        '--coverage.include=lib/validation-sync.mjs',
+        '--coverage.include=lib/founder-taste-order.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
         '--coverage.thresholds.perFile=true',

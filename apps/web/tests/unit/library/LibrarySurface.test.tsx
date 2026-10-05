@@ -29,6 +29,10 @@ import {
   ShellSidebarOverrideProvider,
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
+import {
+  type LibraryPostReleaseBundle,
+  withInspectorScope,
+} from '@/lib/library/post-release-types';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -130,7 +134,7 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: libraryMutationMocks.captureError,
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useReleaseMutations', () => ({
   useSyncReleasesFromSpotifyMutation: () => ({
     isPending: false,
     mutate: libraryMutationMocks.syncSpotify,
@@ -414,8 +418,15 @@ describe('LibrarySurface', () => {
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
-    expect(source).toContain('ReleaseAudioAssetPanel');
-    expect(source).toContain('LibraryInspectorAssetSlots');
+    expect(source).toContain('LibraryFilesPanel');
+    const filesPanelSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/library/LibraryFilesPanel.tsx'
+      ),
+      'utf8'
+    );
+    expect(filesPanelSource).toContain('ReleaseAudioAssetPanel');
     expect(source).toContain('function LibraryFilterPanel');
     expect(source).toContain("data-testid='library-filter-active-indicator'");
     expect(source).toContain("surfaceMode='table'");
@@ -513,6 +524,21 @@ describe('LibrarySurface', () => {
       'font-semibold',
       'text-primary-token'
     );
+  });
+
+  it('exposes the YouTube ledger directly from every Work state', () => {
+    const emptyLibrary = renderLibrary([]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
+
+    emptyLibrary.unmount();
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
   });
 
   it('uses the canonical Spotify sync owner for an empty connected library', () => {
@@ -974,7 +1000,7 @@ describe('LibrarySurface', () => {
     ).toBeGreaterThan(0);
     fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
-    expect(drawer.getByText('68/100')).toBeDefined();
+    expect(drawer.queryByText('68/100')).not.toBeInTheDocument();
     expect(drawer.getByText('Progressive House')).toBeDefined();
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -1187,10 +1213,13 @@ describe('LibrarySurface', () => {
     });
   });
 
-  it('renders merch assets with prices and the shared detail drawer', () => {
+  it('renders merch without private source metadata or share requests', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
     renderLibrary([
       buildAsset({
         id: 'merch-card-1',
+        source: { provider: 'merch', canonicalId: 'internal-card-123' },
         title: 'Never Say A Word Hoodie',
         artworkUrl: 'https://cdn.example.com/hoodie.png',
         smartLinkPath: '/app/library?view=merch',
@@ -1224,7 +1253,7 @@ describe('LibrarySurface', () => {
     );
 
     const drawer = within(screen.getByTestId('library-asset-drawer'));
-    expect(drawer.getAllByText('Merch').length).toBeGreaterThan(0);
+    expect(drawer.getAllByText(/Hoodie/u).length).toBeGreaterThan(0);
     expect(
       drawer.getByText('Black hoodie with Never Say A Word cover art.')
     ).toBeInTheDocument();
@@ -1234,6 +1263,12 @@ describe('LibrarySurface', () => {
       drawer.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.queryByTestId('library-asset-share-merch-card-1')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
+    expect(drawer.queryByText('Source')).toBeNull();
+    expect(drawer.queryByText(/internal-card-123/)).toBeNull();
   });
 
   it('renders the library right rail with the shared compact entity anatomy', () => {
@@ -1263,6 +1298,189 @@ describe('LibrarySurface', () => {
     expect(
       tabs.queryByRole('tab', { name: 'Presence' })
     ).not.toBeInTheDocument();
+  });
+
+  it('states what the selected work is and what is public without conflating visibility', () => {
+    renderLibrary([
+      buildAsset({
+        profileVisibility: 'hidden',
+        source: { provider: 'discography', canonicalId: 'catalog-release-1' },
+        share: {
+          assetId: 'release-1',
+          visibility: 'private',
+          shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
+        },
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    const presentation = within(
+      drawer.getByTestId('work-inspector-presentation')
+    );
+    const about = within(drawer.getByTestId('work-inspector-about'));
+
+    expect(
+      drawer.getByRole('link', { name: 'Open Full View' })
+    ).toHaveAttribute('href', '/tim/take-me-over');
+    expect(presentation.getByText('Released')).toBeInTheDocument();
+    expect(presentation.getByText('Not public')).toBeInTheDocument();
+    expect(presentation.getByText('Hidden from profile')).toBeInTheDocument();
+    expect(presentation.getByText('Listen')).toBeInTheDocument();
+    expect(presentation.getByText('Spotify')).toBeInTheDocument();
+    expect(about.getByText('Single')).toBeInTheDocument();
+    expect(
+      about.getByText('Discography · catalog-release-1')
+    ).toBeInTheDocument();
+    expect(about.queryByText('68/100')).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    'updates Activity after dismissing the last finding (downloads=%s)',
+    async hasDownload => {
+      const collision = withInspectorScope({
+        id: 'collision-1',
+        kind: 'collision',
+        title: 'Wrong artist match',
+        subjectType: 'release',
+        subjectId: 'release-1',
+        issueType: 'wrong_artist',
+        platform: 'Spotify',
+        currentUrl: null,
+        expectedUrl: null,
+        actionMode: 'direct_update',
+        status: 'open',
+        collisionDisposition: null,
+        draftRequest: null,
+      });
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ finding: { ...collision, status: 'dismissed' } }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      renderLibrary([buildAsset()], {
+        profileId: 'profile-1',
+        postReleaseBundle: {
+          findings: [collision],
+          rightsholders: [],
+          stats: [],
+          downloads: hasDownload
+            ? [
+                {
+                  id: 'download-1',
+                  releaseId: 'release-1',
+                  title: 'Radio edit',
+                  fileName: 'radio-edit.wav',
+                },
+              ]
+            : [],
+        },
+      });
+      fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+      const drawer = within(screen.getByTestId('library-asset-drawer'));
+      expect(drawer.getByText('Activity')).toBeInTheDocument();
+      fireEvent.click(drawer.getByRole('button', { name: 'Not This Artist' }));
+      await waitFor(() =>
+        expect(drawer.queryByText('Wrong artist match')).toBeNull()
+      );
+      expect(Boolean(drawer.queryByText('Activity'))).toBe(hasDownload);
+      fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+      fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
+      expect(drawer.queryByText('Wrong artist match')).toBeNull();
+      expect(Boolean(drawer.queryByText('Activity'))).toBe(hasDownload);
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/library/post-release',
+        expect.objectContaining({ method: 'PATCH' })
+      );
+    }
+  );
+
+  it('resets to scoped Overview data synchronously when selection changes', () => {
+    const postReleaseBundle: LibraryPostReleaseBundle = {
+      downloads: [
+        {
+          id: 'download-a',
+          releaseId: 'release-a',
+          title: 'A stems',
+          fileName: 'a.zip',
+        },
+        {
+          id: 'download-b-1',
+          releaseId: 'release-b',
+          title: 'B stems one',
+          fileName: 'b-one.zip',
+        },
+        {
+          id: 'download-b-2',
+          releaseId: 'release-b',
+          title: 'B stems two',
+          fileName: 'b-two.zip',
+        },
+      ],
+      findings: [],
+      rightsholders: [],
+      stats: [],
+    };
+
+    renderLibrary(
+      [
+        buildAsset({ id: 'release-a', title: 'Release A' }),
+        buildAsset({ id: 'release-b', title: 'Release B' }),
+      ],
+      { postReleaseBundle }
+    );
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+    let drawer = within(screen.getByTestId('library-asset-drawer'));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.getAllByTestId(/^library-file-download:/)).toHaveLength(1);
+    expect(drawer.getByText('a.zip')).toBeInTheDocument();
+    expect(drawer.queryByText('b-one.zip')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-b'));
+    drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(drawer.getByTestId('library-asset-entity-header')).toHaveTextContent(
+      'Release B'
+    );
+    expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
+
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.getAllByTestId(/^library-file-download:/)).toHaveLength(2);
+    expect(drawer.getByText('b-one.zip')).toBeInTheDocument();
+    expect(drawer.getByText('b-two.zip')).toBeInTheDocument();
+    expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
+  });
+
+  it('opens the Files tab for the selected work from Share Privately', () => {
+    renderLibrary([
+      buildAsset({
+        id: 'release-a',
+        title: 'Release A',
+        profileVisibility: 'hidden',
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    fireEvent.click(drawer.getByRole('button', { name: 'Share Privately' }));
+
+    expect(drawer.getByRole('tab', { name: 'Files' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
@@ -1520,11 +1738,19 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
 
+    // Missing audio is not a broken state — acquisition sits behind Add File.
+    expect(screen.getByTestId('library-files-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
+
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
       screen.getByLabelText('Upload audio for Take Me Over')
     ).toHaveAttribute('accept', expect.stringContaining('audio/mpeg'));
     expect(screen.queryByTestId('library-audio-ready')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-file-back'));
+    fireEvent.click(screen.getByTestId('library-file-artwork:release-1'));
     expect(screen.getByTestId('library-artwork-object')).toBeInTheDocument();
     expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
   });
@@ -1552,6 +1778,7 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
+    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
     fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
       target: {
         files: [
@@ -1610,19 +1837,57 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
-  it('closes the inspector on Escape from anywhere and returns focus to the opener', () => {
-    renderLibrary([buildAsset()]);
+  it.each(['inside', 'outside'] as const)(
+    'closes the inspector on Escape with focus %s and returns focus to the opener',
+    focusLocation => {
+      renderLibrary([buildAsset()]);
 
-    const row = screen.getByTestId('library-release-row-release-1');
-    row.focus();
-    fireEvent.click(row);
+      const row = screen.getByTestId('library-release-row-release-1');
+      row.focus();
+      fireEvent.click(row);
+      const drawer = screen.getByTestId('library-asset-drawer');
+      expect(drawer).toHaveAttribute('aria-hidden', 'false');
+
+      const focused =
+        focusLocation === 'inside'
+          ? within(drawer).getByRole('tab', { name: 'Files' })
+          : screen.getByRole('button', { name: /^Show filters/i });
+      focused.focus();
+      expect(focused).toHaveFocus();
+      fireEvent.keyDown(focused, { key: 'Escape' });
+
+      expect(drawer).toHaveAttribute('aria-hidden', 'true');
+      expect(row).toHaveFocus();
+    }
+  );
+
+  it('preserves the opener while changing assets with focus inside the inspector', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Another release' }),
+    ]);
+    const opener = screen.getByTestId('library-release-row-release-1');
+    const next = screen.getByTestId('library-release-row-release-2');
+    opener.focus();
+    fireEvent.click(opener);
     const drawer = screen.getByTestId('library-asset-drawer');
-    expect(drawer).toHaveAttribute('aria-hidden', 'false');
+    const files = within(drawer).getByRole('tab', { name: 'Files' });
+    files.focus();
+    expect(files).toHaveFocus();
 
-    fireEvent.keyDown(document.body, { key: 'Escape' });
-
+    fireEvent.click(next);
+    expect(
+      within(drawer).getAllByText('Another release').length
+    ).toBeGreaterThan(0);
+    fireEvent.keyDown(files, { key: 'Escape' });
     expect(drawer).toHaveAttribute('aria-hidden', 'true');
-    expect(row).toHaveFocus();
+    expect(opener).toHaveFocus();
+
+    next.focus();
+    fireEvent.click(next);
+    within(drawer).getByRole('tab', { name: 'Files' }).focus();
+    fireEvent.keyDown(drawer, { key: 'Escape' });
+    expect(next).toHaveFocus();
   });
 
   it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {

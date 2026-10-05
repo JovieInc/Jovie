@@ -251,7 +251,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
           'Jovie focuses on the two artist moments most likely to drive action: new music and nearby shows. That keeps the product tuned to the moments fans are most likely to tap.',
       },
       {
-        question: 'Why use Jovie instead of writing email campaigns?',
+        question: 'Why use Jovie instead of writing newsletters?',
         answer:
           'Because most artists do not want to become campaign operators. Jovie handles the send automatically so you can keep building the audience without writing blasts, formatting newsletters, or timing manual sends.',
       },

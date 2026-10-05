@@ -144,6 +144,27 @@ describe.skipIf(!gh)('staging receipt fetch under the real gh CLI', () => {
     );
   });
 
+  it('pins the resolved real gh ahead of caller PATH by default', async () => {
+    const root = workspace();
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'gh'), '#!/usr/bin/env bash\nexit 88\n');
+    chmodSync(join(bin, 'gh'), 0o755);
+
+    const run = await runWithRealGh({
+      script: currentFetch,
+      env: env(root, { PATH: `${bin}${delimiter}${process.env.PATH}` }),
+      route,
+      gh,
+    });
+
+    expect(run.code, run.stderr).toBe(0);
+    expect(run.requests).toEqual([
+      `GET repos/JovieInc/Jovie/actions/artifacts?name=${receiptName}&per_page=100`,
+      'GET repos/JovieInc/Jovie/actions/artifacts/8/zip',
+    ]);
+  });
+
   it('proves a permissive fake would have falsely passed #20164', async () => {
     const root = workspace();
     const bin = join(root, 'bin');
@@ -169,6 +190,7 @@ esac
       }),
       route,
       gh,
+      allowCallerGhOverride: true,
     });
     expect(run.code).toBe(0);
     expect(run.requests).toEqual([]);

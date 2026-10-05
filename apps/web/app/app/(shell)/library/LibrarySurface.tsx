@@ -23,6 +23,7 @@ import {
   ArrowUpDown,
   Check,
   ChevronDown,
+  ExternalLink,
   FileAudio2,
   FileText,
   Filter,
@@ -56,13 +57,22 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  archiveLibraryRelease,
+  restoreRelease,
+} from '@/app/app/(shell)/dashboard/releases/actions';
+import {
+  archiveLibraryMerchCard,
+  restoreLibraryMerchCard,
+} from '@/app/app/(shell)/library/actions';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
-import { LibraryInspectorAssetSlots } from '@/components/features/library/LibraryInspectorAssetSlots';
+import { LibraryFilesPanel } from '@/components/features/library/LibraryFilesPanel';
 import {
   formatLibraryItemType,
+  formatLibraryStatus,
   formatReleaseStatus,
   formatReleaseType,
   LIBRARY_CATALOG_TABLE_COLUMNS,
@@ -74,7 +84,6 @@ import { WorkInspectorActions } from '@/components/features/library/WorkInspecto
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
-import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
 import { EntityHeader } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -95,6 +104,7 @@ import {
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -151,12 +161,17 @@ import {
 import {
   EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
   type LibraryPostReleaseBundle,
+  type LibraryPresenceFindingView,
 } from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import { releaseStatusDotClasses } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
-import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
+import {
+  deriveWorkInspectorPresentation,
+  scopeWorkInspectorBundle,
+} from '@/lib/library/work-inspector-read-model';
+import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -164,11 +179,6 @@ import {
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
-import {
-  archiveLibraryRelease,
-  restoreRelease,
-} from '../dashboard/releases/actions';
-import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import {
   LIBRARY_LIST_ROW_MODE,
   LIBRARY_TABLE_MIN_WIDTH,
@@ -1481,6 +1491,7 @@ function LibraryToolbar({
       }
       end={
         <>
+          <YouTubeLedgerLink />
           <LibraryImportMenu
             canSyncSpotify={canSyncSpotify}
             isSyncingSpotify={isSyncingSpotify}
@@ -1927,6 +1938,19 @@ function LibraryFirstAction({
   );
 }
 
+function YouTubeLedgerLink() {
+  return (
+    <Button
+      asChild
+      variant='ghost'
+      size='sm'
+      className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+    >
+      <Link href={APP_ROUTES.YOUTUBE_REVIVAL}>YouTube Ledger</Link>
+    </Button>
+  );
+}
+
 function EmptyCatalog({
   canSyncSpotify,
   isSyncing,
@@ -1947,12 +1971,15 @@ function EmptyCatalog({
         <PageToolbar
           start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
           end={
-            <LibraryFirstAction
-              canSyncSpotify={canSyncSpotify}
-              isSyncing={isSyncing}
-              onSyncSpotify={onSyncSpotify}
-              testId='library-sync-spotify-toolbar'
-            />
+            <>
+              <YouTubeLedgerLink />
+              <LibraryFirstAction
+                canSyncSpotify={canSyncSpotify}
+                isSyncing={isSyncing}
+                onSyncSpotify={onSyncSpotify}
+                testId='library-sync-spotify-toolbar'
+              />
+            </>
           }
         />
       }
@@ -2001,17 +2028,6 @@ function MetadataRow({
   readonly value: ReactNode;
 }) {
   return <InspectorRow label={label} value={value} />;
-}
-
-function objectScopedPostReleaseBundle(
-  bundle: LibraryPostReleaseBundle
-): LibraryPostReleaseBundle {
-  return {
-    ...bundle,
-    findings: bundle.findings.filter(
-      finding => finding.subjectType !== 'artist'
-    ),
-  };
 }
 
 function PreviewActionButton({
@@ -2067,55 +2083,6 @@ function PreviewActionButton({
       )}
       {compact ? <span className='sr-only'>{label}</span> : label}
     </Button>
-  );
-}
-
-function LibraryAudioPanel({
-  asset,
-  isPreviewPlaying,
-  onTogglePreview,
-  onUploaded,
-  disabledTabIndex,
-  embedded = false,
-}: {
-  readonly asset: LibraryReleaseAsset;
-  readonly isPreviewPlaying: boolean;
-  readonly onTogglePreview: LibraryPreviewToggle;
-  readonly onUploaded: (assetId: string, previewUrl: string) => void;
-  readonly disabledTabIndex?: number;
-  readonly embedded?: boolean;
-}) {
-  return (
-    <div className={embedded ? undefined : 'mt-4 border-t border-subtle pt-3'}>
-      {embedded ? null : (
-        <div className='mb-2 flex h-7 items-center justify-between gap-2'>
-          <div className='flex min-w-0 items-center gap-2'>
-            <FileAudio2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-            <h3 className='system-b-library-audio-heading truncate font-semibold text-primary-token'>
-              Audio
-            </h3>
-          </div>
-          {hasVerifiedLibraryAudioPreview(asset) ? (
-            <PreviewActionButton
-              asset={asset}
-              isPreviewPlaying={isPreviewPlaying}
-              onTogglePreview={onTogglePreview}
-              compact
-              disabledTabIndex={disabledTabIndex}
-            />
-          ) : null}
-        </div>
-      )}
-      <ReleaseAudioAssetPanel
-        releaseId={asset.id}
-        releaseTitle={asset.title}
-        previewUrl={asset.previewUrl}
-        durationMs={asset.totalDurationMs}
-        disabledTabIndex={disabledTabIndex}
-        testIdPrefix='library'
-        onUploaded={previewUrl => onUploaded(asset.id, previewUrl)}
-      />
-    </div>
   );
 }
 
@@ -2256,17 +2223,69 @@ function AssetDrawer({
     if (asset) setStickyAsset(asset);
   }, [asset]);
 
-  const current = asset ?? stickyAsset;
-  const isMerch = current ? getLibraryItemKind(current) === 'merch' : false;
+  // Keep the last object only while the drawer closes for its exit animation.
+  // An open drawer with no resolved selection must never show the prior work.
+  const current = asset ?? (open ? null : stickyAsset);
+  const workKind = current ? getLibraryItemKind(current) : null;
+  const isMerch = workKind === 'merch';
   const isYouTubeVideo = current?.source?.provider === 'youtube';
-  const [activeTab, setActiveTab] = useState<WorkInspectorTabId>('overview');
+  const [tabSelection, setTabSelection] = useState<{
+    readonly objectId: string | null;
+    readonly tab: WorkInspectorTabId;
+  }>({ objectId: null, tab: 'overview' });
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
-  const inspectorBundle = objectScopedPostReleaseBundle(postReleaseBundle);
-
-  useEffect(() => {
-    setActiveTab('overview');
-  }, [currentId]);
+  const activeTab =
+    tabSelection.objectId === currentId ? tabSelection.tab : 'overview';
+  const handleTabChange = useCallback(
+    (tab: WorkInspectorTabId) => {
+      if (!currentId) return;
+      setTabSelection({ objectId: currentId, tab });
+    },
+    [currentId]
+  );
+  const [findingState, setFindingState] = useState({
+    source: postReleaseBundle.findings,
+    findings: postReleaseBundle.findings,
+  });
+  const findings =
+    findingState.source === postReleaseBundle.findings
+      ? findingState.findings
+      : postReleaseBundle.findings;
+  const handleFindingChange = useCallback(
+    (next: LibraryPresenceFindingView) => {
+      setFindingState(previous => ({
+        source: postReleaseBundle.findings,
+        findings: (previous.source === postReleaseBundle.findings
+          ? previous.findings
+          : postReleaseBundle.findings
+        ).map(finding => (finding.id === next.id ? next : finding)),
+      }));
+    },
+    [postReleaseBundle.findings]
+  );
+  const inspectorBundle = useMemo(
+    () =>
+      current
+        ? scopeWorkInspectorBundle(current, { ...postReleaseBundle, findings })
+        : EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+    [current, postReleaseBundle, findings]
+  );
+  const presentation = useMemo(
+    () => (current ? deriveWorkInspectorPresentation(current) : null),
+    [current]
+  );
+  const contextualBlockers = inspectorBundle.findings.filter(
+    finding =>
+      finding.primitive === 'blocker' &&
+      finding.blocksSelectedObject &&
+      finding.status !== 'resolved' &&
+      finding.status !== 'dismissed'
+  );
+  const hasPostReleaseActivity =
+    inspectorBundle.downloads.length > 0 ||
+    inspectorBundle.findings.length > 0 ||
+    inspectorBundle.rightsholders.length > 0;
   const isPreviewPlaying =
     currentId !== null &&
     currentId === playingPreviewId &&
@@ -2281,7 +2300,14 @@ function AssetDrawer({
   );
   const drawerHeaderActions = current ? (
     <DrawerHeaderActions
-      primaryActions={[]}
+      primaryActions={[
+        {
+          id: 'open-full-view',
+          label: 'Open Full View',
+          icon: ExternalLink,
+          href: current.primaryActionHref ?? current.smartLinkPath,
+        },
+      ]}
       menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
       onClose={onClose}
       searchable
@@ -2304,7 +2330,7 @@ function AssetDrawer({
       emptyMessage='Select a release, product, or file to view details.'
       tabs={WORK_INSPECTOR_TABS}
       activeTab={activeTab}
-      onTabChange={setActiveTab}
+      onTabChange={handleTabChange}
       tabsAriaLabel='Inspector tabs'
       objectHeader={
         current ? (
@@ -2341,29 +2367,19 @@ function AssetDrawer({
           searchPlaceholder='Search actions'
           searchMode='recursive'
         >
-          <div className='space-y-2.5'>
+          <div
+            key={current.id}
+            data-inspector-object-id={current.id}
+            className={cn(
+              activeTab === 'overview'
+                ? 'divide-y divide-subtle'
+                : 'space-y-2.5'
+            )}
+          >
             {activeTab === 'overview' ? (
               <>
-                {isMerch ? (
-                  <InspectorSection title='Merch'>
-                    <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
-                      {current.description ?? 'Merch card saved from chat.'}
-                    </p>
-                    <dl className='mt-2'>
-                      <MetadataRow
-                        label='Sale Price'
-                        value={current.salePriceLabel ?? 'No Price'}
-                      />
-                      <MetadataRow
-                        label='Profit'
-                        value={current.profitLabel ?? 'No Estimate'}
-                      />
-                    </dl>
-                  </InspectorSection>
-                ) : null}
-
                 {!isMerch && hasVerifiedLibraryAudioPreview(current) ? (
-                  <InspectorSection title='Preview'>
+                  <InspectorSection title='Preview' className='pb-3 first:pt-0'>
                     <div className='flex items-center justify-between gap-2'>
                       <span className='system-b-library-drawer-panel-copy min-w-0 flex-1 truncate text-secondary-token'>
                         {current.title}
@@ -2386,28 +2402,94 @@ function AssetDrawer({
                       launches={workLaunches}
                       canPublish={profileId !== null}
                       disabled={!open}
-                      onSharePrivately={() => setActiveTab('files')}
+                      onSharePrivately={() => handleTabChange('files')}
                     />
                   </InspectorSection>
                 ) : null}
 
-                {!isMerch ? (
-                  <InspectorSection title='Sharing'>
-                    <LibraryAssetSharePanel
-                      asset={current}
-                      profileId={profileId}
-                      artistHandle={artistHandle}
-                      disabled={!open}
-                      initialShare={current.share}
-                      onShareChange={onShareChange}
-                    />
+                {presentation ? (
+                  <InspectorSection
+                    title='Public presentation'
+                    className='py-3 first:pt-0'
+                    data-testid='work-inspector-presentation'
+                  >
+                    <dl>
+                      <MetadataRow
+                        label='Lifecycle'
+                        value={formatLibraryStatus(current)}
+                      />
+                      <MetadataRow
+                        label='Public Page'
+                        value={
+                          presentation.pagePublication === 'live'
+                            ? 'Live'
+                            : presentation.pagePublication === 'not_public'
+                              ? 'Not public'
+                              : 'Unknown'
+                        }
+                      />
+                      <MetadataRow
+                        label='Profile'
+                        value={
+                          presentation.profileVisibility === 'visible'
+                            ? 'Shown on profile'
+                            : 'Hidden from profile'
+                        }
+                      />
+                      <MetadataRow
+                        label='Visitor Action'
+                        value={presentation.primaryVisitorAction}
+                      />
+                      <MetadataRow
+                        label='Destinations'
+                        value={
+                          presentation.destinationState === 'connected'
+                            ? presentation.destinations.join(', ')
+                            : presentation.destinationState === 'disconnected'
+                              ? 'Disconnected'
+                              : 'Not supported'
+                        }
+                      />
+                    </dl>
+                    {contextualBlockers.length > 0 ? (
+                      <div className='space-y-1 border-l-2 border-warning pl-2'>
+                        {contextualBlockers.map(blocker => (
+                          <p
+                            key={blocker.id}
+                            className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'
+                          >
+                            {blocker.title}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                    {!isMerch ? (
+                      <LibraryAssetSharePanel
+                        key={current.id}
+                        asset={current}
+                        profileId={profileId}
+                        artistHandle={artistHandle}
+                        disabled={!open}
+                        initialShare={current.share}
+                        onShareChange={onShareChange}
+                      />
+                    ) : null}
                   </InspectorSection>
                 ) : null}
 
-                <InspectorSection title='Details'>
+                <InspectorSection
+                  title='About'
+                  className='py-3'
+                  data-testid='work-inspector-about'
+                >
+                  {current.description ? (
+                    <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
+                      {current.description}
+                    </p>
+                  ) : null}
                   <dl>
                     <MetadataRow
-                      label='Approval Status'
+                      label='Review Status'
                       value={
                         <ApprovalStatusEditor
                           asset={current}
@@ -2419,75 +2501,123 @@ function AssetDrawer({
                       }
                     />
                     <MetadataRow
-                      label={isMerch ? 'Updated' : 'Release Date'}
-                      value={
-                        <span
-                          title={formatLibraryReleaseDateTitle(
-                            current.releaseDate
-                          )}
-                        >
-                          {formatLibraryReleaseDate(current.releaseDate)}
-                        </span>
-                      }
-                    />
-                    <MetadataRow
                       label='Type'
                       value={formatLibraryItemType(current)}
                     />
-                    {isMerch ? (
+                    {current.releaseDate ? (
                       <MetadataRow
-                        label='Sellability'
-                        value={current.sellabilityLabel ?? 'Not Checked'}
+                        label={
+                          workKind === 'video'
+                            ? 'Published'
+                            : isMerch || workKind === 'document'
+                              ? 'Updated'
+                              : 'Release Date'
+                        }
+                        value={
+                          <span
+                            title={formatLibraryReleaseDateTitle(
+                              current.releaseDate
+                            )}
+                          >
+                            {formatLibraryReleaseDate(current.releaseDate)}
+                          </span>
+                        }
                       />
+                    ) : null}
+                    {isMerch ? (
+                      <>
+                        {current.productType ? (
+                          <MetadataRow
+                            label='Product'
+                            value={capitalizeFirst(current.productType)}
+                          />
+                        ) : null}
+                        {current.sellabilityLabel ? (
+                          <MetadataRow
+                            label='Availability'
+                            value={current.sellabilityLabel}
+                          />
+                        ) : null}
+                        {current.salePriceLabel ? (
+                          <MetadataRow
+                            label='Price'
+                            value={current.salePriceLabel}
+                          />
+                        ) : null}
+                        {current.profitLabel ? (
+                          <MetadataRow
+                            label='Estimated Profit'
+                            value={current.profitLabel}
+                          />
+                        ) : null}
+                      </>
                     ) : (
                       <>
-                        <MetadataRow
-                          label='Tracks'
-                          value={current.trackCount}
-                        />
-                        <MetadataRow
-                          label='Duration'
-                          value={formatLibraryDuration(current.totalDurationMs)}
-                        />
-                        <MetadataRow
-                          label='Popularity'
-                          value={
-                            current.spotifyPopularity == null
-                              ? 'No Score'
-                              : `${current.spotifyPopularity}/100`
-                          }
-                        />
-                        <MetadataRow
-                          label='Genres'
-                          value={
-                            current.genres.length > 0
-                              ? current.genres.join(', ')
-                              : 'No Genres'
-                          }
-                        />
-                        <MetadataRow
-                          label='Label'
-                          value={
-                            current.label ?? current.distributor ?? 'No Label'
-                          }
-                        />
-                        <MetadataRow
-                          label='UPC'
-                          value={current.upc ?? 'No UPC'}
-                        />
-                        <MetadataRow
-                          label='Pitch Targets'
-                          value={current.targetPlaylistCount}
-                        />
+                        {(workKind === 'release' || workKind === 'audio') &&
+                        current.trackCount > 0 ? (
+                          <MetadataRow
+                            label='Tracks'
+                            value={current.trackCount}
+                          />
+                        ) : null}
+                        {current.totalDurationMs != null ? (
+                          <MetadataRow
+                            label='Duration'
+                            value={formatLibraryDuration(
+                              current.totalDurationMs
+                            )}
+                          />
+                        ) : null}
+                        {current.genres.length > 0 ? (
+                          <MetadataRow
+                            label='Genres'
+                            value={current.genres.join(', ')}
+                          />
+                        ) : null}
+                        {current.label || current.distributor ? (
+                          <MetadataRow
+                            label='Label'
+                            value={current.label ?? current.distributor}
+                          />
+                        ) : null}
+                        {current.upc ? (
+                          <MetadataRow label='UPC' value={current.upc} />
+                        ) : null}
+                        {current.primaryIsrc ? (
+                          <MetadataRow
+                            label='ISRC'
+                            value={current.primaryIsrc}
+                          />
+                        ) : null}
+                        {workKind === 'video' && current.privacyStatus ? (
+                          <MetadataRow
+                            label='Video Access'
+                            value={capitalizeFirst(current.privacyStatus)}
+                          />
+                        ) : null}
+                        {workKind === 'document' && current.documentStage ? (
+                          <MetadataRow
+                            label='Stage'
+                            value={capitalizeFirst(
+                              current.documentStage.replaceAll('_', ' ')
+                            )}
+                          />
+                        ) : null}
                       </>
                     )}
+                    {!isMerch && current.source ? (
+                      <MetadataRow
+                        label='Source'
+                        value={`${capitalizeFirst(current.source.provider)} · ${current.source.canonicalId}`}
+                      />
+                    ) : null}
                   </dl>
                 </InspectorSection>
 
                 {!isMerch &&
-                isDspQuietListScope(getLibraryItemKind(current)) &&
+                isDspQuietListScope(workKind ?? 'release') &&
                 current.providers.length > 0 ? (
-                  <InspectorSection title='Providers'>
+                  <InspectorSection title='Destinations' className='py-3'>
                     <div className='space-y-0.5'>
                       {current.providers.map(provider => (
                         <DspQuietRow
@@ -2508,9 +2638,16 @@ function AssetDrawer({
                   </InspectorSection>
                 ) : null}
 
-                {isYouTubeVideo && current.source ? (
-                  <InspectorSection title='Relationships'>
+                {isYouTubeVideo &&
+                current.source &&
+                (merchProducts.length > 0 ||
+                  relationships.some(
+                    relationship =>
+                      relationship.subjectId === current.source?.canonicalId
+                  )) ? (
+                  <InspectorSection title='Related work' className='py-3'>
                     <YouTubeMerchRelationshipEditor
+                      key={current.id}
                       profileId={profileId}
                       videoId={current.source.canonicalId}
                       merchProducts={merchProducts}
@@ -2521,8 +2658,9 @@ function AssetDrawer({
                 ) : null}
 
                 {isYouTubeVideo && current.source ? (
-                  <InspectorSection title='Optimization'>
+                  <InspectorSection title='Results' className='py-3'>
                     <YouTubeOptimizationPanel
+                      key={current.id}
                       profileId={profileId}
                       videoId={current.source.canonicalId}
                       disabled={!open}
@@ -2530,14 +2668,14 @@ function AssetDrawer({
                   </InspectorSection>
                 ) : null}
 
-                {!isMerch &&
-                (getLibraryItemKind(current) === 'release' ||
-                  current.linkedReleaseId) ? (
-                  <InspectorSection title='Rights'>
+                {!isMerch && hasPostReleaseActivity ? (
+                  <InspectorSection title='Activity' className='pt-3 last:pb-0'>
                     <PostReleasePanel
+                      key={current.id}
                       asset={current}
                       creatorProfileId={profileId}
                       bundle={inspectorBundle}
+                      onFindingChange={handleFindingChange}
                       disabled={!open}
                     />
                   </InspectorSection>
@@ -2547,9 +2685,13 @@ function AssetDrawer({
               <InspectorEmpty message='No files for this merch item.' />
             ) : (
               <>
-                <InspectorSection title='Audio'>
-                  {hasVerifiedLibraryAudioPreview(current) ? (
-                    <div className='mb-2 flex justify-end'>
+                <LibraryFilesPanel
+                  asset={current}
+                  downloads={inspectorBundle.downloads}
+                  disabled={!open}
+                  disabledTabIndex={closedTabIndex}
+                  audioPreviewAction={
+                    hasVerifiedLibraryAudioPreview(current) ? (
                       <PreviewActionButton
                         asset={current}
                         isPreviewPlaying={isPreviewPlaying}
@@ -2557,22 +2699,9 @@ function AssetDrawer({
                         compact
                         disabledTabIndex={closedTabIndex}
                       />
-                    </div>
-                  ) : null}
-                  <LibraryAudioPanel
-                    asset={current}
-                    isPreviewPlaying={isPreviewPlaying}
-                    onTogglePreview={onTogglePreview}
-                    onUploaded={onAudioUploaded}
-                    disabledTabIndex={closedTabIndex}
-                    embedded
-                  />
-                </InspectorSection>
-
-                <LibraryInspectorAssetSlots
-                  asset={current}
-                  downloads={inspectorBundle.downloads}
-                  disabled={!open}
+                    ) : null
+                  }
+                  onAudioUploaded={onAudioUploaded}
                   onArtworkUploaded={onArtworkUploaded}
                 />
 
@@ -2985,12 +3114,22 @@ export function LibrarySurface({
       );
       return;
     }
-    const opener = document.activeElement;
-    inspectorOpenerRef.current =
-      opener instanceof HTMLElement && opener !== document.body ? opener : null;
+    if (!drawerOpen) {
+      const opener = document.activeElement;
+      inspectorOpenerRef.current =
+        opener instanceof HTMLElement && opener !== document.body
+          ? opener
+          : null;
+    }
     setSelectedId(id);
     setDrawerOpen(true);
   }
+
+  const closeAssetDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    const opener = inspectorOpenerRef.current;
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+  }, []);
 
   // Escape closes the inspector from anywhere on the surface, not only when
   // focus is inside it, and returns focus to the item that opened it. Menus,
@@ -3003,13 +3142,11 @@ export function LibrarySurface({
       if (resolveTableNavAction(event.key, event.target) !== 'close') return;
       if (isInteractiveOverlayTarget(event.target)) return;
       event.preventDefault();
-      setDrawerOpen(false);
-      const opener = inspectorOpenerRef.current;
-      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      closeAssetDrawer();
     }
     globalThis.addEventListener('keydown', handleKeyDown);
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
-  }, [drawerOpen]);
+  }, [closeAssetDrawer, drawerOpen]);
 
   // Keyboard review (J/K/arrows move, Space plays, Enter inspects) for the
   // grid, and for every view while focus rests on the page. Focused table
@@ -3475,7 +3612,7 @@ export function LibrarySurface({
       <AssetDrawer
         asset={selectedAsset}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onClose={closeAssetDrawer}
         activePreviewId={activePreviewId}
         playingPreviewId={playingPreviewId}
         onTogglePreview={handleTogglePreview}
@@ -3505,6 +3642,7 @@ export function LibrarySurface({
       activePreviewId,
       approvalSavingIds,
       artistHandle,
+      closeAssetDrawer,
       drawerOpen,
       effectiveAssets,
       getContextMenuItems,

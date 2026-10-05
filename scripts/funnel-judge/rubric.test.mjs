@@ -3,11 +3,15 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { buildClaudeArgs } from './judge.mjs';
 import {
+  buildCoherencePrompt,
+  buildCoherenceSchema,
   buildJudgePrompt,
   buildJudgeSchema,
   calibrationHolds,
   evaluatePassBar,
+  objectionsFor,
   PERSONAS,
+  parseCoherenceOutput,
   parseJudgeOutput,
   trendLine,
   worstStep,
@@ -45,6 +49,12 @@ const CLEAN_METRICS = STEP_IDS.flatMap(stepId => [
   { stepId, viewport: 'mobile', lcpMs: 1800, cls: 0, a11yBlockers: 0 },
 ]);
 
+const COHERENT = {
+  transitions: [
+    { fromStepId: 'outreach', toStepId: 'start', score: 8, breaks: [] },
+  ],
+};
+
 test('five canon personas with distinct ids', () => {
   assert.equal(PERSONAS.length, 5);
   assert.equal(new Set(PERSONAS.map(persona => persona.id)).size, 5);
@@ -56,6 +66,7 @@ test('a flow every persona loves passes', () => {
     verdicts: verdicts(8),
     primaryJudge: 'opus-5.5',
     metrics: CLEAN_METRICS,
+    coherence: COHERENT,
   });
   assert.deepEqual(result.failures, []);
   assert.equal(result.pass, true);
@@ -68,6 +79,7 @@ test('fewer than 4 of 5 payers fails even with high step scores', () => {
     verdicts: verdicts(9, { payers: 3 }),
     primaryJudge: 'opus-5.5',
     metrics: CLEAN_METRICS,
+    coherence: COHERENT,
   });
   assert.equal(result.pass, false);
   assert.match(result.failures.join('\n'), /3\/5 personas would pay/);
@@ -82,6 +94,7 @@ test('only the primary judge counts toward would-pay', () => {
     ],
     primaryJudge: 'opus-5.5',
     metrics: CLEAN_METRICS,
+    coherence: COHERENT,
   });
   assert.equal(result.payers, 2);
   assert.equal(result.pass, false);
@@ -95,6 +108,7 @@ test('one persona stopping fails the bar', () => {
     verdicts: all,
     primaryJudge: 'opus-5.5',
     metrics: CLEAN_METRICS,
+    coherence: COHERENT,
   });
   assert.equal(result.pass, false);
   assert.match(result.failures[0], /skeptic \(opus-5.5\) stops at start/);
@@ -151,6 +165,7 @@ test('calibration: the blank /start Tim rejected must fail', () => {
     verdicts: blank,
     primaryJudge: 'opus-5.5',
     metrics: CLEAN_METRICS,
+    coherence: COHERENT,
   });
   assert.equal(calibrationHolds(result, 'start'), true);
   assert.deepEqual(worstStep(result.aggregates), { stepId: 'start', score: 1 });
@@ -160,6 +175,7 @@ test('calibration: the blank /start Tim rejected must fail', () => {
     verdicts: verdicts(8),
     primaryJudge: 'opus-5.5',
     metrics: CLEAN_METRICS,
+    coherence: COHERENT,
   });
   assert.equal(calibrationHolds(lenient, 'start'), false);
 });
@@ -230,6 +246,7 @@ test('trend line is one compact JSON row', () => {
     verdicts: verdicts(8),
     primaryJudge: 'opus-5.5',
     metrics: CLEAN_METRICS,
+    coherence: COHERENT,
   });
   const line = trendLine({
     runId: 'r1',
@@ -263,4 +280,164 @@ test('step registry covers outreach through first use, in order', () => {
       'first-use',
     ]
   );
+});
+
+test('coherence: a broken hand-off fails even when every step scores well', () => {
+  const missing = evaluatePassBar({
+    stepIds: STEP_IDS,
+    verdicts: verdicts(8),
+    primaryJudge: 'opus-5.5',
+    metrics: CLEAN_METRICS,
+  });
+  assert.deepEqual(missing.failures, ['coherence not judged']);
+
+  const broken = evaluatePassBar({
+    stepIds: STEP_IDS,
+    verdicts: verdicts(8),
+    primaryJudge: 'opus-5.5',
+    metrics: CLEAN_METRICS,
+    coherence: {
+      transitions: [
+        {
+          fromStepId: 'outreach',
+          toStepId: 'start',
+          score: 4,
+          breaks: [
+            {
+              severity: 'blocker',
+              detail: 'DM names Mega Ran, /start is blank',
+            },
+            { severity: 'minor', detail: 'tone shifts' },
+          ],
+        },
+      ],
+    },
+  });
+  assert.equal(broken.pass, false);
+  assert.deepEqual(broken.failures, [
+    'outreach→start coherence 4 (< 7)',
+    'outreach→start contradiction: DM names Mega Ran, /start is blank',
+  ]);
+  assert.equal(
+    JSON.parse(trendLine({ runId: 'r', at: 'a', baseUrl: 'b', result: broken }))
+      .coherence,
+    4
+  );
+});
+
+test('parseCoherenceOutput needs every consecutive hand-off', () => {
+  const ids = ['outreach', 'claim', 'start'];
+  const row = (fromStepId, toStepId, score = 8) => ({
+    fromStepId,
+    toStepId,
+    score,
+    breaks: [],
+  });
+  assert.throws(() => parseCoherenceOutput({}, ids), /transitions/);
+  assert.throws(
+    () =>
+      parseCoherenceOutput({ transitions: [row('outreach', 'claim')] }, ids),
+    /claim→start/
+  );
+  assert.throws(
+    () =>
+      parseCoherenceOutput(
+        { transitions: [row('outreach', 'claim', 11), row('claim', 'start')] },
+        ids
+      ),
+    /out of range/
+  );
+  assert.throws(
+    () =>
+      parseCoherenceOutput(
+        {
+          transitions: [
+            row('outreach', 'claim'),
+            { ...row('claim', 'start'), breaks: [{ severity: 'meh' }] },
+          ],
+        },
+        ids
+      ),
+    /unknown severity/
+  );
+  const parsed = parseCoherenceOutput(
+    {
+      transitions: [row('claim', 'start', 6), row('outreach', 'claim')],
+      story: 's',
+    },
+    ids
+  );
+  assert.deepEqual(
+    parsed.transitions.map(
+      item => `${item.fromStepId}>${item.toStepId}:${item.score}`
+    ),
+    ['outreach>claim:8', 'claim>start:6']
+  );
+});
+
+test('coherence prompt and schema cover every step and hand-off', () => {
+  const steps = [
+    {
+      id: 'outreach',
+      label: 'DM',
+      context: 'c',
+      images: ['/x/a.png'],
+      text: 'hi',
+    },
+    { id: 'start', label: 'Start', context: 'c', images: ['/x/b.png'] },
+  ];
+  const prompt = buildCoherencePrompt(steps);
+  assert.match(prompt, /consecutive/);
+  assert.match(prompt, /\/x\/a\.png/);
+  assert.match(prompt, /\/x\/b\.png/);
+  const schema = buildCoherenceSchema(['outreach', 'start']);
+  assert.deepEqual(
+    schema.properties.transitions.items.properties.fromStepId.enum,
+    ['outreach', 'start']
+  );
+});
+
+test('mined VOC objections reach the persona prompt and must each be answered', () => {
+  const voc = {
+    personas: {
+      'indie-release': [
+        { type: 'not-worth-price', objection: '$199 vs a $9 link page?' },
+        { type: 'bad', objection: '' },
+      ],
+    },
+  };
+  const objections = objectionsFor(voc, 'indie-release');
+  assert.equal(objections.length, 1);
+  assert.deepEqual(objectionsFor(voc, 'skeptic'), []);
+  assert.deepEqual(objectionsFor(null, 'skeptic'), []);
+
+  const prompt = buildJudgePrompt(PERSONAS[0], [], 'full', objections);
+  assert.match(prompt, /Objections you already carry/);
+  assert.match(prompt, /1\. \$199 vs a \$9 link page\?/);
+  assert.doesNotMatch(buildJudgePrompt(PERSONAS[0], []), /Objections/);
+
+  const schema = buildJudgeSchema(STEP_IDS, 1);
+  assert.ok(schema.required.includes('objections'));
+  assert.ok(!buildJudgeSchema(STEP_IDS).required.includes('objections'));
+
+  const base = {
+    steps: STEP_IDS.map(id => stepVerdict(id, 8)),
+    wouldPay: true,
+    payReason: 'r',
+  };
+  assert.throws(() => parseJudgeOutput(base, STEP_IDS, 1), /objection 1/);
+  const parsed = parseJudgeOutput(
+    {
+      ...base,
+      objections: [
+        { index: 1, answered: false, stepId: '', note: 'never shown ROI' },
+      ],
+    },
+    STEP_IDS,
+    1
+  );
+  assert.deepEqual(parsed.objections, [
+    { index: 1, answered: false, stepId: null, note: 'never shown ROI' },
+  ]);
+  assert.equal('objections' in parseJudgeOutput(base, STEP_IDS), false);
 });

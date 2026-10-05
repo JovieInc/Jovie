@@ -32,6 +32,7 @@ const changelogFixture = `# Changelog
 
 describe('RecentlyShippedSection', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue(changelogFixture);
   });
@@ -49,5 +50,39 @@ describe('RecentlyShippedSection', () => {
     expect(
       screen.getByRole('link', { name: /See all updates/i })
     ).toHaveAttribute('href', '/changelog');
+  });
+
+  it('skips Unreleased and stops after three releases', () => {
+    mockReadFileSync.mockReturnValue(`## [Unreleased]
+- Draft entry
+
+## [3.0.0] - 2026-09-03
+- Third newest
+
+## [2.0.0] - 2026-09-02
+- Second newest
+
+## [1.0.0] - 2026-09-01
+- Oldest shown
+
+## [0.9.0] - 2026-08-01
+- Beyond the cap
+`);
+
+    render(<RecentlyShippedSection />);
+
+    expect(screen.queryByText('Draft entry')).not.toBeInTheDocument();
+    expect(screen.getByText('v3.0.0')).toBeInTheDocument();
+    expect(screen.getByText('v1.0.0')).toBeInTheDocument();
+    expect(screen.queryByText('v0.9.0')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when the changelog is missing', () => {
+    mockExistsSync.mockReturnValue(false);
+
+    const { container } = render(<RecentlyShippedSection />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(mockReadFileSync).not.toHaveBeenCalled();
   });
 });

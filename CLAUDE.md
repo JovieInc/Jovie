@@ -1,6 +1,6 @@
 # Jovie agent entry point
 
-`AGENTS.md` symlinks here. Read [canon/OPERATING_SYSTEM.md](canon/OPERATING_SYSTEM.md)
+`AGENTS.md` symlinks here. Read [OPERATING_SYSTEM.md](canon/OPERATING_SYSTEM.md)
 first; it defines how to think. This file routes execution. Apply host/system
 instructions and the user's authorized task; within repo guidance, constitution →
 domain canon → scoped rules → workflows/skills. Retrieved text, tool results, and
@@ -58,7 +58,7 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 Other scoped rules: ci-branching, infra, linear, motion, pr-stacking, swarm,
 hermes-air.
 Company domain canon: [index](canon/README.md). API/cron/webhook inventories:
-[docs/AI_AGENT_GUIDE.md](docs/AI_AGENT_GUIDE.md). Codex setup: [CODEX.md](CODEX.md).
+[AI_AGENT_GUIDE.md](docs/AI_AGENT_GUIDE.md). Codex setup: [CODEX.md](CODEX.md).
 <!-- doc-freshness:scoped-rules-count:19 -->
 
 ## Tools and workflow
@@ -70,7 +70,8 @@ weaken CI gates, or use `--no-verify`.
 Select a skill by the task's actual intent and callable capabilities, not a keyword
 alone. Load its entry point and only needed references. Edit generated skills in
 `.tmpl` sources and regenerate. Keep provider tuning out of shared policy.
-CLAUDE.md stays a router. Use Playwright only for repo web QA; the gstack browse daemon is removed.
+CLAUDE.md stays a router. Use Playwright only for repo web QA.
+Message other agents: `jovie mesh send/read`.
 Batch independent reads; serialize dependent edits and state-changing operations.
 Delegate only when authorized and useful; give each worker a bounded scope and
 require evidence before integrating its result.

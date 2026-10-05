@@ -243,9 +243,7 @@ describe('isPresenceShellRoute', () => {
 
   it('does not claim identity settings as the Presence workspace', () => {
     expect(isPresenceShellRoute(APP_ROUTES.DASHBOARD_PROFILE)).toBe(false);
-    expect(isPresenceShellRoute(APP_ROUTES.SETTINGS_ARTIST_PROFILE)).toBe(
-      false
-    );
+    expect(isPresenceShellRoute(APP_ROUTES.SETTINGS_PROFILE)).toBe(false);
   });
 });
 
@@ -362,9 +360,7 @@ describe('shouldUseEssentialShellData', () => {
   });
 
   it('returns true for artist profile settings after its page owns supplementary data', () => {
-    expect(
-      shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
-    ).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_PROFILE)).toBe(true);
   });
 
   it('returns false for null', () => {

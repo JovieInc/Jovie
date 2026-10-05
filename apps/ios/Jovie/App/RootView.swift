@@ -69,12 +69,15 @@ private struct AppContentView: View {
     switch launchMode {
     case .uiTestingAudience,
          .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingChat,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
+         .uiTestingStorefrontChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingLibrary,
+         .uiTestingStorefrontReleases,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxOffline,
@@ -87,7 +90,10 @@ private struct AppContentView: View {
   }
 
   private static func previewLibraryAssets(for launchMode: LaunchMode) -> [LibraryAsset] {
-    launchMode.usesEmptyLibraryPreview ? [] : LibraryFeed.previewAssets
+    if launchMode == .uiTestingStorefrontReleases {
+      return LibraryFeed.storefrontReleaseAssets
+    }
+    return launchMode.usesEmptyLibraryPreview ? [] : LibraryFeed.previewAssets
   }
 
   var body: some View {
@@ -330,6 +336,9 @@ private struct AppContentView: View {
           // Deterministic UI-testing fixture: bypasses the network
           // client/cache entirely so parse→render can be asserted without a
           // mocked backend.
+          if appState.launchMode == .uiTestingStorefrontChat {
+            MobileChatStorefrontFixture.primeMockupImages()
+          }
           repository.seedTimelineForUITesting(
             fixtureTimeline,
             activeConversationID: appState.launchMode.chatFixtureConversationID
@@ -444,14 +453,17 @@ private struct AppContentView: View {
     switch appState.launchMode {
     case .uiTestingAudience,
          .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingChat,
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,
          .uiTestingChatAllComponents,
+         .uiTestingStorefrontChat,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingAuthCallback,
          .uiTestingLibrary,
+         .uiTestingStorefrontReleases,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxOffline,
