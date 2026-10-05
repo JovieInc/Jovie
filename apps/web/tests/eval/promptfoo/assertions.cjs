@@ -2680,8 +2680,8 @@ function assertPromptContextAccountSummary(output) {
   if (!payload.hasAccountAccessSection) {
     return fail('prompt did not include account access section');
   }
-  if (!/- \*\*Plan:\*\* Pro/i.test(systemPrompt)) {
-    return fail('prompt did not include safe Pro plan summary');
+  if (!/- \*\*Plan:\*\* Artist Presence/i.test(systemPrompt)) {
+    return fail('prompt did not include safe Artist Presence plan summary');
   }
   if (!/- \*\*Billing Verification:\*\* verified/i.test(systemPrompt)) {
     return fail('prompt did not include verified billing state');
