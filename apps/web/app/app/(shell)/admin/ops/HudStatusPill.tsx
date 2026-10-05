@@ -1,5 +1,4 @@
-import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
-import { cn } from '@/lib/utils';
+import { Badge } from '@jovie/ui';
 
 export interface HudStatusPillProps {
   readonly label: string;
@@ -7,23 +6,9 @@ export interface HudStatusPillProps {
 }
 
 export function HudStatusPill({ label, tone }: Readonly<HudStatusPillProps>) {
-  const accent = getAccentCssVars(HUD_TONE_ACCENT[tone]);
-
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1 text-2xs font-medium leading-none'
-      )}
-      style={{
-        borderColor: `color-mix(in oklab, ${accent.solid} 26%, var(--app-shell-frame-seam))`,
-        backgroundColor: accent.subtle,
-        color:
-          tone === 'neutral'
-            ? 'var(--color-text-secondary-token)'
-            : accent.solid,
-      }}
-    >
+    <Badge variant='outline' size='sm' data-status-tone={tone}>
       {label}
-    </span>
+    </Badge>
   );
 }

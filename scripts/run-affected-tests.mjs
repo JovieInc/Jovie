@@ -47,6 +47,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
       'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
     ],
   ],
+  [
+    'apps/web/lib/leads/qualification-decision.ts',
+    ['apps/web/tests/lib/leads/qualification-decision.test.ts'],
+  ],
+  [
+    'apps/web/lib/leads/qualify.ts',
+    ['apps/web/tests/lib/leads/qualify.test.ts'],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -1055,6 +1063,8 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
   'scripts/lib/validation-sync.mjs',
   'scripts/lib/__tests__/validation-sync.test.mjs',
   'scripts/lib/__tests__/fixtures/validation-world.mjs',
+  'scripts/lib/founder-taste-order.mjs',
+  'scripts/lib/__tests__/founder-taste-order.test.mjs',
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
@@ -1092,6 +1102,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'worktree_sweep',
     'hyperagent_lane',
     'execution_attempt',
+    'gh_app_token',
   ].flatMap(name => [
     `scripts/lanes/${name}.py`,
     `scripts/tests/test_${name}.py`,
@@ -1230,6 +1241,7 @@ function planAffectedTests(
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
         'scripts/lib/__tests__/validation-lifecycle.test.mjs',
         'scripts/lib/__tests__/validation-sync.test.mjs',
+        'scripts/lib/__tests__/founder-taste-order.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
       scriptVitestCoverageArgs: [
@@ -1237,6 +1249,7 @@ function planAffectedTests(
         '--coverage.include=lib/linear-sync-on-merge.mjs',
         '--coverage.include=lib/validation-lifecycle.mjs',
         '--coverage.include=lib/validation-sync.mjs',
+        '--coverage.include=lib/founder-taste-order.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
         '--coverage.thresholds.perFile=true',

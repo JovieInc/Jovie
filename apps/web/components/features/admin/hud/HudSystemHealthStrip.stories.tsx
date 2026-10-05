@@ -1,5 +1,7 @@
+import '@/app/globals.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { HudMetrics } from '@/types/hud';
+import cashBandMeta from './HudCashMrrBand.stories';
 import { HudSystemHealthStrip } from './HudSystemHealthStrip';
 
 // Only the slices the strip reads; the full HudMetrics payload is server-built.
@@ -31,10 +33,10 @@ function metrics({
 const meta = {
   title: 'Features/Admin/Hud/HudSystemHealthStrip',
   component: HudSystemHealthStrip,
+  args: { metrics: cashBandMeta.args.metrics },
   parameters: {
     layout: 'centered',
   },
-  args: { metrics: metrics() },
 } satisfies Meta<typeof HudSystemHealthStrip>;
 
 export default meta;
@@ -51,3 +53,5 @@ export const Degraded: Story = {
     }),
   },
 };
+
+export const Standalone: Story = { args: { presentation: 'page' } };

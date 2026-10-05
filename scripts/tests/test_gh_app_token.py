@@ -115,6 +115,8 @@ class GithubEnvTest(unittest.TestCase):
             self.assertIn('gh_app_token.py --guard "$@")" || exit $?', shim)
             self.assertIn("exec /usr/bin/gh", shim)
             self.assertIn("[ \"$1\" = gist ] && exec /usr/bin/gh", shim, "gists keep the host login")
+            self.assertIn('"$GH_HOST" != github.com ] && exec /usr/bin/gh', shim,
+                          "a non-github.com GH_HOST keeps the caller's credentials")
             self.assertTrue(os.environ["PATH"].startswith(str(shim_dir)))
 
     def test_no_key_and_no_env_changes_nothing(self):
@@ -122,6 +124,33 @@ class GithubEnvTest(unittest.TestCase):
             before = os.environ.get("PATH")
             lane.load_github_env(Path(tmp) / "missing.env", Path(tmp) / "none.pem", Path(tmp) / "bin")
             self.assertEqual(os.environ.get("PATH"), before)
+
+    def test_other_hosts_keep_the_caller_token_and_github_keeps_the_mint_guard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            key = root / "key.pem"
+            key.write_text("test key")
+            real = root / "real-gh"
+            real.write_text('#!/bin/sh\nprintf "%s" "$GH_TOKEN"\n')
+            real.chmod(0o755)
+            marker = root / "minted"
+            python = root / "python3"
+            python.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > "{marker}"\nprintf "test-bot-token"\n')
+            python.chmod(0o755)
+            with mock.patch.object(lane.shutil, "which", return_value=str(real)):
+                lane.load_github_env(root / "missing.env", key, root / "shim")
+            for host in ("github.localhost", "github.enterprise.example"):
+                result = subprocess.run([str(root / "shim" / "gh"), "pr", "list"],
+                                        env={**os.environ, "GH_HOST": host, "GH_TOKEN": "test-caller-token"},
+                                        capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout, "test-caller-token")
+                self.assertFalse(marker.exists())
+            result = subprocess.run([str(root / "shim" / "gh"), "pr", "list"],
+                                    env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}",
+                                         "GH_HOST": "github.com", "GH_TOKEN": "test-caller-token"},
+                                    capture_output=True, text=True, check=True)
+            self.assertEqual(result.stdout, "test-bot-token")
+            self.assertEqual(marker.read_text().splitlines()[-3:], ["--guard", "pr", "list"])
 
 
 if __name__ == "__main__":

@@ -238,6 +238,8 @@ export function isProfileRoute(pathname: string): boolean {
   const allKnownPrefixes = [
     ...DASHBOARD_ROUTES.map(r => r.slice(1).toLowerCase()),
     ...PUBLIC_ROUTES.map(r => r.slice(1).toLowerCase()),
+    // The Ops rewrite preserves /hud in the browser; it is not a username.
+    'hud',
     'api',
   ];
 

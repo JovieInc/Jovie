@@ -77,6 +77,10 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/admin/leads/qualify` | POST | `admin` | Qualify leads |
 | `/api/admin/leads/seed` | POST | `admin` | Seed leads |
 | `/api/admin/leads/settings` | GET, PUT | `admin` | Lead pipeline settings |
+| `/api/admin/ov-lists` | GET, POST | `admin` | Ovie lists + smart views (sidebar), create list |
+| `/api/admin/ov-lists/[id]` | GET, PATCH, DELETE | `admin` | List detail, rate/favorite/swipe/suggestion decisions |
+| `/api/admin/ov-lists/[id]/suggest` | POST | `admin` | Propose explainable auto-fill suggestions (never auto-adds) |
+| `/api/admin/ov-lists/creators` | GET | `admin` | Search existing creator profiles to add to a list |
 | `/api/admin/outreach` | GET, POST | `admin` | Outreach management |
 | `/api/admin/outreach/debug` | GET | `admin` | Debug outreach |
 | `/api/admin/outreach/settings` | GET | `admin` | Outreach settings |

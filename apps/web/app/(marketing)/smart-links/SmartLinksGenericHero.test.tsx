@@ -14,6 +14,7 @@ describe('SmartLinksLanding generic hero', () => {
   });
 
   it('keeps the music headline while the flag is off', () => {
+    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
     render(<SmartLinksLanding />);
     expect(
       screen.getByRole('heading', {
@@ -26,8 +27,7 @@ describe('SmartLinksLanding generic hero', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses the generic headline and a release example when the flag is on', () => {
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'true';
+  it('uses the generic headline and a release example by default', () => {
     render(<SmartLinksLanding />);
     expect(
       screen.getByRole('heading', {
