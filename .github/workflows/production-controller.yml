@@ -729,17 +729,23 @@ jobs:
                   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
                 if [ -z "$staging_artifact_id" ]; then
                   # Coalesced pushes can qualify Web only on a merge-group
-                  # historical head. A carryover staging run deploys current
-                  # main instead; authenticate that exact canonical receipt.
+                  # historical head. A carryover staging run deploys a later
+                  # main head. Further non-Web commits may advance main before
+                  # production authorizes; require Web <= staging <= release.
                   canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
-                  if jq -e --arg sha "$EXPECTED_SHA" '.commitSha == $sha' >/dev/null <<<"$canonical_staging_identity"; then
-                    staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
-                      REPOSITORY="$REPOSITORY" EXPECTED_SHA="$EXPECTED_SHA" \
-                      node .github/scripts/canonical-staging-receipt.mjs)"
-                    staging_receipt_sha="$EXPECTED_SHA"
-                    staging_deployment_id="$(jq -er '.deploymentId' <<<"$canonical_staging_identity")"
-                    staging_artifact_name="staging-deployment-${staging_receipt_sha}"
-                  fi
+                  canonical_staging_sha="$(jq -er '.commitSha | select(type == "string" and test("^[0-9a-f]{40}$"))' <<<"$canonical_staging_identity")"
+                  web_to_staging="$(gh api "repos/$REPOSITORY/compare/${staging_receipt_sha}...${canonical_staging_sha}" --jq '.status // empty')"
+                  staging_to_release="$(gh api "repos/$REPOSITORY/compare/${canonical_staging_sha}...${EXPECTED_SHA}" --jq '.status // empty')"
+                  [[ "$web_to_staging" =~ ^(ahead|identical)$ ]] && [[ "$staging_to_release" =~ ^(ahead|identical)$ ]] || {
+                    echo "::error::Canonical staging does not contain the historical Web head on this production lineage."
+                    exit 1
+                  }
+                  staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
+                    REPOSITORY="$REPOSITORY" EXPECTED_SHA="$canonical_staging_sha" \
+                    node .github/scripts/canonical-staging-receipt.mjs)"
+                  staging_receipt_sha="$canonical_staging_sha"
+                  staging_deployment_id="$(jq -er '.deploymentId' <<<"$canonical_staging_identity")"
+                  staging_artifact_name="staging-deployment-${staging_receipt_sha}"
                 fi
                 if [ -z "$staging_artifact_id" ]; then
                   # A superseded staging generation never deploys, so its exact

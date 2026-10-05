@@ -530,7 +530,7 @@ test('actual controller Bash keeps exact artifact and authenticates empty-ID fal
   }
 });
 
-test('actual controller rebinds a merge-group-only historical head only to authenticated current-main staging', () => {
+test('actual controller rebinds historical Web only to authenticated staging on its release lineage', () => {
   const workflow = readFileSync(
     '.github/workflows/production-controller.yml',
     'utf8'
@@ -553,7 +553,9 @@ test('actual controller rebinds a merge-group-only historical head only to authe
         "if(route.endsWith('/zip'))",
         "if(route.includes('name=staging-deployment-" +
           oldSha +
-          "&')){process.stdout.write(process.env.TEST_HISTORICAL_ARTIFACT || '');process.exit(0);}if(route.endsWith('/zip'))"
+          "&')){process.stdout.write(process.env.TEST_HISTORICAL_ARTIFACT || '');process.exit(0);}if(route.includes('/compare/')){process.stdout.write(route.includes('/compare/" +
+          oldSha +
+          "...') ? process.env.TEST_WEB_TO_STAGE : process.env.TEST_STAGE_TO_MAIN);process.exit(0);}if(route.endsWith('/zip'))"
       )
     );
     writeFileSync(
@@ -561,9 +563,64 @@ test('actual controller rebinds a merge-group-only historical head only to authe
       '#!/usr/bin/env node\nif(process.env.TEST_CURL_FAILURE)process.exit(7);process.stdout.write(process.env.TEST_CANONICAL_IDENTITY);\n'
     );
     chmodSync(join(f.root, 'curl'), 0o755);
-    for (const [historical, identity, failCurl, expected] of [
+    for (const [
+      historical,
+      identity,
+      failCurl,
+      expected,
+      target = sha,
+      webToStage = 'ahead',
+      stageToMain = 'identical',
+    ] of [
       ['', f.env.CANONICAL_STAGING_IDENTITY, '', `102|dpl_exactStage|${sha}`],
       ['999', '', '1', `999||${oldSha}`],
+      // S carried historical Web H; operations-only C may advance main while S
+      // is still canonical staging and production has not advanced from P.
+      [
+        '',
+        f.env.CANONICAL_STAGING_IDENTITY,
+        '',
+        `102|dpl_exactStage|${sha}`,
+        'c'.repeat(40),
+        'ahead',
+        'ahead',
+      ],
+      [
+        '',
+        f.env.CANONICAL_STAGING_IDENTITY,
+        '',
+        null,
+        'c'.repeat(40),
+        'behind',
+        'ahead',
+      ],
+      [
+        '',
+        f.env.CANONICAL_STAGING_IDENTITY,
+        '',
+        null,
+        'c'.repeat(40),
+        'ahead',
+        'diverged',
+      ],
+      [
+        '',
+        f.env.CANONICAL_STAGING_IDENTITY,
+        '',
+        null,
+        'c'.repeat(40),
+        'ahead',
+        'behind',
+      ],
+      [
+        '',
+        f.env.CANONICAL_STAGING_IDENTITY,
+        '',
+        null,
+        'c'.repeat(40),
+        '',
+        'ahead',
+      ],
       [
         '',
         JSON.stringify({ commitSha: oldSha, deploymentId: 'dpl_old' }),
@@ -582,6 +639,9 @@ test('actual controller rebinds a merge-group-only historical head only to authe
         encoding: 'utf8',
         env: {
           ...f.env,
+          EXPECTED_SHA: target,
+          TEST_WEB_TO_STAGE: webToStage,
+          TEST_STAGE_TO_MAIN: stageToMain,
           staging_receipt_sha: oldSha,
           staging_deployment_id: '',
           staging_artifact_name: `staging-deployment-${oldSha}`,

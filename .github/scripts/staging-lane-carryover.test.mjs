@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { resolveStagingCarryover } from './staging-lane-carryover.mjs';
 
@@ -258,6 +259,177 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
         assert.equal(lineage.replacementSha, web);
       if (initial === 'not_applicable' && main === current)
         assert.equal(lineage.carryover.stagingSha, current);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('actual routing stages current non-Web main after exact merge-group Web admission', () => {
+  const workflow = readFileSync(
+    '.github/workflows/staging-controller.yml',
+    'utf8'
+  );
+  const routing = workflow
+    .split('      - id: routing\n')[1]
+    .split('        run: |\n')[1]
+    .split('      - uses:')[0]
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+  const root = mkdtempSync(join(tmpdir(), 'stage-carryover-success-'));
+  try {
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    git('init', '--quiet');
+    git('config', 'user.name', 'Release test');
+    git('config', 'user.email', 'release-test@example.invalid');
+    writeFileSync(join(root, 'README.md'), 'baseline\n');
+    git('add', 'README.md');
+    git('commit', '--quiet', '-m', 'baseline');
+    const stagedSha = git('rev-parse', 'HEAD');
+    writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+    git('add', 'pnpm-lock.yaml');
+    git('commit', '--quiet', '-m', 'Web dependency');
+    const webSha = git('rev-parse', 'HEAD');
+    mkdirSync(join(root, 'scripts/lanes'), { recursive: true });
+    writeFileSync(join(root, 'scripts/lanes/lane_runner.py'), '# operations\n');
+    git('add', 'scripts/lanes/lane_runner.py');
+    git('commit', '--quiet', '-m', 'operations');
+    const mainSha = git('rev-parse', 'HEAD');
+    // Import the real helper while its Git subprocesses run in fixture history.
+    symlinkSync(resolve('.github'), join(root, '.github'), 'dir');
+    mkdirSync(join(root, 'product-lane-release'));
+    writeFileSync(
+      join(root, 'product-lane-release/release.json'),
+      JSON.stringify({
+        ...fixture().currentReceipt,
+        provenance: { sha: mainSha },
+      })
+    );
+    const runId = 37354611740;
+    const artifactId = 101;
+    const run = {
+      id: runId,
+      run_attempt: 1,
+      event: 'merge_group',
+      head_sha: webSha,
+      path: '.github/workflows/ci.yml',
+      head_repository: { full_name: 'JovieInc/Jovie' },
+      status: 'completed',
+      conclusion: 'success',
+    };
+    const prefix = 'repos/JovieInc/Jovie';
+    const routes = {
+      [`${prefix}/actions/workflows/ci.yml/runs?event=merge_group&head_sha=${webSha}&status=completed&per_page=100`]:
+        { workflow_runs: [run] },
+      [`${prefix}/actions/workflows/ci.yml/runs?event=push&head_sha=${webSha}&status=completed&per_page=100`]:
+        { workflow_runs: [] },
+      [`${prefix}/actions/runs/${runId}/attempts/1/jobs?per_page=100`]: {
+        total_count: 1,
+        jobs: [{ ...run, run_id: runId, name: 'PR Ready' }],
+      },
+      [`${prefix}/actions/runs/${runId}/artifacts?per_page=100`]: {
+        total_count: 1,
+        artifacts: [
+          {
+            id: artifactId,
+            expired: false,
+            name: `product-lane-final-${webSha}-1`,
+          },
+        ],
+      },
+    };
+    writeFileSync(join(root, 'routes.json'), JSON.stringify(routes));
+    const receipt = {
+      provenance: { sha: webSha, runId, runAttempt: 1 },
+      aggregatePassed: true,
+      selectedLanes: ['web'],
+      admissions: {
+        web: { selected: true, passed: true, results: ['success'] },
+      },
+    };
+    writeFileSync(join(root, 'final.json'), JSON.stringify(receipt));
+    writeFileSync(join(root, 'final.md'), 'qualified Web\n');
+    execFileSync('zip', ['-q', 'evidence.zip', 'final.json', 'final.md'], {
+      cwd: root,
+    });
+    writeFileSync(
+      join(root, 'gh'),
+      `#!/usr/bin/env node
+const fs=require('node:fs');const route=process.argv[3];
+if(route.endsWith('/commits/main'))process.stdout.write(process.env.TEST_MAIN);
+else if(route.endsWith('/zip'))process.stdout.write(fs.readFileSync(process.env.RUNNER_TEMP+'/evidence.zip'));
+else{const row=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/routes.json','utf8'))[route];if(!row)process.exit(9);process.stdout.write(JSON.stringify(row));}
+`
+    );
+    writeFileSync(
+      join(root, 'curl'),
+      '#!/usr/bin/env node\nprocess.stdout.write(process.env.TEST_IDENTITY);\n'
+    );
+    chmodSync(join(root, 'gh'), 0o755);
+    chmodSync(join(root, 'curl'), 0o755);
+    const env = {
+      ...process.env,
+      PATH: root + delimiter + process.env.PATH,
+      RUNNER_TEMP: root,
+      GITHUB_OUTPUT: join(root, 'output'),
+      INITIAL_OUTCOME: 'not_applicable',
+      EXPECTED_SHA: mainSha,
+      SOURCE_CI_RUN_ID: '37356737863',
+      REPOSITORY: 'JovieInc/Jovie',
+      TEST_MAIN: mainSha,
+      TEST_IDENTITY: JSON.stringify({
+        commitSha: stagedSha,
+        deploymentId: 'dpl_exactStage',
+        environment: 'preview',
+      }),
+    };
+    for (const admitted of [true, false]) {
+      writeFileSync(
+        join(root, 'staging-lineage.json'),
+        JSON.stringify({
+          sha: mainSha,
+          outcome: 'not_applicable',
+          replacementSha: mainSha,
+        })
+      );
+      writeFileSync(join(root, 'output'), '');
+      if (!admitted) {
+        routes[
+          `${prefix}/actions/runs/${runId}/attempts/1/jobs?per_page=100`
+        ].jobs[0].conclusion = 'failure';
+        writeFileSync(join(root, 'routes.json'), JSON.stringify(routes));
+      }
+      const result = spawnSync('bash', ['-c', routing], {
+        cwd: root,
+        env,
+        encoding: 'utf8',
+      });
+      if (!admitted) {
+        assert.notEqual(result.status, 0);
+        assert.equal(readFileSync(join(root, 'output'), 'utf8'), '');
+        continue;
+      }
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(
+        readFileSync(join(root, 'output'), 'utf8'),
+        'outcome=proceed\n'
+      );
+      const lineage = JSON.parse(
+        readFileSync(join(root, 'staging-lineage.json'), 'utf8')
+      );
+      assert.equal(lineage.outcome, 'proceed');
+      assert.deepEqual(lineage.carryover.webEvidence, {
+        sha: webSha,
+        lane: 'web',
+        event: 'merge_group',
+        runId,
+        runAttempt: 1,
+        artifactId,
+        artifactName: `product-lane-final-${webSha}-1`,
+      });
+      assert.equal(lineage.carryover.stagingSha, stagedSha);
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
