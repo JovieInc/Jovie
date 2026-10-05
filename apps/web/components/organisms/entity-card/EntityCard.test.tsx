@@ -426,6 +426,7 @@ describe('ProfilePacCard landscape states', () => {
 
     const card = screen.getByTestId('profile-pac');
     await waitFor(() => expect(card).toHaveAttribute('data-state', 'idle'));
+    expect(screen.getByRole('slider', { name: 'Seek Track' })).toBeEnabled();
     expect(
       screen.queryByRole('textbox', { name: /email address/i })
     ).toBeNull();
