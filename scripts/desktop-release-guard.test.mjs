@@ -9,6 +9,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  realpath,
   rm,
   writeFile,
 } from 'node:fs/promises';
@@ -2124,7 +2125,10 @@ esac
 
 test('desktop release CLI uses the exact merge-group base without weakening stamp scope', async t => {
   async function fixture() {
-    const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-queue-base-'));
+    // macOS temp directories can be symlinks; match Node's resolved CLI URL.
+    const root = await realpath(
+      await mkdtemp(join(tmpdir(), 'jovie-desktop-queue-base-'))
+    );
     t.after(() => rm(root, { force: true, recursive: true }));
     const git = (...args) =>
       execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
