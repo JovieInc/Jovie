@@ -1,0 +1,8 @@
+The branch is unchanged and clean; no commit or push was made.
+
+- Both checks failed because GitHub App installation `112037986` exhausted its shared 5,000-request GraphQL quota.
+- The enqueue sweep failed while inspecting PR #20075, unrelated to #20051.
+- Later workflow runs succeeded after main switched from an 85-PR sweep to exact-PR scanning.
+- PR #20051 remains open at `6e7a5beb` and is currently in the native merge queue.
+
+NOT-SHIPPABLE: failures were shared GitHub infrastructure rate-limit exhaustion, not caused by this PR.
