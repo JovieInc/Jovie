@@ -15,7 +15,7 @@ import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
 import {
   getBrowserTurnstileHostname,
-  resolveTurnstileSiteKey,
+  resolveOnboardingTurnstileSiteKey,
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
@@ -46,6 +46,11 @@ interface OnboardingShellProps {
   readonly intentId?: string;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+  /**
+   * Server-resolved synthetic principal passage (JOV-7697): mount the
+   * Cloudflare test sitekey. Never derived from client input.
+   */
+  readonly turnstileTestMode?: boolean;
   /** The real page behind `?handle=`, shown before the visitor types. */
   readonly entryProfile?: StartEntryProfile | null;
 }
@@ -76,6 +81,7 @@ export function OnboardingShell({
   intentId,
   sessionLabel,
   starterHandoff,
+  turnstileTestMode = false,
   entryProfile,
 }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -148,14 +154,16 @@ export function OnboardingShell({
       instruction={turnstileInstruction}
       focusSignal={turnstileFocusSignal}
       resetSignal={turnstileResetSignal}
+      testMode={turnstileTestMode}
     />
   );
   const turnstilePanelVisible = isOnboardingTurnstilePanelVisible(
     turnstileState,
     turnstileInstruction,
-    resolveTurnstileSiteKey(
+    resolveOnboardingTurnstileSiteKey(
       getBrowserTurnstileHostname(),
-      publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+      turnstileTestMode
     )
   );
 
