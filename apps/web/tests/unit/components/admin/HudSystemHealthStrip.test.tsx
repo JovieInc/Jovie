@@ -17,6 +17,13 @@ function metrics(gbrain?: HudMetrics['gbrain']): HudMetrics {
 const checkedAtIso = '2026-09-27T18:00:00.000Z';
 
 describe('HudSystemHealthStrip gbrain pill', () => {
+  it('uses the page plane for standalone system health', () => {
+    render(<HudSystemHealthStrip metrics={metrics()} presentation='page' />);
+    expect(
+      screen.getByRole('region', { name: 'System Health' }).className
+    ).not.toContain('bg-surface');
+  });
+
   it('shows No Signal when gbrain is not configured', () => {
     render(<HudSystemHealthStrip metrics={metrics()} />);
     expect(screen.getByText('No Signal')).toBeInTheDocument();
