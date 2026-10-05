@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
@@ -1824,6 +1825,151 @@ ${selectedGateScript}`,
       "github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"
     );
   });
+
+  it.each([
+    [
+      'admitted queue',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'success',
+      'true',
+      true,
+    ],
+    [
+      'denied queue',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'success',
+      'false',
+      false,
+    ],
+    [
+      'failed admission',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'failure',
+      'true',
+      false,
+    ],
+    [
+      'skipped admission',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'main fallback',
+      'push',
+      'refs/heads/main',
+      'success',
+      'false',
+      'skipped',
+      '',
+      true,
+    ],
+    [
+      'queue-proven main',
+      'push',
+      'refs/heads/main',
+      'skipped',
+      '',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'failed path intake',
+      'push',
+      'refs/heads/main',
+      'failure',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'no-op queue',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'true',
+      'success',
+      'true',
+      false,
+    ],
+    [
+      'feature push',
+      'push',
+      'refs/heads/feature',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'manual dispatch',
+      'workflow_dispatch',
+      'refs/heads/main',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'source PR',
+      'pull_request',
+      'refs/pull/1/merge',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+  ])(
+    'selects the required product-lane receipt for %s',
+    (_name, event, ref, paths, noop, admission, admitted, expected) => {
+      const workflow = /** @type {{ jobs: Record<string, { if: string }> }} */ (
+        load(CI_WORKFLOW)
+      );
+      // This predicate uses only boolean operators and string equality, whose
+      // semantics match Actions here. Bracket notation preserves hyphenated IDs.
+      const predicate = workflow.jobs['ci-product-lane-receipt'].if.replace(
+        /needs\.([a-z0-9-]+)/g,
+        'needs["$1"]'
+      );
+      const selected = runInNewContext(
+        predicate,
+        {
+          always: () => true,
+          github: { event_name: event, ref },
+          needs: {
+            'ci-path-changes': {
+              result: paths,
+              outputs: { is_noop_merge_group: noop },
+            },
+            'ci-merge-group-admission': {
+              result: admission,
+              outputs: { admitted },
+            },
+          },
+        },
+        { timeout: 1000 }
+      );
+      expect(selected).toBe(expected);
+    }
+  );
 
   it('builds the exact product-lane receipt with a valid immutable run URL', () => {
     const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
