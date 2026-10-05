@@ -77,6 +77,19 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   ),
 }));
 
+vi.mock('@/components/organisms/whats-new/WhatsNewBanner', () => ({
+  WhatsNewBanner: (props: {
+    readonly enabled: boolean;
+    readonly collapsed?: boolean;
+  }) => (
+    <div
+      data-testid='sidebar-whats-new'
+      data-enabled={String(props.enabled)}
+      data-collapsed={String(Boolean(props.collapsed))}
+    />
+  ),
+}));
+
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
   SidebarBottomNowPlayingBridge: (props: { readonly collapsed?: boolean }) => {
     nowPlayingBridgePropsMock(props);
@@ -282,22 +295,28 @@ describe('UnifiedSidebar library route', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps pending Inbox work reachable without a sidebar notifications region', () => {
-    // Runtime updates moved from the sidebar to the central Inbox
-    // (RuntimeUpdateProvider + the DashboardNav Inbox bell); the notification region
-    // and its pill are gone from the sidebar content.
+  it("orders update, What's New, and now-playing in the ambient dock", () => {
     electronRuntimeMock.isElectronRuntime = false;
-    renderUnifiedSidebar({
+    const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.DASHBOARD,
       section: 'dashboard',
     });
 
-    expect(
-      screen.queryByTestId('sidebar-notifications')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('update-available-pill')
-    ).not.toBeInTheDocument();
+    const dock = container.querySelector('[data-sidebar-dock="true"]');
+    const update = screen.getByTestId('update-available-pill');
+    const whatsNew = screen.getByTestId('sidebar-whats-new');
+    const nowPlaying = screen.getByTestId('sidebar-now-playing-bridge');
+    expect(dock).toContainElement(update);
+    expect(dock).toContainElement(whatsNew);
+    expect(dock).toContainElement(nowPlaying);
+    expect(update.compareDocumentPosition(whatsNew)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(whatsNew.compareDocumentPosition(nowPlaying)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(whatsNew).toHaveAttribute('data-enabled', 'false');
+    expect(whatsNew).toHaveAttribute('data-collapsed', 'false');
   });
 
   it('keeps the unified user panel available on settings routes', () => {
@@ -500,10 +519,24 @@ describe('UnifiedSidebar library route', () => {
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
   });
 
+  it('keeps the static OV mark at nav-icon scale with no footer duplicate', () => {
+    const { container } = renderUnifiedSidebar({
+      pathname: APP_ROUTES.OV,
+      section: 'ov',
+      variant: 'ov',
+    });
+
+    const marks = container.querySelectorAll('[data-brand-variant="ov"]');
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveAttribute('data-brand-mark-size', '16');
+    expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
+  });
+
   it('renders dedicated operator navigation without the customer dashboard nav', () => {
-    renderUnifiedSidebar({
+    const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.ADMIN_OPS,
       section: 'ov',
+      variant: 'ov',
     });
 
     expect(
@@ -533,6 +566,12 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.getByRole('button', { name: 'Sign Out' })
     ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-sidebar-dock="true"]')
+    ).toContainElement(screen.getByTestId('sidebar-whats-new'));
+    expect(
+      container.querySelector('[data-sidebar-dock="true"]')
+    ).toContainElement(screen.getByTestId('sidebar-now-playing-bridge'));
   });
 
   it('marks only the exact Operations destination current', () => {

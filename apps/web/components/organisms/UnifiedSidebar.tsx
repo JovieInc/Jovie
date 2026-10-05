@@ -15,6 +15,7 @@ import { type PropsWithChildren, useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
@@ -55,6 +56,7 @@ import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
@@ -65,6 +67,7 @@ import {
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
+import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
 
 export interface UnifiedSidebarProps {
   readonly section: AppShellSection;
@@ -348,7 +351,7 @@ function SidebarHeaderNav({
               {variant === 'ov' ? (
                 <>
                   <BrandLogo
-                    size={24}
+                    size='compact'
                     tone='auto'
                     variant={variant}
                     rounded={false}
@@ -429,6 +432,7 @@ export function UnifiedSidebar({
   const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
+  const isElectron = useIsElectronRuntime();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
@@ -440,6 +444,16 @@ export function UnifiedSidebar({
   // waiting for the effect-backed runtime hook would miss a boot-time event.
 
   const { profileHref } = useProfileData(section !== 'ov');
+  const isSidebarCollapsed = sidebarState === 'closed';
+  const showWhatsNew =
+    !env.IS_TEST && !env.IS_E2E && (isElectron || section === 'ov');
+  const ambientDock = (
+    <SidebarDock>
+      {isSidebarCollapsed ? null : <UpdateAvailablePill />}
+      <WhatsNewBanner enabled={showWhatsNew} collapsed={isSidebarCollapsed} />
+      <SidebarBottomNowPlayingBridge collapsed={isSidebarCollapsed} />
+    </SidebarDock>
+  );
 
   return (
     <Sidebar
@@ -502,6 +516,7 @@ export function UnifiedSidebar({
 
       {section === 'ov' ? (
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
+          {ambientDock}
           <OperatorSessionControls />
         </SidebarFooter>
       ) : (
@@ -509,11 +524,7 @@ export function UnifiedSidebar({
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so media and the protected account panel pin bottom.
         <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
-          <SidebarDock>
-            <SidebarBottomNowPlayingBridge
-              collapsed={sidebarState === 'closed'}
-            />
-          </SidebarDock>
+          {ambientDock}
           <SidebarIdentityGroup
             calm={!isRouteSidebar}
             profileHref={profileHref}
