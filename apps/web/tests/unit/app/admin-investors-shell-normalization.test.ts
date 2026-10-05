@@ -39,6 +39,17 @@ const INVESTOR_TABLE_PRIMITIVES = findSourceFile(
   )
 );
 
+const INVESTOR_PIPELINE_TABLE = findSourceFile(
+  resolve(
+    process.cwd(),
+    'components/features/admin/investors/InvestorPipelineTable.tsx'
+  ),
+  resolve(
+    process.cwd(),
+    'apps/web/components/features/admin/investors/InvestorPipelineTable.tsx'
+  )
+);
+
 const INVESTOR_SETTINGS_PAGE = findSourceFile(
   resolve(process.cwd(), 'app/app/(shell)/admin/investors/settings/page.tsx'),
   resolve(
@@ -59,14 +70,18 @@ const INVESTOR_SETTINGS_FORM = findSourceFile(
 );
 
 describe('admin investor shell normalization', () => {
-  it('keeps investor tables on the local shared table primitives', () => {
+  it('keeps the investor pipeline on UnifiedTable and link management on the local shared primitives', () => {
     const pageSource = readFileSync(INVESTORS_PAGE, 'utf8');
     const managerSource = readFileSync(INVESTOR_LINKS_MANAGER, 'utf8');
     const primitivesSource = readFileSync(INVESTOR_TABLE_PRIMITIVES, 'utf8');
+    const pipelineSource = readFileSync(INVESTOR_PIPELINE_TABLE, 'utf8');
 
-    expect(pageSource).toContain(
+    expect(pageSource).toContain('InvestorPipelineTable');
+    expect(pageSource).not.toContain(
       "from './_components/InvestorTablePrimitives'"
     );
+    expect(pipelineSource).toContain('<UnifiedTable');
+    expect(pipelineSource).toContain('minWidth={INVESTOR_TABLE_MIN_WIDTH}');
     expect(managerSource).toContain(
       "from '../_components/InvestorTablePrimitives'"
     );
