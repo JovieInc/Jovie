@@ -65,6 +65,7 @@ jobs:
             scripts/lib/ci-harness.mjs
             scripts/lib/remediation-signal.mjs
             scripts/lib/linear-issue-intake.mjs
+            scripts/lib/linear-cooldown.mjs
             scripts/invariants/assurance-matrix.mjs
             scripts/invariants/assurance-matrix.json
           sparse-checkout-cone-mode: false
