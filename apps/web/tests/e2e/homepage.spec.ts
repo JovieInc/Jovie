@@ -284,6 +284,78 @@ test.describe('Homepage', () => {
     }
   });
 
+  test('aligns the hero with the shared page spine and desktop columns', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1024, height: 900 },
+      { width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+
+      const geometry = await page.evaluate(() => {
+        const hero = document.querySelector<HTMLElement>(
+          '[data-testid="marketing-section-hero"]'
+        );
+        const section = document.querySelector<HTMLElement>(
+          '.homepage-identity-section__inner'
+        );
+        const sectionHeader = document.querySelector<HTMLElement>(
+          '.homepage-identity-section__header'
+        );
+        const heading = hero?.querySelector('h1');
+        const card = hero?.querySelector('[data-testid="homepage-claim-card"]');
+        if (!hero || !section || !sectionHeader || !heading || !card) {
+          throw new Error(
+            'The actual homepage hero and following section must render'
+          );
+        }
+        const heroBox = hero.getBoundingClientRect();
+        const sectionBox = section.getBoundingClientRect();
+        const style = getComputedStyle(hero);
+        const leftPadding = Number.parseFloat(style.paddingLeft);
+        const rightPadding = Number.parseFloat(style.paddingRight);
+        return {
+          contentLeft: heroBox.x + leftPadding,
+          contentWidth: heroBox.width - leftPadding - rightPadding,
+          sectionLeft: sectionBox.x,
+          sectionWidth: sectionBox.width,
+          headingLeft: heading.getBoundingClientRect().x,
+          cardLeft: card.getBoundingClientRect().x,
+          columnGap: Number.parseFloat(
+            getComputedStyle(sectionHeader).columnGap
+          ),
+        };
+      });
+      const atWidth = JSON.stringify({ width: viewport.width, ...geometry });
+      expect(
+        Math.abs(geometry.contentLeft - geometry.sectionLeft),
+        atWidth
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(geometry.contentWidth - geometry.sectionWidth),
+        atWidth
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(geometry.headingLeft - geometry.sectionLeft),
+        atWidth
+      ).toBeLessThanOrEqual(1);
+      if (viewport.width >= 1024) {
+        const seventhColumn =
+          geometry.sectionLeft +
+          (geometry.sectionWidth + geometry.columnGap) / 2;
+        expect(
+          Math.abs(geometry.cardLeft - seventhColumn),
+          atWidth
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
   test('keeps layout shift under 0.1 while the hero loads', async ({
     page,
   }) => {
