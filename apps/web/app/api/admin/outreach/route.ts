@@ -11,6 +11,8 @@ import {
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
+import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { campaignSettings } from '@/lib/db/schema/admin';
@@ -21,6 +23,7 @@ import {
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
 import {
   OUTREACH_QUEUE_CLAIM_TTL_MS,
   processOutreachBatch,
@@ -341,6 +344,24 @@ export async function POST(request: NextRequest) {
     }
 
     const { limit } = validated.data;
+
+    // JOV-7696: a manual trigger is still acquisition, so it waits for
+    // ACQUISITION_ELIGIBLE exactly like the frequent cron (JOV-7859).
+    if (isInstantlyOutboundEnabled()) {
+      const eligibility = await getAcquisitionEligibility();
+      if (!eligibility.eligible) {
+        return NextResponse.json(
+          {
+            error: describeAcquisitionBlock(eligibility),
+            code: 'ACQUISITION_NOT_ELIGIBLE',
+            verdict: eligibility.verdict,
+            firstBlocker: eligibility.firstBlocker?.id ?? null,
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
     const result = await processOutreachBatch(limit, {
       ignorePipelineEnabled: true,
     });

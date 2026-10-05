@@ -15,7 +15,6 @@ import {
   lte,
   or,
 } from 'drizzle-orm';
-
 import { db } from '@/lib/db';
 import { campaignSettings } from '@/lib/db/schema/admin';
 import {
@@ -29,6 +28,7 @@ import { emailSuppressions } from '@/lib/db/schema/suppression';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
 import type { SuppressionReason } from '@/lib/notifications/suppression';
 import { hashEmail } from '@/lib/notifications/suppression';
+import { isColdClaimInviteSendOpen } from '@/lib/outbound/cold-claim-invites';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -358,6 +358,9 @@ export async function processCampaigns(): Promise<ProcessCampaignsResult> {
     completed: 0,
     errors: 0,
   };
+
+  // Follow-ups are cold claim invites too; nothing sends while closed.
+  if (!isColdClaimInviteSendOpen()) return result;
 
   const now = new Date();
 

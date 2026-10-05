@@ -150,6 +150,24 @@ describe('isProfileRoute', () => {
     }
   );
 
+  it.each(['/hud', '/hud/wiki', '/HUD/'])(
+    'keeps the reserved Ops path out of profile feedback suppression: %s',
+    pathname => {
+      expect(isProfileRoute(pathname)).toBe(false);
+      expect(classifyRoute(pathname)).toMatchObject({
+        type: 'public',
+        useFullSdk: false,
+        useLiteSdk: true,
+        isDynamic: false,
+      });
+    }
+  );
+
+  it('preserves similarly named profile routes', () => {
+    expect(isProfileRoute('/huddle')).toBe(true);
+    expect(isProfileRoute('/hudson/listen')).toBe(true);
+  });
+
   it('should handle hyphenated usernames', () => {
     expect(isProfileRoute('/my-artist-name')).toBe(true);
   });

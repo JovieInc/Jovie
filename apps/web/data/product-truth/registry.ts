@@ -736,7 +736,7 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
   MARKETING_GENERIC_CREATOR_NAV: {
     nonMarketing:
-      'marketing copy presentation; default off; does not change smart-link certification (JOV-7580)',
+      'marketing copy presentation; default on, env kill switch; does not change smart-link certification (JOV-7580)',
   },
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: {
     nonMarketing: 'OAuth dynamic client registration kill switch',

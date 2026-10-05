@@ -11,6 +11,12 @@ export interface ScreenRecording {
 
 export interface ScreenRecordingSession {
   readonly stop: () => Promise<ScreenRecording>;
+  readonly cancel: () => void;
+}
+
+interface RecordingOptions {
+  readonly signal?: AbortSignal;
+  readonly isCurrent?: () => boolean;
 }
 
 function pickRecorderMimeType(): string {
@@ -34,60 +40,129 @@ export function canRecordScreen(): boolean {
 }
 
 export async function startScreenRecording(
-  purpose: CapturePurpose
+  purpose: CapturePurpose,
+  options: RecordingOptions = {}
 ): Promise<ScreenRecordingSession> {
-  if (!canRecordScreen()) {
+  const isCurrent = () =>
+    !options.signal?.aborted && (options.isCurrent?.() ?? true);
+  const cancelled = () =>
+    new DOMException('Screen recording cancelled.', 'AbortError');
+  if (!isCurrent()) throw cancelled();
+  if (!canRecordScreen())
     throw new Error('Screen recording is not available in this window.');
-  }
 
+  // getDisplayMedia cannot dismiss its picker through AbortSignal. Dispose a
+  // late selection before recording if its owner has left or cancelled.
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video: true,
     audio: true,
   });
+  if (!isCurrent()) {
+    stopTracks(stream);
+    throw cancelled();
+  }
+  let recorder: MediaRecorder;
+  let mimeType: string;
+  try {
+    mimeType = pickRecorderMimeType();
+    recorder = new MediaRecorder(stream, { mimeType });
+  } catch (error) {
+    stopTracks(stream);
+    throw error;
+  }
   const chunks: Blob[] = [];
   const startedAt = Date.now();
-  const mimeType = pickRecorderMimeType();
-  const recorder = new MediaRecorder(stream, { mimeType });
-
+  let settled = false;
+  let resolve!: (recording: ScreenRecording) => void;
+  let reject!: (error: Error) => void;
+  const done = new Promise<ScreenRecording>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  // Errors can arrive before the user presses Stop. Keep stop() rejecting, but
+  // handle the retained promise while no caller is awaiting it yet.
+  void done.catch(() => undefined);
+  const cleanup = () => {
+    options.signal?.removeEventListener('abort', cancel);
+    stream.getVideoTracks()[0]?.removeEventListener('ended', stopRecorder);
+    recorder.ondataavailable = null;
+    recorder.onstop = null;
+    recorder.onerror = null;
+    stopTracks(stream);
+  };
+  const fail = (error: Error) => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    if (recorder.state !== 'inactive') {
+      try {
+        recorder.stop();
+      } catch {
+        /* Tracks are already stopped. */
+      }
+    }
+    reject(error);
+  };
+  function cancel() {
+    fail(cancelled());
+  }
+  function stopRecorder() {
+    if (!isCurrent()) {
+      cancel();
+      return;
+    }
+    if (recorder.state !== 'inactive') {
+      try {
+        recorder.stop();
+      } catch {
+        fail(new Error('Screen recording failed.'));
+      }
+    }
+  }
   recorder.ondataavailable = event => {
-    if (event.data.size > 0) chunks.push(event.data);
+    if (!settled && event.data.size > 0) chunks.push(event.data);
   };
-
-  let settle: (recording: ScreenRecording) => void;
-  let fail: (error: Error) => void;
-  const done = new Promise<ScreenRecording>((resolve, reject) => {
-    settle = resolve;
-    fail = reject;
-  });
-
-  recorder.onerror = () => {
-    stopTracks(stream);
-    fail(new Error('Screen recording failed.'));
-  };
-
+  recorder.onerror = () => fail(new Error('Screen recording failed.'));
   recorder.onstop = () => {
-    stopTracks(stream);
-    const blob = new Blob(chunks, { type: mimeType });
-    const file = new File([blob], captureVideoFileName(purpose, new Date()), {
-      type: mimeType,
-    });
-    settle({
-      file,
-      durationMs: Date.now() - startedAt,
-      byteSize: file.size,
-    });
+    if (settled) return;
+    if (!isCurrent()) {
+      cancel();
+      return;
+    }
+    try {
+      const file = new File(
+        [new Blob(chunks, { type: mimeType })],
+        captureVideoFileName(purpose, new Date()),
+        { type: mimeType }
+      );
+      settled = true;
+      cleanup();
+      resolve({
+        file,
+        durationMs: Date.now() - startedAt,
+        byteSize: file.size,
+      });
+    } catch {
+      fail(new Error('Screen recording failed.'));
+    }
   };
-
-  stream.getVideoTracks()[0]?.addEventListener('ended', () => {
-    if (recorder.state === 'recording') recorder.stop();
-  });
-
-  recorder.start(1000);
-
+  stream.getVideoTracks()[0]?.addEventListener('ended', stopRecorder);
+  options.signal?.addEventListener('abort', cancel, { once: true });
+  if (!isCurrent()) {
+    cancel();
+  } else {
+    try {
+      recorder.start(1000);
+    } catch {
+      fail(new Error('Screen recording failed.'));
+    }
+  }
+  if (settled) await done;
   return {
     stop: async () => {
-      if (recorder.state === 'recording') recorder.stop();
+      stopRecorder();
       return done;
     },
+    cancel,
   };
 }

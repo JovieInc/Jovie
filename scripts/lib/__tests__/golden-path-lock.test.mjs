@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGoldenPathLinearIssue } from '../golden-path-intake.mjs';
 import {
   AUTOFIX_ESCALATION_MARKER,
@@ -656,6 +656,26 @@ describe('golden-path lock autofix planner', () => {
 });
 
 describe('golden-path Linear-only intake', () => {
+  // Mocked 429s use the real persistent cooldown helper. Keep their state
+  // local to each case so repeated qualification runs still reach the mocks.
+  let cooldownStateDir;
+  let previousCooldownStateDir;
+
+  beforeEach(() => {
+    previousCooldownStateDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
+    cooldownStateDir = mkdtempSync(join(tmpdir(), 'golden-path-linear-test-'));
+    process.env.LINEAR_COOLDOWN_STATE_DIR = cooldownStateDir;
+  });
+
+  afterEach(() => {
+    if (previousCooldownStateDir === undefined) {
+      delete process.env.LINEAR_COOLDOWN_STATE_DIR;
+    } else {
+      process.env.LINEAR_COOLDOWN_STATE_DIR = previousCooldownStateDir;
+    }
+    rmSync(cooldownStateDir, { recursive: true, force: true });
+  });
+
   const searchEmpty = () =>
     new Response(
       JSON.stringify({

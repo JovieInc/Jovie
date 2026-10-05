@@ -28,11 +28,11 @@ describe('code flags', () => {
     expect(isCodeFlagEnabled('MUSICFETCH_FALLBACK')).toBe(true);
   });
 
-  it('keeps generic creator marketing copy off unless the env override is true', () => {
-    expect(CODE_FLAGS.MARKETING_GENERIC_CREATOR_NAV).toBe(false);
-    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(false);
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'true';
+  it('ships generic creator marketing copy on with an env kill switch', () => {
+    expect(CODE_FLAGS.MARKETING_GENERIC_CREATOR_NAV).toBe(true);
     expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(true);
+    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
+    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(false);
     delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
   });
 
