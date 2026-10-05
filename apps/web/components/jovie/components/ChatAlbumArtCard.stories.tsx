@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { ChatAlbumArtToolResult } from '../types';
 import { ChatAlbumArtCard } from './ChatAlbumArtCard';
+import { ALBUM_ART_SWIPE_PREFERENCE_KEY } from './ChatAlbumArtSwipeReview';
 
 function ChatAlbumArtCardStoryShell({
   children,
@@ -87,6 +88,30 @@ export const GeneratedCandidates: Story = {
   args: {
     result: generatedResult,
   },
+};
+
+export const SwipeReviewOnboarding: Story = {
+  args: {
+    result: generatedResult,
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.removeItem(ALBUM_ART_SWIPE_PREFERENCE_KEY);
+      return <Story />;
+    },
+  ],
+};
+
+export const SwipeReviewMode: Story = {
+  args: {
+    result: generatedResult,
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'on');
+      return <Story />;
+    },
+  ],
 };
 
 export const NeedsReleaseTarget: Story = {
