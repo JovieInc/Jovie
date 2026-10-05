@@ -138,6 +138,44 @@ class ContextManifestTest(unittest.TestCase):
 
 
 class SelectionTest(unittest.TestCase):
+    def test_dispatch_next_precedes_aged_product_and_compounding_work(self):
+        now = datetime(2026, 10, 5, tzinfo=timezone.utc).timestamp()
+        target = issue("JOV-7896", priority=2, created="2026-10-05T00:00:00Z",
+                       labels=["agent-ready", "dispatch-next"])
+        target.title = "Repair account to claim conversion"
+        old = issue("JOV-4258", priority=1, created="2026-09-01T00:00:00Z")
+        old.title = "Strict typography audit"
+        ci = issue("JOV-CI", priority=1, created="2026-09-01T00:00:00Z")
+        ci.title = "Fix CI throughput"
+        for pool in ([old, ci, target], [target, ci, old]):
+            self.assertIs(lane.pick_issue(pool, {}, now=now), target)
+        target.labels.remove("dispatch-next")
+        self.assertIs(lane.pick_issue([old, ci, target], {}, now=now), ci)
+
+    def test_dispatch_next_preserves_admission_and_lane_routing(self):
+        now = 10000.0
+        target = issue("JOV-PIN", labels=["agent-ready", "dispatch-next"])
+        other = issue("JOV-OTHER", priority=1)
+        for kwargs, failures in [
+            ({"in_flight": frozenset({"jov-pin"})}, {}),
+            ({"held_back": frozenset({"JOV-PIN"})}, {}),
+            ({}, {"JOV-PIN": 3}),
+            ({}, {"JOV-PIN": {"count": 1, "at": 9990}}),
+        ]:
+            with self.subTest(kwargs=kwargs, failures=failures):
+                self.assertIs(lane.pick_issue([target, other], failures, now=now, **kwargs), other)
+        for label in ("no-symphony", "type:epic", "auth"):
+            target.labels = ["agent-ready", "dispatch-next", label]
+            self.assertIs(lane.pick_issue([target, other], {}, now=now, provider="devin"), other)
+        target.labels = ["agent-ready", "dispatch-next", "devin"]
+        self.assertIs(lane.pick_issue([target, other], {}, now=now, provider="codex",
+            route=lambda task: {"chosen": {"lane": "devin" if task is target else "codex"}}), other)
+
+    def test_dispatch_next_without_pool_admission_keeps_default_order(self):
+        unadmitted = issue("JOV-PIN", priority=4, labels=["dispatch-next"])
+        urgent = issue("JOV-URGENT", priority=1)
+        self.assertIs(lane.pick_issue([unadmitted, urgent], {}, now=10000), urgent)
+
     def test_rejection_reasons_match_final_worker_admission(self):
         red = issue("JOV-RED")
         red.title = "Rotate production credentials"
