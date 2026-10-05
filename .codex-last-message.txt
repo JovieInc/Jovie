@@ -1,0 +1,8 @@
+The required ship preamble found a gstack update (`0.14.5.0` → `1.91.13.0`). To avoid unrelated tooling changes while repairing PR #20068, I recommend **not upgrading now**.
+
+Choose one:
+
+1. Not now — continue fixing the PR.
+2. Upgrade now — I’ll first verify the PR is still open, as required.
+3. Always auto-upgrade.
+4. Never ask again.
