@@ -2564,6 +2564,27 @@ export function buildControlCoverageCommands() {
   return [
     ['pnpm', nativeCoverageArgs],
     ['pnpm', ownerlessCoverageArgs],
+    [
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/production-lane-range.test.mjs',
+        '--coverage',
+        '--coverage.include=lib/production-lane-range.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.statements=75',
+        '--coverage.thresholds.lines=75',
+        '--coverage.thresholds.branches=70',
+        '--coverage.thresholds.functions=90',
+        controlCoverageReportsDirectory('production-lane-range'),
+      ],
+    ],
   ];
 }
 
