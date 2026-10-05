@@ -11,4 +11,4 @@
 
 export const EMAIL_SIGNATURE_ICON_VERSION = 'v1';
 
-export const EMAIL_SIGNATURE_ICON_BASE_PATH = `/email-signature/social-icons/${EMAIL_SIGNATURE_ICON_VERSION}`;
+export const EMAIL_SIGNATURE_ICON_BASE_PATH = `/email-signature/social-icons/generated/${EMAIL_SIGNATURE_ICON_VERSION}`;

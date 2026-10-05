@@ -4,7 +4,7 @@
  * Renders every entry of the canonical `SOCIAL_ICON_DATA` registry
  * (`lib/social-icons/icon-data.ts`) through sharp and writes one
  * `<normalized-key>.png` per platform under
- * `public/email-signature/social-icons/<version>/`. The runtime URL map
+ * `public/email-signature/social-icons/generated/<version>/`. The runtime URL map
  * lives in `lib/email-signature/social-icons.ts`.
  *
  * Usage: pnpm --filter web generate:email-signature-icons

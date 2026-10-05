@@ -81,9 +81,13 @@ describe('buildEmailSignature', () => {
         { label: 'Spotify', url: 'https://open.spotify.com/artist/a' },
       ],
     });
-    expect(html).toContain('/email-signature/social-icons/v1/instagram.png');
+    expect(html).toContain(
+      '/email-signature/social-icons/generated/v1/instagram.png'
+    );
     // Spotify is detected from the URL host when no platform is provided.
-    expect(html).toContain('/email-signature/social-icons/v1/spotify.png');
+    expect(html).toContain(
+      '/email-signature/social-icons/generated/v1/spotify.png'
+    );
     expect(html).toContain('alt="Instagram"');
     // Icon rail uses a nested presentation table, not the text separator.
     expect(html).not.toContain('&nbsp;·&nbsp;');
@@ -98,7 +102,9 @@ describe('buildEmailSignature', () => {
         { label: 'My Site', url: 'https://example.com/a' },
       ],
     });
-    expect(html).toContain('/email-signature/social-icons/v1/instagram.png');
+    expect(html).toContain(
+      '/email-signature/social-icons/generated/v1/instagram.png'
+    );
     expect(html).toContain('>My Site</a>');
   });
 

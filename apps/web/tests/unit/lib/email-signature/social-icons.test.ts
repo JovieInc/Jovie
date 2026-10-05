@@ -30,7 +30,7 @@ describe('email signature social icons', () => {
 
   it('builds versioned https icon URLs under the Jovie host', () => {
     expect(getEmailSignatureIconUrl('spotify')).toBe(
-      'https://jov.ie/email-signature/social-icons/v1/spotify.png'
+      'https://jov.ie/email-signature/social-icons/generated/v1/spotify.png'
     );
     expect(getEmailSignatureIconUrl('unknown')).toBeNull();
   });
