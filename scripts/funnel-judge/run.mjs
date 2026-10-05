@@ -7,7 +7,13 @@
 // CLI judges, applies the pass bar and writes a JSON receipt plus one trend
 // line. Exit code 0 = pass, 1 = fail, 2 = scorer error or failed calibration.
 
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { captureFunnel } from './capture.mjs';
@@ -20,6 +26,7 @@ import {
 import {
   calibrationHolds,
   evaluatePassBar,
+  objectionsFor,
   PERSONAS,
   RUBRIC_VERSION,
   trendLine,
@@ -43,6 +50,10 @@ const { values } = parseArgs({
       default: join(ROOT, 'scripts/funnel-judge/trend.jsonl'),
     },
     personas: { type: 'string' },
+    objections: {
+      type: 'string',
+      default: join(ROOT, 'scripts/voc/persona-objections.json'),
+    },
     'skip-judge': { type: 'boolean', default: false },
     'no-emotional': { type: 'boolean', default: false },
     'no-coherence': { type: 'boolean', default: false },
@@ -124,6 +135,10 @@ async function main() {
     const personas = personaIds
       ? PERSONAS.filter(persona => personaIds.includes(persona.id))
       : PERSONAS;
+    // Mined VOC objections (#20535); a missing file means no objections.
+    const voc = existsSync(values.objections)
+      ? JSON.parse(readFileSync(values.objections, 'utf8'))
+      : null;
     const judges = values['no-emotional']
       ? [JUDGES.primary]
       : [JUDGES.primary, JUDGES.emotional];
@@ -153,6 +168,7 @@ async function main() {
             persona,
             judge,
             steps: judgeSteps,
+            objections: objectionsFor(voc, persona.id),
             imageDir: outDir,
           });
           console.log(

@@ -1,38 +1,14 @@
 'use client';
 
+import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   getDeploymentLabel,
   getDeploymentTone,
   type HudTone,
 } from '@/lib/hud/tone-determination';
-import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 import type { HudMetrics } from '@/types/hud';
-
-function StatusPill({
-  label,
-  tone,
-}: Readonly<{ readonly label: string; readonly tone: HudTone }>) {
-  const accent = getAccentCssVars(HUD_TONE_ACCENT[tone]);
-  const color =
-    tone === 'neutral' ? 'var(--color-text-secondary-token)' : accent.solid;
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-2xs font-medium leading-none'
-      )}
-      style={{
-        borderColor: `color-mix(in oklab, ${accent.solid} 26%, var(--app-shell-frame-seam))`,
-        backgroundColor: accent.subtle,
-        color,
-      }}
-    >
-      {label}
-    </span>
-  );
-}
 
 interface HealthEntry {
   readonly name: string;
@@ -94,22 +70,36 @@ function buildHealthEntries(metrics: HudMetrics): HealthEntry[] {
  */
 export function HudSystemHealthStrip({
   metrics,
-}: Readonly<{ readonly metrics: HudMetrics }>) {
+  presentation = 'section',
+}: Readonly<{
+  readonly metrics: HudMetrics;
+  readonly presentation?: 'section' | 'page';
+}>) {
   const entries = buildHealthEntries(metrics);
+  const Surface = presentation === 'page' ? 'section' : ContentSurfaceCard;
 
   return (
-    <ContentSurfaceCard surface='details' data-testid='hud-system-health-strip'>
-      <div className='flex flex-wrap items-center gap-x-4 gap-y-2 p-3'>
+    <Surface
+      {...(presentation === 'section' ? { surface: 'details' as const } : {})}
+      aria-label='System Health'
+      data-testid='hud-system-health-strip'
+    >
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-x-4 gap-y-2',
+          presentation === 'section' && 'p-3'
+        )}
+      >
         <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
           System health
         </p>
         {entries.map(entry => (
           <div key={entry.name} className='flex items-center gap-1.5'>
             <span className='text-2xs text-secondary-token'>{entry.name}</span>
-            <StatusPill label={entry.label} tone={entry.tone} />
+            <HudStatusPill label={entry.label} tone={entry.tone} />
           </div>
         ))}
       </div>
-    </ContentSurfaceCard>
+    </Surface>
   );
 }

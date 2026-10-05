@@ -11,6 +11,14 @@ const mockGetEligibleProfileCount = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 
 // Mock dependencies
+const coldGate = vi.hoisted(() => ({ open: true }));
+// Exercise the underlying send logic as if the path were open; the closed
+// default is proven separately below (JOV-7858).
+vi.mock('@/lib/outbound/cold-claim-invites', () => ({
+  isColdClaimInviteSendOpen: () => coldGate.open,
+  COLD_CLAIM_INVITE_CLOSED_MESSAGE: 'closed',
+}));
+
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
   getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
   requireOvieApiAccess: vi.fn(async () => {
@@ -286,6 +294,32 @@ describe('POST /api/admin/creator-invite/bulk', () => {
     expect(data.ok).toBe(true);
     expect(data.sent).toBe(0);
     expect(data.message).toBe('No eligible profiles with contact emails found');
+  });
+
+  it('refuses a real bulk send while cold claim invites are closed', async () => {
+    coldGate.open = false;
+    try {
+      mockGetCurrentUserEntitlements.mockResolvedValue(mockEntitlementsAdmin);
+      mockFetchProfilesByFitScore.mockResolvedValue(mockEligibleProfiles);
+      const { POST } = await import(
+        '@/app/api/admin/creator-invite/bulk/route'
+      );
+      const response = await POST(
+        new Request('http://localhost/api/admin/creator-invite/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fitScoreThreshold: 50, limit: 10 }),
+        })
+      );
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'COLD_OUTBOUND_CLOSED',
+      });
+      expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+      expect(mockEnqueueBulkClaimInviteJobs).not.toHaveBeenCalled();
+    } finally {
+      coldGate.open = true;
+    }
   });
 
   it('sends invites and enqueues jobs successfully', async () => {
