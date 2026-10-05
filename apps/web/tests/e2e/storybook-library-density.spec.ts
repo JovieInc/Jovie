@@ -73,7 +73,7 @@ for (const story of ['dense-scan-with-inspector', 'virtualized-dense-scan']) {
       path: testInfo.outputPath(`${story}-mounted.png`),
       fullPage: true,
     });
-    await testInfo.attach('initial-geometry', {
+    await testInfo.attach('initial-geometry.json', {
       body: JSON.stringify(await geometry(page)),
       contentType: 'application/json',
     });
