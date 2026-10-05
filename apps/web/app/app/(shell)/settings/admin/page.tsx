@@ -17,7 +17,7 @@ export default async function SettingsAdminPage() {
   }
 
   if (!routeContext.dashboardData.isAdmin) {
-    redirect(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    redirect(APP_ROUTES.SETTINGS_PROFILE);
   }
 
   redirect(APP_ROUTES.ADMIN_OPS);

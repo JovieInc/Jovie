@@ -431,8 +431,8 @@ const nextConfig = {
       { source: '/app/dashboard/chat', destination: '/app/chat' },
       { source: '/app/settings', destination: '/app/settings/account' },
       {
-        source: '/app/settings/profile',
-        destination: '/app/settings/artist-profile',
+        source: '/app/settings/artist-profile',
+        destination: '/app/settings/profile',
       },
       {
         source: '/app/settings/appearance',
@@ -460,7 +460,7 @@ const nextConfig = {
       },
       {
         source: '/app/settings/remove-branding',
-        destination: '/app/settings/artist-profile',
+        destination: '/app/settings/profile',
       },
       {
         source: '/app/settings/ad-pixels',
@@ -468,7 +468,7 @@ const nextConfig = {
       },
       {
         source: '/app/settings/branding',
-        destination: '/app/settings/artist-profile',
+        destination: '/app/settings/profile',
       },
       {
         source: '/app/admin/waitlist',

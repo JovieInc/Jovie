@@ -144,6 +144,24 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('keeps canonical profile settings and retained aliases under screen ownership', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/settings/profile/page.tsx',
+      'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
+      'apps/web/app/app/(shell)/tipping/page.tsx',
+    ]) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry?.id, 'web.settings-artist-profile');
+      assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    }
+    const admin = classifyScreenPath(
+      'apps/web/app/app/(shell)/settings/admin/page.tsx'
+    );
+    assert.equal(admin.kind, 'registered');
+    assert.equal(admin.entry?.id, 'web.settings-admin-redirect');
+    assert.deepEqual(admin.entry?.viewports, ['desktop', 'mobile']);
+  });
   it('registers the money route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/money/page.tsx',

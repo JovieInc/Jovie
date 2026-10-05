@@ -29,6 +29,18 @@ describe('quarantine ledger', () => {
     expect(parsed.ledger.entries.length).toBeGreaterThan(0);
     expect(parsed.unitPaths).toHaveLength(expectedUnitCount);
     expect(parsed.e2ePaths).toHaveLength(expectedE2eCount);
+    expect(parsed.unitIssueUrls).toHaveLength(expectedUnitCount);
+    expect(parsed.e2eIssueUrls).toHaveLength(expectedE2eCount);
+    for (const [index, entry] of parsed.ledger.entries
+      .filter(item => item.kind === 'unit')
+      .entries()) {
+      expect(parsed.unitIssueUrls[index]).toBe(entry.fixIssueUrl);
+    }
+    for (const [index, entry] of parsed.ledger.entries
+      .filter(item => item.kind === 'e2e')
+      .entries()) {
+      expect(parsed.e2eIssueUrls[index]).toBe(entry.fixIssueUrl);
+    }
     expect(parsed.summary.withinRetryBudget).toBe(true);
   });
 
