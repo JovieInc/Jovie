@@ -644,6 +644,7 @@
   "tests/unit/ci/runner-host-capacity.test.ts",
   "tests/unit/ci/screenshot-catalog-pr-workflow.test.ts",
   "tests/unit/ci/screenshots-workflow-provenance.test.ts",
+  "tests/unit/ci/sentry-sdk-version.test.ts",
   "tests/unit/ci/setup-doppler-action.test.ts",
   "tests/unit/ci/skip-promote-false-green.test.ts",
   "tests/unit/ci/staging-privacy-headers.test.ts",
