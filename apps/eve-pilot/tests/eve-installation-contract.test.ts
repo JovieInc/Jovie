@@ -5,6 +5,27 @@ import { describe, expect, it } from 'vitest';
 const pilotRoot = process.cwd();
 
 describe('Eve installation contract', () => {
+  it('keeps the isolated Vitest family synchronized in its lockfile', () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
+    ) as {
+      devDependencies?: Record<string, string>;
+    };
+    const lockfile = readFileSync(resolve(pilotRoot, 'pnpm-lock.yaml'), 'utf8');
+    const vitestPin = packageJson.devDependencies?.vitest;
+    const coveragePin = packageJson.devDependencies?.['@vitest/coverage-v8'];
+
+    expect(coveragePin).toBe(vitestPin);
+    expect(lockfile).toContain(
+      `      '@vitest/coverage-v8':\n        specifier: ${coveragePin}\n        version: ${coveragePin}(vitest@${vitestPin})`
+    );
+    expect(lockfile).toContain(
+      `      vitest:\n        specifier: ${vitestPin}\n        version: ${vitestPin}(`
+    );
+    expect(lockfile).toContain(`  '@vitest/coverage-v8@${coveragePin}':`);
+    expect(lockfile).toContain(`  vitest@${vitestPin}:`);
+  });
+
   it('keeps runtime pins synchronized and bundled docs discoverable', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
