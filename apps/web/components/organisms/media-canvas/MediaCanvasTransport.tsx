@@ -37,9 +37,9 @@ export function MediaCanvasTransport({
       aria-label='Media Controls'
       data-testid='media-canvas-transport'
       data-state={hasError ? 'error' : isVideo ? 'populated' : 'disabled'}
-      className='grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(14rem,1.3fr)_auto] sm:px-4'
+      className='flex min-h-16 items-center gap-x-3 px-3 py-2 sm:px-4'
     >
-      <div className='hidden min-w-0 items-center gap-2 sm:flex'>
+      <div className='hidden min-w-0 items-center gap-2 sm:flex sm:w-1/3'>
         <span className='grid size-8 shrink-0 place-items-center rounded-md bg-surface-1 text-tertiary-token'>
           <KindIcon aria-hidden='true' className='size-4' />
         </span>
@@ -54,7 +54,7 @@ export function MediaCanvasTransport({
         </div>
       </div>
 
-      <div className='flex min-w-0 flex-col items-center gap-1.5'>
+      <div className='flex min-w-0 flex-1 flex-col items-center gap-1.5'>
         <div className='flex items-center gap-1.5'>
           <IconButton
             type='button'
@@ -113,7 +113,7 @@ export function MediaCanvasTransport({
         </div>
       </div>
 
-      <div className='flex items-center justify-end'>
+      <div className='flex shrink-0 items-center justify-end'>
         {hasError ? (
           <Button
             type='button'
