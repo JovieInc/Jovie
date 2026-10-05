@@ -674,6 +674,42 @@ describe('merge_group workflow contract', () => {
     expect(Object.keys(CI_RESERVED_MS)).not.toContain('packages/ui');
   });
 
+  it('keeps Codecov reporting outages advisory without masking test or coverage failures', () => {
+    const jobs = load(CI_WORKFLOW).jobs;
+    const units = jobs['ci-unit-tests'];
+    const step = name => {
+      const match = units.steps.find(candidate => candidate.name === name);
+      expect(match, name).toBeDefined();
+      return match;
+    };
+    // Bootstrap/download failures happen before fail_ci_if_error takes effect.
+    const report = step('Upload test results to Codecov');
+    expect(report['continue-on-error']).toBe(true);
+    expect(report.with.fail_ci_if_error).toBe(false);
+    expect(report.if).toContain("github.event_name != 'merge_group'");
+    expect(units['continue-on-error']).toBeUndefined();
+    for (const name of [
+      'Run unit tests',
+      'Run Ovie route and private-boundary coverage',
+      'Run packages/ui unit tests',
+      'Preserve completed unit-shard diagnosis',
+    ]) {
+      expect(step(name)['continue-on-error'], name).toBeUndefined();
+    }
+    for (const job of [
+      'ci-exact-head-coverage-shard',
+      'ci-exact-head-coverage',
+    ]) {
+      expect(jobs[job]['continue-on-error'], job).toBeUndefined();
+      for (const requiredStep of jobs[job].steps) {
+        expect(
+          requiredStep['continue-on-error'],
+          requiredStep.name
+        ).toBeUndefined();
+      }
+    }
+  });
+
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
