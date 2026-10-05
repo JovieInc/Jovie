@@ -1989,3 +1989,36 @@ describe('document review coverage contract', () => {
     );
   });
 });
+
+describe('staging carryover coverage contract', () => {
+  it('executes the cumulative staging behavior tests once with every coverage floor enforced', async () => {
+    const previous = {
+      GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
+      CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
+      CI_FAST_SKIP_STRUCTURAL: process.env.CI_FAST_SKIP_STRUCTURAL,
+    };
+    try {
+      process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+      process.env.CI_PRODUCT_LANES = 'operations';
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi
+        .fn()
+        .mockReturnValue({ code: 0, output: 'executed\n' });
+      expect((await runStructural({ execute })).code).toBe(0);
+      const calls = execute.mock.calls.filter(([command]) =>
+        command.includes('staging-lane-carryover.test.mjs')
+      );
+      expect(calls).toHaveLength(1);
+      for (const dimension of ['lines', 'branches', 'functions'])
+        expect(calls[0][0]).toContain(`--test-coverage-${dimension}=100`);
+      expect(calls[0][0]).toContain(
+        '--test-coverage-include=.github/scripts/staging-lane-carryover.mjs'
+      );
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+});
