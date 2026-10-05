@@ -11,6 +11,7 @@ import {
   formatUsageResetLabel,
   getWeeklyUsageModel,
 } from '@/lib/chat-usage/metrics';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
@@ -26,7 +27,7 @@ interface UsageMenuItemProps {
 export function UsageMenuItem({
   usageStatsUrl,
   onUpgrade,
-  upgradeLabel = 'Upgrade to Pro',
+  upgradeLabel = `Upgrade to ${getPlanDisplayName('pro')}`,
   isUpgradeLoading = false,
 }: UsageMenuItemProps) {
   const [expanded, setExpanded] = useState(false);

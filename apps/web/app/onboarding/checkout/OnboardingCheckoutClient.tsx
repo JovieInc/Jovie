@@ -48,28 +48,28 @@ function getAnnualSavingsPercent(
   return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
 
-const PRO_HIGHLIGHTS = [
+const OFFER_HIGHLIGHTS = [
   {
     icon: Bell,
-    label: 'Visibility Monitoring',
-    detail: ARTIST_VISIBILITY_OFFER.pro.outcomes[0],
+    label: ARTIST_VISIBILITY_OFFER.pro.outcomes[0],
+    detail: 'We watch the places fans find you and flag when something breaks.',
   },
   {
     icon: BarChart3,
-    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Numeric-leading duration is valid Title Case; the rule's canonical suggestion is identical.
-    label: '90-day Analytics',
-    detail: 'Geographic insights & advanced data',
+    label: ARTIST_VISIBILITY_OFFER.pro.outcomes[1],
+    detail: 'See the highest-impact fixes for your profile first.',
   },
   {
     icon: BadgeCheck,
-    label: 'Verified Badge',
-    detail: 'Build trust with your audience',
+    label: ARTIST_VISIBILITY_OFFER.pro.outcomes[2],
+    detail: 'Fixes drafted for you to approve — not a dashboard of chores.',
   },
 ] as const;
 
 interface ProfilePreviewCardProps {
   readonly avatarUrl: string | null;
   readonly displayName: string;
+  readonly offerName: string;
   readonly spotifyFollowers: number | null;
   readonly username: string;
 }
@@ -77,25 +77,29 @@ interface ProfilePreviewCardProps {
 function ProfilePreviewCard({
   avatarUrl,
   displayName,
+  offerName,
   spotifyFollowers,
   username,
 }: ProfilePreviewCardProps) {
+  const artistName = displayName || username;
   return (
     <>
       <ContentSurfaceCard className='mb-6 p-5'>
         <div className='flex flex-col items-center gap-4'>
           <Avatar
             src={avatarUrl}
-            alt={displayName || username}
-            name={displayName || username}
+            alt={artistName || 'Your artist profile'}
+            name={artistName || 'Artist'}
             size='lg'
           />
 
           <div className='text-center'>
             <p className='text-mid font-semibold text-primary-token'>
-              {displayName || username}
+              {artistName || 'Your artist profile'}
             </p>
-            <p className='text-xs text-tertiary-token'>@{username}</p>
+            {username ? (
+              <p className='text-xs text-tertiary-token'>@{username}</p>
+            ) : null}
           </div>
 
           <div className='w-full'>
@@ -125,7 +129,8 @@ function ProfilePreviewCard({
               {spotifyFollowers.toLocaleString()} Spotify followers
             </span>
             {'. '}
-            Pro analytics shows exactly where they&apos;re listening from.
+            {offerName} analytics shows exactly where they&apos;re listening
+            from.
           </p>
         </ContentSurfaceCard>
       ) : null}
@@ -307,28 +312,27 @@ export function OnboardingCheckoutClient({
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
-            {isDefaultUpsell
-              ? 'Upgrade To Artist Presence'
-              : `Upgrade To ${planMarketing.displayName}`}
+            {`Upgrade To ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
-              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what Artist Presence adds on top.`
-              : `Your profile is live. See what ${planMarketing.displayName} unlocks.`}
+              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
+              : `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`}
           </p>
         </div>
 
         <ProfilePreviewCard
           avatarUrl={avatarUrl}
           displayName={displayName}
+          offerName={planMarketing.displayName}
           spotifyFollowers={spotifyFollowers}
           username={username}
         />
 
-        {/* Pro highlights */}
+        {/* Outcome highlights — sourced from the canonical offer */}
         <ContentSurfaceCard className='mb-6 p-4'>
           <div className='space-y-2.5'>
-            {PRO_HIGHLIGHTS.map(item => (
+            {OFFER_HIGHLIGHTS.map(item => (
               <div key={item.label} className='flex items-start gap-3'>
                 <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
                   <item.icon className='h-4 w-4 text-(--linear-accent)' />
@@ -384,22 +388,23 @@ export function OnboardingCheckoutClient({
         >
           {isLoading
             ? 'Redirecting to checkout...'
-            : isDefaultUpsell
-              ? 'Upgrade to Artist Presence'
-              : `Upgrade to ${planMarketing.displayName}`}
+            : `Upgrade to ${planMarketing.displayName}`}
         </Button>
 
-        {/* Skip */}
+        {/* Skip — the free profile is already live; never imply otherwise */}
         <button
           type='button'
           onClick={handleSkip}
           disabled={isLoading}
           className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
         >
-          {isDefaultUpsell
-            ? 'Start free, upgrade anytime'
-            : 'Continue with Free'}
+          {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
         </button>
+        {isDefaultUpsell ? (
+          <p className='mt-2 text-center text-xs text-tertiary-token'>
+            Your public profile stays live and free forever.
+          </p>
+        ) : null}
       </div>
     </div>
   );

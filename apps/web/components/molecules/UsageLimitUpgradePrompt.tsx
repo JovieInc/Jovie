@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 
 interface UsageLimitUpgradePromptProps {
   /** Current usage count */
@@ -17,7 +18,7 @@ interface UsageLimitUpgradePromptProps {
   readonly featureName: string;
   /** What the user unlocks by upgrading (e.g., "unlimited contacts", "70 messages/week") */
   readonly upgradeCopy: string;
-  /** Optional custom CTA label. Defaults to "Upgrade to Pro" */
+  /** Optional custom CTA label. Defaults to the canonical plan upgrade CTA. */
   readonly ctaLabel?: string;
   /** Optional className for the container */
   readonly className?: string;
@@ -34,7 +35,7 @@ export function UsageLimitUpgradePrompt({
   limit,
   featureName,
   upgradeCopy,
-  ctaLabel = 'Upgrade to Pro',
+  ctaLabel = `Upgrade to ${getPlanDisplayName('pro')}`,
   className,
 }: UsageLimitUpgradePromptProps) {
   const hasTrackedRef = useRef(false);

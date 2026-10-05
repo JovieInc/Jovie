@@ -6,7 +6,10 @@ import { InfoBox } from '@/components/molecules/InfoBox';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import {
+  ENTITLEMENT_REGISTRY,
+  getPlanDisplayName,
+} from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 
@@ -39,7 +42,7 @@ export function ChatUsageAlert() {
             plan.
             {isPaidPlan
               ? ' Your messages refresh when the current window ends.'
-              : ` Upgrade to Pro for ${proLimit} messages/week.`}
+              : ` Upgrade to ${getPlanDisplayName('pro')} for ${proLimit} messages/week.`}
           </p>
           {isPaidPlan ? (
             <Button asChild size='sm' variant='secondary'>
@@ -47,7 +50,7 @@ export function ChatUsageAlert() {
             </Button>
           ) : (
             <UpgradeButton size='sm' variant='primary'>
-              Upgrade to Pro
+              {`Upgrade to ${getPlanDisplayName('pro')}`}
             </UpgradeButton>
           )}
         </div>
@@ -66,7 +69,7 @@ export function ChatUsageAlert() {
           You&apos;ve sent {data.used} of {data.weeklyLimit} weekly messages.
           {isPaidPlan
             ? ` ${data.remaining} remaining this week.`
-            : ` Upgrade to Pro for ${proLimit}/week.`}
+            : ` Upgrade to ${getPlanDisplayName('pro')} for ${proLimit}/week.`}
         </p>
         {isPaidPlan ? (
           <Button asChild size='sm' variant='secondary'>
@@ -74,7 +77,7 @@ export function ChatUsageAlert() {
           </Button>
         ) : (
           <UpgradeButton size='sm' variant='secondary'>
-            Upgrade to Pro
+            {`Upgrade to ${getPlanDisplayName('pro')}`}
           </UpgradeButton>
         )}
       </div>

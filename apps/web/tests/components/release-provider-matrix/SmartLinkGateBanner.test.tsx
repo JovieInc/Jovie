@@ -75,7 +75,7 @@ describe('SmartLinkGateBanner', () => {
     expect(
       screen.getByText('You have 2 upcoming releases')
     ).toBeInTheDocument();
-    expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument();
+    expect(screen.getByText('Upgrade to Artist Presence')).toBeInTheDocument();
   });
 
   it('renders trial-aware unreleased copy referencing trial expiry', () => {
@@ -85,7 +85,7 @@ describe('SmartLinkGateBanner', () => {
     expect(
       screen.getByText('2 upcoming releases after your trial')
     ).toBeInTheDocument();
-    expect(screen.getByText('Lock in Pro')).toBeInTheDocument();
+    expect(screen.getByText('Lock in Artist Presence')).toBeInTheDocument();
   });
 
   it('renders reclaim copy for recently_lapsed users', () => {
@@ -93,7 +93,7 @@ describe('SmartLinkGateBanner', () => {
     render(<SmartLinkGateBanner mode='unreleased' unreleasedCount={1} />);
 
     expect(screen.getByText('1 upcoming release')).toBeInTheDocument();
-    expect(screen.getByText('Reclaim Pro')).toBeInTheDocument();
+    expect(screen.getByText('Reclaim Artist Presence')).toBeInTheDocument();
   });
 
   it('renders calm gain-framed copy for stale_lapsed users', () => {
@@ -101,7 +101,7 @@ describe('SmartLinkGateBanner', () => {
     render(<SmartLinkGateBanner mode='unreleased' unreleasedCount={3} />);
 
     expect(screen.getByText('3 upcoming releases')).toBeInTheDocument();
-    expect(screen.getByText('Get Pro')).toBeInTheDocument();
+    expect(screen.getByText('Get Artist Presence')).toBeInTheDocument();
   });
 
   it('uses a quiet System B text token for the gate icon', () => {

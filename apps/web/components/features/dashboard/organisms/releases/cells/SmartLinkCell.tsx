@@ -5,6 +5,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
@@ -39,8 +40,8 @@ export const SmartLinkCell = memo(function SmartLinkCell({
         )}
         title={
           isScheduled
-            ? 'Smart link goes live on release day. Upgrade to Pro for pre-release pages.'
-            : 'Upgrade to Pro to unlock this smart link'
+            ? `Smart link goes live on release day. Upgrade to ${getPlanDisplayName('pro')} for pre-release pages.`
+            : `Upgrade to ${getPlanDisplayName('pro')} to unlock this smart link`
         }
         data-testid={`smart-link-locked-${release.id}`}
       >

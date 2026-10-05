@@ -110,6 +110,6 @@ describe('AiCrawlerIntelligenceCard', () => {
         'Observed machine reads only · no referral or revenue attribution'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument();
+    expect(screen.getByText('Upgrade to Artist Presence')).toBeInTheDocument();
   });
 });

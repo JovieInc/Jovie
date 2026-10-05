@@ -130,7 +130,7 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
       },
       {
         id: 'pro-price',
-        statement: 'Artist Visibility Pro is $199/month with limited access.',
+        statement: 'Artist Presence is $199/month with limited access.',
         evidence: [PRICING_EVIDENCE.proPrice, PRICING_EVIDENCE.proAccess],
       },
       {
@@ -179,13 +179,13 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
       briefSection(
         'plan-pro',
         'offer',
-        'present the Pro plan and its price',
-        'the visitor can request Pro access at the real price',
-        'pro plan',
-        'the pro plan card',
+        'present the Artist Presence plan and its price',
+        'the visitor can request Artist Presence access at the real price',
+        'artist presence plan',
+        'the artist presence plan card',
         ['pro-price'],
         3,
-        [['pro']],
+        [['artist presence']],
         { bodyWordLimit: 8 }
       ),
       briefSection(
@@ -294,7 +294,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-hero-centered-v2',
         controlHeadline: 'Plans and pricing',
         headline: 'Pricing',
-        body: 'Jovie profiles are free forever. Artist Visibility Pro is $199/month with limited access.',
+        body: 'Jovie profiles are free forever. Artist Presence is $199/month with limited access.',
         supportingText: ['Claim my free profile', 'Explore Jovie Profiles'],
         claimIds: ['free-forever', 'pro-price'],
         lineBindings: [
@@ -330,7 +330,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         sectionId: 'plan-pro',
         candidateId: 'pricing-plan-pro-v1',
         controlHeadline: 'Pro plan',
-        headline: 'Pro',
+        headline: 'Artist Presence',
         body: 'Limited access.',
         supportingText: [
           'Limited access',
@@ -381,7 +381,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-final-v1',
         controlHeadline: 'Pick a plan',
         headline: 'Get Started',
-        body: 'Artist Visibility Pro is $199/month with limited access. Request access.',
+        body: 'Artist Presence is $199/month with limited access. Request access.',
         supportingText: [
           'Claim my free profile',
           'Request access',

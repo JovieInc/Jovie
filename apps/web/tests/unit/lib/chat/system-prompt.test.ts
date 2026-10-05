@@ -101,7 +101,7 @@ describe('buildSystemPrompt', () => {
       accountContext: {
         email: 'tim@jov.ie',
         plan: 'pro',
-        displayPlan: 'Pro',
+        displayPlan: 'Artist Presence',
         isPro: true,
         billingVerification: 'verified',
         planMismatch: {
@@ -131,7 +131,7 @@ describe('buildSystemPrompt', () => {
 
     expect(prompt).toContain('## Account & Access');
     expect(prompt).toContain('- **Account Email:** tim@jov.ie');
-    expect(prompt).toContain('- **Plan:** Pro');
+    expect(prompt).toContain('- **Plan:** Artist Presence');
     expect(prompt).toContain('- **Merch Creation:** Available');
     expect(prompt).toContain(
       '- **AI Usage This Week:** 7 used, 63 remaining of 70'

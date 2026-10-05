@@ -77,7 +77,7 @@ describe('startPlaybook', () => {
 
   it('enforces both Tasks entitlements before writing', async () => {
     mockRequireReleasePlanGenerationAccess.mockRejectedValueOnce(
-      new Error('Release plans require a Pro plan.')
+      new Error('Release plans require the Artist Presence plan.')
     );
 
     await expect(
@@ -86,7 +86,7 @@ describe('startPlaybook', () => {
         projectName: 'Book',
         targetDate: '2027-01-15',
       })
-    ).rejects.toThrow('Pro plan');
+    ).rejects.toThrow('Artist Presence plan');
     expect(mockRequireTasksWorkspaceAccess).toHaveBeenCalled();
     expect(mockInsertValues).not.toHaveBeenCalled();
   });

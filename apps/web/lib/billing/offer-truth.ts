@@ -38,7 +38,7 @@ export type PublicOfferPlan = 'free' | 'pro' | 'max' | 'enterprise';
 export type MaxOfferStatus = 'purchase' | 'early_access' | 'contact_sales';
 
 export const PRO_TRIAL_TRUTH =
-  '14-day Pro trial. No credit card. Returns to Free unless you upgrade.';
+  '14-day Artist Presence trial. No credit card. Returns to Free unless you upgrade.';
 
 export const PRO_LIMITED_ACCESS_TRUTH = 'Limited access.';
 
@@ -118,7 +118,8 @@ export function getPlanSignupHref(
 
 export function getPlanCtaLabel(plan: PublicOfferPlan): string {
   if (plan === 'free') return 'Claim your profile';
-  if (plan === 'pro') return `Start ${PRO_TRIAL_DURATION_DAYS}-day Pro trial`;
+  if (plan === 'pro')
+    return `Start ${PRO_TRIAL_DURATION_DAYS}-day Artist Presence trial`;
   return 'Contact sales';
 }
 

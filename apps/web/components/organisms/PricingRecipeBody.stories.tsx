@@ -5,7 +5,7 @@ import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { PricingRecipeBody } from './PricingRecipeBody';
 
 const proClaim = getPublicPriceClaim('pro');
-export const PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY = `Artist Visibility Pro is ${proClaim.priceLabel}/month with limited access. Request access.`;
+export const PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY = `Artist Presence is ${proClaim.priceLabel}/month with limited access. Request access.`;
 
 const meta = {
   title: 'Marketing/Recipes/PricingProduction',

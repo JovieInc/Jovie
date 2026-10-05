@@ -18,9 +18,9 @@ describe('PricingPreview', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Free' })).toHaveClass(
       'uppercase'
     );
-    expect(screen.getByRole('heading', { level: 3, name: 'Pro' })).toHaveClass(
-      'uppercase'
-    );
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Artist Presence' })
+    ).toHaveClass('uppercase');
     expect(
       screen.getByText('Public artist profile and audience capture')
     ).toBeInTheDocument();

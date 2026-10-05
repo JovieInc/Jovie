@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { logEntitlementDenial } from './demand-signal';
+import { getPlanDisplayName } from './registry';
 import { getCurrentUserEntitlements } from './server';
 
 export type TasksUpgradeRequiredCode =
@@ -38,7 +39,7 @@ async function throwTasksUpgradeRequired(
     gate,
     source: 'server-action',
     code,
-    planRequired: 'Pro',
+    planRequired: getPlanDisplayName('pro'),
     message,
   });
 
@@ -52,7 +53,7 @@ export async function requireTasksWorkspaceAccess(): Promise<void> {
 
   await throwTasksUpgradeRequired(
     'TASKS_WORKSPACE_LOCKED',
-    'Tasks requires a Pro plan.',
+    `Tasks requires an ${getPlanDisplayName('pro')} plan.`,
     'canAccessTasksWorkspace'
   );
 }
@@ -64,7 +65,7 @@ export async function requireReleasePlanGenerationAccess(): Promise<void> {
 
   await throwTasksUpgradeRequired(
     'RELEASE_PLAN_LOCKED',
-    'Release plans require a Pro plan.',
+    `Release plans require an ${getPlanDisplayName('pro')} plan.`,
     'canGenerateReleasePlans'
   );
 }

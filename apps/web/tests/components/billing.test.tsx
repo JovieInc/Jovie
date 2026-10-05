@@ -39,7 +39,7 @@ describe('Billing Components', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (global.fetch as any).mockClear();
-    window.location.href = '';
+    window.location.href = 'https://localhost.test/';
     pushMock.mockClear();
   });
 
@@ -126,7 +126,9 @@ describe('Billing Components', () => {
     it('renders with default props', () => {
       mockUseFeatureFlag.mockReturnValue(false);
       renderWithQueryClient(<UpgradeButton />);
-      expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument();
+      expect(
+        screen.getByText('Upgrade to Artist Presence')
+      ).toBeInTheDocument();
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
 

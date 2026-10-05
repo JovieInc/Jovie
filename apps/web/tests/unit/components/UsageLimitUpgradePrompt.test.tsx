@@ -41,7 +41,7 @@ describe('UsageLimitUpgradePrompt', () => {
       '12 of 15 weekly messages used'
     );
     expect(
-      screen.getByRole('link', { name: /upgrade to pro/i })
+      screen.getByRole('link', { name: /upgrade to artist presence/i })
     ).toHaveAttribute('href', '/pricing');
     expect(trackMock).toHaveBeenCalledWith('usage_limit_upgrade_shown', {
       feature: 'weekly messages',

@@ -7,7 +7,10 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { getEntitlements } from '@/lib/entitlements/registry';
+import {
+  getEntitlements,
+  getPlanDisplayName,
+} from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
@@ -59,8 +62,7 @@ export async function POST(req: Request) {
     if (!getEntitlements(entitlements.plan).booleans.aiCanUseTools) {
       return NextResponse.json(
         {
-          error:
-            'Canvas generation requires a Pro plan. Upgrade to unlock this feature.',
+          error: `Canvas generation requires the ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`,
         },
         { status: 403, headers: corsHeaders }
       );

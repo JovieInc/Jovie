@@ -1,3 +1,4 @@
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { getWeeklyUsageModel } from './metrics';
 
@@ -21,7 +22,7 @@ export interface ChatUsageCopy {
 const PLAN_LABELS: Record<ChatUsageData['plan'], string> = {
   free: 'Free',
   trial: 'Trial',
-  pro: 'Pro',
+  pro: getPlanDisplayName('pro'),
   max: 'Max',
 };
 
@@ -54,7 +55,7 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
   if (state === 'exhausted') {
     const summaryDescription =
       data.plan === 'free'
-        ? `You've used all ${data.weeklyLimit} weekly messages included in your plan. Upgrade to Pro for more messages each week.`
+        ? `You've used all ${data.weeklyLimit} weekly messages included in your plan. Upgrade to ${getPlanDisplayName('pro')} for more messages each week.`
         : `You've used all ${data.weeklyLimit} weekly messages included in your plan. Your messages refresh when the current window ends.`;
 
     return {
@@ -66,7 +67,10 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
         'Weekly AI message limit reached. Open pricing to review upgrade options.',
       summaryTitle: "You've reached this week's chat limit",
       summaryDescription,
-      ctaLabel: data.plan === 'free' ? 'Upgrade to Pro' : 'View plans',
+      ctaLabel:
+        data.plan === 'free'
+          ? `Upgrade to ${getPlanDisplayName('pro')}`
+          : 'View plans',
     };
   }
 
@@ -79,7 +83,10 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
       headerAriaLabel: `Only ${data.remaining} AI message${pluralSuffix} left this week. Open pricing to review upgrade options.`,
       summaryTitle: "You're almost out of messages",
       summaryDescription: `You've sent ${data.used} of ${data.weeklyLimit} weekly messages. ${data.remaining} remaining this week.`,
-      ctaLabel: data.plan === 'free' ? 'Upgrade to Pro' : 'View plans',
+      ctaLabel:
+        data.plan === 'free'
+          ? `Upgrade to ${getPlanDisplayName('pro')}`
+          : 'View plans',
     };
   }
 
@@ -91,6 +98,9 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
     headerAriaLabel: `${data.remaining} AI message${pluralSuffix} left this week. Open pricing to review upgrade options.`,
     summaryTitle: "You're within this week's chat limit",
     summaryDescription: `${data.remaining} of ${data.weeklyLimit} weekly messages remaining this week.`,
-    ctaLabel: data.plan === 'free' ? 'Upgrade to Pro' : 'View plans',
+    ctaLabel:
+      data.plan === 'free'
+        ? `Upgrade to ${getPlanDisplayName('pro')}`
+        : 'View plans',
   };
 }

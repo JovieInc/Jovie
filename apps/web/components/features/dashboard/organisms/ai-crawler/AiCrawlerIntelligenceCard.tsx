@@ -11,6 +11,7 @@ import {
 } from '@/components/organisms/entity-card/kind-presets';
 import { getAeoMeasurementDisclosure } from '@/lib/aeo/citation-monitor';
 import { track } from '@/lib/analytics';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
 
@@ -139,7 +140,7 @@ export function AiCrawlerIntelligenceCard({
         >
           {rowContent}
         </div>
-        <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+        <UpgradeButton size='sm'>{`Upgrade to ${getPlanDisplayName('pro')}`}</UpgradeButton>
       </div>
     );
   }

@@ -238,7 +238,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     booleans: { ...PRO_BOOLEANS },
     limits: { ...PRO_LIMITS },
     marketing: {
-      displayName: 'Pro',
+      displayName: 'Artist Presence',
       tagline:
         'Continuous visibility monitoring, prioritized opportunities, and agentic fixes.',
       features: PRO_FEATURES,
@@ -293,7 +293,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       displayName: 'Max',
       tagline: 'Your release ops, automated.',
       features: [
-        'All Pro features +',
+        'All Artist Presence features +',
         'Release plan generation',
         'Metadata submission agent',
         'Unlimited analytics',
@@ -324,8 +324,8 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       profileMonitoringLimit: 15,
     },
     marketing: {
-      displayName: 'Pro Trial',
-      tagline: '14 days of Pro, on us.',
+      displayName: 'Artist Presence Trial',
+      tagline: '14 days of Artist Presence, on us.',
       features: PRO_FEATURES,
       price: null,
     },
