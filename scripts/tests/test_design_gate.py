@@ -442,6 +442,23 @@ class AdmissionTest(unittest.TestCase):
             linear, linear.refresh(held), late, now=NOW + design_gate.HOLD_LIMIT_S))
         self.assertEqual(linear.descriptions[held.id].count('"orderId"'), 1)
 
+    def test_auto_admitted_hold_precedes_ordinary_work_until_build_claim(self):
+        held_at = design_gate.held_marker(NOW - design_gate.HOLD_LIMIT_S)
+        auto = self.task("JOV-2", "Homepage hero", held_at, 4,
+                         ["needs-design-brief", "ws:ui-ia"])
+        ordinary = self.task("JOV-1", "Urgent tab repair", "body", 1, [])
+        due = self.task("JOV-3", "Homepage footer", "no brief", 1, ["ws:ui-ia"])
+        linear = FakeLinear([auto, ordinary, due])
+
+        picked = design_gate.pick_build_issue(
+            [ordinary, due, auto], {}, pick=self.lane.pick_issue, linear=linear,
+            provider="devin", now=NOW)
+
+        self.assertIs(picked, auto)
+        self.assertFalse(design_gate.wants_brief(picked, now=NOW))
+        self.assertIn(design_gate.BRIEF_AUTO_LABEL, linear.labels[auto.id])
+        self.assertIn("held 24h", linear.comments[-1][1])
+
 
 class FounderOrderTest(unittest.TestCase):
     def test_order_matches_the_work_order_contract_fields(self):
