@@ -31,8 +31,12 @@ const LAUNCH_MODE_PATH = 'apps/ios/Jovie/App/LaunchMode.swift';
 const PBXPROJ_PATH = 'apps/ios/Jovie.xcodeproj/project.pbxproj';
 const HEADLINE_FONT = 'apps/web/public/fonts/Satoshi-Variable.woff2';
 const BUNDLE_ID = 'ie.jov.Jovie';
-// Marketing rotates blue, purple, pink only (accent rotation rule 2026-09-26).
-const MARKETING_ACCENTS = ['ion', 'ultra', 'pulse'];
+// Accent rotation rule (2026-09-26): blue, purple, pink, orange in visual
+// order, so neighbours never match. Green and red read as status; never here.
+const ACCENT_ROTATION = ['ion', 'ultra', 'pulse', 'orange'];
+// Status bar glyphs (clock, signal, battery) sit in this band of a capture.
+const STATUS_BAR_BAND = { top: 0.02, bottom: 0.05 };
+const STATUS_BAR_MIN_DENSITY = 0.005;
 
 /** Everything that changes what the store graphics show. */
 export const SOURCE_INPUTS = [
@@ -97,6 +101,10 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
   const ids = new Set();
   if (!spec.device?.width || !spec.device?.height)
     problems.push('device size is missing');
+  const pinned = spec.layout?.pinnedHeader;
+  if (!(pinned > 0 && pinned < 0.2)) {
+    problems.push('layout.pinnedHeader must be between 0 and 0.2');
+  }
   const check = spec.contentCheck;
   if (
     !check ||
@@ -108,15 +116,19 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
     );
   }
   // Pen binding: `requested` until studio builds the section, then every
-  // screen maps to its Pen frame id.
+  // screen maps to its Pen frame, headline and capture-slot node ids.
   if (!['requested', 'bound'].includes(spec.pen?.status)) {
     problems.push('pen.status must be requested or bound');
   }
   if (spec.pen?.status === 'bound') {
     if (!spec.pen.sectionNodeId) problems.push('pen.sectionNodeId is missing');
     for (const screen of spec.screens ?? []) {
-      if (!spec.pen.frames?.[screen.id])
-        problems.push(`${screen.id}: no Pen frame id`);
+      const nodes = spec.pen.frames?.[screen.id];
+      for (const role of ['frame', 'headline', 'capture']) {
+        if (!/^[A-Za-z0-9]{5,6}$/.test(nodes?.[role] ?? '')) {
+          problems.push(`${screen.id}: no Pen ${role} node id`);
+        }
+      }
     }
   }
   if (
@@ -142,26 +154,37 @@ export async function validateStorefront(spec, { launchModeSource, colorSot }) {
         `${label}: ${screen.launchArgument} is not a LaunchMode fixture`
       );
     }
+    const expectedAccent = ACCENT_ROTATION[index % ACCENT_ROTATION.length];
     if (
-      !MARKETING_ACCENTS.includes(screen.accent) ||
+      screen.accent !== expectedAccent ||
       !colorSot.accents.hex[screen.accent]
     ) {
       problems.push(
-        `${label}: accent must be one of ${MARKETING_ACCENTS.join(', ')}`
+        `${label}: accent must be ${expectedAccent} (rotation ${ACCENT_ROTATION.join(', ')})`
       );
     }
-    if (index > 0 && spec.screens[index - 1].accent === screen.accent) {
-      problems.push(`${label}: neighbours must not share an accent`);
+    // Line breaks mirror the Pen headline nodes, which cannot balance wrap.
+    const lines = (screen.headline ?? '').split('\n');
+    if (lines.length > 2 || lines.some(line => !line.trim())) {
+      problems.push(`${label}: headline must be one or two non-empty lines`);
     }
-    const copy = lintCopy(screen.headline ?? '', {
+    const copy = lintCopy(lines.join(' '), {
       register: 'jovie-marketing',
       headline: true,
     });
     for (const finding of copy.blocking) {
       problems.push(`${label}: headline ${finding.rule} (${finding.message})`);
     }
-    if (!screen.headline || screen.headline.length > 40) {
-      problems.push(`${label}: headline must be 1 to 40 characters`);
+    // Apple-simple: a short outcome, two or three words (Tim, 2026-10-04).
+    const words = lines.join(' ').trim().split(/\s+/).length;
+    if (!screen.headline || words < 2 || words > 3) {
+      problems.push(`${label}: headline must be two or three words`);
+    }
+    if (
+      screen.scroll !== undefined &&
+      !(screen.scroll >= 0 && screen.scroll <= 0.3)
+    ) {
+      problems.push(`${label}: scroll must be between 0 and 0.3`);
     }
   });
   return problems;
@@ -291,6 +314,19 @@ export function frameDifference(a, b) {
   return changed / samples;
 }
 
+/**
+ * App background colour near the bottom-left of a capture. A scrolled screen
+ * reveals this colour below the capture, so the shift reads as a real scroll.
+ */
+export function screenBackground(buffer) {
+  const { width, height, channels, pixels } = decodePng(buffer);
+  const i = (Math.round(height * 0.93) * width + 8) * channels;
+  const hex = [0, 1, 2]
+    .map(c => pixels[i + c].toString(16).padStart(2, '0'))
+    .join('');
+  return `#${hex}`;
+}
+
 function escapeHtml(text) {
   return text.replace(
     /[&<>"]/g,
@@ -298,13 +334,19 @@ function escapeHtml(text) {
   );
 }
 
-/** One store graphic as a self-contained HTML document. */
+/**
+ * One store graphic as a self-contained HTML document. One key light from
+ * the upper left sets the single-hue glow, the bezel highlight and the
+ * shadow, and the device bleeds off the bottom edge at the same position on
+ * every panel so the set reads as one strip.
+ */
 export function renderHtml({
   spec,
   screen,
   colorSot,
   captureDataUri,
   fontDataUri,
+  screenFill = '#000',
 }) {
   const { width, height } = spec.device;
   const layout = spec.layout;
@@ -314,26 +356,41 @@ export function renderHtml({
   const accent = colorSot.accents.hex[screen.accent];
   const screenWidth = layout.deviceWidth - layout.bezel * 2;
   const screenHeight = Math.round((screenWidth * height) / width);
+  // The status bar and app header stay put; only the content below scrolls.
+  const pinned = Math.round(layout.pinnedHeader * screenHeight);
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:Satoshi;src:url(${fontDataUri}) format("woff2");font-weight:300 900}
 *{box-sizing:border-box;margin:0}
 html,body{width:${width}px;height:${height}px;overflow:hidden;background:${canvas}}
-.stage{position:relative;width:100%;height:100%;
-background:radial-gradient(ellipse 90% 60% at 50% 66%,
-color-mix(in oklch,${accent} 62%,${canvas}) 0%,
-color-mix(in oklch,${accent} 26%,${canvas}) 46%,${canvas} 82%)}
-h1{position:absolute;top:${layout.headlineTop}px;left:50%;transform:translateX(-50%);
-width:${layout.headlineMaxWidth}px;text-align:center;color:#fff;
-font:700 ${layout.headlineSize}px/1.05 Satoshi,Inter,system-ui,sans-serif;
-letter-spacing:-0.02em;text-wrap:balance}
+.stage{position:relative;width:100%;height:100%;overflow:hidden;
+background:
+radial-gradient(ellipse 120% 70% at 12% 8%,
+color-mix(in oklch,${accent} 58%,${canvas}) 0%,
+color-mix(in oklch,${accent} 24%,${canvas}) 38%,transparent 72%),
+radial-gradient(ellipse 80% 45% at 60% 78%,
+color-mix(in oklch,${accent} 18%,${canvas}) 0%,transparent 70%),${canvas}}
+h1{position:absolute;top:${layout.headlineTop}px;left:${layout.marginX}px;
+width:${width - layout.marginX * 2}px;color:#fff;white-space:pre-line;
+font:700 ${layout.headlineSize}px/1.02 Satoshi,Inter,system-ui,sans-serif;
+letter-spacing:-0.035em}
 .device{position:absolute;top:${layout.deviceTop}px;left:50%;transform:translateX(-50%);
-width:${layout.deviceWidth}px;padding:${layout.bezel}px;background:${card};
-border:2px solid ${floating};border-radius:${layout.deviceRadius}px}
-.device img{display:block;width:${screenWidth}px;height:${screenHeight}px;
-border-radius:${layout.deviceRadius - layout.bezel}px}
+width:${layout.deviceWidth}px;padding:${layout.bezel}px;border:2px solid transparent;
+border-radius:${layout.deviceRadius}px;
+background:linear-gradient(${card},${card}) padding-box,
+linear-gradient(135deg,rgb(255 255 255 / .34),${floating} 32%,${floating} 70%,rgb(0 0 0 / .4)) border-box;
+box-shadow:40px 72px 160px rgb(0 0 0 / .62),12px 20px 48px rgb(0 0 0 / .4)}
+.screen{position:relative;width:${screenWidth}px;height:${screenHeight}px;overflow:hidden;
+background:${screenFill};border-radius:${layout.deviceRadius - layout.bezel}px}
+.screen img{display:block;width:${screenWidth}px;height:${screenHeight}px}
+.pinned{position:absolute;inset:0 0 auto;height:${pinned}px;overflow:hidden}
+.content{position:absolute;inset:${pinned}px 0 0;overflow:hidden}
+.content img{margin-top:${-pinned - Math.round((screen.scroll ?? 0) * screenHeight)}px}
 </style></head><body><div class="stage" data-screen="${screen.id}">
 <h1>${escapeHtml(screen.headline)}</h1>
-<div class="device"><img alt="" src="${captureDataUri}"></div>
+<div class="device"><div class="screen">
+<div class="pinned"><img alt="" src="${captureDataUri}"></div>
+<div class="content"><img alt="" src="${captureDataUri}"></div>
+</div></div>
 </div></body></html>`;
 }
 
@@ -382,7 +439,10 @@ const sleep = ms => new Promise(done => setTimeout(done, ms));
  * slower than a warm local one, so a fixed delay captured empty screens.
  */
 async function captureSettled({ udid, file, spec, screen, settleMs }) {
-  const deadline = Date.now() + settleMs * 6;
+  // A cold hosted simulator can spend 30s+ on one screenshot, so the budget
+  // is generous and a capture always gets at least three frames to compare.
+  const deadline = Date.now() + settleMs * 18;
+  let frames = 0;
   await sleep(settleMs);
   let previous;
   let density = 0;
@@ -392,11 +452,12 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
       stdio: 'ignore',
     });
     const buffer = readFileSync(file);
+    frames++;
     density = contentDensity(buffer, spec.contentCheck);
     difference = previous ? frameDifference(previous, buffer) : 1;
     const settled = difference < 0.001;
     if (settled && density >= spec.contentCheck.minDensity) return buffer;
-    if (Date.now() > deadline) {
+    if (Date.now() > deadline && frames >= 3) {
       throw new Error(
         `${screen.id}: ${settled ? 'screen body is empty' : 'screen never settled'} (content density ${(density * 100).toFixed(2)}%, last frame change ${(difference * 100).toFixed(2)}%)`
       );
@@ -435,7 +496,7 @@ async function capture({ appPath, out, settleMs }) {
     '--operatorName',
     '',
     '--batteryState',
-    'charged',
+    'discharging',
     '--batteryLevel',
     '100',
   ]);
@@ -494,6 +555,7 @@ async function render({ out }) {
           colorSot,
           fontDataUri,
           captureDataUri: `data:image/png;base64,${raw.toString('base64')}`,
+          screenFill: screenBackground(raw),
         }),
         { waitUntil: 'load' }
       );
@@ -520,7 +582,11 @@ async function render({ out }) {
     marketingVersion: marketingVersion(readRepo(PBXPROJ_PATH)),
     gitSha: run('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT }).trim(),
     device: spec.device,
-    pen: { status: spec.pen.status, sectionNodeId: spec.pen.sectionNodeId },
+    pen: {
+      file: spec.pen.file,
+      status: spec.pen.status,
+      sectionNodeId: spec.pen.sectionNodeId,
+    },
     screens,
   };
   writeFileSync(
@@ -586,6 +652,10 @@ export function verifyOutput({ out, spec, currentSourceHash, currentVersion }) {
     }
     if (sha256(capture) !== entry.captureSha256) {
       problems.push(`raw/${screen.id}.png: does not match the receipt`);
+    }
+    // The 9:41 status bar band must be present so every panel reads as a phone.
+    if (contentDensity(capture, STATUS_BAR_BAND) < STATUS_BAR_MIN_DENSITY) {
+      problems.push(`raw/${screen.id}.png: status bar (9:41) is missing`);
     }
     const density = contentDensity(capture, spec.contentCheck);
     if (density < spec.contentCheck.minDensity) {

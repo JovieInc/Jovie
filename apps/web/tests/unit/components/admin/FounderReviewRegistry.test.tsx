@@ -9,6 +9,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FounderReviewRegistry } from '@/components/features/admin/FounderReviewRegistry';
 import {
+  HeaderActionsProvider,
+  useHeaderActions,
+} from '@/contexts/HeaderActionsContext';
+import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
@@ -63,12 +67,20 @@ function MountedRightPanel() {
   return <div data-testid='mounted-right-panel'>{panel}</div>;
 }
 
+function MountedHeaderActions() {
+  const { headerActions } = useHeaderActions();
+  return <div data-testid='mounted-header-actions'>{headerActions}</div>;
+}
+
 function renderRegistry() {
   return render(
-    <RightPanelProvider>
-      <FounderReviewRegistry kind='feature' items={items} />
-      <MountedRightPanel />
-    </RightPanelProvider>
+    <HeaderActionsProvider>
+      <RightPanelProvider>
+        <MountedHeaderActions />
+        <FounderReviewRegistry kind='feature' items={items} />
+        <MountedRightPanel />
+      </RightPanelProvider>
+    </HeaderActionsProvider>
   );
 }
 
@@ -79,6 +91,17 @@ describe('FounderReviewRegistry', () => {
 
   it('uses the unified selectable table and mounts media-first certification details in the right rail', async () => {
     renderRegistry();
+
+    const headerActions = screen.getByTestId('mounted-header-actions');
+    expect(
+      within(headerActions).getByRole('tablist', { name: 'Registry Filter' })
+    ).toBeVisible();
+    expect(
+      within(screen.getByTestId('feature-review-registry')).queryByRole(
+        'tablist',
+        { name: 'Registry Filter' }
+      )
+    ).not.toBeInTheDocument();
 
     expect(
       screen.getByRole('columnheader', { name: 'Registry Item' })

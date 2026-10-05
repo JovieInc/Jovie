@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
+  HeaderActionsProvider,
+  useHeaderActions,
+} from '@/contexts/HeaderActionsContext';
+import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
@@ -119,6 +123,28 @@ function RightPanelSlot() {
   );
 }
 
+function RegistryStoryFrame({
+  children,
+}: {
+  readonly children: React.ReactNode;
+}) {
+  const { headerActions } = useHeaderActions();
+  return (
+    <div className='flex h-screen flex-col bg-(--app-shell-content-surface)'>
+      <header className='flex h-(--app-shell-header-height) shrink-0 items-center gap-2 border-b border-(--app-shell-border) px-(--app-shell-header-padding-x)'>
+        <h1 className='min-w-0 flex-1 truncate text-xs font-semibold text-primary-token'>
+          Feature Registry
+        </h1>
+        {headerActions}
+      </header>
+      <div className='flex min-h-0 flex-1'>
+        <main className='min-w-0 flex-1 overflow-auto p-3'>{children}</main>
+        <RightPanelSlot />
+      </div>
+    </div>
+  );
+}
+
 const meta = {
   title: 'Features/Admin/FounderReviewRegistry',
   component: FounderReviewRegistry,
@@ -128,14 +154,13 @@ const meta = {
   },
   decorators: [
     Story => (
-      <RightPanelProvider>
-        <div className='flex h-screen bg-(--app-shell-content-surface)'>
-          <main className='min-w-0 flex-1 overflow-auto p-4'>
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <RegistryStoryFrame>
             <Story />
-          </main>
-          <RightPanelSlot />
-        </div>
-      </RightPanelProvider>
+          </RegistryStoryFrame>
+        </RightPanelProvider>
+      </HeaderActionsProvider>
     ),
   ],
   args: {
@@ -148,3 +173,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const FeatureRegistry: Story = {};
+
+export const FeatureRegistryLight: Story = {
+  parameters: { themes: { themeOverride: 'light' } },
+};

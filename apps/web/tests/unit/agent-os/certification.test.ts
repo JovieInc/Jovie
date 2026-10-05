@@ -665,3 +665,13 @@ describe('first-human design baseline routing (JOV-6947)', () => {
     expect(admission.founderBaseline).toEqual(founderApproval);
   });
 });
+
+describe('certification decision digest', () => {
+  it('is byte-stable across the isomorphic sha256 implementation', () => {
+    // Golden captured from the node:crypto implementation; stored founder
+    // decisions bind to this digest, so the value must never drift.
+    expect(buildCertificationDecisionDigest(reviewPacket())).toBe(
+      'sha256:6cc6a0e660a8b4b83a3cf732826cb9b25d498282b9fdef689995c9d19a3cb112'
+    );
+  });
+});
