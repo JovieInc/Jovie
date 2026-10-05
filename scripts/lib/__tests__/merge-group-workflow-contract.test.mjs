@@ -675,7 +675,11 @@ describe('merge_group workflow contract', () => {
   });
 
   it('keeps Codecov reporting outages advisory without masking test or coverage failures', () => {
-    const jobs = load(CI_WORKFLOW).jobs;
+    /** @typedef {{ name?: string, 'continue-on-error'?: boolean, if?: string, with?: { fail_ci_if_error?: boolean } }} ReportingStep */
+    const jobs =
+      /** @type {{ jobs: Record<string, { 'continue-on-error'?: boolean, steps: ReportingStep[] }> }} */ (
+        load(CI_WORKFLOW)
+      ).jobs;
     const units = jobs['ci-unit-tests'];
     const step = name => {
       const match = units.steps.find(candidate => candidate.name === name);
@@ -685,7 +689,7 @@ describe('merge_group workflow contract', () => {
     // Bootstrap/download failures happen before fail_ci_if_error takes effect.
     const report = step('Upload test results to Codecov');
     expect(report['continue-on-error']).toBe(true);
-    expect(report.with.fail_ci_if_error).toBe(false);
+    expect(report.with?.fail_ci_if_error).toBe(false);
     expect(report.if).toContain("github.event_name != 'merge_group'");
     expect(units['continue-on-error']).toBeUndefined();
     for (const name of [
