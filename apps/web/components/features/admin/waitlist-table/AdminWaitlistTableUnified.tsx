@@ -11,7 +11,7 @@ import {
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
-import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
@@ -240,7 +240,7 @@ export function AdminWaitlistTableUnified({
         </div>
       }
       getRowId={row => row.id}
-      rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+      rowMode='dense'
       overscan={5}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
       rowSelection={rowSelection}

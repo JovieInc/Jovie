@@ -327,6 +327,7 @@ describe('surface elevation guardrails', () => {
     const files = [
       'components/features/admin/ActivityTableUnified.tsx',
       'components/features/admin/agent-os/AgentOsRunsPanel.tsx',
+      'components/features/admin/contacts-table/AdminContactsTable.tsx',
       'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx',
       'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx',
       'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx',

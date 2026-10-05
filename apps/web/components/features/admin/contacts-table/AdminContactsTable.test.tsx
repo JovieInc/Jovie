@@ -201,6 +201,15 @@ describe('AdminContactsTable', () => {
       .mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     renderTable();
+    // Canonical dense people row with a face, not a hand-rolled 56px table.
+    expect(
+      document.querySelector('table[data-table-row-mode="dense"]')
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByTestId('admin-contact-row')
+        .querySelector('[data-table-person-cell]')
+    ).not.toBeNull();
     fireEvent.click(screen.getByTestId('admin-contact-row'));
 
     expect(
