@@ -336,7 +336,7 @@ describe('applyRemediationDecisionWithRetry', () => {
       { attempts: 2, sleep: noSleep }
     );
     expect(result.ok).toBe(false);
-    expect(result.reason).toBe('linear_create_503');
+    expect('reason' in result && result.reason).toBe('linear_create_503');
     expect(
       fetchImpl.mock.calls.filter(([, init]) =>
         String(init.body).includes('issueCreate')
@@ -352,7 +352,7 @@ describe('applyRemediationDecisionWithRetry', () => {
       { sleep: noSleep }
     );
     expect(result.ok).toBe(false);
-    expect(result.reason).toBe('missing_linear_api_key');
+    expect('reason' in result && result.reason).toBe('missing_linear_api_key');
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
