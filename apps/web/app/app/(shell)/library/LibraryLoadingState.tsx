@@ -51,8 +51,8 @@ export const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
     | 'meta';
 }> = [
   { variant: 'release', width: '100%' },
-  { variant: 'badge', width: '108px' },
-  { variant: 'badge', width: '92px' },
+  { variant: 'meta', width: '72px' },
+  { variant: 'avatar', width: '16px' },
   { variant: 'text', width: '88px' },
   { variant: 'meta', width: '72px' },
   { variant: 'text', width: '96px' },
@@ -75,17 +75,10 @@ export const LIBRARY_TABLE_SKELETON_COLUMNS = [
   },
   {
     id: 'status',
-    header: 'Release',
-    size: 112,
-    minSize: 96,
-    meta: { className: 'px-2', priority: 4, minWidth: 112 },
-  },
-  {
-    id: 'approval',
-    header: 'Approval',
-    size: 128,
-    minSize: 108,
-    meta: { className: 'px-2', priority: 4, minWidth: 128 },
+    header: 'Status',
+    size: 40,
+    minSize: 40,
+    meta: { className: 'px-2', minWidth: 40, headerVisibility: 'sr-only' },
   },
   {
     id: 'type',
