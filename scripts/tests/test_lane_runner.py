@@ -1044,6 +1044,45 @@ class LinearRateLimitTest(unittest.TestCase):
             with self.assertRaises(lane.LinearRateLimited):
                 self.client.gql("query", {})
 
+    def test_unwritable_state_dir_falls_back_and_reports(self):
+        """A read-only shared dir must not silently lose the cooldown (JOV-7577)."""
+        readonly = self.state / "readonly-cooldown"
+        readonly.mkdir()
+        readonly.chmod(0o555)
+        self.addCleanup(lambda: readonly.chmod(0o700))
+        scope_id = hashlib.sha256(f"{lane.LINEAR_API_URL}\0{self.client.key}".encode()).hexdigest()
+        tmp_scope = lane._tmp_cooldown_root() / scope_id
+        self.addCleanup(lambda: shutil.rmtree(tmp_scope, ignore_errors=True))
+        self.addCleanup(lambda: lane._PROCESS_LINEAR_COOLDOWNS.pop(scope_id, None))
+        self.addCleanup(lambda: setattr(lane, "_COOLDOWN_UNWRITABLE_EVENT_FIRED", False))
+        lane._COOLDOWN_UNWRITABLE_EVENT_FIRED = False
+        events = []
+        stderr = io.StringIO()
+        # _chmod_private no-op keeps 0o555: a dir the lane cannot repair.
+        with patch.dict(os.environ, {"LINEAR_COOLDOWN_STATE_DIR": str(readonly)}), \
+                patch.object(lane, "_chmod_private", lambda *args: None), \
+                patch.object(lane.pr_events, "upsert_intake", lambda event: events.append(event) or 1), \
+                patch.object(lane.random, "random", return_value=0), \
+                patch("sys.stderr", stderr), \
+                self.assertRaises(lane.LinearRateLimited):
+            lane.urllib.request.urlopen = lambda request, timeout: (_ for _ in ()).throw(
+                self.http_error(429, b"", self.headers(remaining="0")))
+            self.client.gql("query", {})
+        self.assertIn("linear-cooldown-unwritable", stderr.getvalue())
+        self.assertEqual([event["fingerprint"] for event in events], ["linear-cooldown-unwritable"])
+        self.assertFalse(any(readonly.iterdir()), "the unwritable root must stay untouched")
+        records = [path for path in tmp_scope.iterdir() if path.is_file()]
+        self.assertTrue(records, "tmp fallback must persist the deadline for siblings")
+        calls = []
+        lane.urllib.request.urlopen = lambda request, timeout: calls.append(1) or self.response(
+            {"data": {"ok": True}}, self.headers())
+        with self.assertRaises(lane.LinearRateLimited):
+            lane.Linear(self.env).gql("query", {})
+        self.assertEqual(calls, [], "the fallback cooldown must keep siblings off Linear")
+        lane._PROCESS_LINEAR_COOLDOWNS.pop(scope_id, None)
+        self.assertIsNotNone(lane.linear_cooldown_until(self.client.key),
+                             "the tmp record alone still cools the credential")
+
     def test_doctor_observe_skips_linear_during_a_cooldown(self):
         os.environ["LANES_SELFTEST"] = "1"
         self.addCleanup(lambda: os.environ.pop("LANES_SELFTEST", None))

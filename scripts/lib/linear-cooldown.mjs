@@ -7,7 +7,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 export const LINEAR_API_URL = 'https://api.linear.app/graphql';
@@ -40,6 +40,70 @@ export function legacyCooldownRoots(
   const roots = [join(home, '.local', 'state', 'jovie-linear-backoff')];
   if (env.LINEAR_BACKOFF_STATE_DIR) roots.push(env.LINEAR_BACKOFF_STATE_DIR);
   return [...new Set(roots)].filter(root => root && root !== canonical);
+}
+
+/** Per-uid tmp fallback used when the shared state dir rejects a write. */
+export function fallbackCooldownRoot() {
+  const uid = process.getuid ? process.getuid() : 'shared';
+  return join(tmpdir(), `jovie-linear-cooldown-${uid}`);
+}
+
+// Cooldowns this process failed to persist, keyed by credential scope hash.
+// Raw keys never reach the map or the fallback files (JOV-7577).
+const processCooldowns = new Map();
+let unwritableEventFired = false;
+
+async function fallbackPublish(scope, resetAt) {
+  try {
+    const directory = join(fallbackCooldownRoot(), scope);
+    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    const record = join(directory, `${resetAt}-${randomUUID()}.json`);
+    const fd = await fs.open(record, 'wx', 0o600);
+    try {
+      await fd.writeFile(JSON.stringify({ schema: 1, resetAt }));
+      await fd.sync();
+    } finally {
+      await fd.close();
+    }
+  } catch {
+    // the tmp fallback is best-effort; the in-process record still applies
+  }
+}
+
+async function reportUnwritableCooldown(root, cause) {
+  console.error(
+    JSON.stringify({
+      schema: 'jovie.linear-cooldown-write-failure/v1',
+      fingerprint: 'linear-cooldown-unwritable',
+      root,
+      error:
+        cause instanceof Error
+          ? `${cause.name}: ${cause.message}`
+          : String(cause),
+    })
+  );
+  if (unwritableEventFired) return;
+  unwritableEventFired = true;
+  try {
+    const { upsertLinearIssueByTitleFingerprint } = await import(
+      './linear-issue-intake.mjs'
+    );
+    await upsertLinearIssueByTitleFingerprint({
+      fingerprint: 'linear-cooldown-unwritable',
+      labelKey: 'linear-cooldown-unwritable',
+      title:
+        'Linear cooldown state dir unwritable (linear-cooldown-unwritable)',
+      description:
+        'A lane could not persist the shared Linear cooldown. Until a write ' +
+        'succeeds, sibling processes rely on the tmp and in-process fallback. ' +
+        'Check ownership and permissions of the LINEAR_COOLDOWN_STATE_DIR root.',
+      priority: 2,
+      createStateName: 'Todo',
+      reopenTerminal: true,
+    });
+  } catch {
+    // remediation reporting must never break the rate-limit path
+  }
 }
 
 function stateError() {
@@ -178,6 +242,16 @@ export function credentialBackoff(
         const fileReset = await readLegacyFile(legacy, keyHash, nowMs);
         resetAt = Math.max(resetAt, scopeReset, fileReset);
       }
+      // Fallbacks written when the shared dir rejected a publish (JOV-7577).
+      resetAt = Math.max(
+        resetAt,
+        await readScope(join(fallbackCooldownRoot(), scope), nowMs, false)
+      );
+      const local = processCooldowns.get(scope);
+      if (local !== undefined) {
+        if (local > nowMs) resetAt = Math.max(resetAt, local);
+        else processCooldowns.delete(scope);
+      }
       return resetAt;
     } catch (error) {
       if (!strict) return 0;
@@ -214,6 +288,16 @@ export function credentialBackoff(
       } catch {
         // a crashed publication is removed when we can; strict readers still fail closed on leftovers
       }
+      // Never swallow a write failure silently: log, report once, and keep the
+      // deadline alive in-process and under tmp so siblings still back off.
+      if (Number.isSafeInteger(resetAt) && resetAt > 0) {
+        processCooldowns.set(
+          scope,
+          Math.max(resetAt, processCooldowns.get(scope) ?? 0)
+        );
+        await fallbackPublish(scope, resetAt);
+      }
+      await reportUnwritableCooldown(root, error);
       if (!strict) return;
       if (error?.code === 'BACKOFF_STATE_INVALID') throw error;
       throw stateError();
