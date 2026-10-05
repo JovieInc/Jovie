@@ -1,6 +1,6 @@
 // Homepage anatomy contract: renders the real `/` layout and page together
 // and fails when a required section of the canonical homepage goes missing.
-// Required, in order: header, claim hero, product sections, FAQ, claim close,
+// Required, in order: header, claim hero, product sections, claim close,
 // full footer. The logo strip is required exactly when permissioned,
 // audience-neutral logo proof exists, and is never rendered without it.
 import { render, screen, within } from '@testing-library/react';
@@ -68,15 +68,14 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
     const header = container.querySelector('header');
     const hero = screen.getByTestId('marketing-section-hero');
     const products = screen.getAllByTestId('marketing-section-feature-split');
-    const faq = screen.getByTestId('marketing-section-faq');
     const close = screen.getByTestId('marketing-section-cta');
     const footer = screen.getByTestId('marketing-footer');
 
     expect(header, 'header').not.toBeNull();
     expect(products.length, 'product sections').toBeGreaterThanOrEqual(2);
 
-    const sequence = [header!, hero, products[0], faq, close, footer].map(
-      node => order(container, node)
+    const sequence = [header!, hero, ...products, close, footer].map(node =>
+      order(container, node)
     );
     expect(sequence).toEqual([...sequence].sort((a, b) => a - b));
 
@@ -89,14 +88,21 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
       );
     }
 
-    // FAQ answers every question in the copy and ships FAQPage JSON-LD.
-    for (const item of HOMEPAGE_IDENTITY_COPY.faq.items) {
-      expect(within(faq).getByText(item.question)).toBeInTheDocument();
-    }
-    const jsonLd = [
+    // Removing the FAQ also removes its schema and leaves no empty slot.
+    expect(screen.queryByTestId('marketing-section-faq')).toBeNull();
+    const structure = container.querySelector(
+      '[data-homepage-testid="homepage-section-structure"]'
+    );
+    expect(structure).not.toBeNull();
+    expect(structure?.nextElementSibling).toBe(close);
+    const schemas = [
       ...container.querySelectorAll('script[type="application/ld+json"]'),
-    ].map(node => node.textContent ?? '');
-    expect(jsonLd.some(text => text.includes('"FAQPage"'))).toBe(true);
+    ].map(node => JSON.parse(node.textContent ?? '{}') as { '@type'?: string });
+    expect(schemas.map(schema => schema['@type'])).toEqual([
+      'WebSite',
+      'SoftwareApplication',
+      'Organization',
+    ]);
 
     // The full SEO footer, never the minimal one.
     expect(footer).not.toHaveClass('system-b-mounted-home-footer');
