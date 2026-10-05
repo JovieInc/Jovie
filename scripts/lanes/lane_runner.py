@@ -1864,16 +1864,18 @@ def cool_down(host: Host, name: str) -> None:
 def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
     """The cheapest enabled, healthy, non-cooling lane not yet tried on this run.
 
-    Order comes from providers.json (optional `tier`, else list position). A registry
-    entry with `enabled: false` — Hyperagent, grok, kimi — is never chosen.
+    Order comes from providers.json (optional `tier`, else list position). Registry
+    exclusions and the same host slot limits used by dispatch also apply to handoff.
     """
     catalog = providers or load_providers()
+    host_excluded = {name for name, spec in catalog.items()
+                     if isinstance(spec, dict) and host.slots(name, spec.get("slots", 1)) <= 0}
     cooled = {name for name in catalog if cooling(host, name)}
 
     def healthy(_name, spec):
         return provider_healthy(spec)
 
-    chosen = remediation.route_lane(catalog, exclude=set(exclude), healthy=healthy, cooled=cooled)
+    chosen = remediation.route_lane(catalog, exclude=set(exclude) | host_excluded, healthy=healthy, cooled=cooled)
     if chosen is None:
         return None
     return chosen["lane"], chosen["spec"]
