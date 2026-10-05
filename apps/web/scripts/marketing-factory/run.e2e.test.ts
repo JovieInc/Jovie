@@ -668,10 +668,12 @@ describe('page stage gates', () => {
       }),
     });
 
-    const runsDir = join(runDir(), 'render', 'preview-records');
+    const outDir = (seen[0] as { outDir: string }).outDir;
+    expect(outDir).toMatch(/render\/iteration-0-attempt-1-/u);
+    const runsDir = join(outDir, 'preview-records');
     expect(seen).toEqual([
       {
-        outDir: join(runDir(), 'render'),
+        outDir,
         preview: { recordId: 'solutions.founders', runsDir },
       },
     ]);
