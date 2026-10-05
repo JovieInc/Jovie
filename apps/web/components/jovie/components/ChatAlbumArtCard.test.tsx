@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatAlbumArtToolResult } from '../types';
 import { ChatAlbumArtCard } from './ChatAlbumArtCard';
+import { ALBUM_ART_SWIPE_PREFERENCE_KEY } from './ChatAlbumArtSwipeReview';
 
 const {
   mockUseApplyGeneratedAlbumArtMutation,
@@ -36,7 +37,24 @@ const GENERATED_RESULT: ChatAlbumArtToolResult = {
   ],
 };
 
+function mockMutations() {
+  mockUseApplyGeneratedAlbumArtMutation.mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+  });
+  mockUseCreateReleaseWithGeneratedAlbumArtMutation.mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+  });
+}
+
 describe('ChatAlbumArtCard', () => {
+  beforeEach(() => {
+    globalThis.localStorage.clear();
+  });
+
   it('renders an apply failure with the error token, not raw red-* (JOV-6773)', () => {
     mockUseApplyGeneratedAlbumArtMutation.mockReturnValue({
       mutate: vi.fn(),
@@ -101,5 +119,63 @@ describe('ChatAlbumArtCard', () => {
     expect(artwork).toHaveClass('object-contain');
     expect(artwork).not.toHaveClass('object-cover');
     expect(screen.getByText('Dream Pop')).not.toHaveClass('absolute');
+  });
+
+  it('shows the one-time swipe-mode prompt while undecided (JOV-3834)', async () => {
+    mockMutations();
+    render(
+      <ChatAlbumArtCard result={GENERATED_RESULT} profileId='profile-123' />
+    );
+
+    expect(
+      await screen.findByTestId('album-art-swipe-onboarding')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('album-art-swipe-region')).toBeNull();
+  });
+
+  it('enabling swipe review from the prompt persists the preference', async () => {
+    mockMutations();
+    render(
+      <ChatAlbumArtCard result={GENERATED_RESULT} profileId='profile-123' />
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Try Swipe Review' })
+    );
+
+    expect(screen.getByTestId('album-art-swipe-region')).toBeInTheDocument();
+    expect(
+      globalThis.localStorage.getItem(ALBUM_ART_SWIPE_PREFERENCE_KEY)
+    ).toBe('on');
+  });
+
+  it('declining the prompt keeps the grid and persists off', async () => {
+    mockMutations();
+    render(
+      <ChatAlbumArtCard result={GENERATED_RESULT} profileId='profile-123' />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep Grid' }));
+
+    expect(screen.queryByTestId('album-art-swipe-region')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Use This Art' })
+    ).toBeInTheDocument();
+    expect(
+      globalThis.localStorage.getItem(ALBUM_ART_SWIPE_PREFERENCE_KEY)
+    ).toBe('off');
+  });
+
+  it('renders the swipe region directly when the preference is already on', async () => {
+    globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'on');
+    mockMutations();
+    render(
+      <ChatAlbumArtCard result={GENERATED_RESULT} profileId='profile-123' />
+    );
+
+    expect(
+      await screen.findByTestId('album-art-swipe-region')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('album-art-swipe-onboarding')).toBeNull();
   });
 });
