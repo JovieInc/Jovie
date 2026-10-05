@@ -5,10 +5,12 @@ import { clearRemediationLabelCache } from '../linear-issue-intake.mjs';
 import {
   AGENT_READY_LABEL,
   applyRemediationDecision,
+  applyRemediationDecisionWithRetry,
   decideAuthSmokeSignal,
   decideLoginSignal,
   decideMonitorSignal,
   gateSteadyGreen,
+  isTransientRemediationFailure,
   remediationIntakeDisabled,
 } from '../remediation-signal.mjs';
 
@@ -260,6 +262,98 @@ describe('red remediation is agent-ready', () => {
     expect(run.calls.some(call => call.query.includes('issueCreate'))).toBe(
       false
     );
+  });
+});
+
+describe('applyRemediationDecisionWithRetry', () => {
+  const red = { action: 'red', fingerprint: 'production-monitor-continuity' };
+  const context = fetchImpl => ({
+    source: 'production-continuity.yml',
+    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    apiKey: 'lin_test',
+    fetchImpl,
+  });
+  const noSleep = async () => {};
+
+  it('classifies only upstream resets and 5xx as transient', () => {
+    expect(
+      isTransientRemediationFailure({ ok: false, reason: 'linear_update_503' })
+    ).toBe(true);
+    expect(
+      isTransientRemediationFailure({
+        ok: false,
+        reason: 'linear_update_transport',
+      })
+    ).toBe(true);
+    expect(
+      isTransientRemediationFailure({ ok: false, reason: 'linear_update_400' })
+    ).toBe(false);
+    expect(
+      isTransientRemediationFailure({
+        ok: false,
+        reason: 'missing_linear_api_key',
+      })
+    ).toBe(false);
+    expect(isTransientRemediationFailure({ ok: true })).toBe(false);
+  });
+
+  it('retries a transient Linear 503 and files on the next attempt', async () => {
+    clearRemediationLabelCache();
+    const inner = linearStub([]);
+    let createCalls = 0;
+    const fetchImpl = vi.fn(async (url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueCreate')) {
+        createCalls += 1;
+        if (createCalls === 1) {
+          return new Response('upstream connect error', { status: 503 });
+        }
+      }
+      return inner.fetchImpl(url, init);
+    });
+    const result = await applyRemediationDecisionWithRetry(
+      red,
+      context(fetchImpl),
+      { sleep: noSleep }
+    );
+    expect(result.ok).toBe(true);
+    expect(createCalls).toBe(2);
+  });
+
+  it('stops retrying after the attempt budget', async () => {
+    clearRemediationLabelCache();
+    const inner = linearStub([]);
+    const fetchImpl = vi.fn(async (url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueCreate')) {
+        return new Response('upstream connect error', { status: 503 });
+      }
+      return inner.fetchImpl(url, init);
+    });
+    const result = await applyRemediationDecisionWithRetry(
+      red,
+      context(fetchImpl),
+      { attempts: 2, sleep: noSleep }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('linear_create_503');
+    expect(
+      fetchImpl.mock.calls.filter(([, init]) =>
+        String(init.body).includes('issueCreate')
+      )
+    ).toHaveLength(2);
+  });
+
+  it('does not retry permanent failures', async () => {
+    const fetchImpl = vi.fn();
+    const result = await applyRemediationDecisionWithRetry(
+      red,
+      { ...context(fetchImpl), apiKey: '' },
+      { sleep: noSleep }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('missing_linear_api_key');
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
 
