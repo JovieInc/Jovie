@@ -1,0 +1,9 @@
+Draft PR opened: [#20120](https://github.com/JovieInc/Jovie/pull/20120), commit `c688273a2d`.
+
+Handoff:
+
+- Handles the exact MusicFetch 401 “subscription not active” response as terminal no-data, preventing retries while keeping unrelated 401s loud.
+- Added regression coverage in [musicfetch.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T222615Z-JOV-7349-codex-c071c1/apps/web/tests/lib/musicfetch.test.ts:329).
+- Verified 17 focused tests, changed-file Biome, 17-package typecheck, bug-to-test gate, and commit/push hooks.
+- PR is draft against `main`; hosted checks are pending.
+- GBrain returned HTTP 400 and Linear credentials were unavailable, so repository source/history provided the evidence base.
