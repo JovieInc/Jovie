@@ -239,7 +239,7 @@
     "@jovie/extension-contracts": "workspace:*",
     "@jovie/ui": "workspace:*",
     "@modelcontextprotocol/sdk": "1.30.0",
-    "@neondatabase/serverless": "^1.1.0",
+    "@neondatabase/serverless": "^1.2.0",
     "@noble/hashes": "2.4.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
     "@opentelemetry/sdk-node": "^0.222.0",
