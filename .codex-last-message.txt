@@ -1,0 +1,24 @@
+Implemented and opened draft PR: [JOV-5859: rank social inbox by ROI](https://github.com/JovieInc/Jovie/pull/20137)
+
+What changed:
+
+- Added deterministic ROI ranking using identity, intent, unanswered status, relationship, capped reach, recency decay, and negative spam/replied signals.
+- Added feedback learning from Inbox approve/reject and 👍/👎 activity.
+- Replaced chronological display ordering while retaining a bounded candidate fetch.
+- Added regression coverage proving a 3-day unanswered collab outranks a 5-minute emoji.
+
+Verified:
+
+- Biome passed on all changed files.
+- 62 focused tests passed.
+- Typecheck passed: 17/17 tasks.
+- Pre-commit and pre-push security/policy gates passed.
+- Hosted coverage, security, migration, and PR-size checks passed.
+- Commit: `2ab7071d835bbe3d450e1260e5a7284a8256cc60`
+
+Deviations/status:
+
+- PR remains draft and unmerged as required.
+- Source Validation and changed-UI capture were still pending at last check; no hosted checks were failing.
+- Linear could not be moved to In Review because the connector requires reauthentication and no local token was available.
+- GBrain invariant retrieval succeeded, but the implementation-receipt write timed out and was not created (`gbrain-unavailable` for writeback).
