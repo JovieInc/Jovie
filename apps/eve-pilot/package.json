@@ -31,10 +31,10 @@
   },
   "devDependencies": {
     "@types/node": "26.6.3",
-    "@vitest/coverage-v8": "5.0.2",
+    "@vitest/coverage-v8": "5.0.3",
     "typescript": "6.0.3",
     "vercel": "59.23.2",
-    "vitest": "5.0.2"
+    "vitest": "5.0.3"
   },
   "pnpm": {
     "patchedDependencies": {
