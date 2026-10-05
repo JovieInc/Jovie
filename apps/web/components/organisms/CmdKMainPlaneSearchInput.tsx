@@ -40,6 +40,7 @@ export function CmdKMainPlaneSearchInput({
       />
       <input
         ref={inputRef}
+        id={`${listId}-input`}
         type='search'
         value={value}
         onChange={event => {
