@@ -208,6 +208,8 @@ export function CmdKPalette({
     hasSearchError,
     retrySearch,
   } = useCmdkData(profileId, query, open);
+  const pendingMessage =
+    query.trim().length > 0 ? 'Searching…' : 'Loading results…';
   const filteredAdditional = useMemo(
     () => filterAdditionalSections(query, additionalSectionsAfter),
     [query, additionalSectionsAfter]
@@ -516,7 +518,7 @@ export function CmdKPalette({
             </Button>
           </>
         ) : isSearching ? (
-          'Searching…'
+          pendingMessage
         ) : null}
       </div>
       <div

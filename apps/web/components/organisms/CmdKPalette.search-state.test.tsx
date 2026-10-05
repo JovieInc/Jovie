@@ -105,6 +105,19 @@ describe('Cmd-K search feedback and recovery', () => {
     }
   );
 
+  it.each(['isLoading', 'isFetching'] as const)(
+    'announces default result loading without implying a query during %s',
+    phase => {
+      mocks.releases[phase] = true;
+      render(palette());
+      expect(screen.getByRole('status')).toHaveTextContent('Loading results');
+      expect(screen.getByRole('combobox')).toHaveValue('');
+      expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getAllByRole('option').length).toBeGreaterThan(0);
+      expect(screen.queryByText('No matches.')).not.toBeInTheDocument();
+    }
+  );
+
   it('keeps local routes usable while release data loads', () => {
     mocks.releases.isLoading = true;
     render(palette());
