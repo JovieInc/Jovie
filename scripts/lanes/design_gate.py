@@ -969,11 +969,12 @@ def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
     # Explicit bottleneck work must also win this wrapper's brief-priority pass.
     # Only already build-admissible pool issues qualify; the ordinary brief path
     # remains responsible for a designated issue whose design evidence is missing.
-    designated = [issue for issue in issues
-                  if {"agent-ready", "dispatch-next"} <= {label.lower() for label in issue.labels}
-                  and admission(issue)["admit"]]
-    chosen = pick(designated, failures, now=now, in_flight=in_flight, provider=provider) if designated else None
-    if chosen is not None:
+    designated = lambda issue: {"agent-ready", "dispatch-next"} <= {label.lower() for label in issue.labels}
+    # Select against the whole pool, so a designated non-canonical duplicate
+    # cannot hide its canonical sibling from the claim predicate.
+    chosen = (pick(issues, failures, now=now, in_flight=in_flight, provider=provider)
+              if any(designated(issue) for issue in issues) else None)
+    if chosen is not None and designated(chosen) and admission(chosen)["admit"]:
         decision = admission(chosen)
         if decision["auto"] and linear is not None:
             try:

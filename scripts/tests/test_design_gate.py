@@ -352,6 +352,13 @@ class AdmissionTest(unittest.TestCase):
         self.assertIs(design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
                          linear=linear, provider="devin", now=NOW), held)
 
+    def test_designation_preserves_whole_pool_duplicate_admission(self):
+        canonical = self.task("JOV-1", "Repair account claim conversion", "body", 2, [])
+        target = self.task("JOV-7896", canonical.title, "body", 2, ["agent-ready", "dispatch-next"])
+        target.created_at = "2026-09-02T00:00:00Z"
+        self.assertIs(design_gate.pick_build_issue([canonical, target], {}, pick=self.lane.pick_issue,
+                      provider="devin", now=NOW), canonical)
+
     def test_designation_does_not_bypass_design_or_worker_admission(self):
         target = self.task("JOV-7896", "Homepage hero", "no brief", 2,
                            ["agent-ready", "dispatch-next", "ws:ui-ia"])
