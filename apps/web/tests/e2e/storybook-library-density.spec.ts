@@ -178,3 +178,69 @@ test('loading reserves the same dense row and title geometry', async ({
     fullPage: true,
   });
 });
+
+test('Library grid preserves container-fit densities and the phone breakpoint', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(
+    '/iframe.html?id=library-workinspector--dense-scan-with-inspector&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  await expect(page.getByTestId('library-asset-drawer')).toHaveAttribute(
+    'aria-hidden',
+    'false',
+    { timeout: 90_000 }
+  );
+  await page.getByRole('radio', { name: 'Grid View', exact: true }).check();
+  const grid = page.locator('[data-library-grid]');
+  const cards = grid.locator('article.system-b-library-card');
+  await expect(cards).toHaveCount(19);
+  for (const [label, columns] of [
+    ['Small cards card size', 3],
+    ['Medium cards card size', 2],
+    ['Large cards card size', 1],
+  ] as const) {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await expect
+      .poll(() =>
+        grid.evaluate(
+          element =>
+            getComputedStyle(element).gridTemplateColumns.split(' ').length
+        )
+      )
+      .toBe(columns);
+    const gridRight = await grid.evaluate(
+      element => element.getBoundingClientRect().right
+    );
+    for (const card of await cards.all()) {
+      const box = await card.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(gridRight + 1);
+    }
+    expect(
+      await cards
+        .first()
+        .evaluate(
+          element =>
+            getComputedStyle(element).gridTemplateRows.split(' ').length
+        )
+    ).toBe(2);
+    await page.screenshot({
+      path: testInfo.outputPath(`grid-${columns}-columns.png`),
+      fullPage: true,
+    });
+  }
+  // Verify the grid breakpoint itself. This fixed-width inspector fixture is
+  // intentionally not a full mobile-page certification.
+  await page.setViewportSize({ width: 639, height: 900 });
+  await expect
+    .poll(() =>
+      grid.evaluate(
+        element =>
+          getComputedStyle(element).gridTemplateColumns.split(' ').length
+      )
+    )
+    .toBe(2);
+  await expect(page.getByTestId('library-grid-density-toggle')).toBeHidden();
+});
