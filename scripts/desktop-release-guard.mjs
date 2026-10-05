@@ -294,7 +294,17 @@ function resolveBranch() {
 }
 
 function getChangedFiles(baseRef) {
-  const mergeBase = git(['merge-base', baseRef, 'HEAD']);
+  // The queue already supplies the exact previous combined head. origin/main
+  // can lag that head and would fold an earlier member into this stamp's diff.
+  const mergeGroup = process.env.GITHUB_EVENT_NAME === 'merge_group';
+  const diffBase = mergeGroup ? process.env.TURBO_SCM_BASE : baseRef;
+  if (mergeGroup && !/^[0-9a-f]{40}$/.test(diffBase ?? '')) {
+    throw new Error('merge_group requires an exact TURBO_SCM_BASE');
+  }
+  const mergeBase = git(['merge-base', diffBase, 'HEAD']);
+  if (mergeGroup && mergeBase !== diffBase) {
+    throw new Error('merge_group exact base is not an ancestor of HEAD');
+  }
   const committedOutput = git(['diff', '--name-only', mergeBase, 'HEAD']);
   const workingTreeOutput = git(['diff', '--name-only']);
   return {

@@ -54,6 +54,44 @@ describe('UnifiedTable keyboard selection', () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false });
   });
 
+  it.each([true, false])(
+    'keeps Space playback separate from Enter and selection (toggle=%s)',
+    hasToggle => {
+      const onRowClick = vi.fn();
+      const onRowToggle = vi.fn();
+      const onToggleRowSelection = vi.fn();
+      render(
+        <UnifiedTable
+          data={data}
+          columns={columns}
+          enableVirtualization={false}
+          enableKeyboardNavigation
+          getRowId={row => row.id}
+          getRowTestId={row => `row-${row.id}`}
+          onRowClick={onRowClick}
+          onRowToggle={hasToggle ? onRowToggle : undefined}
+          onToggleRowSelection={onToggleRowSelection}
+        />
+      );
+      const row = screen.getByTestId('row-b');
+      act(() => row.focus());
+      fireEvent.keyDown(row, { key: ' ' });
+      expect(onRowToggle).toHaveBeenCalledTimes(hasToggle ? 1 : 0);
+      expect(onRowClick).toHaveBeenCalledTimes(hasToggle ? 0 : 1);
+      expect((hasToggle ? onRowToggle : onRowClick).mock.calls[0][0]).toEqual(
+        data[1]
+      );
+      expect(onToggleRowSelection).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(row, { key: 'Enter' });
+      expect(onRowClick).toHaveBeenCalledTimes(hasToggle ? 1 : 2);
+      expect(onRowClick.mock.calls.at(-1)?.[0]).toEqual(data[1]);
+      fireEvent.keyDown(row, { key: 'x' });
+      expect(onToggleRowSelection).toHaveBeenCalledWith(data[1], 1);
+      expect(row).toHaveFocus();
+    }
+  );
+
   it('toggles the focused row with x', () => {
     const onSelection = vi.fn();
     render(<ConsumerOwnedSelection onSelection={onSelection} />);

@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx
 
+import { StatusGlyph, type StatusGlyphState } from '@jovie/ui';
 import { memo, useMemo } from 'react';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
 import {
@@ -16,9 +17,7 @@ import {
   DspAvatarStack,
 } from '@/components/shell/DspAvatarStack';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
-import { releaseStatusClasses } from '@/lib/library/release-status';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
-import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 
 // ---------------------------------------------------------------------------
@@ -37,7 +36,8 @@ export function formatReleaseType(
 
 export function formatLibraryItemType(asset: LibraryReleaseAsset): string {
   if (asset.itemKind === 'merch') {
-    return asset.productType?.trim() || 'Merch';
+    const productType = asset.productType?.trim();
+    return productType ? capitalizeFirst(productType) : 'Merch';
   }
   if (asset.itemKind === 'document') {
     return asset.itemStatusLabel ?? 'Document';
@@ -57,22 +57,80 @@ export function formatLibraryStatus(asset: LibraryReleaseAsset): string {
   return asset.itemStatusLabel ?? formatReleaseStatus(asset.status);
 }
 
+export interface LibraryStatusGlyphSpec {
+  readonly state: StatusGlyphState;
+  /** One phrase for both axes; the tooltip and accessible name. */
+  readonly label: string;
+}
+
+/**
+ * Folds release status and approval into one Linear-style glyph so a tile
+ * never shows two stacked "Draft" words (#10384 / JOV-3333). Progress reads
+ * left to right: empty ring (draft), half (scheduled), check (out). Review is
+ * the one approval state that needs attention, so it owns the glyph; any
+ * other approval state only qualifies the label.
+ */
+export function resolveLibraryStatusGlyph(
+  asset: LibraryReleaseAsset
+): LibraryStatusGlyphSpec {
+  if (
+    asset.lifecycleStatus === 'archived' ||
+    asset.approvalStatus === 'archived'
+  ) {
+    return { state: 'canceled', label: 'Archived' };
+  }
+  const status = formatLibraryStatus(asset);
+  if (asset.approvalStatus === 'needs_review') {
+    return { state: 'in_review', label: `${status} · Needs review` };
+  }
+  const state: StatusGlyphState =
+    asset.status === 'released'
+      ? 'done'
+      : asset.status === 'scheduled'
+        ? 'in_progress'
+        : 'todo';
+  if (asset.approvalStatus === 'approved') {
+    return { state, label: `${status} · Approved` };
+  }
+  // An unapproved draft has nothing to approve yet; say it once.
+  return {
+    state,
+    label: asset.status === 'draft' ? status : `${status} · Not approved`,
+  };
+}
+
+/** The one status mark for tile, row, table and inspector. */
+export const LibraryStatusGlyph = memo(function LibraryStatusGlyph({
+  asset,
+  showLabel = false,
+  className,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  /** Visible words, for the inspector only; elsewhere the glyph speaks. */
+  readonly showLabel?: boolean;
+  readonly className?: string;
+}) {
+  const { state, label } = resolveLibraryStatusGlyph(asset);
+  return (
+    <StatusGlyph
+      state={state}
+      size='md'
+      tooltipLabel={label}
+      label={showLabel ? label : undefined}
+      data-testid={`library-status-glyph-${asset.id}`}
+      className={className}
+    />
+  );
+});
+
 export const LibraryCatalogStatusCell = memo(function LibraryCatalogStatusCell({
   asset,
 }: {
   readonly asset: LibraryReleaseAsset;
 }) {
   return (
-    <span
-      role='status'
-      className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
-        releaseStatusClasses(asset.status)
-      )}
-      data-testid={`library-release-status-${asset.id}`}
-      aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
-    >
-      {formatLibraryStatus(asset)}
+    <span className='flex h-6 items-center'>
+      <LibraryStatusGlyph asset={asset} />
     </span>
   );
 });
@@ -147,7 +205,8 @@ export const LibraryCatalogProvidersCell = memo(
 /**
  * Placeholder for catalog metrics the production schema does not carry yet
  * (BPM, musical key, energy, rating). Fixed-size em-dash so the dense row
- * never shifts when real values land.
+ * never shifts when real values land. Hidden metric columns leave no compact
+ * form behind: a run of dashes beside the title says nothing.
  */
 export type LibraryCatalogMetric = 'bpm' | 'key' | 'energy' | 'rating';
 
@@ -292,9 +351,14 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     id: 'status',
     header: 'Status',
     cell: ({ row }) => <LibraryCatalogStatusCell asset={row.original} />,
-    size: 112,
-    minSize: 96,
-    meta: { className: alignment.workspaceSeamX, minWidth: 112 },
+    size: 44,
+    minSize: 44,
+    enableSorting: false,
+    meta: {
+      className: alignment.workspaceSeamX,
+      minWidth: 44,
+      headerVisibility: 'sr-only',
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'artwork',
@@ -303,13 +367,17 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     size: 56,
     minSize: 56,
     enableSorting: false,
-    meta: { className: 'px-2', minWidth: 56 },
+    // The art names itself; a visible header would widen the column past 56.
+    meta: { className: 'px-2', minWidth: 56, headerVisibility: 'sr-only' },
   }),
   libraryCatalogColumnHelper.accessor('title', {
     id: 'title',
     header: 'Title',
     cell: ({ row }) => (
-      <span className='system-b-library-release-title block truncate'>
+      // Fluid cell: no min-content width, so the auto-layout table shrinks
+      // this column and long titles truncate instead of pushing trailing
+      // columns out of the container.
+      <span className='system-b-library-release-title system-b-library-fluid-cell block truncate'>
         {row.original.title}
       </span>
     ),
@@ -365,7 +433,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 4,
       minWidth: 72,
-      compact: asset => <LibraryCatalogMetricCell asset={asset} metric='bpm' />,
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -380,7 +447,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 4,
       minWidth: 72,
-      compact: asset => <LibraryCatalogMetricCell asset={asset} metric='key' />,
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -395,9 +461,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 3,
       minWidth: 80,
-      compact: asset => (
-        <LibraryCatalogMetricCell asset={asset} metric='energy' />
-      ),
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -412,9 +475,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 3,
       minWidth: 88,
-      compact: asset => (
-        <LibraryCatalogMetricCell asset={asset} metric='rating' />
-      ),
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -427,7 +487,10 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 5,
       minWidth: 80,
-      compact: asset => <LibraryCatalogLengthCell asset={asset} />,
+      compact: asset =>
+        asset.totalDurationMs ? (
+          <LibraryCatalogLengthCell asset={asset} />
+        ) : null,
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -449,7 +512,10 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 5,
       minWidth: 120,
-      compact: asset => <LibraryCatalogProvidersCell asset={asset} />,
+      compact: asset =>
+        asset.providers.length > 0 ? (
+          <LibraryCatalogProvidersCell asset={asset} />
+        ) : null,
     },
   }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];

@@ -4,7 +4,13 @@
  * Publish is always `shadow` until the ramp ships.
  */
 
-import { existsSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+} from 'node:fs';
 import { extname, join, relative } from 'node:path';
 import { modelFamily } from '@jovie/copy';
 import {
@@ -27,8 +33,9 @@ import {
   resolveCapture,
 } from '../marketing-media/capture-adapter';
 import { generateMarketingImage } from '../marketing-media/generate-image';
+import { captureBytesDigest, verifyRenderBytes } from './capture-integrity';
 import { buildFactoryPageRecord } from './page-record';
-import { digestOf, writeJson } from './receipts';
+import { digestOf, writeImmutableJson } from './receipts';
 import { evaluateRenderCaptures } from './render-measurer';
 import {
   artifactOf,
@@ -276,14 +283,25 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
     );
   }
   // The candidate the local build previews (FACTORY_PREVIEW_RECORD).
-  const previewDir = join(ctx.runDir, 'render', 'preview-records');
-  const recordId = `${ctx.brief.family}.${ctx.brief.slug}`;
-  writeJson(
-    join(previewDir, recordId.replace('.', '-'), 'page-record.json'),
-    record
+  const renderDir = join(ctx.runDir, 'render');
+  mkdirSync(renderDir, { recursive: true });
+  const attemptDir = mkdtempSync(
+    join(renderDir, `iteration-${ctx.iteration ?? 0}-attempt-${ctx.attempt}-`)
   );
+  const previewDir = join(attemptDir, 'preview-records');
+  const recordId = `${ctx.brief.family}.${ctx.brief.slug}`;
+  const previewPath = join(
+    previewDir,
+    recordId.replace('.', '-'),
+    'page-record.json'
+  );
+  writeImmutableJson(previewPath, record);
+  const preview = {
+    path: previewPath,
+    digest: captureBytesDigest(readFileSync(previewPath)),
+  };
   const measured = await ctx.providers.measureRender(ctx.brief.route, {
-    outDir: join(ctx.runDir, 'render'),
+    outDir: attemptDir,
     preview: { recordId, runsDir: previewDir },
   });
   if (measured.status !== 'ok') {
@@ -303,6 +321,7 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
       cls: measured.cls,
       lcpMs: measured.lcpMs,
       captures: measured.captures,
+      preview,
     },
     { notes: { record } }
   );
@@ -545,6 +564,19 @@ async function visualAdmission(
 
 async function trustStage(ctx: StageContext): Promise<StageResult> {
   const checks = new Checks();
+  const integrity = verifyRenderBytes(
+    artifactOf(ctx, 'render'),
+    ctx.providers.mode
+  );
+  if (
+    !checks.check(
+      'capture-integrity',
+      integrity.length === 0,
+      integrity.join('; ')
+    )
+  ) {
+    return result(checks, null);
+  }
   const upstream = FACTORY_STAGES.slice(
     0,
     FACTORY_STAGES.indexOf('adversarial-trust')

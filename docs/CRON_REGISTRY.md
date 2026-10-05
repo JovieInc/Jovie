@@ -103,6 +103,7 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | 11 | workflowApprovalRecovery | Every invocation | Recovers accepted suggested_actions missing workflow_runs enqueue |
 | 12 | youtubeLibraryRefresh | Every invocation | JOV-5136: re-syncs YouTube channels stale >24h via `runScheduledRefreshes`. No-op (`provider: null`) until the OAuth connector lands with JOV-3189 |
 | 13 | billingSyncRemediation | Every invocation | JOV-7558: reads the billing audit log and unprocessed Stripe rows. Files one Linear issue labeled `remediation:billing-sync-stale` or `remediation:billing-webhooks-stuck` when the last reconciliation heartbeat is older than 48 hours or a webhook is stuck. Does not call `/api/billing/health`. |
+| 14 | canaryReceiptFreshness | Hourly (`minute < 15`) | Reads the two daily acquisition-canary reports; missing, invalid, future or 26-hour-old receipts fail the sub-job with Sentry `canary_receipt_stale`, even when acquisition is disabled. Two Redis reads/run; no new schedule (JOV-7895). |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 

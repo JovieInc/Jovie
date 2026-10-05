@@ -5,9 +5,11 @@ import { readFileSync } from 'node:fs';
 import {
   appendFile,
   chmod,
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
+  realpath,
   rm,
   writeFile,
 } from 'node:fs/promises';
@@ -2119,4 +2121,142 @@ esac
   const outputs = await readFile(join(root, 'output.txt'), 'utf8');
   assert.match(outputs, /^should_release=false$/m);
   assert.doesNotMatch(outputs, /^should_(release|stamp)=true$/m);
+});
+
+test('desktop release CLI uses the exact merge-group base without weakening stamp scope', async t => {
+  async function fixture() {
+    // macOS temp directories can be symlinks; match Node's resolved CLI URL.
+    const root = await realpath(
+      await mkdtemp(join(tmpdir(), 'jovie-desktop-queue-base-'))
+    );
+    t.after(() => rm(root, { force: true, recursive: true }));
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    const write = async (path, content) => {
+      const destination = join(root, path);
+      await mkdir(join(destination, '..'), { recursive: true });
+      await writeFile(destination, content);
+    };
+    const contents = releaseStampContents();
+    for (const path of deterministicReleaseStampFiles) {
+      await write(path, contents.getBaseContent(path));
+    }
+    for (const path of [
+      'desktop-release-guard.mjs',
+      'version-fanout-guard.mjs',
+      'version-stamp.mjs',
+      'lib/changelog-filter-rules.mjs',
+    ]) {
+      const destination = join(root, 'scripts', path);
+      await mkdir(join(destination, '..'), { recursive: true });
+      await copyFile(new URL(`./${path}`, import.meta.url), destination);
+    }
+    git('init', '-q');
+    git('config', 'user.email', 'desktop-guard-test@jov.ie');
+    git('config', 'user.name', 'Desktop Guard Test');
+    git('add', '.');
+    git('commit', '-qm', 'base');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    await write(
+      'apps/web/prior-queue-member.ts',
+      'export const prior = true;\n'
+    );
+    git('add', '.');
+    git('commit', '-qm', 'preceding queue member');
+    const queueBase = git('rev-parse', 'HEAD');
+    for (const path of deterministicReleaseStampFiles) {
+      await write(path, contents.getHeadContent(path));
+    }
+    git('add', '.');
+    git('commit', '-qm', 'deterministic release stamp');
+    const invoke = (environment = {}) =>
+      spawnSync(
+        process.execPath,
+        [
+          join(root, 'scripts/desktop-release-guard.mjs'),
+          '--base',
+          'origin/main',
+        ],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GITHUB_EVENT_NAME: 'merge_group',
+            GITHUB_HEAD_REF: '',
+            GITHUB_BASE_REF: '',
+            GITHUB_REF_NAME: `gh-readonly-queue/main/pr-20440-${queueBase}`,
+            TURBO_SCM_BASE: queueBase,
+            ...environment,
+          },
+        }
+      );
+    return { git, invoke, root, write };
+  }
+
+  await t.test(
+    'excludes the previous member despite a stale origin/main',
+    async () => {
+      const { invoke } = await fixture();
+      const result = invoke();
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(
+        result.stdout,
+        /deterministic desktop version fan-out allowed/
+      );
+    }
+  );
+  await t.test(
+    'still rejects code bundled into the release member',
+    async () => {
+      const { git, invoke, write } = await fixture();
+      await write(
+        'apps/web/bundled-with-stamp.ts',
+        'export const bundled = true;\n'
+      );
+      git('add', '.');
+      git('commit', '-qm', 'unauthorized bundled code');
+      const result = invoke();
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /apps\/web\/bundled-with-stamp\.ts/);
+      assert.doesNotMatch(result.stderr, /prior-queue-member/);
+    }
+  );
+  for (const base of ['', 'origin/main', 'not-a-sha']) {
+    await t.test(
+      `fails closed on missing or malformed exact base ${JSON.stringify(base)}`,
+      async () => {
+        const { invoke } = await fixture();
+        const result = invoke({ TURBO_SCM_BASE: base });
+        assert.equal(result.status, 1);
+        assert.match(
+          result.stderr,
+          /merge_group requires an exact TURBO_SCM_BASE/
+        );
+      }
+    );
+  }
+  await t.test('rejects an exact SHA that is not an ancestor', async () => {
+    const { git, invoke } = await fixture();
+    const unrelated = git(
+      'commit-tree',
+      'HEAD^{tree}',
+      '-p',
+      'refs/remotes/origin/main',
+      '-m',
+      'unrelated branch'
+    );
+    const result = invoke({ TURBO_SCM_BASE: unrelated });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Could not determine changed files/);
+  });
+  await t.test('does not apply the queue override to a source PR', async () => {
+    const { invoke } = await fixture();
+    const result = invoke({
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_HEAD_REF: 'release/guard-fixture',
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /prior-queue-member\.ts/);
+  });
 });

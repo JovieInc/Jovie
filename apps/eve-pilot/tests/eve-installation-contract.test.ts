@@ -10,13 +10,13 @@ describe('Eve installation contract', () => {
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
     ) as {
       packageManager?: string;
-      dependencies?: { ai?: string; eve?: string };
+      dependencies?: { ai?: string; eve?: string; microsandbox?: string };
     };
     const lockfile = readFileSync(resolve(pilotRoot, 'pnpm-lock.yaml'), 'utf8');
 
     // Keep this pin in lockstep with the package.json dependency; dependabot
     // bumps edit the manifest but not this test.
-    const EVE_PIN = '0.68.0';
+    const EVE_PIN = '0.70.0';
 
     expect(packageJson.packageManager).toBe('pnpm@9.15.9');
     expect(packageJson.dependencies?.eve).toBe(EVE_PIN);
@@ -24,6 +24,16 @@ describe('Eve installation contract', () => {
       `      ai:\n        specifier: ${packageJson.dependencies?.ai}\n`
     );
     expect(lockfile).toContain(`  ai@${packageJson.dependencies?.ai}:`);
+    expect(packageJson.dependencies?.microsandbox).toBe('0.7.6');
+    expect(lockfile).toContain(
+      `      microsandbox:\n        specifier: ${packageJson.dependencies?.microsandbox}\n        version: ${packageJson.dependencies?.microsandbox}\n`
+    );
+    expect(lockfile).toContain(
+      `  microsandbox@${packageJson.dependencies?.microsandbox}:`
+    );
+    expect(lockfile).toContain(
+      `      '@microsandbox/types': ${packageJson.dependencies?.microsandbox}`
+    );
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))
     ).toBe(true);

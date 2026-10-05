@@ -5,6 +5,7 @@ import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
 const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
@@ -55,6 +56,41 @@ function css(): string {
 }
 
 describe('HomepageIdentityHero', () => {
+  it.each([true, false])(
+    'binds homepage performance readiness to the rendered claim with waitlist=%s',
+    waitlist => {
+      gate.WAITLIST_ENABLED = waitlist;
+      const { container } = render(
+        <HomepageIdentityHero headingId='home-hero-heading' />
+      );
+      const route = getEndUserPerfRouteById('home');
+      expect(route).toBeDefined();
+      if (!route) throw new Error('Missing home performance route');
+      const shellSelectors = route.readySelectors.shell;
+      if (!shellSelectors) {
+        throw new Error('Missing home shell readiness selectors');
+      }
+
+      // Each declared alternative must match the mounted hero, even though the
+      // performance runner accepts the first visible readiness candidate.
+      for (const selector of [
+        ...shellSelectors,
+        ...(route.readySelectors.content ?? []),
+      ]) {
+        expect(container.querySelector(selector), selector).toBeVisible();
+      }
+      const claimInput = within(
+        screen.getByTestId('homepage-claim-form')
+      ).getByRole('textbox');
+      expect(
+        route.readySelectors.content?.some(selector =>
+          claimInput.matches(selector)
+        )
+      ).toBe(true);
+      expect(container.querySelector('input#homepage-intent-input')).toBeNull();
+    }
+  );
+
   it('renders the identity headline and the jov.ie/you link claim (Tim 2026-09-28)', () => {
     render(<HomepageIdentityHero headingId='home-hero-heading' />);
 
@@ -136,6 +172,36 @@ describe('HomepageIdentityHero', () => {
     expect(source).toMatch(
       /@media\s*\(min-width:\s*768px\)\s*and\s*\(max-width:\s*1279px\)/
     );
+  });
+
+  it('keeps the copy and claim in the direct scoped grid slots', () => {
+    render(<HomepageIdentityHero />);
+
+    const layout = screen.getByTestId('marketing-section-hero');
+    const heading = screen.getByRole('heading', { level: 1 });
+    const copy = heading.parentElement;
+    const card = screen.getByTestId('homepage-claim-card');
+    if (!copy) throw new Error('Missing hero copy slot');
+
+    // Grid placement depends on these being direct children of the shared
+    // hero. A new wrapper must not detach either slot from its scoped rules.
+    expect(layout).toHaveClass('homepage-claim-hero__layout');
+    expect(copy).toHaveClass('homepage-claim-hero__copy');
+    expect(card).toHaveClass('homepage-claim-hero__card');
+    expect(Array.from(layout.children)).toEqual([copy, card]);
+    expect(
+      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.kicker)
+    ).toBeInTheDocument();
+    expect(
+      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
+    ).toBeInTheDocument();
+    expect(within(copy).queryByRole('textbox')).toBeNull();
+    expect(within(card).getByTestId('homepage-claim-form')).toContainElement(
+      screen.getByRole('textbox')
+    );
+    expect(
+      within(card).getByTestId('homepage-hero-real-profile')
+    ).toBeInTheDocument();
   });
 
   it('keeps hero copy generic and free of em dashes', () => {

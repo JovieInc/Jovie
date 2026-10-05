@@ -1185,6 +1185,7 @@ class ClaimScanCacheTest(unittest.TestCase):
     def test_hud_reason_queue_and_sweep_state_share_one_minute(self):
         import hud
         import reason_lane
+        import lane_runner as reason_cache
         calls = {"hud": 0, "reason": 0, "state": 0}
 
         class Client:
@@ -1201,10 +1202,12 @@ class ClaimScanCacheTest(unittest.TestCase):
                 return "In Progress"
 
         client = Client()
-        saved = hud.lane.Linear, hud.lane.SHARED_CACHE_DIR
+        saved = hud.lane.Linear, hud.lane.SHARED_CACHE_DIR, reason_cache.SHARED_CACHE_DIR
         hud.lane.Linear = lambda env: client
-        # hud.py loads its own lane_runner, and reason_lane imports that copy.
+        # Full CI collection can load another lane_runner module. Isolate the
+        # module queued_jobs actually imports as well as the HUD's module.
         hud.lane.SHARED_CACHE_DIR = lane.SHARED_CACHE_DIR
+        reason_cache.SHARED_CACHE_DIR = lane.SHARED_CACHE_DIR
         try:
             with patch.object(lane.time, "time", lambda: self.clock["now"]), \
                     patch.object(hud.lane.time, "time", lambda: self.clock["now"]):
@@ -1221,7 +1224,68 @@ class ClaimScanCacheTest(unittest.TestCase):
                 hud.linear_model(Path("/x"))
                 self.assertEqual(calls, {"hud": 2, "reason": 2, "state": 2})
         finally:
-            hud.lane.Linear, hud.lane.SHARED_CACHE_DIR = saved
+            hud.lane.Linear, hud.lane.SHARED_CACHE_DIR, reason_cache.SHARED_CACHE_DIR = saved
+
+
+class HostHandoffAdmissionTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+
+    def test_host_disabled_handoffs_are_not_probed_or_selected(self):
+        providers = {"claude": {"slots": 2}, "hyperagent": {"slots": 2}}
+        with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_HYPERAGENT": "0"}), \
+                patch.object(lane, "provider_healthy", return_value=True) as healthy:
+            self.assertIsNone(lane.next_provider(self.host, set(), providers))
+            healthy.assert_not_called()
+
+    def test_effective_nonpositive_slots_exclude_handoffs(self):
+        providers = {"codex": {"slots": 3}}
+        for slots in (0, -1):
+            with self.subTest(slots=slots), patch.object(self.host, "slots", return_value=slots), \
+                    patch.object(lane, "provider_healthy", return_value=True) as healthy:
+                self.assertIsNone(lane.next_provider(self.host, set(), providers))
+                healthy.assert_not_called()
+
+    def test_host_limits_preserve_deterministic_router_order(self):
+        providers = {"claude": {"slots": 2, "tier": 0},
+                     "codex": {"slots": 3, "tier": 2},
+                     "devin": {"slots": 2, "tier": 1}}
+        with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_CODEX": "3",
+                                     "LANES_SLOTS_DEVIN": "2", "SYMPHONY_AUTOSCALE": "0"}), \
+                patch.object(lane, "provider_healthy", return_value=True):
+            self.assertEqual(lane.next_provider(self.host, set(), providers)[0], "devin")
+            self.assertEqual(lane.next_provider(self.host, {"devin"}, providers)[0], "codex")
+            self.assertIsNone(lane.next_provider(self.host, {"devin", "codex"}, providers))
+
+    def test_zero_slot_worker_does_not_claim_a_new_issue(self):
+        with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0"}), \
+                patch.object(lane, "load_providers", return_value={"claude": {"slots": 2}}), \
+                patch.object(lane, "worker_with_slot") as work:
+            self.assertEqual(lane.worker(self.host, "claude"), 0)
+            work.assert_not_called()
+        self.assertFalse((self.host.state / "slots").exists())
+
+    def test_reexec_preserves_explicit_host_limits_in_the_current_release(self):
+        current = self.host.state / "current"
+        current.mkdir()
+        bounds = {"LANES_SLOTS_DEVIN": "2", "LANES_SLOTS_CODEX": "3",
+                  "LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_HYPERAGENT": "0",
+                  "LANES_SLOTS_GROK": "0", "LANES_SLOTS_KIMI": "0", "SYMPHONY_AUTOSCALE": "0"}
+        (current / "lane_runner.py").write_text(
+            "import json, os, sys\n"
+            "print(json.dumps({'argv': sys.argv[1:], 'bounds': "
+            "{key: os.environ.get(key) for key in " + repr(list(bounds)) + "}}))\n")
+        script = ("import sys; from pathlib import Path; "
+                  f"sys.path.insert(0, {str(ROOT / 'scripts/lanes')!r}); "
+                  "import lane_runner as lane; "
+                  f"lane.reexec(lane.Host(state=Path({str(self.host.state)!r})), 'codex')")
+        result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,
+                                timeout=10, env={**lane.selftest_env(self.host.state), **bounds})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout),
+                         {"argv": ["worker", "--provider", "codex"], "bounds": bounds})
 
 
 class RunIssueTest(unittest.TestCase):
@@ -5047,8 +5111,8 @@ class TimerInstallerNodePathTests(unittest.TestCase):
         import plistlib
 
         source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
-        for platform in ("Linux", "Darwin"):
-            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as tmp:
+        for platform, with_gbrain in ((p, g) for p in ("Linux", "Darwin") for g in (False, True)):
+            with self.subTest(platform=platform, with_gbrain=with_gbrain), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 bin_dir = root / "selected-node-bin"
                 bin_dir.mkdir()
@@ -5058,6 +5122,10 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 # Redirect only service output destinations; keep HOME and the
                 # actual installer logic intact. No host timer is installed.
                 script = source.replace("$HOME/.config/systemd/user", str(units))
+                # Keep the installer algorithm real while preventing this host's
+                # CLI aliases from satisfying or shadowing the fixture lookup.
+                script = script.replace("$HOME/.local/bin", str(root / "local-bin"))
+                script = script.replace("$HOME/.npm-global/bin", str(root / "npm-bin"))
                 script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes.plist", str(plist))
                 installer = root / "install.sh"
                 installer.write_text(script)
@@ -5068,6 +5136,12 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                     path.write_text(body)
                     path.chmod(0o755)
 
+                brain_bin = root / "installed-gbrain-bin"
+                brain_bin.mkdir()
+                brain = brain_bin / "gbrain"
+                if with_gbrain:
+                    brain.write_text("#!/bin/sh\nprintf 'fixture-retrieval-ok\\n'\n")
+                    brain.chmod(0o755)
                 stub("node", "#!/bin/sh\nprintf 'v24.21.0\\n'\n")
                 stub("uname", f"#!/bin/sh\nprintf '{platform}\\n'\n")
                 stub("git", "#!/bin/sh\nprintf '" + "c" * 40 + "\\n'\n")
@@ -5091,7 +5165,7 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
 ''')
                 result = subprocess.run(
                     ["/bin/bash", str(installer)], capture_output=True, text=True,
-                    env={**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin",
+                    env={**os.environ, "PATH": f"{bin_dir}:{brain_bin}:/usr/bin:/bin",
                          "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
                          "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
                 )
@@ -5108,6 +5182,14 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertIn("KillMode=process", service)
                     self.assertIn("Environment=CODEX_LEDGER_CADENCE_S=3600", service)
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
+                if with_gbrain:
+                    self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))
+                    retrieval = subprocess.run(["gbrain", "query", "fixture"],
+                                               env={"PATH": timer_path}, capture_output=True, text=True)
+                    self.assertEqual(retrieval.stdout.strip(), "fixture-retrieval-ok")
+                    self.assertEqual(timer_path.split(":").count(str(brain_bin)), 1)
+                else:
+                    self.assertNotIn(str(brain_bin), timer_path.split(":"))
                 self.assertIn("codex_lane.py reconcile --if-due 3600", tick)
                 self.assertIn("lane_runner.py dispatch", tick)
                 log = commands.read_text()

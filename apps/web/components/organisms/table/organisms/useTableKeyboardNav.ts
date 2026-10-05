@@ -10,6 +10,8 @@ export interface TableKeyboardNavConfig<TData> {
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly setFocusedIndex: (index: number) => void;
   readonly onRowClick?: (row: TData) => void;
+  /** Space; falls back to `onRowClick` when omitted. */
+  readonly onRowToggle?: (row: TData) => void;
   /** Toggles one row's selection (`x`). Omit when the table has no selection. */
   readonly onToggleSelection?: (rowIndex: number) => void;
   /**
@@ -41,6 +43,7 @@ export function useTableKeyboardNav<TData>({
   rowRefsMap,
   setFocusedIndex,
   onRowClick,
+  onRowToggle,
   onToggleSelection,
   onExtendSelection,
 }: TableKeyboardNavConfig<TData>): TableKeyboardNavResult<TData> {
@@ -95,11 +98,14 @@ export function useTableKeyboardNav<TData>({
           break;
 
         case 'activate':
-        case 'toggle':
           event.preventDefault();
           onRowClick?.(rowData);
           break;
 
+        case 'toggle':
+          event.preventDefault();
+          (onRowToggle ?? onRowClick)?.(rowData);
+          break;
         case 'select':
           if (!onToggleSelection) return;
           event.preventDefault();
@@ -112,6 +118,7 @@ export function useTableKeyboardNav<TData>({
       rowCount,
       moveFocus,
       onRowClick,
+      onRowToggle,
       onToggleSelection,
       onExtendSelection,
     ]
