@@ -476,6 +476,42 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.isPlaying).toBe(false);
   });
 
+  it('pauses canvas video before audio takes playback ownership', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const chrome = await import('@/components/organisms/audio-chrome-state');
+    const pauseVideo = vi.fn();
+    chrome.setMediaTransportSnapshot({
+      ownerId: 'canvas-test',
+      itemId: 'video:/walkthrough.mp4:0',
+      kind: 'video',
+      label: 'Walkthrough',
+      index: 0,
+      itemCount: 1,
+      status: 'playing',
+      currentTime: 1,
+      duration: 10,
+      hasPrevious: false,
+      hasNext: false,
+      togglePlayback: vi.fn(),
+      pausePlayback: pauseVideo,
+      seek: vi.fn(),
+      previous: vi.fn(),
+      next: vi.fn(),
+      retry: vi.fn(),
+    });
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+
+    expect(pauseVideo).toHaveBeenCalledOnce();
+  });
+
   it('switches source onto a single active track', async () => {
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());

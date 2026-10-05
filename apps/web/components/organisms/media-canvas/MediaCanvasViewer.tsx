@@ -1,7 +1,25 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { Button, IconButton, Kbd } from '@jovie/ui';
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  ImageIcon,
+  LoaderCircle,
+  Play,
+  X,
+} from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  type MediaTransportStatus,
+  resetMediaCanvasDockHost,
+  resetMediaTransportSnapshot,
+  setMediaCanvasDockHost,
+  setMediaTransportSnapshot,
+} from '@/components/organisms/audio-chrome-state';
+import { pauseTrackPlayback } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { cn } from '@/lib/utils';
 
 export interface MediaCanvasItem {
@@ -20,10 +38,24 @@ export interface MediaCanvasViewerProps {
   readonly onClose: () => void;
 }
 
+interface MediaPlaybackState {
+  readonly key: string;
+  readonly status: MediaTransportStatus;
+  readonly currentTime: number;
+  readonly duration: number;
+}
+
+const EMPTY_PLAYBACK_STATE: MediaPlaybackState = {
+  key: '',
+  status: 'loading',
+  currentTime: 0,
+  duration: 0,
+};
+
 /**
- * Full-canvas photo and video viewer. A native modal <dialog> gives focus
- * containment, Escape and the top layer; ←/→ step through items and the
- * filmstrip jumps. Video uses native controls so Space/scrub work as usual.
+ * Full-canvas photo and video viewer. A native modal dialog owns focus,
+ * Escape, and the top layer. PersistentAudioBar portals its ShellAudioDock
+ * into this dialog so video and audio never expose competing transports.
  */
 export function MediaCanvasViewer({
   items,
@@ -32,29 +64,158 @@ export function MediaCanvasViewer({
   onClose,
 }: MediaCanvasViewerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const open = index !== null && items.length > 0;
-  const current = open ? items[Math.min(index, items.length - 1)] : undefined;
-  const at = open ? Math.min(index, items.length - 1) : 0;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const ownerId = useId();
+  const [attempt, setAttempt] = useState(0);
+  const [dockHost, setDockHost] = useState<HTMLDivElement | null>(null);
+  const [playback, setPlayback] =
+    useState<MediaPlaybackState>(EMPTY_PLAYBACK_STATE);
+  const open = index !== null;
+  const at = open && items.length > 0 ? Math.min(index, items.length - 1) : 0;
+  const current = open ? items[at] : undefined;
+  const currentKey = current
+    ? `${current.kind}:${current.src}:${attempt}`
+    : 'empty';
+  const currentPlayback =
+    playback.key === currentKey
+      ? playback
+      : { ...EMPTY_PLAYBACK_STATE, key: currentKey };
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
+    if (open && !dialog.open) {
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
+    }
+    if (!open && dialog.open) {
+      if (typeof dialog.close === 'function') dialog.close();
+      else dialog.removeAttribute('open');
+    }
   }, [open]);
+
+  useEffect(() => {
+    if (!dockHost) return;
+    setMediaCanvasDockHost(ownerId, dockHost);
+    return () => resetMediaCanvasDockHost(ownerId);
+  }, [dockHost, ownerId]);
+
+  useEffect(
+    () => () => {
+      resetMediaTransportSnapshot(ownerId);
+      resetMediaCanvasDockHost(ownerId);
+    },
+    [ownerId]
+  );
+
+  const updatePlayback = useCallback(
+    (patch: Partial<Omit<MediaPlaybackState, 'key'>>) => {
+      setPlayback(previous => {
+        const base =
+          previous.key === currentKey
+            ? previous
+            : { ...EMPTY_PLAYBACK_STATE, key: currentKey };
+        return { ...base, ...patch };
+      });
+    },
+    [currentKey]
+  );
+
+  const selectIndex = useCallback(
+    (next: number) => {
+      setAttempt(0);
+      onIndexChange(next);
+    },
+    [onIndexChange]
+  );
 
   const step = useCallback(
     (delta: number) => {
       const next = at + delta;
-      if (next >= 0 && next < items.length) onIndexChange(next);
+      if (next >= 0 && next < items.length) selectIndex(next);
     },
-    [at, items.length, onIndexChange]
+    [at, items.length, selectIndex]
   );
+
+  const retry = useCallback(() => {
+    setPlayback(EMPTY_PLAYBACK_STATE);
+    setAttempt(value => value + 1);
+  }, []);
+
+  const togglePlayback = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play().catch(() => updatePlayback({ status: 'error' }));
+    } else {
+      video.pause();
+    }
+  }, [updatePlayback]);
+
+  const pausePlayback = useCallback(() => {
+    videoRef.current?.pause();
+  }, []);
+
+  const markReady = useCallback(
+    () => updatePlayback({ status: 'ready' }),
+    [updatePlayback]
+  );
+
+  const markError = useCallback(
+    () => updatePlayback({ status: 'error' }),
+    [updatePlayback]
+  );
+
+  const seek = useCallback((time: number) => {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(time)) return;
+    video.currentTime = Math.max(0, Math.min(time, video.duration || 0));
+  }, []);
+
+  useEffect(() => {
+    if (!open || !current) {
+      resetMediaTransportSnapshot(ownerId);
+      return;
+    }
+
+    setMediaTransportSnapshot({
+      ownerId,
+      itemId: currentKey,
+      kind: current.kind,
+      label: current.label ?? current.alt,
+      index: at,
+      itemCount: items.length,
+      status: currentPlayback.status,
+      currentTime: currentPlayback.currentTime,
+      duration: currentPlayback.duration,
+      hasPrevious: at > 0,
+      hasNext: at < items.length - 1,
+      togglePlayback: current.kind === 'video' ? togglePlayback : undefined,
+      pausePlayback: current.kind === 'video' ? pausePlayback : undefined,
+      seek: current.kind === 'video' ? seek : undefined,
+      previous: () => step(-1),
+      next: () => step(1),
+      retry,
+    });
+  }, [
+    at,
+    current,
+    currentKey,
+    currentPlayback.currentTime,
+    currentPlayback.duration,
+    currentPlayback.status,
+    items.length,
+    open,
+    ownerId,
+    pausePlayback,
+    retry,
+    seek,
+    step,
+    togglePlayback,
+  ]);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDialogElement>) => {
-      // Let a focused video keep its own arrow-key seeking.
-      if (event.target instanceof HTMLVideoElement) return;
       if (event.key === 'ArrowRight') {
         event.preventDefault();
         step(1);
@@ -65,6 +226,10 @@ export function MediaCanvasViewer({
     },
     [step]
   );
+
+  const mediaPadding = current
+    ? 'calc(var(--app-shell-audio-bar-max-height) + var(--app-shell-gap) + var(--space-2))'
+    : undefined;
 
   return (
     <dialog
@@ -79,94 +244,233 @@ export function MediaCanvasViewer({
       onClose={onClose}
       className='fixed inset-0 m-0 h-dvh max-h-dvh w-dvw max-w-none border-0 bg-black p-0 text-white dark:bg-black dark:text-white backdrop:bg-black/70'
     >
-      {current ? (
-        <div className='flex h-full flex-col'>
-          <div className='flex h-12 shrink-0 items-center gap-3 px-4'>
-            <p className='min-w-0 flex-1 truncate text-xs text-white/70'>
-              {current.label ?? current.alt}
-            </p>
-            <span className='text-xs tabular-nums text-white/50'>
-              {at + 1} / {items.length}
-            </span>
-            <button
-              type='button'
-              onClick={onClose}
-              aria-label='Close Viewer'
-              className='group grid size-11 place-items-center rounded-full text-white/70 hover:text-white focus-visible:outline-none'
-            >
-              <span className='grid size-8 place-items-center rounded-full group-hover:bg-white/10 group-focus-visible:ring-2 group-focus-visible:ring-white/40'>
-                <X className='size-4' aria-hidden='true' />
+      <div
+        className='relative flex h-full flex-col'
+        style={{ paddingBottom: mediaPadding }}
+      >
+        <div className='flex h-12 shrink-0 items-center gap-3 px-3 sm:px-4'>
+          <p className='min-w-0 flex-1 truncate text-xs text-white/70'>
+            {current?.label ?? current?.alt ?? 'Media preview'}
+          </p>
+          {current ? (
+            <>
+              <span className='hidden items-center gap-1 text-3xs text-white/50 sm:flex'>
+                <Kbd variant='tooltip'>←</Kbd>
+                <Kbd variant='tooltip'>→</Kbd>
+                Browse
               </span>
-            </button>
-          </div>
+              <span className='text-xs tabular-nums text-white/50'>
+                {at + 1} / {items.length}
+              </span>
+            </>
+          ) : null}
+          <IconButton
+            type='button'
+            variant='frosted'
+            size='lg'
+            onClick={onClose}
+            ariaLabel='Close Viewer'
+          >
+            <X aria-hidden='true' className='size-4' />
+          </IconButton>
+        </div>
 
-          <div className='relative flex min-h-0 flex-1 items-center justify-center px-14'>
-            {current.kind === 'video' ? (
-              // biome-ignore lint/a11y/useMediaCaption: evidence recordings have no caption track.
-              <video
-                key={current.src}
-                src={current.src}
-                poster={current.poster}
-                controls
-                autoPlay
-                playsInline
-                className='max-h-full max-w-full rounded-md'
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element -- full-resolution evidence; next/image would resample it
-              <img
-                key={current.src}
-                src={current.src}
-                alt={current.alt}
-                className='max-h-full max-w-full rounded-md object-contain'
-              />
-            )}
-            <NavButton
-              side='left'
-              disabled={at === 0}
-              onClick={() => step(-1)}
-            />
-            <NavButton
-              side='right'
-              disabled={at === items.length - 1}
-              onClick={() => step(1)}
-            />
-          </div>
-
-          {items.length > 1 ? (
-            <div className='flex h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto px-4'>
-              {items.map((item, i) => (
-                <button
-                  key={item.src}
-                  type='button'
-                  onClick={() => onIndexChange(i)}
-                  aria-label={`Show ${item.alt}`}
-                  aria-current={i === at || undefined}
+        <div className='relative flex min-h-0 flex-1 items-center justify-center px-12 sm:px-14'>
+          {current ? (
+            <>
+              {current.kind === 'video' ? (
+                // biome-ignore lint/a11y/useMediaCaption: evidence recordings have no caption track.
+                <video
+                  ref={videoRef}
+                  key={currentKey}
+                  src={current.src}
+                  poster={current.poster}
+                  autoPlay
+                  playsInline
+                  tabIndex={-1}
+                  aria-label={current.alt}
+                  onLoadedMetadata={event =>
+                    updatePlayback({
+                      currentTime: event.currentTarget.currentTime,
+                      duration: Number.isFinite(event.currentTarget.duration)
+                        ? event.currentTarget.duration
+                        : 0,
+                    })
+                  }
+                  onCanPlay={event =>
+                    updatePlayback({
+                      status: event.currentTarget.paused ? 'ready' : 'playing',
+                    })
+                  }
+                  onPlaying={() => {
+                    pauseTrackPlayback();
+                    updatePlayback({ status: 'playing' });
+                  }}
+                  onPause={() => updatePlayback({ status: 'paused' })}
+                  onWaiting={() => updatePlayback({ status: 'loading' })}
+                  onTimeUpdate={event =>
+                    updatePlayback({
+                      currentTime: event.currentTarget.currentTime,
+                      duration: Number.isFinite(event.currentTarget.duration)
+                        ? event.currentTarget.duration
+                        : 0,
+                    })
+                  }
+                  onError={markError}
                   className={cn(
-                    'relative h-12 w-20 shrink-0 overflow-hidden rounded-md border transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40',
-                    i === at
+                    'max-h-full max-w-full rounded-md object-contain',
+                    currentPlayback.status === 'error' && 'invisible'
+                  )}
+                />
+              ) : (
+                <CanvasImage
+                  key={currentKey}
+                  src={current.src}
+                  alt={current.alt}
+                  onReady={markReady}
+                  onError={markError}
+                  className={cn(
+                    'relative size-full overflow-hidden rounded-md',
+                    currentPlayback.status === 'error' && 'invisible'
+                  )}
+                />
+              )}
+
+              {currentPlayback.status === 'loading' ? (
+                <div
+                  role='status'
+                  className='absolute inset-0 grid place-items-center text-white/70'
+                >
+                  <span className='flex items-center gap-2 text-sm'>
+                    <LoaderCircle
+                      aria-hidden='true'
+                      className='size-4 animate-spin'
+                    />
+                    Loading media
+                  </span>
+                </div>
+              ) : null}
+
+              {currentPlayback.status === 'error' ? (
+                <EmptyState
+                  testId='media-canvas-error'
+                  variant='error'
+                  icon={<AlertCircle className='size-5' />}
+                  heading='Preview Unavailable'
+                  description='The media could not be loaded. Try it again.'
+                  action={{ label: 'Retry', onClick: retry }}
+                  className='dark absolute inset-0'
+                />
+              ) : null}
+
+              <NavButton
+                side='left'
+                disabled={at === 0}
+                onClick={() => step(-1)}
+              />
+              <NavButton
+                side='right'
+                disabled={at === items.length - 1}
+                onClick={() => step(1)}
+              />
+            </>
+          ) : (
+            <EmptyState
+              testId='media-canvas-empty'
+              icon={<ImageIcon className='size-5' />}
+              heading='No Media Yet'
+              description='There are no photos or videos in this preview.'
+              action={{ label: 'Close', onClick: onClose }}
+              className='dark'
+            />
+          )}
+        </div>
+
+        {items.length > 1 ? (
+          <div className='flex h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto px-4'>
+            {items.map((item, itemIndex) => (
+              <Button
+                key={item.src}
+                type='button'
+                variant='ghost'
+                size='icon-xl'
+                onClick={() => selectIndex(itemIndex)}
+                aria-label={`Show ${item.alt}`}
+                aria-current={itemIndex === at || undefined}
+              >
+                <span
+                  className={cn(
+                    'relative block size-9 overflow-hidden rounded-md border transition-opacity duration-subtle',
+                    itemIndex === at
                       ? 'border-white/80 opacity-100'
-                      : 'border-white/10 opacity-50 hover:opacity-80'
+                      : 'border-white/10 opacity-50'
                   )}
                 >
                   <MediaThumb item={item} />
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {/* Warm the neighbours so stepping is instant. */}
-          <div hidden>
-            {[items[at - 1], items[at + 1]].map(item =>
-              item?.kind === 'image' ? (
-                // eslint-disable-next-line @next/next/no-img-element -- hidden preload of the next evidence frame
-                <img key={item.src} src={item.src} alt='' />
-              ) : null
-            )}
+                </span>
+              </Button>
+            ))}
           </div>
+        ) : null}
+
+        {/* PersistentAudioBar portals the canonical cinematic dock here. */}
+        <div
+          ref={setDockHost}
+          data-testid='media-canvas-dock-host'
+          className='absolute inset-x-2 bottom-2 z-20 sm:inset-x-4'
+        />
+
+        {/* Warm image neighbours so stepping is instant. */}
+        <div hidden>
+          {[items[at - 1], items[at + 1]].map(item =>
+            item?.kind === 'image' ? (
+              // eslint-disable-next-line @next/next/no-img-element -- hidden preload of the next evidence frame
+              <img key={item.src} src={item.src} alt='' />
+            ) : null
+          )}
         </div>
-      ) : null}
+      </div>
     </dialog>
+  );
+}
+
+function CanvasImage({
+  src,
+  alt,
+  className,
+  onReady,
+  onError,
+}: {
+  readonly src: string;
+  readonly alt: string;
+  readonly className?: string;
+  readonly onReady: () => void;
+  readonly onError: () => void;
+}) {
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image) return;
+    image.addEventListener('load', onReady);
+    image.addEventListener('error', onError);
+    if (image.complete && image.naturalWidth > 0) onReady();
+    return () => {
+      image.removeEventListener('load', onReady);
+      image.removeEventListener('error', onError);
+    };
+  }, [onError, onReady]);
+
+  return (
+    <div className={className}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- evidence URLs are arbitrary and must not be resampled */}
+      <img
+        ref={imageRef}
+        src={src}
+        alt={alt}
+        className='size-full object-contain'
+      />
+    </div>
   );
 }
 
@@ -181,20 +485,20 @@ function NavButton({
 }) {
   const Icon = side === 'left' ? ChevronLeft : ChevronRight;
   return (
-    <button
+    <IconButton
       type='button'
+      variant='frosted'
+      size='lg'
       onClick={onClick}
       disabled={disabled}
-      aria-label={side === 'left' ? 'Previous' : 'Next'}
+      ariaLabel={side === 'left' ? 'Previous' : 'Next'}
       className={cn(
-        'group absolute top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full text-white/80 hover:text-white focus-visible:outline-none disabled:opacity-0',
-        side === 'left' ? 'left-3' : 'right-3'
+        'absolute top-1/2 -translate-y-1/2',
+        side === 'left' ? 'left-2 sm:left-3' : 'right-2 sm:right-3'
       )}
     >
-      <span className='grid size-10 place-items-center rounded-full bg-white/8 group-hover:bg-white/15 group-focus-visible:ring-2 group-focus-visible:ring-white/40'>
-        <Icon className='size-5' aria-hidden='true' />
-      </span>
-    </button>
+      <Icon aria-hidden='true' className='size-5' />
+    </IconButton>
   );
 }
 

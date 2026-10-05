@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import {
   requestFullAudioPlayer,
   useAudioChromeSnapshot,
+  useMediaTransportSnapshot,
 } from './audio-chrome-state';
 
 /**
@@ -24,6 +25,7 @@ export function SidebarBottomNowPlayingBridge({
   collapsed = false,
 }: Readonly<{ collapsed?: boolean }>) {
   const audioChrome = useAudioChromeSnapshot();
+  const mediaTransport = useMediaTransportSnapshot();
   const { playbackState, stop, toggleTrack } = useTrackAudioPlayer();
 
   const handlePlay = useCallback(() => {
@@ -42,8 +44,9 @@ export function SidebarBottomNowPlayingBridge({
   // Mini (sidebar) yields while the full docked bar owns this track.
   // When the full bar is minimized, the mini becomes the sole chrome.
   const fullPlayerOwnsTrack =
-    audioChrome.fullPlayerVisible &&
-    audioChrome.activeTrackId === playbackState.activeTrackId;
+    Boolean(mediaTransport) ||
+    (audioChrome.fullPlayerVisible &&
+      audioChrome.activeTrackId === playbackState.activeTrackId);
 
   return (
     <div

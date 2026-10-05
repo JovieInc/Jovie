@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { pauseActiveMediaTransport } from '@/components/organisms/audio-chrome-state';
 
 export interface AudioTrackSource {
   readonly id: string;
@@ -189,6 +190,7 @@ function bindMediaSessionHandlers(): void {
     session.setActionHandler('play', () => {
       const audio = getAudio();
       if (!audio || !state.activeTrackId) return;
+      pauseActiveMediaTransport();
       void audio.play().catch(() => {
         handlePlaybackFailure(audio, 'play_rejected');
       });
@@ -335,6 +337,7 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   });
 
   try {
+    pauseActiveMediaTransport();
     await audio.play();
   } catch (error) {
     if (_playToken === token) {
@@ -488,6 +491,12 @@ export function pausePlaybackForInterruption(): void {
   }
 }
 
+/** Pause the current track without clearing it so canvas video can take over. */
+export function pauseTrackPlayback(): void {
+  const audio = getAudio();
+  if (audio && !audio.paused) audio.pause();
+}
+
 /** Release interruption hold. Pass `{ resume: true }` to resume prior track. */
 export function resumePlaybackAfterInterruption(
   options: { readonly resume?: boolean } = {}
@@ -502,6 +511,7 @@ export function resumePlaybackAfterInterruption(
 
   const audio = getAudio();
   if (!audio || !state.activeTrackId) return;
+  pauseActiveMediaTransport();
   void audio.play().catch(() => {
     handlePlaybackFailure(audio, 'play_rejected');
   });
@@ -591,6 +601,7 @@ export function useTrackAudioPlayer() {
       if (state.activeTrackId === track.id) {
         if (audio.paused) {
           try {
+            pauseActiveMediaTransport();
             await audio.play();
           } catch (error) {
             handlePlaybackFailure(audio, 'play_rejected');

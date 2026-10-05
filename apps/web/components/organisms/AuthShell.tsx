@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
+import { MediaCanvasHost } from '@/components/organisms/media-canvas/MediaCanvasHost';
 import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
@@ -135,6 +136,7 @@ function AuthShellInner({
         contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
         composerFocusActive={isComposerFocused && !isMobile}
       />
+      <MediaCanvasHost />
     </RuntimeUpdateProvider>
   );
 }

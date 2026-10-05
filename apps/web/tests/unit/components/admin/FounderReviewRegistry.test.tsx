@@ -8,6 +8,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FounderReviewRegistry } from '@/components/features/admin/FounderReviewRegistry';
+import { MediaCanvasHost } from '@/components/organisms/media-canvas/MediaCanvasHost';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -79,6 +80,7 @@ function renderRegistry() {
         <MountedHeaderActions />
         <FounderReviewRegistry kind='feature' items={items} />
         <MountedRightPanel />
+        <MediaCanvasHost />
       </RightPanelProvider>
     </HeaderActionsProvider>
   );

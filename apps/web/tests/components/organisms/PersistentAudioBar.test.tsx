@@ -12,6 +12,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getAudioChromeSnapshot,
   resetAudioChromeSnapshot,
+  resetMediaCanvasDockHost,
+  resetMediaTransportSnapshot,
+  setMediaCanvasDockHost,
+  setMediaTransportSnapshot,
 } from '@/components/organisms/audio-chrome-state';
 import {
   APP_ROUTES,
@@ -165,6 +169,8 @@ describe('PersistentAudioBar', () => {
     mockPlaybackState = { ...basePlaybackState };
     mockPrefersReducedMotion = false;
     resetAudioChromeSnapshot();
+    resetMediaTransportSnapshot();
+    resetMediaCanvasDockHost('persistent-audio-test');
     globalThis.localStorage?.clear();
   });
 
@@ -187,6 +193,46 @@ describe('PersistentAudioBar', () => {
     expect(dock.style.maxHeight).toBe('0px');
     expect(screen.queryByRole('region', { name: 'Audio Player' })).toBeNull();
     expect(screen.queryByTestId('player-visibility-toggle')).toBeNull();
+  });
+
+  it('portals the media transport into the native canvas dock host', () => {
+    const next = vi.fn();
+    render(<div data-testid='canvas-dock-host' />);
+    act(() => {
+      setMediaCanvasDockHost(
+        'persistent-audio-test',
+        screen.getByTestId('canvas-dock-host')
+      );
+      setMediaTransportSnapshot({
+        ownerId: 'persistent-audio-test',
+        itemId: 'image:/capture.png:0',
+        kind: 'image',
+        label: 'Release screenshot',
+        index: 0,
+        itemCount: 2,
+        status: 'ready',
+        currentTime: 0,
+        duration: 0,
+        hasPrevious: false,
+        hasNext: true,
+        previous: vi.fn(),
+        next,
+        retry: vi.fn(),
+      });
+    });
+
+    render(<PersistentAudioBar />);
+
+    expect(screen.getByTestId('media-canvas-audio-dock')).toHaveAttribute(
+      'data-state',
+      'open'
+    );
+    expect(
+      screen.getByRole('region', { name: 'Media Controls' })
+    ).toHaveTextContent('Release screenshot');
+    expect(screen.getByRole('button', { name: 'Play video' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Next media item' }));
+    expect(next).toHaveBeenCalledOnce();
   });
 
   it('keeps compact playback artwork contained instead of cropping it', async () => {
