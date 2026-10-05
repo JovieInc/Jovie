@@ -15,7 +15,6 @@ interface SeekBarProps {
   readonly onSeek: (time: number) => void;
   readonly disabled?: boolean;
   readonly className?: string;
-  readonly ariaLabel?: string;
 }
 
 export function SeekBar({
@@ -24,7 +23,6 @@ export function SeekBar({
   onSeek,
   disabled = false,
   className,
-  ariaLabel = 'Seek track',
 }: SeekBarProps) {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubTime, setScrubTime] = useState(currentTime);
@@ -85,7 +83,7 @@ export function SeekBar({
       onPointerUp={endScrub}
       onPointerCancel={endScrub}
       onBlur={endScrub}
-      aria-label={ariaLabel}
+      aria-label='Seek Track'
       disabled={isDisabled}
       className={cn(
         'seek-range cursor-pointer appearance-none rounded-full accent-(--linear-accent) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:cursor-default disabled:opacity-50',

@@ -4,7 +4,6 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
 import {
   DrawerBackButton,
@@ -22,6 +21,7 @@ import {
   type InspectorTabId,
   LIBRARY_INSPECTOR_TABS,
 } from '@/components/molecules/inspector';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import type {
   PreviewSource,
   PreviewVerification,
