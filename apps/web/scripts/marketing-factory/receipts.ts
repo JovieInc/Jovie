@@ -280,9 +280,12 @@ function verifyLink(
   const sourceDigest = brief
     ? factoryStageSourceDigest(entry.stage, brief, source)
     : null;
+  // Archived evidence has no historical registry snapshot. Recheck its
+  // structural/output bindings without judging old truth against today's sources.
   if (
+    brief &&
     receipt.inputDigest !==
-    stageInputDigest(manifest.briefDigest, prior, sourceDigest)
+      stageInputDigest(manifest.briefDigest, prior, sourceDigest)
   ) {
     issues.push(`${where}: input digest does not bind current stage inputs`);
   }
@@ -314,7 +317,12 @@ function verifyRetainedAttempts(
           `${where}: retained artifact digest does not match the receipt`
         );
       }
-      if (record.receipt.stage === 'render' && record.artifact !== null) {
+      const retainedRender =
+        record.receipt.stage === 'render' ||
+        manifest.chain.some(
+          link => link.file === file && link.stage === 'render'
+        );
+      if (retainedRender && record.artifact !== null) {
         const parsed = FACTORY_STAGE_ARTIFACT_SCHEMAS.render.safeParse(
           record.artifact
         );
@@ -384,7 +392,11 @@ export function verifyFactoryRun(
           const saved = FactoryRunManifestSchema.parse(
             readJson(join(priorDir, 'run.json'))
           );
-          const retained = verifyRetainedAttempts(priorDir, saved);
+          const retained: string[] = [];
+          for (let index = 0; index < saved.chain.length; index++) {
+            retained.push(...verifyLink(priorDir, saved, index, null, {}));
+          }
+          retained.push(...verifyRetainedAttempts(priorDir, saved));
           if (
             digestOf(readJson(join(priorDir, 'brief.json'))) !==
             saved.briefDigest

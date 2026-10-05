@@ -21,6 +21,7 @@ import { capturePng } from './capture-integrity.fixtures';
 import { dryProviders } from './providers';
 import {
   digestOf,
+  type FactoryRunManifest,
   readJson,
   type StageAttemptRecord,
   verifyFactoryRun,
@@ -229,14 +230,14 @@ function providersForRework(revise: boolean) {
   return { providers, reviewed };
 }
 
-async function rework(revise: boolean) {
+async function rework(revise: boolean, mode: 'dry' | 'live' = 'dry') {
   const runsDir = directory();
   const setup = providersForRework(revise);
   const manifest = await runFactory({
     family: 'solutions',
     slug: 'founders',
     runsDir,
-    providers: setup.providers,
+    providers: { ...setup.providers, mode },
   });
   const runDir = join(runsDir, 'solutions-founders');
   const renderRecords = manifest.attempts
@@ -320,6 +321,51 @@ describe('retained rework evidence', () => {
     expect(verifyFactoryRun(result.runDir).join('\n')).toContain(
       'retained render artifact fails the render schema'
     );
+  });
+
+  it('binds an archived live render receipt to its chain before checking retained captures', async () => {
+    // Live byte/config validation with controlled providers: no model or network calls.
+    const result = await rework(true, 'live');
+    expect(result.manifest).toMatchObject({ status: 'complete', mode: 'live' });
+    expect(verifyFactoryRun(result.runDir)).toEqual([]);
+    await runFactory({
+      family: 'solutions',
+      slug: 'founders',
+      runsDir: result.runsDir,
+      dry: true,
+    });
+    const history = readdirSync(join(result.runDir, 'history'));
+    expect(history).toHaveLength(1);
+    const archived = join(result.runDir, 'history', history[0]!);
+    const manifest = readJson<FactoryRunManifest>(join(archived, 'run.json'));
+    expect(manifest.mode).toBe('live');
+    const link = manifest.chain.find(link => link.stage === 'render')!;
+    const path = join(archived, link.file);
+    const record = readJson<StageAttemptRecord>(path);
+    expect(verifyFactoryRun(result.runDir)).toEqual([]);
+    // Only the discriminator changes: artifact and both output digests stay intact.
+    writeJson(path, {
+      ...record,
+      receipt: { ...record.receipt, stage: 'layout' },
+    });
+    const relabelled = verifyFactoryRun(result.runDir).join('\n');
+    const render = record.artifact as FactoryStageArtifact<'render'>;
+    rmSync(render.captures![0]!.screenshot.path);
+    const missing = verifyFactoryRun(result.runDir).join('\n');
+    expect({ relabelled, missing }).toEqual({
+      relabelled: expect.stringMatching(/history\/.*out of spine order/u),
+      missing: expect.stringMatching(/history\/.*out of spine order/u),
+    });
+    expect(missing).toContain('missing or unreadable capture');
+    await expect(
+      runFactory({
+        family: 'solutions',
+        slug: 'founders',
+        runsDir: result.runsDir,
+        dry: true,
+        fromStage: 'render',
+      })
+    ).rejects.toThrow(/history\/.*out of spine order/u);
   });
 
   it('preserves original attempts and capture paths across resume and fresh runs', async () => {
