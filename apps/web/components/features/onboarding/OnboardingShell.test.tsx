@@ -85,6 +85,17 @@ describe('OnboardingShell status', () => {
     claimState.value = 'error';
   });
 
+  it.each([false, true])(
+    'forwards the server-selected Turnstile test mode (%s) to the widget',
+    testMode => {
+      render(
+        <OnboardingShell sessionLabel='pending' turnstileTestMode={testMode} />
+      );
+
+      expect(turnstileProps.current).toMatchObject({ testMode });
+    }
+  );
+
   it('explains identity recovery without suggesting another handle or a blind retry', () => {
     claimState.value = 'identity-conflict';
     render(<OnboardingShell sessionLabel='pending' />);

@@ -139,14 +139,14 @@ describe('PublicPageShell', () => {
     footerFlagCalls.values.length = 0;
     delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
 
-    const off = render(<PublicPageShell>body</PublicPageShell>);
-    expect(footerFlagCalls.values.at(-1)).toBe(false);
-    off.unmount();
+    const on = render(<PublicPageShell>body</PublicPageShell>);
+    expect(footerFlagCalls.values.at(-1)).toBe(true);
+    on.unmount();
 
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'true';
+    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
     try {
       render(<PublicPageShell>body</PublicPageShell>);
-      expect(footerFlagCalls.values.at(-1)).toBe(true);
+      expect(footerFlagCalls.values.at(-1)).toBe(false);
     } finally {
       delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
     }

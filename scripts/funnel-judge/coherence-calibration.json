@@ -1,0 +1,60 @@
+{
+  "schema": "jovie.coherence-screen-calibration/v1",
+  "note": "Known escapes must FAIL and the good neighbor must PASS before the screen judge may gate. Image paths are relative to --fixtures-dir; captures are not committed.",
+  "fixtures": [
+    {
+      "id": "start-blank",
+      "expect": "fail",
+      "why": "Tim 2026-10-03: /start?handle=tim showed a blank prompt that ignored the handle the visitor arrived with.",
+      "label": "/start entry from an outreach link carrying ?handle=",
+      "context": "A prospect clicked an outreach link for their own prebuilt page and expects to see it.",
+      "images": ["start-blank.png"]
+    },
+    {
+      "id": "library-draft-draft",
+      "expect": "fail",
+      "why": "Library rows rendered the status value twice side by side (Draft / Draft).",
+      "label": "Library list",
+      "context": "An artist scans their releases to see what is live and what is still a draft.",
+      "images": ["library-draft-draft.png"]
+    },
+    {
+      "id": "greeting-insight-swap",
+      "expect": "fail",
+      "why": "The chat greeting was swapped for an insight card after load, changing the content under the user.",
+      "label": "Chat empty state after load",
+      "context": "A signed-in artist opens the app and starts reading the greeting.",
+      "images": ["greeting-insight-swap-after.png"],
+      "neighbors": [
+        {
+          "id": "greeting-insight-swap-before",
+          "label": "Same screen a moment earlier",
+          "images": ["greeting-insight-swap-before.png"]
+        }
+      ]
+    },
+    {
+      "id": "sidebar-one-way-toggle",
+      "expect": "fail",
+      "why": "The sidebar toggle collapsed the rail but offered no control to reopen it.",
+      "label": "App shell with the sidebar collapsed",
+      "context": "An artist collapsed the sidebar and now wants it back.",
+      "images": ["sidebar-collapsed.png"],
+      "neighbors": [
+        {
+          "id": "sidebar-open",
+          "label": "Same screen before collapsing",
+          "images": ["sidebar-open.png"]
+        }
+      ]
+    },
+    {
+      "id": "good-neighbor",
+      "expect": "pass",
+      "why": "A certified screen in the same product that a careful designer would ship.",
+      "label": "Certified neighbor screen",
+      "context": "A visitor viewing the screen for its primary purpose.",
+      "images": ["good-neighbor.png"]
+    }
+  ]
+}

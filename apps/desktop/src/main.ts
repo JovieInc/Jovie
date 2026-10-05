@@ -5,7 +5,6 @@ import {
   app,
   BrowserWindow,
   clipboard,
-  desktopCapturer,
   dialog,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
@@ -93,7 +92,6 @@ import {
   resolveDesktopNotificationClickAction,
 } from './desktop-notifications';
 import {
-  isDesktopCaptureRouteUrl,
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
   shouldGrantTrustedHudScreenPermission,
@@ -1076,26 +1074,19 @@ function registerMainWindowPermissionHandlers(session: Session): void {
       })
   );
 
-  session.setDisplayMediaRequestHandler((request, callback) => {
-    const frameUrl = request.frame?.url;
-    if (!isDesktopCaptureRouteUrl(frameUrl, parseUrl)) {
-      callback({});
-      return;
-    }
-    void desktopCapturer
-      .getSources({ types: ['screen'] })
-      .then(sources => {
-        const firstScreen = sources[0];
-        if (!firstScreen) {
-          callback({});
-          return;
-        }
-        callback({ video: firstScreen });
-      })
-      .catch(() => {
+  // Permission request/check handlers above authorize the HUD document before
+  // Electron invokes its system-picker wrapper (which bypasses this fallback).
+  session.setDisplayMediaRequestHandler(
+    (_request, callback) => {
+      // macOS <15 and unsupported platforms must never select a default screen.
+      try {
         callback({});
-      });
-  });
+      } catch {
+        // Electron rejects the renderer request and also throws for no video.
+      }
+    },
+    { useSystemPicker: true }
+  );
 }
 
 function buildAuthCompletionUrl(completion: DesktopAuthCompletion): string {

@@ -21,6 +21,10 @@ import {
   getSenderPolicy,
 } from '@/lib/notifications/sender-policy';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
+import {
+  COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+  isColdClaimInviteSendOpen,
+} from '@/lib/outbound/cold-claim-invites';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 
@@ -71,6 +75,16 @@ export async function processSendClaimInviteJob(
   jobPayload: unknown
 ): Promise<SendClaimInviteResult> {
   const payload = sendClaimInvitePayloadSchema.parse(jobPayload);
+
+  // Already-queued jobs never send while cold claim invites are closed.
+  if (!isColdClaimInviteSendOpen()) {
+    return {
+      inviteId: payload.inviteId,
+      email: '',
+      status: 'skipped',
+      detail: COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+    };
+  }
 
   // Check global campaign toggle — skip sending if disabled
   const [settings] = await db
