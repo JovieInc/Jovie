@@ -5108,8 +5108,8 @@ class TimerInstallerNodePathTests(unittest.TestCase):
         import plistlib
 
         source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
-        for platform in ("Linux", "Darwin"):
-            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as tmp:
+        for platform, with_gbrain in ((p, g) for p in ("Linux", "Darwin") for g in (False, True)):
+            with self.subTest(platform=platform, with_gbrain=with_gbrain), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 bin_dir = root / "selected-node-bin"
                 bin_dir.mkdir()
@@ -5129,6 +5129,12 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                     path.write_text(body)
                     path.chmod(0o755)
 
+                brain_bin = root / "installed-gbrain-bin"
+                brain_bin.mkdir()
+                brain = brain_bin / "gbrain"
+                if with_gbrain:
+                    brain.write_text("#!/bin/sh\nprintf 'fixture-retrieval-ok\\n'\n")
+                    brain.chmod(0o755)
                 stub("node", "#!/bin/sh\nprintf 'v24.21.0\\n'\n")
                 stub("uname", f"#!/bin/sh\nprintf '{platform}\\n'\n")
                 stub("git", "#!/bin/sh\nprintf '" + "c" * 40 + "\\n'\n")
@@ -5152,7 +5158,7 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
 ''')
                 result = subprocess.run(
                     ["/bin/bash", str(installer)], capture_output=True, text=True,
-                    env={**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin",
+                    env={**os.environ, "PATH": f"{bin_dir}:{brain_bin}:/usr/bin:/bin",
                          "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
                          "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
                 )
@@ -5169,6 +5175,14 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertIn("KillMode=process", service)
                     self.assertIn("Environment=CODEX_LEDGER_CADENCE_S=3600", service)
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
+                if with_gbrain:
+                    self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))
+                    retrieval = subprocess.run(["gbrain", "query", "fixture"],
+                                               env={"PATH": timer_path}, capture_output=True, text=True)
+                    self.assertEqual(retrieval.stdout.strip(), "fixture-retrieval-ok")
+                    self.assertEqual(timer_path.split(":").count(str(brain_bin)), 1)
+                else:
+                    self.assertNotIn(str(brain_bin), timer_path.split(":"))
                 self.assertIn("codex_lane.py reconcile --if-due 3600", tick)
                 self.assertIn("lane_runner.py dispatch", tick)
                 log = commands.read_text()
