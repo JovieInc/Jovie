@@ -1,0 +1,10 @@
+DONE — [PR #20684](https://github.com/JovieInc/Jovie/pull/20684) is updated and its required checks are green.
+
+- Merged current `origin/main`.
+- Resolved the lockfile conflict using main’s lockfile and regenerated it with `pnpm install --lockfile-only`.
+- Added an Eve isolated-lock regression test in [eve-installation-contract.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T141219Z-PR20684-codex-fix-ac1741/apps/eve-pilot/tests/eve-installation-contract.test.ts:8).
+- Pushed commit `0d73cee40c`; local and remote SHAs match.
+- Full web, affected package, Eve, lint, typecheck, lockfile, and bug-to-test checks passed.
+- Hosted `PR Ready`, Migration Guard, PR Size Guard, and Fork PR Gate all pass.
+
+One non-required `jovie-execution/...` receipt remains pending with `attempt_finished`; it does not block required-check green status.
