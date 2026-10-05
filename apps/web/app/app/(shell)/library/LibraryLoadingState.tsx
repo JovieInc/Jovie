@@ -27,6 +27,7 @@ import type { LibraryReleaseAsset, LibraryView } from './library-data';
  * row class and 32px cell clamp still apply, which clipped the artist line.
  */
 export const LIBRARY_LIST_ROW_MODE = 'two-line' satisfies TableRowMode;
+export const LIBRARY_CATALOG_ROW_MODE = 'dense' satisfies TableRowMode;
 export const LIBRARY_TABLE_MIN_WIDTH = '0';
 
 export const LIBRARY_VIEW_FILTER_CHIP_KEYS: readonly LibraryView[] = [
@@ -114,6 +115,69 @@ export const LIBRARY_TABLE_SKELETON_COLUMNS = [
   },
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
+// Geometry only: importing the feature columns here would load the whole
+// catalog graph into the shell fallback. The parity test pins this projection.
+export const LIBRARY_CATALOG_SKELETON_COLUMNS = [
+  {
+    id: 'status',
+    header: 'Status',
+    size: 44,
+    minSize: 44,
+    meta: {
+      className: alignment.workspaceSeamX,
+      minWidth: 44,
+      headerVisibility: 'sr-only',
+    },
+  },
+  {
+    id: 'artwork',
+    header: 'Artwork',
+    size: 40,
+    minSize: 40,
+    meta: { className: 'px-2', minWidth: 40, headerVisibility: 'sr-only' },
+  },
+  {
+    id: 'title',
+    header: 'Title',
+    minSize: 180,
+    size: 9999,
+    meta: { className: 'px-2', primary: true, minWidth: 180 },
+  },
+  {
+    id: 'artist',
+    header: 'Artist',
+    size: 160,
+    minSize: 120,
+    meta: { className: 'px-2', priority: 5, minWidth: 160 },
+  },
+  {
+    id: 'type',
+    header: 'Type',
+    size: 120,
+    minSize: 96,
+    meta: { className: 'pl-2 pr-3', priority: 6, minWidth: 120 },
+  },
+  {
+    id: 'length',
+    header: 'Length',
+    size: 80,
+    minSize: 72,
+    meta: { className: 'px-2', priority: 5, minWidth: 80 },
+  },
+  LIBRARY_TABLE_SKELETON_COLUMNS[6],
+] as ColumnDef<LibraryReleaseAsset, unknown>[];
+
+export const LIBRARY_CATALOG_SKELETON_CONFIG: typeof LIBRARY_TABLE_SKELETON_CONFIG =
+  [
+    { variant: 'avatar', width: '16px' },
+    { variant: 'avatar', width: '24px' },
+    { variant: 'text', width: '100%' },
+    { variant: 'text', width: '96px' },
+    { variant: 'text', width: '72px' },
+    { variant: 'meta', width: '48px' },
+    { variant: 'button', width: '24px' },
+  ];
+
 export function LibraryLoadingState() {
   return (
     <WorkspacePage
@@ -143,12 +207,11 @@ export function LibraryLoadingState() {
       }
     >
       <UnifiedTableSkeleton<LibraryReleaseAsset>
-        columns={LIBRARY_TABLE_SKELETON_COLUMNS}
-        hideHeader
-        rowMode={LIBRARY_LIST_ROW_MODE}
+        columns={LIBRARY_CATALOG_SKELETON_COLUMNS}
+        rowMode={LIBRARY_CATALOG_ROW_MODE}
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
-        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
+        skeletonColumnConfig={LIBRARY_CATALOG_SKELETON_CONFIG}
         containerClassName='h-full'
       />
     </WorkspacePage>

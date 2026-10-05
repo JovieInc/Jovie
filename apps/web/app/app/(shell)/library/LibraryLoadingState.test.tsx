@@ -2,10 +2,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  LIBRARY_CATALOG_SKELETON_COLUMNS,
   LIBRARY_TABLE_SKELETON_COLUMNS,
   LIBRARY_VIEW_FILTER_CHIP_KEYS,
 } from './LibraryLoadingState';
-import { LIBRARY_TABLE_COLUMNS, PRESETS } from './LibrarySurface';
+import {
+  LIBRARY_CATALOG_SCAN_COLUMNS,
+  LIBRARY_TABLE_COLUMNS,
+  PRESETS,
+} from './LibrarySurface';
 
 function geometry(
   columns: readonly {
@@ -36,6 +41,12 @@ describe('LibraryLoadingState', () => {
   it('matches the loaded Library table geometry so the swap cannot shift', () => {
     expect(geometry(LIBRARY_TABLE_SKELETON_COLUMNS)).toEqual(
       geometry(LIBRARY_TABLE_COLUMNS)
+    );
+  });
+
+  it('matches the dense default catalog geometry', () => {
+    expect(geometry(LIBRARY_CATALOG_SKELETON_COLUMNS)).toEqual(
+      geometry(LIBRARY_CATALOG_SCAN_COLUMNS)
     );
   });
 
