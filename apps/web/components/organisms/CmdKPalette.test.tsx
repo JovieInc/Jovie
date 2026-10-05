@@ -140,6 +140,58 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('dismisses Search from a non-form control without taking its other keys', () => {
+    const onOpenChange = vi.fn();
+    pushMock.mockClear();
+    render(
+      <>
+        <button type='button'>Outside control</button>
+        <MainPlaneHarness onOpenChange={onOpenChange} />
+      </>
+    );
+    const outside = screen.getByRole('button', { name: 'Outside control' });
+    outside.focus();
+    for (const event of [
+      { key: 'Enter' },
+      { key: 'ArrowDown' },
+      { key: '2', metaKey: true },
+      { key: 'Escape', repeat: true },
+      { key: 'Escape', isComposing: true },
+      { key: 'Escape', keyCode: 229 },
+      { key: 'Escape', shiftKey: true },
+    ]) {
+      expect(fireEvent.keyDown(outside, event)).toBe(true);
+    }
+    const consumed = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    consumed.preventDefault();
+    fireEvent(outside, consumed);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(fireEvent.keyDown(outside, { key: 'Escape' })).toBe(false);
+    expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it('leaves Escape and navigation with an unrelated editor', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <>
+        <textarea aria-label='Outside editor' />
+        <MainPlaneHarness onOpenChange={onOpenChange} />
+      </>
+    );
+    const editor = screen.getByRole('textbox', { name: 'Outside editor' });
+    editor.focus();
+    for (const key of ['Escape', 'Enter', 'ArrowDown']) {
+      expect(fireEvent.keyDown(editor, { key })).toBe(true);
+    }
+    expect(editor).toHaveFocus();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it.each([{ metaKey: true }, { ctrlKey: true }])(
     'closes from the focused dialog search with %o',
     modifier => {

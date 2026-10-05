@@ -364,7 +364,8 @@ export function CmdKPalette({
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // The context-mounted header delegates directly. Global handling belongs
-  // only to this palette's dialog input or result composite, never the sidebar.
+  // to this palette's dialog input or result composite. Escape also dismisses
+  // Search from non-form controls; editors retain their own Escape handling.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -373,6 +374,10 @@ export function CmdKPalette({
         return;
       }
       const target = event.target;
+      if (event.key === 'Escape' && !isFormElement(target)) {
+        handleKeyboardCommand(event);
+        return;
+      }
       if (
         !(target instanceof HTMLElement) ||
         !resultsRef.current?.contains(target) ||
