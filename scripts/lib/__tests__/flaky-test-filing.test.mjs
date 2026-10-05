@@ -1,9 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  githubIssueFilingRetired,
-  planFlakyTestFiling,
-} from '../flaky-test-filing.mjs';
+import { planFlakyTestFiling } from '../flaky-test-filing.mjs';
 
 const retired = readFileSync(
   '.github/workflows/test-flakiness-report.yml',
@@ -27,8 +24,9 @@ describe('flaky-test filing remediation', () => {
   });
 
   it('keeps GitHub issue filing retired', () => {
-    expect(githubIssueFilingRetired(retired)).toBe(true);
-    expect(retired).toContain("github.event_name == '__retired_linear_only__'");
+    expect(retired).not.toContain('github.rest.issues');
+    expect(retired).not.toContain('gh issue');
+    expect(retired).not.toContain('__retired_linear_only__');
     expect(retired).not.toContain('issues: write');
   });
 

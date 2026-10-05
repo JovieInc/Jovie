@@ -374,6 +374,22 @@ its idle, clean and published checks, then `worktree_pool.recycle()` detaches HE
 checkout into the pool while there is room and disk. Deleting one installed worktree
 took 3 to 32 minutes under load; recycling takes seconds.
 
+`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick.
+Scale-down drops one slot after 30 idle ticks, floor `ceil(base/2)`.
+`SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
+divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
+disk or memory emergencies cut immediately and ignore that cooldown. Tim set
+this on 2026-10-02 with no observe-only period. `observe` or `shadow` records
+the decision and leaves `Host.slots()` on the configured base. The kill switch
+is `SYMPHONY_AUTOSCALE=0` (`off` or `false`), in the environment or
+`~/.config/jovie-lanes/autoscale.env` (the environment wins). Ceilings are
+`SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` (default twice the base) and
+`SYMPHONY_AUTOSCALE_HOST_MAX` (default twice the base sum, never below today's
+base sum). New-issue budgets stay on base slots (`×2` active, `×4` terminal).
+Missing, stale, or corrupt input fails safe to base; an unknown API budget
+never exceeds base; a disabled lane stays at 0. `install.sh` does not pass
+the flag. Scale-down does not signal workers.
+
 ## Preserved repairs (JOV-7347)
 
 Repair retries reuse a registered preserved checkout only after its ended run,

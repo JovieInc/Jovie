@@ -144,6 +144,24 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('keeps canonical profile settings and retained aliases under screen ownership', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/settings/profile/page.tsx',
+      'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
+      'apps/web/app/app/(shell)/tipping/page.tsx',
+    ]) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry?.id, 'web.settings-artist-profile');
+      assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    }
+    const admin = classifyScreenPath(
+      'apps/web/app/app/(shell)/settings/admin/page.tsx'
+    );
+    assert.equal(admin.kind, 'registered');
+    assert.equal(admin.entry?.id, 'web.settings-admin-redirect');
+    assert.deepEqual(admin.entry?.viewports, ['desktop', 'mobile']);
+  });
   it('registers the money route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/money/page.tsx',
@@ -163,6 +181,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.equal(entry?.id, 'web.admin-chat-playground');
       assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
     }
+  });
+  it('registers the admin share studio for both viewports', () => {
+    const entry = classifyScreenPath(
+      'apps/web/app/app/(shell)/admin/share-studio/page.tsx'
+    ).entry;
+
+    assert.equal(entry?.id, 'web.admin-share-studio');
+    assert.equal(entry?.owner, 'admin-share-studio');
+    assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
   });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
@@ -331,23 +358,16 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers public SmartLink release and track pages', () => {
-    assert.equal(
-      kindOf('apps/web/app/[username]/[slug]/page.tsx'),
-      'registered'
-    );
-    assert.equal(
-      kindOf('apps/web/app/[username]/[slug]/[trackSlug]/page.tsx'),
-      'registered'
-    );
+  it('registers public SmartLink alias, release, and track pages', () => {
+    const sources = [
+      'apps/web/app/[username]/[...slug]/page.tsx',
+      'apps/web/app/[username]/[slug]/page.tsx',
+      'apps/web/app/[username]/[slug]/[trackSlug]/page.tsx',
+    ];
+    for (const source of sources) assert.equal(kindOf(source), 'registered');
+
     const result = evaluateChangedScreens({
-      changedFiles: [
-        { path: 'apps/web/app/[username]/[slug]/page.tsx', status: 'M' },
-        {
-          path: 'apps/web/app/[username]/[slug]/[trackSlug]/page.tsx',
-          status: 'M',
-        },
-      ],
+      changedFiles: sources.map(path => ({ path, status: 'M' })),
       headSha: HEAD,
       proofs: [],
     });

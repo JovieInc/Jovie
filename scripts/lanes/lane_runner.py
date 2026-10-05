@@ -100,10 +100,12 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py"]
-# Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
+# Dependencies outside scripts/lanes for installed source admission and the HUD's
+# PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
                   "scripts/merge-queue-backend.mjs", "scripts/lib/merge-queue-guard.mjs"]
@@ -4752,6 +4754,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         issue = labeled
         if local:
             sweep_lane_prs(host, name, linear)
+        # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
+        # autoscaled count would admit more parked PRs as capacity rises.
         budget = None if red or adopt or labeled else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
@@ -5212,7 +5216,9 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     sharing Tim's token (its secondary limit throttled every lane on 2026-09-27, JOV-6878).
     An explicit GH_TOKEN in github.env wins; otherwise, with the Jovie Bot app key present, a `gh`
     shim first on PATH mints a fresh 1h installation token (cached) for every gh call, including
-    the agents' own, so a long run never outlives its token."""
+    the agents' own, so a long run never outlives its token. Calls aimed at a different GH_HOST
+    (offline harnesses, other enterprises) keep the caller's credentials — the bot token is a
+    github.com installation token and would be wrong there."""
     try:
         for line in path.read_text().splitlines():
             key, _, value = line.strip().removeprefix("export ").partition("=")
@@ -5230,8 +5236,11 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     shim_dir.mkdir(parents=True, exist_ok=True)
     shim = shim_dir / "gh"
     # App installation tokens cannot touch user gists (403), and the status feed is Tim's gist:
-    # `gh gist` keeps the host's own login.
+    # `gh gist` keeps the host's own login. A caller that targets another host
+    # (GH_HOST, e.g. the offline real-gh test harness) keeps its own credentials:
+    # the Jovie Bot installation token only exists for github.com.
     shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+                    f'[ -n "${{GH_HOST:-}}" ] && [ "$GH_HOST" != github.com ] && exec {real} "$@"\n'
                     f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
                     f'export GH_TOKEN\nexec {real} "$@"\n')
     shim.chmod(0o755)

@@ -56,11 +56,11 @@ describe('dashboard earnings page', () => {
 
   it('redirects authenticated users to artist profile tips', async () => {
     await expect(EarningsPage()).rejects.toThrow(
-      `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+      `REDIRECT:${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
     );
 
     expect(redirectMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+      `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
     );
   });
 });
@@ -89,11 +89,11 @@ describe('canonical earnings page', () => {
 
   it('redirects authenticated users to artist profile tips', async () => {
     await expect(CanonicalEarningsPage()).rejects.toThrow(
-      `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+      `REDIRECT:${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
     );
 
     expect(redirectMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+      `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
     );
   });
 
