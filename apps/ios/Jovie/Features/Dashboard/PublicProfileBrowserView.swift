@@ -417,34 +417,46 @@ struct PublicProfileBrowserView: View {
 
       Spacer()
 
-      Button {
-        model.goBack()
-      } label: {
-        Image(systemName: "chevron.left")
-      }
-      .buttonStyle(JovieIconButtonStyle())
-      .disabled(!model.canGoBack)
-      .accessibilityLabel("Back")
-      .accessibilityIdentifier("public-profile-browser-back")
+      // One trailing action only (ios-nav-one-trailing-action, JOV-5354):
+      // back/forward/reload live in a single Actions overflow menu.
+      Menu {
+        Button {
+          model.goBack()
+        } label: {
+          Label("Back", systemImage: "chevron.left")
+        }
+        .disabled(!model.canGoBack)
+        .accessibilityIdentifier("public-profile-browser-back")
 
-      Button {
-        model.goForward()
-      } label: {
-        Image(systemName: "chevron.right")
-      }
-      .buttonStyle(JovieIconButtonStyle())
-      .disabled(!model.canGoForward)
-      .accessibilityLabel("Forward")
-      .accessibilityIdentifier("public-profile-browser-forward")
+        Button {
+          model.goForward()
+        } label: {
+          Label("Forward", systemImage: "chevron.right")
+        }
+        .disabled(!model.canGoForward)
+        .accessibilityIdentifier("public-profile-browser-forward")
 
-      Button {
-        model.reload()
+        Button {
+          model.reload()
+        } label: {
+          Label("Reload", systemImage: "arrow.clockwise")
+        }
+        .accessibilityIdentifier("public-profile-browser-reload")
       } label: {
-        Image(systemName: "arrow.clockwise")
+        Image(systemName: "ellipsis")
+          .font(.system(size: 17, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+          .frame(
+            width: JovieIconButtonStyle.targetSize,
+            height: JovieIconButtonStyle.targetSize
+          )
+          .background(JovieColor.surface1, in: Circle())
+          .overlay {
+            Circle().stroke(JovieColor.borderDefault, lineWidth: 1)
+          }
       }
-      .buttonStyle(JovieIconButtonStyle())
-      .accessibilityLabel("Reload")
-      .accessibilityIdentifier("public-profile-browser-reload")
+      .accessibilityLabel("Actions")
+      .accessibilityIdentifier("public-profile-browser-actions")
     }
     .padding(.horizontal, JovieSpacing.large)
     .padding(.vertical, JovieSpacing.small)
