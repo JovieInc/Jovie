@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -191,6 +192,7 @@ def search_slugs(raw: str) -> list[str]:
 
 def page_precedent(slug: str, raw: str) -> dict:
     document = raw or ""
+    metadata = {}
     try:
         parsed = json.loads(document)
     except json.JSONDecodeError:
@@ -203,6 +205,7 @@ def page_precedent(slug: str, raw: str) -> dict:
             raise ValueError("prior-art response is not a page")
         document = page.get("compiled_truth") or page.get("compiledTruth") or page.get("body") or page.get("content") or ""
         title = page.get("title")
+        metadata = page.get("frontmatter") if isinstance(page.get("frontmatter"), dict) else {}
     if not isinstance(document, str):
         raise ValueError("prior-art body is not text")
     body = re.sub(r"\A---\s*\n.*?\n---\s*(?:\n|$)", "", document, flags=re.S).strip()
@@ -211,6 +214,8 @@ def page_precedent(slug: str, raw: str) -> dict:
         raise ValueError("empty prior-art body")
 
     def field(name: str) -> str | None:
+        if isinstance(metadata.get(name), (str, int, float)):
+            return str(metadata[name])
         match = re.search(rf"^{re.escape(name)}:\s*(.+)$", document, re.M)
         if not match:
             return None
@@ -233,6 +238,19 @@ def page_precedent(slug: str, raw: str) -> dict:
             if applicability else "Evaluate against the current Jovie evidence and constraints."}
 
 
+def catalog_command(slug: str) -> list[str]:
+    """Compose the installed authenticated adapter only for the known YC catalog.
+
+    The global CLI keeps its existing routing. Hosts without the matched helper
+    keep the native command; adapter failures never fall back to another authority.
+    """
+    executable = shutil.which("gbrain")
+    helper = Path(executable).resolve().with_name("gbrain_loopback.py") if executable else None
+    if helper and helper.is_file():
+        return [sys.executable, str(HERE / "gbrain_catalog.py"), str(helper), slug]
+    return ["gbrain", "get", slug]
+
+
 def retrieve_business_prior_art(job: dict, run=subprocess.run, limit: int = 3) -> dict:
     topic = business_topic(job["question"])
     receipt = {"schema": PRIOR_ART_SCHEMA, "topic": topic, "retrievedAt": now_iso(),
@@ -248,7 +266,7 @@ def retrieve_business_prior_art(job: dict, run=subprocess.run, limit: int = 3) -
         # never a precedent. The original reasoning question remains unchanged.
         catalog_slug = f"knowledge/external/yc/playbook/{topic}"
         receipt.update(catalogSlug=catalog_slug, retrievalPath="discovery")
-        catalog = run(["gbrain", "get", catalog_slug], capture_output=True, text=True, timeout=20)
+        catalog = run(catalog_command(catalog_slug), capture_output=True, text=True, timeout=20)
         if catalog.returncode == 0:
             try:
                 precedent = page_precedent(catalog_slug, catalog.stdout)
