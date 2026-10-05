@@ -21,6 +21,16 @@ const meta: Meta<typeof WhatsNewBannerView> = {
     // The fetching container is covered by WhatsNewBanner.test.tsx.
     jovie: { uncoveredProps: ['enabled'] },
   },
+  decorators: [
+    Story => (
+      <div
+        className='flex h-screen flex-col justify-end border-r border-(--app-shell-border) bg-base pb-12'
+        style={{ width: 244 }}
+      >
+        <Story />
+      </div>
+    ),
+  ],
   args: { onOpen: fn(), onDismiss: fn() },
 };
 
@@ -29,6 +39,11 @@ type Story = StoryObj<typeof WhatsNewBannerView>;
 
 export const SingleUpdate: Story = {
   args: { unseen: { entry: ENTRY, unseenCount: 1, href: ENTRY.url } },
+};
+
+export const SingleUpdateLight: Story = {
+  ...SingleUpdate,
+  parameters: { themes: { themeOverride: 'light' } },
 };
 
 export const MultipleUpdates: Story = {

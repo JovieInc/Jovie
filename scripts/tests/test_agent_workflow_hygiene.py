@@ -1428,6 +1428,21 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
 
 
+def test_visual_bot_publication_is_main_only() -> None:
+    """A dispatch on an unmerged ref must never open an auto-merging bot PR.
+
+    2026-10-03: a visual-regression dispatch on a feature branch committed
+    that branch's unreviewed source into the baseline PR with auto-merge on.
+    """
+    baseline_diff = _step_block(
+        "visual-regression.yml", "Check for baseline changes (refresh only)"
+    )
+    publisher_job = _job_block("screenshots.yml", "publish")
+
+    assert "github.ref == 'refs/heads/main'" in baseline_diff
+    assert "github.ref == 'refs/heads/main'" in publisher_job
+
+
 def test_product_screenshots_preserve_the_active_exact_head_capture() -> None:
     """Frequent main pushes must not discard an in-progress capture."""
     workflow = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")

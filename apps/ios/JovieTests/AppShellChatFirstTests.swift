@@ -70,7 +70,7 @@ struct AppShellChatFirstTests {
     )
     let timeline = MobileChatStorefrontFixture.default
     #expect(LaunchMode.uiTestingStorefrontChat.chatEntityFixture == timeline)
-    #expect(timeline.map(\.role) == [.user, .assistant])
+    #expect(timeline.map(\.role) == [.user, .assistant, .user, .assistant])
     #expect(timeline.allSatisfy { $0.status == .completed && !$0.requiresWebHandoff })
 
     let segments = MobileChatContentParser.segments(
@@ -94,6 +94,30 @@ struct AppShellChatFirstTests {
     for item in timeline {
       #expect(!item.content.contains("\u{2014}") && !item.content.contains("\u{2013}"))
     }
+  }
+
+  @Test func uiTestingStorefrontIdentityShowsAFictionalProfileWithWallet() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-storefront-identity"], isXCTest: false)
+        == .uiTestingStorefrontIdentity
+    )
+    #expect(LaunchMode.uiTestingStorefrontIdentity.defaultInitialTab == .profile)
+    #expect(LaunchMode.uiTestingStorefrontIdentity.usesLiveAuth == false)
+    let profile = MobileMeResponse.previewStorefront
+    #expect(profile.appleWalletProfilePassAvailable)
+    #expect(profile.qrPayload == profile.publicProfileURL)
+    #expect(profile.displayName != MobileMeResponse.previewReady.displayName)
+  }
+
+  @Test func uiTestingStorefrontReleasesShowsOnlyLinkedReleases() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-storefront-releases"], isXCTest: false)
+        == .uiTestingStorefrontReleases
+    )
+    #expect(LaunchMode.uiTestingStorefrontReleases.defaultInitialTab == .library)
+    let assets = LibraryFeed.storefrontReleaseAssets
+    #expect(assets.count >= 4)
+    #expect(assets.allSatisfy { $0.type == .release && $0.publicURL != nil })
   }
 
   @Test func uiTestingAudienceYieldsChatDefault() {

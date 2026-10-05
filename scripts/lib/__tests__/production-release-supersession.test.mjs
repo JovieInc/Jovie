@@ -885,6 +885,73 @@ esac
   });
 });
 
+describe('controller merge-queue read resilience', () => {
+  function runCoalesce(queueFailures) {
+    const fixture = makeFixture('coalesce-');
+    const attempts = join(fixture.root, 'queue-attempts');
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!/bin/sh
+case "$*" in
+  *graphql*)
+    n=0
+    [ -f "$STUB_QUEUE_ATTEMPTS" ] && n="$(cat "$STUB_QUEUE_ATTEMPTS")"
+    n=$((n + 1))
+    printf '%s' "$n" > "$STUB_QUEUE_ATTEMPTS"
+    if [ "$n" -le "$STUB_QUEUE_FAILURES" ]; then
+      echo "gh: API rate limit already exceeded for site ID installation." >&2
+      exit 1
+    fi
+    printf '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\\n'
+    ;;
+  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      COALESCE_MAX_SECONDS: '150',
+      COALESCE_PER_GENERATION_SECONDS: '30',
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GH_API_RETRY_ATTEMPTS: '3',
+      GH_API_RETRY_SECONDS: '0',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      STUB_MAIN_SHA: EXPECTED_SHA,
+      STUB_QUEUE_ATTEMPTS: attempts,
+      STUB_QUEUE_FAILURES: String(queueFailures),
+    });
+    return {
+      attempts: existsSync(attempts)
+        ? Number(readFileSync(attempts, 'utf8'))
+        : 0,
+      outputs: parseOutputs(fixture.output),
+      result,
+    };
+  }
+
+  it('recovers from a transient API failure and proceeds on an empty queue', () => {
+    const run = runCoalesce(1);
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.attempts).toBe(2);
+    expect(run.outputs.is_current).toBe('true');
+    expect(run.outputs.decision).toBe('proceed');
+  });
+
+  it('still fails closed when the merge queue stays unreadable', () => {
+    const run = runCoalesce(9);
+    expect(run.result.status).toBe(1);
+    expect(run.attempts).toBe(3);
+    expect(run.result.stdout).toContain('Could not read the main merge queue');
+  });
+});
+
 describe('controller starvation bound', () => {
   it('routes every post-coalesce main recheck through the lineage gate', () => {
     const coalesce = getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production');
