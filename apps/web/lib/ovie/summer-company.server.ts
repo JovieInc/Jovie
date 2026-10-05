@@ -26,6 +26,7 @@ import {
   isInternalOrTestAccountEmail,
 } from '@/lib/utils/email';
 import { getLybDailyMrr } from './lyb-mrr.server';
+import { getSummerFounderAccounts } from './summer-founder-cohort.server';
 
 /**
  * Summer company reads (contract v1 §2): Jovie product aggregates plus the
@@ -105,7 +106,12 @@ export async function getSummerRevenue(now = new Date()) {
 }
 
 export const summerCohortQuerySchema = z.object({
-  kind: z.enum(['claimed_artists', 'checkout_abandoned', 'churned']),
+  kind: z.enum([
+    'claimed_artists',
+    'checkout_abandoned',
+    'churned',
+    'accounts_created',
+  ]),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
@@ -342,7 +348,10 @@ export async function getSummerCohort(
   kind: SummerCohortKind,
   limit: number,
   now = new Date()
-): Promise<Cohort | Unavailable> {
+): Promise<
+  Cohort | Unavailable | Awaited<ReturnType<typeof getSummerFounderAccounts>>
+> {
+  if (kind === 'accounts_created') return getSummerFounderAccounts(limit);
   if (kind === 'claimed_artists') return claimedArtists(limit);
   if (kind === 'churned') return churned(limit);
   if (!env.STRIPE_SECRET_KEY) return unavailable('stripe_not_configured');
