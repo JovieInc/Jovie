@@ -24,7 +24,7 @@
     "@vercel/blob": "2.8.0",
     "ai": "7.0.122",
     "braintrust": "3.35.0",
-    "eve": "0.68.0",
+    "eve": "0.70.0",
     "just-bash": "3.4.2",
     "microsandbox": "0.7.5",
     "zod": "4.6.5"
