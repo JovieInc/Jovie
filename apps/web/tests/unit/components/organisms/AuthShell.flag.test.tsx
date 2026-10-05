@@ -242,6 +242,9 @@ describe('AuthShell canonical wiring', () => {
     renderAuthShell();
 
     expect(screen.getByTestId('app-shell-frame')).toBeInTheDocument();
+    expect(screen.getByTestId('media-canvas-viewer')).not.toHaveAttribute(
+      'open'
+    );
     expect(
       screen.queryByRole('button', { name: 'Toggle Sidebar' })
     ).not.toBeInTheDocument();

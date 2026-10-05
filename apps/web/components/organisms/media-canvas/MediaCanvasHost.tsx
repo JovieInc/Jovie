@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/organisms/media-canvas/MediaCanvasViewer.test.tsx
+
 import { useEffect } from 'react';
 import { MediaCanvasViewer } from './MediaCanvasViewer';
 import {

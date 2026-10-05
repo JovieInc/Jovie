@@ -224,6 +224,7 @@ describe('TrackSidebar', () => {
     );
 
     await user.click(screen.getByTestId('drawer-tab-assets'));
+    expect(screen.getByRole('slider', { name: 'Seek Track' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Play preview' }));
 
     expect(toggleTrack).toHaveBeenCalledWith(

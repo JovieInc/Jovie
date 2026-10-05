@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SeekBar } from '@/components/molecules/SeekBar';
+import { SeekBar } from './SeekBar';
 
 describe('SeekBar', () => {
   it('holds local scrub value while pointer is down so engine ticks cannot snap the thumb', () => {
