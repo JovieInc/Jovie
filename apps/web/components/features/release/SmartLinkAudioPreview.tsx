@@ -2,8 +2,8 @@
 
 import { Loader2, Pause, Play } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
-import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type {
   PreviewSource,

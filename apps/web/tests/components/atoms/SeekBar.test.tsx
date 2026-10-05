@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SeekBar } from '@/components/atoms/SeekBar';
+import { SeekBar } from '@/components/molecules/SeekBar';
 
 describe('SeekBar', () => {
   it('holds local scrub value while pointer is down so engine ticks cannot snap the thumb', () => {
@@ -9,7 +9,7 @@ describe('SeekBar', () => {
       <SeekBar currentTime={10} duration={100} onSeek={onSeek} />
     );
 
-    const input = screen.getByLabelText('Seek track') as HTMLInputElement;
+    const input = screen.getByLabelText('Seek Track') as HTMLInputElement;
     fireEvent.pointerDown(input);
     fireEvent.change(input, { target: { value: '40' } });
     expect(onSeek).toHaveBeenCalledWith(40);
@@ -26,6 +26,6 @@ describe('SeekBar', () => {
 
   it('disables when duration is zero', () => {
     render(<SeekBar currentTime={0} duration={0} onSeek={vi.fn()} />);
-    expect(screen.getByLabelText('Seek track')).toBeDisabled();
+    expect(screen.getByLabelText('Seek Track')).toBeDisabled();
   });
 });

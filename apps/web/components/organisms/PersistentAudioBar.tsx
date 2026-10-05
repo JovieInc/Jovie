@@ -10,9 +10,9 @@ import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
-import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import { MediaCanvasTransport } from '@/components/organisms/media-canvas/MediaCanvasTransport';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';

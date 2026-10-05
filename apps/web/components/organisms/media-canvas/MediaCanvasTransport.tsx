@@ -11,7 +11,7 @@ import {
   RotateCcw,
   Video,
 } from 'lucide-react';
-import { SeekBar } from '@/components/atoms/SeekBar';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import type { MediaTransportSnapshot } from '@/components/organisms/audio-chrome-state';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
@@ -103,7 +103,6 @@ export function MediaCanvasTransport({
             duration={transport.duration}
             onSeek={transport.seek ?? (() => undefined)}
             disabled={!isVideo || isLoading || hasError}
-            ariaLabel='Seek video'
             className='h-1 min-w-15 flex-1 bg-surface-1'
           />
           <span className='w-8 shrink-0 text-3xs tabular-nums text-quaternary-token'>
