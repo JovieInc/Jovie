@@ -1,0 +1,6 @@
+NOT-SHIPPABLE: Sentry’s external “Seer Code Review” was cancelled after the PR was temporarily closed; it reported zero annotations and no code finding.
+
+- All four required checks pass: Fork PR Gate, Migration Guard, PR Ready, PR Size Guard.
+- Worktree is clean at `bba7682`.
+- No files changed, installed, committed, or pushed.
+- The remaining pending/exhausted statuses are lane automation state, not branch failures.
