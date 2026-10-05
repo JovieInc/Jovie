@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/user-button/UsageMenuItem.test.tsx
 import { Button } from '@jovie/ui';
 import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';

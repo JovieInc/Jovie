@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
@@ -47,5 +48,24 @@ describe('SettingsToggleRow', () => {
     expect(
       screen.getByRole('switch', { name: 'High Contrast' })
     ).toBeDisabled();
+  });
+
+  it('names the canonical Artist Presence plan on a gated row', () => {
+    render(
+      <TooltipProvider>
+        <SettingsToggleRow
+          title='Release Radar'
+          description='Track release performance.'
+          checked={false}
+          onCheckedChange={vi.fn()}
+          gated
+          ariaLabel='Release radar'
+        />
+      </TooltipProvider>
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Upgrade to Artist Presence' })
+    ).toHaveAttribute('href', '/pricing');
   });
 });
