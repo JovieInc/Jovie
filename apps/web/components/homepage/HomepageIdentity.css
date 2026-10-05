@@ -606,6 +606,14 @@
    The rules above for .homepage-identity-hero* are retired with the old hero
    and removed in the follow-up cleanup PR. ─────────────────────────────── */
 
+/* Keep the technical texture's seam clear of supporting copy on phones.
+   The desktop split composition retains the shared right-aligned crop. */
+@media (max-width: 767px) {
+  .homepage-claim-hero .marketing-hero-photo__img {
+    object-position: 70% center;
+  }
+}
+
 /* This hero's split shell breaks into two columns at md (768), a whole
    breakpoint earlier than the shared marketing H1 ramp expects (that ramp
    steps up to its medium size at the same 768 boundary, sized for a
