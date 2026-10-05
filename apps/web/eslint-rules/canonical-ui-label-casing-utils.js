@@ -48,6 +48,7 @@ const BRAND_WORDS = new Set([
   'Spotify',
   'TikTok',
   'Venmo',
+  'WhatsApp',
   'YouTube',
   'iPhone',
   'vCard',

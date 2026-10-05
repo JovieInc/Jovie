@@ -9,9 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
-import { Check, Copy, Trash2 } from 'lucide-react';
+import { Check, Copy, Plus, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   DrawerChoiceChipGroup,
   DrawerEditableTextField,
@@ -36,6 +37,7 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { cn } from '@/lib/utils';
 import type { ContactChannel, ContactRole } from '@/types/contacts';
+import { ContactReachActions } from './ContactReachActions';
 
 function getPreferredChannelLabel(
   channel: ContactChannel | null | undefined
@@ -44,6 +46,60 @@ function getPreferredChannelLabel(
   if (channel === 'phone') return 'Phone';
   return 'Select preferred';
 }
+
+type OptionalContactField = 'companyName' | 'email' | 'phone';
+
+const OPTIONAL_CONTACT_FIELDS: readonly {
+  readonly key: OptionalContactField;
+  readonly label: string;
+  readonly placeholder: string;
+}[] = [
+  { key: 'companyName', label: 'Company', placeholder: 'Company name' },
+  { key: 'email', label: 'Email', placeholder: 'Email' },
+  { key: 'phone', label: 'Phone', placeholder: 'Phone' },
+];
+
+function isContactFieldShown(
+  contact: EditableContact,
+  field: OptionalContactField,
+  revealed: ReadonlySet<OptionalContactField>
+): boolean {
+  return Boolean(contact[field]?.trim()) || revealed.has(field);
+}
+
+function AddContactFieldMenu({
+  contact,
+  revealedFields,
+  onAdd,
+}: Readonly<{
+  contact: EditableContact;
+  revealedFields: ReadonlySet<OptionalContactField>;
+  onAdd: (field: OptionalContactField) => void;
+}>) {
+  const missing = OPTIONAL_CONTACT_FIELDS.filter(
+    field => !isContactFieldShown(contact, field.key, revealedFields)
+  );
+  if (missing.length === 0) return null;
+  return (
+    <TableActionMenu
+      trigger='custom'
+      align='start'
+      items={missing.map(field => ({
+        id: `add-${field.key}`,
+        label: field.label,
+        onClick: () => onAdd(field.key),
+      }))}
+    >
+      <button type='button' className={ADD_FIELD_BUTTON_CLASSNAME}>
+        <Plus className='h-3.5 w-3.5' aria-hidden='true' />
+        Add Field
+      </button>
+    </TableActionMenu>
+  );
+}
+
+const ADD_FIELD_BUTTON_CLASSNAME =
+  'inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-app text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16';
 
 const CONTACT_TAB_OPTIONS = [
   { value: 'info' as const, label: 'Info' },
@@ -168,6 +224,14 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   contextMenuItems,
 }: ContactDetailSidebarProps) {
   const [activeTab, setActiveTab] = useState<'info' | 'territories'>('info');
+  // Empty fields stay hidden until someone adds them (filled-fields-only rail).
+  const [revealedFields, setRevealedFields] = useState<
+    ReadonlySet<OptionalContactField>
+  >(() => new Set());
+  const contactId = contact?.id;
+  useEffect(() => {
+    if (contactId) setRevealedFields(new Set());
+  }, [contactId]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use a ref so the debounced timeout always calls the latest onSave,
@@ -416,25 +480,34 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                     contact.personName,
                     'Contact name'
                   )}
-                  {renderEditableField(
-                    'companyName',
-                    'Company',
-                    contact.companyName,
-                    'Company name'
-                  )}
-                  {renderEditableField(
-                    'email',
-                    'Email',
-                    contact.email,
-                    'Email'
-                  )}
-                  {renderEditableField(
-                    'phone',
-                    'Phone',
-                    contact.phone,
-                    'Phone'
-                  )}
+                  {OPTIONAL_CONTACT_FIELDS.filter(field =>
+                    isContactFieldShown(contact, field.key, revealedFields)
+                  ).map(field => (
+                    <div key={field.key}>
+                      {renderEditableField(
+                        field.key,
+                        field.label,
+                        contact[field.key],
+                        field.placeholder
+                      )}
+                    </div>
+                  ))}
                 </div>
+                <AddContactFieldMenu
+                  contact={contact}
+                  revealedFields={revealedFields}
+                  onAdd={key =>
+                    setRevealedFields(previous => new Set(previous).add(key))
+                  }
+                />
+                <ContactReachActions
+                  contact={{
+                    name: contactDisplayName,
+                    email: contact.email,
+                    phone: contact.phone,
+                  }}
+                  className='pt-1'
+                />
               </DrawerSection>
 
               {/* Preferred Channel */}
