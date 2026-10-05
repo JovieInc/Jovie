@@ -1224,6 +1224,67 @@ class ClaimScanCacheTest(unittest.TestCase):
             hud.lane.Linear, hud.lane.SHARED_CACHE_DIR = saved
 
 
+class HostHandoffAdmissionTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+
+    def test_host_disabled_handoffs_are_not_probed_or_selected(self):
+        providers = {"claude": {"slots": 2}, "hyperagent": {"slots": 2}}
+        with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_HYPERAGENT": "0"}), \
+                patch.object(lane, "provider_healthy", return_value=True) as healthy:
+            self.assertIsNone(lane.next_provider(self.host, set(), providers))
+            healthy.assert_not_called()
+
+    def test_effective_nonpositive_slots_exclude_handoffs(self):
+        providers = {"codex": {"slots": 3}}
+        for slots in (0, -1):
+            with self.subTest(slots=slots), patch.object(self.host, "slots", return_value=slots), \
+                    patch.object(lane, "provider_healthy", return_value=True) as healthy:
+                self.assertIsNone(lane.next_provider(self.host, set(), providers))
+                healthy.assert_not_called()
+
+    def test_host_limits_preserve_deterministic_router_order(self):
+        providers = {"claude": {"slots": 2, "tier": 0},
+                     "codex": {"slots": 3, "tier": 2},
+                     "devin": {"slots": 2, "tier": 1}}
+        with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_CODEX": "3",
+                                     "LANES_SLOTS_DEVIN": "2", "SYMPHONY_AUTOSCALE": "0"}), \
+                patch.object(lane, "provider_healthy", return_value=True):
+            self.assertEqual(lane.next_provider(self.host, set(), providers)[0], "devin")
+            self.assertEqual(lane.next_provider(self.host, {"devin"}, providers)[0], "codex")
+            self.assertIsNone(lane.next_provider(self.host, {"devin", "codex"}, providers))
+
+    def test_zero_slot_worker_does_not_claim_a_new_issue(self):
+        with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0"}), \
+                patch.object(lane, "load_providers", return_value={"claude": {"slots": 2}}), \
+                patch.object(lane, "worker_with_slot") as work:
+            self.assertEqual(lane.worker(self.host, "claude"), 0)
+            work.assert_not_called()
+        self.assertFalse((self.host.state / "slots").exists())
+
+    def test_reexec_preserves_explicit_host_limits_in_the_current_release(self):
+        current = self.host.state / "current"
+        current.mkdir()
+        bounds = {"LANES_SLOTS_DEVIN": "2", "LANES_SLOTS_CODEX": "3",
+                  "LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_HYPERAGENT": "0",
+                  "LANES_SLOTS_GROK": "0", "LANES_SLOTS_KIMI": "0", "SYMPHONY_AUTOSCALE": "0"}
+        (current / "lane_runner.py").write_text(
+            "import json, os, sys\n"
+            "print(json.dumps({'argv': sys.argv[1:], 'bounds': "
+            "{key: os.environ.get(key) for key in " + repr(list(bounds)) + "}}))\n")
+        script = ("import sys; from pathlib import Path; "
+                  f"sys.path.insert(0, {str(ROOT / 'scripts/lanes')!r}); "
+                  "import lane_runner as lane; "
+                  f"lane.reexec(lane.Host(state=Path({str(self.host.state)!r})), 'codex')")
+        result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,
+                                timeout=10, env={**lane.selftest_env(self.host.state), **bounds})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout),
+                         {"argv": ["worker", "--provider", "codex"], "bounds": bounds})
+
+
 class RunIssueTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
