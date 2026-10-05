@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from 'react';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import { cn } from '@/lib/utils';
 
 interface SeekBarProps {
@@ -36,7 +37,10 @@ export function SeekBar({
   const displayTime = isScrubbing ? scrubTime : currentTime;
   const progressPercent =
     duration > 0
-      ? Math.min(100, Math.max(0, (displayTime / duration) * 100))
+      ? Math.min(
+          100,
+          Math.max(0, computeRatePercent(displayTime, duration, 12))
+        )
       : 0;
   const isDisabled = disabled || duration <= 0;
 
