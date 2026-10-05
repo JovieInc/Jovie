@@ -95,6 +95,124 @@ def record_lease(path: str | None, name: str, cwd, now: float) -> None:
         os.fsync(handle.fileno())
 
 
+class LaunchEvidence:
+    """Allowlisted identity from verified CLIs' first, pre-prompt startup header.
+
+    Codex 0.147.0 JSON thread.started exposes only thread_id. The verified
+    0.144.6/0.147.0 human header (exec/src/event_processor_with_human_output.rs)
+    reports the thread/start model/provider and configured reasoning effort.
+    This is CLI launch evidence, never provider attestation or generated text.
+    A different format/version stays unknown until its contract is verified.
+    """
+    VERSIONS = {"0.144.6", "0.147.0"}
+    KEYS = ("workdir", "model", "provider", "approval", "sandbox",
+            "reasoning effort", "reasoning summaries", "session id")
+    REQUIRED = {"workdir", "model", "provider", "approval", "sandbox", "session id"}
+    EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
+
+    @staticmethod
+    def identifier(value):
+        return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}", value) else None
+
+    def __init__(self, path, name, cmd, cwd):
+        self.path, self.pid = path, None
+        self.done, self.recorded = False, False
+        self.stage, self.size, self.lines = 0, 0, 0
+        self.fields = {}
+        requested = {"model": None, "provider": None, "reasoningEffort": None}
+        for flag, value in zip(cmd, cmd[1:]):
+            if flag in ("-m", "--model"):
+                requested["model"] = self.identifier(value)
+            if flag in ("-c", "--config"):
+                match = re.fullmatch(r'model_reasoning_effort="([a-z]+)"', value)
+                if match and match[1] in self.EFFORTS:
+                    requested["reasoningEffort"] = match[1]
+        try:
+            digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        except OSError:
+            digest = None
+        self.row = {"schema": PROVIDER_EVIDENCE_SCHEMA, "provider": "codex", "event": "cli-launch",
+                    "accountClass": ACCOUNT_CLASS, "account": name, "launchId": str(uuid.uuid4()),
+                    "startedAt": iso(time.time()), "host": os.uname().nodename,
+                    "worktree": str(Path(cwd or ".").resolve()), "adapterSha256": digest,
+                    "requested": requested, "identityState": "unknown", "cliReported": None,
+                    "provenance": None, "reasoningEffortSource": None, "providerAttested": False,
+                    "usage": None, "costUsd": None}
+
+    def observe(self, line):
+        if self.done:
+            return
+        self.size += len(line)
+        self.lines += 1
+        value = line.rstrip("\r\n")
+        if self.size > 16384 or self.lines > 16:
+            self.done = True
+        elif self.stage == 0:
+            self.version = value.removeprefix("OpenAI Codex v")
+            self.done = self.version not in self.VERSIONS or not value.startswith("OpenAI Codex v")
+            self.stage = 1
+        elif self.stage == 1:
+            self.done = value != "--------"
+            self.stage = 2
+        elif self.stage == 2:
+            if value == "--------":
+                self.done = not self.valid_fields()
+                self.stage = 3
+            else:
+                key, separator, item = value.partition(": ")
+                if not separator or key not in self.KEYS or key in self.fields or \
+                        (self.fields and self.KEYS.index(key) <= self.KEYS.index(next(reversed(self.fields)))):
+                    self.done = True
+                else:
+                    self.fields[key] = item
+        elif self.stage == 3:
+            self.done = True
+            if value == "user":
+                effort = self.fields.get("reasoning effort")
+                self.row.update(identityState="reported", provenance="codex-cli-startup-header",
+                                cliVersion=self.version,
+                                reasoningEffortSource="cli-resolved-configuration" if effort else None,
+                                cliReported={"model": self.fields["model"], "provider": self.fields["provider"],
+                                             "reasoningEffort": effort, "sessionId": self.fields["session id"]})
+        if self.done:
+            self.record()
+
+    def valid_fields(self):
+        if not self.REQUIRED.issubset(self.fields):
+            return False
+        if not self.identifier(self.fields["model"]) or not self.identifier(self.fields["provider"]):
+            return False
+        effort = self.fields.get("reasoning effort")
+        if effort is not None and effort not in self.EFFORTS:
+            return False
+        try:
+            return (Path(self.fields["workdir"]).is_absolute() and
+                    str(Path(self.fields["workdir"]).resolve()) == self.row["worktree"] and
+                    str(uuid.UUID(self.fields["session id"])) == self.fields["session id"])
+        except (OSError, ValueError, RuntimeError):
+            return False
+
+    def record(self):
+        if self.recorded or self.pid is None:
+            return
+        self.recorded = True
+        if not self.path:
+            return
+        # Metadata failure must not change the child exit, banking or rotation.
+        try:
+            with open(self.path, "a") as handle:
+                handle.write(json.dumps({**self.row, "pid": self.pid, "observedAt": iso(time.time())},
+                                        sort_keys=True) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError as exc:
+            print(f"codex-lane: launch evidence unavailable ({type(exc).__name__})", file=sys.stderr)
+
+    def finish(self):
+        self.done = True
+        self.record()
+
+
 def update_state(change) -> dict:
     """Read-modify-write under one lock, so concurrent runs never drop each other's banking."""
     STATE.parent.mkdir(parents=True, exist_ok=True)
@@ -549,20 +667,25 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
     env = {**os.environ, "CODEX_HOME": str(home)}
     from collections import deque
     tail = deque(maxlen=400)  # classification only needs the end of the output
+    launch = None
     try:
         update_state(lambda st: st.setdefault(name, {}).update(
             lastUsed=now, runs=int(st.get(name, {}).get("runs") or 0) + 1))
         record_lease(receipt_file, name, cwd, now)
+        launch = LaunchEvidence(receipt_file, name, cmd, cwd)
         print(f"codex-lane: account={name} accountClass={ACCOUNT_CLASS} home={home}", flush=True)
         proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True)
+        launch.pid = proc.pid
         proc.stdin.write(prompt)
         proc.stdin.close()
         for line in proc.stdout:
+            launch.observe(line)
             tail.append(line)
             sys.stdout.write(line)
             sys.stdout.flush()
         proc.stdout.close()
+        launch.finish()
         code = proc.wait()
         output = "".join(tail)
         kind, until = classify(output, code, time.time())
@@ -579,6 +702,8 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
             return 0, "reset-credit", None
         return code, kind, until
     finally:
+        if launch is not None:
+            launch.finish()
         handle.close()
 
 

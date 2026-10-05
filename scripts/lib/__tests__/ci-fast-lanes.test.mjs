@@ -64,7 +64,7 @@ describe('Shared fenced-attempt coverage contract', () => {
   it('preserves the existing lane floor and enforces fenced-attempt coverage', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain(
-      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
     );
     expect(command).toContain(
       '*/scripts/lanes/execution_attempt.py\" --fail-under=85'

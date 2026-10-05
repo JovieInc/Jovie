@@ -1,5 +1,7 @@
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 
+export const DEFAULT_PALETTE_SECTION_LIMIT = 5;
+
 // @coverage-via apps/web/tests/unit/lib/commands/palette-ranking.test.ts
 
 const ACTIVE_CHAT_STATUSES = new Set<ChatConversation['latestTurnStatus']>([

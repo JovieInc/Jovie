@@ -712,63 +712,88 @@ class Tracker:
         except Exception:
             pass
 
-    def reopen(self, issue_id: str, text: str, key: str | None = None) -> None:
-        try:
-            self.linear.move(issue_id, "Triage")
-            self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
-            if key:
-                self.apply_alert_label(issue_id, key)
-        except Exception:
-            pass
+    def _move_acknowledged(self, issue_id: str, target: str) -> bool:
+        """The shared client's move is best-effort; only readback proves the state."""
+        def acknowledged():
+            if target == "Triage":
+                data = self.linear.gql('query($id:String!){issue(id:$id){state{type}}}', {"id": issue_id})
+                state = ((data.get("issue") or {}).get("state") or {}).get("type")
+                # Intake may already have claimed or deferred the reopened issue.
+                return state in ("triage", "backlog", "unstarted", "started")
+            return self.linear.state_of(issue_id) == target
 
-    def close(self, issue_id: str, key: str | None = None) -> None:
+        try:
+            if acknowledged():
+                return True  # an earlier uncertain mutation already applied
+            self.linear.move(issue_id, target)
+            return acknowledged()
+        except Exception as error:
+            print(f"doctor: {target} acknowledgment pending ({type(error).__name__})", file=sys.stderr)
+            return False
+
+    def reopen(self, issue_id: str, text: str, key: str | None = None) -> bool:
+        if not self._move_acknowledged(issue_id, "Triage"):
+            return False
+        try:
+            self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
+        except Exception as error:
+            print(f"doctor: reopened issue; notification failed ({type(error).__name__})", file=sys.stderr)
+        if key:
+            self.apply_alert_label(issue_id, key)
+        return True
+
+    def close(self, issue_id: str, key: str | None = None) -> bool:
+        if not self._move_acknowledged(issue_id, "Done"):
+            return False
         try:
             self.linear.comment(issue_id, f"🤖 doctor: cleared on `{self.host}` at {now_iso()}.")
-            self.linear.move(issue_id, "Done")
-            if key:
-                self.apply_alert_label(issue_id, key)
-        except Exception:
-            pass
+        except Exception as error:
+            print(f"doctor: closed issue; notification failed ({type(error).__name__})", file=sys.stderr)
+        if key:
+            self.apply_alert_label(issue_id, key)
+        return True
 
 
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
               conditions: dict[str, dict] | None = None) -> dict:
-    """Carry issue ids across ticks; open/reopen/close through the tracker; return the new doctor.json."""
-    issues = dict(previous.get("issues", {}))      # key -> {"id", "closedAt"}
+    """Carry issue ids across ticks; acknowledge remote transitions before advancing receipts."""
+    issues = {key: dict(entry) for key, entry in previous.get("issues", {}).items()}
     for key, text in alerts.items():
         entry = issues.get(key)
-        if entry and entry.get("closedAt") is None and entry.get("id"):
+        if entry and entry.get("closedAt") is None and entry.get("id") and not entry.get("pendingAction"):
             continue  # still open
-        if entry and entry.get("closedAt") is None and not entry.get("id"):
-            issue_id = tracker.open(key, text) if tracker else None
-            issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
-            contradict = getattr(tracker, "contradict_invariant", None) if issue_id else None
-            if contradict and conditions and key in conditions:
-                contradict(conditions[key])
-            continue
-        if entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
-            if tracker:
-                tracker.reopen(entry["id"], text, key)
+        if entry and entry.get("id") and (entry.get("pendingAction") or
+                now - float(entry.get("closedAt") or 0) < COOL_OFF_S):
+            # Retain the original issue across cooldown expiry and uncertain close/refire.
+            if tracker and tracker.reopen(entry["id"], text, key) is True:
+                issues[key] = {"id": entry["id"], "closedAt": None}
                 contradict = getattr(tracker, "contradict_invariant", None)
                 if contradict and conditions and key in conditions:
                     contradict(conditions[key])
-            issues[key] = {"id": entry["id"], "closedAt": None}
+            else:
+                entry["pendingAction"] = "reopen"
             continue
         issue_id = tracker.open(key, text) if tracker else None
-        issues[key] = {"id": issue_id, "closedAt": None}
+        issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
         if tracker and issue_id and conditions and key in conditions:
             contradict = getattr(tracker, "contradict_invariant", None)
             if contradict:
                 contradict(conditions[key])
     for key, entry in issues.items():
-        if key not in alerts and entry.get("closedAt") is None:
-            if tracker and entry.get("id"):
-                tracker.close(entry["id"], key)
-            entry["closedAt"] = now
+        if key not in alerts and (entry.get("closedAt") is None or entry.get("pendingAction")):
+            if not entry.get("id") or (tracker and tracker.close(entry["id"], key) is True):
+                entry["closedAt"] = now
+                entry.pop("pendingAction", None)
+            else:
+                entry["pendingAction"] = "close"
     receipts = {}
     for key, event in (conditions or {}).items():
-        escalation = ("cleared" if event.get("state") == "resolved" else
-                      "requested" if (issues.get(key) or {}).get("id") else "pending")
+        entry = issues.get(key) or {}
+        acknowledged = bool(entry) and not entry.get("pendingAction")
+        if event.get("state") == "resolved":
+            escalation = "cleared" if acknowledged and entry.get("closedAt") is not None else "pending"
+        else:
+            escalation = "requested" if acknowledged and entry.get("id") and entry.get("closedAt") is None else "pending"
         receipts[key] = {**event, "summerEscalation": {"transport": "linear", "outcome": escalation}}
     return {"at": epoch_iso(now), "alerts": alerts, "issues": issues, "conditions": receipts}
 

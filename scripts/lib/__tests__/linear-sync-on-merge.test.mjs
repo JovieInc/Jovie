@@ -1,5 +1,14 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
@@ -547,4 +556,42 @@ describe('linear sync on merge', () => {
       }
     }
   });
+});
+
+it('loads every transitive dependency from the workflow sparse checkout', () => {
+  const repository = resolve(import.meta.dirname, '../../..');
+  const workflow = readFileSync(
+    join(repository, '.github/workflows/linear-sync-on-merge.yml'),
+    'utf8'
+  );
+  const sparse = workflow.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+  if (!sparse) throw new Error('workflow must declare its sparse checkout');
+  const paths = sparse[1]
+    .trim()
+    .split('\n')
+    .map(path => path.trim());
+  const root = mkdtempSync(join(tmpdir(), 'linear-sync-checkout-'));
+  try {
+    for (const path of paths) {
+      const target = join(root, path);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(join(repository, path), target);
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `globalThis.fetch = () => { throw new Error('unexpected network call'); };
+         const entry = await import(process.argv[1]);
+         if (typeof entry.syncLinearIssueOnMerge !== 'function') process.exit(1);`,
+        pathToFileURL(join(root, 'scripts/lib/linear-sync-on-merge.mjs')).href,
+      ],
+      { cwd: root, encoding: 'utf8', env: {}, timeout: 10_000 }
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
