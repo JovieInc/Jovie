@@ -2,13 +2,19 @@
 
 import { Button } from '@jovie/ui';
 import Image from 'next/image';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useApplyGeneratedAlbumArtMutation,
   useCreateReleaseWithGeneratedAlbumArtMutation,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import type { ChatAlbumArtToolResult } from '../types';
+import type { ChatAlbumArtCandidate, ChatAlbumArtToolResult } from '../types';
+import {
+  type AlbumArtSwipePreference,
+  ChatAlbumArtSwipeReview,
+  readAlbumArtSwipePreference,
+  writeAlbumArtSwipePreference,
+} from './ChatAlbumArtSwipeReview';
 import { ChatArtifactErrorCard } from './ChatArtifactErrorCard';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
@@ -68,8 +74,24 @@ function ChatAlbumArtCardSuccess({
   const [appliedCandidateId, setAppliedCandidateId] = useState<string | null>(
     null
   );
+  const [swipePreference, setSwipePreference] =
+    useState<AlbumArtSwipePreference>('undecided');
   const applyMutation = useApplyGeneratedAlbumArtMutation();
   const createMutation = useCreateReleaseWithGeneratedAlbumArtMutation();
+
+  // Read the stored preference after mount so SSR and first client render
+  // agree; `undecided` shows the one-time onboarding prompt.
+  useEffect(() => {
+    setSwipePreference(readAlbumArtSwipePreference());
+  }, []);
+
+  const chooseSwipePreference = useCallback(
+    (preference: Exclude<AlbumArtSwipePreference, 'undecided'>) => {
+      writeAlbumArtSwipePreference(preference);
+      setSwipePreference(preference);
+    },
+    []
+  );
 
   const selectedCandidate = useMemo(() => {
     if (result.state !== 'generated') return null;
@@ -85,39 +107,47 @@ function ChatAlbumArtCardSuccess({
     selectedCandidateId !== null &&
     appliedCandidateId === selectedCandidateId;
 
-  const handleApply = useCallback(() => {
-    if (result.state !== 'generated' || !selectedCandidate) {
-      return;
-    }
+  const applyCandidate = useCallback(
+    (candidate: ChatAlbumArtCandidate) => {
+      if (result.state !== 'generated') {
+        return;
+      }
 
-    if (result.releaseId) {
-      applyMutation.mutate(
+      if (result.releaseId) {
+        applyMutation.mutate(
+          {
+            profileId,
+            releaseId: result.releaseId,
+            generationId: result.generationId,
+            candidateId: candidate.id,
+          },
+          {
+            onSuccess: () => setAppliedCandidateId(candidate.id),
+          }
+        );
+        return;
+      }
+
+      createMutation.mutate(
         {
           profileId,
-          releaseId: result.releaseId,
+          title: result.releaseTitle,
+          releaseType: 'single',
           generationId: result.generationId,
-          candidateId: selectedCandidate.id,
+          candidateId: candidate.id,
         },
         {
-          onSuccess: () => setAppliedCandidateId(selectedCandidate.id),
+          onSuccess: () => setAppliedCandidateId(candidate.id),
         }
       );
-      return;
-    }
+    },
+    [applyMutation, createMutation, profileId, result]
+  );
 
-    createMutation.mutate(
-      {
-        profileId,
-        title: result.releaseTitle,
-        releaseType: 'single',
-        generationId: result.generationId,
-        candidateId: selectedCandidate.id,
-      },
-      {
-        onSuccess: () => setAppliedCandidateId(selectedCandidate.id),
-      }
-    );
-  }, [applyMutation, createMutation, profileId, result, selectedCandidate]);
+  const handleApply = useCallback(() => {
+    if (!selectedCandidate) return;
+    applyCandidate(selectedCandidate);
+  }, [applyCandidate, selectedCandidate]);
 
   if (result.state === 'needs_release_target') {
     return (
@@ -154,78 +184,120 @@ function ChatAlbumArtCardSuccess({
   else if (!result.releaseId) applyButtonLabel = 'Create Release With Art';
   else if (result.hasExistingArtwork) applyButtonLabel = 'Replace Artwork';
 
+  const swipeModeActive = swipePreference === 'on';
+  const showSwipeOnboarding = swipePreference === 'undecided';
+  const requestAnotherSet = () =>
+    result.releaseId
+      ? insertReleaseChips({ id: result.releaseId, title: result.releaseTitle })
+      : insertCreateReleaseChip();
+
   return (
     <ChatGenerationArtifactSurface
       title={result.releaseTitle}
       subtitle={
-        hasAppliedSelectedCandidate ? 'Artwork Applied' : 'Select Artwork'
+        appliedCandidateId !== null ? 'Artwork Applied' : 'Select Artwork'
       }
     >
-      <div className='mt-3 grid grid-cols-3 gap-2 max-sm:flex max-sm:overflow-x-auto'>
-        {result.candidates.map(candidate => {
-          const isSelected = candidate.id === selectedCandidateId;
-          return (
-            <button
-              key={candidate.id}
+      {showSwipeOnboarding ? (
+        <div
+          data-testid='album-art-swipe-onboarding'
+          className='mt-3 rounded-lg border border-subtle bg-surface-1 p-3'
+        >
+          <p className='text-xs text-secondary-token'>
+            Review artwork one card at a time — swipe right to keep it, left to
+            see the next.
+          </p>
+          <div className='mt-2 flex flex-wrap gap-2'>
+            <Button
               type='button'
-              onClick={() => setSelectedCandidateId(candidate.id)}
-              className={cn(
-                'group min-w-24 overflow-hidden rounded-lg border bg-surface-2 text-left transition-colors',
-                isSelected
-                  ? 'border-cyan-400/60 shadow-[inset_0_0_0_1px_rgb(103_232_249_/_0.18)]'
-                  : 'border-subtle hover:border-secondary-token'
-              )}
-              aria-pressed={isSelected}
-              aria-label={`Select ${candidate.styleLabel} artwork for ${result.releaseTitle}`}
+              size='sm'
+              onClick={() => chooseSwipePreference('on')}
             >
-              <span className='relative block aspect-square w-full bg-surface-1'>
-                <Image
-                  src={candidate.previewUrl}
-                  alt={`${result.releaseTitle} album art in ${candidate.styleLabel} style`}
-                  fill
-                  className='object-contain'
-                  sizes='160px'
-                  unoptimized
-                />
-              </span>
-              <span className='block border-t border-subtle px-2 py-1.5 text-3xs font-medium text-secondary-token'>
-                {candidate.styleLabel}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className='mt-3 flex flex-wrap items-center gap-2'>
-        <Button
-          type='button'
-          size='sm'
-          onClick={handleApply}
-          disabled={
-            !selectedCandidate ||
-            applyMutation.isPending ||
-            createMutation.isPending ||
-            hasAppliedSelectedCandidate
-          }
-        >
-          {applyButtonLabel}
-        </Button>
-        <Button
-          type='button'
-          size='sm'
-          variant='secondary'
-          disabled={applyMutation.isPending || createMutation.isPending}
-          onClick={() =>
-            result.releaseId
-              ? insertReleaseChips({
-                  id: result.releaseId,
-                  title: result.releaseTitle,
-                })
-              : insertCreateReleaseChip()
-          }
-        >
-          Regenerate
-        </Button>
-      </div>
+              Try Swipe Review
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              onClick={() => chooseSwipePreference('off')}
+            >
+              Keep Grid
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {swipeModeActive ? (
+        <ChatAlbumArtSwipeReview
+          releaseTitle={result.releaseTitle}
+          candidates={result.candidates}
+          appliedCandidateId={appliedCandidateId}
+          isActionPending={applyMutation.isPending || createMutation.isPending}
+          onAccept={applyCandidate}
+          onRequestMore={requestAnotherSet}
+          onExitSwipeMode={() => chooseSwipePreference('off')}
+        />
+      ) : (
+        <>
+          <div className='mt-3 grid grid-cols-3 gap-2 max-sm:flex max-sm:overflow-x-auto'>
+            {result.candidates.map(candidate => {
+              const isSelected = candidate.id === selectedCandidateId;
+              return (
+                <button
+                  key={candidate.id}
+                  type='button'
+                  onClick={() => setSelectedCandidateId(candidate.id)}
+                  className={cn(
+                    'group min-w-24 overflow-hidden rounded-lg border bg-surface-2 text-left transition-colors',
+                    isSelected
+                      ? 'border-cyan-400/60 shadow-[inset_0_0_0_1px_rgb(103_232_249_/_0.18)]'
+                      : 'border-subtle hover:border-secondary-token'
+                  )}
+                  aria-pressed={isSelected}
+                  aria-label={`Select ${candidate.styleLabel} artwork for ${result.releaseTitle}`}
+                >
+                  <span className='relative block aspect-square w-full bg-surface-1'>
+                    <Image
+                      src={candidate.previewUrl}
+                      alt={`${result.releaseTitle} album art in ${candidate.styleLabel} style`}
+                      fill
+                      className='object-contain'
+                      sizes='160px'
+                      unoptimized
+                    />
+                  </span>
+                  <span className='block border-t border-subtle px-2 py-1.5 text-3xs font-medium text-secondary-token'>
+                    {candidate.styleLabel}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className='mt-3 flex flex-wrap items-center gap-2'>
+            <Button
+              type='button'
+              size='sm'
+              onClick={handleApply}
+              disabled={
+                !selectedCandidate ||
+                applyMutation.isPending ||
+                createMutation.isPending ||
+                hasAppliedSelectedCandidate
+              }
+            >
+              {applyButtonLabel}
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              disabled={applyMutation.isPending || createMutation.isPending}
+              onClick={requestAnotherSet}
+            >
+              Regenerate
+            </Button>
+          </div>
+        </>
+      )}
       {applyMutation.isError || createMutation.isError ? (
         <output className='mt-2 block text-xs text-error'>
           Could not apply artwork. Try again.

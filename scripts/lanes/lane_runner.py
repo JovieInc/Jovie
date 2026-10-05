@@ -623,7 +623,8 @@ def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None) ->
 def admission_order(issue: Issue, now: float) -> tuple:
     """Dispatch rule shared by every lane and the doctor (JOV-7423 leverage-first):
 
-    1. tier 0 = urgent (effective P1, including aged work) or compounding infrastructure
+    1. tier -1 = operator-designated `dispatch-next` in the agent-ready pool;
+       tier 0 = urgent (effective P1, including aged work) or compounding infrastructure
        (CI, Symphony throughput); everything else is tier 1;
     2. aged priority: waiting work gains one level per day until it reaches P1;
     3. workstream rank (workstreams.RANK);
@@ -634,7 +635,9 @@ def admission_order(issue: Issue, now: float) -> tuple:
     waited = max(0, now - created_at) if created_at is not None else 0
     effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
     stream = workstreams.classify(issue.title, issue.labels)
-    tier = 0 if effective_priority == 1 or workstreams.compounding(stream) else 1
+    labels = {label.lower() for label in issue.labels}
+    tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
+            else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
     return (tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
@@ -3607,7 +3610,7 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
             return
         attempt.update(endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed",
                        repairRunId=receipt.get("runId"), repairBranch=receipt.get("branch"),
-                       repairHeadBefore=receipt.get("headBefore"))
+                       repairHeadBefore=receipt.get("headBefore"), repairVerdict=receipt.get("verdict"))
         if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
             attempt["pushedHead"] = receipt["headAfter"]
     update_json(host.state / "fix-attempts.json", finish)
@@ -4538,6 +4541,58 @@ def ended_repair_head(pr: dict, record: dict, pending: dict, now: float) -> bool
                 str(pr.get("state", "OPEN")).upper() == "OPEN")
 
 
+def publish_exhausted_repairs(host: Host, name: str, prs: list[dict], now: float | None = None) -> int:
+    """Reconcile ended failed repairs into the existing terminal PR label (JOV-7913).
+
+    This publication is independent of the optional stuck-PR model ladder. Legacy
+    records without a failed verdict remain evidence gaps, not publication authority.
+    Counters, underlying issues, holds and re-entry policy are never changed here.
+    """
+    now = time.time() if now is None else now
+    attempts = read_json(host.state / "fix-attempts.json")
+    published = 0
+    for pr in prs:
+        record = attempts.get(str(pr.get("number")))
+        if not isinstance(record, dict) or pr_is_terminal(pr):
+            continue
+        head, branch = pr.get("headRefOid"), pr.get("headRefName")
+        owned = LANE_BRANCH.match(branch or "")
+        stamps = [record.get("at"), record.get("endedAt")]
+        if not (owned and owned.group("lane") == name and record.get("lane") == name
+                and isinstance(head, str) and head and record.get("sha") == head
+                and type(record.get("count")) is int and record["count"] >= MAX_FIX_ATTEMPTS
+                and record.get("pushed") is False and record.get("repairVerdict") == "failed"
+                and record.get("repairRunId") and record.get("repairBranch") == branch
+                and record.get("repairHeadBefore") == head
+                and all(type(t) in (int, float) and math.isfinite(t) for t in stamps)
+                and 0 < stamps[0] <= stamps[1] <= now):
+            continue
+        repair = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+        gate = None
+        try:
+            if not repair.held:
+                continue
+            gate = reserve_gate(host, pr)
+            if gate is None:
+                continue
+            live = reconcile_fix_target(pr)
+            if (live is None or live.get("state") != "OPEN" or live.get("headRefOid") != head
+                    or live.get("headRefName") != branch or live.get("isCrossRepository")
+                    or live.get("isInMergeQueue") or pr_is_terminal(live) or is_green(live)):
+                continue
+            if any(pr_events.claim_active(pr["number"], head, sh, now, kind=kind,
+                                           exclude_host=HOST) for kind in ("fix", "gate")):
+                continue
+            published += int(pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh))
+        except (OSError, subprocess.SubprocessError):
+            pass  # An unreadable claim or failed publication remains retryable next scan.
+        finally:
+            if gate is not None:
+                gate.lock.release()
+            repair.release()
+    return published
+
+
 def claim_adoptable_pr(host: Host, name: str, prs: list[dict], repair_candidates: list[dict] | None = None) -> GateClaim | None:
     path = host.state / "verified.json"
     verified = json.loads(path.read_text()) if path.exists() else {}
@@ -4756,6 +4811,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         issue = labeled
         if local:
             sweep_lane_prs(host, name, linear)
+        if local and not (red or adopt or labeled):
+            publish_exhausted_repairs(host, name, candidates)
         # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
         # autoscaled count would admit more parked PRs as capacity rises.
         budget = None if red or adopt or labeled else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))

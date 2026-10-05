@@ -29,6 +29,14 @@ test('ignores non-deprecation lines and echoed shell source', () => {
   assert.ok(found.every(w => !w.text.includes('echo')));
 });
 
+test('ignores git ref updates whose branch name contains deprecated', () => {
+  const found = extractDeprecations(
+    'Build\tCheckout\t2026-09-21T12:56:42.5859549Z  * [new branch]          fix/sonarcloud-s1874-deprecated-app-url-batch1 -> origin/fix/sonarcloud-s1874-deprecated-app-url-batch1'
+  );
+
+  assert.deepEqual(found, []);
+});
+
 test('normalizes runner paths so fingerprints are stable', () => {
   assert.equal(
     normalizeWarning(

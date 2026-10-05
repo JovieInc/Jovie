@@ -138,6 +138,44 @@ class ContextManifestTest(unittest.TestCase):
 
 
 class SelectionTest(unittest.TestCase):
+    def test_dispatch_next_precedes_aged_product_and_compounding_work(self):
+        now = datetime(2026, 10, 5, tzinfo=timezone.utc).timestamp()
+        target = issue("JOV-7896", priority=2, created="2026-10-05T00:00:00Z",
+                       labels=["agent-ready", "dispatch-next"])
+        target.title = "Repair account to claim conversion"
+        old = issue("JOV-4258", priority=1, created="2026-09-01T00:00:00Z")
+        old.title = "Strict typography audit"
+        ci = issue("JOV-CI", priority=1, created="2026-09-01T00:00:00Z")
+        ci.title = "Fix CI throughput"
+        for pool in ([old, ci, target], [target, ci, old]):
+            self.assertIs(lane.pick_issue(pool, {}, now=now), target)
+        target.labels.remove("dispatch-next")
+        self.assertIs(lane.pick_issue([old, ci, target], {}, now=now), ci)
+
+    def test_dispatch_next_preserves_admission_and_lane_routing(self):
+        now = 10000.0
+        target = issue("JOV-PIN", labels=["agent-ready", "dispatch-next"])
+        other = issue("JOV-OTHER", priority=1)
+        for kwargs, failures in [
+            ({"in_flight": frozenset({"jov-pin"})}, {}),
+            ({"held_back": frozenset({"JOV-PIN"})}, {}),
+            ({}, {"JOV-PIN": 3}),
+            ({}, {"JOV-PIN": {"count": 1, "at": 9990}}),
+        ]:
+            with self.subTest(kwargs=kwargs, failures=failures):
+                self.assertIs(lane.pick_issue([target, other], failures, now=now, **kwargs), other)
+        for label in ("no-symphony", "type:epic", "auth"):
+            target.labels = ["agent-ready", "dispatch-next", label]
+            self.assertIs(lane.pick_issue([target, other], {}, now=now, provider="devin"), other)
+        target.labels = ["agent-ready", "dispatch-next", "devin"]
+        self.assertIs(lane.pick_issue([target, other], {}, now=now, provider="codex",
+            route=lambda task: {"chosen": {"lane": "devin" if task is target else "codex"}}), other)
+
+    def test_dispatch_next_without_pool_admission_keeps_default_order(self):
+        unadmitted = issue("JOV-PIN", priority=4, labels=["dispatch-next"])
+        urgent = issue("JOV-URGENT", priority=1)
+        self.assertIs(lane.pick_issue([unadmitted, urgent], {}, now=10000), urgent)
+
     def test_rejection_reasons_match_final_worker_admission(self):
         red = issue("JOV-RED")
         red.title = "Rotate production credentials"
@@ -1973,6 +2011,28 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(fixed, [9])
         self.assertEqual(self.linear.moves, [])
 
+    def test_terminal_publication_precedes_the_unchanged_new_issue_budget(self):
+        pr = {"number": 9, "headRefOid": "h", "headRefName": "devin/jov-9-20261005",
+              "state": "OPEN", "isDraft": True, "mergeStateStatus": "DIRTY", "labels": []}
+        record = {"sha": "h", "count": 2, "lane": "devin", "at": time.time() - 2,
+                  "endedAt": time.time() - 1, "pushed": False, "repairVerdict": "failed",
+                  "repairRunId": "run", "repairBranch": pr["headRefName"], "repairHeadBefore": "h"}
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"9": record}))
+        other = {**pr, "number": 10, "headRefName": "devin/jov-10-20261005", "labels": []}
+        lane.fix_candidates = lambda name: [pr]
+        lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, [pr, other])
+        claimed = []
+        lane.run_issue = lambda host, name, spec, linear, issue: claimed.append(issue.identifier) or {"verdict": "landing"}
+        def publish(number, kind, sh):
+            pr["labels"].append({"name": "lane-fix-exhausted"})
+            return True
+        with patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.pr_events, "add_label", side_effect=publish):
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(claimed, ["JOV-3"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["9"], record)
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -1980,6 +2040,111 @@ class WorkerTest(unittest.TestCase):
         self.linear.issues = []
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
+
+
+class ExhaustedRepairPublicationTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=ROOT, linear_env=Path("unused"))
+        self.pr = {"number": 20590, "headRefName": "devin/jov-7596-20261004t090735",
+                   "headRefOid": "h", "state": "OPEN", "isDraft": True,
+                   "mergeStateStatus": "DIRTY", "labels": [{"name": "lane-fix-conflict"}]}
+        self.record = {"sha": "h", "count": 2, "lane": "devin", "at": 100,
+                       "endedAt": 200, "pushed": False, "repairRunId": "ended-run",
+                       "repairBranch": self.pr["headRefName"], "repairHeadBefore": "h", "repairVerdict": "failed"}
+        self.save(self.record)
+
+    def save(self, record):
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"20590": record}))
+
+    def test_finished_exhaustion_publishes_terminal_label_and_unblocks_original_budget(self):
+        rows = [self.pr, {**self.pr, "number": 20672, "headRefName": "devin/jov-2135-20261005", "labels": []}]
+        self.assertFalse(lane.new_issue_budget("devin", 1, rows)["allowed"])
+        def publish(number, kind, sh):
+            self.assertEqual((number, kind), (20590, "exhausted"))
+            self.pr["labels"].append({"name": "lane-fix-exhausted"})
+            return True
+        with patch.object(lane, "reconcile_fix_target", return_value=dict(self.pr)), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.pr_events, "add_label", side_effect=publish) as published:
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", rows, now=300), 1)
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", rows, now=300), 0)
+        result = lane.new_issue_budget("devin", 1, rows)
+        self.assertEqual((result["allowed"], result["used"], result["cap"], result["terminal"],
+                          result["terminalCap"]), (True, 1, 2, 1, 4))
+        self.assertEqual(published.call_count, 1)
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["20590"], self.record)
+
+    def test_missing_or_unfinished_provenance_never_authorizes_publication(self):
+        cases = [{**self.record, key: value} for key, value in [
+            ("sha", "other"), ("count", 1), ("count", True), ("pushed", True),
+            ("endedAt", None), ("endedAt", 301), ("endedAt", 50), ("at", float("nan")),
+            ("repairRunId", None), ("repairBranch", "other"), ("repairHeadBefore", "other"),
+            ("lane", "codex"), ("repairVerdict", None), ("repairVerdict", "cancelled"),
+            ("repairVerdict", "disk-held")]]
+        for record in cases:
+            with self.subTest(record=record), patch.object(lane, "reconcile_fix_target") as fresh, \
+                    patch.object(lane.pr_events, "add_label") as published:
+                self.save(record)
+                self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                fresh.assert_not_called(); published.assert_not_called()
+
+    def test_fresh_head_queue_holds_and_cross_host_claims_remain_protected(self):
+        cases = [None, {**self.pr, "headRefOid": "new"}, {**self.pr, "state": "MERGED"},
+                 {**self.pr, "headRefName": "other"}, {**self.pr, "isCrossRepository": True},
+                 {**self.pr, "isInMergeQueue": True}, {**self.pr, "mergeStateStatus": "CLEAN", "isDraft": False},
+                 {**self.pr, "labels": [{"name": "tim-hold"}]},
+                 {**self.pr, "labels": [{"name": "lane-fix-escalating"}]}]
+        for live in cases:
+            with self.subTest(live=live), patch.object(lane, "reconcile_fix_target", return_value=live), \
+                    patch.object(lane.pr_events, "claim_active", return_value=False), \
+                    patch.object(lane.pr_events, "add_label") as published:
+                self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                published.assert_not_called()
+        for claims in [(True, False), (False, True)]:
+            with patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                    patch.object(lane.pr_events, "claim_active", side_effect=claims), \
+                    patch.object(lane.pr_events, "add_label") as published:
+                self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                published.assert_not_called()
+
+    def test_failed_label_write_keeps_the_same_receipt_retryable(self):
+        with patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.pr_events, "add_label", side_effect=[False, True]) as published:
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 1)
+        self.assertEqual(published.call_count, 2)
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["20590"], self.record)
+
+    def test_running_local_repair_or_gate_prevents_publication(self):
+        for kind in ("repair", "gate"):
+            lock = (lane.Locked(self.host.state / "locks/repair-pr-20590.lock", blocking=False)
+                    if kind == "repair" else lane.reserve_gate(self.host, self.pr).lock)
+            try:
+                with patch.object(lane, "reconcile_fix_target") as fresh, \
+                        patch.object(lane.pr_events, "add_label") as published:
+                    self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                    fresh.assert_not_called(); published.assert_not_called()
+            finally:
+                lock.release()
+
+    def test_receipt_verdict_is_recorded_without_resetting_attempts(self):
+        old = {key: value for key, value in self.record.items() if key != "repairVerdict"}
+        self.save(old)
+        lane.end_local_fix_attempt(self.host, self.pr, {"verdict": "failed", "runId": "ended-run",
+                                   "branch": self.pr["headRefName"], "headBefore": "h"})
+        saved = json.loads((self.host.state / "fix-attempts.json").read_text())["20590"]
+        self.assertEqual((saved["repairVerdict"], saved["count"], saved["sha"], saved["pushed"]),
+                         ("failed", 2, "h", False))
+
+    def test_unreadable_claim_does_not_fabricate_terminal_publication(self):
+        with patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                patch.object(lane.pr_events, "claim_active", side_effect=subprocess.TimeoutExpired("gh", 30)), \
+                patch.object(lane.pr_events, "add_label") as published:
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+            published.assert_not_called()
 
 
 class NewIssueBudgetTest(unittest.TestCase):
