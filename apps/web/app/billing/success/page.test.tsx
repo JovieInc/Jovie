@@ -114,13 +114,15 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('shows "Welcome to Pro" when the checkout session validates pro', async () => {
+  it('shows "Welcome to Artist Presence" when the checkout session validates pro', async () => {
     setSearchParams('session_id=cs_test&plan_id=pro');
     mockValidatedSessionPlan('pro');
     mockBilling(null);
     render(<CheckoutSuccessPage />);
     expect(
-      await screen.findByRole('heading', { name: /welcome to pro/i })
+      await screen.findByRole('heading', {
+        name: /welcome to artist presence/i,
+      })
     ).toBeInTheDocument();
   });
 
@@ -140,7 +142,9 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
     mockBilling(null);
     render(<CheckoutSuccessPage />);
     expect(
-      await screen.findByRole('heading', { name: /welcome to pro/i })
+      await screen.findByRole('heading', {
+        name: /welcome to artist presence/i,
+      })
     ).toBeInTheDocument();
   });
 
@@ -158,7 +162,7 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('heading', { name: /welcome to pro/i })
+      screen.getByRole('heading', { name: /welcome to artist presence/i })
     ).toBeInTheDocument();
   });
 
@@ -217,7 +221,7 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
       await screen.findByRole('heading', { name: /welcome to max/i })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: /welcome to pro/i })
+      screen.queryByRole('heading', { name: /welcome to artist presence/i })
     ).not.toBeInTheDocument();
   });
 
@@ -227,7 +231,9 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
     mockBilling(null);
     render(<CheckoutSuccessPage />);
     expect(
-      await screen.findByRole('heading', { name: /welcome to pro/i })
+      await screen.findByRole('heading', {
+        name: /welcome to artist presence/i,
+      })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: /welcome to max/i })
