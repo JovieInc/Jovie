@@ -66,6 +66,7 @@ jobs:
             scripts/dependabot-workflow-run-adapter.mjs
             scripts/native-merge-intent.mjs
             scripts/lib/source-admission-policy.mjs
+            scripts/lib/product-lane-classifier.mjs
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs

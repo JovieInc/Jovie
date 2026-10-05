@@ -100,10 +100,12 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py"]
-# Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
+# Dependencies outside scripts/lanes for installed source admission and the HUD's
+# PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
                   "scripts/merge-queue-backend.mjs", "scripts/lib/merge-queue-guard.mjs"]

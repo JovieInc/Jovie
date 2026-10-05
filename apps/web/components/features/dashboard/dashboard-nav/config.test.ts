@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   artistNavigation,
+  artistSettingsNavigation,
   CUSTOMER_NAV_CAPACITY,
   canonicalSidebarNavigation,
   desktopMoreNavigation,
@@ -10,6 +11,7 @@ import {
   mobilePrimaryNavigation,
   partitionCustomerNavigation,
   primaryNavigation,
+  settingsNavigation,
 } from './config';
 
 const CANONICAL_NAVIGATION = [
@@ -26,6 +28,22 @@ function toContract(
 }
 
 describe('canonical customer shell navigation', () => {
+  it('binds the live profile settings row to the canonical route', () => {
+    const profile = artistSettingsNavigation.find(
+      item => item.id === 'artist-profile'
+    );
+    expect(profile).toMatchObject({
+      name: 'Profile',
+      href: APP_ROUTES.SETTINGS_PROFILE,
+    });
+    expect(
+      settingsNavigation.filter(item => item.id === 'artist-profile')
+    ).toEqual([profile]);
+    expect(APP_ROUTES.SETTINGS_ARTIST_PROFILE).toBe(
+      APP_ROUTES.SETTINGS_PROFILE
+    );
+  });
+
   it('keeps the four job-level roots in the DESIGN.md order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
     expect(toContract(canonicalSidebarNavigation)).toEqual(

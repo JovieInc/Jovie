@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Jovie
 
@@ -63,5 +64,38 @@ struct JovieAppIntentsTests {
 
   @Test func shortcutsExposeVoiceCapture() {
     #expect(JovieAppShortcuts.appShortcuts.count == 5)
+  }
+}
+
+struct PushNotificationDeepLinkTests {
+  @Test func ctaUrlParsesFromAPNsUserInfo() {
+    let userInfo: [AnyHashable: Any] = [
+      "notificationId": "notif_1",
+      "url": "https://jovie.ing/artist/release",
+      "aps": ["alert": ["title": "New release"]],
+    ]
+
+    #expect(
+      PushNotificationDeepLink.url(from: userInfo) ==
+        URL(string: "https://jovie.ing/artist/release")
+    )
+  }
+
+  @Test func missingOrMalformedUrlDrops() {
+    #expect(PushNotificationDeepLink.url(from: [:]) == nil)
+    #expect(PushNotificationDeepLink.url(from: ["url": NSNull()]) == nil)
+    #expect(PushNotificationDeepLink.url(from: ["url": "not a url"]) == nil)
+    #expect(PushNotificationDeepLink.url(from: ["url": "  "]) == nil)
+    #expect(PushNotificationDeepLink.url(from: ["url": "jovie.ing/artist"]) == nil)
+  }
+
+  @Test(arguments: [
+    "ie.jov.jovie://callback?code=abc&state=xyz",
+    "javascript:alert(1)",
+    "file:///etc/passwd",
+    "ftp://example.com/x",
+  ])
+  func nonWebSchemesAreRejected(raw: String) {
+    #expect(PushNotificationDeepLink.url(from: ["url": raw]) == nil)
   }
 }

@@ -101,6 +101,7 @@ function runWrapper(stateDir, marker, options = {}) {
       });
       child.stderr.on('data', chunk => {
         stderr += chunk.toString('utf8');
+        options.onStderr?.(stderr);
       });
     }
     child.once('exit', code =>
@@ -337,15 +338,33 @@ describe('typecheck singleflight process integration', () => {
           command: ['tsc'],
         });
 
+        let rejectRecovery;
+        const recoveryDeadline = new Promise((_, rejectDeadline) => {
+          rejectRecovery = rejectDeadline;
+        });
+        let recovered = false;
         const result = await Promise.race([
-          runWrapper(stateDir, marker, { durationMs: 50, capture: true }),
-          new Promise((_, rejectDeadline) => {
-            deadline = setTimeout(
-              () =>
-                rejectDeadline(new Error('Zombie owner blocked lock recovery')),
-              3000
-            );
+          runWrapper(stateDir, marker, {
+            durationMs: 50,
+            capture: true,
+            onStderr(stderr) {
+              if (recovered) return;
+              // Measure recovery after the wrapper starts, independently of
+              // Node startup and the dummy compiler's eventual completion.
+              deadline ??= setTimeout(
+                () =>
+                  rejectRecovery(
+                    new Error('Zombie owner blocked lock recovery')
+                  ),
+                3000
+              );
+              if (stderr.includes('reason=dead-owner')) {
+                recovered = true;
+                clearTimeout(deadline);
+              }
+            },
           }),
+          recoveryDeadline,
         ]);
         expect(result.code).toBe(0);
         expect(result.stderr).toContain('reason=dead-owner');
