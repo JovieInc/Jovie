@@ -21,6 +21,10 @@ apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts
 # https target in the introducing commit. Later commits construct the URL
 # from parts; keep the path excluded so range scans do not fail on that blob.
 apps/web/lib/canaries/m2-revenue-path.test.ts
+# Same URI-detector bait pattern: ae3265bc41 carried a literal
+# https://user:pass@chatgpt.com test case. HEAD now builds the URL from
+# parts, but range scans still attribute the finding to that blob.
+apps/web/lib/chatgpt/directory/mcp.test.ts
 .agents/skills/gstack/browse/test/sidebar-unit.test.ts
 .claude/skills/gstack/browse/test/sidebar-unit.test.ts
 .agents/skills/gstack/test/skill-e2e-cso.test.ts
