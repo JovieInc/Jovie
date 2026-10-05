@@ -8,10 +8,11 @@ import {
   openSync,
   readSync,
   rmSync,
+  symlinkSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -155,11 +156,13 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
+  const ghBin = join(home, 'bin');
+  mkdirSync(ghBin);
+  symlinkSync(binary, join(ghBin, 'gh'));
   try {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: `${dirname(binary)}${delimiter}${process.env.PATH ?? ''}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
@@ -170,6 +173,7 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
           HTTP_PROXY: proxy,
           http_proxy: proxy,
           ...env,
+          PATH: `${ghBin}${delimiter}${env.PATH ?? process.env.PATH ?? ''}`,
         },
       });
       let stdout = '';
