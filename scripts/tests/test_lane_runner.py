@@ -1185,6 +1185,7 @@ class ClaimScanCacheTest(unittest.TestCase):
     def test_hud_reason_queue_and_sweep_state_share_one_minute(self):
         import hud
         import reason_lane
+        import lane_runner as reason_cache
         calls = {"hud": 0, "reason": 0, "state": 0}
 
         class Client:
@@ -1201,10 +1202,12 @@ class ClaimScanCacheTest(unittest.TestCase):
                 return "In Progress"
 
         client = Client()
-        saved = hud.lane.Linear, hud.lane.SHARED_CACHE_DIR
+        saved = hud.lane.Linear, hud.lane.SHARED_CACHE_DIR, reason_cache.SHARED_CACHE_DIR
         hud.lane.Linear = lambda env: client
-        # hud.py loads its own lane_runner, and reason_lane imports that copy.
+        # Full CI collection can load another lane_runner module. Isolate the
+        # module queued_jobs actually imports as well as the HUD's module.
         hud.lane.SHARED_CACHE_DIR = lane.SHARED_CACHE_DIR
+        reason_cache.SHARED_CACHE_DIR = lane.SHARED_CACHE_DIR
         try:
             with patch.object(lane.time, "time", lambda: self.clock["now"]), \
                     patch.object(hud.lane.time, "time", lambda: self.clock["now"]):
@@ -1221,7 +1224,7 @@ class ClaimScanCacheTest(unittest.TestCase):
                 hud.linear_model(Path("/x"))
                 self.assertEqual(calls, {"hud": 2, "reason": 2, "state": 2})
         finally:
-            hud.lane.Linear, hud.lane.SHARED_CACHE_DIR = saved
+            hud.lane.Linear, hud.lane.SHARED_CACHE_DIR, reason_cache.SHARED_CACHE_DIR = saved
 
 
 class HostHandoffAdmissionTest(unittest.TestCase):
