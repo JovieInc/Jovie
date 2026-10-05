@@ -60,7 +60,7 @@ const queryClient = new QueryClient();
 function palette(open = true) {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppFlagProvider flags={{}}>
+      <AppFlagProvider initialFlags={{}}>
         <CmdKPalette profileId='profile-1' open={open} onOpenChange={vi.fn()} />
       </AppFlagProvider>
     </QueryClientProvider>
