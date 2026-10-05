@@ -36,6 +36,7 @@ import type {
   CertifiableUnit,
   RoutedInvariantRow,
 } from '../design-ci-judge-router';
+import { verifyCaptureBytes } from './capture-integrity';
 import type { Unavailable } from './providers';
 import {
   evaluateRenderCaptures,
@@ -184,6 +185,17 @@ export async function runVisualReview(
       reason: 'no rendered screenshots to review',
     };
   }
+  const integrity = verifyCaptureBytes(request.captures);
+  if (integrity.length > 0) {
+    return {
+      status: 'reviewed',
+      judgeModel: 'capture-integrity',
+      verdict: 'fail',
+      score: 0,
+      findings: integrity,
+      judges: [],
+    };
+  }
   if (refs) {
     // Deterministic and free, so it runs before any judge is paid.
     const copies = await (refs.findCopies ?? findRefCopies)({
@@ -208,6 +220,17 @@ export async function runVisualReview(
   const unit = visualReviewUnit(request.pageId);
   const decisions = [];
   for (const capture of request.captures) {
+    const changed = verifyCaptureBytes(request.captures);
+    if (changed.length > 0) {
+      return {
+        status: 'reviewed',
+        judgeModel: 'capture-integrity',
+        verdict: 'fail',
+        score: 0,
+        findings: changed,
+        judges: [],
+      };
+    }
     const decision = await runClassifierFirst(
       {
         row,
@@ -226,6 +249,17 @@ export async function runVisualReview(
       };
     }
     decisions.push({ capture, decision });
+  }
+  const changed = verifyCaptureBytes(request.captures);
+  if (changed.length > 0) {
+    return {
+      status: 'reviewed',
+      judgeModel: 'capture-integrity',
+      verdict: 'fail',
+      score: 0,
+      findings: changed,
+      judges: [],
+    };
   }
   const all = decisions.flatMap(({ decision }) => decision.judges);
   // Each viewport is decided by its last judge (the flagship when that

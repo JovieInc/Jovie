@@ -9,7 +9,13 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -33,6 +39,7 @@ import {
   hashProof,
 } from '../../data/product-truth/truth-sync';
 import type { FactoryPageBrief } from './brief';
+import { verifyRenderBytes } from './capture-integrity';
 
 export const FACTORY_RUN_SCHEMA = 'jovie.factory-run/v1' as const;
 
@@ -215,6 +222,11 @@ export function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+export function writeImmutableJson(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' });
+}
+
 export function readJson<T = unknown>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf8')) as T;
 }
@@ -283,6 +295,48 @@ function verifyLink(
   return issues;
 }
 
+function verifyRetainedAttempts(
+  runDir: string,
+  manifest: FactoryRunManifest
+): string[] {
+  const issues: string[] = [];
+  // Rejected and superseded attempts remain evidence, not just the final chain.
+  for (const file of new Set([
+    ...manifest.attempts,
+    ...manifest.chain.map(link => link.file),
+  ])) {
+    const path = join(runDir, file);
+    try {
+      const record = readJson<StageAttemptRecord>(path);
+      const where = `${record.receipt.stage}#${record.receipt.attempt} (${file})`;
+      if (record.receipt.outputDigest !== digestOf(record.artifact)) {
+        issues.push(
+          `${where}: retained artifact digest does not match the receipt`
+        );
+      }
+      if (record.receipt.stage === 'render' && record.artifact !== null) {
+        const parsed = FACTORY_STAGE_ARTIFACT_SCHEMAS.render.safeParse(
+          record.artifact
+        );
+        if (parsed.success) {
+          issues.push(
+            ...verifyRenderBytes(parsed.data, manifest.mode).map(
+              issue => `${where}: ${issue}`
+            )
+          );
+        } else {
+          issues.push(
+            `${where}: retained render artifact fails the render schema`
+          );
+        }
+      }
+    } catch {
+      issues.push(`retained attempt missing or unreadable: ${file}`);
+    }
+  }
+  return issues;
+}
+
 /** Re-checks every receipt digest and rule in a run directory. Empty = valid. */
 export function verifyFactoryRun(
   runDir: string,
@@ -319,6 +373,34 @@ export function verifyFactoryRun(
   }
   for (let index = 0; index < manifest.chain.length; index++) {
     issues.push(...verifyLink(runDir, manifest, index, brief, source));
+  }
+  issues.push(...verifyRetainedAttempts(runDir, manifest));
+  const history = join(runDir, 'history');
+  if (existsSync(history)) {
+    for (const prior of readdirSync(history, { withFileTypes: true })) {
+      if (prior.isDirectory()) {
+        const priorDir = join(history, prior.name);
+        try {
+          const saved = FactoryRunManifestSchema.parse(
+            readJson(join(priorDir, 'run.json'))
+          );
+          const retained = verifyRetainedAttempts(priorDir, saved);
+          if (
+            digestOf(readJson(join(priorDir, 'brief.json'))) !==
+            saved.briefDigest
+          ) {
+            retained.push('brief digest does not match archived manifest');
+          }
+          issues.push(
+            ...retained.map(issue => `history/${prior.name}: ${issue}`)
+          );
+        } catch {
+          issues.push(
+            `history/${prior.name}: missing or unreadable archived run`
+          );
+        }
+      }
+    }
   }
   return issues;
 }
