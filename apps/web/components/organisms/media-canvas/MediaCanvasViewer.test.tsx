@@ -1,7 +1,27 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  getMediaTransportSnapshot,
+  resetMediaTransportSnapshot,
+} from '@/components/organisms/audio-chrome-state';
+import { MediaCanvasHost } from './MediaCanvasHost';
 import { type MediaCanvasItem, MediaCanvasViewer } from './MediaCanvasViewer';
+import { closeMediaCanvas, openMediaCanvas } from './media-canvas-state';
+
+const { pauseTrackPlayback } = vi.hoisted(() => ({
+  pauseTrackPlayback: vi.fn(),
+}));
+
+vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
+  pauseTrackPlayback,
+}));
 
 const items: readonly MediaCanvasItem[] = [
   { kind: 'image', src: '/a.png', alt: 'First capture' },
@@ -9,11 +29,17 @@ const items: readonly MediaCanvasItem[] = [
   { kind: 'image', src: '/c.png', alt: 'Last capture' },
 ];
 
-function Harness({ start }: { readonly start: number | null }) {
+function Harness({
+  start,
+  media = items,
+}: {
+  readonly start: number | null;
+  readonly media?: readonly MediaCanvasItem[];
+}) {
   const [index, setIndex] = useState<number | null>(start);
   return (
     <MediaCanvasViewer
-      items={items}
+      items={media}
       index={index}
       onIndexChange={setIndex}
       onClose={() => setIndex(null)}
@@ -22,11 +48,16 @@ function Harness({ start }: { readonly start: number | null }) {
 }
 
 describe('MediaCanvasViewer', () => {
-  // jsdom lacks the native dialog API; restore it so mocks don't leak.
+  // jsdom lacks the native dialog and media playback APIs.
   const originalShowModal = HTMLDialogElement.prototype.showModal;
   const originalClose = HTMLDialogElement.prototype.close;
+  const originalPlay = HTMLMediaElement.prototype.play;
+  const originalPause = HTMLMediaElement.prototype.pause;
 
   beforeEach(() => {
+    pauseTrackPlayback.mockClear();
+    closeMediaCanvas();
+    resetMediaTransportSnapshot();
     HTMLDialogElement.prototype.showModal = vi.fn(function (
       this: HTMLDialogElement
     ) {
@@ -38,14 +69,20 @@ describe('MediaCanvasViewer', () => {
       this.removeAttribute('open');
       this.dispatchEvent(new Event('close'));
     });
+    HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
+    HTMLMediaElement.prototype.pause = vi.fn();
   });
 
   afterEach(() => {
+    closeMediaCanvas();
+    resetMediaTransportSnapshot();
     HTMLDialogElement.prototype.showModal = originalShowModal;
     HTMLDialogElement.prototype.close = originalClose;
+    HTMLMediaElement.prototype.play = originalPlay;
+    HTMLMediaElement.prototype.pause = originalPause;
   });
 
-  it('steps with arrow keys, clamps at both ends, and closes', () => {
+  it('steps through every media kind with arrows and clamps at both ends', () => {
     render(<Harness start={0} />);
     const dialog = screen.getByTestId('media-canvas-viewer');
     expect(dialog).toHaveAttribute('open');
@@ -58,12 +95,7 @@ describe('MediaCanvasViewer', () => {
     expect(dialog).toHaveAccessibleName('Walkthrough (2 of 3)');
     expect(dialog.querySelector('video')).toHaveAttribute('src', '/b.mp4');
 
-    // A focused video keeps its own arrow-key seeking.
-    fireEvent.keyDown(dialog.querySelector('video') as HTMLVideoElement, {
-      key: 'ArrowRight',
-    });
-    expect(dialog).toHaveAccessibleName('Walkthrough (2 of 3)');
-
+    // Video seeking belongs to the dock now; arrows always browse the list.
     fireEvent.keyDown(dialog, { key: 'ArrowRight' });
     fireEvent.keyDown(dialog, { key: 'ArrowRight' });
     expect(dialog).toHaveAccessibleName('Last capture (3 of 3)');
@@ -73,6 +105,75 @@ describe('MediaCanvasViewer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close Viewer' }));
     expect(dialog).not.toHaveAttribute('open');
+  });
+
+  it('publishes video playback, seek, and list controls to the shell dock', async () => {
+    render(<Harness start={1} />);
+    const video = screen.getByLabelText('Walkthrough') as HTMLVideoElement;
+    expect(video).not.toHaveAttribute('controls');
+    Object.defineProperty(video, 'duration', {
+      configurable: true,
+      value: 42,
+    });
+    video.currentTime = 5;
+
+    fireEvent.loadedMetadata(video);
+    fireEvent.playing(video);
+
+    await waitFor(() => {
+      expect(getMediaTransportSnapshot()?.status).toBe('playing');
+    });
+    expect(pauseTrackPlayback).toHaveBeenCalledOnce();
+
+    act(() => getMediaTransportSnapshot()?.seek?.(12));
+    expect(video.currentTime).toBe(12);
+
+    act(() => getMediaTransportSnapshot()?.next());
+    expect(screen.getByTestId('media-canvas-viewer')).toHaveAccessibleName(
+      'Last capture (3 of 3)'
+    );
+  });
+
+  it('exposes loading, error, and retry states for photos', async () => {
+    render(<Harness start={0} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading media');
+    const image = screen.getByRole('img', { name: 'First capture' });
+
+    fireEvent.error(image);
+
+    expect(await screen.findByTestId('media-canvas-error')).toBeInTheDocument();
+    expect(getMediaTransportSnapshot()?.status).toBe('error');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(screen.getByRole('img', { name: 'First capture' })).not.toBe(image);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading media');
+  });
+
+  it('renders an actionable empty state', () => {
+    render(<Harness start={0} media={[]} />);
+
+    expect(screen.getByTestId('media-canvas-viewer')).toHaveAttribute('open');
+    expect(screen.getByTestId('media-canvas-empty')).toHaveTextContent(
+      'No Media Yet'
+    );
+    expect(getMediaTransportSnapshot()).toBeNull();
+  });
+
+  it('opens a supplied list through the shell-level host API', () => {
+    render(
+      <>
+        <button type='button' onClick={() => openMediaCanvas(items, 2)}>
+          Open shared canvas
+        </button>
+        <MediaCanvasHost />
+      </>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open shared canvas' }));
+
+    expect(screen.getByTestId('media-canvas-viewer')).toHaveAccessibleName(
+      'Last capture (3 of 3)'
+    );
   });
 
   it('stays closed without an index', () => {

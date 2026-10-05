@@ -55,6 +55,19 @@ describe('ShellAudioDock', () => {
     expect(dock.style.marginTop).toBe('0px');
   });
 
+  it('accepts explicit visibility when portaled into the media canvas', () => {
+    render(
+      <ShellAudioDock visible testId='media-dock'>
+        <div>Media controls</div>
+      </ShellAudioDock>
+    );
+
+    expect(screen.getByTestId('media-dock')).toHaveAttribute(
+      'data-state',
+      'open'
+    );
+  });
+
   it('reveals with the cinematic tier when a track starts playing', () => {
     render(
       <ShellAudioDock>

@@ -27,13 +27,18 @@ import { cn } from '@/lib/utils';
 export function ShellAudioDock({
   children,
   className,
+  visible,
+  testId = 'shell-audio-dock',
 }: {
   readonly children: ReactNode;
   readonly className?: string;
+  /** Override chrome visibility for a dock portaled into the media dialog. */
+  readonly visible?: boolean;
+  readonly testId?: string;
 }) {
   const { fullPlayerVisible } = useAudioChromeSnapshot();
   const prefersReducedMotion = useReducedMotion();
-  const open = fullPlayerVisible;
+  const open = visible ?? fullPlayerVisible;
 
   // Reveal: cinematic tier (~420ms, ease-out-expo). Hide: standard tier
   // (--duration-normal ≈ 160ms, subtle easing).
@@ -46,7 +51,7 @@ export function ShellAudioDock({
 
   return (
     <div
-      data-testid='shell-audio-dock'
+      data-testid={testId}
       data-shell-audio-dock='true'
       data-shell-rail-motion='dock'
       data-state={open ? 'open' : 'closed'}

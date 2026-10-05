@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
@@ -12,6 +13,7 @@ import {
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
+import { MediaCanvasTransport } from '@/components/organisms/media-canvas/MediaCanvasTransport';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
@@ -29,6 +31,8 @@ import {
   resetAudioChromeSnapshot,
   setAudioChromeSnapshot,
   useFullAudioPlayerExpandRequests,
+  useMediaCanvasDockHost,
+  useMediaTransportSnapshot,
 } from './audio-chrome-state';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
@@ -80,6 +84,8 @@ export function PersistentAudioBar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const mediaTransport = useMediaTransportSnapshot();
+  const mediaCanvasDockHost = useMediaCanvasDockHost();
   const {
     playbackState,
     toggleTrack,
@@ -231,6 +237,8 @@ export function PersistentAudioBar() {
         return;
       }
 
+      // The canvas owns every transport shortcut while its modal is open.
+      if (mediaTransport) return;
       if (!hasActiveTrack) return;
 
       if (event.key === '`' && plainKey) {
@@ -275,6 +283,7 @@ export function PersistentAudioBar() {
     handleOpenLyrics,
     handleToggle,
     hasActiveTrack,
+    mediaTransport,
     pathname,
     playbackState.hasLyrics,
   ]);
@@ -296,15 +305,33 @@ export function PersistentAudioBar() {
     return resetAudioChromeSnapshot;
   }, []);
 
+  const mediaDockPortal = mediaCanvasDockHost
+    ? createPortal(
+        <ShellAudioDock
+          visible={Boolean(mediaTransport)}
+          testId='media-canvas-audio-dock'
+          className='bg-surface-0/95 backdrop-blur-xl'
+        >
+          {mediaTransport ? (
+            <MediaCanvasTransport transport={mediaTransport} />
+          ) : null}
+        </ShellAudioDock>,
+        mediaCanvasDockHost
+      )
+    : null;
+
   if (!hasActiveTrack || !activeTrackId) {
     // Idle/stopped: keep the dock mounted but empty so ShellAudioDock can
     // animate 0-height after the snapshot clears (the panel slides back down
     // instead of the player vanishing). Zero reserved space — the closed
     // dock's max-height is 0.
     return (
-      <div className='hidden shrink-0 lg:block'>
-        <ShellAudioDock>{null}</ShellAudioDock>
-      </div>
+      <>
+        <div className='hidden shrink-0 lg:block'>
+          <ShellAudioDock>{null}</ShellAudioDock>
+        </div>
+        {mediaDockPortal}
+      </>
     );
   }
 
@@ -487,6 +514,7 @@ export function PersistentAudioBar() {
         </ShellAudioDock>
       </div>
       {mobileBar('lg:hidden')}
+      {mediaDockPortal}
     </>
   );
 }

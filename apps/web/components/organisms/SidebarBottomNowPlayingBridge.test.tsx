@@ -29,9 +29,14 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   }),
 }));
 
+import {
+  resetMediaTransportSnapshot,
+  setMediaTransportSnapshot,
+} from '@/components/organisms/audio-chrome-state';
 import { SidebarBottomNowPlayingBridge } from '@/components/organisms/SidebarBottomNowPlayingBridge';
 
 beforeEach(() => {
+  resetMediaTransportSnapshot();
   _state = {
     activeTrackId: null,
     isPlaying: false,
@@ -47,6 +52,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetMediaTransportSnapshot();
   vi.clearAllMocks();
 });
 
@@ -99,6 +105,43 @@ describe('SidebarBottomNowPlayingBridge', () => {
       id: 'track-1',
       title: 'Lost in the Light',
     });
+  });
+
+  it('yields the compact audio controls while the canvas owns transport', () => {
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      trackTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      isPlaying: false,
+    };
+    setMediaTransportSnapshot({
+      ownerId: 'canvas-test',
+      itemId: 'video:/walkthrough.mp4:0',
+      kind: 'video',
+      label: 'Walkthrough',
+      index: 0,
+      itemCount: 1,
+      status: 'playing',
+      currentTime: 1,
+      duration: 10,
+      hasPrevious: false,
+      hasNext: false,
+      togglePlayback: vi.fn(),
+      pausePlayback: vi.fn(),
+      seek: vi.fn(),
+      previous: vi.fn(),
+      next: vi.fn(),
+      retry: vi.fn(),
+    });
+
+    render(<SidebarBottomNowPlayingBridge />);
+
+    expect(
+      screen
+        .getByText('Lost in the Light')
+        .closest('[data-shell-audio-surface]')
+    ).toHaveAttribute('data-state', 'reserved');
   });
 
   it('wires the compact dismiss control to stop exactly once', () => {

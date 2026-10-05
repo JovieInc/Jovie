@@ -15,10 +15,11 @@ import {
   DrawerSection,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { MediaThumb } from '@/components/organisms/media-canvas/MediaCanvasViewer';
 import {
-  MediaCanvasViewer,
-  MediaThumb,
-} from '@/components/organisms/media-canvas/MediaCanvasViewer';
+  closeMediaCanvas,
+  openMediaCanvas,
+} from '@/components/organisms/media-canvas/media-canvas-state';
 import { TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
@@ -129,7 +130,6 @@ export function FounderReviewRegistry({
   );
   const [decisions, setDecisions] = useState<ReviewDecisionMap>({});
   const [note, setNote] = useState('');
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const persistDecisions = useCallback((next: ReviewDecisionMap) => {
     setDecisions(next);
@@ -340,7 +340,7 @@ export function FounderReviewRegistry({
               <>
                 <button
                   type='button'
-                  onClick={() => setViewerIndex(0)}
+                  onClick={() => openMediaCanvas(selected.media, 0)}
                   aria-label={`Open ${media?.alt ?? selected.title}`}
                   className='relative block aspect-video w-full overflow-hidden rounded-lg border border-(--app-shell-border) bg-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                 >
@@ -352,7 +352,7 @@ export function FounderReviewRegistry({
                       <button
                         key={item.src}
                         type='button'
-                        onClick={() => setViewerIndex(i)}
+                        onClick={() => openMediaCanvas(selected.media, i)}
                         aria-label={`Open ${item.alt}`}
                         className='relative aspect-video overflow-hidden rounded-md border border-(--app-shell-border) bg-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                       >
@@ -478,7 +478,7 @@ export function FounderReviewRegistry({
             onRowClick={item => {
               setSelectedId(item.id);
               setNote('');
-              setViewerIndex(null);
+              closeMediaCanvas();
             }}
             isRowSelected={item => item.id === selected?.id}
             getRowTestId={item => `founder-review-row-${item.id}`}
@@ -495,13 +495,6 @@ export function FounderReviewRegistry({
           />
         )}
       </AdminTableShell>
-
-      <MediaCanvasViewer
-        items={selected?.media ?? []}
-        index={viewerIndex}
-        onIndexChange={setViewerIndex}
-        onClose={() => setViewerIndex(null)}
-      />
     </div>
   );
 }
