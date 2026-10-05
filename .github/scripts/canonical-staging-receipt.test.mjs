@@ -529,3 +529,75 @@ test('actual controller Bash keeps exact artifact and authenticates empty-ID fal
     rmSync(f.root, { recursive: true, force: true });
   }
 });
+
+test('actual controller rebinds a merge-group-only historical head only to authenticated current-main staging', () => {
+  const workflow = readFileSync(
+    '.github/workflows/production-controller.yml',
+    'utf8'
+  );
+  const start = workflow.indexOf(
+    '              if [ "$staging_receipt_sha" = "$EXPECTED_SHA" ]; then'
+  );
+  const end = workflow.indexOf('              staging_receipt_dir=', start);
+  const script =
+    'set -euo pipefail\n' +
+    workflow.slice(start, end) +
+    '\nprintf "%s|%s|%s" "$staging_artifact_id" "$staging_deployment_id" "$staging_receipt_sha"';
+  const oldSha = 'a'.repeat(40);
+  const f = cliFixture();
+  try {
+    const gh = readFileSync(join(f.root, 'gh'), 'utf8');
+    writeFileSync(
+      join(f.root, 'gh'),
+      gh.replace(
+        "if(route.endsWith('/zip'))",
+        "if(route.includes('name=staging-deployment-" +
+          oldSha +
+          "&')){process.stdout.write(process.env.TEST_HISTORICAL_ARTIFACT || '');process.exit(0);}if(route.endsWith('/zip'))"
+      )
+    );
+    writeFileSync(
+      join(f.root, 'curl'),
+      '#!/usr/bin/env node\nif(process.env.TEST_CURL_FAILURE)process.exit(7);process.stdout.write(process.env.TEST_CANONICAL_IDENTITY);\n'
+    );
+    chmodSync(join(f.root, 'curl'), 0o755);
+    for (const [historical, identity, failCurl, expected] of [
+      ['', f.env.CANONICAL_STAGING_IDENTITY, '', `102|dpl_exactStage|${sha}`],
+      ['999', '', '1', `999||${oldSha}`],
+      [
+        '',
+        JSON.stringify({ commitSha: oldSha, deploymentId: 'dpl_old' }),
+        '',
+        null,
+      ],
+      [
+        '',
+        JSON.stringify({ commitSha: sha, deploymentId: 'dpl_wrong' }),
+        '',
+        null,
+      ],
+      ['', f.env.CANONICAL_STAGING_IDENTITY, '1', null],
+    ]) {
+      const result = spawnSync('bash', ['-c', script], {
+        encoding: 'utf8',
+        env: {
+          ...f.env,
+          staging_receipt_sha: oldSha,
+          staging_deployment_id: '',
+          staging_artifact_name: `staging-deployment-${oldSha}`,
+          EXACT_STAGING_ARTIFACT_ID: '',
+          TEST_HISTORICAL_ARTIFACT: historical,
+          TEST_CANONICAL_IDENTITY: identity,
+          TEST_CURL_FAILURE: failCurl,
+        },
+      });
+      if (expected === null) assert.notEqual(result.status, 0, result.stdout);
+      else {
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, expected);
+      }
+    }
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});

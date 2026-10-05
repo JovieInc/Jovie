@@ -728,6 +728,20 @@ jobs:
                   "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
                   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
                 if [ -z "$staging_artifact_id" ]; then
+                  # Coalesced pushes can qualify Web only on a merge-group
+                  # historical head. A carryover staging run deploys current
+                  # main instead; authenticate that exact canonical receipt.
+                  canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+                  if jq -e --arg sha "$EXPECTED_SHA" '.commitSha == $sha' >/dev/null <<<"$canonical_staging_identity"; then
+                    staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
+                      REPOSITORY="$REPOSITORY" EXPECTED_SHA="$EXPECTED_SHA" \
+                      node .github/scripts/canonical-staging-receipt.mjs)"
+                    staging_receipt_sha="$EXPECTED_SHA"
+                    staging_deployment_id="$(jq -er '.deploymentId' <<<"$canonical_staging_identity")"
+                    staging_artifact_name="staging-deployment-${staging_receipt_sha}"
+                  fi
+                fi
+                if [ -z "$staging_artifact_id" ]; then
                   # A superseded staging generation never deploys, so its exact
                   # receipt can never exist. Its durable lineage receipt either
                   # rebinds this wait to the exact replacement SHA on this
