@@ -114,7 +114,8 @@ jobs:
               outcome=superseded
               jq --arg replacement "$current_main" '.outcome="superseded" | .replacementSha=$replacement' "$RUNNER_TEMP/staging-lineage.json" > "$RUNNER_TEMP/staging-lineage-next.json"
             else
-              export CANONICAL_STAGING_IDENTITY="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+              CANONICAL_STAGING_IDENTITY="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+              export CANONICAL_STAGING_IDENTITY
               node --input-type=module <<'NODE' > "$RUNNER_TEMP/staging-carryover.json"
           import { readFileSync } from 'node:fs';
           import { resolveStagingCarryover } from './.github/scripts/staging-lane-carryover.mjs';

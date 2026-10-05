@@ -240,6 +240,19 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
       });
       if (!good) {
         assert.notEqual(result.status, 0);
+        if (failedCurl && main === current) {
+          assert.equal(
+            result.status,
+            7,
+            'identity fetch failure must propagate'
+          );
+          assert.equal(readFileSync(join(root, 'output'), 'utf8'), '');
+          assert.equal(
+            JSON.parse(readFileSync(join(root, 'staging-lineage.json'), 'utf8'))
+              .outcome,
+            initial
+          );
+        }
         continue;
       }
       assert.equal(result.status, 0, result.stderr);
