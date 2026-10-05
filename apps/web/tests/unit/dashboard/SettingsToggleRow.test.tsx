@@ -56,10 +56,7 @@ describe('SettingsToggleRow', () => {
         <SettingsToggleRow
           title='Release Radar'
           description='Track release performance.'
-          checked={false}
-          onCheckedChange={vi.fn()}
           gated
-          ariaLabel='Release radar'
         />
       </TooltipProvider>
     );
