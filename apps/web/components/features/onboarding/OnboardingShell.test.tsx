@@ -135,6 +135,15 @@ describe('OnboardingShell status', () => {
     expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
   });
 
+  it('gives the compact sign-in link a 44px hit target (JOV-4411)', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveClass(
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+  });
+
   it('reports a failed chat start without verification jargon or error codes', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 

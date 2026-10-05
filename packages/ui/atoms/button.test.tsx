@@ -3,7 +3,13 @@ import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
+import {
+  BUTTON_SIZE_NAMES,
+  BUTTON_VARIANT_NAMES,
+  Button,
+  ICON_HIT_TARGET_44,
+  TEXT_HIT_TARGET_44,
+} from './button';
 import {
   ACTION_BUTTON_LABEL_WEIGHT,
   ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
@@ -321,6 +327,15 @@ describe('Button', () => {
       }
       unmount();
     }
+  });
+
+  it('exports the canonical 44px hit bands for non-Button controls (JOV-4411)', () => {
+    expect(ICON_HIT_TARGET_44).toContain('before:h-11');
+    expect(ICON_HIT_TARGET_44).toContain('before:w-11');
+    expect(TEXT_HIT_TARGET_44).toContain('before:h-full');
+    expect(TEXT_HIT_TARGET_44).toContain('before:min-h-11');
+    expect(TEXT_HIT_TARGET_44).toContain('before:w-full');
+    expect(TEXT_HIT_TARGET_44).toContain('before:min-w-11');
   });
 
   it('maps deprecated variants to canonical variants with a warning', () => {

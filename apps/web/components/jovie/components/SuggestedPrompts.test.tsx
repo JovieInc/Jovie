@@ -21,4 +21,12 @@ describe('SuggestedPrompts', () => {
       screen.getByRole('button', { name: 'Plan a Release' })
     ).toBeInTheDocument();
   });
+
+  it('keeps a 44px hit band around each suggestion pill (JOV-4411)', () => {
+    render(<SuggestedPrompts onSelect={vi.fn()} />);
+
+    for (const pill of screen.getAllByRole('button')) {
+      expect(pill).toHaveClass('before:min-h-11', 'before:min-w-11');
+    }
+  });
 });
