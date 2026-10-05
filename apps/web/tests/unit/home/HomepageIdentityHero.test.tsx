@@ -66,11 +66,15 @@ describe('HomepageIdentityHero', () => {
       const route = getEndUserPerfRouteById('home');
       expect(route).toBeDefined();
       if (!route) throw new Error('Missing home performance route');
+      const shellSelectors = route.readySelectors.shell;
+      if (!shellSelectors) {
+        throw new Error('Missing home shell readiness selectors');
+      }
 
       // Each declared alternative must match the mounted hero, even though the
       // performance runner accepts the first visible readiness candidate.
       for (const selector of [
-        ...route.readySelectors.shell,
+        ...shellSelectors,
         ...(route.readySelectors.content ?? []),
       ]) {
         expect(container.querySelector(selector), selector).toBeVisible();
