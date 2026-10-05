@@ -194,6 +194,7 @@
     "tailwind:guard": "node scripts/tailwind-guard.mjs",
     "mobile-overflow:guard": "node scripts/mobile-overflow-guard.mjs",
     "generate": "plop",
+    "generate:email-signature-icons": "tsx scripts/generate-email-signature-icons.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "storybook:build": "storybook build",
