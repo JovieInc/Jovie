@@ -9,21 +9,48 @@
     "height": 2868
   },
   "pen": {
-    "file": "Jovie Design Studio — canonical.lib.pen",
+    "file": "Jovie Homepage Profiles Claim — review copy 2026-10-01.pen",
     "section": "App Store / iOS screenshots (STAGING)",
-    "status": "requested",
-    "sectionNodeId": null,
-    "frames": {}
+    "status": "bound",
+    "sectionNodeId": "kH5Zr",
+    "frames": {
+      "chat": {
+        "frame": "XC4ox",
+        "headline": "DVed2",
+        "capture": "Ynw5J"
+      },
+      "audience": {
+        "frame": "ckgFv",
+        "headline": "Q6xZD",
+        "capture": "Upx1i"
+      },
+      "calendar": {
+        "frame": "YfiIo",
+        "headline": "j6fQn",
+        "capture": "Ofsbw"
+      },
+      "work": {
+        "frame": "J7yfE9",
+        "headline": "a82Ali",
+        "capture": "eNClk"
+      },
+      "identity": {
+        "frame": "K6oMB",
+        "headline": "tOpc7",
+        "capture": "YBpij"
+      }
+    }
   },
   "layout": {
     "canvas": "canvas",
-    "headlineTop": 200,
+    "marginX": 110,
+    "headlineTop": 260,
     "headlineSize": 96,
-    "headlineMaxWidth": 1080,
-    "deviceTop": 560,
-    "deviceWidth": 1056,
-    "bezel": 22,
-    "deviceRadius": 150
+    "deviceTop": 600,
+    "deviceWidth": 1220,
+    "bezel": 20,
+    "deviceRadius": 168,
+    "pinnedHeader": 0.115
   },
   "contentCheck": {
     "top": 0.15,
@@ -34,32 +61,33 @@
     {
       "id": "chat",
       "launchArgument": "-ui-testing-storefront-chat",
-      "headline": "Merch ideas, ready in one chat.",
+      "headline": "Make merch.",
       "accent": "ion"
     },
     {
       "id": "audience",
       "launchArgument": "-ui-testing-audience",
-      "headline": "Your fans, at a glance.",
-      "accent": "ultra"
+      "headline": "Capture fans.",
+      "accent": "ultra",
+      "scroll": 0.135
+    },
+    {
+      "id": "work",
+      "launchArgument": "-ui-testing-storefront-releases",
+      "headline": "Drive streams.",
+      "accent": "pulse"
     },
     {
       "id": "calendar",
       "launchArgument": "-ui-testing-calendar",
-      "headline": "Shows and releases on one calendar.",
-      "accent": "pulse"
-    },
-    {
-      "id": "work",
-      "launchArgument": "-ui-testing-library",
-      "headline": "All your work in one place.",
-      "accent": "ion"
+      "headline": "Plan shows.",
+      "accent": "orange"
     },
     {
       "id": "identity",
-      "launchArgument": "-ui-testing-venue-mode",
-      "headline": "Share your profile with one scan.",
-      "accent": "ultra"
+      "launchArgument": "-ui-testing-storefront-identity",
+      "headline": "Share one link.",
+      "accent": "ion"
     }
   ]
 }
