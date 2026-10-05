@@ -8,7 +8,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
 import {
   getBrowserTurnstileHostname,
-  resolveTurnstileSiteKey,
+  resolveOnboardingTurnstileSiteKey,
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
@@ -81,6 +81,8 @@ interface OnboardingTurnstileProps {
   readonly instruction?: string | null;
   readonly focusSignal?: number;
   readonly resetSignal?: number;
+  /** Server-resolved synthetic principal passage (JOV-7697). */
+  readonly testMode?: boolean;
 }
 
 const LOCAL_DEV_BYPASS_TOKEN = 'local-dev-turnstile-bypass';
@@ -114,6 +116,7 @@ export function OnboardingTurnstile({
   instruction,
   focusSignal = 0,
   resetSignal = 0,
+  testMode = false,
 }: OnboardingTurnstileProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -132,9 +135,10 @@ export function OnboardingTurnstile({
     useState(false);
   // Hostname-aware: preview/localhost get always-pass dummy keys so prod
   // domain-locked sitekeys cannot cause Cloudflare 110200 on *.vercel.app.
-  const siteKey = resolveTurnstileSiteKey(
+  const siteKey = resolveOnboardingTurnstileSiteKey(
     getBrowserTurnstileHostname(),
-    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    testMode
   );
   const hasStaticBypass =
     process.env.NODE_ENV === 'development' ||

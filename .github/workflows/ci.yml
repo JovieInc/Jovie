@@ -3644,7 +3644,7 @@ jobs:
       always() &&
       needs.ci-path-changes.result == 'success' &&
       needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
-      needs.ci-merge-group-admission.result == 'success' &&
+      (github.event_name != 'merge_group' || needs.ci-merge-group-admission.result == 'success') &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true') &&
       (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
@@ -5435,6 +5435,9 @@ jobs:
           retention-days: 14
 
       - name: Upload test results to Codecov
+        # Advisory reporting: bootstrap/TLS failures precede fail_ci_if_error.
+        # Unit execution, preserved JUnit evidence, and coverage remain required.
+        continue-on-error: true
         # Queue evidence must not consume external service credentials.
         if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
