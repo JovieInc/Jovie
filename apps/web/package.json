@@ -222,7 +222,7 @@
     "qa:releases:loop": "tsx scripts/releases-dashboard-qa-loop.ts"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^4.0.102",
+    "@ai-sdk/gateway": "^4.0.103",
     "@ai-sdk/react": "^4.0.121",
     "@better-auth/oauth-provider": "1.7.6",
     "@better-auth/passkey": "1.7.7",
@@ -295,7 +295,7 @@
     "jose": "^6.2.12",
     "jszip": "^3.10.2",
     "langfuse": "^3.39.2",
-    "lucide-react": "^1.48.0",
+    "lucide-react": "^1.49.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^13.4.6",
     "next": "16.3.8",
@@ -331,7 +331,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@biomejs/biome": "^2.5.14",
-    "@chromatic-com/storybook": "^5.3.1",
+    "@chromatic-com/storybook": "^5.4.0",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.3.7",
     "@playwright/test": "1.63.0",
