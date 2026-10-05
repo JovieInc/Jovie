@@ -1,0 +1,11 @@
+No code change or PR was opened. The reported event is an intentional warning, not a crash: rendering continues with the reconciled artist union in [data.ts](</home/timwhite/.local/state/jovie-lanes/worktrees/20261002T222609Z-JOV-6165-codex-802ea2/apps/web/app/[username]/[slug]/_lib/data.ts:217>). Suppressing it would hide data drift; the backfill belongs to JOV-6151.
+
+Verified:
+
+- Branch is clean and exactly matches `origin/main`.
+- Node 24.21.0.
+- Relevant Vitest suites: 30/30 tests passed.
+- No commit, push, or draft PR created.
+- Live Linear state was unavailable because `LINEAR_API_KEY` is absent; GBrain and current source agree on the disposition.
+
+NOT-SHIPPABLE: JOV-6165 records an intentional mismatch warning with working fallback behavior; the underlying data repair is tracked separately in JOV-6151.
