@@ -140,6 +140,138 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it.each([{ metaKey: true }, { ctrlKey: true }])(
+    'closes from the focused dialog search with %o',
+    modifier => {
+      const onOpenChange = vi.fn();
+      render(
+        <CmdKPalette profileId='profile-1' open onOpenChange={onOpenChange} />
+      );
+      const input = screen.getByRole('combobox', {
+        name: 'Command Palette Search',
+      });
+      expect(input).toHaveFocus();
+      fireEvent.keyDown(input, { key: 'k', ...modifier });
+      expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+    }
+  );
+
+  it.each([
+    { key: 'k', metaKey: true, isComposing: true },
+    { key: 'k', ctrlKey: true, keyCode: 229 },
+    { key: 'k', metaKey: true, repeat: true },
+    { key: 'k', metaKey: true, shiftKey: true },
+    { key: 'Enter', repeat: true },
+    { key: 'Enter', isComposing: true },
+    { key: 'Escape', repeat: true },
+    { key: 'ArrowDown', altKey: true },
+  ])('leaves guarded search keys alone: %o', event => {
+    const onOpenChange = vi.fn();
+    pushMock.mockClear();
+    render(<MainPlaneHarness onOpenChange={onOpenChange} />);
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    const activeRow = input.getAttribute('aria-activedescendant');
+    expect(fireEvent.keyDown(input, event)).toBe(true);
+    expect(input).toHaveAttribute('aria-activedescendant', activeRow);
+    expect(input).toHaveFocus();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('does not commit a search key already handled by another owner', () => {
+    const onOpenChange = vi.fn();
+    pushMock.mockClear();
+    render(<MainPlaneHarness onOpenChange={onOpenChange} />);
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    event.preventDefault();
+    fireEvent(input, event);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { event: { key: 'ArrowDown' }, from: 0 },
+    { event: { key: '2', metaKey: true }, from: 0 },
+    { event: { key: 'ArrowUp' }, from: 2 },
+  ])(
+    'returns result-row navigation to search before Enter: %o',
+    ({ event, from }) => {
+      pushMock.mockClear();
+      render(<MainPlaneHarness />);
+      const input = screen.getByRole('combobox', {
+        name: 'Command Palette Search',
+      });
+      const rows = screen.getAllByRole('option');
+      rows[from].focus();
+      expect(rows[from]).toHaveFocus();
+      fireEvent.keyDown(rows[from], event);
+      expect(rows[1]).toHaveAttribute('aria-selected', 'true');
+      expect(input).toHaveFocus();
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(pushMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.LIBRARY);
+    }
+  );
+
+  it('commits the focused result instead of a different highlighted row', () => {
+    pushMock.mockClear();
+    render(<MainPlaneHarness />);
+    const rows = screen.getAllByRole('option');
+    expect(rows[0]).toHaveAttribute('aria-selected', 'true');
+    rows[1].focus();
+    fireEvent.keyDown(rows[1], { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.LIBRARY);
+  });
+
+  it('keeps an empty search open when navigation or commit has no result', () => {
+    const onOpenChange = vi.fn();
+    pushMock.mockClear();
+    render(<MainPlaneHarness onOpenChange={onOpenChange} />);
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'totally-absent-command' } });
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(fireEvent.keyDown(input, { key: '3', metaKey: true })).toBe(true);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('totally-absent-command');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps held arrow navigation responsive without repeating a commit', () => {
+    render(<MainPlaneHarness />);
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown', repeat: true });
+    expect(screen.getAllByRole('option')[2]).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    fireEvent.keyDown(input, { key: 'ArrowUp', repeat: true });
+    fireEvent.keyDown(input, { key: 'ArrowUp', repeat: true });
+    expect(screen.getAllByRole('option')[0]).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(input).toHaveFocus();
+  });
+
   it('keeps Identity gated when workspace discoverability flags are hydrated', () => {
     pushMock.mockClear();
     const view = (enabled: boolean) => (

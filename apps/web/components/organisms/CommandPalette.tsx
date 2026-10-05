@@ -117,10 +117,23 @@ function CommandPaletteController() {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.keyCode === 229 ||
+        event.repeat
+      ) {
+        return;
+      }
       // The loaded palette owns Escape and focus restoration. While its
       // header is still absent, the synchronous controller can cancel loading.
       if (
         event.key === 'Escape' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !isFormElement(event.target) &&
         isCommandPaletteOpen &&
         !commandPaletteHeader
       ) {
@@ -130,7 +143,14 @@ function CommandPaletteController() {
       }
       const isK = event.key === 'k' || event.key === 'K';
       if (!isK || !(event.metaKey || event.ctrlKey)) return;
-      if (event.shiftKey || event.altKey || isFormElement(event.target)) return;
+      if (
+        event.shiftKey ||
+        event.altKey ||
+        (event.metaKey && event.ctrlKey) ||
+        isFormElement(event.target)
+      ) {
+        return;
+      }
       event.preventDefault();
       if (isCommandPaletteOpen) closeCommandPalette();
       else openCommandPalette();

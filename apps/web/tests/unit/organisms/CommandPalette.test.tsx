@@ -183,7 +183,20 @@ function CommandPaletteHeaderHarness() {
   return <div>{commandPaletteHeader}</div>;
 }
 
-function withDashboard(node: ReactNode, isAdmin = false) {
+function CommandPaletteState() {
+  const { isCommandPaletteOpen } = useHeaderActions();
+  return (
+    <output aria-label='Command palette state'>
+      {isCommandPaletteOpen ? 'open' : 'closed'}
+    </output>
+  );
+}
+
+function withDashboard(
+  node: ReactNode,
+  isAdmin = false,
+  mountMainSurface = true
+) {
   const dashboard = makeDashboard(isAdmin);
 
   return (
@@ -196,7 +209,7 @@ function withDashboard(node: ReactNode, isAdmin = false) {
     >
       <HeaderActionsProvider>
         {node}
-        <CommandPaletteMainSurface />
+        {mountMainSurface && <CommandPaletteMainSurface />}
         <CommandPaletteHeaderHarness />
       </HeaderActionsProvider>
     </DashboardDataContext.Provider>
@@ -220,7 +233,7 @@ describe('CommandPalette', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
-    const input = screen.getByLabelText('Command Palette Search');
+    const input = await screen.findByLabelText('Command Palette Search');
     expect(input).toBeInTheDocument();
     // React applies autofocus by calling .focus() on mount, not by emitting
     // the deprecated HTML attribute — assert focus state instead.
@@ -230,22 +243,41 @@ describe('CommandPalette', () => {
   });
 
   it('cancels a pending first open with Escape and can open again', async () => {
-    render(
-      withDashboard(
-        <>
-          <button type='button'>Return target</button>
-          <CommandPalette />
-        </>
-      )
+    const controller = (
+      <>
+        <button type='button'>Return target</button>
+        <CommandPalette />
+        <CommandPaletteState />
+      </>
     );
+    // Hold the lazy surface absent so this proves pending cancellation even
+    // when previous tests have already loaded its dynamic import.
+    const view = render(withDashboard(controller, false, false));
     const origin = screen.getByRole('button', { name: 'Return target' });
     origin.focus();
     fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    expect(screen.getByLabelText('Command palette state')).toHaveTextContent(
+      'open'
+    );
+    for (const guarded of [
+      { repeat: true },
+      { isComposing: true },
+      { keyCode: 229 },
+      { altKey: true },
+    ]) {
+      expect(fireEvent.keyDown(origin, { key: 'Escape', ...guarded })).toBe(
+        true
+      );
+      expect(screen.getByLabelText('Command palette state')).toHaveTextContent(
+        'open'
+      );
+    }
     fireEvent.keyDown(window, { key: 'Escape' });
     await waitFor(() => expect(origin).toHaveFocus());
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
 
-    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    view.rerender(withDashboard(controller));
+    fireEvent.keyDown(origin, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
@@ -255,6 +287,57 @@ describe('CommandPalette', () => {
     fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
+  });
+
+  it('honors editor and modifier ownership before opening and closing search', async () => {
+    render(
+      withDashboard(
+        <>
+          <button type='button'>Shortcut origin</button>
+          <textarea aria-label='Shortcut editor' />
+          <CommandPalette />
+        </>
+      )
+    );
+    const origin = screen.getByRole('button', { name: 'Shortcut origin' });
+    const editor = screen.getByRole('textbox', { name: 'Shortcut editor' });
+    origin.focus();
+    for (const modifier of [
+      {},
+      { metaKey: true, shiftKey: true },
+      { ctrlKey: true, altKey: true },
+      { metaKey: true, ctrlKey: true },
+      { metaKey: true, repeat: true },
+      { metaKey: true, isComposing: true },
+      { metaKey: true, keyCode: 229 },
+    ]) {
+      expect(fireEvent.keyDown(origin, { key: 'k', ...modifier })).toBe(true);
+      expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+    }
+    const handled = new KeyboardEvent('keydown', {
+      key: 'k',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    handled.preventDefault();
+    fireEvent(origin, handled);
+    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+    editor.focus();
+    expect(fireEvent.keyDown(editor, { key: 'k', metaKey: true })).toBe(true);
+    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+
+    origin.focus();
+    fireEvent.keyDown(origin, { key: 'k', metaKey: true });
+    await screen.findByLabelText('Command Palette Search');
+    editor.focus();
+    expect(fireEvent.keyDown(editor, { key: 'k', metaKey: true })).toBe(true);
+    expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
+    expect(editor).toHaveFocus();
+    origin.focus();
+    fireEvent.keyDown(origin, { key: 'k', metaKey: true });
+    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+    await waitFor(() => expect(origin).toHaveFocus());
   });
 
   it('opens the same main plane from the sidebar Search trigger', async () => {
@@ -442,15 +525,60 @@ describe('CommandPalette', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/chat/thread-a');
   });
 
-  it('toggles closed when Cmd+K is pressed again', async () => {
-    render(withDashboard(<CommandPalette />));
+  it.each([{ metaKey: true }, { ctrlKey: true }])(
+    'closes from the focused search with the opening accelerator %j',
+    async modifier => {
+      render(
+        withDashboard(
+          <>
+            <button type='button'>Return target</button>
+            <CommandPalette />
+          </>
+        )
+      );
+      const origin = screen.getByRole('button', { name: 'Return target' });
+      origin.focus();
+      fireEvent.keyDown(origin, { key: 'k', ...modifier });
+      const input = await screen.findByLabelText('Command Palette Search');
+      expect(input).toHaveFocus();
+      fireEvent.change(input, { target: { value: 'Settings' } });
+      fireEvent.keyDown(input, { key: 'k', ...modifier });
+      expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+      await waitFor(() => expect(origin).toHaveFocus());
+      fireEvent.keyDown(origin, { key: 'k', ...modifier });
+      expect(
+        await screen.findByLabelText('Command Palette Search')
+      ).toHaveValue('');
+    }
+  );
+
+  it('leaves sidebar activation and unrelated text editing to their owners', async () => {
+    const onSidebarKeyDown = vi.fn();
+    render(
+      withDashboard(
+        <>
+          <button type='button' onKeyDown={onSidebarKeyDown}>
+            Sidebar action
+          </button>
+          <textarea aria-label='Other editor' />
+          <CommandPalette />
+        </>
+      )
+    );
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    await screen.findByTestId('cmdk-main-plane');
+    await screen.findByLabelText('Command Palette Search');
+    pushMock.mockClear();
+    const sidebar = screen.getByRole('button', { name: 'Sidebar action' });
+    sidebar.focus();
+    expect(fireEvent.keyDown(sidebar, { key: 'Enter' })).toBe(true);
+    expect(onSidebarKeyDown).toHaveBeenCalledOnce();
+    const editor = screen.getByRole('textbox', { name: 'Other editor' });
+    editor.focus();
+    for (const key of ['ArrowDown', 'ArrowUp', 'Enter', 'Escape']) {
+      expect(fireEvent.keyDown(editor, { key })).toBe(true);
+    }
+    expect(pushMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Command Palette Search')).toBeInTheDocument();
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    expect(
-      screen.queryByLabelText('Command Palette Search')
-    ).not.toBeInTheDocument();
   });
 
   it('escapes back to the prior focus target', async () => {
@@ -467,7 +595,9 @@ describe('CommandPalette', () => {
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByLabelText('Command Palette Search'), {
+      key: 'Escape',
+    });
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
     await waitFor(() => expect(origin).toHaveFocus());
   });
