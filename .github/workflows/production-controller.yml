@@ -99,6 +99,11 @@ jobs:
           # the merge queue, capped well inside the 5-minute job budget.
           COALESCE_PER_GENERATION_SECONDS: '30'
           COALESCE_MAX_SECONDS: '150'
+          # A transient GitHub API failure (rate limit, 5xx) must not kill a
+          # release wave: each API read retries a bounded number of times
+          # before failing closed. Sized well inside the 5-minute job budget.
+          GH_API_RETRY_ATTEMPTS: '3'
+          GH_API_RETRY_SECONDS: '15'
           # Retired fixed release-wave window; receipts record time saved
           # against it.
           FIXED_WINDOW_SECONDS_REPLACED: '60'
@@ -159,6 +164,25 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           }
 
+          # Bounded retry for GitHub API reads: a transient rate limit or 5xx
+          # must not fail the release wave, but a persistent failure still
+          # fails closed so supersession evidence is never guessed.
+          gh_api() {
+            local attempt
+            for attempt in $(seq "$GH_API_RETRY_ATTEMPTS"); do
+              if gh api "$@" > "$RUNNER_TEMP/gh-api-out.json" 2> "$RUNNER_TEMP/gh-api-err.log"; then
+                cat "$RUNNER_TEMP/gh-api-out.json"
+                return 0
+              fi
+              if [ "$attempt" -lt "$GH_API_RETRY_ATTEMPTS" ]; then
+                echo "::warning::gh api attempt $attempt failed ($(head -n 1 "$RUNNER_TEMP/gh-api-err.log")); retrying in ${GH_API_RETRY_SECONDS}s." >&2
+                sleep "$GH_API_RETRY_SECONDS"
+              fi
+            done
+            cat "$RUNNER_TEMP/gh-api-err.log" >&2
+            return 1
+          }
+
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
@@ -168,7 +192,7 @@ jobs:
           # marked superseded, naming its replacement. Supersession is
           # monotonic because main only moves forward and idempotent because
           # no mutation has started for this lineage.
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(gh_api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main during release supersession."
             exit 1
@@ -192,7 +216,7 @@ jobs:
           # Event 2: the merge queue is the only signal of a newer eligible
           # generation already validating or queued. An empty queue means no
           # wait can avoid redundant work, so proceed immediately.
-          queue_json="$(gh api graphql \
+          queue_json="$(gh_api graphql \
             -F owner="${REPOSITORY%%/*}" \
             -F name="${REPOSITORY##*/}" \
             -f query='query($owner: String!, $name: String!) {
@@ -227,7 +251,7 @@ jobs:
           echo "::notice::Release lineage $EXPECTED_SHA waits ${wait_seconds}s (queue_depth=$queue_depth, expected benefit: allow queued merge-group generations to supersede before exact CI authorization, deadline $(date -u -d "+${wait_seconds} seconds" +%Y-%m-%dT%H:%M:%SZ))."
           sleep "$wait_seconds"
 
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(gh_api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main at the coalescing deadline."
             exit 1
