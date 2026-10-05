@@ -2040,6 +2040,43 @@ class NewIssueBudgetTest(unittest.TestCase):
             self.assertTrue(result["allowed"])
             self.assertEqual(result["used"], 0)
 
+    def test_a_transient_read_failure_is_retried_once_before_failing_closed(self):
+        """JOV-7917: one gh blip must not defer every new claim or raise a doctor issue."""
+        calls = []
+
+        def flaky(args, **kwargs):
+            calls.append(args)
+            if len(calls) == 1:
+                return subprocess.CompletedProcess([], 1, "", "boom")
+            return subprocess.CompletedProcess([], 0, "[]", "")
+
+        with patch.object(lane, "sh", side_effect=flaky), \
+                patch.object(lane.time, "sleep") as sleep:
+            result = lane.read_new_issue_budget("codex", 3)
+        self.assertTrue(result["allowed"])
+        self.assertEqual(result["used"], 0)
+        self.assertIsNone(result["error"])
+        self.assertEqual(len(calls), 2)
+        sleep.assert_called_once()
+
+    def test_persistent_read_failure_and_integrity_violations_stay_fail_closed(self):
+        """Two failed reads still fail closed; contract violations never retry."""
+        failed = subprocess.CompletedProcess([], 1, "", "boom")
+        with patch.object(lane, "sh", return_value=failed) as sh, \
+                patch.object(lane.time, "sleep"):
+            result = lane.read_new_issue_budget("codex", 3)
+        self.assertEqual(result["reason"], "pr-inventory-unavailable")
+        self.assertEqual(result["error"], "pr-read-failed")
+        self.assertEqual(sh.call_count, 2)
+        for output in ("{}", json.dumps([self.row(), self.row()])):
+            with patch.object(lane, "sh",
+                              return_value=subprocess.CompletedProcess([], 0, output, "")) as sh, \
+                    patch.object(lane.time, "sleep") as sleep:
+                result = lane.read_new_issue_budget("codex", 3)
+            self.assertEqual(result["reason"], "pr-inventory-unavailable")
+            self.assertEqual(sh.call_count, 1)
+            sleep.assert_not_called()
+
 
 class RunAgentTest(unittest.TestCase):
     def test_cancellation_does_not_signal_a_reused_root_process_group(self):

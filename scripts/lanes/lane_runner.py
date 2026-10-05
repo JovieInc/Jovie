@@ -4424,31 +4424,44 @@ def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dic
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
-    """Fail closed on incomplete budget reads without disrupting maintenance reads."""
+    """Fail closed on incomplete budget reads without disrupting maintenance reads.
+
+    One retry absorbs a transient gh/GitHub blip (timeout, 5xx, truncated pipe) so
+    a single failed read cannot defer every new claim for a tick and raise a
+    doctor issue (JOV-7917). Reads that parse but violate the inventory contract
+    (incomplete, malformed, duplicate) still fail closed without retrying: those
+    are integrity violations, not blips."""
     inventory, error = None, None
     if slots <= 0:
         return new_issue_budget(name, slots, [])
-    try:
-        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open",
-                     "--search", f"head:{name}/", "--limit", "200", "--json", LIGHT_PR_FIELDS],
-                    timeout=60)
-        if listed.returncode:
-            raise ValueError("pr-read-failed")
-        rows = json.loads(listed.stdout)
-        # Validate before filtering: 200 manual rows can hide dated lane PRs.
-        if not isinstance(rows, list) or len(rows) >= 200:
-            raise ValueError("pr-inventory-incomplete")
-        for row in rows:
-            if (not isinstance(row, dict) or type(row.get("number")) is not int or row["number"] <= 0
-                    or not isinstance(row.get("headRefName"), str) or not row["headRefName"].strip()
-                    or type(row.get("isDraft")) is not bool
-                    or not isinstance(row.get("mergeStateStatus"), str) or not row["mergeStateStatus"].strip()):
-                raise ValueError("pr-inventory-malformed")
-        if len({row["number"] for row in rows}) != len(rows):
-            raise ValueError("pr-inventory-duplicate")
-        inventory = rows
-    except (OSError, ValueError, subprocess.SubprocessError) as failure:
-        error = str(failure) if isinstance(failure, ValueError) else type(failure).__name__
+    for attempt in range(2):
+        try:
+            listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open",
+                         "--search", f"head:{name}/", "--limit", "200", "--json", LIGHT_PR_FIELDS],
+                        timeout=60)
+            if listed.returncode:
+                raise ValueError("pr-read-failed")
+            rows = json.loads(listed.stdout)
+            # Validate before filtering: 200 manual rows can hide dated lane PRs.
+            if not isinstance(rows, list) or len(rows) >= 200:
+                raise ValueError("pr-inventory-incomplete")
+            for row in rows:
+                if (not isinstance(row, dict) or type(row.get("number")) is not int or row["number"] <= 0
+                        or not isinstance(row.get("headRefName"), str) or not row["headRefName"].strip()
+                        or type(row.get("isDraft")) is not bool
+                        or not isinstance(row.get("mergeStateStatus"), str) or not row["mergeStateStatus"].strip()):
+                    raise ValueError("pr-inventory-malformed")
+            if len({row["number"] for row in rows}) != len(rows):
+                raise ValueError("pr-inventory-duplicate")
+            inventory = rows
+            error = None
+            break
+        except (OSError, ValueError, subprocess.SubprocessError) as failure:
+            error = str(failure) if isinstance(failure, ValueError) else type(failure).__name__
+            integrity = isinstance(failure, ValueError) and str(failure).startswith("pr-inventory-")
+            if integrity or attempt == 1:
+                break
+            time.sleep(2)
     result = new_issue_budget(name, slots, inventory)
     return {**result, "observedAt": now_iso(), "error": error}
 
