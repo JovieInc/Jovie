@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { classifyProductLanes } from './product-lane-classifier.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -428,6 +429,31 @@ function hasExactGate(jobs, runRecord, sha, gateName) {
   return exact.length === 1;
 }
 
+function historicalReceiptAgreement(receipt, repository, runId, artifactName) {
+  // Each candidate has already passed its exact SHA/run/attempt admission.
+  // Only the independently validated producer run identity may differ. Keep
+  // every other field, including unknown future fields, in the comparison.
+  const { runId: _runId, ...provenance } = receipt.provenance;
+  const agreement = { ...receipt, provenance };
+  if (Object.hasOwn(receipt, 'actualResults')) {
+    const actual = receipt.actualResults;
+    if (
+      !actual ||
+      typeof actual !== 'object' ||
+      Array.isArray(actual) ||
+      actual.run !== `https://github.com/${repository}/actions/runs/${runId}` ||
+      actual.receiptArtifact !== artifactName
+    ) {
+      throw new Error(
+        'historical receipt result provenance does not match its producer'
+      );
+    }
+    const { run: _run, ...results } = actual;
+    agreement.actualResults = results;
+  }
+  return agreement;
+}
+
 export function resolveHistoricalLaneEvidence({
   repository,
   sha,
@@ -437,6 +463,7 @@ export function resolveHistoricalLaneEvidence({
 }) {
   exactSha(sha, 'historical evidence SHA');
   const candidates = [];
+  let agreement;
   for (const [event, gateName] of [
     ['merge_group', 'PR Ready'],
     ['push', 'Main Release Ready'],
@@ -450,7 +477,11 @@ export function resolveHistoricalLaneEvidence({
     const listing = ghJsonImpl(
       `repos/${repository}/actions/workflows/ci.yml/runs?${query}`
     );
-    for (const runRecord of listing.workflow_runs ?? []) {
+    for (const runRecord of exactListing(
+      listing,
+      'exact CI runs',
+      'workflow_runs'
+    )) {
       if (!validateRun(runRecord, repository, sha, event)) continue;
       const jobs = exactListing(
         ghJsonImpl(
@@ -484,6 +515,26 @@ export function resolveHistoricalLaneEvidence({
         expectedRunAttempt: runRecord.run_attempt,
         lane,
       });
+      const currentAgreement = historicalReceiptAgreement(
+        receipt,
+        repository,
+        runRecord.id,
+        matchingArtifacts[0].name
+      );
+      if (
+        candidates.length > 0 &&
+        !isDeepStrictEqual(agreement, currentAgreement)
+      ) {
+        throw new Error(
+          `conflicting exact passing ${lane} receipts for ${sha}`
+        );
+      }
+      if (candidates.some(candidate => candidate.runId === runRecord.id)) {
+        throw new Error(
+          `duplicate historical evidence producer ${runRecord.id}`
+        );
+      }
+      agreement = currentAgreement;
       candidates.push({
         sha,
         lane,
@@ -495,11 +546,18 @@ export function resolveHistoricalLaneEvidence({
       });
     }
   }
-  if (candidates.length !== 1) {
+  if (candidates.length === 0) {
     throw new Error(
       `expected one exact passing ${lane} receipt for ${sha}; found ${candidates.length}`
     );
   }
+  // Prefer the original combined-head proof; stabilize within an event so
+  // GitHub listing order cannot change the selected immutable evidence.
+  candidates.sort(
+    (left, right) =>
+      Number(left.event === 'push') - Number(right.event === 'push') ||
+      left.runId - right.runId
+  );
   return candidates[0];
 }
 

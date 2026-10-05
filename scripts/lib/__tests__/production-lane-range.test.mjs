@@ -49,6 +49,88 @@ function receipt({
   };
 }
 
+function historicalEvidenceFixture({ events = ['merge_group', 'push'] } = {}) {
+  const repository = 'JovieInc/Jovie';
+  const evidenceSha = 'ce07c2cdcf5e80bf2ed59389b8186e193937bda3';
+  const runs = events.map((event, index) => ({
+    id: 37347371805 + index,
+    run_attempt: 1,
+    event,
+    head_sha: evidenceSha,
+    head_branch: event === 'push' ? 'main' : 'gh-readonly-queue/main/pr-1-base',
+    path: '.github/workflows/ci.yml',
+    head_repository: { full_name: repository },
+    status: 'completed',
+    conclusion: 'success',
+  }));
+  const listingRuns = [...runs];
+  const listingOverrides = new Map();
+  const artifacts = runs.map((run, index) => ({
+    id: 11361322461 + index,
+    name: `product-lane-final-${evidenceSha}-${run.run_attempt}`,
+    expired: false,
+  }));
+  const receipts = runs.map((run, index) => ({
+    ...receipt({ headSha: evidenceSha, runId: run.id }),
+    authority: 'Summer',
+    qualificationProfile: 'full',
+    changedPaths: ['apps/web/app/page.tsx'],
+    requiredGates: { web: { tests: 'Web unit shards and independent build' } },
+    actualResults: {
+      lanes: { web: ['success', 'success'] },
+      receiptArtifact: artifacts[index].name,
+      run: `https://github.com/${repository}/actions/runs/${run.id}`,
+    },
+  }));
+  const jobs = runs.map(run => [
+    {
+      name: run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
+      run_id: run.id,
+      run_attempt: run.run_attempt,
+      head_sha: evidenceSha,
+      status: 'completed',
+      conclusion: 'success',
+    },
+  ]);
+  const resolveEvidence = () =>
+    resolveHistoricalLaneEvidence({
+      repository,
+      sha: evidenceSha,
+      lane: 'web',
+      ghJsonImpl(endpoint) {
+        if (endpoint.includes('/workflows/ci.yml/runs?')) {
+          const event = new URLSearchParams(endpoint.split('?')[1]).get(
+            'event'
+          );
+          if (listingOverrides.has(event)) return listingOverrides.get(event);
+          const matching = listingRuns.filter(run => run.event === event);
+          return { total_count: matching.length, workflow_runs: matching };
+        }
+        const index = runs.findIndex(run =>
+          endpoint.includes(`/runs/${run.id}/`)
+        );
+        if (index >= 0 && endpoint.includes('/jobs?')) {
+          return { total_count: jobs[index].length, jobs: jobs[index] };
+        }
+        if (index >= 0 && endpoint.includes('/artifacts?')) {
+          return { total_count: 1, artifacts: [artifacts[index]] };
+        }
+        throw new Error(`Unexpected fixture endpoint: ${endpoint}`);
+      },
+      downloadFinalReceiptImpl: (_repository, id) =>
+        receipts[artifacts.findIndex(artifact => artifact.id === id)],
+    });
+  return {
+    runs,
+    listingRuns,
+    listingOverrides,
+    artifacts,
+    receipts,
+    jobs,
+    resolveEvidence,
+  };
+}
+
 describe('production lane range', () => {
   it('bootstraps only an older canonical live base with no marker', () => {
     expect(
@@ -324,9 +406,10 @@ describe('production lane range', () => {
     };
     const ghJsonImpl = endpoint => {
       if (endpoint.includes('event=merge_group')) {
-        return { workflow_runs: [runRecord] };
+        return { total_count: 1, workflow_runs: [runRecord] };
       }
-      if (endpoint.includes('event=push')) return { workflow_runs: [] };
+      if (endpoint.includes('event=push'))
+        return { total_count: 0, workflow_runs: [] };
       if (endpoint.includes('/jobs?')) {
         return {
           total_count: 1,
@@ -375,6 +458,236 @@ describe('production lane range', () => {
       artifactName: `product-lane-final-${evidenceSha}-${runAttempt}`,
     });
   });
+
+  it('accepts equivalent exact-head merge-group and push evidence without conflating their provenance', () => {
+    const fixture = historicalEvidenceFixture();
+    expect(fixture.resolveEvidence()).toMatchObject({
+      event: 'merge_group',
+      runId: fixture.runs[0].id,
+      runAttempt: 1,
+      artifactId: fixture.artifacts[0].id,
+    });
+    expect(fixture.receipts[0].provenance.runId).not.toBe(
+      fixture.receipts[1].provenance.runId
+    );
+    expect(fixture.receipts[0].actualResults.run).not.toBe(
+      fixture.receipts[1].actualResults.run
+    );
+  });
+
+  it('selects deterministic evidence among equivalent producers regardless of listing order', () => {
+    const fixture = historicalEvidenceFixture({
+      events: ['merge_group', 'merge_group', 'push'],
+    });
+    fixture.listingRuns.reverse();
+    expect(fixture.resolveEvidence().runId).toBe(fixture.runs[0].id);
+  });
+
+  it('retains valid push-only historical evidence', () => {
+    const fixture = historicalEvidenceFixture({ events: ['push'] });
+    expect(fixture.resolveEvidence()).toMatchObject({
+      event: 'push',
+      runId: fixture.runs[0].id,
+    });
+  });
+
+  it('compares objects independently of JSON property order without mutating receipts', () => {
+    const fixture = historicalEvidenceFixture();
+    fixture.receipts[1] = Object.fromEntries(
+      Object.entries(fixture.receipts[1]).reverse()
+    );
+    const before = structuredClone(fixture.receipts);
+    expect(fixture.resolveEvidence().runId).toBe(fixture.runs[0].id);
+    expect(fixture.receipts).toEqual(before);
+  });
+
+  it.each([
+    [
+      'qualification profile',
+      value => {
+        value.qualificationProfile = 'reduced';
+      },
+    ],
+    [
+      'authority',
+      value => {
+        value.authority = 'Other';
+      },
+    ],
+    [
+      'changed paths',
+      value => {
+        value.changedPaths.push('apps/web/app/other.tsx');
+      },
+    ],
+    [
+      'selected lanes',
+      value => {
+        value.selectedLanes.push('ios');
+      },
+    ],
+    [
+      'required gates',
+      value => {
+        value.requiredGates.web.tests = 'Different obligations';
+      },
+    ],
+    [
+      'admission results',
+      value => {
+        value.admissions.web.results.push('success');
+      },
+    ],
+    [
+      'actual lane results',
+      value => {
+        value.actualResults.lanes.web.push('success');
+      },
+    ],
+    [
+      'unknown future field',
+      value => {
+        value.futurePolicy = 'different';
+      },
+    ],
+    [
+      'missing actual results',
+      value => {
+        delete value.actualResults;
+      },
+    ],
+  ])(
+    'rejects conflicting %s even when both receipts pass the requested lane',
+    (_name, mutate) => {
+      const fixture = historicalEvidenceFixture();
+      mutate(fixture.receipts[1]);
+      expect(fixture.resolveEvidence).toThrow(
+        'conflicting exact passing web receipts'
+      );
+    }
+  );
+
+  it.each([
+    [
+      'head',
+      value => {
+        value.provenance.sha = sha('d');
+      },
+    ],
+    [
+      'producer',
+      value => {
+        value.provenance.runId = '999';
+      },
+    ],
+    [
+      'attempt',
+      value => {
+        value.provenance.runAttempt = '2';
+      },
+    ],
+    [
+      'aggregate',
+      value => {
+        value.aggregatePassed = false;
+      },
+    ],
+    [
+      'selected lane',
+      value => {
+        value.selectedLanes = [];
+      },
+    ],
+    [
+      'admission',
+      value => {
+        value.admissions.web.passed = false;
+      },
+    ],
+    [
+      'failed result',
+      value => {
+        value.admissions.web.results = ['failure'];
+      },
+    ],
+    [
+      'producer URL',
+      value => {
+        value.actualResults.run =
+          'https://github.com/other/repo/actions/runs/999';
+      },
+    ],
+    [
+      'artifact',
+      value => {
+        value.actualResults.receiptArtifact = 'other';
+      },
+    ],
+    [
+      'malformed results',
+      value => {
+        value.actualResults = null;
+      },
+    ],
+  ])(
+    'does not hide invalid %s behind another valid receipt',
+    (_name, mutate) => {
+      const fixture = historicalEvidenceFixture();
+      mutate(fixture.receipts[1]);
+      expect(fixture.resolveEvidence).toThrow();
+    }
+  );
+
+  it.each([
+    'path',
+    'repository',
+    'head',
+    'branch',
+    'conclusion',
+    'gate',
+    'expired artifact',
+  ])('retains the trusted producer filter for %s', field => {
+    const fixture = historicalEvidenceFixture({ events: ['push'] });
+    if (field === 'path')
+      fixture.runs[0].path = '.github/workflows/untrusted.yml';
+    if (field === 'repository')
+      fixture.runs[0].head_repository.full_name = 'other/repo';
+    if (field === 'head') fixture.runs[0].head_sha = sha('d');
+    if (field === 'branch') fixture.runs[0].head_branch = 'untrusted';
+    if (field === 'conclusion') fixture.runs[0].conclusion = 'failure';
+    if (field === 'gate') fixture.jobs[0][0].conclusion = 'failure';
+    if (field === 'expired artifact') fixture.artifacts[0].expired = true;
+    expect(fixture.resolveEvidence).toThrow('found 0');
+  });
+
+  it('rejects duplicate producer records rather than treating them as independent evidence', () => {
+    const fixture = historicalEvidenceFixture({ events: ['merge_group'] });
+    fixture.listingRuns.push(fixture.runs[0]);
+    expect(fixture.resolveEvidence).toThrow(
+      'duplicate historical evidence producer'
+    );
+  });
+
+  it.each([
+    [
+      'incomplete',
+      runs => ({ total_count: runs.length + 1, workflow_runs: runs }),
+    ],
+    ['missing count', runs => ({ workflow_runs: runs })],
+    ['noninteger count', runs => ({ total_count: '1', workflow_runs: runs })],
+    ['missing runs', () => ({ total_count: 0 })],
+    ['malformed runs', () => ({ total_count: 1, workflow_runs: {} })],
+    ['null listing', () => null],
+  ])(
+    'rejects an %s run listing even after another producer has passed',
+    (_name, payload) => {
+      const fixture = historicalEvidenceFixture();
+      fixture.listingOverrides.set('push', payload([fixture.runs[1]]));
+      expect(fixture.resolveEvidence).toThrow(
+        'incomplete exact CI runs listing'
+      );
+    }
+  );
 
   it('executes the repository-backed CLI path with exact current lane evidence', () => {
     const currentSha = execFileSync('git', ['rev-parse', 'HEAD'], {
