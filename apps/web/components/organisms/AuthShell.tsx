@@ -15,13 +15,11 @@ import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader'
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { env } from '@/lib/env-client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { OperatorMobileNavigation } from './OperatorMobileNavigation';
 import { PersistentAudioBar } from './PersistentAudioBar';
-import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
 export interface AuthShellProps {
   readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
@@ -41,19 +39,6 @@ export interface AuthShellProps {
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
-}
-
-/** Mac app everywhere; on the web only the operator shell (dogfood). */
-export function isWhatsNewBannerEnabled({
-  section,
-  isElectron,
-  isAutomatedTest,
-}: {
-  readonly section: AppShellSection;
-  readonly isElectron: boolean;
-  readonly isAutomatedTest: boolean;
-}): boolean {
-  return !isAutomatedTest && (isElectron || section === 'ov');
 }
 
 function getContentClassName(showMobileTabs: boolean, isTableRoute: boolean) {
@@ -79,11 +64,6 @@ function AuthShellInner({
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
   const isElectron = useIsElectronRuntime();
-  const showWhatsNew = isWhatsNewBannerEnabled({
-    section,
-    isElectron,
-    isAutomatedTest: env.IS_TEST || env.IS_E2E,
-  });
   // The desktop window-control row (DesktopTitlebar) owns the single canonical
   // left-sidebar toggle in Electron. Keep the initial client tree identical to
   // SSR; the runtime CSS hides the header slot before paint, and this hook
@@ -155,7 +135,6 @@ function AuthShellInner({
         contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
         composerFocusActive={isComposerFocused && !isMobile}
       />
-      <WhatsNewBanner enabled={showWhatsNew} />
     </RuntimeUpdateProvider>
   );
 }
