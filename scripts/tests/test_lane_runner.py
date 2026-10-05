@@ -477,6 +477,20 @@ class GateTest(unittest.TestCase):
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
         self.assertEqual(lane.gate_rules([self.change(".cursor/rules/general.mdc")]), [])
 
+    def test_dependency_metadata_does_not_require_a_product_test(self):
+        dependency_only = [
+            self.change("package.json"),
+            self.change("apps/web/package.json"),
+            self.change("packages/ui/package.json"),
+            self.change("pnpm-lock.yaml"),
+            self.change("apps/eve-pilot/pnpm-lock.yaml"),
+        ]
+        self.assertEqual(lane.gate_rules(dependency_only), [])
+        self.assertEqual(
+            lane.gate_rules([*dependency_only, self.change("apps/web/lib/a.ts")]),
+            ["code-change-without-test"],
+        )
+
     def test_xcode_tests_directory_counts_as_test(self):
         changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
                    self.change("apps/ios/JovieTests/ChatRepositoryTests.swift")]
