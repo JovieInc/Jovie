@@ -277,6 +277,17 @@ describe('DashboardNav route warming', () => {
     }
   });
 
+  it('stages the search slot exit on the shared rail-motion contract (JOV-4522)', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
+    );
+    // The search pill collapses vertically (max-height + fade) in lockstep
+    // with the rail instead of snapping to display:none at frame one.
+    const slot = source.slice(source.indexOf('data-sidebar-search-slot'));
+    expect(slot).toContain('SHELL_RAIL_BLOCK_LABEL');
+    expect(slot).not.toContain('group-data-[collapsible=icon]:hidden');
+  });
+
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource(
       'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
