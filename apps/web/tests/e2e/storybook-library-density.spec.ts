@@ -244,3 +244,42 @@ test('Library grid preserves container-fit densities and the phone breakpoint', 
     .toBe(2);
   await expect(page.getByTestId('library-grid-density-toggle')).toBeHidden();
 });
+test('Library grid reviews from the tile reached by Tab', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(
+    '/iframe.html?id=library-workinspector--dense-scan-with-inspector&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  await expect(page.getByTestId('library-asset-drawer')).toHaveAttribute(
+    'aria-hidden',
+    'false',
+    { timeout: 90_000 }
+  );
+  await page.getByRole('radio', { name: 'Grid View', exact: true }).check();
+  const cards = page.locator(
+    '[data-library-grid] article.system-b-library-card'
+  );
+  const first = cards.nth(0).locator('[data-library-item-focus]');
+  const second = cards.nth(1).locator('[data-library-item-focus]');
+  const third = cards.nth(2).locator('[data-library-item-focus]');
+  await first.focus();
+  for (
+    let tab = 0;
+    tab < 4 &&
+    !(await second.evaluate(node => node === document.activeElement));
+    tab++
+  ) {
+    await page.keyboard.press('Tab');
+  }
+  await expect(second).toBeFocused();
+  await expect(cards.first()).toHaveClass(/system-b-library-card--selected/);
+  await page.keyboard.press('ArrowRight');
+  await expect(third).toBeFocused();
+  await expect(cards.nth(2)).toHaveClass(/system-b-library-card--selected/);
+  await page.screenshot({
+    path: testInfo.outputPath('grid-tab-focus.png'),
+    fullPage: true,
+  });
+});

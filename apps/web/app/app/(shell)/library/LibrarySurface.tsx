@@ -3223,7 +3223,16 @@ export function LibrarySurface({
       : resolveLibraryReviewStep(event.key, target, gridColumns);
     if (!step || visibleAssets.length === 0) return;
 
-    const index = visibleAssets.findIndex(asset => asset.id === selectedId);
+    // Tab can move focus without changing selection. Item shortcuts follow
+    // that focus; page and toolbar shortcuts retain the selected cursor.
+    const focusedItemId =
+      inCatalog && target instanceof Element
+        ? target.closest<HTMLElement>('[data-library-item-id]')?.dataset
+            .libraryItemId
+        : undefined;
+    const index = visibleAssets.findIndex(
+      asset => asset.id === (focusedItemId ?? selectedId)
+    );
     const cursor = index === -1 ? null : visibleAssets[index];
     if (step.kind === 'play' || step.kind === 'open') {
       if (!cursor) return;

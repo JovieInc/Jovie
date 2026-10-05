@@ -1980,6 +1980,46 @@ describe('LibrarySurface', () => {
     expect(drawer).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it.each(['Space', 'ArrowRight'] as const)(
+    'reviews the focused tile after Tab navigation: %s',
+    async key => {
+      const user = userEvent.setup();
+      renderLibrary([
+        buildAsset(),
+        buildAsset({ id: 'release-2', title: 'Second Song' }),
+        buildAsset({ id: 'release-3', title: 'Third Song' }),
+      ]);
+      clickGridView();
+      const first = screen.getByRole('button', { name: 'View Take Me Over' });
+      const second = screen.getByRole('button', { name: 'View Second Song' });
+
+      fireEvent.keyDown(document.body, { key: 'j' });
+      expect(first).toHaveFocus();
+      for (let tab = 0; tab < 4 && document.activeElement !== second; tab++) {
+        await user.tab();
+      }
+      expect(second).toHaveFocus();
+      expect(first.closest('[data-library-item-id]')).toHaveClass(
+        'system-b-library-card--selected'
+      );
+
+      await user.keyboard(key === 'Space' ? ' ' : '{ArrowRight}');
+      if (key === 'Space') {
+        expect(audioMock.toggleTrack).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'release-2', title: 'Second Song' })
+        );
+        expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+          'aria-hidden',
+          'true'
+        );
+      } else {
+        expect(
+          screen.getByRole('button', { name: 'View Third Song' })
+        ).toHaveFocus();
+      }
+    }
+  );
+
   it('lets list rows play on Space and carries selection with the arrow keys', () => {
     renderLibrary([
       buildAsset(),
