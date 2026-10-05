@@ -430,10 +430,15 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
 
-    fireEvent.keyDown(globalThis, { key, metaKey: true });
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    input.focus();
+    fireEvent.keyDown(input, { key, metaKey: true });
 
     const rows = screen.getAllByRole('option');
     expect(rows[rowIndex]).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveFocus();
     expect(pushMock).not.toHaveBeenCalled();
   });
 
