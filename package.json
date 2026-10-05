@@ -311,7 +311,7 @@
     "desktop:performance": "pnpm --filter @jovie/desktop run performance"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.129.0",
+    "@anthropic-ai/sdk": "^0.131.0",
     "@biomejs/biome": "^2.5.14",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
