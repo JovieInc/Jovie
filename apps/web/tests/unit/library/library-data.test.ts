@@ -377,13 +377,13 @@ describe('library data', () => {
     // Tiles fill the container by minimum width, so an open inspector or the
     // Mac window keeps a dense grid; phones always get two columns.
     expect(LIBRARY_GRID_DENSITY_LAYOUT.compact).toContain(
-      'sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]'
+      'system-b-library-grid--compact'
     );
     expect(LIBRARY_GRID_DENSITY_LAYOUT.comfortable).toContain(
-      'sm:grid-cols-[repeat(auto-fill,minmax(11.5rem,1fr))]'
+      'system-b-library-grid--comfortable'
     );
     expect(LIBRARY_GRID_DENSITY_LAYOUT.spacious).toContain(
-      'sm:grid-cols-[repeat(auto-fill,minmax(16rem,1fr))]'
+      'system-b-library-grid--spacious'
     );
     for (const layout of Object.values(LIBRARY_GRID_DENSITY_LAYOUT)) {
       expect(layout).toMatch(/^grid grid-cols-2 /u);

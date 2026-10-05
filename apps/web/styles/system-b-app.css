@@ -1195,7 +1195,23 @@
   font-size: var(--text-xs);
 }
 
+/* Library density owns the tile minimums; phones retain two columns. */
+@media (min-width: 640px) {
+  :where(.system-b-library-grid--compact) {
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  }
+
+  :where(.system-b-library-grid--comfortable) {
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  }
+
+  :where(.system-b-library-grid--spacious) {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  }
+}
+
 :where(.system-b-library-card) {
+  grid-template-rows: auto 1fr;
   border-radius: var(--radius-lg);
   background: var(--system-b-bg-surface-0);
   transition-duration: var(--duration-fast);

@@ -1568,7 +1568,7 @@ const AssetCard = memo(function AssetCard({
         // Artwork overlays (play, scrub) share the button's first grid row
         // through subgrid, so they sit on the art without nesting controls
         // inside the button or measuring its height.
-        'system-b-library-card group relative grid min-w-0 grid-cols-1 grid-rows-[auto_1fr] overflow-hidden border',
+        'system-b-library-card group relative grid min-w-0 grid-cols-1 overflow-hidden border',
         selected
           ? 'system-b-library-card--selected'
           : 'system-b-library-card--idle'

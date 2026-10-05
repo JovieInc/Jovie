@@ -137,12 +137,9 @@ export interface LibraryReleaseAsset {
  * grid. Phones always show two columns, so the size toggle hides there.
  */
 export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {
-  compact:
-    'grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]',
-  comfortable:
-    'grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(11.5rem,1fr))]',
-  spacious:
-    'grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-[repeat(auto-fill,minmax(16rem,1fr))]',
+  compact: 'grid grid-cols-2 gap-2 system-b-library-grid--compact',
+  comfortable: 'grid grid-cols-2 gap-3 system-b-library-grid--comfortable',
+  spacious: 'grid grid-cols-2 gap-3 sm:gap-4 system-b-library-grid--spacious',
 };
 
 export function getLibraryAssetAspectRatio(
