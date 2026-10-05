@@ -4998,7 +4998,8 @@ def ensure_full_history(host: Host) -> None:
 
 
 def dispatch(host: Host) -> int:
-    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
+    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "quotaBlocked": {},
+            "spawned": [], "error": None}
     try:
         tick["disk"] = disk_guard.check(host)
         if autoscale.mode() != "off":
@@ -5024,6 +5025,10 @@ def dispatch(host: Host) -> int:
             slots = host.slots(name, spec.get("slots", 1))
             # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
             if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
+                continue
+            quota = quota_pressure(host, name, spec, time.time())
+            if not quota["ok"]:
+                tick["quotaBlocked"][name] = quota["why"]
                 continue
             if not provider_healthy(spec):
                 tick["unhealthy"].append(name)

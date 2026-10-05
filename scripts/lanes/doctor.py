@@ -869,6 +869,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "account-leases-occupied" if provider == "codex" and account_state["state"] == "leases-occupied" else
             "account-quota-banked" if provider == "codex" and account_state["state"] == "quota-banked" else
             "account-cooldown" if provider == "codex" and account_state["state"] == "cooldown" else
+            f"quota-blocked:{(tick.get('quotaBlocked') or {})[provider]}"
+            if provider in (tick.get("quotaBlocked") or {}) else
             "provider-unhealthy" if provider in (tick.get("unhealthy") or []) else
             "no-account-available" if provider == "codex" and account_available == 0 else
             "new-issue-admission-unknown" if qualified is None else
