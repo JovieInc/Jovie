@@ -366,7 +366,7 @@ class LaunchIdentityTest(Isolated):
         self.assertFalse(row["providerAttested"])
         self.assertGreater(row["pid"], 0)
         self.assertEqual(len(row["adapterSha256"]), 64)
-        self.assertEqual(row["worktree"], self.tmp.name)
+        self.assertEqual(row["worktree"], str(Path(self.tmp.name).resolve()))
         self.assertNotIn("private prompt", json.dumps(row))
 
     def test_observed_previous_cli_header_has_explicit_version_provenance(self):

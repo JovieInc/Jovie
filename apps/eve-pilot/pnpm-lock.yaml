@@ -27,13 +27,13 @@ importers:
         version: 3.36.0(zod@4.6.5)
       eve:
         specifier: 0.70.0
-        version: 0.70.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.5)
+        version: 0.70.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.6)
       just-bash:
         specifier: 3.6.0
         version: 3.6.0
       microsandbox:
-        specifier: 0.7.5
-        version: 0.7.5
+        specifier: 0.7.6
+        version: 0.7.6
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -525,8 +525,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  '@microsandbox/types@0.7.5':
-    resolution: {integrity: sha512-njO1yvZ4ZOFc4foThOziiR8cQbzapJYnRg6D26oFZQRmphujI9qN4WSWkqSJURoEhOSshlEn04rHxvso4CtkwQ==}
+  '@microsandbox/types@0.7.6':
+    resolution: {integrity: sha512-c37qErKf6FuPRGOM9CElrEcmg5kGOWghLnDVxZyQwTYEwXGm+ySA1nw7ShSPaUWXWw+/wvCxagGJrw/TK/+f+g==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -1170,32 +1170,32 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.7.5':
-    resolution: {integrity: sha512-f6osb7/ye6cB0INQwImnBCfBOqgL9ozE11zgVxonDUj38DigYO4hFApRbJOgQoznINPgkeICp9FHAlpf2puNqw==}
+  '@superradcompany/microsandbox-darwin-arm64@0.7.6':
+    resolution: {integrity: sha512-gTboiANChdpsdPzfZ40Co9ls1UIhKGol5reMBApcCNCvp7z1C65vPK3i9QnWp4yFeClQ0k+gQezApiTSRsevGw==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [darwin]
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.5':
-    resolution: {integrity: sha512-43KjMT+XWb+Texi0eJKjvE0TqNM8nJ2tAbzzZ2au7vxOkE8YaWPVp9Oifi9en2iIeJ+j+SJnRkABvxTS8P+VuQ==}
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.6':
+    resolution: {integrity: sha512-089OfW/yHu3wkiMqtNG0jcTWCwjZeNC+x5piXFipQKS2MuYWa/U9tQxGfSQnn6ZU7eA3cKJUjVA8EGIa0RvUYg==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [linux]
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.7.5':
-    resolution: {integrity: sha512-4SfHdTQuOegMXY/u3A9KWGFhZosFBj0wflq2LRWpT7PI0RV6mlZZ96i9kOfYdgBO61KsNQtTjfjLN8oaH8TEcw==}
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.6':
+    resolution: {integrity: sha512-1wwZjgki/JuHeo/GI4BVREIrtsSim7Ei8S5xohkz3R6CGyf+xNgoodrKtJXB/NwxmxHDCscc88/qGUbTsljhsw==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [linux]
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.5':
-    resolution: {integrity: sha512-914bmg5aDsGvUJi9QSZn/7io6eVGNSDvGfqv8FZGkVUAbPHJNmaLXFTK3KMAxOAC6PDi7F+cDAK3cOM+MgQeXA==}
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.6':
+    resolution: {integrity: sha512-KAsVOqBDJp8Pg4C7/Tq1xiVA/P7OiETmYA+/w9W/2dDxo+/MgiWV6D63vqisn5J2ug0tcOmGXn9D9qaZMoZywg==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [win32]
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.7.5':
-    resolution: {integrity: sha512-v3gmmwC8e5xhIfBOaNOTHmwcLs+rPrPlkwTIWToIrlmyTmn0BDtOKubPeUj5GXU4MJz4zsy9N86fig35yo1+Xg==}
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.6':
+    resolution: {integrity: sha512-JkMe0sJZVXwnpBrcrH34InRZSMYY12vAmRwpMNm9DQUkVBA91utfkY1SKL+cI7ux9LZZq7GDVe8IypA8sdAu/Q==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [win32]
@@ -2327,8 +2327,8 @@ packages:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
 
-  microsandbox@0.7.5:
-    resolution: {integrity: sha512-ho1zV1YojmfLIQlFN+b6M4eN+A3qXvQbQkLTaKys5XzHviQ5D/SZMzihV6Cod4v0JfEL3Xd6oI7O9pkzgwtdww==}
+  microsandbox@0.7.6:
+    resolution: {integrity: sha512-66lq0qH5xiFPm4nOb4euqsTd7AuDCGEg+ibdWtBu1nlzGGVEbCYBOjCy8Aihrinnu/kpEtx+d99x1nUMCpb8XQ==}
     engines: {node: '>= 22'}
     hasBin: true
 
@@ -3550,7 +3550,7 @@ snapshots:
       - encoding
       - supports-color
 
-  '@microsandbox/types@0.7.5': {}
+  '@microsandbox/types@0.7.6': {}
 
   '@mixmark-io/domino@2.2.0': {}
 
@@ -3935,19 +3935,19 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.7.5':
+  '@superradcompany/microsandbox-darwin-arm64@0.7.6':
     optional: true
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.5':
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.6':
     optional: true
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.7.5':
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.6':
     optional: true
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.5':
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.6':
     optional: true
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.7.5':
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.6':
     optional: true
 
   '@tokenizer/inflate@0.4.1':
@@ -4844,7 +4844,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.70.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.5):
+  eve@0.70.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.6):
     dependencies:
       ai: 7.0.122(zod@4.6.5)
       nitro: 3.0.260903-beta
@@ -4853,7 +4853,7 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       braintrust: 3.36.0(zod@4.6.5)
       just-bash: 3.6.0
-      microsandbox: 0.7.5
+      microsandbox: 0.7.6
 
   events-intercept@2.0.0: {}
 
@@ -5317,15 +5317,15 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.2
 
-  microsandbox@0.7.5:
+  microsandbox@0.7.6:
     dependencies:
-      '@microsandbox/types': 0.7.5
+      '@microsandbox/types': 0.7.6
     optionalDependencies:
-      '@superradcompany/microsandbox-darwin-arm64': 0.7.5
-      '@superradcompany/microsandbox-linux-arm64-gnu': 0.7.5
-      '@superradcompany/microsandbox-linux-x64-gnu': 0.7.5
-      '@superradcompany/microsandbox-win32-arm64-msvc': 0.7.5
-      '@superradcompany/microsandbox-win32-x64-msvc': 0.7.5
+      '@superradcompany/microsandbox-darwin-arm64': 0.7.6
+      '@superradcompany/microsandbox-linux-arm64-gnu': 0.7.6
+      '@superradcompany/microsandbox-linux-x64-gnu': 0.7.6
+      '@superradcompany/microsandbox-win32-arm64-msvc': 0.7.6
+      '@superradcompany/microsandbox-win32-x64-msvc': 0.7.6
 
   mime-db@1.52.0: {}
 
