@@ -23,11 +23,11 @@ importers:
         specifier: 7.0.122
         version: 7.0.122(zod@4.6.5)
       braintrust:
-        specifier: 3.35.0
-        version: 3.35.0(zod@4.6.5)
+        specifier: 3.36.0
+        version: 3.36.0(zod@4.6.5)
       eve:
         specifier: 0.68.0
-        version: 0.68.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.6)
+        version: 0.68.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.6)
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -1618,8 +1618,8 @@ packages:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
 
-  braintrust@3.35.0:
-    resolution: {integrity: sha512-WozT9N/M/HhMgyUS/fM99WW9NWqXS0I4lfQgil/uVeYOLTHxgngrxESAxWC53OkaxgxjFLFHFYHDWpLxc5R6Sw==}
+  braintrust@3.36.0:
+    resolution: {integrity: sha512-E6lzjWrLyOyU/rOdiDqCS1Sw+sb+DlqcKtR8W2lreXaogPd442nz9gxUVUw8QaXR3SVoso57K9wNxx5ppionrA==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.34 || ^4.0
@@ -4580,7 +4580,7 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  braintrust@3.35.0(zod@4.6.5):
+  braintrust@3.36.0(zod@4.6.5):
     dependencies:
       '@next/env': 14.2.35
       '@types/react': 18.3.31
@@ -4867,14 +4867,14 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.68.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.6):
+  eve@0.68.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.6):
     dependencies:
       ai: 7.0.122(zod@4.6.5)
       nitro: 3.0.260903-beta
       undici: 8.9.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
-      braintrust: 3.35.0(zod@4.6.5)
+      braintrust: 3.36.0(zod@4.6.5)
       just-bash: 3.4.2
       microsandbox: 0.7.6
 
