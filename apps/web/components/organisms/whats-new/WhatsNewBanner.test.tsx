@@ -96,7 +96,7 @@ describe('WhatsNewBannerView', () => {
     ).toHaveAttribute('href', 'https://jov.ie/changelog/26.9.2');
   });
 
-  it('sits on the banner overlay layer, below sheets and dialogs', () => {
+  it('renders in flow at dock width instead of floating over content', () => {
     render(
       <WhatsNewBannerView
         unseen={{
@@ -109,8 +109,9 @@ describe('WhatsNewBannerView', () => {
       />
     );
     const banner = screen.getByTestId('whats-new-banner');
-    expect(banner.className).toContain('z-banner');
-    expect(banner.className).not.toMatch(/(?:^|\s)z-\d/);
+    expect(banner).toHaveClass('w-full');
+    expect(banner.className).not.toMatch(/(?:^|\s)fixed(?:\s|$)/);
+    expect(banner.className).not.toMatch(/(?:^|\s)z-/);
   });
 
   it('counts multiple unseen updates and links the changelog index', () => {
@@ -180,6 +181,12 @@ describe('WhatsNewBanner', () => {
     expect(screen.queryByTestId('whats-new-banner')).toBeNull();
     await settle();
     expect(screen.getByTestId('whats-new-banner')).toBeInTheDocument();
+  });
+
+  it('waits while the sidebar is collapsed to icons', async () => {
+    render(<WhatsNewBanner enabled collapsed />);
+    await settle();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
   });
 
   it('records the entry as seen on dismiss and stays hidden', async () => {
