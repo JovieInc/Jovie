@@ -303,6 +303,12 @@ function verifyRetainedAttempts(
   manifest: FactoryRunManifest
 ): string[] {
   const issues: string[] = [];
+  const rejectedRenderDigests = new Set(
+    (manifest.reworks ?? []).flatMap(rework =>
+      rework.rejectedRenderDigest ? [rework.rejectedRenderDigest] : []
+    )
+  );
+  const missingRejectedRenders = new Set(rejectedRenderDigests);
   // Rejected and superseded attempts remain evidence, not just the final chain.
   for (const file of new Set([
     ...manifest.attempts,
@@ -317,7 +323,19 @@ function verifyRetainedAttempts(
           `${where}: retained artifact digest does not match the receipt`
         );
       }
+      const rejectedRender = rejectedRenderDigests.has(
+        record.receipt.outputDigest
+      );
+      if (rejectedRender) {
+        missingRejectedRenders.delete(record.receipt.outputDigest);
+        if (record.receipt.stage !== 'render') {
+          issues.push(
+            `${where}: capture-integrity: rejected render receipt stage does not match rework`
+          );
+        }
+      }
       const retainedRender =
+        rejectedRender ||
         record.receipt.stage === 'render' ||
         manifest.chain.some(
           link => link.file === file && link.stage === 'render'
@@ -341,6 +359,11 @@ function verifyRetainedAttempts(
     } catch {
       issues.push(`retained attempt missing or unreadable: ${file}`);
     }
+  }
+  for (const digest of missingRejectedRenders) {
+    issues.push(
+      `capture-integrity: missing rejected render for rework digest ${digest}`
+    );
   }
   return issues;
 }

@@ -368,6 +368,127 @@ describe('retained rework evidence', () => {
     ).rejects.toThrow(/history\/.*out of spine order/u);
   });
 
+  it('binds an archived rejected live render to its rework digest outside the final chain', async () => {
+    const result = await rework(true, 'live');
+    expect(result.manifest).toMatchObject({ status: 'complete', mode: 'live' });
+    expect(verifyFactoryRun(result.runDir)).toEqual([]);
+    await runFactory({
+      family: 'solutions',
+      slug: 'founders',
+      runsDir: result.runsDir,
+      dry: true,
+    });
+    const history = readdirSync(join(result.runDir, 'history'));
+    expect(history).toHaveLength(1);
+    const archived = join(result.runDir, 'history', history[0]!);
+    const manifest = readJson<FactoryRunManifest>(join(archived, 'run.json'));
+    expect(manifest.mode).toBe('live');
+    const rejectedDigest = manifest.reworks![0]!.rejectedRenderDigest;
+    expect(rejectedDigest).toBeTruthy();
+    const rejected = manifest.attempts
+      .map(file => ({
+        file,
+        record: readJson<StageAttemptRecord>(join(archived, file)),
+      }))
+      .filter(({ record }) => record.receipt.outputDigest === rejectedDigest);
+    expect(rejected).toHaveLength(1);
+    const { file, record } = rejected[0]!;
+    expect(record.receipt.stage).toBe('render');
+    expect(manifest.chain.some(link => link.file === file)).toBe(false);
+    expect(verifyFactoryRun(result.runDir)).toEqual([]);
+    writeJson(join(archived, file), {
+      ...record,
+      receipt: { ...record.receipt, stage: 'layout' },
+    });
+    const relabelled = verifyFactoryRun(result.runDir).join('\n');
+    const render = record.artifact as FactoryStageArtifact<'render'>;
+    const capture = render.captures![0]!.screenshot.path;
+    const bytes = readFileSync(capture);
+    rmSync(capture);
+    const missingCapture = verifyFactoryRun(result.runDir).join('\n');
+    writeFileSync(capture, bytes, { flag: 'wx' });
+    rmSync(render.preview!.path);
+    const missingPreview = verifyFactoryRun(result.runDir).join('\n');
+    expect({ relabelled, missingCapture, missingPreview }).toEqual({
+      relabelled: expect.stringMatching(
+        /history\/.*rejected render receipt stage/u
+      ),
+      missingCapture: expect.stringMatching(
+        /history\/.*rejected render receipt stage/u
+      ),
+      missingPreview: expect.stringMatching(
+        /history\/.*rejected render receipt stage/u
+      ),
+    });
+    expect(missingCapture).toContain(
+      `missing or unreadable capture ${capture}`
+    );
+    expect(missingPreview).toContain(
+      `missing or unreadable capture ${render.preview!.path}`
+    );
+    await expect(
+      runFactory({
+        family: 'solutions',
+        slug: 'founders',
+        runsDir: result.runsDir,
+        dry: true,
+        fromStage: 'render',
+      })
+    ).rejects.toThrow(/history\/.*rejected render receipt stage/u);
+  });
+
+  it.each(['current', 'archived'] as const)(
+    'rejects a missing %s attempt referenced by a rework digest',
+    async location => {
+      const result = await rework(true, 'live');
+      expect(result.manifest.status).toBe('complete');
+      let retainedDir = result.runDir;
+      if (location === 'archived') {
+        await runFactory({
+          family: 'solutions',
+          slug: 'founders',
+          runsDir: result.runsDir,
+          dry: true,
+        });
+        const history = readdirSync(join(result.runDir, 'history'));
+        retainedDir = join(result.runDir, 'history', history[0]!);
+      }
+      expect(verifyFactoryRun(result.runDir)).toEqual([]);
+      const manifest = readJson<FactoryRunManifest>(
+        join(retainedDir, 'run.json')
+      );
+      const digest = manifest.reworks![0]!.rejectedRenderDigest;
+      const missingFiles = manifest.attempts.filter(
+        file =>
+          readJson<StageAttemptRecord>(join(retainedDir, file)).receipt
+            .outputDigest === digest
+      );
+      expect(missingFiles).toHaveLength(1);
+      expect(
+        manifest.chain.some(link => missingFiles.includes(link.file))
+      ).toBe(false);
+      writeJson(join(retainedDir, 'run.json'), {
+        ...manifest,
+        attempts: manifest.attempts.filter(
+          file => !missingFiles.includes(file)
+        ),
+      });
+      for (const file of missingFiles) rmSync(join(retainedDir, file));
+      expect(verifyFactoryRun(result.runDir).join('\n')).toContain(
+        `capture-integrity: missing rejected render for rework digest ${digest}`
+      );
+      await expect(
+        runFactory({
+          family: 'solutions',
+          slug: 'founders',
+          runsDir: result.runsDir,
+          dry: true,
+          fromStage: 'render',
+        })
+      ).rejects.toThrow(/missing rejected render for rework digest/u);
+    }
+  );
+
   it('preserves original attempts and capture paths across resume and fresh runs', async () => {
     const result = await rework(true);
     const file = result.manifest.attempts.find(file =>
