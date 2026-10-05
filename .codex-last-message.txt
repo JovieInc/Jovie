@@ -1,0 +1,10 @@
+BLOCKED. No code change or push was made; the worktree remains clean.
+
+Evidence:
+
+- `PR Ready` received `abandoned,abandoned,success,abandoned`.
+- Source Validation, Coverage, Security, and `PR targets main` were canceled after ~15 minutes with zero steps executed.
+- Unrelated PRs show the same failures amid a repo-wide Actions queue backlog.
+- PR #20768 remains open, outside the merge queue, at exact head `7c395d7f09`.
+
+NOT-SHIPPABLE: GitHub Actions infrastructure abandoned required jobs before execution, so there is no branch failure to fix.
