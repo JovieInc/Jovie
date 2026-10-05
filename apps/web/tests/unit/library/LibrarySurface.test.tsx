@@ -81,7 +81,7 @@ const feedbackMocks = vi.hoisted(() => ({
 
 const audioMock = vi.hoisted(() => {
   const basePlaybackState = {
-    activeTrackId: null,
+    activeTrackId: null as string | null,
     isPlaying: false,
     playbackStatus: 'idle',
     lastErrorReason: null,
