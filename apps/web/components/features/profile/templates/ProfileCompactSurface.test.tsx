@@ -113,7 +113,6 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
     creditSegments,
     contacts,
     modeCardAccents,
-    paymentsVenmoLink,
   }: {
     readonly mode: string;
     readonly catalogLoadFailed?: boolean;
@@ -121,7 +120,6 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
     readonly creditSegments?: readonly { readonly type: string }[];
     readonly contacts?: readonly { readonly id: string }[];
     readonly modeCardAccents?: Record<string, { accent: string }>;
-    readonly paymentsVenmoLink?: string | null;
   }) => (
     <div
       data-testid={`mock-primary-tab-panel-${mode}`}
@@ -140,7 +138,6 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
               .join(',')
           : undefined
       }
-      data-payments-link={paymentsVenmoLink ?? ''}
     />
   ),
 }));
@@ -574,38 +571,26 @@ describe('ProfileCompactSurface', () => {
     expect(rail).toHaveAttribute('data-featured-strength', 'art');
   });
 
-  it('rotates positionally and passes the payments link only when tips are on', () => {
-    const venmo = {
-      id: 'venmo-1',
-      artist_id: artist.id,
-      platform: 'venmo',
-      url: 'https://venmo.com/u/timwhite',
-      clicks: 0,
-      created_at: '2026-01-01T00:00:00.000Z',
-    };
-    const { unmount } = renderSurface({
+  it('rotates positionally and mounts the About panel without a payments card', () => {
+    // JOV-7810: the pay surface lives on the pay intent URL, not the About tab.
+    renderSurface({
       activeMode: 'about',
-      socialLinks: [venmo],
+      socialLinks: [
+        {
+          id: 'venmo-1',
+          artist_id: artist.id,
+          platform: 'venmo',
+          url: 'https://venmo.com/u/timwhite',
+          clicks: 0,
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
     });
 
     const panel = screen.getByTestId('mock-primary-tab-panel-about');
     // No release art and no photo: no image anchor, plain visual order.
     expect(panel).toHaveAttribute('data-accents', 'ion,ultra,pulse,orange');
-    expect(panel).toHaveAttribute(
-      'data-payments-link',
-      'https://venmo.com/u/timwhite'
-    );
-    unmount();
-
-    renderSurface({
-      activeMode: 'about',
-      socialLinks: [venmo],
-      showPayButton: false,
-    });
-    expect(screen.getByTestId('mock-primary-tab-panel-about')).toHaveAttribute(
-      'data-payments-link',
-      ''
-    );
+    expect(screen.queryByTestId('profile-payments-card')).toBeNull();
   });
 
   it('forwards the release credits opener to the overflow menu drawer', () => {
