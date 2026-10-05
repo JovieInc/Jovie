@@ -37,7 +37,6 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
-  Shirt,
   Table2,
   Video,
 } from 'lucide-react';
@@ -79,6 +78,7 @@ import {
   LIBRARY_CATALOG_TABLE_COLUMNS,
   LibraryCatalogProvidersCell,
   LibraryCatalogStatusCell,
+  LibraryStatusGlyph,
 } from '@/components/features/library/library-catalog-columns';
 import { WorkInspectorActions } from '@/components/features/library/WorkInspectorActions';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
@@ -129,11 +129,13 @@ import {
   type TableRowMode,
 } from '@/components/organisms/table/table.styles';
 import {
+  isFormElement,
   isInteractiveOverlayTarget,
   resolveTableNavAction,
 } from '@/components/organisms/table/utils/tableKeyMap';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
+import { RowWaveform } from '@/components/shell/RowWaveform';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -162,10 +164,7 @@ import {
   type LibraryPresenceFindingView,
 } from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
-import {
-  releaseStatusClasses,
-  releaseStatusDotClasses,
-} from '@/lib/library/release-status';
+import { releaseStatusDotClasses } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
 import {
@@ -515,11 +514,6 @@ function countBy<T extends string>(
   return counts;
 }
 
-function formatCompactCount(value: number): string {
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-  return String(value);
-}
-
 const ReleaseCell = memo(function ReleaseCell({
   asset,
 }: {
@@ -532,7 +526,9 @@ const ReleaseCell = memo(function ReleaseCell({
   const isPreviewPlaying = playingPreviewId === asset.id;
 
   return (
-    <div className='flex min-w-0 items-center gap-2.5'>
+    // system-b-library-fluid-cell: no min-content width, so long titles
+    // truncate instead of widening the table past its container.
+    <div className='system-b-library-fluid-cell flex items-center gap-2.5'>
       <ArtworkFrame
         size='thumbnail'
         className='system-b-library-artwork-shell group/artwork h-10 w-10'
@@ -576,26 +572,6 @@ const ReleaseCell = memo(function ReleaseCell({
         </span>
       </span>
     </div>
-  );
-});
-
-const ApprovalStatusCell = memo(function ApprovalStatusCell({
-  asset,
-}: {
-  readonly asset: LibraryReleaseAsset;
-}) {
-  return (
-    <span
-      role='status'
-      className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
-        libraryApprovalStatusClasses(asset.approvalStatus)
-      )}
-      data-testid={`library-approval-status-${asset.id}`}
-      aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
-    >
-      {formatLibraryApprovalStatus(asset.approvalStatus)}
-    </span>
   );
 });
 
@@ -708,32 +684,15 @@ export const LIBRARY_TABLE_COLUMNS = [
       compact: asset => <ReleaseDateCell asset={asset} />,
     },
   }),
-  // Release and Approval share a tier so a row never shows bare "Draft" alone.
+  // One glyph folds release and approval, so a row never says "Draft" twice.
   libraryColumnHelper.display({
     id: 'status',
-    header: 'Release',
+    header: 'Status',
     cell: ({ row }) => <LibraryCatalogStatusCell asset={row.original} />,
-    size: 112,
-    minSize: 96,
-    meta: {
-      className: 'px-2',
-      priority: 4,
-      minWidth: 112,
-      compact: asset => <LibraryCatalogStatusCell asset={asset} />,
-    },
-  }),
-  libraryColumnHelper.display({
-    id: 'approval',
-    header: 'Approval',
-    cell: ({ row }) => <ApprovalStatusCell asset={row.original} />,
-    size: 128,
-    minSize: 108,
-    meta: {
-      className: 'px-2',
-      priority: 4,
-      minWidth: 128,
-      compact: asset => <ApprovalStatusCell asset={asset} />,
-    },
+    size: 40,
+    minSize: 40,
+    enableSorting: false,
+    meta: { className: 'px-2', minWidth: 40, headerVisibility: 'sr-only' },
   }),
   createLibraryTypeColumn(104, 88),
   libraryColumnHelper.display({
@@ -746,7 +705,10 @@ export const LIBRARY_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 3,
       minWidth: 120,
-      compact: asset => <LibraryCatalogProvidersCell asset={asset} />,
+      compact: asset =>
+        asset.providers.length > 0 ? (
+          <LibraryCatalogProvidersCell asset={asset} />
+        ) : null,
     },
   }),
   libraryColumnHelper.display({
@@ -765,9 +727,8 @@ export const LIBRARY_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 1,
       minWidth: 220,
-      compact: asset => (
-        <LibraryAssetShareUrlCell asset={asset} share={asset.share} />
-      ),
+      // No compact form: a folded URL crowds the title out on narrow rows;
+      // sharing lives in the row menu and the inspector.
     },
   }),
   createLibraryActionColumn('w-10 pl-1 pr-2'),
@@ -1367,7 +1328,7 @@ function GridDensityToggle({
 }) {
   return (
     <fieldset
-      // Every density is one column below sm, so the control would be inert.
+      // Every density is two columns below sm, so the control would be inert.
       className={cn(
         PAGE_TOOLBAR_END_GROUP_CLASS,
         'ml-0 hidden gap-0.5 border-0 p-0 sm:flex'
@@ -1554,25 +1515,35 @@ function LibraryToolbar({
   );
 }
 
-const AssetKindPill = memo(function AssetKindPill({
-  kind,
-}: {
-  readonly kind: LibraryAssetKind;
-}) {
-  const Icon = ASSET_KIND_ICONS[kind];
-  return (
-    <span className='system-b-library-kind-pill inline-flex h-6 items-center gap-1 px-2'>
-      <Icon className='h-3 w-3' strokeWidth={2.25} />
-      {ASSET_KIND_LABELS[kind]}
-    </span>
-  );
-});
+/** The one meta line under a tile title: what it is, then when or how much. */
+export function formatLibraryTileMeta(asset: LibraryReleaseAsset): string {
+  const type = formatLibraryItemType(asset);
+  if (getLibraryItemKind(asset) === 'merch') {
+    return asset.salePriceLabel ? `${type} · ${asset.salePriceLabel}` : type;
+  }
+  const year = asset.releaseDate
+    ? new Date(asset.releaseDate).getUTCFullYear()
+    : Number.NaN;
+  return Number.isFinite(year) ? `${type} · ${year}` : type;
+}
 
+interface LibraryTilePlayback {
+  readonly currentTime: number;
+  readonly duration: number;
+  readonly onSeek: (seconds: number) => void;
+}
+
+/**
+ * Frame.io-style tile: artwork, title with one status glyph, one meta line.
+ * Playback lives on the artwork only: play on hover or focus, and a scrub
+ * strip once this tile owns the player.
+ */
 const AssetCard = memo(function AssetCard({
   asset,
   selected,
   isPreviewActive,
   isPreviewPlaying,
+  playback,
   onSelect,
   onTogglePreview,
 }: {
@@ -1580,16 +1551,24 @@ const AssetCard = memo(function AssetCard({
   readonly selected: boolean;
   readonly isPreviewActive: boolean;
   readonly isPreviewPlaying: boolean;
+  /** Present only on the tile that owns the player, so other tiles stay memoized. */
+  readonly playback?: LibraryTilePlayback;
   readonly onSelect: () => void;
   readonly onTogglePreview: LibraryPreviewToggle;
 }) {
   const hasPreview = hasVerifiedLibraryAudioPreview(asset);
   const aspectRatio = getLibraryAssetAspectRatio(asset);
+  const scrubDuration =
+    playback && playback.duration > 0 ? playback.duration : null;
 
   return (
     <article
+      data-library-item-id={asset.id}
       className={cn(
-        'system-b-library-card group relative min-w-0 overflow-hidden border',
+        // Artwork overlays (play, scrub) share the button's first grid row
+        // through subgrid, so they sit on the art without nesting controls
+        // inside the button or measuring its height.
+        'system-b-library-card group relative grid min-w-0 grid-cols-1 overflow-hidden border',
         selected
           ? 'system-b-library-card--selected'
           : 'system-b-library-card--idle'
@@ -1607,7 +1586,7 @@ const AssetCard = memo(function AssetCard({
         size='sm'
         static
         className={cn(
-          'flex h-full w-full flex-col items-stretch justify-start rounded-none p-0 text-left transition-colors duration-fast ease-subtle hover:bg-transparent active:bg-transparent',
+          'col-start-1 row-span-2 row-start-1 grid h-full w-full grid-rows-subgrid items-stretch justify-stretch gap-0 rounded-none p-0 text-left transition-colors duration-fast ease-subtle hover:bg-transparent active:bg-transparent',
           LIBRARY_CARD_FOCUS_CLASS
         )}
       >
@@ -1615,6 +1594,7 @@ const AssetCard = memo(function AssetCard({
           type='button'
           onClick={onSelect}
           aria-label={`View ${asset.title}`}
+          data-library-item-focus
         >
           <div
             className={cn(
@@ -1624,92 +1604,19 @@ const AssetCard = memo(function AssetCard({
           >
             <LibraryMediaThumbnail asset={asset} size='card' />
           </div>
-          <div className='min-w-0 p-3'>
-            <div className='flex min-w-0 items-start justify-between gap-2'>
-              <div className='min-w-0'>
-                <h2 className='system-b-library-card-title truncate'>
-                  {asset.title}
-                </h2>
-                <p className='system-b-library-card-meta mt-0.5 truncate'>
-                  {asset.artist}
-                </p>
-              </div>
-              {getLibraryItemKind(asset) === 'merch' ? (
-                <span className='system-b-library-card-count shrink-0 tabular-nums'>
-                  {asset.salePriceLabel ?? 'Merch'}
-                </span>
-              ) : (
-                <span
-                  className='system-b-library-card-count shrink-0 tabular-nums'
-                  role='img'
-                  aria-label={`${asset.providerCount} Providers`}
-                  title={`${asset.providerCount} Providers`}
-                >
-                  {formatCompactCount(asset.providerCount)}
-                </span>
-              )}
+          <div className='min-w-0 px-3 pb-3 pt-2'>
+            <div className='flex min-w-0 items-center gap-1.5'>
+              <h2 className='system-b-library-card-title min-w-0 flex-1 truncate'>
+                {asset.title}
+              </h2>
+              <LibraryStatusGlyph asset={asset} className='shrink-0' />
             </div>
-            {/*
-              Two status axes, always reserved in a fixed stack so card layout
-              never shifts between draft/approved states (#10384 / JOV-3333).
-              Keep them off the media frame; only playback belongs on artwork.
-            */}
-            <div
-              className='mt-2 flex min-h-11 max-w-full flex-col items-start gap-1'
-              data-testid={`library-card-status-stack-${asset.id}`}
+            <p
+              className='system-b-library-card-meta mt-0.5 truncate tabular-nums'
+              data-testid={`library-card-meta-${asset.id}`}
             >
-              <span
-                role='status'
-                className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
-                  releaseStatusClasses(asset.status)
-                )}
-                data-testid={`library-release-status-${asset.id}`}
-                aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
-              >
-                {formatLibraryStatus(asset)}
-              </span>
-              <span
-                role='status'
-                className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
-                  libraryApprovalStatusClasses(asset.approvalStatus)
-                )}
-                data-testid={`library-approval-status-${asset.id}`}
-                aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
-              >
-                {formatLibraryApprovalStatus(asset.approvalStatus)}
-              </span>
-            </div>
-            <div className='system-b-library-card-summary mt-2 flex min-w-0 items-center gap-1.5'>
-              {getLibraryItemKind(asset) === 'merch' ? (
-                <Shirt className='h-3 w-3 shrink-0' />
-              ) : (
-                <Layers className='h-3 w-3 shrink-0' />
-              )}
-              <span>{formatLibraryItemType(asset)}</span>
-              {getLibraryItemKind(asset) === 'release' ? (
-                <>
-                  <span aria-hidden='true' className='opacity-50'>
-                    ·
-                  </span>
-                  <span>
-                    {asset.trackCount}{' '}
-                    {asset.trackCount === 1 ? 'Track' : 'Tracks'}
-                  </span>
-                </>
-              ) : null}
-            </div>
-            <div className='mt-3 flex flex-wrap gap-1.5'>
-              {asset.assetKinds.slice(0, 3).map(kind => (
-                <AssetKindPill key={kind} kind={kind} />
-              ))}
-              {asset.assetKinds.length > 3 ? (
-                <span className='system-b-library-card-more-pill inline-flex h-6 items-center px-2'>
-                  +{asset.assetKinds.length - 3}
-                </span>
-              ) : null}
-            </div>
+              {formatLibraryTileMeta(asset)}
+            </p>
           </div>
         </button>
       </Button>
@@ -1727,10 +1634,10 @@ const AssetCard = memo(function AssetCard({
           aria-pressed={isPreviewPlaying}
           data-testid={`library-preview-card-${asset.id}`}
           className={cn(
-            'system-b-library-preview-float absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center backdrop-blur',
+            'system-b-library-preview-float z-10 col-start-1 row-start-1 m-2 grid h-8 w-8 place-items-center self-start justify-self-start backdrop-blur transition-opacity duration-fast ease-subtle',
             isPreviewActive
               ? 'opacity-100'
-              : 'opacity-90 group-hover:opacity-100',
+              : 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100',
             LIBRARY_CARD_FOCUS_CLASS
           )}
         >
@@ -1744,15 +1651,104 @@ const AssetCard = memo(function AssetCard({
           </span>
         </Button>
       ) : null}
+      {playback && scrubDuration ? (
+        <div
+          className='system-b-library-card-scrub z-10 col-start-1 row-start-1 self-end px-2 pb-1 pt-4'
+          data-testid={`library-card-scrub-${asset.id}`}
+        >
+          <RowWaveform
+            track={{
+              id: asset.id,
+              title: asset.title,
+              durationSec: scrubDuration,
+              waveformSeed: asset.waveformSeed,
+              cues: [],
+            }}
+            currentTimeSec={playback.currentTime}
+            isCurrentTrack
+            onSeek={playback.onSeek}
+            className='h-6'
+          />
+        </div>
+      ) : null}
     </article>
   );
 });
+
+export type LibraryReviewStep =
+  | { readonly kind: 'move'; readonly delta: number }
+  | { readonly kind: 'edge'; readonly to: 'first' | 'last' }
+  | { readonly kind: 'play' }
+  | { readonly kind: 'open' };
+
+/**
+ * Keyboard review across grid, list and table: J/K and arrows move, Space
+ * plays, Enter inspects. In the grid, up and down jump a row of tiles.
+ * Focused controls keep their native keys, except the tile itself, where
+ * Space plays instead of opening.
+ */
+export function resolveLibraryReviewStep(
+  key: string,
+  target: EventTarget | null,
+  gridColumns: number | null
+): LibraryReviewStep | null {
+  if (target instanceof Element && target.closest('[role="slider"]')) {
+    return null;
+  }
+  const nativeControl =
+    target instanceof Element &&
+    Boolean(target.closest('button, a[href]')) &&
+    !target.closest('[data-library-item-focus]');
+  const isGrid = gridColumns !== null;
+  if (isGrid && (key === 'ArrowRight' || key === 'ArrowLeft')) {
+    return isFormElement(target)
+      ? null
+      : { kind: 'move', delta: key === 'ArrowRight' ? 1 : -1 };
+  }
+  const rowStep = isGrid ? Math.max(1, gridColumns) : 1;
+  switch (resolveTableNavAction(key, target)) {
+    case 'next':
+      return { kind: 'move', delta: key === 'ArrowDown' ? rowStep : 1 };
+    case 'prev':
+      return { kind: 'move', delta: key === 'ArrowUp' ? -rowStep : -1 };
+    case 'first':
+      return { kind: 'edge', to: 'first' };
+    case 'last':
+      return { kind: 'edge', to: 'last' };
+    case 'toggle':
+      return nativeControl ? null : { kind: 'play' };
+    case 'activate':
+      // Buttons and tiles activate natively; only the page itself needs help.
+      return target instanceof Element && target.closest('button, a[href]')
+        ? null
+        : { kind: 'open' };
+    default:
+      return null;
+  }
+}
+
+/** The tile button or table row that carries keyboard focus for an item. */
+function findLibraryItemFocusTarget(
+  region: HTMLElement,
+  id: string
+): HTMLElement | null {
+  const tile = Array.from(
+    region.querySelectorAll<HTMLElement>('[data-library-item-id]')
+  ).find(element => element.dataset.libraryItemId === id);
+  if (tile) return tile.querySelector<HTMLElement>('[data-library-item-focus]');
+  return (
+    Array.from(region.querySelectorAll<HTMLElement>('tr[data-testid]')).find(
+      row => row.dataset.testid?.endsWith(`-row-${id}`)
+    ) ?? null
+  );
+}
 
 function AssetGrid({
   assets,
   selectedId,
   activePreviewId,
   playingPreviewId,
+  activePlayback,
   gridDensity,
   onSelect,
   onTogglePreview,
@@ -1762,6 +1758,7 @@ function AssetGrid({
   readonly selectedId: string | null;
   readonly activePreviewId: string | null;
   readonly playingPreviewId: string | null;
+  readonly activePlayback?: LibraryTilePlayback;
   readonly gridDensity: LibraryGridDensity;
   readonly onSelect: (id: string) => void;
   readonly onTogglePreview: LibraryPreviewToggle;
@@ -1769,6 +1766,7 @@ function AssetGrid({
 }) {
   return (
     <div
+      data-library-grid
       className={cn(
         LIBRARY_GRID_DENSITY_LAYOUT[gridDensity],
         LIBRARY_CONTENT_INSET_CLASS
@@ -1787,6 +1785,7 @@ function AssetGrid({
             selected={selectedId === asset.id}
             isPreviewActive={activePreviewId === asset.id}
             isPreviewPlaying={playingPreviewId === asset.id}
+            playback={activePreviewId === asset.id ? activePlayback : undefined}
             onSelect={() => onSelect(asset.id)}
             onTogglePreview={onTogglePreview}
           />
@@ -1820,6 +1819,8 @@ function LibraryReleaseTable({
   rowMode,
   playingPreviewId,
   onSelect,
+  onCursor,
+  onRowToggle,
   onTogglePreview,
   getContextMenuItems,
 }: {
@@ -1831,6 +1832,10 @@ function LibraryReleaseTable({
   readonly rowMode: TableRowMode;
   readonly playingPreviewId?: string | null;
   readonly onSelect: (id: string) => void;
+  /** Keyboard focus moved to a row; selection (and an open inspector) follows. */
+  readonly onCursor: (id: string) => void;
+  /** Space on a row. */
+  readonly onRowToggle: (asset: LibraryReleaseAsset) => void;
   readonly onTogglePreview?: LibraryPreviewToggle;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
 }) {
@@ -1854,6 +1859,11 @@ function LibraryReleaseTable({
       data={tableData}
       columns={columns}
       onRowClick={asset => onSelect(asset.id)}
+      onRowToggle={onRowToggle}
+      onFocusedRowChange={index => {
+        const asset = tableData[index];
+        if (asset) onCursor(asset.id);
+      }}
       getRowId={getRowId}
       getRowTestId={getRowTestId}
       rowSelection={rowSelection}
@@ -2333,19 +2343,8 @@ function AssetDrawer({
             title={current.title}
             subtitle={current.artist}
             meta={
-              <div className='system-b-library-status-bar flex min-w-0 items-center gap-1.5 text-tertiary-token'>
-                <span className='truncate'>
-                  {formatLibraryItemType(current)}
-                </span>
-                <span aria-hidden='true'>·</span>
-                <span
-                  role='status'
-                  className='truncate'
-                  data-testid={`library-release-status-${current.id}`}
-                  aria-label={`Release Status: ${formatLibraryStatus(current)}`}
-                >
-                  {formatLibraryStatus(current)}
-                </span>
+              <div className='flex h-6 min-w-0 items-center'>
+                <LibraryStatusGlyph asset={current} showLabel />
               </div>
             }
             stableLayout
@@ -2808,7 +2807,7 @@ export function LibrarySurface({
       },
     });
   }, [profileId, router, syncSpotify]);
-  const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, seek } = useTrackAudioPlayer();
   const [audioOverrides, setAudioOverrides] = useState<Record<string, string>>(
     {}
   );
@@ -3009,6 +3008,18 @@ export function LibrarySurface({
       ? activePreviewAsset.title
       : null;
 
+  const activeTilePlayback = useMemo<LibraryTilePlayback | undefined>(
+    () =>
+      activePreviewId
+        ? {
+            currentTime: playbackState.currentTime,
+            duration: playbackState.duration,
+            onSeek: seek,
+          }
+        : undefined,
+    [activePreviewId, playbackState.currentTime, playbackState.duration, seek]
+  );
+
   const handleTogglePreview = useCallback<LibraryPreviewToggle>(
     (asset, event) => {
       event?.stopPropagation();
@@ -3136,6 +3147,90 @@ export function LibrarySurface({
     globalThis.addEventListener('keydown', handleKeyDown);
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [closeAssetDrawer, drawerOpen]);
+
+  // Keyboard review (J/K/arrows move, Space plays, Enter inspects) for the
+  // grid, and for every view while focus rests on the page. Focused table
+  // rows handle their own keys and report moves through onCursor.
+  const catalogRegionRef = useRef<HTMLDivElement | null>(null);
+  const reviewKeyDownRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  function handleReviewKeyDown(event: KeyboardEvent) {
+    if (event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const region = catalogRegionRef.current;
+    const target = event.target;
+    if (!region || isInteractiveOverlayTarget(target)) return;
+    const onPage =
+      target === null ||
+      target === document.body ||
+      target === document.documentElement;
+    const inCatalog = target instanceof Node && region.contains(target);
+    // From the toolbar (after clicking a view or stage control) only the
+    // letter keys move; arrows, Space and Enter stay with that control.
+    const inChrome =
+      !inCatalog &&
+      target instanceof Element &&
+      Boolean(target.closest('[data-testid="library-surface"]')) &&
+      Boolean(
+        target.closest('button, input[type="radio"], input[type="checkbox"]')
+      );
+    if (
+      !onPage &&
+      !inCatalog &&
+      !(inChrome && (event.key === 'j' || event.key === 'k'))
+    ) {
+      return;
+    }
+    const grid = region.querySelector<HTMLElement>('[data-library-grid]');
+    const gridColumns =
+      view === 'grid' && grid
+        ? getComputedStyle(grid)
+            .getPropertyValue('grid-template-columns')
+            .split(' ')
+            .filter(Boolean).length || 1
+        : null;
+    const step: LibraryReviewStep | null = inChrome
+      ? { kind: 'move', delta: event.key === 'j' ? 1 : -1 }
+      : resolveLibraryReviewStep(event.key, target, gridColumns);
+    if (!step || visibleAssets.length === 0) return;
+
+    const index = visibleAssets.findIndex(asset => asset.id === selectedId);
+    const cursor = index === -1 ? null : visibleAssets[index];
+    if (step.kind === 'play' || step.kind === 'open') {
+      if (!cursor) return;
+      event.preventDefault();
+      if (step.kind === 'play') handleTogglePreview(cursor);
+      else openAsset(cursor.id);
+      return;
+    }
+
+    event.preventDefault();
+    const last = visibleAssets.length - 1;
+    const nextIndex =
+      step.kind === 'edge'
+        ? step.to === 'first'
+          ? 0
+          : last
+        : index === -1
+          ? step.delta > 0
+            ? 0
+            : last
+          : Math.min(last, Math.max(0, index + step.delta));
+    const next = visibleAssets[nextIndex];
+    if (!next) return;
+    setSelectedId(next.id);
+    const focusTarget = findLibraryItemFocusTarget(region, next.id);
+    focusTarget?.focus({ preventScroll: true });
+    focusTarget?.scrollIntoView?.({ block: 'nearest' });
+  }
+  useEffect(() => {
+    reviewKeyDownRef.current = handleReviewKeyDown;
+  });
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) =>
+      reviewKeyDownRef.current(event);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleApprovalStatusChange = useCallback(
     async (
@@ -3621,7 +3716,10 @@ export function LibrarySurface({
         className='flex h-full min-h-0 flex-1 overflow-hidden'
       >
         <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
-          <div className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'>
+          <div
+            ref={catalogRegionRef}
+            className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'
+          >
             {visibleAssets.length === 0 ? (
               <NoResults onReset={resetView} />
             ) : view === 'grid' ? (
@@ -3630,6 +3728,7 @@ export function LibrarySurface({
                 selectedId={selectedId}
                 activePreviewId={activePreviewId}
                 playingPreviewId={playingPreviewId}
+                activePlayback={activeTilePlayback}
                 gridDensity={gridDensity}
                 onSelect={openAsset}
                 onTogglePreview={handleTogglePreview}
@@ -3643,6 +3742,8 @@ export function LibrarySurface({
                 rowTestIdPrefix='library-catalog-row'
                 rowMode='compact'
                 onSelect={openAsset}
+                onCursor={setSelectedId}
+                onRowToggle={handleTogglePreview}
                 getContextMenuItems={getContextMenuItems}
               />
             ) : (
@@ -3655,6 +3756,8 @@ export function LibrarySurface({
                 rowMode={LIBRARY_LIST_ROW_MODE}
                 playingPreviewId={playingPreviewId}
                 onSelect={openAsset}
+                onCursor={setSelectedId}
+                onRowToggle={handleTogglePreview}
                 onTogglePreview={handleTogglePreview}
                 getContextMenuItems={getContextMenuItems}
               />

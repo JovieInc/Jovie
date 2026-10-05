@@ -15,7 +15,8 @@
  * `shadow` until the ramp ships.
  */
 
-import { existsSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { routedTransport } from '@jovie/copy/transport';
@@ -43,6 +44,7 @@ import {
   FactoryPaidBudgetConfigSchema,
   openFactoryPaidBudget,
 } from './budget';
+import { renderContentDigest, verifyRenderBytes } from './capture-integrity';
 import { preflightFactoryRun } from './preflight';
 import {
   dryProviders,
@@ -61,6 +63,7 @@ import {
   type StageAttemptRecord,
   stageInputDigest,
   verifyFactoryRun,
+  writeImmutableJson,
   writeJson,
 } from './receipts';
 import type { StageContext, StageResult, StageRunner } from './stage-kit';
@@ -204,8 +207,12 @@ function loadPriorChain(
       '--from-stage: prior stage identities do not match the current spine order; rerun from truth'
     );
   }
-  const issues = verifyFactoryRun(runDir).filter(issue =>
-    chain.some(link => issue.startsWith(`${link.stage}#`))
+  const issues = verifyFactoryRun(runDir).filter(
+    issue =>
+      chain.some(link => issue.startsWith(`${link.stage}#`)) ||
+      issue.includes('capture-integrity:') ||
+      issue.startsWith('retained attempt') ||
+      issue.startsWith('history/')
   );
   if (issues.length > 0) {
     throw new Error(
@@ -348,7 +355,21 @@ export async function runFactory(
       };
     }
   } else {
-    rmSync(runDir, { recursive: true, force: true });
+    // Keep earlier runs and their absolute capture paths retrievable. Only the
+    // current manifest/brief pointers are replaced; attempt files are append-only.
+    const priorPath = join(runDir, 'run.json');
+    if (existsSync(priorPath)) {
+      const prior = FactoryRunManifestSchema.parse(readJson(priorPath));
+      const history = join(runDir, 'history', randomUUID());
+      mkdirSync(history, { recursive: true });
+      for (const file of new Set([
+        'run.json',
+        'brief.json',
+        ...prior.attempts,
+      ])) {
+        copyFileSync(join(runDir, file), join(history, file));
+      }
+    }
   }
   writeJson(join(runDir, 'brief.json'), brief);
 
@@ -399,10 +420,35 @@ export async function runFactory(
         artifacts,
         receipts,
         attempt,
+        iteration: rework,
         feedback,
         runDir,
       });
       const harness = harnessInvariants(stage, result);
+      const render =
+        stage === 'render'
+          ? FACTORY_STAGE_ARTIFACT_SCHEMAS.render.safeParse(result.artifact)
+          : null;
+      let contentDigest: string | null = null;
+      if (render?.success) {
+        const integrity = verifyRenderBytes(render.data, providers.mode);
+        if (integrity.length === 0) {
+          try {
+            contentDigest = await renderContentDigest(
+              render.data,
+              providers.mode
+            );
+          } catch (error) {
+            integrity.push(
+              error instanceof Error ? error.message : String(error)
+            );
+          }
+        }
+        if (integrity.length > 0) {
+          harness.failed.push('capture-integrity');
+          harness.feedback.push(...integrity);
+        }
+      }
       const receipt = applyStagePassedBit(
         {
           schema: FACTORY_RECEIPT_SCHEMA,
@@ -419,15 +465,21 @@ export async function runFactory(
         },
         { certifier: FACTORY_CERTIFIER_HARNESS }
       );
-      const file = attemptFileName(stage, attempt, rework);
+      const baseFile = attemptFileName(stage, attempt, rework);
+      const file = existsSync(join(runDir, baseFile))
+        ? baseFile.replace(/\.json$/u, `.${randomUUID()}.json`)
+        : baseFile;
       const record: StageAttemptRecord = {
         receipt,
         artifact: result.artifact,
         feedbackIn: feedback,
-        notes: result.notes,
+        notes: {
+          ...result.notes,
+          ...(contentDigest ? { renderContentDigest: contentDigest } : {}),
+        },
         unavailable: result.unavailable,
       };
-      writeJson(join(runDir, file), record);
+      writeImmutableJson(join(runDir, file), record);
       manifest = { ...manifest, attempts: [...manifest.attempts, file] };
 
       if (paidBudget?.blockedReason) {
@@ -444,13 +496,36 @@ export async function runFactory(
           reason: result.unavailable,
         });
       }
-      if (
-        receipt.passed &&
-        stage === 'render' &&
-        manifest.reworks?.some(
-          entry => entry.rejectedRenderDigest === receipt.outputDigest
-        )
-      ) {
+      let unchangedRender = false;
+      if (receipt.passed && stage === 'render') {
+        for (const entry of manifest.reworks ?? []) {
+          const rejected = manifest.attempts
+            .map(file => readJson<StageAttemptRecord>(join(runDir, file)))
+            .find(
+              record =>
+                record.receipt.outputDigest === entry.rejectedRenderDigest
+            );
+          const prior = FACTORY_STAGE_ARTIFACT_SCHEMAS.render.safeParse(
+            rejected?.artifact
+          );
+          try {
+            const previousContent = prior.success
+              ? await renderContentDigest(prior.data, providers.mode)
+              : null;
+            unchangedRender ||=
+              previousContent && contentDigest
+                ? previousContent === contentDigest
+                : entry.rejectedRenderDigest === receipt.outputDigest;
+          } catch (error) {
+            return finish({
+              status: 'failed',
+              stoppedAt: stage,
+              reason: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      }
+      if (unchangedRender) {
         return finish({
           status: 'failed',
           stoppedAt: stage,
