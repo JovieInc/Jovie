@@ -1,0 +1,10 @@
+STATUS: BLOCKED
+
+- Merged `origin/main` into the branch at `c334677e4e`.
+- Required gate passed formatting, typecheck, lint, component shipping, and initial test shards.
+- Gate failed on the spacing-scale ratchet: branch measures 667 vs baseline 670.
+- Confirmed `origin/main` independently measures 668 vs baseline 670 and produces the same failure.
+- No baseline change or push was made.
+- Preserved `.jovie-preserved-repair.json`; working tree otherwise clean.
+
+NOT-SHIPPABLE: origin/main independently fails the spacing-scale shrink-only ratchet (668 measured vs 670 baseline).
