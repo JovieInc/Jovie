@@ -90,11 +90,8 @@ vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
   }),
 }));
 
-vi.mock('@/lib/queries', async () => {
-  const actual =
-    await vi.importActual<typeof import('@/lib/queries')>('@/lib/queries');
+vi.mock('@/lib/queries/useChatConversationsQuery', () => {
   return {
-    ...actual,
     useChatConversationsQuery: () => ({
       data: [
         {

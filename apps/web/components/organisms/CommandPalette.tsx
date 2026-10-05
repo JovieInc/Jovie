@@ -21,10 +21,7 @@ import {
   useMemo,
 } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import {
-  DEFAULT_PALETTE_SECTION_LIMIT,
-  type PaletteSection,
-} from '@/components/organisms/SharedCommandPalette';
+import type { PaletteSection } from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   useHeaderActions,
@@ -37,12 +34,13 @@ import {
 } from '@/lib/app-shell/workspaces';
 import type { EntityRef } from '@/lib/commands/entities';
 import {
+  DEFAULT_PALETTE_SECTION_LIMIT,
   getPaletteConversationSubtitle,
   rankPaletteConversations,
 } from '@/lib/commands/palette-ranking';
 import type { NavCommand } from '@/lib/commands/registry';
 import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
-import { useChatConversationsQuery } from '@/lib/queries';
+import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 
