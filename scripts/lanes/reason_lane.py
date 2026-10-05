@@ -193,11 +193,22 @@ def page_precedent(slug: str, raw: str) -> dict:
     document = raw or ""
     try:
         parsed = json.loads(document)
-        page = parsed.get("page", parsed.get("data", parsed))
-        document = page.get("compiled_truth") or page.get("compiledTruth") or page.get("body") or ""
-        title = page.get("title")
-    except (json.JSONDecodeError, AttributeError, TypeError):
+    except json.JSONDecodeError:
         title = None
+    else:
+        if not isinstance(parsed, dict):
+            raise ValueError("prior-art response is not a page")
+        page = parsed.get("page", parsed.get("data", parsed))
+        if not isinstance(page, dict):
+            raise ValueError("prior-art response is not a page")
+        document = page.get("compiled_truth") or page.get("compiledTruth") or page.get("body") or page.get("content") or ""
+        title = page.get("title")
+    if not isinstance(document, str):
+        raise ValueError("prior-art body is not text")
+    body = re.sub(r"\A---\s*\n.*?\n---\s*(?:\n|$)", "", document, flags=re.S).strip()
+    substantive = re.sub(r"^#{1,6}\s+.*$", "", body, flags=re.M).strip()
+    if not substantive or body.lower().rstrip(".") in {"0 results", "no results", "not found"}:
+        raise ValueError("empty prior-art body")
 
     def field(name: str) -> str | None:
         match = re.search(rf"^{re.escape(name)}:\s*(.+)$", document, re.M)
@@ -211,12 +222,13 @@ def page_precedent(slug: str, raw: str) -> dict:
             return value.strip("'\"")
 
     heading = re.search(r"^#\s+(.+)$", document, re.M)
-    applicability = re.search(r"^## Applicability\s+(.+?)(?=\n## |\Z)", document, re.M | re.S)
+    applicability = re.search(r"^## Applicability[ \t]*\n(.*?)(?=^## |\Z)", document, re.M | re.S)
     source_url = field("source_url")
     return {"slug": slug, "sourceKind": "yc-prior-art" if slug.startswith("knowledge/external/yc/") else "internal",
             "title": title or field("title") or (heading.group(1).strip() if heading else slug),
             "sourceUrl": source_url,
             "publishedAt": field("published_at") or field("updated_at") or field("compiled_at") or "unknown",
+            "excerpt": document[:2500],
             "applicability": re.sub(r"\s+", " ", applicability.group(1)).strip()[:500]
             if applicability else "Evaluate against the current Jovie evidence and constraints."}
 
@@ -231,25 +243,42 @@ def retrieve_business_prior_art(job: dict, run=subprocess.run, limit: int = 3) -
     receipt["queries"] = queries
     slugs: list[str] = []
     try:
+        # The existing YC corpus owns one known playbook per exact topic token.
+        # Read it before discovery; an empty historical page is evidence missing,
+        # never a precedent. The original reasoning question remains unchanged.
+        catalog_slug = f"knowledge/external/yc/playbook/{topic}"
+        receipt.update(catalogSlug=catalog_slug, retrievalPath="discovery")
+        catalog = run(["gbrain", "get", catalog_slug], capture_output=True, text=True, timeout=20)
+        if catalog.returncode == 0:
+            try:
+                precedent = page_precedent(catalog_slug, catalog.stdout)
+                applicability = re.search(r"^## Applicability[ \t]*\n(.*?)(?=^## |\Z)",
+                                          precedent["excerpt"], re.M | re.S)
+                if not applicability or not applicability.group(1).strip():
+                    raise ValueError("catalog applicability missing")
+            except ValueError:
+                receipt["catalogStatus"] = "empty"
+            else:
+                receipt.update(status="found", catalogStatus="verified", retrievalPath="known-catalog",
+                               queries=[], precedents=[precedent])
+                return receipt
+        elif re.search(r"(?:page[_ ]not[_ ]found|not found)",
+                       f"{catalog.stdout}\n{catalog.stderr}", re.I):
+            receipt["catalogStatus"] = "missing"
+        else:
+            raise RuntimeError((catalog.stderr or "catalog read failed")[-300:])
         for query in queries:
-            keyword = run(["gbrain", "search", query, "--limit", str(limit)], capture_output=True,
-                          text=True, timeout=20)
-            if keyword.returncode != 0:
-                raise RuntimeError((keyword.stderr or "keyword search failed")[-300:])
-            found = search_slugs(keyword.stdout)
-            if not found:
-                semantic = run(["gbrain", "query", query, "--limit", str(limit)], capture_output=True,
-                               text=True, timeout=20)
-                if semantic.returncode != 0:
-                    raise RuntimeError((semantic.stderr or "semantic query failed")[-300:])
-                found = search_slugs(semantic.stdout)
-            slugs.extend(found)
+            semantic = run(["gbrain", "query", query, "--limit", str(limit)], capture_output=True,
+                           text=True, timeout=20)
+            if semantic.returncode != 0:
+                raise RuntimeError((semantic.stderr or "semantic query failed")[-300:])
+            slugs.extend(search_slugs(semantic.stdout))
         for slug in list(dict.fromkeys(slugs))[:limit * 2]:
             page = run(["gbrain", "get", slug], capture_output=True, text=True, timeout=30)
             if page.returncode != 0:
                 raise RuntimeError(f"get {slug}: {(page.stderr or 'failed')[-200:]}")
             receipt["precedents"].append(page_precedent(slug, page.stdout))
-    except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+    except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
         receipt.update(status="retrieval-failed", failure=f"{type(error).__name__}: {error}"[:500])
         return receipt
     receipt["status"] = "found" if receipt["precedents"] else "no sufficiently applicable precedent"

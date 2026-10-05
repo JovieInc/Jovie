@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -186,21 +187,81 @@ class BusinessPriorArtTest(unittest.TestCase):
         for question, topic in questions.items():
             self.assertEqual(reason.business_topic(question), topic, question)
 
-    def test_keyword_first_results_bind_source_date_and_applicability(self):
+    def test_known_catalog_reads_real_content_without_discovery(self):
+        page = json.dumps({"title": "Growth", "compiled_truth": "---\nsource_url: https://www.ycombinator.com/blog/ycs-essential-startup-advice\npublished_at: 2017-09-25\n---\n# Growth\n## Applicability\nMeasure actual demand before scaling.\n## Limits\nAn observed delivery bottleneck may justify capacity work."})
+        def read(args, _kw):
+            self.assertEqual(args, ["gbrain", "get", "knowledge/external/yc/playbook/growth-scaling"])
+            return done(page)
+        run = Runner(gbrain=read)
+        job = reason.parse_job("JOV-9", "Growth", description({**JOB_BLOCK, "question": "How should growth react to our revenue constraint?"}))
+        receipt = reason.retrieve_business_prior_art(job, run=run)
+        self.assertEqual(receipt["status"], "found")
+        self.assertEqual(receipt["retrievalPath"], "known-catalog")
+        self.assertEqual(receipt["precedents"][0]["sourceUrl"], "https://www.ycombinator.com/blog/ycs-essential-startup-advice")
+        self.assertIn("observed delivery bottleneck", receipt["precedents"][0]["excerpt"])
+        self.assertEqual(len(run.calls), 1)
+        self.assertLessEqual(run.calls[0][1]["timeout"], 20)
+
+    def test_empty_catalog_requires_hybrid_discovery_and_never_counts_as_found(self):
+        def read(args, _kw):
+            if args[1] == "get":
+                return done(json.dumps({"title": "Growth", "compiled_truth": "", "timeline": ""}))
+            self.assertEqual(args[1], "query", "natural language needs hybrid retrieval")
+            return done("", 1, "semantic unavailable")
+        run = Runner(gbrain=read)
+        job = reason.parse_job("JOV-9", "Growth", description({**JOB_BLOCK, "question": "How should growth react to our revenue constraint?"}))
+        receipt = reason.retrieve_business_prior_art(job, run=run)
+        self.assertEqual(receipt["status"], "retrieval-failed")
+        self.assertEqual(receipt["precedents"], [])
+        self.assertEqual(receipt["catalogStatus"], "empty")
+        self.assertIn("semantic unavailable", receipt["failure"])
+
+    def test_catalog_provider_failure_does_not_retry_or_spend_on_discovery(self):
+        run = Runner(gbrain=done("", 1, "unauthorized"))
+        job = reason.parse_job("JOV-9", "Growth", description({**JOB_BLOCK, "question": "How should growth react to our revenue constraint?"}))
+        receipt = reason.retrieve_business_prior_art(job, run=run)
+        self.assertEqual(receipt["status"], "retrieval-failed")
+        self.assertEqual(receipt["precedents"], [])
+        self.assertEqual(len(run.calls), 1)
+
+    def test_empty_or_malformed_discovered_pages_are_not_precedents(self):
+        for document in ('', '---\ntitle: Growth\n---\n# Growth', '[]', '{"body":17}', '{"title":"Growth"}'):
+            with self.subTest(document=document):
+                with self.assertRaises(ValueError):
+                    reason.page_precedent('ops/growth', document)
+        hit = '[0.9] ops/growth -- Growth'
+        run = Runner(gbrain=[done('', 1, 'page_not_found'), done(hit), done('No results.'),
+                             done('{"compiled_truth":""}')])
+        job = reason.parse_job("JOV-9", "Growth", description({**JOB_BLOCK, "question": "How should growth react to our revenue constraint?"}))
+        receipt = reason.retrieve_business_prior_art(job, run=run)
+        self.assertEqual(receipt['status'], 'retrieval-failed')
+        self.assertEqual(receipt['precedents'], [])
+
+    def test_known_catalog_requires_substantive_applicability(self):
+        page = '# Growth\n## Applicability\n\n## Limits\nAvoid scaling without demand evidence.'
+        run = Runner(gbrain=[done(page), done('No results.'), done('No results.')])
+        job = reason.parse_job("JOV-9", "Growth", description({**JOB_BLOCK, "question": "How should growth react to our revenue constraint?"}))
+        receipt = reason.retrieve_business_prior_art(job, run=run)
+        self.assertEqual(receipt['status'], 'no sufficiently applicable precedent')
+        self.assertEqual(receipt['precedents'], [])
+
+    def test_hybrid_discovery_results_bind_source_date_and_applicability(self):
         internal = json.dumps({"results": [{"slug": "ops/summer/pricing-evidence"}]})
         yc = "[0.91] knowledge/external/yc/playbook/pricing-unit-economics -- Pricing"
-        internal_page = "---\ntitle: Internal pricing evidence\nupdated_at: 2026-09-28\n---\n# Evidence"
+        internal_page = "---\ntitle: Internal pricing evidence\nupdated_at: 2026-09-28\n---\n# Evidence\nMeasure customer value before pricing."
         yc_page = ("---\ntitle: Pricing and unit economics\npublished_at: 2017-09-25\n"
                    "source_url: https://www.ycombinator.com/blog/ycs-essential-startup-advice\n---\n"
                    "# Pricing\n## Applicability\nUse before buying growth.\n## Source evidence")
-        run = Runner(gbrain=[done(internal), done(yc), done(internal_page), done(yc_page)])
+        run = Runner(gbrain=[done("", 1, "page_not_found"), done(internal), done(yc), done(internal_page), done(yc_page)])
         job = reason.parse_job("JOV-9", "Pricing", description({**JOB_BLOCK, "question": "How should we price Jovie?"}))
         receipt = reason.retrieve_business_prior_art(job, run=run)
         self.assertEqual(receipt["status"], "found")
         self.assertEqual([p["sourceKind"] for p in receipt["precedents"]], ["internal", "yc-prior-art"])
         self.assertEqual(receipt["precedents"][1]["publishedAt"], "2017-09-25")
         self.assertEqual(receipt["precedents"][1]["applicability"], "Use before buying growth.")
-        self.assertEqual(run.made("gbrain")[0][1], "search", "keyword retrieval is always first")
+        self.assertEqual(run.made("gbrain")[0][1], "get", "known catalog is read first")
+        self.assertEqual([call[1] for call in run.made("gbrain")][1:3], ["query", "query"],
+                         "natural-language discovery uses hybrid retrieval")
 
     def test_novel_problem_and_failure_are_distinct(self):
         job = reason.parse_job("JOV-9", "Pricing", description({**JOB_BLOCK, "question": "Choose pricing for antimatter tours"}))
@@ -529,7 +590,7 @@ class OneJobTest(unittest.TestCase):
                     "newLearningNeeded": [],
                     "ranking": [{**item, "evidence": ["knowledge/external/yc/playbook/hiring-team", "JOV-12"]}
                                 for item in PROPOSAL["ranking"]]}
-        run = Runner(gbrain=[done("0 results"), done(hit), done(hit), done(page), done("ok"), done("", 1)],
+        run = Runner(gbrain=[done(page), done("ok"), done("", 1)],
                      claude=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, issue, CONFIG, Path(tmp), run=run)
@@ -576,6 +637,15 @@ class DrainAndTickTest(unittest.TestCase):
 
     def setUp(self):
         FakeLock.held_paths = set()
+        module_path = patch.object(sys, 'path', [str(ROOT / 'scripts/lanes'), *sys.path])
+        module_path.start()
+        self.addCleanup(module_path.stop)
+        import lane_runner as lane
+        cache = tempfile.TemporaryDirectory()
+        self.addCleanup(cache.cleanup)
+        cache_patch = patch.object(lane, 'SHARED_CACHE_DIR', Path(cache.name))
+        cache_patch.start()
+        self.addCleanup(cache_patch.stop)
 
     def test_drain_runs_queued_jobs_and_skips_ones_another_host_took(self):
         jobs = [{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "2"},
@@ -671,8 +741,12 @@ class DrainAndTickTest(unittest.TestCase):
             FakeLock.held_paths = set()
             self.assertEqual(reason.tick(host, self.lane(None), lambda: FakeLinear(), CONFIG)["status"], "idle")
             queued = FakeLinear(jobs=[{"id": "i", "identifier": "JOV-1", "title": "", "description": "", "createdAt": "1"}])
-            out = reason.tick(host, self.lane(None), lambda: queued, CONFIG,
-                              spawn=lambda args, **kw: spawned.append(args))
+            self.assertEqual(reason.tick(host, self.lane(None), lambda: queued, CONFIG)["status"], "idle")
+            import lane_runner as lane
+            refreshed = time.time() + lane.CLAIM_SCAN_TTL_S + 1
+            with patch.object(lane.time, 'time', lambda: refreshed):
+                out = reason.tick(host, self.lane(None), lambda: queued, CONFIG,
+                                  spawn=lambda args, **kw: spawned.append(args))
         self.assertEqual(out, {"status": "spawned", "queued": 1})
         self.assertEqual(spawned[0][-1], "drain")
 
