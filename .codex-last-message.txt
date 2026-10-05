@@ -1,0 +1,8 @@
+The failure is unrelated infrastructure, not this PR:
+
+- Jovie Bot’s GraphQL rate limit was exhausted for installation `112037986`.
+- PRs #20095 and #20079 failed identically minutes earlier.
+- The job does not check out or execute this PR’s fixture changes.
+- Worktree remains clean; nothing was installed, changed, or pushed.
+
+NOT-SHIPPABLE: GitHub App installation rate-limit exhaustion caused the required auto-merge check to fail independently of PR #19874.
