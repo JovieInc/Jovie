@@ -1604,7 +1604,7 @@ const AssetCard = memo(function AssetCard({
           >
             <LibraryMediaThumbnail asset={asset} size='card' />
           </div>
-          <div className='min-w-0 px-2.5 pb-2.5 pt-2'>
+          <div className='min-w-0 px-3 pb-3 pt-2'>
             <div className='flex min-w-0 items-center gap-1.5'>
               <h2 className='system-b-library-card-title min-w-0 flex-1 truncate'>
                 {asset.title}
