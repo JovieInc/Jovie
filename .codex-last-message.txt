@@ -1,0 +1,10 @@
+Blocking findings:
+
+- [P1] (10/10) [dogfood-receipt.ts:380](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T140425Z-JOV-7411-codex-ef959d/apps/web/lib/agent-os/dogfood-receipt.ts:380): outcome depends only on `exitCode`. A timed-out, canceled, failed, or canonically mismatched invocation with exit code 0 becomes `passed`, inflating metrics and potentially satisfying machine-certification reliability.
+- [P1] (9/10) [fleet-hardening.ts:10](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T140425Z-JOV-7411-codex-ef959d/apps/web/lib/agent-os/fleet-hardening.ts:10): secret detection is bypassable. Common forms such as `--access-token=...`, `Authorization: Bearer ...`, JWTs, and credentials in `actualResult` validate despite the no-retention claim.
+- [P1] (9/10) [dogfood-receipt.ts:226](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T140425Z-JOV-7411-codex-ef959d/apps/web/lib/agent-os/dogfood-receipt.ts:226): non-null primitive/array `invocation` values are accepted as valid receipts. Metrics then treat them as structured evidence and can crash while dereferencing `caller`, `latencyMs`, or related fields.
+- [P2] (9/10) [fleet-hardening.ts:31](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T140425Z-JOV-7411-codex-ef959d/apps/web/lib/agent-os/fleet-hardening.ts:31): repair timestamps lack ordering validation, allowing recertification before detection and negative defect-to-recertification metrics.
+
+The added tests cover only normal exit-code mapping and one secret form; none cover these failure paths. No migration, auth/billing, infrastructure, or unrelated-scope changes were present.
+
+LLM-REVIEW: FAIL — failed executions can certify as passed; secret redaction and invocation validation are bypassable
