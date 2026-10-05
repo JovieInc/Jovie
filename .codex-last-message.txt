@@ -1,0 +1,12 @@
+STATUS: NEEDS_CONTEXT
+
+The `ship` workflow requires an upgrade decision before continuing. gstack v1.91.25.0 is available; current version is v0.14.5.0.
+
+PR #20689 remains OPEN, outside the merge queue, and the worktree is clean.
+
+RECOMMENDATION: Choose C to keep this dependency repair focused.
+
+A) Upgrade now  
+B) Always auto-upgrade  
+C) Not now  
+D) Never ask again
