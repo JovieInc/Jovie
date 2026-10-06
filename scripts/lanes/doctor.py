@@ -447,6 +447,26 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = (f"{busy} slots busy with {pool if pool is not None else 'unknown'} eligible new issues "
                                 f"and {obs.get('openPRCount', 'unknown')} open PRs but nothing passed the gate ({last})")
+    if busy and waiting and isinstance(obs.get("lastWorkAge"), (int, float)) and obs["lastWorkAge"] > 3600:
+        alerts["workers-without-completions"] = (
+            f"{busy} slot leases occupied but no completed run for {int(obs['lastWorkAge'] // 60)}m; "
+            "check current processes, fenced ownership and repair holds before adding workers")
+    budgets = obs.get("newIssueBudgetByProvider") or {}
+    inventory_holds = [name for name, budget in budgets.items()
+                       if budget.get("reason") in {"over-budget", "terminal-pr-backlog"}]
+    if obs.get("eligiblePool") and obs.get("pool") == 0 and inventory_holds:
+        alerts["admission-repair-needed"] = (
+            f"{obs['eligiblePool']} qualified issues await PR inventory recovery on {', '.join(sorted(inventory_holds))}; "
+            "repair existing owned PRs or reconcile held dependencies; retain concurrency and retry limits")
+    elif obs.get("eligiblePool") is None or obs.get("pool") is None or any(
+            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
+        if prior_alarm:
+            alerts["admission-repair-needed"] = prior_alarm
+    if obs.get("lastWorkAge") is None:
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("workers-without-completions")
+        if prior_alarm:
+            alerts["workers-without-completions"] = prior_alarm
     spawned = (obs.get("tick") or {}).get("spawned") or []
     idle_ages = obs.get("idleExitAge") or {}
     clean_exit = bool(spawned) and all(
@@ -537,6 +557,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
+        "workers-without-completions": "verify-process-and-fenced-repair-ownership",
+        "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -556,6 +578,12 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                  else float((previous.get("providerIdleSince") or {}).get(provider, now)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
         if key == "design-brief-stale" and obs.get("designGate") is None:
+            source_status = "unknown"
+        if key == "admission-repair-needed" and (obs.get("eligiblePool") is None or obs.get("pool") is None
+                or any(row.get("reason") == "pr-inventory-unavailable"
+                       for row in (obs.get("newIssueBudgetByProvider") or {}).values())):
+            source_status = "unknown"
+        if key == "workers-without-completions" and obs.get("lastWorkAge") is None:
             source_status = "unknown"
         freshness = (obs.get("hudBeatAge") if key == "hud-stale" else
                      obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)

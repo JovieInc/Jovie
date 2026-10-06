@@ -222,6 +222,33 @@ class ConditionReceiptTest(unittest.TestCase):
 
 
 class ReconcileTest(unittest.TestCase):
+    def test_admission_alarm_survives_unknown_inventory_until_observed_recovery(self):
+        observed = obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "over-budget"}})
+        alerts = doctor.judge(observed)
+        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, observed, "gem")}
+        for unknown in (obs(eligiblePool=None, pool=None, newIssueBudgetByProvider={}),
+                        obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "pr-inventory-unavailable"}})):
+            carried = doctor.judge(unknown, prior)
+            receipt = doctor.condition_receipts(carried, prior, unknown, "gem")["admission-repair-needed"]
+            self.assertEqual(receipt["state"], "active")
+            self.assertEqual(receipt["source"]["status"], "unknown")
+            self.assertEqual(receipt["generation"], 1)
+        recovered = obs(eligiblePool=59, pool=59)
+        receipts = doctor.condition_receipts(doctor.judge(recovered, prior), prior, recovered, "gem")
+        self.assertEqual(receipts["admission-repair-needed"]["state"], "resolved")
+
+    def test_busy_scanners_without_completions_require_diagnosis_not_more_slots(self):
+        observed = obs(eligiblePool=59, busy=5, lastWorkAge=20482)
+        alerts = doctor.judge(observed)
+        receipt = doctor.condition_receipts(alerts, {}, observed, "gem")["workers-without-completions"]
+        self.assertEqual(receipt["recovery"]["action"], "verify-process-and-fenced-repair-ownership")
+        prior = {"alerts": alerts, "conditions": {"workers-without-completions": receipt}}
+        unknown = obs(lastWorkAge=None)
+        carried = doctor.judge(unknown, prior)
+        self.assertEqual(doctor.condition_receipts(carried, prior, unknown, "gem")["workers-without-completions"]["source"]["status"], "unknown")
+        self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=60), prior))
+        self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=None)))
+
     def test_unknown_design_census_preserves_alarm_until_observed_recovery(self):
         for reason in ({"linearError": "pool read failed"}, {"linearSkipped": "cooldown"}):
             with self.subTest(reason=reason):

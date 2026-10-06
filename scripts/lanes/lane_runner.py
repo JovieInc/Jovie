@@ -3142,16 +3142,37 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
 
 
 def fetch_labeled_events(linear) -> list:
-    """The one label-filtered Linear read per tick, shared across workers via `shared`.
+    """One complete bounded inventory per cache fill; never plan from a truncated page.
 
     JOV and LYB issues labeled `remediation:<fingerprint>` come back together.
     Callers must not issue a follow-up read per issue.
     """
     def fetch():
-        data = linear.gql(remediation.LABELED_EVENT_QUERY, {})
-        return (data.get("issues") or {}).get("nodes") or []
+        rows, ids, cursors, after = [], set(), set(), None
+        for _ in range(remediation.EVENT_INVENTORY_PAGES):
+            data = linear.gql(remediation.LABELED_EVENT_QUERY, {"after": after})
+            edge = data.get("issues")
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise RuntimeError("remediation-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not row.get("id"):
+                    raise RuntimeError("remediation-inventory-malformed")
+                if row["id"] not in ids:
+                    rows.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise RuntimeError("remediation-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return rows
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise RuntimeError("remediation-inventory-cursor-invalid")
+            cursors.add(after)
+        raise RuntimeError("remediation-inventory-page-limit")
 
-    return shared("remediation-events", SUMMARY_TTL_S, fetch) or []
+    # New cache namespace fences old first-page-only receipts after source installation.
+    return shared("remediation-events-v2", SUMMARY_TTL_S, fetch) or []
 
 
 def _apply_event_plan(linear, plan: dict) -> None:
