@@ -1,0 +1,10 @@
+Already fixed on `origin/main`; no duplicate change or PR was created.
+
+- H-07: in-app delivery defaults off and has no settings control via [preferences.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T091443Z-JOV-7612-codex-6d78fd/apps/web/lib/notifications/preferences.ts). Landed in PR #20205.
+- H-08: “Instagram DMs / Coming soon” was removed from [ProfileNotificationsMenu.tsx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T091443Z-JOV-7612-codex-6d78fd/apps/web/components/organisms/profile-notifications-menu/ProfileNotificationsMenu.tsx). Landed in PR #20196.
+- Verification: 3 related test files, 63 tests passed using Node 24.21.0 and pnpm 9.15.9.
+- Worktree remains clean; `HEAD` equals `origin/main`.
+- GBrain query returned HTTP 400 (`gbrain-unavailable`). The supplied audit artifact path was unavailable locally, so verification used current source and merged PR evidence.
+- No Biome run was needed because no files changed.
+
+NOT-SHIPPABLE: H-07 and H-08 are already fixed on origin/main by merged PRs #20205 and #20196.
