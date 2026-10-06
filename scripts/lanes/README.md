@@ -295,6 +295,26 @@ account until the reset it reports (default 5h). `codex_lane.py status` is the J
 HUD and doctor read; `health` exits non-zero when no account is available, which keeps
 the lane from dispatching at all.
 
+For an existing supported CLI subscription login, operators can opt in with
+`CODEX_LANE_AUTH_MODE=current-login`. This uses the existing `CODEX_HOME` (default
+`~/.codex`) and a single `current-login` flock. It asks `codex login status` for
+ChatGPT auth without reading credential files or discovering other accounts.
+`CODEX_LANE_CLI` may name an already installed executable when the host's PATH
+entry is broken; it does not install a CLI. API credentials are removed from the
+child environment, execution pins OpenAI plus `forced_login_method="chatgpt"`,
+and `--approve-for-me` retains the workspace sandbox and automatic approval review.
+An auth or rate/usage limit banks this one login and returns exit 75 to the existing
+handoff policy. This mode never rotates profiles, redeems reset credits, or probes
+private quota services. Auth status establishes login, not available plan quota.
+
+Enabling the mode and any nonzero `LANES_SLOTS_CODEX` value is a host configuration
+change, separate from landing source. Review the activation and rollback plan
+before changing the service. Existing issue/PR ownership, file-overlap admission,
+slot limits, PR backlog budgets, capability floors, and independent security,
+review, queue and production gates still apply. Summer reasoning/notification
+failures are ancillary to `dispatch()`; they do not authorize bypassing an intake
+or release hold.
+
 Auth, billing, payment, infrastructure, and Vercel labels are admitted only by this lane.
 Those runs use maximum reasoning effort, carry the `sensitive-surface` PR label across
 hosts, and stay draft until the normal Migration Guard/security/boundary checks plus a
