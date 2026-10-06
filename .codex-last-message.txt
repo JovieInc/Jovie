@@ -1,0 +1,17 @@
+Implemented and opened draft PR [#20289](https://github.com/JovieInc/Jovie/pull/20289).
+
+Handoff:
+
+- Replaced Google CSE with Exa fallback while retaining SerpAPI priority.
+- Preserved typed `not_configured`, quota, auth, timeout, and provider-error outcomes.
+- Added Exa domain filtering, pagination, retries, and regression coverage.
+- Removed Google CSE environment/runtime usage without changing Linktree/Beacons crawling.
+- Final SHA: `e4422aee09c7d935f97f25fe2b34197805fadee9`
+- Verification: Biome passed; 186/186 focused tests passed; typecheck 17/17; all exact-head GitHub checks passed.
+- PR remains open, draft, mergeable, and unmerged.
+
+Concerns/deviations:
+
+- Production secrets were not inspected. Deployment needs either existing `SERPAPI_API_KEY` or an approved `EXA_API_KEY`; otherwise discovery truthfully returns `not_configured`.
+- Historical `google_cse` database values remain to avoid an unrelated migration.
+- GBrain returned HTTP 400, Linear required reauthentication, and CodeRabbit automatic review was disabled; these are documented in the PR.
