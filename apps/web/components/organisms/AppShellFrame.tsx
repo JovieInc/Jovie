@@ -106,7 +106,11 @@ export const AppShellFrame = memo(function AppShellFrame({
           <div
             data-app-shell-main-plane='true'
             className={cn(
-              'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+              // This plane clips shell chrome; route panes own scrolling.
+              // overflow:hidden is still programmatically scrollable, so a
+              // hovering inspector's travel can let scrollIntoView move the
+              // entire header and route by 6px. Clip without a scroll box.
+              'flex min-h-0 min-w-0 flex-1 overflow-clip',
               SHELL_RAIL_MAIN_PLANE
             )}
           >
