@@ -473,6 +473,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if stale_briefs:
         alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
                                         f"without a build claim ({', '.join(stale_briefs[:5])})")
+    elif obs.get("designGate") is None:
+        # A failed/cooldown census cannot prove recovery of a previously observed alarm.
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("design-brief-stale")
+        if prior_alarm:
+            alerts["design-brief-stale"] = prior_alarm
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -550,6 +555,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         first = (float(old["firstObservedEpoch"]) if continuing and old.get("firstObservedEpoch") is not None
                  else float((previous.get("providerIdleSince") or {}).get(provider, now)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
+        if key == "design-brief-stale" and obs.get("designGate") is None:
+            source_status = "unknown"
         freshness = (obs.get("hudBeatAge") if key == "hud-stale" else
                      obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)
         action = ("dispatch-provider-workers" if key.startswith("provider-idle:") else

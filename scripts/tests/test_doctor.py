@@ -222,6 +222,31 @@ class ConditionReceiptTest(unittest.TestCase):
 
 
 class ReconcileTest(unittest.TestCase):
+    def test_unknown_design_census_preserves_alarm_until_observed_recovery(self):
+        for reason in ({"linearError": "pool read failed"}, {"linearSkipped": "cooldown"}):
+            with self.subTest(reason=reason):
+                tracker = FakeTracker()
+                observed = obs(designGate={"stale": ["JOV-3"]})
+                alerts = doctor.judge(observed)
+                state = doctor.reconcile(alerts, {}, tracker, observed["now"],
+                                         doctor.condition_receipts(alerts, {}, observed, "gem"))
+                observed = obs(designGate=None, **reason)
+                alerts = doctor.judge(observed, state)
+                state = doctor.reconcile(alerts, state, tracker, observed["now"],
+                                         doctor.condition_receipts(alerts, state, observed, "gem"))
+                self.assertEqual(tracker.closed, [])
+                self.assertIsNone(state["issues"]["design-brief-stale"]["closedAt"])
+                condition = state["conditions"]["design-brief-stale"]
+                self.assertEqual(condition["state"], "active")
+                self.assertEqual(condition["source"]["status"], "unknown")
+                self.assertEqual(condition["generation"], 1)
+                observed = obs(designGate={"stale": []})
+                alerts = doctor.judge(observed, state)
+                state = doctor.reconcile(alerts, state, tracker, observed["now"],
+                                         doctor.condition_receipts(alerts, state, observed, "gem"))
+                self.assertEqual(tracker.closed.count("id-design-brief-stale"), 1)
+                self.assertEqual(state["conditions"]["design-brief-stale"]["state"], "resolved")
+
     def test_new_alert_opens_once_clearing_closes_and_refire_reopens(self):
         tracker = FakeTracker()
         now = 1_000_000.0
