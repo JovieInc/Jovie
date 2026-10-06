@@ -1,0 +1,13 @@
+Implemented and opened draft PR [#20339](https://github.com/JovieInc/Jovie/pull/20339), commit `9634bed`.
+
+Root cause: responsive tests clicked the hidden desktop sign-in link. [auth-visual.spec.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T145530Z-JOV-7683-codex-ee6690/apps/web/tests/e2e/auth-visual.spec.ts:87) now opens the mobile menu when present and clicks the visible sign-in link.
+
+Verified:
+
+- Sign-in visual matrix: 4/4 breakpoints passed
+- Biome and web/monorepo typechecks passed
+- Commit and pre-push hooks passed
+- Hosted Source Validation, coverage, security, migration, and PR gates passed
+- Branch is clean and matches remote
+
+The PR remains draft and unmerged as required. The original scheduled signal can only clear after the change lands and the workflow reruns. GBrain was unavailable, and the manual Linear transition was rate-limited; the active Symphony execution receipt confirmed issue ownership.
