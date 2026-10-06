@@ -1,0 +1,28 @@
+Implemented and opened [draft PR #20285](https://github.com/JovieInc/Jovie/pull/20285) against `main`.
+
+Commit: `173c7bc5121eecb1d3345cd539b12e09b109b0e5`
+
+Changes:
+
+- Added `jovie creator lookup <youtube-url|youtube:handle>` and matching MCP tool.
+- Resolves canonical YouTube channel identity before matching public Jovie profiles.
+- Returns fresh extraction with `exists:false` when no profile matches.
+- Detects ambiguous channel ownership without guessing by Jovie username.
+- Added stable `ARTIST_NOT_FOUND` API codes for `artist get` 404s.
+- Updated OpenAPI, CLI documentation, packaged-command smoke coverage, and regression tests.
+
+Verification:
+
+- CLI: 73 tests passed.
+- Web: 55 tests passed.
+- Typecheck: 17/17 tasks passed.
+- Server-boundary lint passed.
+- CLI package dry-run passed.
+- Biome and `git diff --check` passed.
+- Branch is clean and matches the pushed remote commit.
+
+Deviations:
+
+- Live credentialed YouTube API lookup was not run; tests use mocked responses.
+- Linear could not transition JOV-7567 to In Review because the connector requires reauthentication.
+- GBrain writeback failed because its embedding service was unreachable (`gbrain-unavailable`).
