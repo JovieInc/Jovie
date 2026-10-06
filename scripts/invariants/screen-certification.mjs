@@ -12,6 +12,10 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  screenNeedsProductReferences,
+  validateProductReferenceSnapshot,
+} from './product-reference-coherence.mjs';
 import { projectScreenDecisionRouting } from './screen-decision-routing.mjs';
 import {
   resolveTrustedArtifactId,
@@ -539,6 +543,16 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
   if (proof.screenId !== screen.id) {
     findings.push(
       `proof screenId ${proof.screenId ?? '<missing>'} does not match ${screen.id}`
+    );
+  }
+  if (
+    screenNeedsProductReferences(screen.id) ||
+    proof.productReferences !== undefined
+  ) {
+    findings.push(
+      ...validateProductReferenceSnapshot(proof.productReferences, {
+        screenId: screen.id,
+      })
     );
   }
   const proofHead =

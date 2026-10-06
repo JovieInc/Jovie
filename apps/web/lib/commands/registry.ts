@@ -299,8 +299,8 @@ export function buildCommands(
       PRODUCT_ONTOLOGY.identity.label,
       PRODUCT_ONTOLOGY.identity.definition,
       'Waypoints',
-      APP_ROUTES.PRESENCE,
-      'PROFILES_WORKSPACE'
+      PRODUCT_ONTOLOGY.identity.canonicalRoute,
+      PRODUCT_ONTOLOGY.identity.requiredFlag
     ),
     nav(
       'go-work',

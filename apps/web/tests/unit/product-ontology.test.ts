@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { APP_SCREEN_REGISTRY } from '@/data/appScreens';
 import {
+  getProductProjection,
   PRODUCT_ONTOLOGY,
   PRODUCT_ONTOLOGY_FIXTURES,
   PRODUCT_REPRESENTATIONS,
@@ -10,6 +11,23 @@ import {
 } from '@/data/productOntology';
 
 describe('Identity and Work product ontology', () => {
+  it('projects only enabled features while retaining technical compatibility IDs', () => {
+    expect(
+      getProductProjection({}).features.map(feature => feature.featureId)
+    ).toEqual(['work']);
+    const enabled = getProductProjection({ PROFILES_WORKSPACE: true });
+    expect(enabled.features).toContainEqual({
+      featureId: 'identity',
+      label: 'Identity',
+      destination: APP_ROUTES.PRESENCE,
+    });
+    expect(enabled.features).toContainEqual({
+      featureId: 'work',
+      label: 'Work',
+      destination: APP_ROUTES.LIBRARY,
+    });
+    expect(() => getProductProjection({}, 'fr')).toThrow('not defined');
+  });
   it('has exactly two top-level concepts and treats links as representation', () => {
     expect(TOP_LEVEL_PRODUCT_CONCEPTS).toEqual(['identity', 'work']);
     expect(Object.keys(PRODUCT_ONTOLOGY)).toEqual(['identity', 'work']);
