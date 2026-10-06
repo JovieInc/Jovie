@@ -1,0 +1,8 @@
+JOV-6195 is already fixed by merged PR [#17714](https://github.com/JovieInc/Jovie/pull/17714), commit `6c1323ab69`.
+
+- Current `origin/main` contains the idempotent migration and schema index.
+- Focused regression test passed: 2/2 tests.
+- Worktree remains clean; no commit, push, or duplicate PR created.
+- Linear credentials were unavailable, so no state transition was made; no implementation edits occurred.
+
+NOT-SHIPPABLE: JOV-6195 was already fixed and merged into main by PR #17714.
