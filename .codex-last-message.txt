@@ -1,0 +1,15 @@
+The source defect is already fixed on `main` by [PR #19742](https://github.com/JovieInc/Jovie/pull/19742), commit `8a07cf5966`. The implementation is in [cli.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T054718Z-JOV-7649-codex-b93c95/packages/jovie-cli/src/cli.ts:320), with regression coverage in [cli.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T054718Z-JOV-7649-codex-b93c95/packages/jovie-cli/src/cli.test.ts:444).
+
+Verification:
+
+- Current source `--help --json` and `--version --json` parse successfully under Node 24.21.0.
+- CLI tests: 202/202 passed.
+- CLI typecheck passed.
+- Biome checked 30 files successfully.
+- npm latest remains `26.9.16`; its `--help --json` reproduces the plaintext defect and matches plain `--help`.
+- Branch remains clean and identical to `origin/main`.
+- No existing or new JOV-7649 PR was found/opened.
+
+No files, commits, pushes, or PRs were created. The remaining publication gap is already owned by JOV-6864.
+
+NOT-SHIPPABLE: the source fix and regression test already landed on main; only the separately owned npm publication remains.
