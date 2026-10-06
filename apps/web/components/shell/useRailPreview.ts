@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SHELL_RAIL_PREVIEW_GRACE_MS } from './rail-motion';
-import { useRailMotionPhase } from './useRailMotionPhase';
 
 /** Transient access belongs to the rail owner, never its persisted pin bit.
  * Delegated events cover browser and native-titlebar affordances equally. */
@@ -21,7 +20,6 @@ export function useRailPreview({
   const [presentationMode, setPresentationMode] = useState<
     'preview' | 'pinned'
   >('pinned');
-  const previewPhase = useRailMotionPhase(isPreview);
   const blocked = useRef(false);
   const pointerInside = useRef(false);
   const pointerPoint = useRef<{ x: number; y: number } | null>(null);
@@ -39,6 +37,7 @@ export function useRailPreview({
   useEffect(() => {
     cancel();
     setIsPreview(false);
+    setPresentationMode('pinned');
     blocked.current = false;
   }, [cancel, resetKey, enabled]);
 
@@ -168,8 +167,10 @@ export function useRailPreview({
     isFloating:
       enabled &&
       !pinned &&
-      presentationMode === 'preview' &&
-      (isPreview || previewPhase !== 'closed'),
+      // Placement outlives visibility. Returning a closed preview to flow
+      // can allocate its last border frame while CSS is still settling.
+      // Pinning or a scope reset, rather than a timer, owns that transfer.
+      presentationMode === 'preview',
     dismissPreview,
   };
 }

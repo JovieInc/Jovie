@@ -130,10 +130,18 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // frame, header, and content read as unrelated backgrounds.
                   // Founder lock 2026-09-25: one rounded, borderless, clipped
                   // panel — no border, soft elevation only.
-                  'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--app-shell-content-surface)',
+                  'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
                   'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
                 )}
               >
+                {header ? (
+                  <div
+                    data-app-shell-header='true'
+                    className='relative z-40 shrink-0'
+                  >
+                    {header}
+                  </div>
+                ) : null}
                 <div
                   data-app-shell-main-content='true'
                   // No inset here: the header spans the panel edge-to-edge so
@@ -156,7 +164,6 @@ export const AppShellFrame = memo(function AppShellFrame({
                       style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
                     />
                   ) : null}
-                  {header}
                   <div
                     data-app-shell-content-inset='true'
                     className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'

@@ -29,13 +29,14 @@ export function AppShellRightRail({
   children,
   className,
 }: AppShellRightRailProps) {
-  const preview = useOptionalPreviewPanelState()?.isFloating === true;
+  const previewState = useOptionalPreviewPanelState();
+  const preview = previewState?.isFloating === true;
   return (
     <aside
       data-testid='app-shell-right-rail'
       data-shell-rail-motion='right'
       aria-label='Context Panel'
-      data-rail-preview={preview || undefined}
+      data-rail-preview={previewState?.isPreview || undefined}
       data-rail-preview-region='right'
       style={
         preview

@@ -14,7 +14,7 @@ function Harness({
   enabled?: boolean;
 }) {
   const [pinned, setPinned] = useState(false);
-  const { isPreview, dismissPreview } = useRailPreview({
+  const { isPreview, isFloating, dismissPreview } = useRailPreview({
     side,
     pinned,
     enabled,
@@ -37,6 +37,7 @@ function Harness({
         data-testid='rail'
         data-rail-preview-region={side}
         data-preview={isPreview}
+        data-floating={isFloating}
         data-pinned={pinned}
       >
         <button type='button'>Rail action</button>
@@ -85,6 +86,25 @@ describe.each(['left', 'right'] as const)(
         'data-preview',
         'false'
       );
+    });
+
+    it('retains overlay placement after dismissal until pinning or a scope reset', () => {
+      vi.useFakeTimers();
+      const { rerender } = render(<Harness side={side} />);
+      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      fireEvent.pointerOut(screen.getByTestId('trigger'));
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'false');
+      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'true');
+      fireEvent.click(screen.getByTestId('trigger'));
+      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'false');
+      fireEvent.click(screen.getByTestId('trigger'));
+      act(() => screen.getByTestId('outside').focus());
+      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'true');
+      rerender(<Harness side={side} resetKey='next-route' />);
+      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'false');
+      expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'false');
     });
 
     it('offers equivalent keyboard access and Escape does not reopen from retained focus', () => {
