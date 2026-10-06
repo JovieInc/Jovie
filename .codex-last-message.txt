@@ -1,0 +1,10 @@
+STATUS: DONE
+
+[PR #20143](https://github.com/JovieInc/Jovie/pull/20143) is green and cleanly mergeable.
+
+- Root cause: Drizzle’s `sql` import violated the required alias rule.
+- Fixed [store.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T235516Z-PR20143-codex-fix-834390/apps/web/lib/artist-snapshots/store.ts:2) by using `sql as drizzleSql`.
+- Pushed commit `4d95618e0d` to the existing branch.
+- Hosted Source Validation, Exact-head Coverage, Security Evidence, Migration Guard, and PR Ready all pass.
+- Local Source Validation sequence and all 15 focused snapshot tests pass.
+- Worktree is clean and synchronized with the remote.
