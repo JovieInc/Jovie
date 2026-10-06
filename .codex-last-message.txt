@@ -1,0 +1,18 @@
+Draft PR opened: [#20361 — fix(ci): accept anonymous deploy-health liveness (JOV-7674)](https://github.com/JovieInc/Jovie/pull/20361)
+
+- Updated the canary verifier to accept the documented anonymous `{ healthy, timestamp }` response while preserving detailed authorized checks.
+- Added regression coverage for healthy and unhealthy anonymous responses.
+- Commit: `bbcc5dd9be`
+
+Verified:
+
+- Focused Vitest: 65 passed
+- Biome: clean
+- Monorepo typecheck: 18/18 tasks
+- Bug-to-test gate: satisfied
+- Pre-commit/push security hooks: passed
+- Remote SHA matches; worktree clean
+
+The PR remains draft and unmerged as required. Source CI is running without reported failures. Production continuity will remain stale until the independent gate lands this PR and a new staging receipt succeeds.
+
+Deviations: GBrain returned HTTP 400, so repository and live workflow evidence were used. Local CodeRabbit was unavailable; tooling was not modified, and hosted CodeRabbit passed. No additional worktrees were created.
