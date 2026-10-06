@@ -10,6 +10,7 @@ export const PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY = `Artist Visibility Pro i
 const meta = {
   title: 'Marketing/Recipes/PricingProduction',
   component: PricingRecipeBody,
+  excludeStories: /^PRICING_RECIPE_STORY_/,
   parameters: {
     layout: 'fullscreen',
     docs: {
