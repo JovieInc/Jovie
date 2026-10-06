@@ -1,0 +1,25 @@
+Implemented and published JOV-6140 in draft PR [#20313](https://github.com/JovieInc/Jovie/pull/20313).
+
+What changed:
+
+- Added the canonical deterministic evaluator in [attention-policy.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T090343Z-JOV-6140-codex-8c9562/apps/web/lib/notifications/attention-policy.ts:1).
+- Supports `deliver-now`, `defer-until`, `aggregate`, and `suppress`.
+- Handles recipient-local timezone, preferences, class, urgency, channel, expiry, dedupe identity, weekends, and critical bypasses.
+- Added the complete class × quiet-window × weekend × bypass matrix.
+- Documented and set the editable default to 22:00–07:00 America/Los_Angeles.
+- Commit: `7cb5068d46`.
+
+Verification:
+
+- 65 focused tests passed.
+- Evaluator coverage: 100% statements, branches, functions, and lines.
+- Monorepo typecheck: 17/17 tasks passed.
+- Test typecheck: no new errors.
+- Biome, ESLint, secret scans, and commit/push hooks passed.
+- Hosted checks observed so far have no failures; Source Validation and exact-head coverage remained pending at handoff.
+
+Deviations/concerns:
+
+- Linear state transitions could not be recorded because the connector required reauthentication and no Doppler token was available.
+- GBrain reading succeeded; implementation writeback failed because its embedding service was unreachable.
+- Pre-existing parent draft PR #20298 overlaps this module but does not implement JOV-6140’s complete required contract.
