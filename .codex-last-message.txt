@@ -1,0 +1,12 @@
+Draft PR opened: [#20350 — fix(ci): bound flakiness report execution (JOV-7687)](https://github.com/JovieInc/Jovie/pull/20350)
+
+Handoff:
+
+- Restored main-only flakiness reporting with stale-run cancellation.
+- Removed the exhaustive collector from the 10-minute hot path while preserving the analyzer and ratchet.
+- Added regression coverage locking the bounded workflow behavior.
+- Commit: `a320a6f0d1cc44c4dfb0c1f4223a9beae7f560ce`
+- Verified: focused tests (3), analyzer tests (19), workflow references, CI harness, Biome, actionlint, publication hooks.
+- Two unrelated pre-existing intake-contract failures are tracked as JOV-7688.
+- GBrain/Linear connectors required reauthentication; Linear state was verified through the repository GraphQL client. JOV-7687 is `In Review`.
+- Hosted PR checks are still running. The PR remains draft and was not merged or marked ready.
