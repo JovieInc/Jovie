@@ -1,0 +1,15 @@
+Implemented and opened draft PR [#20300](https://github.com/JovieInc/Jovie/pull/20300).
+
+- Added Insights to the Audience workspace route control.
+- Kept Audience active on `/app/insights` across desktop and mobile navigation.
+- Updated route-coverage and regression tests.
+- Commit: `439bb57025`
+
+Verified:
+
+- Biome and ESLint on all 8 changed files
+- 43 focused tests across 5 files
+- Full monorepo typecheck: 17/17 tasks passed
+- Pre-commit, accessibility, secret-scan, and publication hooks passed
+
+Hosted CI is running; the PR remains draft as requested. Deviation: `gbrain-unavailable` for the final durable note because its embedding service could not be reached.
