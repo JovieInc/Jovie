@@ -58,7 +58,7 @@ from gem_gate_contract import (  # noqa: E402
     validate_capacity_receipt as validate_legacy_capacity_receipt,
     v2_validate_capacity_receipt,
 )
-from symphony_proof_context import load_context, validation_args  # noqa: E402
+from symphony_proof_context import load_context, public_context_diagnostics, validation_args  # noqa: E402
 
 
 SCHEMA = "jovie-fleet-gate/v1"
@@ -1061,7 +1061,10 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
             "reason": "capacity-evidence-malformed",
         }
     accepted, reason, proofs = validate_capacity_receipt(receipt, now)
-    return {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
+    observation = {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
+    if not accepted and reason == "capacity-evidence-trust-context-unavailable":
+        observation["trustDiagnostics"] = public_context_diagnostics(now)
+    return observation
 
 
 def _fallback_probe_timeout() -> float:

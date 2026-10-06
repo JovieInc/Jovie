@@ -1144,6 +1144,10 @@ LINEAR_BUDGET_HEADERS = (
 LINEAR_RESET_HEADERS = ("X-RateLimit-Requests-Reset", "X-RateLimit-Complexity-Reset")
 
 
+class LaneInventoryUnknown(RuntimeError):
+    """A bounded native scan did not prove complete candidate/ownership coverage."""
+
+
 class LinearRateLimited(RuntimeError):
     """The shared Linear budget is cooling down. Callers must not hit the API."""
 
@@ -1546,21 +1550,39 @@ class Linear:
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
 
-    def _paginated_lane_issues(self, label: str) -> list[dict]:
-        """Up to 500 Todo issues. Only the claim-scan cache fill calls this."""
-        nodes, after = [], None
+    def _bounded_lane_nodes(self, query: str, variables: dict) -> list[dict]:
+        """Retain the request cap, but never treat a truncated inventory as complete."""
+        nodes, ids, cursors, after = [], set(), set(), None
         for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+            data = self.gql(query, {**variables, "after": after})
+            edge = data.get("issues") if isinstance(data, dict) else None
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise LaneInventoryUnknown("lane-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"]:
+                    raise LaneInventoryUnknown("lane-inventory-malformed")
+                if row["id"] not in ids:
+                    nodes.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return nodes
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
+            cursors.add(after)
+        raise LaneInventoryUnknown("lane-inventory-page-limit")
+
+    def _paginated_lane_issues(self, label: str) -> list[dict]:
+        """Complete Todo inventory within 500 rows, only on a claim-scan cache fill."""
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt '
-                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL], "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
         return [{"id": n["id"], "identifier": n["identifier"], "title": n["title"],
                  "description": n.get("description") or "", "priority": n.get("priority") or 0,
                  "created_at": n["createdAt"], "labels": [l["name"] for l in n["labels"]["nodes"]]}
@@ -1571,7 +1593,7 @@ class Linear:
 
         The 500-issue read (JOV-7514) runs only as the shared claim-scan fill. A hit
         within CLAIM_SCAN_TTL_S returns the stored pool and does not paginate."""
-        rows = shared(f"claim-lane-issues-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
+        rows = shared(f"claim-lane-issues-v2-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
                       lambda: self._paginated_lane_issues(label)) or []
         return [Issue(row["id"], row["identifier"], row["title"], row.get("description") or "",
                       row.get("priority") or 0, row["created_at"], list(row.get("labels") or []))
@@ -1579,19 +1601,12 @@ class Linear:
 
     def active_lane_issues(self, labels: list[str]) -> list[Issue]:
         """In Progress work claimed from a lane pool, for cross-host overlap admission."""
-        nodes, after = [], None
-        for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
-                {"labels": labels, "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                {"labels": labels})
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
                 for n in nodes]
@@ -3142,16 +3157,37 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
 
 
 def fetch_labeled_events(linear) -> list:
-    """The one label-filtered Linear read per tick, shared across workers via `shared`.
+    """One complete bounded inventory per cache fill; never plan from a truncated page.
 
     JOV and LYB issues labeled `remediation:<fingerprint>` come back together.
     Callers must not issue a follow-up read per issue.
     """
     def fetch():
-        data = linear.gql(remediation.LABELED_EVENT_QUERY, {})
-        return (data.get("issues") or {}).get("nodes") or []
+        rows, ids, cursors, after = [], set(), set(), None
+        for _ in range(remediation.EVENT_INVENTORY_PAGES):
+            data = linear.gql(remediation.LABELED_EVENT_QUERY, {"after": after})
+            edge = data.get("issues")
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise RuntimeError("remediation-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not row.get("id"):
+                    raise RuntimeError("remediation-inventory-malformed")
+                if row["id"] not in ids:
+                    rows.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise RuntimeError("remediation-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return rows
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise RuntimeError("remediation-inventory-cursor-invalid")
+            cursors.add(after)
+        raise RuntimeError("remediation-inventory-page-limit")
 
-    return shared("remediation-events", SUMMARY_TTL_S, fetch) or []
+    # New cache namespace fences old first-page-only receipts after source installation.
+    return shared("remediation-events-v2", SUMMARY_TTL_S, fetch) or []
 
 
 def _apply_event_plan(linear, plan: dict) -> None:
@@ -4303,7 +4339,7 @@ def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict
                  "createdAt": issue.created_at, "labels": issue.labels}
                 for issue in linear.active_lane_issues([SHARED_LABEL, *provider_labels])]
     try:
-        active = shared("file-overlap-tasks", SUMMARY_TTL_S, fetch_active)
+        active = shared("file-overlap-tasks-v2", SUMMARY_TTL_S, fetch_active)
     except LinearRateLimited:
         raise
     except Exception:

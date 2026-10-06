@@ -43,6 +43,9 @@ const admitter = await import('../admitter.mjs');
 const routing = await import('../symphony-routing.mjs');
 const triageRouter = await import('../triage-router.mjs');
 const deterministicGates = await import('../deterministic-gates.mjs');
+const { buildEligibilityCensus, completeAuditInventory } = await import(
+  '../eligibility-census.mjs'
+);
 const { withFullGateReceipts } = await import('./pre-lease.mjs');
 
 describe('team production health contract', () => {
@@ -160,6 +163,92 @@ function makeIssue(overrides = {}) {
       : { nodes: [] },
   };
 }
+
+describe('complete eligibility census', () => {
+  it('accounts for every observed issue, including unchanged classifications beyond 100', () => {
+    const issues = Array.from({ length: 101 }, (_, index) =>
+      makeIssue({ identifier: `JOV-${index}`, labels: ['agent-ready'] })
+    );
+    const before = JSON.stringify(issues);
+    const classifications = issues.map(issue => ({
+      identifier: issue.identifier,
+      category: 'triageable',
+      needsModel: false,
+      preexisting: { fp: 'same' },
+    }));
+    const census = buildEligibilityCensus(issues, classifications);
+    assert.equal(census.issueCount, 101);
+    assert.equal(census.entries[100].identifier, 'JOV-100');
+    assert.equal(census.entries[100].candidateForAdmission, true);
+    assert.equal(census.executionGrant, false);
+    assert.ok(census.entries.every(row => row.executionEligible === null));
+    assert.equal(JSON.stringify(issues), before);
+  });
+  it('retains ownership and dependency holds and ranks dependency repair fanout', () => {
+    const dep = { type: 'blocked_by', relatedIssue: { identifier: 'JOV-7' } };
+    const issues = [
+      makeIssue({
+        identifier: 'JOV-1',
+        labels: ['agent-ready'],
+        relations: [dep, dep],
+      }),
+      makeIssue({
+        identifier: 'JOV-2',
+        labels: ['agent-ready'],
+        relations: [dep],
+      }),
+      makeIssue({
+        identifier: 'JOV-3',
+        labels: ['agent-ready'],
+        assignee: { id: 'human', name: 'Owner' },
+      }),
+      makeIssue({ identifier: 'JOV-4', labels: ['agent-ready'] }),
+      makeIssue({ identifier: 'JOV-5' }),
+      makeIssue({ identifier: 'JOV-6', labels: ['agent-ready'] }),
+    ];
+    const census = buildEligibilityCensus(issues, [
+      { identifier: 'JOV-4', category: 'duplicate' },
+      { identifier: 'JOV-6', category: 'superseded' },
+    ]);
+    assert.equal(census.entries[0].reason, 'blocked-by-relation');
+    assert.equal(
+      census.entries[0].nextAction,
+      'repair-or-reconcile-dependencies'
+    );
+    assert.equal(census.entries[2].owner, 'human');
+    assert.equal(census.entries[2].reason, 'already-assigned');
+    assert.equal(census.entries[3].reason, 'terminal-intake-classification');
+    assert.equal(census.entries[5].reason, 'terminal-intake-classification');
+    assert.ok(census.entries.every(row => !row.candidateForAdmission));
+    assert.deepEqual(census.dependencyRepairs, [
+      { identifier: 'JOV-7', affectedIssues: 2 },
+    ]);
+  });
+  it('refuses partial audit coverage when a team read fails', () => {
+    const teams = [{ key: 'JOV' }, { key: 'LYB' }];
+    assert.throws(
+      () =>
+        completeAuditInventory(
+          [
+            { status: 'fulfilled', value: [] },
+            { status: 'rejected', reason: new Error('offline') },
+          ],
+          teams
+        ),
+      /audit inventory incomplete: LYB/
+    );
+    assert.deepEqual(
+      completeAuditInventory(
+        [
+          { status: 'fulfilled', value: [1] },
+          { status: 'fulfilled', value: [2] },
+        ],
+        teams
+      ),
+      [1, 2]
+    );
+  });
+});
 
 describe('classifier', () => {
   it('classifies a standard issue as triageable', () => {
