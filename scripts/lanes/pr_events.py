@@ -605,9 +605,11 @@ def queued_prs(lane, kinds) -> list[dict]:
                           "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
         return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
     # Per-check rollups over 100 PRs are the costliest GraphQL read the lanes make, and every
-    # worker pass asked for them; one read per minute per host serves them all.
+    # worker pass asked for them; one read per minute per host serves them all. This is part
+    # of the claim scan, so it shares that TTL with lane issues, in-flight, and fix candidates.
     shared = getattr(lane, "shared", None)
-    prs = shared("queued-" + "-".join(sorted(kinds)), 60, fetch) if shared else fetch()
+    ttl = getattr(lane, "CLAIM_SCAN_TTL_S", 60)
+    prs = shared("queued-" + "-".join(sorted(kinds)), ttl, fetch) if shared else fetch()
     if prs is None:
         return []
     for pr in prs:
