@@ -1,0 +1,9 @@
+BLOCKED. No changes, commit, or push were made.
+
+Evidence:
+
+- PR diff only changes marketing navigation and its test.
+- Both the branch merge base and current `origin/main` contain 113 destructive usages against a baseline of 114.
+- The targeted ratchet test reproduced the failure under Node 24.21.0/pnpm 9.15.9.
+
+NOT-SHIPPABLE: required ratchet failure is pre-existing on main and unrelated to PR #20250.
