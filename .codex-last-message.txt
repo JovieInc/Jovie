@@ -1,0 +1,16 @@
+Implemented and opened draft PR [#20266](https://github.com/JovieInc/Jovie/pull/20266).
+
+- Removed the visible “Go to earnings” shortcut and `G then E` navigation.
+- Removed the `NAV_SHORTCUTS.earnings` alias.
+- Updated [keyboard-shortcuts.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T040631Z-JOV-7611-codex-a629f0/apps/web/lib/keyboard-shortcuts.test.ts) to prevent earnings-route relinking.
+- Kept `CREATOR_FINANCE` default-off and existing API privacy gates unchanged.
+
+Verification:
+
+- Biome passed.
+- 49 focused tests passed.
+- Turbo typecheck: 17/17 tasks passed.
+- All draft PR checks passed, including source validation, exact-head coverage, security, migration, and visual capture.
+- Commit: `1cd425002b`
+
+Deviation: Linear credentials were unavailable, so the manual In Review transition could not be performed. The PR retains both required JOV-7611 linkage markers. GBrain returned no matching prior decisions, and the supplied audit artifact path was not mounted.
