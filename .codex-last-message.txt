@@ -1,0 +1,10 @@
+Handoff:
+
+- Added explicit HTTP 301 from `/artist-profile` to `/artist-profiles`.
+- Preserved and tested canonical metadata and query parameters.
+- Updated route inventory and browser coverage.
+- Verification: Biome passed, 63 Vitest assertions passed, targeted Playwright test passed.
+- Commit: `cfae1bd6ca1053dd09c6a646d00c28785a831cd2`
+- Draft PR: [#20278](https://github.com/JovieInc/Jovie/pull/20278)
+- JOV-7607 transitioned to In Review.
+- PR remains draft against `main`; hosted CI is currently running. No other concerns or deviations.
