@@ -2,6 +2,10 @@
 
 import { usePathname } from 'next/navigation';
 import React from 'react';
+import {
+  SidebarContext,
+  type SidebarContextValue,
+} from '@/components/shell/SidebarContext';
 import { useRailPreview } from '@/components/shell/useRailPreview';
 import { useRailToggleFocusContinuity } from '@/components/shell/useRailToggleFocusContinuity';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -12,30 +16,11 @@ import {
 } from '@/hooks/useSidebarKeyboardShortcut';
 import { cn } from '@/lib/utils';
 
-export type SidebarContextValue = {
-  state: 'open' | 'closed';
-  open: boolean;
-  isPreview: boolean;
-  isFloating: boolean;
-  setOpen: (open: boolean | ((value: boolean) => boolean)) => void;
-  openMobile: boolean;
-  setOpenMobile: (open: boolean) => void;
-  isMobile: boolean;
-  toggleSidebar: () => void;
-};
-
-export const SidebarContext = React.createContext<SidebarContextValue | null>(
-  null
-);
-
-export function useSidebar() {
-  const context = React.useContext(SidebarContext);
-  if (!context) {
-    throw new TypeError('useSidebar must be used within a SidebarProvider.');
-  }
-
-  return context;
-}
+export {
+  SidebarContext,
+  type SidebarContextValue,
+  useSidebar,
+} from '@/components/shell/SidebarContext';
 
 export const SidebarProvider = React.forwardRef<
   HTMLDivElement,

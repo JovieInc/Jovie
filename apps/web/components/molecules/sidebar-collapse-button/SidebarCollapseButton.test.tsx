@@ -32,7 +32,7 @@ vi.mock('@jovie/ui', () => ({
     children,
 }));
 
-vi.mock('@/components/organisms/sidebar', () => ({
+vi.mock('@/components/shell/SidebarContext', () => ({
   useSidebar: () => ({
     toggleSidebar: vi.fn(),
     state: 'open' as const,
