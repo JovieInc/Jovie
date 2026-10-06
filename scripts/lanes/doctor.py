@@ -35,6 +35,7 @@ NO_LANDING_S = 6 * 3600
 # (every worker exited on claim), which looked busy to every other rule.
 NO_WORK_S = 5 * 60
 PROVIDER_IDLE_S = 5 * 60
+ADMISSION_REPAIR_S = 5 * 60
 ESCALATION_S = 10 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
@@ -412,6 +413,22 @@ def new_work_empty(obs: dict) -> bool:
                     for row in budgets.values()))
 
 
+def admission_repair_holds(obs: dict) -> list[str] | None:
+    """Providers whose known PR budgets block an otherwise qualified pool.
+
+    A transient cap is normal backpressure while existing PR recovery starts. Unknown
+    inventory cannot prove either a new alarm or recovery of an existing one.
+    """
+    budgets = obs.get("newIssueBudgetByProvider") or {}
+    if obs.get("eligiblePool") is None or obs.get("pool") is None or any(
+            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
+        return None
+    if not obs.get("eligiblePool") or obs.get("pool") != 0:
+        return []
+    return sorted(name for name, budget in budgets.items()
+                  if budget.get("reason") in {"over-budget", "terminal-pr-backlog"})
+
+
 # ---------------------------------------------------------------- judgement
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -460,18 +477,16 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["workers-without-completions"] = (
             f"{busy} slot leases occupied but no completed run for {int(obs['lastWorkAge'] // 60)}m; "
             "check current processes, fenced ownership and repair holds before adding workers")
-    budgets = obs.get("newIssueBudgetByProvider") or {}
-    inventory_holds = [name for name, budget in budgets.items()
-                       if budget.get("reason") in {"over-budget", "terminal-pr-backlog"}]
-    if obs.get("eligiblePool") and obs.get("pool") == 0 and inventory_holds:
+    inventory_holds = admission_repair_holds(obs)
+    prior_admission_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
+    blocked_since = (previous or {}).get("admissionRepairSince")
+    if inventory_holds and (prior_admission_alarm or (
+            isinstance(blocked_since, (int, float)) and obs["now"] - blocked_since >= ADMISSION_REPAIR_S)):
         alerts["admission-repair-needed"] = (
             f"{obs['eligiblePool']} qualified issues await PR inventory recovery on {', '.join(sorted(inventory_holds))}; "
             "repair existing owned PRs or reconcile held dependencies; retain concurrency and retry limits")
-    elif obs.get("eligiblePool") is None or obs.get("pool") is None or any(
-            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
-        prior_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
-        if prior_alarm:
-            alerts["admission-repair-needed"] = prior_alarm
+    elif inventory_holds is None and prior_admission_alarm:
+        alerts["admission-repair-needed"] = prior_admission_alarm
     if obs.get("lastWorkAge") is None:
         prior_alarm = ((previous or {}).get("alerts") or {}).get("workers-without-completions")
         if prior_alarm:
@@ -1091,6 +1106,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]
     else:
         previous["poolEmptySince"] = None
+    repair_holds = admission_repair_holds(obs)
+    if repair_holds:
+        previous["admissionRepairSince"] = previous.get("admissionRepairSince") or obs["now"]
+    elif repair_holds is not None or not (previous.get("alerts") or {}).get("admission-repair-needed"):
+        previous["admissionRepairSince"] = None
     previous["providerIdleSince"] = provider_idle_since(obs, previous)
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     alerts = judge(obs, previous)
@@ -1104,6 +1124,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
     result["poolEmptySince"] = previous["poolEmptySince"]
+    result["admissionRepairSince"] = previous["admissionRepairSince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
