@@ -1,0 +1,7 @@
+DONE — [PR #20195](https://github.com/JovieInc/Jovie/pull/20195) is green.
+
+- Merged `origin/main` as `cf06558549`.
+- Affected pre-push gate passed.
+- Pushed to `cursor/playlists-index-noindex-fecb`.
+- Hosted CI: 19 successful, 6 skipped, 0 failing, 0 pending.
+- Local and remote heads match; worktree is clean.
