@@ -1,0 +1,10 @@
+Implemented and published as draft PR [#20362](https://github.com/JovieInc/Jovie/pull/20362), commit `c44b94ad5d`.
+
+- Customer-only funnel, cohort, MRR, activation, retention-input, and growth reporting now excludes QA/dogfood principals.
+- Raw, synthetic-health, and unattributed views remain observable.
+- Historical unclassified events cannot enter customer metrics.
+- Added regression coverage; 97 focused tests passed.
+- Full monorepo typecheck, Biome, ESLint, bug-to-test, security, and pre-push checks passed.
+- JOV-7362 moved to In Review; PR remains draft and unmerged.
+
+Production acceptance is not claimed: the approved production read failed because this lane lacks a Doppler token. At handoff, CI had 13 successes, 9 expected skips, 0 failures, and 3 running checks. The issue must remain open until post-deploy production reads confirm zero QA accounts in customer metrics and retained synthetic-health visibility.
