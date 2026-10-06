@@ -1,0 +1,9 @@
+Merged `origin/main` was already up to date. The affected gate passed until the final ratchet test:
+
+- Actual destructive utility count: 113
+- `origin/main` baseline: 114
+- PR changes no counted destructive utilities or ratchet files
+- Worktree remains clean
+- Nothing was committed or pushed
+
+NOT-SHIPPABLE: origin/main has a stale destructive utility ratchet baseline unrelated to PR #20220.
