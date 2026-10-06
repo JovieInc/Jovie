@@ -1,0 +1,18 @@
+Implemented and opened [draft PR #20389](https://github.com/JovieInc/Jovie/pull/20389) at commit `d097aab23d`.
+
+Changes:
+
+- Corrected `workflow_run` controller identity validation without conflating policy and deployment SHAs.
+- Retained fail-closed run, attempt, workflow, event, branch, deployment, and public-readback checks.
+- Added regression coverage for accepted and rejected controller identities.
+
+Verification:
+
+- 63 tests passed.
+- 95.09% line / 88.83% branch coverage.
+- Biome passed.
+- All 18 typecheck tasks passed.
+- Exact failed production marker replayed successfully, producing a valid two-outcome plan.
+- Bug-to-test gate satisfied.
+
+The PR remains draft as required. Hosted checks are running. Deviations: `gbrain-unavailable`; Linear and CodeRabbit local access required reauthentication/unavailable, so the Linear `In Review` transition could not be recorded.
