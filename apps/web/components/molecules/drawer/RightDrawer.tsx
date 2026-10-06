@@ -10,6 +10,7 @@ import {
   SHELL_RAIL_SHEET,
   SHELL_RAIL_TRAVEL,
 } from '@/components/shell/rail-motion';
+import { useRailFocusReturn } from '@/components/shell/useRailFocusReturn';
 import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
@@ -283,6 +284,7 @@ export function RightDrawer({
   // opacity/travel stage with the width give-back, instead of snapping to
   // `invisible` at frame one. `data-rail-phase` is the certification hook.
   const railPhase = useRailMotionPhase(isOpen);
+  useRailFocusReturn(asideRef, !isOpen && !isMobile, 'right');
 
   // Suppress the width/opacity transition on first paint so the panel appears
   // at its final size instead of animating in on hydration. The transition
@@ -407,15 +409,25 @@ export function RightDrawer({
       )}
       style={{
         width: isOpen ? width : 0,
+        borderWidth: isOpen ? 1 : 0,
         maxWidth: '100vw',
         transitionDuration: hasAnimated ? undefined : '0ms',
-        willChange: hasAnimated ? 'width, opacity, transform' : 'auto',
+        willChange:
+          railPhase === 'opening' || railPhase === 'closing'
+            ? 'opacity, transform'
+            : 'auto',
         contain: 'layout style paint',
       }}
     >
       <div
         className='relative flex h-full min-h-0 flex-col'
-        style={{ minWidth: '100%' }}
+        // Keep controls, text, and scroll geometry at their open width while
+        // the outer allocation clips/reveals them; no rewrapping per frame.
+        style={{
+          width: Math.max(0, width - 2),
+          maxWidth: 'calc(100vw - 2px)',
+          flexShrink: 0,
+        }}
       >
         {content}
       </div>

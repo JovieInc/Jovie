@@ -11,14 +11,16 @@ interface SidebarCollapseButtonProps {
 export function SidebarCollapseButton({
   className,
 }: SidebarCollapseButtonProps) {
-  const { toggleSidebar, state } = useSidebar();
+  const { toggleSidebar, state, isPreview, open: pinned } = useSidebar();
   const isCollapsed = state === 'closed';
 
   return (
     <RailToggleButton
       side='left'
+      controlsId='shell-left-rail'
       open={!isCollapsed}
-      openLabel='Collapse sidebar'
+      pinned={pinned}
+      openLabel={isPreview ? 'Pin sidebar' : 'Collapse sidebar'}
       closedLabel='Expand sidebar'
       onToggle={toggleSidebar}
       shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}

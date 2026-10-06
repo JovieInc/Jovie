@@ -11,10 +11,12 @@ export const RAIL_TOGGLE_BUTTON_CLASS =
 interface RailToggleButtonProps {
   readonly side: 'left' | 'right';
   readonly open: boolean;
+  readonly pinned?: boolean;
   readonly openLabel: string;
   readonly closedLabel: string;
   readonly onToggle: () => void;
   readonly disabled?: boolean;
+  readonly controlsId?: string;
   readonly shortcut?: string;
   readonly className?: string;
   readonly dataTestId?: string;
@@ -29,10 +31,12 @@ interface RailToggleButtonProps {
 export function RailToggleButton({
   side,
   open,
+  pinned,
   openLabel,
   closedLabel,
   onToggle,
   disabled,
+  controlsId,
   shortcut,
   className,
   dataTestId,
@@ -47,8 +51,10 @@ export function RailToggleButton({
       variant='secondary'
       size='sm'
       aria-label={label}
+      aria-controls={controlsId}
       aria-expanded={open}
-      aria-pressed={open}
+      aria-pressed={pinned ?? open}
+      data-rail-pinned={pinned ?? open}
       onClick={onToggle}
       disabled={disabled}
       data-testid={dataTestId}

@@ -61,6 +61,24 @@ describe('RailToggleButton', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('exposes preview visibility separately from saved pin state', () => {
+    render(
+      <RailToggleButton
+        side='right'
+        open
+        pinned={false}
+        controlsId='profile-rail'
+        openLabel='Pin profile'
+        closedLabel='Show profile'
+        onToggle={vi.fn()}
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Pin profile' });
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).toHaveAttribute('aria-controls', 'profile-rail');
+  });
+
   it('mirrors the same contract for a closed right rail', () => {
     render(
       <RailToggleButton

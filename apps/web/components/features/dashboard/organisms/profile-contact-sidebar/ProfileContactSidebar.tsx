@@ -1134,6 +1134,8 @@ export function ProfileContactSidebar() {
   if (!previewData) {
     return (
       <EntitySidebarShell
+        id='shell-artist-profile-rail'
+        onClose={close}
         isOpen={isOpen}
         ariaLabel='Profile Contact'
         data-testid='profile-contact-sidebar-skeleton'
@@ -1201,6 +1203,8 @@ export function ProfileContactSidebar() {
   if (mode === 'view') {
     return (
       <EntitySidebarShell
+        id='shell-artist-profile-rail'
+        onClose={close}
         isOpen={isOpen}
         ariaLabel='Profile Preview'
         data-testid='profile-contact-sidebar'
@@ -1222,6 +1226,8 @@ export function ProfileContactSidebar() {
 
   return (
     <EntitySidebarShell
+      id='shell-artist-profile-rail'
+      onClose={close}
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       data-testid='profile-contact-sidebar'

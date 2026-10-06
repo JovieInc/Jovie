@@ -1,6 +1,9 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import React from 'react';
+import { useRailPreview } from '@/components/shell/useRailPreview';
+import { useRailToggleFocusContinuity } from '@/components/shell/useRailToggleFocusContinuity';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useSidebarCookieState } from '@/hooks/useSidebarCookieState';
 import {
@@ -12,6 +15,8 @@ import { cn } from '@/lib/utils';
 export type SidebarContextValue = {
   state: 'open' | 'closed';
   open: boolean;
+  isPreview: boolean;
+  isFloating: boolean;
   setOpen: (open: boolean | ((value: boolean) => boolean)) => void;
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
@@ -52,6 +57,7 @@ export const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
+    const pathname = usePathname();
     const isMobile = useBreakpointDown('lg');
     const [openMobile, setOpenMobile] = React.useState(false);
     const { open, setOpen } = useSidebarCookieState({
@@ -60,26 +66,54 @@ export const SidebarProvider = React.forwardRef<
       onOpenChange: setOpenProp,
     });
 
+    const { isPreview, isFloating, dismissPreview } = useRailPreview({
+      side: 'left',
+      pinned: open,
+      enabled: !isMobile,
+      resetKey: pathname,
+    });
+
+    useRailToggleFocusContinuity('left', open);
+
+    // A drawer dismissed by a desktop resize must not reappear on the next
+    // resize into mobile or retain Radix's background interaction locks.
+    React.useEffect(() => {
+      if (!isMobile) setOpenMobile(false);
+    }, [isMobile]);
+
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
+      dismissPreview();
       return isMobile ? setOpenMobile(open => !open) : setOpen(open => !open);
-    }, [isMobile, setOpen, setOpenMobile]);
+    }, [isMobile, setOpen, setOpenMobile, dismissPreview]);
 
     useSidebarKeyboardShortcut(toggleSidebar, SIDEBAR_KEYBOARD_SHORTCUT);
 
-    const state = open ? 'open' : 'closed';
+    const state = open || isPreview ? 'open' : 'closed';
 
     const contextValue = React.useMemo<SidebarContextValue>(
       () => ({
         state,
         open,
+        isPreview,
+        isFloating,
         setOpen,
         isMobile,
         openMobile,
         setOpenMobile,
         toggleSidebar,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [
+        state,
+        open,
+        isPreview,
+        isFloating,
+        setOpen,
+        isMobile,
+        openMobile,
+        setOpenMobile,
+        toggleSidebar,
+      ]
     );
 
     return (
