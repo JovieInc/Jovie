@@ -1,0 +1,15 @@
+Implemented and opened draft PR [#20251](https://github.com/JovieInc/Jovie/pull/20251) at commit `e6ab74b687`.
+
+- Restored `/app/settings/referral`, navigation, and screen registries.
+- Redirected legacy `/app/referrals` to the restored page.
+- Replaced stale Clerk-ID conversions with authenticated app-user UUIDs across the page and referral APIs.
+- Added referral page/API regression coverage.
+
+Verified:
+
+- 72 focused tests passed.
+- Full typecheck: 17/17 tasks passed.
+- Biome, ESLint, server-boundary, accessibility, secret, and required CI checks passed.
+- PR remains draft and unmerged.
+
+Limitations: GBrain was unavailable, local CodeRabbit CLI was absent, and Linear required reauthentication, so JOV-7596 could not be transitioned to In Review. Optional hosted coverage/security/visual checks were still pending at handoff.
