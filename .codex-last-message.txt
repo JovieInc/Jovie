@@ -1,0 +1,17 @@
+Implemented and opened draft PR [#20248](https://github.com/JovieInc/Jovie/pull/20248).
+
+- Removed the uncertified YouTube thumbnail generator from marketing navigation.
+- Added regression coverage tying the disabled flag to navigation absence.
+- Commit: `e6320e1145`
+- Linear JOV-7608 moved to In Review.
+- PR remains draft and unmerged.
+
+Verification passed:
+
+- Biome on all changed files
+- 10 focused Vitest tests
+- Monorepo typecheck: 17/17 packages
+- Web test typecheck: no new errors
+- All GitHub source checks green, including coverage, security, migration, and internal review
+
+Concerns/deviations: gbrain returned HTTP 400, the referenced audit artifact was unavailable in this workspace, and the local CodeRabbit CLI was unavailable. Repository CI review passed.
