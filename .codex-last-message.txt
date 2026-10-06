@@ -1,0 +1,12 @@
+H-06 is already fixed on `origin/main` by [PR #20196](https://github.com/JovieInc/Jovie/pull/20196), commit `d9c7a19197`.
+
+- API-only providers are hidden from the provider endpoint and excluded from sync targets.
+- Unsupported API attempts no longer persist request rows.
+- Regression coverage exists for both route and service behavior.
+- Biome passed on 5 relevant files.
+- Vitest passed: 2 files, 4 tests.
+- Branch is clean and identical to `origin/main`.
+- No commit, push, or duplicate PR was created.
+- GBrain and Linear were unavailable due connector reauthentication.
+
+NOT-SHIPPABLE: H-06 was already fixed and regression-tested on origin/main by merged PR #20196.
