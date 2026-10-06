@@ -1,0 +1,9 @@
+PR #20219 is already green at exact head `8746ef5a`.
+
+- Failed run `37131463852` was a duplicate workflow run whose proof jobs were canceled.
+- Parallel run `37131463803` passed all proofs on the identical SHA.
+- Required checks currently pass: PR Ready, Migration Guard, Fork PR Gate, and PR Size Guard.
+- Auto-merge is enabled.
+- Worktree remains clean; nothing was committed or pushed.
+
+NOT-SHIPPABLE: the reported failure was unrelated to this PR’s code, and the exact same head already passed all required checks.
