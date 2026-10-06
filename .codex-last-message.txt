@@ -1,0 +1,7 @@
+NOT-SHIPPABLE: the ratchet failure is unrelated to PR #20265 and already exists on `main`.
+
+- PR head has 113 usages with baseline 114, but its diff removes zero matching utilities.
+- Current `origin/main` independently has 112 usages with the same baseline 114.
+- The targeted test reproduced the failure after merging current `main`.
+- No baseline edits, installs, or pushes were made.
+- Local branch restored cleanly to remote head `d7f1aa09c216b9ebb0e26e6071be3f063a94aa9d`.
