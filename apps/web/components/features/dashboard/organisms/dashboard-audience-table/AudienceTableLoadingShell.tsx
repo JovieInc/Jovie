@@ -6,7 +6,7 @@ import {
   PageToolbar,
   UnifiedTableSkeleton,
 } from '@/components/organisms/table';
-import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import {
   AUDIENCE_TABLE_CONTAINER_CLASS,
   AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG,
@@ -84,7 +84,7 @@ export function AudienceTableLoadingShell() {
               columns={AUDIENCE_LOADING_COLUMNS}
               skeletonRows={SKELETON_ROW_COUNT.TABLE}
               skeletonColumnConfig={AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG}
-              rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+              rowMode='dense'
               minWidth='800px'
               className='text-app'
               containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}

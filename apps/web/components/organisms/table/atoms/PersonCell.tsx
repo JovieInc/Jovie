@@ -1,5 +1,7 @@
 'use client';
 
+import { LoadingSkeleton } from '@jovie/ui';
+import Link from 'next/link';
 import React from 'react';
 import { Avatar } from '@/components/molecules/Avatar';
 import { cn } from '../table.styles';
@@ -7,11 +9,14 @@ import { cn } from '../table.styles';
 export interface PersonCellProps {
   /** Name shown in the row; also seeds the fallback initials. */
   readonly name: string;
+  readonly nameHref?: string;
   /** One quiet fact after the name (handle, email, company, role). */
-  readonly secondary?: string | null;
+  readonly secondary?: React.ReactNode;
   /** Photo URL. Missing or broken photos fall back to initials. */
   readonly avatarUrl?: string | null;
   readonly verified?: boolean;
+  /** Unidentified person: the face shows a neutral mark, not the label's initials. */
+  readonly anonymous?: boolean;
   /** Small trailing slot for a status glyph or badge. */
   readonly trailing?: React.ReactNode;
   readonly className?: string;
@@ -24,9 +29,11 @@ export interface PersonCellProps {
  */
 export const PersonCell = React.memo(function PersonCell({
   name,
+  nameHref,
   secondary,
   avatarUrl,
   verified = false,
+  anonymous = false,
   trailing,
   className,
 }: PersonCellProps) {
@@ -38,12 +45,20 @@ export const PersonCell = React.memo(function PersonCell({
       <Avatar
         src={avatarUrl}
         alt=''
-        name={name}
+        name={anonymous ? undefined : name}
         size='sm'
         verified={verified}
       />
       <span className='min-w-0 truncate'>
-        <span className='font-medium text-primary-token'>{name}</span>
+        <span className='font-medium text-primary-token'>
+          {nameHref ? (
+            <Link href={nameHref} onClick={event => event.stopPropagation()}>
+              {name}
+            </Link>
+          ) : (
+            name
+          )}
+        </span>
         {secondary ? (
           <span className='ml-1.5 text-tertiary-token'>{secondary}</span>
         ) : null}
@@ -55,14 +70,18 @@ export const PersonCell = React.memo(function PersonCell({
 
 /**
  * Loading geometry for PersonCell: the same 20px face and one name line.
- * Uses the canonical `.skeleton` shimmer directly, as Avatar does, because the
- * shared Skeleton owns no size variants for these slots.
+ * Canonical LoadingSkeleton supplies the loading attributes without announcing
+ * again; table CSS reserves each placeholder's geometry.
  */
 export function PersonCellSkeleton({ width }: Readonly<{ width?: string }>) {
   return (
     <div className='flex items-center gap-2' style={{ width }} aria-hidden>
-      <span className='skeleton system-b-table-skeleton-person-face shrink-0 rounded-full motion-reduce:animate-none' />
-      <span className='skeleton system-b-table-skeleton-person-name rounded-sm motion-reduce:animate-none' />
+      <div className='system-b-table-skeleton-person-face shrink-0'>
+        <LoadingSkeleton announce={false} height='h-5' rounded='full' />
+      </div>
+      <div className='system-b-table-skeleton-person-name'>
+        <LoadingSkeleton announce={false} height='h-3' />
+      </div>
     </div>
   );
 }

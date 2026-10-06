@@ -89,4 +89,39 @@ describe('TableIconButton', () => {
     const { container } = renderButton({ ariaLabel: 'Open row settings' });
     await expectNoA11yViolations(container);
   });
+
+  it('renders a 24px control for dense rows and keeps the 44px hit target', () => {
+    renderButton({ dense: true, ariaLabel: 'Message Maya' });
+
+    const button = screen.getByRole('button', { name: 'Message Maya' });
+    expect(button).toHaveAttribute('data-size', 'icon-xs');
+    expect(button.className).toContain('h-6');
+    expect(button.className).toContain('before:h-11');
+  });
+
+  it('never also activates the row it sits in', async () => {
+    const rowClick = vi.fn();
+    const onClick = vi.fn();
+    render(
+      <TooltipProvider delayDuration={0}>
+        <table>
+          <tbody>
+            <tr onClick={rowClick}>
+              <td>
+                <TableIconButton
+                  icon={<svg aria-hidden='true' />}
+                  onClick={onClick}
+                  ariaLabel='Row action'
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </TooltipProvider>
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Row action' }));
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(rowClick).not.toHaveBeenCalled();
+  });
 });

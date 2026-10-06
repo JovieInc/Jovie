@@ -97,3 +97,25 @@ describe('creator query isolation', () => {
     }
   );
 });
+
+describe('creator people rows', () => {
+  it('renders creators on the 32px dense one-line people row', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(view(client, '', [ari, sam]));
+
+    expect(await screen.findByText('Ari Lane')).toBeVisible();
+    expect(
+      document.querySelector('table[data-table-row-mode="dense"]')
+    ).not.toBeNull();
+    const person = screen
+      .getByText('Ari Lane')
+      .closest('[data-table-person-cell]');
+    expect(person).toHaveTextContent('Ari Lane@ari');
+    expect(
+      person?.querySelector('[data-slot="app-avatar-frame"]')
+    ).toHaveAttribute('data-size', 'sm');
+    client.clear();
+  });
+});

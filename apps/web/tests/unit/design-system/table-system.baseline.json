@@ -20,7 +20,6 @@
   "rawRowHeight": {
     "app/app/(shell)/admin/investors/page.tsx": 1,
     "app/app/(shell)/admin/presence/CompanyPresenceWorkspace.tsx": 1,
-    "app/app/(shell)/dashboard/contacts/loading.tsx": 1,
     "app/app/(shell)/profiles/ProfilesWorkspace.tsx": 1,
     "components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": 1,
     "components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": 1,

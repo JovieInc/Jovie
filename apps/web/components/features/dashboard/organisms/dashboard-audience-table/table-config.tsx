@@ -29,15 +29,16 @@ export const AUDIENCE_TABLE_CONTAINER_CLASS = 'h-full';
 
 export const AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG: Array<{
   readonly width?: string;
-  readonly variant?: 'text' | 'avatar' | 'badge' | 'button' | 'meta';
+  readonly variant?: 'text' | 'badge' | 'meta' | 'person';
 }> = [
   { width: '1.25rem', variant: 'text' as const },
-  { width: '14rem', variant: 'avatar' as const },
+  { width: '14rem', variant: 'person' as const },
   { width: '4.5rem', variant: 'badge' as const },
   { width: '4.5rem', variant: 'badge' as const },
   { width: '4rem', variant: 'meta' as const },
   { width: '3rem', variant: 'meta' as const },
-  { width: '5.5rem', variant: 'button' as const },
+  // Actions fit the 24px dense content height; a 32px button bar would shift.
+  { width: '5.5rem', variant: 'badge' as const },
 ];
 
 /** Fit budgets, not rendered sizes. Priority 2 appears at 720; priority 1 at 960. */
@@ -144,9 +145,13 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       id: 'action',
       header: () => <div className='text-right'>Action</div>,
       cell: ({ row }) => <AudienceActionCell member={row.original} />,
-      size: 120,
+      size: 56,
       enableSorting: false,
-      meta: { className: 'text-right', minWidth: AUDIENCE_FIT.action },
+      meta: {
+        className: 'text-right',
+        minWidth: AUDIENCE_FIT.action,
+        actionVisibility: 'contextual',
+      },
     }),
   ] as Array<ColumnDef<AudienceMember, unknown>>;
 }
