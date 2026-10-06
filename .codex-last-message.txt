@@ -1,0 +1,17 @@
+Implemented and opened [draft PR #20267](https://github.com/JovieInc/Jovie/pull/20267).
+
+- Added Interviews, Playlists, and Presence to canonical OV navigation with Lucide icons.
+- Removed their manual-entry route exceptions.
+- Added regression coverage proving all three routes remain discoverable.
+- Commit: `e73e62f7d8`
+- Linear JOV-7605 moved to In Review.
+
+Verification:
+
+- Biome: passed
+- Focused tests: 40 passed
+- Repository typecheck: 17 packages passed
+- Test typecheck: no new errors
+- All draft PR checks green, including exact-head coverage and desktop/mobile visual capture
+
+Concerns: none. The supplied audit artifact directory was unavailable in this lane, so the issue text and current repository source were used as evidence. The PR remains draft and unmerged as required.
