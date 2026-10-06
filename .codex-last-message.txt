@@ -1,0 +1,17 @@
+JOV-2156 is already implemented on `origin/main` via merged [PR #15582](https://github.com/JovieInc/Jovie/pull/15582).
+
+Handoff:
+
+- Existing [story matrix](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T190458Z-JOV-2156-codex-a0cbfd/apps/web/.storybook/stories/elevation-matrix.stories.tsx:1) covers 8 allowed and 7 explicitly broken combinations.
+- Existing [Playwright spec](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T190458Z-JOV-2156-codex-a0cbfd/apps/web/tests/e2e/storybook-elevation.spec.ts:1) has 30 light/dark baselines plus two functional invariants.
+- Blocking coverage runs in the exact-head merge-group Storybook lane; baseline refresh is scheduled/manual under current CI policy.
+- Verification:
+  - Elevation Playwright suite: 32/32 passed.
+  - CI contract tests: 24/24 passed.
+  - Biome: 3 relevant files clean.
+  - All 30 snapshots present.
+  - Branch is clean and `HEAD` matches `origin/main`.
+- GBrain query timed out; repository and GitHub history provided the evidence.
+- No changes, commit, push, or duplicate PR were created, as required for already-fixed work.
+
+NOT-SHIPPABLE: JOV-2156 was already implemented and merged in PR #15582; the current matrix and regression suite pass.
