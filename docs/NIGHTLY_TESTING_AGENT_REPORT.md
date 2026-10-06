@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37240143285)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37545037335)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-04T22:52:20.687Z
+Generated: 2026-10-06T23:31:38.987Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -19,10 +19,10 @@ Workflow conclusion: failure
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 8419 | 8407 | 3 | 0 | 9 |
-| unit | 7826 | 7806 | 1 | 0 | 19 |
-| unit | 7528 | 7494 | 0 | 0 | 34 |
-| unit | 7793 | 7753 | 0 | 0 | 40 |
+| unit | 7538 | 7522 | 2 | 0 | 14 |
+| unit | 9936 | 9922 | 1 | 0 | 13 |
+| unit | 8358 | 8316 | 1 | 0 | 41 |
+| unit | 7883 | 7849 | 0 | 0 | 34 |
 
 ## Selected Targets
 
@@ -46,7 +46,7 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for f68e3e9c3c6c2aaee650a4670e6e78f588a3816e: expected null not to be null |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-rfE78b/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-YA9uQe/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
-| unit | tests/unit/design-system/spacing-scale-ratchet.test.ts optical-grid spacing-scale ratchet (shrink-only) > keeps the conservative tier (10px / 14px steps) from growing |  | off-grid 10px/14px spacing steps (*-2.5, *-3.5) dropped to 668 (baseline 670). Great — lower the baseline to 668 in this PR so the ratchet l |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-Pb52pq/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-koJI6G/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for 45d2113a5e3bea8c509a2a9e8d5369b83258e159: expected null not to be null |
+| unit | tests/unit/storybook/story-quality-guard.test.ts storybook story quality guard > passes on the current product story library and provenance receipts |  | Test timed out in 60000ms. If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTime |
