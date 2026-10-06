@@ -1,0 +1,25 @@
+Implemented and pushed JOV-5937.
+
+- Draft PR opened: [JovieInc/Jovie#20392](https://github.com/JovieInc/Jovie/pull/20392)
+- Commit: `cccc738555dae5b4f91df6e0b0465c2dad9f60b2`
+- Branch is clean and synchronized with origin.
+- Reviewable diff is exactly 500 lines.
+
+Key changes:
+
+- Connected the existing CI risk receipt to release planning, evidence selection, promotion gates, and latency SLOs.
+- Added versioned not-applicable/low/medium/high release policy.
+- Added exact-SHA provenance, fail-closed unknown evidence, auditable overrides, and Ovi certification receipts.
+- Added consequence-matched production candidate, canary, rollback, and high-risk evidence gates.
+- Added the PR #20164 broken `gh api --jq --arg` regression fixture; the corrected #20347 form passes.
+- Added the required risk fixture matrix.
+
+Verification passed:
+
+- 154 focused tests.
+- 87 structural release tests.
+- 120 CI fast-lane tests.
+- CI harness, TypeScript script checks, Biome, actionlint, workflow references, policy liveness, secret scans, and git hygiene.
+- Hosted Source Validation, Security Evidence, Coverage, Migration Guard, PR Size Guard, and other completed checks passed with no failures.
+
+The PR was opened as draft. The repository’s independent enrollment automation subsequently marked it ready; I did not mark it ready or merge it. Seer Code Review remains pending. GBrain writeback timed out (`gbrain-unavailable`); repository and PR evidence are complete.
