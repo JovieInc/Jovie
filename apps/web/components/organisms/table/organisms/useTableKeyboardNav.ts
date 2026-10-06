@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { resolveTableNavAction } from '../utils/tableKeyMap';
 
 export interface TableKeyboardNavConfig<TData> {
@@ -8,6 +8,10 @@ export interface TableKeyboardNavConfig<TData> {
   readonly focusedIndex: number;
   readonly rowCount: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
+  /** Virtualizer handoff for keyboard destinations outside the mounted window. */
+  readonly revealRow?: (index: number) => void;
+  readonly renderedRowWindow?: string;
+  readonly focusScope?: unknown;
   readonly setFocusedIndex: (index: number) => void;
   readonly onRowClick?: (row: TData) => void;
   /** Space; falls back to `onRowClick` when omitted. */
@@ -42,22 +46,72 @@ export function useTableKeyboardNav<TData>({
   rowCount,
   rowRefsMap,
   setFocusedIndex,
+  revealRow,
+  renderedRowWindow,
+  focusScope,
   onRowClick,
   onRowToggle,
   onToggleSelection,
   onExtendSelection,
 }: TableKeyboardNavConfig<TData>): TableKeyboardNavResult<TData> {
+  const pendingFocus = useRef<{
+    index: number;
+    origin: Element | null;
+    scope: unknown;
+  } | null>(null);
   const moveFocus = useCallback(
     (nextIndex: number) => {
+      pendingFocus.current = null;
       setFocusedIndex(nextIndex);
-      rowRefsMap.get(nextIndex)?.focus();
+      const row = rowRefsMap.get(nextIndex);
+      if (row) row.focus();
+      else if (revealRow) {
+        pendingFocus.current = {
+          index: nextIndex,
+          origin: document.activeElement,
+          scope: focusScope,
+        };
+        revealRow(nextIndex);
+      }
     },
-    [setFocusedIndex, rowRefsMap]
+    [setFocusedIndex, rowRefsMap, revealRow, focusScope]
   );
+
+  // Complete only an owned keyboard request after the virtual destination mounts.
+  useEffect(() => {
+    const request = pendingFocus.current;
+    if (!request) return;
+    const focusOwned =
+      document.activeElement === request.origin ||
+      (document.activeElement === document.body &&
+        !request.origin?.isConnected);
+    if (
+      !enabled ||
+      request.index !== focusedIndex ||
+      request.index >= rowCount ||
+      request.scope !== focusScope ||
+      !focusOwned
+    ) {
+      pendingFocus.current = null;
+      return;
+    }
+    const row = rowRefsMap.get(request.index);
+    if (row) {
+      pendingFocus.current = null;
+      row.focus({ preventScroll: true });
+    }
+  }, [
+    enabled,
+    focusedIndex,
+    rowCount,
+    rowRefsMap,
+    renderedRowWindow,
+    focusScope,
+  ]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent, rowIndex: number, rowData: TData) => {
-      if (!enabled) return;
+      if (!enabled || rowCount === 0) return;
 
       // Shifted letter selection belongs to these rows. Other consumers of
       // the shared mapper retain their ordinary j/k bindings.

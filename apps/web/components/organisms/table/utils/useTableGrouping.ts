@@ -41,6 +41,7 @@ interface UseTableGroupingOptions<T> {
    * Defaults to viewport when not provided.
    */
   scrollRoot?: Element | null;
+  stickyOffset?: number;
 }
 
 /**
@@ -114,6 +115,7 @@ export function useTableGrouping<T>({
   getGroupLabel,
   enabled,
   scrollRoot = null,
+  stickyOffset = 0,
 }: UseTableGroupingOptions<T>) {
   const [visibleGroupIndex, setVisibleGroupIndex] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -153,7 +155,10 @@ export function useTableGrouping<T>({
   // Handle intersection entry for sticky header tracking
   const handleIntersectionEntry = useCallback(
     (entry: IntersectionObserverEntry, groups: GroupedData<T>[]) => {
-      if (!entry.isIntersecting || entry.boundingClientRect.top > 0) return;
+      const stickyTop =
+        (scrollRoot?.getBoundingClientRect().top ?? 0) + stickyOffset;
+      if (!entry.isIntersecting || entry.boundingClientRect.top > stickyTop + 1)
+        return;
 
       // Use .dataset API instead of getAttribute for cleaner access
       const key = (entry.target as HTMLElement).dataset.groupKey;
@@ -164,7 +169,7 @@ export function useTableGrouping<T>({
         setVisibleGroupIndex(index);
       }
     },
-    []
+    [scrollRoot, stickyOffset]
   );
 
   // Set up Intersection Observer for sticky header behavior
@@ -183,7 +188,7 @@ export function useTableGrouping<T>({
       },
       {
         threshold: [0, 1],
-        rootMargin: '-1px 0px 0px 0px',
+        rootMargin: `-${stickyOffset + 1}px 0px 0px 0px`,
         root: scrollRoot,
       }
     );
@@ -200,7 +205,7 @@ export function useTableGrouping<T>({
         observerRef.current.disconnect();
       }
     };
-  }, [enabled, groupedData, handleIntersectionEntry, scrollRoot]);
+  }, [enabled, groupedData, handleIntersectionEntry, scrollRoot, stickyOffset]);
 
   // Function to register a group header for observation
   const observeGroupHeader = (key: string, element: HTMLElement | null) => {
