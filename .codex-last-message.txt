@@ -1,0 +1,20 @@
+Implemented and opened draft PR [#20247](https://github.com/JovieInc/Jovie/pull/20247).
+
+Key changes:
+
+- Admission guard predicts files from issue paths/workstreams and checks cached open PRs plus in-flight tasks.
+- Hot files and duplicate migration numbers block; shared/generated files sequence; other overlaps flag.
+- Stacked children target `main`, remain held until parents land, then enter the existing rebase lane.
+- Added `doctor.json.fileOverlap`, HUD visibility, ledger events, overlap metrics, and queue entries per merge.
+- Added default enforcement, flag-only mode, and kill switch.
+- Added Oct 2 regression fixtures covering #20141/#20166, #20139/#20148, README sequencing, and duplicate `0131` migrations.
+
+Verified:
+
+- 389 Python tests passed.
+- 5 promotion-metrics tests passed.
+- Biome, Python compilation, whitespace, secret scanning, and pre-push policy gates passed.
+- Rebased onto current `origin/main` after #20141 landed.
+- PR is draft, targets `main`, contains one commit, and remains unmerged.
+
+Limitation: GBrain and live Linear credentials were unavailable, so prior-decision lookup and independent issue-receipt verification could not be completed. The implementation used the supplied commissioning contract and repository evidence.
