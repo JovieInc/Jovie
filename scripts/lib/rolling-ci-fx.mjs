@@ -1695,7 +1695,9 @@ const HOSTED_CANARY_HOLD_LABELS = new Set([
 const SYMPHONY_REMEDIATION_CONTEXT = 'symphony-remediation';
 
 export function symphonyRemediationEvent(plan) {
-  const checks = [...(plan?.failedChecks ?? [])].map(name => String(name)).sort();
+  const checks = [...(plan?.failedChecks ?? [])]
+    .map(name => String(name))
+    .sort();
   const workflow = String(plan?.workflow ?? plan?.workflowName ?? 'CI');
   const pr = plan?.prNumber ?? plan?.pr ?? null;
   return {

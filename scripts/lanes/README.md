@@ -308,119 +308,30 @@ contract or hash-only sidecar.
 
 ## Remediation (JOV-7540)
 
-Stuck PRs, red main, scheduled CI (Golden Path Nightly; Production Synthetic Monitoring
-and Production Continuity Guard are telemetry observers and cannot `workflow_run` into
-the relay), deploy
-failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
-`jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
-`ready`, `needs-rebase` (`lockfile-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
-`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+Symphony normalizes stuck PRs, red or scheduled CI, deploy failures, and Sentry
+signals into `jovie.remediation-event/v1`. `remediation.py` classifies the
+blocker, runs deterministic repair first, then chooses a stronger enabled and
+healthy `providers.json` tier, fails over across lanes/accounts, and permits one
+top-rung retry. Per-head, per-PR, and cooldown limits are configurable with the
+`LANES_ESCALATION_*` variables.
 
-The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
-the existing lockfile resolver, one `gh run rerun --failed` per head. Those spend no model
-attempt. The next model rung is the lowest enabled healthy `tier` strictly above every lane
-that already attempted the head (`select_escalation_lane`). Host-local lanes participate by
-tier. When nothing is stronger, one top-rung retry runs on the strongest enabled healthy lane.
-Caps, overridable by env: 2 model escalations per head (`LANES_ESCALATION_PER_HEAD`), 4 per PR
-(`LANES_ESCALATION_PER_PR`), 30 minutes between model escalations (`LANES_ESCALATION_COOLDOWN_S`).
-Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared dependency, or
-main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
+Detectors file or reopen one JOV/LYB issue labeled
+`remediation:<fingerprint>`. One cached label-filtered read per tick dedupes by
+that label across teams; titles never dedupe. Closed issues are recurrence
+history, while one oldest open issue is canonical. `remediation:musicfetch-*`
+routes to the JOV-7323 in-house resolver and never renews MusicFetch.
 
-Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
-`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
-Needs-human, obsolete and ladder-exhausted share one PR comment marked
-`<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
-Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
-via `lane-fix-escalating` / `lane-fix-exhausted`.
+Spend, live billing actions, env/DNS/secrets, store submissions, outside-human
+work, and manual deploys are human-only. Human-only and ladder-exhausted state
+is always recorded; the `needs-human` label and one exact-ask comment require
+`LANES_ESCALATION_NOTIFY_TIM=1` (default off). In-process stuck-PR escalation
+also defaults off (`LANES_ESCALATION_STUCK_PRS`); the remediation sweep files
+ordinary `remediation:pr-*` events instead.
 
-Non-PR intake from the relay is still a GitHub issue labeled `symphony-remediation` with a
-fingerprint marker (no new Actions secret). After a 30-minute claim window the tick converts
-it to one Linear issue labeled `remediation`, `agent-ready` and `ws:ci` /
-`ws:release-deploy` / `ws:reliability`. `ws:ci` is the first workstream rank, so those
-issues drain first.
-
-### Label contract (`remediation:<fingerprint>`)
-
-Any detector — CI, Sentry, a synthetic monitor, a cron — files or reopens **one Linear
-issue** on team **JOV** or **LYB** and adds a label whose name is `remediation:<fingerprint>`.
-That label is the event. No new controller, workflow, or service is required, and nobody
-has to file the event by hand beyond creating or reopening that issue.
-
-Examples: `remediation:asc-agreements`, `remediation:billing-health-public`,
-`remediation:stripe-reconcile`, `remediation:e2e-nightly`, `remediation:synthetic-monitor`.
-
-The bare label `remediation` (no colon) is the relay intake label, not an event.
-
-### Precedence over `no-symphony`
-
-An issue that carries any `remediation:*` label is never skipped because it also
-carries `no-symphony`. JOV-7540 and JOV-7551 carry `no-symphony`. The bare
-`remediation` label does not override that exclusion. `type:epic`,
-`codex-blocked`, and `reasoning-job` still exclude the issue. The exception
-follows `LANES_ESCALATION` (default on). When that flag is off, `no-symphony`
-excludes the issue again.
-
-### Dedupe is the label, and closed issues are history
-
-Events dedupe by the `remediation:<fingerprint>` label across JOV and LYB.
-Titles are not a match key. A title such as `vercel-deploy-failed:jovie-docs`
-(JOV-7544) does not join an event unless that issue carries the same label.
-A second **open** issue with the same label is a comment, not a second claim.
-A **closed** or **Done** issue that carries the label is history: it increments
-`recurrence` and its recorded attempts stay on `attemptCount`. It is not an
-active duplicate, and the router does not reopen it to absorb a newer open
-issue. The open issue is the active event. This history rule follows
-`LANES_ESCALATION`. When the flag is off, a recurrence reopens the canonical
-issue instead.
-
-### Doctor alert labels
-
-While `LANES_ESCALATION` is on, `scripts/lanes/doctor.py` Tracker applies
-`remediation:<alert-key-slug>` next to `symphony` when it opens, reopens, or
-closes the issue for that alert key. The slug matches
-`^[a-z0-9]+(-[a-z0-9]+)*$`: colons and other separators collapse to single
-hyphens (`provider-idle:codex` → `remediation:provider-idle-codex`). The label
-is created on the JOV team when it is missing, color `#E5484D`.
-
-### Stuck PRs stay on the sweep
-
-Stuck-PR detection lives in remediation-sweep. It files ordinary labeled
-issues: `remediation:pr-<n>-hold` and `remediation:pr-<n>-conflict` for a PR
-whose `lane-fix-exhausted` label has aged out. The router consumes those as
-normal remediation events. It does not run its own stuck-PR escalation unless
-`LANES_ESCALATION_STUCK_PRS=1` (and `LANES_ESCALATION` is on). That flag
-defaults off.
-
-On the next dispatch tick the router:
-
-1. Reads events with **one** label-filtered Linear query (`labels.name startsWith "remediation:"`,
-   teams JOV and LYB, first 100, no per-issue follow-up read). The read goes through the
-   cached claim scan (`shared`, key `remediation-events`) so workers do not repeat it.
-2. Dedupes by the `remediation:<fingerprint>` label across JOV and LYB, never by
-   title. One open event per fingerprint. A second open issue is a comment, not a
-   second claim. A closed or Done issue with the label counts as history
-   (`recurrence`, `attemptCount`), not as an active duplicate.
-3. Classifies the event as `fixable-by-agent` or `human-only`. Human-only means Tim has
-   to act: spend, billing actions, env/DNS/secrets, store submissions (including
-   `asc-agreements`), outside humans, manual deploys.
-4. Dispatches fixable events up the existing lane ladder: the first model is a stronger
-   enabled lane than the weakest, then failover across lanes and accounts, then one
-   top-rung retry. The assigned lane claims the issue on its existing worker pass.
-5. For human-only or ladder-exhausted events, records the state always. The `needs-human`
-   label and one comment with the exact ask are posted only when
-   `LANES_ESCALATION_NOTIFY_TIM` is on (default off).
-
-`remediation:musicfetch-*` is not a renewal. It routes to the in-house resolver cutover
-(**JOV-7323**). The dossier tells the lane not to renew, purchase, extend, or restore
-MusicFetch.
-
-`doctor.json` always carries `escalation` (`by_class`, `escalating`, `ladder_exhausted`,
-`surfaced`, `attempts24h`, `landed_after_escalation24h`) and `remediation` (`by_source`,
-`by_class`, `routed_by_lane`, `failovers24h`, `escalations24h`, `ladder_exhausted`,
-`surfaced`, plus the event counters). The same event counters are top-level:
-`eventsOpen`, `eventsClaimed`, `eventsHuman`, `eventsExhausted`, and `byFingerprint`
-(state, issue, class, lane, and the exact ask). A non-empty `surfaced` list raises
-alert `escalation-needs-human`.
+`doctor.json` exposes the escalation classes plus `eventsOpen`,
+`eventsClaimed`, `eventsHuman`, `eventsExhausted`, and `byFingerprint`.
+`LANES_ESCALATION` defaults on; notify, hold-lifting, and stuck-PR flags default
+off. The retired Hyperagent poke workflow and its standalone test are removed.
 
 ## Tests
 
