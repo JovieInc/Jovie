@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   isGatewayBudgetExceededError,
+  isGatewayInsufficientFundsError,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
 import { auth } from '@/lib/auth/better-auth';
@@ -714,6 +715,7 @@ export async function tryHandleAnonymousOnboardingChat(
     // Mid-stream failures cannot swap the Response for the scripted
     // fallback; the lint-clean script line is the recovery copy instead.
     const streamErrorText = (error: unknown) =>
+      isGatewayInsufficientFundsError(error) ||
       isGatewayBudgetExceededError(error)
         ? resolveChatStreamErrorMessage(error)
         : STREAM_ERROR_LINE.text;
