@@ -1138,9 +1138,25 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertEqual(reduceMotionStatus.value as? String, "Interactive progress hidden")
 
+    XCTAssertTrue(
+      app.staticTexts["Home"].isHittable,
+      "Reduce Motion fixture did not start on Home.\n\(app.debugDescription)"
+    )
+
     let shortStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
     let shortEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.42))
-    shortStart.press(forDuration: 0.4, thenDragTo: shortEnd)
+    // This phase rejects a short, slow drag. XCTest's default 500px/s can
+    // legitimately open the drawer through the projected-distance policy.
+    shortStart.press(
+      forDuration: 0.4,
+      thenDragTo: shortEnd,
+      withVelocity: XCUIGestureVelocity(rawValue: 50),
+      thenHoldForDuration: 0
+    )
+    XCTAssertTrue(
+      app.staticTexts["Home"].isHittable,
+      "The rejected drag left Home.\n\(app.debugDescription)"
+    )
     XCTAssertFalse(app.descendants(matching: .any)["shell-drawer"].isHittable)
     XCTAssertFalse(app.descendants(matching: .any)["shell-right-rail"].isHittable)
     XCTAssertEqual(
