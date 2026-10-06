@@ -953,8 +953,9 @@ def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
 
     Held issues come first: among issues whose brief run is due, `pick`'s own
     order and eligibility choose one, so a held issue gets its brief run on
-    the next claim instead of waiting behind the whole pool. Otherwise the
-    first admissible issue is returned; a `brief-auto` admission is labeled
+    the next claim instead of waiting behind the whole pool. Once `brief-auto`
+    admits a held issue, it keeps that priority until its build claim. Otherwise
+    the first admissible issue is returned. A `brief-auto` admission is labeled
     and filed for the founder once. An issue that is neither (a linked brief
     still incomplete, or a remote-only lane) is labeled once and skipped.
     """
@@ -979,6 +980,18 @@ def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
         if decision["auto"] and linear is not None:
             try:
                 ensure_brief_auto(linear, chosen, decision, now=now)
+            except Exception as error:
+                sys.stderr.write(f"brief-auto record skipped: {type(error).__name__}: {error}\n")
+        return chosen
+
+    auto_admitted = [issue for issue in issues
+                     if NEEDS_BRIEF_LABEL in _labels(issue) and admission(issue)["auto"]]
+    chosen = (pick(auto_admitted, failures, now=now, in_flight=in_flight, provider=provider)
+              if auto_admitted else None)
+    if chosen is not None:
+        if linear is not None:
+            try:
+                ensure_brief_auto(linear, chosen, admission(chosen), now=now)
             except Exception as error:
                 sys.stderr.write(f"brief-auto record skipped: {type(error).__name__}: {error}\n")
         return chosen

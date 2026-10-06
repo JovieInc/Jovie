@@ -657,9 +657,10 @@ in sync with those registries.
    under `<!-- design-gate:brief-retry -->`.
 4. **Auto-admission.** After the retry, or 24h after `held-at`, an incomplete
    brief is admitted as `brief-auto`. The gate labels it, comments a warning,
-   and appends one founder `jovie.work-order/v1` block for the taste call.
-   Summer's founder path (JOV-7739) posts that block to Ovie with no model
-   turn.
+   and appends one founder `jovie.work-order/v1` block for the taste call. An
+   auto-admitted issue keeps brief-lane priority until its build claim, so the
+   24h escape cannot fall back into ordinary pool ordering. Summer's founder
+   path (JOV-7739) posts that block to Ovie with no model turn.
 5. **Linked briefs.** A linked `Design brief:` doc is never overwritten. It
    gets no brief run and follows the 24h rule.
 
