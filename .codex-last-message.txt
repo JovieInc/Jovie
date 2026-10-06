@@ -1,0 +1,11 @@
+Disabled auto-merge on PR #20139 and verified it remains open, dirty, and failing Source Validation, PR Size Guard, and PR Ready.
+
+No repository changes, commit, push, tests, or draft PR were created because:
+
+- JOV-7594 is operational coordination work.
+- JOV-7595 already owns the in-progress file-overlap guard implementation.
+- Another lane-control PR would worsen the collision this ticket documents.
+
+Live audit updates: #20106, #20172, #20174, and #20132 merged; #20131 closed; #20148 auto-merge was already off. GBrain lookup failed with HTTP 400, so repo, Linear, and GitHub evidence were used.
+
+NOT-SHIPPABLE: JOV-7594 is one-off PR sequencing/remediation; its code prevention work is concurrently owned by JOV-7595.
