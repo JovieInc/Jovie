@@ -1,0 +1,18 @@
+Implemented and opened draft PR [#20444](https://github.com/JovieInc/Jovie/pull/20444).
+
+- Deleted the two files defining `FeatureIntroHost`, `FeatureIntroCard`, and `FeatureIntroCatalog`, including AppStorage plumbing.
+- Removed Xcode project entries and obsolete tests.
+- Added regression coverage in [ComposerWorkflowSheetTests.swift](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T214254Z-JOV-7731-codex-d81954/apps/ios/JovieTests/ComposerWorkflowSheetTests.swift).
+- Confirmed `MobileChatPlaceholderView` is intentional: [RootView.swift](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T214254Z-JOV-7731-codex-d81954/apps/ios/Jovie/App/RootView.swift) mounts it twice when `ChatRepository` is unavailable.
+- Commit: `47158a5f78`
+
+Verified:
+
+- `pnpm run ios:lint` passed.
+- Regression source contract passed.
+- `git diff --check` passed.
+- Commit and publication hooks passed.
+- Biome had no supported files in this Swift/Xcode-only diff.
+- Focused simulator tests could not start on the Linux lane because Xcode and `/usr/bin/plutil` are unavailable; hosted iOS checks are queued.
+
+PR remains draft and Linear JOV-7731 is `In Review`.
