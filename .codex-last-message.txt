@@ -1,0 +1,9 @@
+DONE — [PR #20274](https://github.com/JovieInc/Jovie/pull/20274) is green, clean, and mergeable.
+
+- Merged `origin/main`.
+- Registered the `/playlists` screen, fixing `JOV-INV-018`.
+- Added regression coverage for the registry entry.
+- `pre-push-gate.sh affected` passed.
+- Pushed head `c05bae636b`.
+- Hosted CI: 19 passed, 6 intentionally skipped, 0 failures.
+- Worktree and remote branch match.
