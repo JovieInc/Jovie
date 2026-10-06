@@ -44,4 +44,11 @@ describe('ShareableLinkRow', () => {
     );
     expect(screen.getByTestId('row')).toHaveClass('h-8');
   });
+
+  it('locks rail density to the 32px desktop control contract', () => {
+    render(
+      <ShareableLinkRow url='https://jov.ie/tim' density='rail' testId='row' />
+    );
+    expect(screen.getByTestId('row')).toHaveClass('h-8');
+  });
 });
