@@ -1,0 +1,16 @@
+Draft PR opened: [#20376](https://github.com/JovieInc/Jovie/pull/20376) at commit `35ef1ce252`.
+
+Changed:
+
+- Added `--allow-escape-sequences` when capturing ANSI-bearing build logs in [deprecation-intake.yml](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T184941Z-JOV-7693-codex-e1a8a3/.github/workflows/deprecation-intake.yml:57).
+- Added a regression assertion in [deprecation-intake.test.mjs](/home/timwhite/.local/state/jovie-lanes/worktrees/20261003T184941Z-JOV-7693-codex-e1a8a3/scripts/deprecation-intake.test.mjs:54). This addresses GitHub CLI v2.97’s escape-sequence protection.
+
+Verified:
+
+- Focused tests: 4 passed
+- Biome: passed
+- Actionlint: passed
+- Monorepo typecheck: 18/18 passed
+- Diff and commit/push hooks: passed
+
+Deviation: GBrain and Linear connectors required reauthentication, and no fallback tokens were available, so separate issue-state receipts could not be verified. The pre-admitted lane and required PR markers were preserved.
