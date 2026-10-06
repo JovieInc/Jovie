@@ -24,7 +24,7 @@
     "@vercel/blob": "2.8.0",
     "ai": "7.0.122",
     "braintrust": "3.36.0",
-    "eve": "0.70.0",
+    "eve": "0.70.3",
     "just-bash": "3.6.0",
     "microsandbox": "0.7.6",
     "zod": "4.6.5"
@@ -38,7 +38,7 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "eve@0.70.0": "patches/eve@0.70.0.patch"
+      "eve@0.70.3": "patches/eve@0.70.3.patch"
     }
   }
 }
