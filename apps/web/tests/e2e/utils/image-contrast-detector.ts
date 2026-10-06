@@ -402,9 +402,25 @@ export async function inspectImageContrast(
   const styleTag = await page.addStyleTag({
     content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; }`,
   });
+  // Under runner CPU contention headless Chromium intermittently rejects a
+  // capture with "Protocol error (Page.captureScreenshot): Unable to capture
+  // screenshot" (see playwright-artifact-secrets.test.ts for the documented
+  // transient). Retry only that error, at most twice; anything else fails.
   let screenshot: Buffer;
   try {
-    screenshot = await page.screenshot({ type: 'png' });
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        screenshot = await page.screenshot({ type: 'png' });
+        break;
+      } catch (error) {
+        if (
+          attempt >= 3 ||
+          !String(error).includes('Unable to capture screenshot')
+        ) {
+          throw error;
+        }
+      }
+    }
   } finally {
     await styleTag.evaluate(tag => tag.remove());
   }
