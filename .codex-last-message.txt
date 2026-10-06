@@ -1,0 +1,14 @@
+Implemented and published [draft PR #20383](https://github.com/JovieInc/Jovie/pull/20383) at `d221caa72b`.
+
+Handoff:
+
+- Escaped-defect merges now transition to `Validating`, never directly to `Done`.
+- Closure requires product proof plus live JOV-2967/JOV-7084 detector/compiler evidence.
+- Added the reusable reversible-control detector with JOV-7207 deliberate-red replay.
+- Applied it to composed left rail, right rail/drawer, audio reveal, keyboard, pointer, hydration, focus, and ARIA flows.
+- Created the canonical `escaped-defect` Linear label and applied it to JOV-7207.
+- JOV-7201 is In Review.
+- Final exact-head CI is fully green, including Source Validation, PR Ready, coverage, migration, security, Biome, typechecks, 31 quality-gap tests, 28 reconciler tests, and 51 control tests.
+- PR remains draft and unmerged as requested.
+
+Remaining runtime evidence is intentionally post-deployment: exact-build journey retest and live detector receipt must exist before the guarded Done transition. GBrain was unavailable with HTTP 400; repository canon and live source were used instead.
