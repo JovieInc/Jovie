@@ -48,7 +48,7 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     vi.resetModules();
   });
 
-  it('mounts the v3 hero, presence, structure, FAQ, and close with the flag on', async () => {
+  it('mounts the v3 hero, presence, structure, and close without FAQ with the flag on', async () => {
     flags.HOMEPAGE_V3_ENABLED = true;
     const { container } = await renderHomePage();
 
@@ -59,7 +59,6 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
       'homepage-hero-shell',
       'homepage-section-presence',
       'homepage-section-structure',
-      'homepage-faq',
       'homepage-close',
     ]);
     expect(
@@ -68,6 +67,8 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
         name: 'Be found.Be understood.',
       })
     ).toBeInTheDocument();
+
+    expect(screen.queryByTestId('marketing-section-faq')).toBeNull();
 
     // One jov.ie/you claim action in hero and close (Tim 2026-09-28).
     const hero = screen.getByTestId('marketing-section-hero');
