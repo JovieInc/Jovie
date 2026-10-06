@@ -1,0 +1,10 @@
+Already fixed in [PR #20148](https://github.com/JovieInc/Jovie/pull/20148), commit `be546c2003`:
+
+- Autoscale reads #20141’s canonical `remaining`, `limit`, `reset`, and `rateLimitedAt` keys, with legacy fallback.
+- Its writer emits the same schema.
+- Regression coverage confirms canonical data avoids `hold:linear-unknown`.
+- Verified exact PR head `cf02985f29`: 7 tests passed.
+- This branch remains clean; no commit, push, or duplicate PR was created.
+- #20148 remains open and DIRTY pending its planned rebase/merge ordering.
+
+NOT-SHIPPABLE: JOV-7591 was already fixed on open PR #20148 before this lane began.
