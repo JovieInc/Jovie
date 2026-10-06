@@ -1,0 +1,11 @@
+Draft PR opened: [#20314](https://github.com/JovieInc/Jovie/pull/20314)
+
+- Removed the duplicate appearance redirect page and sidebar row.
+- Preserved the `next.config.js` compatibility redirect to Account.
+- Updated route registries, baselines, and regression tests.
+- Verified 62 focused tests, Biome, full workspace typecheck, and commit hooks.
+- Commit: `236e76a55f37d85656839a7bd5261c8cc11ac728`
+- Linear moved to `In Review`.
+- Worktree is clean and synchronized with the remote branch.
+
+Concerns: hosted draft checks are queued. The referenced audit artifact paths were unavailable, so the issue description was verified directly against repository source.
