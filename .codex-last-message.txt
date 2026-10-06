@@ -1,0 +1,10 @@
+PR [#20288](https://github.com/JovieInc/Jovie/pull/20288) is green and mergeable.
+
+- Merged `origin/main`; conflict resolved by preserving both CI structural tests.
+- No migration or lockfile conflicts.
+- `pre-push-gate.sh affected` passed, including all 11 test shards.
+- Pushed merge commit `d82c2eb6860e081a044b315f65c70460ae224b6f`.
+- GitHub: 20 passed, 6 skipped, 0 failed/pending.
+- PR status: `OPEN`, `MERGEABLE`, `CLEAN`.
+- Worktree and remote head match.
+- `gbrain-unavailable`: queries returned HTTP 400; repo/runtime evidence was used.
