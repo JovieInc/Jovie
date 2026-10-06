@@ -222,6 +222,63 @@ class ConditionReceiptTest(unittest.TestCase):
 
 
 class ReconcileTest(unittest.TestCase):
+    def test_mac_quota_unknown_retains_original_watchdog_until_observed_budget_recovery(self):
+        first = obs(now=1791321038.0, githubRemaining=230)
+        alerts = doctor.judge(first)
+        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, first, "mac")}
+        for now in (1791321100.0, 1791321600.0):
+            unknown = obs(now=now, githubRemaining=None)
+            carried = doctor.judge(unknown, prior)
+            receipt = doctor.condition_receipts(carried, prior, unknown, "mac")["github-quota"]
+            self.assertEqual(receipt["state"], "active")
+            self.assertEqual(receipt["source"]["status"], "unknown")
+            self.assertEqual(receipt["deadlineAt"], "2026-10-06T21:20:38Z")
+            self.assertEqual(receipt["generation"], 1)
+            self.assertIsNone(receipt["terminalOutcome"])
+            prior = {"alerts": carried, "conditions": {"github-quota": receipt}}
+        recovered = obs(now=1791321700.0, githubRemaining=4854)
+        receipt = doctor.condition_receipts(doctor.judge(recovered, prior), prior, recovered, "mac")["github-quota"]
+        self.assertEqual(receipt["state"], "resolved")
+        self.assertEqual(receipt["source"]["status"], "healthy")
+        self.assertEqual(receipt["recoveryEvidence"]["githubRemaining"], 4854)
+        self.assertEqual(receipt["source"]["observedAt"], doctor.epoch_iso(recovered["now"]))
+
+    def test_mac_ownership_read_alarm_survives_cooldown_without_duplicate_issue_actions(self):
+        first = obs(linearError="in-flight PR ownership unreadable", pool=None, eligiblePool=None)
+        tracker = FakeTracker()
+        alerts = doctor.judge(first)
+        prior = doctor.reconcile(alerts, {}, tracker, first["now"], doctor.condition_receipts(alerts, {}, first, "mac"))
+        unknown = obs(now=first["now"] + 600, linearError=None, linearSkipped="cooldown", pool=None, eligiblePool=None)
+        alerts = doctor.judge(unknown, prior)
+        receipt = doctor.condition_receipts(alerts, prior, unknown, "mac")["linear-down"]
+        state = doctor.reconcile(alerts, prior, None, unknown["now"], {"linear-down": receipt})
+        self.assertEqual(receipt["state"], "active")
+        self.assertEqual(receipt["generation"], 1)
+        self.assertEqual(receipt["deadlineAt"], prior["conditions"]["linear-down"]["deadlineAt"])
+        self.assertEqual(tracker.closed, [])
+        self.assertIsNone(state["issues"]["linear-down"]["closedAt"])
+        recovered = obs(now=unknown["now"] + 60, pool=0, eligiblePool=50)
+        receipt = doctor.condition_receipts(doctor.judge(recovered, state), state, recovered, "mac")["linear-down"]
+        self.assertEqual(receipt["state"], "resolved")
+        self.assertEqual(receipt["recoveryEvidence"]["eligiblePool"], 50)
+
+    def test_shipping_alarm_does_not_recover_when_workers_or_census_disappear(self):
+        first = obs(lastLandingAge=41000, pool=50)
+        alerts = doctor.judge(first)
+        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, first, "mac")}
+        for unknown in (obs(lastLandingAge=41100, pool=None, eligiblePool=None, openPRCount=None),
+                        obs(lastLandingAge=41100, pool=50, busy=0)):
+            carried = doctor.judge(unknown, prior)
+            receipt = doctor.condition_receipts(carried, prior, unknown, "mac")["no-landing"]
+            self.assertEqual(receipt["state"], "active")
+            self.assertEqual(receipt["generation"], 1)
+            self.assertEqual(receipt["deadlineAt"], prior["conditions"]["no-landing"]["deadlineAt"])
+            self.assertIsNone(receipt["terminalOutcome"])
+        for recovered in (obs(lastLandingAge=60), obs(lastLandingAge=41100, pool=0, eligiblePool=0, openPRCount=0)):
+            receipt = doctor.condition_receipts(doctor.judge(recovered, prior), prior, recovered, "mac")["no-landing"]
+            self.assertEqual(receipt["state"], "resolved")
+            self.assertEqual(receipt["recoveryEvidence"]["lastLandingAge"], recovered["lastLandingAge"])
+
     def test_admission_alarm_survives_unknown_inventory_until_observed_recovery(self):
         observed = obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "over-budget"}})
         alerts = doctor.judge(observed)

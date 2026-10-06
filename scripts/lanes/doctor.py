@@ -439,6 +439,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
+    elif obs.get("linearSkipped") or obs.get("pool") is None:
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("linear-down")
+        if prior_alarm:
+            alerts["linear-down"] = prior_alarm
     elif new_work_empty(obs):
         since = (previous or {}).get("poolEmptySince") or obs["now"]
         if obs["now"] - since >= POOL_EMPTY_S:
@@ -447,6 +451,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = (f"{busy} slots busy with {pool if pool is not None else 'unknown'} eligible new issues "
                                 f"and {obs.get('openPRCount', 'unknown')} open PRs but nothing passed the gate ({last})")
+    elif (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S) and not new_work_empty(obs):
+        # Losing demand/worker visibility is not a new landing or observed absence of demand.
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("no-landing")
+        if prior_alarm:
+            alerts["no-landing"] = prior_alarm
     if busy and waiting and isinstance(obs.get("lastWorkAge"), (int, float)) and obs["lastWorkAge"] > 3600:
         alerts["workers-without-completions"] = (
             f"{busy} slot leases occupied but no completed run for {int(obs['lastWorkAge'] // 60)}m; "
@@ -505,6 +514,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    elif obs.get("githubRemaining") is None:
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("github-quota")
+        if prior_alarm:
+            alerts["github-quota"] = prior_alarm
     brake = (obs.get("autoscale") or {}).get("throughputBrake") or {}
     held_for = brake.get("heldForS")
     interval = brake.get("intervalS")
@@ -585,6 +598,11 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             source_status = "unknown"
         if key == "workers-without-completions" and obs.get("lastWorkAge") is None:
             source_status = "unknown"
+        if key == "github-quota" and obs.get("githubRemaining") is None:
+            source_status = "unknown"
+        if key == "no-landing" and (obs.get("lastLandingAge") is None or obs.get("linearSkipped")
+                or (obs.get("eligiblePool", obs.get("pool")) is None and obs.get("openPRCount") is None)):
+            source_status = "unknown"
         freshness = (obs.get("hudBeatAge") if key == "hud-stale" else
                      obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)
         action = ("dispatch-provider-workers" if key.startswith("provider-idle:") else
@@ -618,6 +636,14 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             continue
         receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(now),
                          "nextAction": "none", "terminalOutcome": "health-proven"}
+        fields = {"github-quota": ("githubRemaining",),
+                  "linear-down": ("linearError", "linearSkipped", "pool", "eligiblePool"),
+                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider")}
+        if key in fields:
+            receipts[key]["source"] = {**old.get("source", {}), "status": "healthy",
+                                       "observedAt": epoch_iso(now), "freshnessSeconds": 0}
+            receipts[key]["recoveryEvidence"] = {"observedAt": epoch_iso(now),
+                                                  **{field: obs.get(field) for field in fields[key]}}
     return receipts
 
 
