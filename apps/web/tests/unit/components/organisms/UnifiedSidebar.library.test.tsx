@@ -591,10 +591,19 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Account' })).toContainElement(
+      screen.getByTestId('user-button')
+    );
+    expect(userButtonPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showUserInfo: true, profileHref: undefined })
+    );
     expect(
-      screen.getByRole('button', { name: 'Sign Out' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Sign Out' })
+    ).not.toBeInTheDocument();
+    for (const link of operatorLinks) {
+      expect(link).toHaveAttribute('data-navigation-item-id');
+      expect(link).toHaveClass('grid', 'rounded-lg');
+    }
     expect(
       container.querySelector('[data-sidebar-dock="true"]')
     ).toContainElement(screen.getByTestId('sidebar-whats-new'));

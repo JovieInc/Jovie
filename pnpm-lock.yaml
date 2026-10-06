@@ -271,6 +271,9 @@ importers:
       '@jovie/web':
         specifier: workspace:*
         version: link:../web
+      '@simplewebauthn/browser':
+        specifier: 13.3.0
+        version: 13.3.0
       '@statsig/statsig-node-core':
         specifier: ^0.23.1
         version: 0.23.1(encoding@0.1.13)

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, createElement } from 'react';
 import type {
   CommonDropdownFilterItemPredicate,
   CommonDropdownItem,
@@ -217,11 +217,119 @@ export function filterItems(
 
 export function getContentStyle(
   minWidth?: number | string,
-  maxHeight?: number | string
+  maxHeight?: number | string,
+  kind: 'dropdown' | 'context' = 'dropdown'
 ): CSSProperties | undefined {
-  if (minWidth === undefined && maxHeight === undefined) {
-    return undefined;
-  }
+  const available = `var(--radix-${kind}-menu-content-available-height)`;
+  const requested =
+    typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight;
+  return {
+    maxHeight: requested ? `min(${requested}, ${available})` : available,
+    minWidth,
+    overflowY: 'auto',
+  };
+}
 
-  return { maxHeight, minWidth };
+/** Count real controls, including action rows and radio groups. Never truncate. */
+export const MENU_MAX_GROUP_ACTIONS = 8;
+export const MENU_MAX_ROOT_ACTIONS = 12;
+export const MENU_MAX_SUBMENU_DEPTH = 1;
+
+export function menuNeedsSearch(items: readonly CommonDropdownItem[]): boolean {
+  let total = 0;
+  let group = 0;
+  for (const item of items) {
+    if (isSeparator(item) || isLabel(item)) {
+      group = 0;
+      continue;
+    }
+    const count =
+      isActionRow(item) || isRadioGroup(item) ? item.items.length : 1;
+    total += count;
+    group += count;
+    if (group > MENU_MAX_GROUP_ACTIONS || total > MENU_MAX_ROOT_ACTIONS)
+      return true;
+  }
+  return false;
+}
+
+export function menuSubmenuDepth(items: readonly CommonDropdownItem[]): number {
+  return items.reduce(
+    (depth, item) =>
+      isSubmenu(item)
+        ? Math.max(depth, 1 + menuSubmenuDepth(item.items))
+        : depth,
+    0
+  );
+}
+
+/** Deep hierarchies become a searchable chooser, retaining every supplied action. */
+export function flattenMenuItems(
+  items: readonly CommonDropdownItem[],
+  labels: readonly string[] = [],
+  ids: readonly string[] = [],
+  parentDisabled = false
+): CommonDropdownItem[] {
+  return items.flatMap((item): CommonDropdownItem[] => {
+    const disabled = parentDisabled || item.disabled;
+    const id = [...ids, item.id].join('/');
+    const label = (value: string) => [...labels, value].join(' › ');
+    if (isSubmenu(item))
+      return flattenMenuItems(
+        item.items,
+        [...labels, item.label],
+        [...ids, item.id],
+        disabled
+      );
+    if (isCustomItem(item))
+      return [
+        {
+          ...item,
+          id,
+          render: () =>
+            createElement(
+              'div',
+              { inert: disabled || undefined },
+              item.render()
+            ),
+        },
+      ];
+    if (isActionRow(item)) {
+      return [
+        {
+          ...item,
+          id,
+          disabled,
+          items: item.items.map(child => ({
+            ...child,
+            id: `${id}/${child.id}`,
+            disabled: disabled || child.disabled,
+            label: label(child.label),
+          })),
+        },
+      ];
+    }
+    if (isRadioGroup(item))
+      return [
+        {
+          ...item,
+          id,
+          disabled,
+          items: item.items.map(child => ({
+            ...child,
+            id: `${id}/${child.id}`,
+            disabled: disabled || child.disabled,
+            label: label(child.label),
+          })),
+        },
+      ];
+    return [
+      {
+        ...item,
+        id,
+        disabled,
+        ...('label' in item ? { label: label(item.label) } : {}),
+      },
+    ];
+  });
 }

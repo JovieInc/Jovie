@@ -156,6 +156,7 @@ export const Settings: Story = {
 };
 
 export const Operator: Story = {
+  parameters: { nextjs: { navigation: { pathname: APP_ROUTES.ADMIN_CHAT } } },
   args: {
     section: 'ov',
     variant: 'ov',

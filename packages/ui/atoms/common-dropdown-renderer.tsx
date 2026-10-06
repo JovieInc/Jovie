@@ -41,7 +41,11 @@ import {
   isSeparator,
   isSubmenu,
 } from './common-dropdown-types';
-import { filterItems, getContentStyle } from './common-dropdown-utils';
+import {
+  filterItems,
+  getContentStyle,
+  menuNeedsSearch,
+} from './common-dropdown-utils';
 
 export type MenuPrimitiveKind = 'dropdown' | 'context';
 
@@ -308,6 +312,7 @@ function CommonDropdownSubmenuRenderer({
   readonly item: CommonDropdownSubmenu;
   readonly context: MenuRenderContext;
 }) {
+  const searchable = item.searchable || menuNeedsSearch(item.items);
   const submenuGroup = React.useContext(SubmenuGroupContext);
   const [localOpen, setLocalOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -346,14 +351,14 @@ function CommonDropdownSubmenuRenderer({
   );
 
   React.useEffect(() => {
-    if (!open || !item.searchable) return;
+    if (!open || !searchable) return;
 
     const timer = globalThis.setTimeout(() => {
       inputRef.current?.focus();
     }, 0);
 
     return () => globalThis.clearTimeout(timer);
-  }, [item.searchable, open]);
+  }, [searchable, open]);
 
   const handleQueryChange = React.useCallback(
     (nextQuery: string) => {
@@ -391,7 +396,11 @@ function CommonDropdownSubmenuRenderer({
       data-slot='common-dropdown-subcontent'
       aria-busy={item.isLoading || undefined}
       className={cn(subMenuContentClasses, transformOrigin)}
-      style={getContentStyle(item.minWidth ?? measuredMinWidth, item.maxHeight)}
+      style={getContentStyle(
+        item.minWidth ?? measuredMinWidth,
+        item.maxHeight,
+        context.kind
+      )}
       onFocusOutside={event => {
         if (contentRef.current?.contains(event.target as Node)) {
           event.preventDefault();
@@ -409,7 +418,7 @@ function CommonDropdownSubmenuRenderer({
         }
       }}
     >
-      {item.searchable ? (
+      {searchable ? (
         <SearchableContent
           query={query}
           placeholder={item.searchPlaceholder ?? `Search ${item.label}`}
