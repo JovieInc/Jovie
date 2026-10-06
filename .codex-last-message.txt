@@ -1,0 +1,19 @@
+Implemented and opened draft PR: [#20270 — feat(cli): add read-only creator lookup (JOV-7566)](https://github.com/JovieInc/Jovie/pull/20270)
+
+Changes:
+
+- Added `jovie creator lookup <url>` and read-only MCP tool `lookup_creator`.
+- Added a read-only API supporting YouTube, Instagram, TikTok, and Linktree.
+- Added validation, rate limiting, stable errors, privacy-safe response fields, and regression tests.
+- Kept `profile create` Spotify-only.
+
+Verification:
+
+- CLI: 206 tests passed.
+- Backend lookup/rate-limit tests: 81 passed.
+- Biome, ESLint, CLI build/pack smoke, typecheck, docs parity/freshness, and secret scans passed.
+- Latest hosted Source Validation, coverage, security, migration, size, and PR Ready checks passed.
+- Branch is clean and synchronized; commit `1d54e19f8fcc0997ef21557dcdfafbc719ec9d91`.
+- PR remains draft and unmerged as requested.
+
+Limitations: Linear status could not be updated because this lane exposed no Linear credentials. The GBrain durable write was unavailable because its embedding service could not be reached. An earlier CI run failed before required changelog metadata was added; the corrected exact-head run is green.
