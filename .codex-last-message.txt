@@ -1,0 +1,15 @@
+Implemented and opened draft PR [#20242](https://github.com/JovieInc/Jovie/pull/20242).
+
+- Every `main` push now enters the E2E concurrency group, preventing stale runners from being externally killed and misreported as failures.
+- Added a regression assertion rejecting path-filtered push triggers.
+- Commit: `3e18a108ad`
+
+Verified:
+
+- Workflow hygiene: 62 passed
+- Pinned actionlint/shellcheck/pyflakes: passed
+- Workflow topology: valid
+- Secret and publication policy gates: passed
+- PR remains draft; CI is queued
+
+Deviation: Linear transitions could not be recorded because this environment has no Linear API or Doppler token. Biome processed zero files because YAML and Python are ignored by its configuration.
