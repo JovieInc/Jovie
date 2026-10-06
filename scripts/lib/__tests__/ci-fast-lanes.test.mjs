@@ -149,15 +149,16 @@ fs.closeSync(fd);
         );
         expect(result.status, result.stderr).toBe(0);
         // Each invocation owns its record; shared append writes can interleave.
-        const scriptCommands = readdirSync(capture)
-          .map(name => readFileSync(join(capture, name), 'utf8').trim())
-          .filter(
-            command =>
-              command.startsWith('exec vitest --root scripts ') &&
-              command.includes(
-                'lib/__tests__/native-queue-group-evidence.test.mjs'
-              )
-          );
+        const capturedCommands = readdirSync(capture).map(name =>
+          readFileSync(join(capture, name), 'utf8').trim()
+        );
+        const scriptCommands = capturedCommands.filter(
+          command =>
+            command.startsWith('exec vitest --root scripts ') &&
+            command.includes(
+              'lib/__tests__/native-queue-group-evidence.test.mjs'
+            )
+        );
         expect(scriptCommands).toHaveLength(1);
         const [scriptCommand] = scriptCommands;
         expect(scriptCommand.split(' ')).toContain(
@@ -168,6 +169,19 @@ fs.closeSync(fd);
           'lib/__tests__/merge-group-workflow-contract.test.mjs'
         );
         expect(scriptCommand).toContain('--coverage');
+        const productionCommands = capturedCommands.filter(command =>
+          command.includes('--coverage.include=lib/production-lane-range.mjs')
+        );
+        expect(productionCommands).toHaveLength(1);
+        expect(productionCommands[0]).toContain(
+          'lib/__tests__/production-lane-range.test.mjs'
+        );
+        expect(productionCommands[0]).toContain(
+          '--coverage.thresholds.perFile=true'
+        );
+        expect(productionCommands[0]).toContain(
+          '--coverage.thresholds.functions=90'
+        );
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }
@@ -1987,5 +2001,38 @@ describe('document review coverage contract', () => {
     expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
       '--coverage.thresholds.branches=80'
     );
+  });
+});
+
+describe('staging carryover coverage contract', () => {
+  it('executes the cumulative staging behavior tests once with every coverage floor enforced', async () => {
+    const previous = {
+      GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
+      CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
+      CI_FAST_SKIP_STRUCTURAL: process.env.CI_FAST_SKIP_STRUCTURAL,
+    };
+    try {
+      process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+      process.env.CI_PRODUCT_LANES = 'operations';
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi
+        .fn()
+        .mockReturnValue({ code: 0, output: 'executed\n' });
+      expect((await runStructural({ execute })).code).toBe(0);
+      const calls = execute.mock.calls.filter(([command]) =>
+        command.includes('staging-lane-carryover.test.mjs')
+      );
+      expect(calls).toHaveLength(1);
+      for (const dimension of ['lines', 'branches', 'functions'])
+        expect(calls[0][0]).toContain(`--test-coverage-${dimension}=100`);
+      expect(calls[0][0]).toContain(
+        '--test-coverage-include=.github/scripts/staging-lane-carryover.mjs'
+      );
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 });

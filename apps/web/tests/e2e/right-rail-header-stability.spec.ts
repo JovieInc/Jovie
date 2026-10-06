@@ -239,3 +239,155 @@ test('audience right rail header stays fixed when a contact has sparse data', as
   expectNoRightRailShift({ before, after });
   expectNoConsoleErrors(consoleErrors);
 });
+
+const CONTACTS_AUDIENCE_URL = '/app/contacts?tab=audience';
+const CONTACTS_AUDIENCE_ANALYTICS_URL =
+  '/app/contacts?tab=audience&panel=analytics';
+const PRESENCE_URL = '/app/presence';
+const REPRODUCED_VIEWPORT = { width: 1512, height: 949 };
+
+async function waitForAudienceTable(page: Page) {
+  await expect(page.getByTestId('dashboard-audience-table')).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+function analyticsSidebar(page: Page) {
+  return page.getByTestId('analytics-sidebar');
+}
+
+function analyticsToggle(page: Page) {
+  return page.getByRole('button', {
+    name: /analytics panel/i,
+  });
+}
+
+// JOV-5836 deliberate-red fixture: neither a direct route load nor a
+// Presence -> Contacts navigation may implicitly open the analytics panel.
+// These assertions fail on builds that eagerly open the panel on mount.
+test.describe('audience analytics panel is decoupled from navigation @jov-5836', () => {
+  test.use({ viewport: REPRODUCED_VIEWPORT });
+
+  test('direct load of the audience tab opens no secondary panel', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(240_000);
+
+    const consoleErrors: string[] = [];
+    page.on('pageerror', err => consoleErrors.push(String(err)));
+
+    await gotoWithDevServerRetry(page, CONTACTS_AUDIENCE_URL);
+    await page.waitForURL(/\/app\/(?:dashboard\/)?contacts/, {
+      timeout: 60_000,
+    });
+    await waitForAudienceTable(page);
+
+    await expect(analyticsSidebar(page)).toBeHidden();
+    await expect(analyticsToggle(page)).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(new URL(page.url()).searchParams.get('panel')).toBeNull();
+    await testInfo.attach('contacts-audience-direct-load', {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+    expectNoConsoleErrors(consoleErrors);
+  });
+
+  test('presence -> contacts navigation opens no secondary panel', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(240_000);
+
+    const consoleErrors: string[] = [];
+    page.on('pageerror', err => consoleErrors.push(String(err)));
+
+    await gotoWithDevServerRetry(page, PRESENCE_URL);
+    await page.waitForURL(/\/app\/(?:dashboard\/)?presence/, {
+      timeout: 60_000,
+    });
+
+    await page.getByRole('link', { name: 'Contacts', exact: true }).click();
+    await page.waitForURL(/\/app\/(?:dashboard\/)?contacts/, {
+      timeout: 60_000,
+    });
+
+    await page.getByRole('link', { name: 'Audience', exact: true }).click();
+    await waitForAudienceTable(page);
+
+    await expect(analyticsSidebar(page)).toBeHidden();
+    expect(new URL(page.url()).searchParams.get('panel')).toBeNull();
+    await testInfo.attach('presence-to-contacts-audience', {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+    expectNoConsoleErrors(consoleErrors);
+  });
+
+  test('explicit toggle opens the panel and keeps header geometry stable', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    const consoleErrors: string[] = [];
+    page.on('pageerror', err => consoleErrors.push(String(err)));
+
+    await gotoWithDevServerRetry(page, CONTACTS_AUDIENCE_URL);
+    await waitForAudienceTable(page);
+
+    const header = page.getByTestId('dashboard-header');
+    const before = await readRect(header);
+
+    await analyticsToggle(page).click();
+    await expect(analyticsSidebar(page)).toBeVisible({ timeout: 15_000 });
+    await expect(analyticsToggle(page)).toHaveAttribute('aria-pressed', 'true');
+    expect(new URL(page.url()).searchParams.get('panel')).toBe('analytics');
+
+    expectStableRect(before, await readRect(header), 'Dashboard header');
+
+    await analyticsToggle(page).click();
+    await expect(analyticsSidebar(page)).toBeHidden({ timeout: 15_000 });
+    expect(new URL(page.url()).searchParams.get('panel')).toBeNull();
+
+    expectStableRect(before, await readRect(header), 'Dashboard header');
+    expectNoConsoleErrors(consoleErrors);
+  });
+
+  test('keyboard toggle works and back/forward restores panel state', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    await gotoWithDevServerRetry(page, CONTACTS_AUDIENCE_URL);
+    await waitForAudienceTable(page);
+
+    const toggle = analyticsToggle(page);
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(analyticsSidebar(page)).toBeVisible({ timeout: 15_000 });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await page.goBack();
+    await expect(analyticsSidebar(page)).toBeHidden({ timeout: 15_000 });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await page.goForward();
+    await expect(analyticsSidebar(page)).toBeVisible({ timeout: 15_000 });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  // Legitimate deep link: a route that explicitly encodes the panel must open
+  // it on load.
+  test('panel=analytics deep link opens the analytics panel', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    await gotoWithDevServerRetry(page, CONTACTS_AUDIENCE_ANALYTICS_URL);
+    await waitForAudienceTable(page);
+
+    await expect(analyticsSidebar(page)).toBeVisible({ timeout: 15_000 });
+    await expect(analyticsToggle(page)).toHaveAttribute('aria-pressed', 'true');
+  });
+});

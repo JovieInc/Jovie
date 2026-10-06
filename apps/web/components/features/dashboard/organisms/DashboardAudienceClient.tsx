@@ -10,12 +10,16 @@ import * as React from 'react';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
-import { audienceSortFields, audienceViews } from '@/lib/nuqs';
+import {
+  audiencePanelParser,
+  audienceSortFields,
+  audienceViews,
+} from '@/lib/nuqs';
 import { QueryErrorBoundary, useAudienceInfiniteQuery } from '@/lib/queries';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 import {
-  AudiencePanelProvider,
+  ControlledAudiencePanelProvider,
   useAudiencePanel,
 } from './AudiencePanelContext';
 import { DashboardAudienceWorkspace } from './DashboardAudienceWorkspace';
@@ -69,8 +73,19 @@ export function DashboardAudienceClient({
   filters: initialFilters,
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
+  // Panel state lives in the `panel` URL param (shallow, history-pushed) so it
+  // is always explicit: navigation never opens a panel, the param deep-links
+  // one, and back/forward restores the user's choice (JOV-5836).
+  const [panelMode, setPanelMode] = useQueryState(
+    'panel',
+    audiencePanelParser.withOptions({ shallow: true, history: 'push' })
+  );
+
   return (
-    <AudiencePanelProvider initialMode={null}>
+    <ControlledAudiencePanelProvider
+      mode={panelMode}
+      onModeChange={setPanelMode}
+    >
       <DashboardAudienceClientInner
         mode={mode}
         view={view}
@@ -85,7 +100,7 @@ export function DashboardAudienceClient({
         filters={initialFilters}
         tourDates={tourDates}
       />
-    </AudiencePanelProvider>
+    </ControlledAudiencePanelProvider>
   );
 }
 
@@ -103,15 +118,9 @@ function DashboardAudienceClientInner({
   filters: initialFilters,
   tourDates,
 }: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
-  const { mode: panelMode, open, close } = useAudiencePanel();
+  const { mode: panelMode, close } = useAudiencePanel();
   const isBelowLg = useBreakpointDown('lg');
   const previousIsBelowLgRef = React.useRef<boolean | null>(null);
-
-  React.useEffect(() => {
-    if ((globalThis.window?.innerWidth ?? 0) >= 1024) {
-      open('analytics');
-    }
-  }, [open]);
 
   React.useEffect(() => {
     if (previousIsBelowLgRef.current === null) {
