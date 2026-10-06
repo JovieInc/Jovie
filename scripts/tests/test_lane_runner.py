@@ -826,7 +826,7 @@ class LinearClientTest(unittest.TestCase):
             env.write_text('export LINEAR_API_KEY="lin_api_x"\n')
             client = lane.Linear(env)
             self.assertEqual(client.key, "lin_api_x")
-            payload = {"data": {"issues": {"nodes": [{
+            payload = {"data": {"issues": {"pageInfo": {"hasNextPage": False}, "nodes": [{
                 "id": "i1", "identifier": "JOV-5", "title": "t", "description": None, "priority": 2,
                 "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": [{"name": "devin"}]}}]}}}
             real = lane.urllib.request.urlopen
@@ -872,7 +872,8 @@ class LinearClientTest(unittest.TestCase):
         self.assertEqual(seen, [None, "c1"])
         endless = {"issues": {"pageInfo": {"hasNextPage": True, "endCursor": "c"}, "nodes": [node(3)]}}
         client.gql = lambda query, variables: endless
-        self.assertEqual(len(client.lane_issues("codex")), lane.LANE_ISSUE_PAGES)
+        with self.assertRaises(lane.LaneInventoryUnknown):
+            client.lane_issues("codex")
 
     def test_missing_key_is_a_clear_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -880,6 +881,74 @@ class LinearClientTest(unittest.TestCase):
             env.write_text("OTHER=1\n")
             with self.assertRaises(SystemExit):
                 lane.Linear(env)
+
+
+class NativeInventoryBoundaryTest(unittest.TestCase):
+    def client(self, pages):
+        client = lane.Linear.__new__(lane.Linear)
+        calls = []
+        def gql(query, variables):
+            calls.append((query, variables["after"]))
+            page = pages[len(calls) - 1]
+            if isinstance(page, Exception):
+                raise page
+            return page
+        client.gql = gql
+        return client, calls
+
+    def node(self, index):
+        return {"id": str(index), "identifier": f"JOV-{index}", "title": "task", "description": "",
+                "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": []}}
+
+    def test_complete_native_candidate_and_ownership_scans_include_page101_and_dedupe(self):
+        for method in ("lane_issues", "active_lane_issues"):
+            first = [self.node(i) for i in range(100)]
+            client, calls = self.client([
+                {"issues": {"nodes": first, "pageInfo": {"hasNextPage": True, "endCursor": "next"}}},
+                {"issues": {"nodes": [first[-1], self.node(100)], "pageInfo": {"hasNextPage": False}}},
+            ])
+            rows = getattr(client, method)("codex" if method == "lane_issues" else ["codex"])
+            self.assertEqual(len(rows), 101)
+            self.assertEqual([after for _, after in calls], [None, "next"])
+
+    def test_native_scans_reject_unknown_coverage_without_increasing_request_cap(self):
+        cases = [
+            [{"issues": {"nodes": [self.node(1)]}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True}}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "same"}}}] * 2,
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": str(i)}}}
+             for i in range(lane.LANE_ISSUE_PAGES)],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "next"}}}, RuntimeError("read failed")],
+        ]
+        for method in ("lane_issues", "active_lane_issues"):
+            for pages in cases:
+                with self.subTest(method=method, pages=len(pages)):
+                    client, calls = self.client(pages)
+                    with self.assertRaises(RuntimeError):
+                        getattr(client, method)("codex" if method == "lane_issues" else ["codex"])
+                    self.assertLessEqual(len(calls), lane.LANE_ISSUE_PAGES)
+                    self.assertTrue(all(query.startswith("query(") for query, _ in calls))
+
+    def test_partial_cross_host_inventory_is_unknown_and_old_cache_cannot_admit(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}), \
+                patch.object(lane, "SHARED_CACHE_DIR", Path(tmp)), \
+                patch.object(lane.file_overlap, "guard_mode", return_value="enforce"), \
+                patch.object(lane.file_overlap, "local_tasks", return_value=[]), \
+                patch.object(lane, "overlap_prs_summary", return_value=[]), \
+                patch.object(lane, "load_providers", return_value={"codex": {"label": "codex"}}):
+            (Path(tmp) / "file-overlap-tasks.json").write_text(json.dumps({"at": time.time(), "value": []}))
+            (Path(tmp) / "claim-lane-issues-codex.json").write_text(json.dumps({"at": time.time(), "value": []}))
+            pages = [{"issues": {"nodes": [self.node(1)], "pageInfo": {"hasNextPage": True}}}]
+            client, calls = self.client(pages)
+            self.assertIsNone(lane.overlap_inventory(SimpleNamespace(state=Path(tmp)), client))
+            self.assertEqual(len(calls), 1)
+            self.assertFalse((Path(tmp) / "file-overlap-tasks-v2.json").exists())
+            client, calls = self.client(pages)
+            with self.assertRaises(lane.LaneInventoryUnknown):
+                client.lane_issues("codex")
+            self.assertEqual(len(calls), 1)
+            self.assertFalse((Path(tmp) / "claim-lane-issues-v2-codex.json").exists())
 
 
 class LinearRateLimitTest(unittest.TestCase):
@@ -1207,7 +1276,7 @@ class ClaimScanCacheTest(unittest.TestCase):
         saved = lane.shared
 
         def cached(key, ttl, fetch):
-            self.assertEqual(key, "claim-lane-issues-codex")
+            self.assertEqual(key, "claim-lane-issues-v2-codex")
             self.assertLessEqual(ttl, 60)
             self.assertEqual(calls, [], "pagination must not run before the cache fill")
             return [{"id": "i", "identifier": "JOV-9", "title": "t", "description": "", "priority": 1,
