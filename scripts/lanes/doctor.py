@@ -77,16 +77,23 @@ def age_s(stamp: str | None, now: float) -> float | None:
 
 # ---------------------------------------------------------------- observations
 
-def host_capacity(host, lane) -> dict:
+def host_capacity(host, lane, now: float | None = None) -> dict:
     """Configured seats, including draining workers but not stale lock files."""
+    now = time.time() if now is None else now
     capacity = {}
     for name, spec in lane.load_providers().items():
         enabled = spec.get("enabled", True)
         configured = spec.get("slots", 1)
         base = host.base_slots(name, configured) if enabled else 0
         slots = max(0, host.slots(name, configured)) if enabled else 0
-        running = sum(_locked(path) for path in (host.state / "slots").glob(f"{name}.*.lock"))
-        capacity[name] = {"slots": slots, "running": running, "base": base}
+        leases = [_active_lease(path, now) for path in (host.state / "slots").glob(f"{name}.*.lock")]
+        leases = [lease for lease in leases if lease is not None]
+        row = {"slots": slots, "running": len(leases), "base": base}
+        if leases:
+            ages = [lease["age"] for lease in leases if lease.get("age") is not None]
+            row["leaseAgesComplete"] = len(ages) == len(leases)
+            row["oldestLeaseAge"] = max(ages) if ages else None
+        capacity[name] = row
     return capacity
 
 
@@ -146,7 +153,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     except Exception as error:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     account_observed_at = sample_clock()
-    capacity_by_provider = host_capacity(host, lane)
+    capacity_by_provider = host_capacity(host, lane, now)
+    busy_capacity = [row for row in capacity_by_provider.values() if row["running"]]
+    known_lease_ages = [row["oldestLeaseAge"] for row in busy_capacity
+                        if row.get("oldestLeaseAge") is not None]
     design_census = None
     linear_skipped = None
     try:
@@ -229,6 +239,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
                         for name, row in idle_exit.items() if isinstance(row, dict)},
         "worktrees": len(list((state / "worktrees").glob("*"))),
         "busy": sum(seats["running"] for seats in capacity_by_provider.values()),
+        "leaseAgesComplete": all(row.get("leaseAgesComplete") is True for row in busy_capacity),
+        "oldestLeaseAge": max(known_lease_ages) if known_lease_ages else None,
         "capacityByProvider": capacity_by_provider,
         "codex": accounts, "pool": pool, "candidatePool": candidate_pool, "poolByProvider": pool_by_provider,
         "eligiblePool": eligible_pool, "eligiblePoolByProvider": eligible_by_provider,
@@ -336,6 +348,15 @@ def _locked(path: Path) -> bool:
             return False
     except (OSError, BlockingIOError):
         return True
+
+
+def _active_lease(path: Path, now: float) -> dict | None:
+    """Current kernel ownership plus best-effort acquisition age from its fenced writer."""
+    if not _locked(path):
+        return None
+    owner = read_json(path, {})
+    age = age_s(owner.get("acquiredAt"), now)
+    return {"age": max(0.0, age) if age is not None else None}
 
 
 def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
@@ -456,10 +477,16 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         prior_alarm = ((previous or {}).get("alerts") or {}).get("no-landing")
         if prior_alarm:
             alerts["no-landing"] = prior_alarm
-    if busy and waiting and isinstance(obs.get("lastWorkAge"), (int, float)) and obs["lastWorkAge"] > 3600:
+    current_lease_stale = (obs.get("leaseAgesComplete") is not True
+                           or (isinstance(obs.get("oldestLeaseAge"), (int, float))
+                               and obs["oldestLeaseAge"] > 3600))
+    if (busy and waiting and isinstance(obs.get("lastWorkAge"), (int, float))
+            and obs["lastWorkAge"] > 3600 and current_lease_stale):
+        lease_age = ("current lease ages unknown" if obs.get("leaseAgesComplete") is not True else
+                     f"oldest current lease {int(obs['oldestLeaseAge'] // 60)}m")
         alerts["workers-without-completions"] = (
             f"{busy} slot leases occupied but no completed run for {int(obs['lastWorkAge'] // 60)}m; "
-            "check current processes, fenced ownership and repair holds before adding workers")
+            f"{lease_age}; check current processes, fenced ownership and repair holds before adding workers")
     budgets = obs.get("newIssueBudgetByProvider") or {}
     inventory_holds = [name for name, budget in budgets.items()
                        if budget.get("reason") in {"over-budget", "terminal-pr-backlog"}]
@@ -596,7 +623,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                 or any(row.get("reason") == "pr-inventory-unavailable"
                        for row in (obs.get("newIssueBudgetByProvider") or {}).values())):
             source_status = "unknown"
-        if key == "workers-without-completions" and obs.get("lastWorkAge") is None:
+        if key == "workers-without-completions" and (obs.get("lastWorkAge") is None
+                or obs.get("leaseAgesComplete") is not True):
             source_status = "unknown"
         if key == "github-quota" and obs.get("githubRemaining") is None:
             source_status = "unknown"
@@ -638,7 +666,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                          "nextAction": "none", "terminalOutcome": "health-proven"}
         fields = {"github-quota": ("githubRemaining",),
                   "linear-down": ("linearError", "linearSkipped", "pool", "eligiblePool"),
-                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider")}
+                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider"),
+                  "workers-without-completions": ("busy", "lastWorkAge", "leaseAgesComplete", "oldestLeaseAge")}
         if key in fields:
             receipts[key]["source"] = {**old.get("source", {}), "status": "healthy",
                                        "observedAt": epoch_iso(now), "freshnessSeconds": 0}

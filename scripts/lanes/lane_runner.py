@@ -1658,10 +1658,22 @@ class Locked:
     """flock-held file: released by the kernel if the holder dies, so no stale locks."""
     def __init__(self, path: Path, blocking: bool):
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.handle = open(path, "w")
+        # A contender must not erase the current owner's acquisition receipt before
+        # failing LOCK_NB.  The doctor uses that receipt to distinguish a newly busy
+        # slot from a worker that has made no progress for an hour.
+        self.handle = open(path, "a+")
         try:
             fcntl.flock(self.handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
             self.held = True
+            try:
+                self.handle.seek(0)
+                self.handle.truncate()
+                self.handle.write(json.dumps({"pid": os.getpid(), "host": HOST, "acquiredAt": now_iso()}))
+                self.handle.flush()
+            except OSError:
+                # The kernel lease is still authoritative.  Missing metadata keeps
+                # the doctor's diagnosis degraded instead of forfeiting ownership.
+                pass
         except BlockingIOError:
             self.held = False
 

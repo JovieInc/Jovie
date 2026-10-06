@@ -754,11 +754,20 @@ class ProviderAndLockTest(unittest.TestCase):
     def test_slot_lock_is_exclusive_and_released(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "slot.lock"
-            first = lane.Locked(path, blocking=False)
+            with patch.object(lane, "now_iso", return_value="2026-10-06T23:02:30Z"):
+                first = lane.Locked(path, blocking=False)
             self.assertTrue(first.held)
-            self.assertFalse(lane.Locked(path, blocking=False).held)
+            owner = json.loads(path.read_text())
+            contender = lane.Locked(path, blocking=False)
+            self.assertFalse(contender.held)
+            self.assertEqual(json.loads(path.read_text()), owner, "a contender must preserve the owner's receipt")
+            contender.release()
+            self.assertEqual(owner, {"pid": os.getpid(), "host": lane.HOST,
+                                     "acquiredAt": "2026-10-06T23:02:30Z"})
             first.release()
-            self.assertTrue(lane.Locked(path, blocking=False).held)
+            next_owner = lane.Locked(path, blocking=False)
+            self.assertTrue(next_owner.held)
+            next_owner.release()
 
     def test_needs_update_only_on_a_new_tree(self):
         self.assertTrue(lane.needs_update(None, "t1"))
