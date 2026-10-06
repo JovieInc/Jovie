@@ -94,17 +94,35 @@ describe.each(['left', 'right'] as const)(
       fireEvent.pointerOver(screen.getByTestId('trigger'));
       fireEvent.pointerOut(screen.getByTestId('trigger'));
       act(() => vi.advanceTimersByTime(1000));
-      expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'false');
-      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'true');
+      expect(screen.getByTestId('rail')).toHaveAttribute(
+        'data-preview',
+        'false'
+      );
+      expect(screen.getByTestId('rail')).toHaveAttribute(
+        'data-floating',
+        'true'
+      );
       fireEvent.click(screen.getByTestId('trigger'));
-      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'false');
+      expect(screen.getByTestId('rail')).toHaveAttribute(
+        'data-floating',
+        'false'
+      );
       fireEvent.click(screen.getByTestId('trigger'));
       act(() => screen.getByTestId('outside').focus());
       fireEvent.pointerOver(screen.getByTestId('trigger'));
-      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'true');
+      expect(screen.getByTestId('rail')).toHaveAttribute(
+        'data-floating',
+        'true'
+      );
       rerender(<Harness side={side} resetKey='next-route' />);
-      expect(screen.getByTestId('rail')).toHaveAttribute('data-floating', 'false');
-      expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'false');
+      expect(screen.getByTestId('rail')).toHaveAttribute(
+        'data-floating',
+        'false'
+      );
+      expect(screen.getByTestId('rail')).toHaveAttribute(
+        'data-preview',
+        'false'
+      );
     });
 
     it('offers equivalent keyboard access and Escape does not reopen from retained focus', () => {
