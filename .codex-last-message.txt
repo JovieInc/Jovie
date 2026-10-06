@@ -1,0 +1,17 @@
+Implemented and pushed JOV-7568.
+
+- Added `audience`, `links`, `creatorType`, and `platformIds` to the public artist API and OpenAPI schema.
+- Added exact YouTube audience snapshots with Spotify fallback.
+- Added regression coverage for IDs, socials, audience provenance, and rounded-count rejection.
+- Commit: `0257efe865f066d9f3f6d6cca9653231dab3199b`
+- PR: [JOV-7568: expose public artist audience and links](https://github.com/JovieInc/Jovie/pull/20283)
+
+Verification:
+
+- 46 focused tests passed.
+- Web and workspace typechecks passed.
+- Biome passed on changed files.
+- Source Validation, exact-head coverage, Security Evidence, Migration Guard, PR Size Guard, and parity are green.
+- Worktree is clean and matches the remote branch.
+
+Concerns/deviations: Spotify’s legacy follower count has no trustworthy observation timestamp, so `observedAt` is `null`. The PR was opened as a draft; the repository’s independent `PR Ready` gate subsequently promoted it after validation. I did not mark it ready or merge it.
