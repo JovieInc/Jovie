@@ -1,0 +1,11 @@
+PR [#20151](https://github.com/JovieInc/Jovie/pull/20151) is green and mergeable.
+
+- Merged latest `origin/main`; resolved both flag/registry conflicts preserving both sides.
+- Fixed the resolver import cycle.
+- Added adapter coverage and fixed Apple Music `?i=<track-id>` URL handling.
+- Pushed head `4d758eac67` to the existing branch.
+- No migration collision or lockfile conflict occurred.
+- Hosted Source Validation, Exact-head Coverage, Migration Guard, Security Evidence, PR Ready, and PR Size Guard all pass.
+- Local changed-line coverage: 84.6% versus 60% required.
+- JOV-7323 moved to In Review.
+- Worktree is clean.
