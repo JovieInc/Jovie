@@ -1,0 +1,23 @@
+Implemented and handed off in draft PR [#20186](https://github.com/JovieInc/Jovie/pull/20186), commit `650ef0828350dd39783d736d7bcb6cea3d2c10aa`.
+
+Changes:
+
+- Updated the staging supersession query to use `status=success`, avoiding completed-run indexing lag in [staging-controller.yml](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T235642Z-JOV-7582-codex-61e759/.github/workflows/staging-controller.yml:38).
+- Added regression coverage in [staging-controller-supersession.test.mjs](/home/timwhite/.local/state/jovie-lanes/worktrees/20261002T235642Z-JOV-7582-codex-61e759/scripts/lib/__tests__/staging-controller-supersession.test.mjs:121).
+
+Verified:
+
+- Regression test: 8/8 passed; confirmed failing behavior before the workflow fix.
+- Biome and actionlint passed.
+- `git diff --check` passed.
+- CI harness passed.
+- Full Turbo typecheck passed.
+- Commit and publication push hooks passed.
+- PR is draft, targets `main`, has the required Linear markers, and contains only the two intended files.
+- Hosted PR checks started successfully; several were still running at handoff.
+
+Concerns/deviations:
+
+- `gbrain-unavailable`; investigation used repository and live GitHub evidence.
+- Branch guard emitted its expected routing warning because the contract mandates the named branch targeting `main`; it did not fail.
+- The production incident remains open until the draft-PR gates, merge, deployment, and continuity detector verify the fix.
