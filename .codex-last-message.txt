@@ -1,0 +1,14 @@
+Implemented and opened draft PR [#20447](https://github.com/JovieInc/Jovie/pull/20447).
+
+- Removed 16 dead/superseded API handlers.
+- Documented 5 external machine-to-machine contracts.
+- Added pruning regression coverage and CI registration.
+- Audited all 21 listed candidates—the issue heading incorrectly says 19.
+- Diff: 1,447 lines, within the 1,500-line limit.
+- Exact-head CI passed: Source Validation, Security Evidence, Migration Guard, Exact-head Coverage, and PR Ready.
+- Local targeted tests, Biome, documentation freshness, and 18/18 typecheck tasks passed.
+
+Commit: `514bf4b042`  
+Branch: `codex/jov-7727-20261003t214254`
+
+Deviations: GBrain was unavailable, so repository evidence was used. The repository suggested an integration target, but the explicit contract required `main`. The PR remains draft and unmerged.
