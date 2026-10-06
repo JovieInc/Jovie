@@ -1,0 +1,19 @@
+Implemented and published [draft PR #20208](https://github.com/JovieInc/Jovie/pull/20208).
+
+- Added all five merge-throughput signals and a 30-minute queue-wait brake.
+- Blocks scale-up immediately and steps down after sustained pressure.
+- Files or reopens the deduplicated merge-queue remediation.
+- Added caching, stale-evidence safeguards, documentation, and regression tests.
+- Carried #20148’s autoscaler because it is not yet on `main`; total diff is 1,054 lines, under the 1,500-line limit.
+
+Verified:
+
+- 51 Python tests passed.
+- 5 Node tests passed.
+- Biome, Python compilation, diff checks, and all 18 typecheck packages passed.
+- Exact-head GitHub CI: 15 successful, 9 skipped, 0 failing.
+- PR remains open, mergeable, and draft.
+- Local and remote SHA match: `f359907cd8b1d4ff4445b85479a1497ee758bbfa`.
+- Worktree is clean.
+
+Concern/deviation: GBrain was unavailable due to HTTP 400 and statement-timeout errors; repository and live GitHub evidence were used instead.
