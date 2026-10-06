@@ -81,7 +81,8 @@ async function certify(page: Page, side: 'left' | 'right') {
 
 test.beforeEach(async ({ page }) => {
   await page.goto(
-    '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app'
+    '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app',
+    { waitUntil: 'domcontentloaded' }
   );
   await expect(page.locator('[data-app-shell-frame]')).toBeVisible();
   await waitForHydration(page);
