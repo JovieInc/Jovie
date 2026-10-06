@@ -4327,8 +4327,12 @@ jobs:
       - name: Run Lighthouse CI (public launch thresholds)
         run: |
           cd apps/web
+          FIXTURE_SERVER_PID=""
           cleanup() {
-            kill $SERVER_PID 2>/dev/null || true
+            if [ -n "$FIXTURE_SERVER_PID" ]; then
+              kill "$FIXTURE_SERVER_PID" 2>/dev/null || true
+            fi
+            kill "$SERVER_PID" 2>/dev/null || true
           }
           trap cleanup EXIT
 
@@ -4375,7 +4379,44 @@ jobs:
           if [ "${{ matrix.shard }}" = "1" ]; then
             mkdir -p tests/.auth
             echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
+            FIXTURE_PATTERN='Public Profile Mock Home Release Card Layout|Public Profile Home Editorial Card'
+            # The six showcase cases intentionally exercise development-only
+            # fixtures. Keep the production /demo deny gate and all 86 checks:
+            # six fixture cases here, then 80 public cases on the built server.
+            NODE_ENV=development NEXT_PUBLIC_APP_URL=http://localhost:3001 \
+              BETTER_AUTH_URL=http://localhost:3001 \
+              NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3001 \
+              pnpm exec next dev -p 3001 --hostname localhost \
+              > "$RUNNER_TEMP/lighthouse-profile-fixture-server.log" 2>&1 &
+            FIXTURE_SERVER_PID=$!
+            FIXTURE_READY=false
+            for attempt in $(seq 1 30); do
+              echo "Waiting for profile fixture server ($attempt/30)..."
+              kill -0 "$FIXTURE_SERVER_PID" 2>/dev/null || {
+                echo "::error::Profile fixture development server died"
+                exit 1
+              }
+              if curl -sf http://localhost:3001 >/dev/null 2>&1; then
+                FIXTURE_READY=true
+                break
+              fi
+              sleep 1
+            done
+            if [ "$FIXTURE_READY" != "true" ]; then
+              echo "::error::Profile fixture development server failed to start"
+              exit 1
+            fi
+            BASE_URL=http://localhost:3001 \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts \
+              --config=playwright.config.noauth.ts --project=chromium --reporter=line \
+              --grep "$FIXTURE_PATTERN"
+            kill "$FIXTURE_SERVER_PID" 2>/dev/null || true
+            FIXTURE_SERVER_PID=""
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts \
+              --config=playwright.config.noauth.ts --project=chromium --reporter=line \
+              --grep-invert "$FIXTURE_PATTERN"
           fi
         env:
           CI: true
