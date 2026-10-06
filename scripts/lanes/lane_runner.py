@@ -5208,7 +5208,7 @@ def release_identity(host: Host) -> dict:
 
 # Per-host tuning (LANES_SLOTS_DEVIN=2, SYMPHONY_FILE_OVERLAP_GUARD=flag, ...) must not reach the
 # release self-test: the fixtures assume defaults, so a tuned host refused every release.
-HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_")
+HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 
 
 def selftest_env(scratch: Path) -> dict:

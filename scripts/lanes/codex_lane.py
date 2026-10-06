@@ -51,10 +51,45 @@ NEGATED = re.compile(r"\b(?:no|not|never|won't|will not|didn't|did not)\b", re.I
 NO_ACCOUNT_EXIT = 75  # EX_TEMPFAIL: the lane treats it as provider-error and cools down
 PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
 ACCOUNT_CLASS = "chatgpt-oauth"
+CURRENT_LOGIN = "current-login"
+
+
+def current_login_mode() -> bool:
+    """Opt-in to the existing CLI login; never discover or rotate other profiles."""
+    return os.environ.get("CODEX_LANE_AUTH_MODE") == CURRENT_LOGIN
+
+
+def cli() -> str:
+    return os.environ.get("CODEX_LANE_CLI", "codex")
+
+
+def account_home(name: str) -> Path:
+    if current_login_mode() and name == CURRENT_LOGIN:
+        return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    return ACCOUNTS_ROOT / name
+
+
+def subscription_env(name: str) -> dict:
+    # Environment API credentials must never override a subscription login.
+    excluded = {"OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL", "AZURE_OPENAI_API_KEY"}
+    return {**{key: value for key, value in os.environ.items() if key not in excluded},
+            "CODEX_HOME": str(account_home(name))}
+
+
+def current_login_available() -> bool:
+    """Ask the supported CLI for auth mode; do not open/copy credentials or infer quota."""
+    try:
+        result = subprocess.run([cli(), "login", "status"], env=subscription_env(CURRENT_LOGIN),
+                                capture_output=True, text=True, timeout=10)
+        return result.returncode == 0 and "Logged in using ChatGPT" in (result.stdout + result.stderr).splitlines()
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def accounts() -> list[str]:
     """ChatGPT-authenticated profiles only; adapters and API-key profiles never lease."""
+    if current_login_mode():
+        return [CURRENT_LOGIN] if current_login_available() else []
     found = []
     for auth in sorted(ACCOUNTS_ROOT.glob("*/auth.json")):
         try:
@@ -466,6 +501,10 @@ def _lease_digest(value: dict) -> str:
     return hashlib.sha256(json.dumps(stable, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 def reconcile(now: float | None = None, if_due: int = LEDGER_CADENCE_S, fetch=account_snapshot) -> dict:
+    if current_login_mode():
+        # This route uses only CLI login status and run-output cooldowns. No credit
+        # redemption, quota reset, profile enumeration or private app-server calls.
+        return {"reconciled": False, "reason": "current-login-cli-only"}
     now = time.time() if now is None else now
     current = read_state()
     last = float(current.get("_ledger", {}).get("reconciledAt") or 0)
@@ -628,8 +667,12 @@ def run(args) -> int:
     provider."""
     prompt = Path(args.prompt_file).read_text()
     last = Path(args.cwd or ".") / ".codex-last-message.txt"
-    base = ["codex", "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
+    base = [cli(), "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
             "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
+    if current_login_mode():
+        base.remove("--dangerously-bypass-approvals-and-sandbox")
+        base += ["--approve-for-me", "-c", 'model_provider="openai"',
+                 "-c", 'forced_login_method="chatgpt"']
     if args.model:
         base += ["-m", args.model]
     if args.reasoning_effort:
@@ -652,6 +695,10 @@ def run(args) -> int:
         attempted = True
         code, kind, until = run_account(name, handle, base, text, args.cwd, now,
                                         getattr(args, "receipt_file", None))
+        if current_login_mode():
+            # Preserve the worktree for the harness's existing retry/handoff policy;
+            # never rotate accounts or consume reset credits after an exhausted run.
+            return NO_ACCOUNT_EXIT if kind in ("rate", "limit", "auth") else code
         if kind == "reset-credit":
             tried.remove(name)
             continue
@@ -663,8 +710,8 @@ def run(args) -> int:
 
 def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                 receipt_file: str | None = None):
-    home = ACCOUNTS_ROOT / name
-    env = {**os.environ, "CODEX_HOME": str(home)}
+    home = account_home(name)
+    env = subscription_env(name) if current_login_mode() else {**os.environ, "CODEX_HOME": str(home)}
     from collections import deque
     tail = deque(maxlen=400)  # classification only needs the end of the output
     launch = None
@@ -698,7 +745,7 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
             else:
                 entry.pop("exhaustedUntil", None)
         update_state(record)
-        if kind == "limit" and maybe_redeem(name, handle, time.time()):
+        if kind == "limit" and not current_login_mode() and maybe_redeem(name, handle, time.time()):
             return 0, "reset-credit", None
         return code, kind, until
     finally:

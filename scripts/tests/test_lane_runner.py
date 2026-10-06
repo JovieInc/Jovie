@@ -2011,6 +2011,46 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(fixed, [9])
         self.assertEqual(self.linear.moves, [])
 
+    def test_subscription_slot_reaches_existing_repair_adapter_without_new_intake(self):
+        # Exercise the real provider command with a model-free CLI. Repair target
+        # admission remains the existing claim seam; no remote assignment is made.
+        root = self.host.state
+        cli = root / "fake-codex"
+        cli.write_text(f"#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n"
+                       "if sys.argv[1:]==['login','status']:\n print('Logged in using ChatGPT'); sys.exit(0)\n"
+                       f"Path({str(root / 'repair-launch.json')!r}).write_text(json.dumps(sys.argv))\n"
+                       "sys.stdin.read(); print('repair completed')\n")
+        cli.chmod(0o700)
+        spec = json.loads((ROOT / "scripts/lanes/providers.json").read_text())["codex"]
+        spec = {**spec, "slots": 1}
+        lane.load_providers = lambda: {"codex": spec}
+        lane.claim_red_pr = lambda *a: {"number": 9}
+        lane.read_new_issue_budget = lambda *a: self.fail("repair must precede new-intake budget")
+        prompt = root / "repair.prompt"
+        prompt.write_text("Repair the admitted existing PR")
+        receipt = root / "provider.jsonl"
+        def repair(host, name, provider, pr):
+            self.assertEqual((name, pr["number"]), ("codex", 9))
+            command = lane.template(provider["cmd"], {"prompt_file": str(prompt),
+                                    "provider_receipt": str(receipt), "cwd": str(root)})
+            command[0] = sys.executable
+            result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        lane.fix_red_pr = repair
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login",
+                        "CODEX_LANE_CLI": str(cli), "CODEX_HOME": str(root / "existing-login"),
+                        "LANES_STATE": str(root), "LANES_SLOTS_CODEX": "0"}):
+            self.assertEqual(lane.worker(self.host, "codex"), 0)
+            self.assertFalse(receipt.exists(), "an inactive adapter cannot restore repair throughput")
+            os.environ["LANES_SLOTS_CODEX"] = "1"
+            self.assertEqual(lane.worker(self.host, "codex"), 0)
+        rows = [json.loads(row) for row in receipt.read_text().splitlines()]
+        self.assertEqual([(row["event"], row["account"]) for row in rows],
+                         [("account-leased", "current-login"), ("cli-launch", "current-login")])
+        argv = json.loads((root / "repair-launch.json").read_text())
+        self.assertIn('forced_login_method="chatgpt"', argv)
+        self.assertEqual(self.linear.moves, [], "repair does not create another issue assignment")
+
     def test_terminal_publication_precedes_the_unchanged_new_issue_budget(self):
         pr = {"number": 9, "headRefOid": "h", "headRefName": "devin/jov-9-20261005",
               "state": "OPEN", "isDraft": True, "mergeStateStatus": "DIRTY", "labels": []}
@@ -2504,6 +2544,32 @@ class DispatchTest(unittest.TestCase):
         clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
         clock.start()
         self.addCleanup(clock.stop)
+
+    def test_coding_dispatch_continues_when_coordinator_reasoning_and_alerts_are_unavailable(self):
+        # Summer/Gateway failure affects optional reasoning and observability, not
+        # the independently admitted coding lane. Keep all existing disk/slot gates.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane.pr_events, "tick", return_value={}), \
+                patch.object(lane.reason_lane, "tick", side_effect=RuntimeError("credits unavailable")), \
+                patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.dispatch(host), 0)
+            self.assertEqual(spawn.call_count, 1)
+            self.assertEqual(spawn.call_args.args[0][-1], "codex")
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertEqual(tick["spawned"], ["codex"])
+            self.assertIsNone(tick["error"])
+            self.assertIn("reasonError", tick)
+            self.assertIn("doctorError", tick)
 
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
@@ -3879,7 +3945,8 @@ class UpdateTest(unittest.TestCase):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 
     def test_release_selftest_never_sees_host_tuning(self):
-        knobs = {"LANES_SLOTS_DEVIN": "2", "SYMPHONY_FILE_OVERLAP_GUARD": "flag", "LANES_PARKED_RETIRE": "0"}
+        knobs = {"LANES_SLOTS_DEVIN": "2", "SYMPHONY_FILE_OVERLAP_GUARD": "flag", "LANES_PARKED_RETIRE": "0",
+                 "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": "/host/codex"}
         with patch.dict(os.environ, {**knobs, "PATH": "/bin"}):
             env = lane.selftest_env(Path("/scratch"))
         self.assertFalse(set(knobs) & set(env))
