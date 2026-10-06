@@ -1,0 +1,20 @@
+Implemented and opened draft PR [#20445](https://github.com/JovieInc/Jovie/pull/20445) against `main`.
+
+- Set `INBOX_HOME`, `PROFILES_WORKSPACE`, and `PROFILE_SEARCH_MONITORING` defaults to `true`.
+- Added generated migration deleting the stale `DESIGN_V1` row and ten redundant overrides while preserving audit history.
+- Added/updated regression coverage.
+- Commit: `cb74d2ce581c288c99e0e6095cfce39b221dcb41`
+
+Verified:
+
+- Biome passed.
+- 10 focused tests passed.
+- Web typecheck passed.
+- Drizzle check, migration validation, and migration guard passed.
+- Corrected hosted CI run is fully green, including Source Validation, Exact-head Coverage, Security Evidence, Migration Guard, and PR Ready.
+
+Concerns/deviations:
+
+- The superseded initial metadata failure remains visible beside the corrected green run because the GitHub token cannot rerun obsolete jobs.
+- Linear required reauthentication, so the manual `In Review` transition could not be confirmed. The Symphony execution lease receipt was present.
+- PR remains draft and was not merged or marked ready.
