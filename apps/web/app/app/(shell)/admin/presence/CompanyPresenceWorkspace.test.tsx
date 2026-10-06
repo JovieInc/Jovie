@@ -59,7 +59,14 @@ function renderWorkspace(data: CompanyPresenceData) {
   return render(
     <HeaderActionsProvider>
       <TooltipProvider>
-        <CompanyPresenceWorkspace data={data} />
+        <CompanyPresenceWorkspace
+          scope={{
+            actorId: 'test-actor',
+            workspaceId: 'test-workspace',
+            target: 'company',
+          }}
+          data={data}
+        />
       </TooltipProvider>
     </HeaderActionsProvider>
   );
