@@ -17,17 +17,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Unconfigured: Story = {};
-export const Healthy: Story = {
-  args: {
-    status: {
-      ...meta.args.status,
-      label: 'Healthy',
-      tone: 'success',
-      needsAttention: false,
-      nextAction: 'No action needed.',
-    },
-  },
-};
 export const Signals: Story = {
   render: () => (
     <PresenceSignalList
