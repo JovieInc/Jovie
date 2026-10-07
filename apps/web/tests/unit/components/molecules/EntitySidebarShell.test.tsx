@@ -6,18 +6,21 @@ import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarS
 vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
+    id,
     ariaLabel,
     className,
     onKeyDown,
     'data-testid': testId,
   }: {
     readonly children: ReactNode;
+    readonly id?: string;
     readonly ariaLabel?: string;
     readonly className?: string;
     readonly onKeyDown?: (event: KeyboardEvent) => void;
     readonly 'data-testid'?: string;
   }) => (
     <aside
+      id={id}
       data-testid={testId ?? 'right-drawer'}
       aria-label={ariaLabel}
       className={className}
@@ -45,6 +48,23 @@ describe('EntitySidebarShell', () => {
     fireEvent.keyDown(drawer, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards a stable id so rail controls can target the drawer', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        id='shell-artist-profile-rail'
+        ariaLabel='Entity details'
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(screen.getByTestId('right-drawer')).toHaveAttribute(
+      'id',
+      'shell-artist-profile-rail'
+    );
   });
 
   it('defaults entity workspaces to the shared raised surface', () => {

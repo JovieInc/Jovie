@@ -13,7 +13,7 @@ const { unifiedSidebarMock, sidebarMock } = vi.hoisted(() => ({
   unifiedSidebarMock: vi.fn(),
   sidebarMock: {
     isMobile: false,
-    state: 'open' as 'open' | 'closed',
+    open: true,
   },
 }));
 
@@ -71,13 +71,19 @@ vi.mock('@/components/organisms/UnifiedSidebar', () => ({
   UnifiedSidebar: ({
     section,
     variant,
+    headerOwnsCollapsedToggle,
   }: {
     section: string;
     variant?: string;
+    headerOwnsCollapsedToggle?: boolean;
   }) => {
-    unifiedSidebarMock({ section, variant });
+    unifiedSidebarMock({ section, variant, headerOwnsCollapsedToggle });
     return (
-      <aside data-section={section} data-variant={variant}>
+      <aside
+        data-section={section}
+        data-variant={variant}
+        data-header-owns-collapsed-toggle={headerOwnsCollapsedToggle}
+      >
         Sidebar
       </aside>
     );
@@ -169,12 +175,28 @@ describe('AuthShell runtime update wiring', () => {
 describe('AuthShell canonical wiring', () => {
   beforeEach(() => {
     sidebarMock.isMobile = false;
-    sidebarMock.state = 'open';
+    sidebarMock.open = true;
     delete document.documentElement.dataset.desktopRuntime;
   });
 
   it('mounts the header collapse control in the browser when the rail is closed', () => {
-    sidebarMock.state = 'closed';
+    sidebarMock.open = false;
+    renderAuthShell();
+
+    expect(screen.getByTestId('sidebar-rail-toggle')).toBeInTheDocument();
+  });
+
+  it('omits the header collapse control while the rail is pinned open', () => {
+    sidebarMock.open = true;
+    renderAuthShell();
+
+    expect(screen.queryByTestId('sidebar-rail-toggle')).not.toBeInTheDocument();
+  });
+
+  it('mounts the header collapse control when a previewed rail is not pinned', () => {
+    // Preview state reports open=false; the header affordance must stay
+    // available so the rail intent remains reachable (JOV-7207).
+    sidebarMock.open = false;
     renderAuthShell();
 
     expect(screen.getByTestId('sidebar-rail-toggle')).toBeInTheDocument();
@@ -183,14 +205,14 @@ describe('AuthShell canonical wiring', () => {
   it('does not mount a second left-sidebar control in Electron (JOV-7207)', () => {
     // The desktop window-control row owns the single canonical toggle.
     document.documentElement.dataset.desktopRuntime = 'electron';
-    sidebarMock.state = 'closed';
+    sidebarMock.open = false;
     renderAuthShell();
 
     expect(screen.queryByTestId('sidebar-rail-toggle')).not.toBeInTheDocument();
   });
 
   it('hydrates the collapsed Electron shell without replacing server content (JOV-7207)', async () => {
-    sidebarMock.state = 'closed';
+    sidebarMock.open = false;
     const tree = (
       <QueryClientProvider client={new QueryClient()}>
         <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
@@ -236,6 +258,30 @@ describe('AuthShell canonical wiring', () => {
     expect(
       screen.queryByRole('button', { name: 'Toggle Sidebar' })
     ).not.toBeInTheDocument();
+  });
+
+  it('lets the sidebar stage its collapsed chrome when the top header renders', () => {
+    renderAuthShell();
+
+    expect(screen.getByText('Sidebar')).toHaveAttribute(
+      'data-header-owns-collapsed-toggle',
+      'true'
+    );
+  });
+
+  it('hands collapsed-toggle ownership back to the sidebar when the header is hidden', () => {
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <AuthShell section='dashboard' breadcrumbs={[]} isLyricsRoute>
+          <div>Lyrics Content</div>
+        </AuthShell>
+      </AppFlagProvider>
+    );
+
+    expect(screen.getByText('Sidebar')).toHaveAttribute(
+      'data-header-owns-collapsed-toggle',
+      'false'
+    );
   });
 
   it('propagates OV mode to the sidebar on the first render', () => {

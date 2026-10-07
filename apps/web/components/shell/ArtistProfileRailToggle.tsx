@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/shell/__tests__/ArtistProfileRailToggle.test.tsx
 'use client';
 
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';

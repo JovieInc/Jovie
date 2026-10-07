@@ -5,10 +5,14 @@ import { ArtistProfileRailToggle } from '../ArtistProfileRailToggle';
 
 const toggleMock = vi.fn();
 let mockIsOpen = false;
+let mockIsPreview = false;
+let mockIsPinned = false;
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({
     isOpen: mockIsOpen,
+    isPreview: mockIsPreview,
+    isPinned: mockIsPinned,
     toggle: toggleMock,
   }),
 }));
@@ -65,6 +69,8 @@ vi.mock('@jovie/ui', () => ({
 describe('ArtistProfileRailToggle', () => {
   beforeEach(() => {
     mockIsOpen = false;
+    mockIsPreview = false;
+    mockIsPinned = false;
     mockCreatorProfiles = [mockSelectedProfile];
     toggleMock.mockReset();
   });
@@ -105,6 +111,40 @@ describe('ArtistProfileRailToggle', () => {
       'aria-label',
       'Hide Tim White profile'
     );
+  });
+
+  it('points aria-controls at the stable rail landmark', () => {
+    render(<ArtistProfileRailToggle />);
+
+    expect(screen.getByTestId('artist-profile-rail-toggle')).toHaveAttribute(
+      'aria-controls',
+      'shell-artist-profile-rail'
+    );
+  });
+
+  it('offers pin intent instead of hide while the rail is only previewing', () => {
+    mockIsOpen = true;
+    mockIsPreview = true;
+    mockIsPinned = false;
+
+    render(<ArtistProfileRailToggle />);
+
+    const button = screen.getByTestId('artist-profile-rail-toggle');
+    expect(button).toHaveAttribute('aria-label', 'Pin Tim White profile');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).toHaveAttribute('data-rail-pinned', 'false');
+  });
+
+  it('reports the pinned affordance once the rail is committed open', () => {
+    mockIsOpen = true;
+    mockIsPinned = true;
+
+    render(<ArtistProfileRailToggle />);
+
+    const button = screen.getByTestId('artist-profile-rail-toggle');
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button).toHaveAttribute('data-rail-pinned', 'true');
+    expect(button).toHaveAttribute('aria-label', 'Hide Tim White profile');
   });
 
   it('keeps a single icon control when multiple artist profiles exist', () => {

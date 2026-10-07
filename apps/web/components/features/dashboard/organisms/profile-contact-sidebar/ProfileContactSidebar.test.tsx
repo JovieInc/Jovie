@@ -69,6 +69,7 @@ const mockState = vi.hoisted(() => ({
   useRealProfileMutation: false,
   selectedProfileId: 'profile-1',
   previewReady: true,
+  previewClose: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -92,7 +93,10 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   return {
-    usePreviewPanelState: () => ({ isOpen: true, close: vi.fn() }),
+    usePreviewPanelState: () => ({
+      isOpen: true,
+      close: mockState.previewClose,
+    }),
     usePreviewPanelData: () => {
       const [previewData, setPreviewData] = React.useState(() =>
         mockState.previewReady
@@ -134,11 +138,26 @@ vi.mock('@/components/atoms/AppIconButton', () => ({
 vi.mock('@/components/molecules/drawer', () => ({
   EntitySidebarShell: ({
     children,
+    id,
+    onClose,
     'data-testid': testId,
   }: {
     children: React.ReactNode;
+    id?: string;
+    onClose?: () => void;
     'data-testid'?: string;
-  }) => <aside data-testid={testId}>{children}</aside>,
+  }) => (
+    <aside data-testid={testId} id={id}>
+      <button
+        type='button'
+        data-testid={testId ? `${testId}-close` : 'drawer-close'}
+        onClick={onClose}
+      >
+        Close
+      </button>
+      {children}
+    </aside>
+  ),
   DrawerTabbedCard: ({
     children,
     tabs,
@@ -407,6 +426,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     mockState.removeCalls.length = 0;
     mockState.toastSuccess.mockReset();
     mockState.toastError.mockReset();
+    mockState.previewClose.mockReset();
     mockState.useRealProfileMutation = false;
     mockState.selectedProfileId = 'profile-1';
     mockState.previewReady = true;
@@ -417,6 +437,17 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     renderEditingSidebar();
 
     expect(screen.getByTestId('profile-contact-sidebar')).toBeInTheDocument();
+  });
+
+  it('exposes a stable rail id and wires the drawer close affordance to the panel', async () => {
+    const user = userEvent.setup();
+    renderEditingSidebar();
+
+    const rail = screen.getByTestId('profile-contact-sidebar');
+    expect(rail).toHaveAttribute('id', 'shell-artist-profile-rail');
+
+    await user.click(screen.getByTestId('profile-contact-sidebar-close'));
+    expect(mockState.previewClose).toHaveBeenCalledTimes(1);
   });
 
   it('does not expose content readiness while the profile rail is a skeleton', () => {
