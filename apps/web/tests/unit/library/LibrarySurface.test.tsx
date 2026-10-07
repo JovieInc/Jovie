@@ -1052,9 +1052,11 @@ describe('LibrarySurface', () => {
     const drawer = within(screen.getByTestId('library-asset-drawer'));
 
     await user.click(drawer.getByRole('button', { name: 'More actions' }));
-    await user.hover(screen.getByRole('menuitem', { name: 'Copy' }));
-    fireEvent.click(
-      await screen.findByRole('menuitem', { name: 'Share Link' })
+    const search = screen.getByRole('textbox', { name: 'Search actions' });
+    expect(search).toHaveFocus();
+    await user.type(search, 'share link');
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Copy › Share Link' })
     );
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
