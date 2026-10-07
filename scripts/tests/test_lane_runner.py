@@ -2972,6 +2972,27 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertFalse(any(call[:3] == ["gh", "pr", "merge"] for call in self.calls))
         self.assertFalse(any(call[:2] == ["git", "push"] for call in self.calls))
 
+    def test_unreadable_target_has_observation_diagnosis_without_refunding_work(self):
+        receipt = self.hold("reconcile-unavailable")
+        event = receipt["execution"]
+        self.assertEqual(event["result"], "failed_known")
+        self.assertEqual(event["failureClass"], "target_state_unavailable")
+        self.assertEqual(event["confidence"], "unknown")
+        self.assertEqual(event["dependencies"], ["codex", "github-target-state"])
+        self.assertEqual(event["failureFingerprint"], lane.execution_attempt.digest(["target-state-unavailable"]))
+        self.assertEqual(event["evidenceDigest"], lane.execution_attempt.digest({
+            "before": self.pr["headRefOid"], "after": None,
+            "targetObservation": {"reason": "target-state-unavailable", "stage": "agent-running", "observedState": "UNKNOWN"}}))
+        self.assertEqual((event["attempt"], event["retryDecision"], event["terminalState"]), (1, "retry", None))
+        self.assertEqual(event["remainingBudgets"]["attempts"], 1)
+        self.assertEqual(event["remainingBudgets"]["spend"], 1)
+        self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
+        rows = [json.loads(line) for line in (self.host.state / "runs/execution-attempts.jsonl").read_text().splitlines()]
+        start = next(row for row in rows if row["event"] == "attempt_started")
+        self.assertEqual(event["fencingToken"], start["fencingToken"])
+        self.assertEqual(start["policy"]["attempts"], lane.MAX_FIX_ATTEMPTS)
+        self.assertEqual(start["policy"]["concurrency"], 1)
+
     def test_transient_read_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("reconcile-unavailable")
 

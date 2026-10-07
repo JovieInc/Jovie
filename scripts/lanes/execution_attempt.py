@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
 SCHEMA, GITHUB_LEDGER_ANCHOR = "jovie-execution-attempt/v1", "cd29469b1fa2c433135f23bbfca273e674934676"
 TERMINAL = frozenset({"succeeded", "no_op_stale", "canceled", "failed_known", "failed_unknown", "budget_exhausted", "quarantined", "superseded", "dead_lettered"})
-RETRYABLE = frozenset({"provider_outage", "flaky_infra", "repair_incomplete"})
+RETRYABLE = frozenset({"provider_outage", "flaky_infra", "repair_incomplete", "target_state_unavailable"})
 def digest(value) -> str: return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 def identity(domain: str, work: dict, generation) -> dict:
     work_key, generation = f"{domain}:{digest(work)}", digest(generation)
@@ -160,7 +160,11 @@ def boundary(path: Path, ident: dict, fence: str, reservation: dict, now: float 
     def decide(all_rows):
         rows = _for(all_rows, ident)
         start = next((row for row in reversed(rows) if row.get("fencingToken") == fence and row["event"] == "attempt_started"), None)
-        if not start or start["leaseExpiresAt"] <= now or any(row.get("terminalState") in TERMINAL for row in rows): raise RuntimeError("stale-fencing-token")
+        if (not start or start["leaseExpiresAt"] <= now
+                or any(row.get("terminalState") in TERMINAL
+                       or (row["event"] == "attempt_finished" and row.get("fencingToken") == fence)
+                       for row in rows)):
+            raise RuntimeError("stale-fencing-token")
         used, policy = _usage(rows, now), start["policy"]
         if used["wallSeconds"] >= policy["wallSeconds"] or any(used[key] + reservation[key] > policy[key] for key in ("spend", "mutations")): raise RuntimeError("execution-budget-exhausted")
         row = {**ident, "schema": SCHEMA, "event": "boundary_admitted", "at": now, "attempt": start["attempt"], "fencingToken": fence, "reservation": reservation}

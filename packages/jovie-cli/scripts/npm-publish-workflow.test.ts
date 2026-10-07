@@ -89,7 +89,7 @@ function assertPublishWorkflowContract(source: string): void {
     'npm publish --provenance --access public "$PACKAGE_DIR"'
   );
   expect(source).toContain('- name: Prove public registry release');
-  expect(source).toContain('for attempt in {1..12}');
+  expect(source).toContain('for attempt in {1..60}');
   expect(source).toContain('metadata.dist?.attestations?.url');
   expect(source).toContain('metadata.dist?.attestations?.provenance');
   expect(source).toContain('Array.isArray(metadata.maintainers)');
