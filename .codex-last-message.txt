@@ -1,0 +1,13 @@
+Implemented and opened draft PR [#20563](https://github.com/JovieInc/Jovie/pull/20563).
+
+- Added durable success/failure reconciliation receipts.
+- Added lease-safe re-drive for webhooks stuck over two hours.
+- Charge reversals are retained with a manual-action reason, preventing automated Stripe mutations.
+- Corrected detector thresholds to 36h/2h with recovery closure.
+- Added regression coverage.
+
+Verification: 54 focused tests passed, Biome clean, server-boundary lint passed, monorepo typecheck 18/18, bug-to-test satisfied. Hosted size, migration, security, coverage, and review gates are green; Source Validation remains in progress.
+
+Commit: `92c1c0eb52`  
+Linear: JOV-7558 → In Review  
+Production remains unchanged until the draft lands and deploys. GBrain was unavailable as noted; no other deviations.
