@@ -200,8 +200,10 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
       request: {
         prompt: [
           `${ctx.brief.icp}: ${ref.sectionInstanceId}`,
-          ...ctx.feedback.filter(line =>
-            line.startsWith(`asset-art:${ref.id}`)
+          ...ctx.feedback.filter(
+            line =>
+              line.startsWith(`asset-art:${ref.id}`) ||
+              visualFeedbackStage(line) === 'asset'
           ),
         ].join('\n'),
         recipeId: ref.source as never,
@@ -490,6 +492,14 @@ export type VisualDimension = 'copy' | 'imagery' | 'layout';
 export const VISUAL_DIMENSION_STAGE: Readonly<
   Record<VisualDimension, FactoryStage>
 > = { copy: 'copy', imagery: 'asset', layout: 'layout' };
+
+/** Route already-tagged visual findings; generic stage feedback stays local. */
+export function visualFeedbackStage(finding: string): FactoryStage | undefined {
+  const tag = /^\[([a-z]+)\]/iu.exec(finding)?.[1]?.toLowerCase();
+  return Object.entries(VISUAL_DIMENSION_STAGE).find(
+    ([dimension]) => dimension === tag
+  )?.[1];
+}
 
 const DIMENSION_CUES: readonly [VisualDimension, RegExp][] = [
   // An explicit `[dimension]` tag from the judge wins.
