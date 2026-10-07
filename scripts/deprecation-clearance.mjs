@@ -53,11 +53,18 @@ export async function recordDeprecationObservations({
   )
     throw new Error('unverified-build-run');
   const jobs = [];
+  let webBuild = false;
   for (let page = 1; page <= 10; page++) {
     const { body, link } = await github(
       `${prefix}/actions/runs/${match[1]}/jobs?per_page=100&page=${page}`
     );
     if (!Array.isArray(body.jobs)) throw new Error('invalid-build-jobs');
+    webBuild ||= body.jobs.some(
+      job =>
+        ['Build + Layout (combined)', 'Build (public routes)'].includes(
+          job.name
+        ) && job.conclusion === 'success'
+    );
     jobs.push(
       ...body.jobs
         .filter(job => /^Build/.test(job.name) && job.conclusion === 'success')
@@ -67,6 +74,8 @@ export async function recordDeprecationObservations({
     if (page === 10) throw new Error('incomplete-build-jobs');
   }
   if (
+    !webBuild ||
+    !/Compiled successfully/.test(log) ||
     jobs.length === 0 ||
     JSON.stringify([...jobs].sort()) !==
       JSON.stringify([...source.jobIds].sort())

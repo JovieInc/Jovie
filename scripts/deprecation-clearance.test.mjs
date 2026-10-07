@@ -136,8 +136,10 @@ test('records disappearance only for current verified production containing its 
 });
 test('records a recurring warning as red even before a deployed repair exists', async () => {
   const { state, options } = fixture();
-  options.log = WARNING;
-  options.source.logSha256 = createHash('sha256').update(WARNING).digest('hex');
+  options.log = `${WARNING}\nCompiled successfully`;
+  options.source.logSha256 = createHash('sha256')
+    .update(options.log)
+    .digest('hex');
   state.production.status = 'unknown';
   const result = await recordDeprecationObservations(options);
   assert.equal(result.results[0].status, 'red');
@@ -178,6 +180,8 @@ for (const name of [
   });
 for (const name of [
   'partial-log',
+  'empty-web-log',
+  'no-web-build',
   'wrong-digest',
   'empty-jobs',
   'wrong-run-url',
@@ -195,6 +199,12 @@ for (const name of [
 ])
   test(`fails closed on ${name}`, async () => {
     const { state, options } = fixture();
+    if (name === 'empty-web-log') {
+      options.log = '';
+      options.source.logSha256 = createHash('sha256').update('').digest('hex');
+    }
+    if (name === 'no-web-build')
+      state.jobs[0].name = 'Build and verify runner image offline';
     if (name === 'partial-log') options.source.complete = false;
     if (name === 'wrong-digest') options.source.logSha256 = 'wrong';
     if (name === 'empty-jobs') options.source.jobIds = [];
