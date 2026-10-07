@@ -1,0 +1,14 @@
+Draft PR opened: [#20640](https://github.com/JovieInc/Jovie/pull/20640) at commit `ff67ec0b08`.
+
+- Updated [setup-node-pnpm/action.yml](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T173959Z-JOV-7876-codex-10edef/.github/actions/setup-node-pnpm/action.yml:46) to the SHA-pinned v6.1 installer, removing the Node 24 `DEP0169` source while retaining pnpm 9.15.9.
+- Updated the regression contract in [runner-setup-action.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T173959Z-JOV-7876-codex-10edef/apps/web/tests/unit/ci/runner-setup-action.test.ts:94).
+
+Verified:
+
+- Exact v6.1 action: pnpm 9.15.9 installed without `DEP0169`.
+- Biome passed.
+- Setup-action tests: 33 passed.
+- Typecheck: 18/18 tasks passed.
+- Commit/push hooks passed.
+
+Deviations: GBrain and Linear API access were unavailable, so the commissioned lane owns the Linear transition receipt. The PR remains draft against `main` and was not marked ready or merged.
