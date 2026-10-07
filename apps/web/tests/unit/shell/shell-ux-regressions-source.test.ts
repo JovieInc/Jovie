@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { BREAKPOINTS } from '@/hooks/useBreakpoint';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -63,7 +64,9 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       /height: 0;[\s\S]*width: 0;[\s\S]*overflow: visible;/
     );
     expect(overlay).toMatch(
-      /@variant lg[\s\S]*position: absolute;[\s\S]*inset-inline-end: 0;/
+      new RegExp(
+        `@media \\(min-width: ${BREAKPOINTS.lg}px\\)[\\s\\S]*position: absolute;[\\s\\S]*inset-inline-end: 0;`
+      )
     );
     expect(overlay).toContain('width: fit-content;');
     expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
@@ -120,7 +123,7 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       "import { IconButton, TooltipShortcut } from '@jovie/ui'"
     );
     expect(sharedToggle).toContain('<IconButton');
-    expect(sharedToggle).toContain("variant='secondary'");
+    expect(sharedToggle).toContain("variant='ghost'");
     expect(sharedToggle).toContain("size='sm'");
     expect(sharedToggle).not.toContain('<Button');
     expect(sharedToggle).not.toContain('h-7 w-7 rounded-full');
