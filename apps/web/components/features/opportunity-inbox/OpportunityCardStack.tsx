@@ -186,7 +186,7 @@ export function OpportunityCardStack({
                 card={topCard}
                 onApprove={onAccept}
                 onReject={onReject}
-                isBusy={pendingActionId === topCard.id}
+                isBusy={isBusy}
               />
             ) : topCard.category === 'social_reply' && topCard.socialReply ? (
               <OpportunityInboxSocialReplyCard
@@ -222,7 +222,7 @@ export function OpportunityCardStack({
                   onDismiss={id => {
                     onReject(id);
                   }}
-                  isBusy={pendingActionId === topCard.id}
+                  isBusy={isBusy}
                   dataTestId={`opportunity-stack-top-${topCard.id}`}
                 />
               </ul>
