@@ -1,0 +1,6 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T074720Z-JOV-6874-codex-brief-4140f6/.design-brief.md).
+
+- Steps 1–8 validate successfully.
+- `public-profile` is a certified capability ID.
+- Step 9 is intentionally empty because no real Pen or ImageGen artifact exists.
+- The article and product source remain unchanged; no commit, push, or PR was created.
