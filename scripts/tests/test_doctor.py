@@ -160,6 +160,20 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("codex-broken", doctor.judge(obs(codex={"error": "no codex", "accounts": {}, "available": []})))
         self.assertNotIn("hud-stale", doctor.judge(obs(hudExpected=False, hudBeatAge=None)))
 
+    def test_github_read_floor_is_one_global_alert_not_one_per_provider(self):
+        unavailable = {name: {"reason": "pr-inventory-unavailable", "error": "pr-read-failed"}
+                       for name in ("codex", "devin", "hyperagent")}
+        alerts = doctor.judge(obs(githubRemaining=doctor.GITHUB_MIN_REMAINING - 1,
+                                  newIssueBudgetByProvider=unavailable))
+        self.assertEqual(set(alerts), {"github-quota"})
+        self.assertIn(f"{doctor.GITHUB_MIN_REMAINING}-point floor", alerts["github-quota"])
+
+        # A failed read at or above the guard floor still needs provider-specific repair.
+        alerts = doctor.judge(obs(githubRemaining=doctor.GITHUB_MIN_REMAINING,
+                                  newIssueBudgetByProvider={"hyperagent": unavailable["hyperagent"]}))
+        self.assertIn("pr-inventory-unavailable:hyperagent", alerts)
+        self.assertNotIn("github-quota", alerts)
+
     def test_sustained_merge_queue_brake_files_only_after_one_interval(self):
         signal = {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6,
                   "openedPerHour": 31, "ejectionRate": 0.55}
