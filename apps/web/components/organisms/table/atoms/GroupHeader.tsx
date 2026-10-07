@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/organisms/table/molecules/GroupedTableBody.test.tsx
+
 import React from 'react';
 import { cn, presets, typography } from '../table.styles';
 
