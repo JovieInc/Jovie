@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   CircleDashed,
+  FilePenLine,
   Search,
   XCircle,
 } from 'lucide-react';
@@ -28,49 +29,85 @@ import type {
   FounderReviewItem,
   FounderReviewRegistryKind,
 } from '@/lib/admin/types';
+import type {
+  OvieCertificationDecisionKind,
+  OvieCertificationRow,
+} from '@/lib/ovie/certifications/types';
+import {
+  getCertificationDecisionErrorMessage,
+  useOvieCertificationDecisionMutation,
+  useOvieCertificationsQuery,
+} from '@/lib/queries/useOvieCertificationsQuery';
 import type { ColumnDef } from '@/lib/tanstack-table';
 
 type ReviewOutcome = 'certified' | 'needs-work';
 type RegistryFilter = 'all' | 'ready' | ReviewOutcome;
 
-interface ReviewDecision {
+/**
+ * Non-authoritative local drafts. Legacy `ovie-founder-review-decisions-v1`
+ * marks load through the same shape: they are never presented as approvals
+ * and must be re-confirmed against current server evidence to count.
+ */
+interface ReviewDraft {
   readonly outcome: ReviewOutcome;
   readonly note: string;
-  readonly reviewedAt: string;
-  /** JOV-5753 deterministic evidence digest the decision was recorded against. */
+  readonly draftedAt: string;
+  /** JOV-5753 deterministic evidence digest the draft was recorded against. */
   readonly evidenceDigest: string;
 }
 
-type ReviewDecisionMap = Readonly<Record<string, ReviewDecision>>;
+type ReviewDraftMap = Readonly<Record<string, ReviewDraft>>;
 
 interface FounderReviewRegistryProps {
   readonly kind: FounderReviewRegistryKind;
   readonly items: readonly FounderReviewItem[];
 }
 
-const LOCAL_REVIEW_STORAGE_KEY = 'ovie-founder-review-decisions-v1';
+const LOCAL_DRAFT_STORAGE_KEY = 'ovie-founder-review-decisions-v1';
 
-function isReviewDecision(value: unknown): value is ReviewDecision {
+const OUTCOME_TO_DECISION: Record<
+  ReviewOutcome,
+  OvieCertificationDecisionKind
+> = {
+  certified: 'approved',
+  'needs-work': 'changes_requested',
+};
+
+function isReviewDraft(value: unknown): value is ReviewDraft {
   if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<ReviewDecision>;
+  const candidate = value as Partial<ReviewDraft & { reviewedAt: string }>;
+  const outcome = candidate.outcome;
   return (
-    (candidate.outcome === 'certified' || candidate.outcome === 'needs-work') &&
+    (outcome === 'certified' || outcome === 'needs-work') &&
     typeof candidate.note === 'string' &&
-    typeof candidate.reviewedAt === 'string' &&
-    typeof candidate.evidenceDigest === 'string'
+    typeof candidate.evidenceDigest === 'string' &&
+    (typeof candidate.draftedAt === 'string' ||
+      typeof candidate.reviewedAt === 'string')
   );
 }
 
-function loadReviewDecisions(): ReviewDecisionMap {
+/** Legacy marks used `reviewedAt`; normalize both into the draft shape. */
+function toDraft(value: ReviewDraft & { reviewedAt?: string }): ReviewDraft {
+  return {
+    outcome: value.outcome,
+    note: value.note,
+    draftedAt: value.draftedAt ?? value.reviewedAt ?? '',
+    evidenceDigest: value.evidenceDigest,
+  };
+}
+
+function loadReviewDrafts(): ReviewDraftMap {
   try {
     const parsed: unknown = JSON.parse(
-      localStorage.getItem(LOCAL_REVIEW_STORAGE_KEY) ?? 'null'
+      localStorage.getItem(LOCAL_DRAFT_STORAGE_KEY) ?? 'null'
     );
     if (!parsed || typeof parsed !== 'object') return {};
     return Object.fromEntries(
-      Object.entries(parsed).filter(
-        (entry): entry is [string, ReviewDecision] => isReviewDecision(entry[1])
-      )
+      Object.entries(parsed)
+        .filter((entry): entry is [string, ReviewDraft] =>
+          isReviewDraft(entry[1])
+        )
+        .map(([id, draft]) => [id, toDraft(draft)])
     );
   } catch {
     return {};
@@ -82,18 +119,41 @@ function scopeLabel(item: FounderReviewItem): string {
   return item.scope[0].toUpperCase() + item.scope.slice(1);
 }
 
-function validDecisionForItem(
+/** The authoritative server projection for one registry item, if connected. */
+function rowForItem(
   item: FounderReviewItem,
-  decisions: ReviewDecisionMap
-): ReviewDecision | undefined {
-  const decision = decisions[item.id];
-  if (
-    item.readiness !== 'ready' ||
-    decision?.evidenceDigest !== item.decisionEvidenceDigest
-  ) {
+  rowsBySubject: ReadonlyMap<string, OvieCertificationRow>
+): OvieCertificationRow | undefined {
+  return rowsBySubject.get(item.id);
+}
+
+/**
+ * The authoritative decision bound to the item's current evidence digest.
+ * `currentDecision` is digest-bound server-side, so changed evidence clears
+ * the mark here without erasing the ledger's history.
+ */
+function authoritativeOutcome(
+  item: FounderReviewItem,
+  rowsBySubject: ReadonlyMap<string, OvieCertificationRow>
+): ReviewOutcome | undefined {
+  const kind = rowForItem(item, rowsBySubject)?.decision.currentDecision?.kind;
+  if (kind === 'approved') return 'certified';
+  if (kind === 'changes_requested' || kind === 'rejected') return 'needs-work';
+  return undefined;
+}
+
+function draftForItem(
+  item: FounderReviewItem,
+  drafts: ReviewDraftMap,
+  rowsBySubject: ReadonlyMap<string, OvieCertificationRow>
+): ReviewDraft | undefined {
+  if (authoritativeOutcome(item, rowsBySubject) !== undefined) {
     return undefined;
   }
-  return decision;
+  const draft = drafts[item.id];
+  return draft?.evidenceDigest === item.decisionEvidenceDigest
+    ? draft
+    : undefined;
 }
 
 const MARK_TOKENS = {
@@ -105,13 +165,22 @@ const MARK_TOKENS = {
 
 function DecisionMark({
   item,
-  decision,
+  outcome,
+  draft,
 }: Readonly<{
   item: FounderReviewItem;
-  decision?: ReviewDecision;
+  outcome?: ReviewOutcome;
+  draft?: ReviewDraft;
 }>) {
-  const [size, Icon, label, tone] =
-    MARK_TOKENS[decision?.outcome ?? item.readiness];
+  if (draft) {
+    return (
+      <span className='inline-flex items-center gap-1 text-2xs text-tertiary-token'>
+        <FilePenLine className='size-3' aria-hidden='true' />
+        {`Draft · ${draft.outcome === 'certified' ? 'Certified' : 'Needs Work'}`}
+      </span>
+    );
+  }
+  const [size, Icon, label, tone] = MARK_TOKENS[outcome ?? item.readiness];
   return (
     <span className={`inline-flex items-center gap-1 text-2xs ${tone}`}>
       <Icon className={size} aria-hidden='true' />
@@ -124,43 +193,76 @@ export function FounderReviewRegistry({
   kind,
   items,
 }: Readonly<FounderReviewRegistryProps>) {
+  const query = useOvieCertificationsQuery();
+  const decision = useOvieCertificationDecisionMutation();
   const [filter, setFilter] = useState<RegistryFilter>('all');
   const [selectedId, setSelectedId] = useState(
     items.find(item => item.readiness === 'ready')?.id ?? items[0]?.id ?? ''
   );
-  const [decisions, setDecisions] = useState<ReviewDecisionMap>({});
+  const [drafts, setDrafts] = useState<ReviewDraftMap>({});
+  const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [note, setNote] = useState('');
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [pendingOutcome, setPendingOutcome] = useState<ReviewOutcome | null>(
+    null
+  );
+  const [decisionError, setDecisionError] = useState<string | null>(null);
 
-  const persistDecisions = useCallback((next: ReviewDecisionMap) => {
-    setDecisions(next);
+  /** Authoritative state: feature-registry rows from the unified inventory. */
+  const rowsBySubject = useMemo(() => {
+    const map = new Map<string, OvieCertificationRow>();
+    for (const row of query.data?.rows ?? []) {
+      if (row.domain === 'feature_registry') map.set(row.subject.id, row);
+    }
+    return map;
+  }, [query.data]);
+
+  const persistDrafts = useCallback(
+    (
+      update: ReviewDraftMap | ((current: ReviewDraftMap) => ReviewDraftMap)
+    ) => {
+      setDrafts(update);
+    },
+    []
+  );
+
+  useEffect(() => {
+    persistDrafts(loadReviewDrafts());
+    setDraftsLoaded(true);
+  }, [persistDrafts]);
+
+  useEffect(() => {
+    if (!draftsLoaded) return;
     try {
-      localStorage.setItem(LOCAL_REVIEW_STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(LOCAL_DRAFT_STORAGE_KEY, JSON.stringify(drafts));
     } catch {
       // The current screen remains usable when local persistence is blocked.
     }
-  }, []);
+  }, [drafts, draftsLoaded]);
 
-  useEffect(() => {
-    persistDecisions(loadReviewDecisions());
-  }, [persistDecisions]);
-
-  // Prune decisions whose evidence digest no longer matches the item's packet.
+  // Prune drafts whose evidence digest no longer matches the item's packet or
+  // that an authoritative server decision has superseded.
   useEffect(() => {
     const itemById = new Map(items.map(item => [item.id, item]));
-    const stale = Object.keys(decisions).filter(itemId => {
+    const stale = Object.keys(drafts).filter(itemId => {
       const item = itemById.get(itemId);
       return (
         item &&
-        validDecisionForItem(item, { [itemId]: decisions[itemId] }) ===
+        draftForItem(item, { [itemId]: drafts[itemId] }, rowsBySubject) ===
           undefined
       );
     });
     if (stale.length === 0) return;
-    const next = { ...decisions };
-    for (const itemId of stale) delete next[itemId];
-    persistDecisions(next);
-  }, [decisions, items, persistDecisions]);
+    persistDrafts(current => {
+      const next = { ...current };
+      for (const itemId of stale) {
+        const item = itemById.get(itemId);
+        if (item && draftForItem(item, current, rowsBySubject) === undefined)
+          delete next[itemId];
+      }
+      return next;
+    });
+  }, [drafts, items, rowsBySubject, persistDrafts]);
 
   const behaviorCount = useMemo(
     () => items.filter(item => item.scope === 'behavior').length,
@@ -172,9 +274,9 @@ export function FounderReviewRegistry({
       items.filter(item => {
         if (filter === 'all') return true;
         if (filter === 'ready') return item.readiness === 'ready';
-        return validDecisionForItem(item, decisions)?.outcome === filter;
+        return authoritativeOutcome(item, rowsBySubject) === filter;
       }),
-    [decisions, filter, items]
+    [filter, items, rowsBySubject]
   );
 
   useEffect(() => {
@@ -183,13 +285,22 @@ export function FounderReviewRegistry({
     }
   }, [filteredItems, selectedId]);
 
+  useEffect(() => {
+    setDecisionError(null);
+  }, [selectedId]);
+
   const selected =
     filteredItems.find(item => item.id === selectedId) ??
     filteredItems[0] ??
     null;
-  const selectedDecision = selected
-    ? validDecisionForItem(selected, decisions)
+  const selectedRow = selected ? rowForItem(selected, rowsBySubject) : null;
+  const selectedOutcome = selected
+    ? authoritativeOutcome(selected, rowsBySubject)
     : undefined;
+  const selectedDraft = selected
+    ? draftForItem(selected, drafts, rowsBySubject)
+    : undefined;
+  const selectedDecision = selectedRow?.decision.currentDecision ?? null;
 
   const headerActions = useMemo(
     () => (
@@ -212,27 +323,53 @@ export function FounderReviewRegistry({
   useRegisterHeaderActions(headerActions);
 
   const recordDecision = useCallback(
-    (outcome: ReviewOutcome) => {
-      if (!selected || selected.readiness !== 'ready') return;
-      persistDecisions({
-        ...decisions,
-        [selected.id]: {
-          outcome,
-          note: note.trim(),
-          reviewedAt: new Date().toISOString(),
-          evidenceDigest: selected.decisionEvidenceDigest,
-        },
-      });
-      setNote('');
+    async (outcome: ReviewOutcome) => {
+      if (!selected || !selectedRow) return;
+      const availability = selectedRow.decision;
+      if (!availability.available || !availability.evidenceDigest) return;
+      const kind = OUTCOME_TO_DECISION[outcome];
+      const notes = note.trim();
+      // Request-changes needs the founder's reason; the server enforces it too.
+      if (kind === 'changes_requested' && notes.length === 0) return;
+
+      const draft: ReviewDraft = {
+        outcome,
+        note: notes,
+        draftedAt: new Date().toISOString(),
+        evidenceDigest: availability.evidenceDigest,
+      };
+      persistDrafts(current => ({ ...current, [selected.id]: draft }));
+      setPendingOutcome(outcome);
+      setDecisionError(null);
+      try {
+        await decision.mutateAsync({
+          rowId: selectedRow.id,
+          evidenceDigest: availability.evidenceDigest,
+          decision: kind,
+          notes: notes.length > 0 ? notes : null,
+          actionId: crypto.randomUUID(),
+        });
+        persistDrafts(current => {
+          const { [selected.id]: _cleared, ...next } = current;
+          return next;
+        });
+        setNote('');
+      } catch (error) {
+        setDecisionError(getCertificationDecisionErrorMessage(error));
+      } finally {
+        setPendingOutcome(null);
+      }
     },
-    [decisions, note, persistDecisions, selected]
+    [decision, note, persistDrafts, selected, selectedRow]
   );
 
-  const reopenSelected = useCallback(() => {
+  const clearDraft = useCallback(() => {
     if (!selected) return;
-    const { [selected.id]: _removed, ...next } = decisions;
-    persistDecisions(next);
-  }, [decisions, persistDecisions, selected]);
+    persistDrafts(current => {
+      const { [selected.id]: _removed, ...next } = current;
+      return next;
+    });
+  }, [persistDrafts, selected]);
 
   const columns = useMemo<ColumnDef<FounderReviewItem, unknown>[]>(() => {
     const text = (
@@ -276,17 +413,22 @@ export function FounderReviewRegistry({
         cell: ({ row }) => (
           <DecisionMark
             item={row.original}
-            decision={validDecisionForItem(row.original, decisions)}
+            outcome={authoritativeOutcome(row.original, rowsBySubject)}
+            draft={draftForItem(row.original, drafts, rowsBySubject)}
           />
         ),
       },
     ];
-  }, [decisions, kind]);
+  }, [drafts, kind, rowsBySubject]);
 
   const detailPanel = useMemo(() => {
     if (!selected) return null;
     const media = selected.media[0];
-    const canCertify = selected.readiness === 'ready';
+    const canDecide = Boolean(
+      selectedRow?.decision.available && !pendingOutcome
+    );
+    const decisionsConnected = !query.isError;
+    const needsWorkReady = note.trim().length > 0;
 
     return (
       <EntitySidebarShell
@@ -303,15 +445,19 @@ export function FounderReviewRegistry({
             <label className='block'>
               <span className='mb-1.5 block text-2xs font-medium text-primary-token'>
                 Founder note{' '}
-                <span className='text-tertiary-token'>(optional)</span>
+                <span className='text-tertiary-token'>
+                  {selectedDecision || !canDecide
+                    ? '(optional)'
+                    : '(required for Needs Work)'}
+                </span>
               </span>
               <textarea
                 value={note}
                 onChange={event => setNote(event.target.value)}
                 rows={2}
-                disabled={!canCertify}
+                disabled={!canDecide}
                 placeholder={
-                  canCertify
+                  canDecide
                     ? 'What should stay true or change?'
                     : 'Available when the review packet is ready.'
                 }
@@ -319,38 +465,50 @@ export function FounderReviewRegistry({
               />
             </label>
             <div className='flex flex-wrap items-center justify-end gap-2'>
-              {selectedDecision ? (
-                <Button size='sm' variant='secondary' onClick={reopenSelected}>
-                  Reopen Review
-                </Button>
-              ) : (
+              {selectedDecision ? null : (
                 <>
                   <Button
                     size='sm'
                     variant='secondary'
-                    disabled={!canCertify}
-                    onClick={() => recordDecision('needs-work')}
+                    disabled={!canDecide || !needsWorkReady}
+                    onClick={() => void recordDecision('needs-work')}
                   >
                     Needs Work
                   </Button>
                   <Button
                     size='sm'
-                    disabled={!canCertify}
-                    onClick={() => recordDecision('certified')}
+                    disabled={!canDecide}
+                    onClick={() => void recordDecision('certified')}
                     data-testid='certify-review-item'
                   >
-                    Certify For Taste
+                    {pendingOutcome ? 'Recording…' : 'Certify For Taste'}
                   </Button>
                 </>
               )}
+              {selectedDraft ? (
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  onClick={clearDraft}
+                  data-testid='discard-review-draft'
+                >
+                  Discard Draft
+                </Button>
+              ) : null}
             </div>
             <div
               className='min-h-4 text-2xs text-tertiary-token'
               aria-live='polite'
             >
-              {selectedDecision
-                ? `${selectedDecision.outcome === 'certified' ? 'Certified' : 'Needs Work'} · ${new Date(selectedDecision.reviewedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}${selectedDecision.note ? ` · ${selectedDecision.note}` : ''}`
-                : 'Local founder-review record only; this does not imply CI, deploy, or runtime certification.'}
+              {decisionError ??
+                (selectedDecision
+                  ? `${selectedDecision.kind === 'approved' ? 'Certified' : 'Needs Work'} · ${new Date(selectedDecision.decidedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · ${selectedDecision.reviewer}${selectedDecision.notes ? ` · ${selectedDecision.notes}` : ''}`
+                  : selectedDraft
+                    ? 'Local draft only — not recorded. It cannot certify this item.'
+                    : !decisionsConnected
+                      ? 'Authoritative decisions are unavailable; retry when the certification service recovers.'
+                      : (selectedRow?.decision.reason ??
+                        'Decisions record against the shared certification ledger.'))}
             </div>
           </div>
         }
@@ -410,7 +568,11 @@ export function FounderReviewRegistry({
                   {selected.title}
                 </p>
               </div>
-              <DecisionMark item={selected} decision={selectedDecision} />
+              <DecisionMark
+                item={selected}
+                outcome={selectedOutcome}
+                draft={selectedDraft}
+              />
             </div>
             <p className='mt-2 text-xs leading-5 text-secondary-token'>
               {selected.description}
@@ -458,7 +620,19 @@ export function FounderReviewRegistry({
         </div>
       </EntitySidebarShell>
     );
-  }, [note, recordDecision, reopenSelected, selected, selectedDecision]);
+  }, [
+    clearDraft,
+    decisionError,
+    note,
+    pendingOutcome,
+    query.isError,
+    recordDecision,
+    selected,
+    selectedDecision,
+    selectedDraft,
+    selectedOutcome,
+    selectedRow,
+  ]);
 
   useRegisterRightPanel(detailPanel);
 

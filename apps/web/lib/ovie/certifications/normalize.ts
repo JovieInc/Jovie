@@ -188,10 +188,20 @@ function decisionAvailability(
 ): OvieCertificationDecisionAvailability {
   const { admission, decisions } = input;
   const evidenceDigest = admission.decisionEvidenceDigest;
+  const current = admission.currentDecision;
+  const currentDecision = current
+    ? {
+        kind: current.decision,
+        decidedAt: current.decidedAt,
+        reviewer: current.reviewer,
+        notes: current.notes,
+      }
+    : null;
   const unavailable = (reason: string) => ({
     available: false,
     reason,
     evidenceDigest,
+    currentDecision,
   });
 
   if (!evidenceDigest) {
@@ -209,7 +219,7 @@ function decisionAvailability(
     );
   }
   if (input.domainDecisionGate) return unavailable(input.domainDecisionGate);
-  return { available: true, reason: null, evidenceDigest };
+  return { available: true, reason: null, evidenceDigest, currentDecision };
 }
 
 export function normalizeKernelCertificationRow(
