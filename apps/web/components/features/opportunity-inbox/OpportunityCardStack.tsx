@@ -12,6 +12,7 @@ import { OpportunityRow } from '@/components/organisms/opportunity-card/Opportun
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
+import { OpportunityInboxSocialReplyCard } from './OpportunityInboxSocialReplyCard';
 import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeThumbnailCard';
 
 const COMMIT_OFFSET_PX = 120;
@@ -22,6 +23,8 @@ export interface OpportunityCardStackProps {
   readonly onReject: (id: string) => void;
   readonly onOpen: (id: string) => void;
   readonly onNextStep?: (id: string) => void;
+  readonly onRevise?: (id: string, comment: string) => void;
+  readonly pendingReviseId?: string | null;
   readonly pendingActionId?: string | null;
   readonly pendingNextStepId?: string | null;
   /** Receives focus when the parent restores context after an action. */
@@ -44,6 +47,8 @@ export function OpportunityCardStack({
   onReject,
   onOpen,
   onNextStep,
+  onRevise,
+  pendingReviseId = null,
   pendingActionId = null,
   pendingNextStepId = null,
   keyboardControlRef,
@@ -52,11 +57,17 @@ export function OpportunityCardStack({
   const reducedMotion = useReducedMotion();
   const instructionsId = useId();
   const topCard = cards[0] ?? null;
+  const isBusy = Boolean(
+    topCard &&
+      (pendingActionId === topCard.id ||
+        pendingNextStepId === topCard.id ||
+        pendingReviseId === topCard.id)
+  );
   const peekCards = cards.slice(1, 3);
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-      if (!topCard) return;
+      if (!topCard || isBusy) return;
       // This handler belongs to the dedicated native button. It cannot hijack
       // keyboard behavior from the visible child controls in the stack.
       if (
@@ -78,7 +89,7 @@ export function OpportunityCardStack({
         onReject(topCard.id);
       }
     },
-    [onAccept, onReject, topCard]
+    [isBusy, onAccept, onReject, topCard]
   );
 
   if (!topCard) {
@@ -98,6 +109,7 @@ export function OpportunityCardStack({
         size='sm'
         className='sr-only focus-visible:absolute focus-visible:top-0 focus-visible:left-0 focus-visible:z-20 focus-visible:not-sr-only focus-visible:rounded-sm focus-visible:bg-surface-1 focus-visible:px-2 focus-visible:py-1 focus-visible:text-2xs focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
         aria-describedby={instructionsId}
+        disabled={isBusy}
         onClick={() => onOpen(topCard.id)}
         onKeyDown={handleKeyDown}
       >
@@ -133,10 +145,18 @@ export function OpportunityCardStack({
           <motion.div
             key={topCard.id}
             className='relative z-10'
-            drag={reducedMotion ? false : 'x'}
+            drag={reducedMotion || isBusy ? false : 'x'}
+            onPointerDownCapture={event => {
+              if (
+                event.target instanceof HTMLElement &&
+                event.target.closest('button, a, input, textarea, select')
+              )
+                event.stopPropagation();
+            }}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.85}
             onDragEnd={(_event, info) => {
+              if (isBusy) return;
               if (info.offset.x > COMMIT_OFFSET_PX) {
                 onAccept(topCard.id);
               } else if (info.offset.x < -COMMIT_OFFSET_PX) {
@@ -167,6 +187,16 @@ export function OpportunityCardStack({
                 onApprove={onAccept}
                 onReject={onReject}
                 isBusy={pendingActionId === topCard.id}
+              />
+            ) : topCard.category === 'social_reply' && topCard.socialReply ? (
+              <OpportunityInboxSocialReplyCard
+                card={topCard}
+                onApprove={onAccept}
+                onDismiss={onReject}
+                onRevise={onRevise ?? (() => undefined)}
+                isApproving={pendingActionId === topCard.id}
+                isDismissing={pendingActionId === topCard.id}
+                isRevising={pendingReviseId === topCard.id}
               />
             ) : topCard.category === 'report' && topCard.report ? (
               <OpportunityInboxReportCard
