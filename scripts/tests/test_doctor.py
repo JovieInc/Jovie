@@ -222,6 +222,115 @@ class ConditionReceiptTest(unittest.TestCase):
 
 
 class ReconcileTest(unittest.TestCase):
+    def test_mac_quota_unknown_retains_original_watchdog_until_observed_budget_recovery(self):
+        first = obs(now=1791321038.0, githubRemaining=230)
+        alerts = doctor.judge(first)
+        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, first, "mac")}
+        for now in (1791321100.0, 1791321600.0):
+            unknown = obs(now=now, githubRemaining=None)
+            carried = doctor.judge(unknown, prior)
+            receipt = doctor.condition_receipts(carried, prior, unknown, "mac")["github-quota"]
+            self.assertEqual(receipt["state"], "active")
+            self.assertEqual(receipt["source"]["status"], "unknown")
+            self.assertEqual(receipt["deadlineAt"], "2026-10-06T21:20:38Z")
+            self.assertEqual(receipt["generation"], 1)
+            self.assertIsNone(receipt["terminalOutcome"])
+            prior = {"alerts": carried, "conditions": {"github-quota": receipt}}
+        recovered = obs(now=1791321700.0, githubRemaining=4854)
+        receipt = doctor.condition_receipts(doctor.judge(recovered, prior), prior, recovered, "mac")["github-quota"]
+        self.assertEqual(receipt["state"], "resolved")
+        self.assertEqual(receipt["source"]["status"], "healthy")
+        self.assertEqual(receipt["recoveryEvidence"]["githubRemaining"], 4854)
+        self.assertEqual(receipt["source"]["observedAt"], doctor.epoch_iso(recovered["now"]))
+
+    def test_mac_ownership_read_alarm_survives_cooldown_without_duplicate_issue_actions(self):
+        first = obs(linearError="in-flight PR ownership unreadable", pool=None, eligiblePool=None)
+        tracker = FakeTracker()
+        alerts = doctor.judge(first)
+        prior = doctor.reconcile(alerts, {}, tracker, first["now"], doctor.condition_receipts(alerts, {}, first, "mac"))
+        unknown = obs(now=first["now"] + 600, linearError=None, linearSkipped="cooldown", pool=None, eligiblePool=None)
+        alerts = doctor.judge(unknown, prior)
+        receipt = doctor.condition_receipts(alerts, prior, unknown, "mac")["linear-down"]
+        state = doctor.reconcile(alerts, prior, None, unknown["now"], {"linear-down": receipt})
+        self.assertEqual(receipt["state"], "active")
+        self.assertEqual(receipt["generation"], 1)
+        self.assertEqual(receipt["deadlineAt"], prior["conditions"]["linear-down"]["deadlineAt"])
+        self.assertEqual(tracker.closed, [])
+        self.assertIsNone(state["issues"]["linear-down"]["closedAt"])
+        recovered = obs(now=unknown["now"] + 60, pool=0, eligiblePool=50)
+        receipt = doctor.condition_receipts(doctor.judge(recovered, state), state, recovered, "mac")["linear-down"]
+        self.assertEqual(receipt["state"], "resolved")
+        self.assertEqual(receipt["recoveryEvidence"]["eligiblePool"], 50)
+
+    def test_shipping_alarm_does_not_recover_when_workers_or_census_disappear(self):
+        first = obs(lastLandingAge=41000, pool=50)
+        alerts = doctor.judge(first)
+        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, first, "mac")}
+        for unknown in (obs(lastLandingAge=41100, pool=None, eligiblePool=None, openPRCount=None),
+                        obs(lastLandingAge=41100, pool=50, busy=0)):
+            carried = doctor.judge(unknown, prior)
+            receipt = doctor.condition_receipts(carried, prior, unknown, "mac")["no-landing"]
+            self.assertEqual(receipt["state"], "active")
+            self.assertEqual(receipt["generation"], 1)
+            self.assertEqual(receipt["deadlineAt"], prior["conditions"]["no-landing"]["deadlineAt"])
+            self.assertIsNone(receipt["terminalOutcome"])
+        for recovered in (obs(lastLandingAge=60), obs(lastLandingAge=41100, pool=0, eligiblePool=0, openPRCount=0)):
+            receipt = doctor.condition_receipts(doctor.judge(recovered, prior), prior, recovered, "mac")["no-landing"]
+            self.assertEqual(receipt["state"], "resolved")
+            self.assertEqual(receipt["recoveryEvidence"]["lastLandingAge"], recovered["lastLandingAge"])
+
+    def test_admission_alarm_survives_unknown_inventory_until_observed_recovery(self):
+        observed = obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "over-budget"}})
+        alerts = doctor.judge(observed)
+        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, observed, "gem")}
+        for unknown in (obs(eligiblePool=None, pool=None, newIssueBudgetByProvider={}),
+                        obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "pr-inventory-unavailable"}})):
+            carried = doctor.judge(unknown, prior)
+            receipt = doctor.condition_receipts(carried, prior, unknown, "gem")["admission-repair-needed"]
+            self.assertEqual(receipt["state"], "active")
+            self.assertEqual(receipt["source"]["status"], "unknown")
+            self.assertEqual(receipt["generation"], 1)
+        recovered = obs(eligiblePool=59, pool=59)
+        receipts = doctor.condition_receipts(doctor.judge(recovered, prior), prior, recovered, "gem")
+        self.assertEqual(receipts["admission-repair-needed"]["state"], "resolved")
+
+    def test_busy_scanners_without_completions_require_diagnosis_not_more_slots(self):
+        observed = obs(eligiblePool=59, busy=5, lastWorkAge=20482)
+        alerts = doctor.judge(observed)
+        receipt = doctor.condition_receipts(alerts, {}, observed, "gem")["workers-without-completions"]
+        self.assertEqual(receipt["recovery"]["action"], "verify-process-and-fenced-repair-ownership")
+        prior = {"alerts": alerts, "conditions": {"workers-without-completions": receipt}}
+        unknown = obs(lastWorkAge=None)
+        carried = doctor.judge(unknown, prior)
+        self.assertEqual(doctor.condition_receipts(carried, prior, unknown, "gem")["workers-without-completions"]["source"]["status"], "unknown")
+        self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=60), prior))
+        self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=None)))
+
+    def test_unknown_design_census_preserves_alarm_until_observed_recovery(self):
+        for reason in ({"linearError": "pool read failed"}, {"linearSkipped": "cooldown"}):
+            with self.subTest(reason=reason):
+                tracker = FakeTracker()
+                observed = obs(designGate={"stale": ["JOV-3"]})
+                alerts = doctor.judge(observed)
+                state = doctor.reconcile(alerts, {}, tracker, observed["now"],
+                                         doctor.condition_receipts(alerts, {}, observed, "gem"))
+                observed = obs(designGate=None, **reason)
+                alerts = doctor.judge(observed, state)
+                state = doctor.reconcile(alerts, state, tracker, observed["now"],
+                                         doctor.condition_receipts(alerts, state, observed, "gem"))
+                self.assertEqual(tracker.closed, [])
+                self.assertIsNone(state["issues"]["design-brief-stale"]["closedAt"])
+                condition = state["conditions"]["design-brief-stale"]
+                self.assertEqual(condition["state"], "active")
+                self.assertEqual(condition["source"]["status"], "unknown")
+                self.assertEqual(condition["generation"], 1)
+                observed = obs(designGate={"stale": []})
+                alerts = doctor.judge(observed, state)
+                state = doctor.reconcile(alerts, state, tracker, observed["now"],
+                                         doctor.condition_receipts(alerts, state, observed, "gem"))
+                self.assertEqual(tracker.closed.count("id-design-brief-stale"), 1)
+                self.assertEqual(state["conditions"]["design-brief-stale"]["state"], "resolved")
+
     def test_new_alert_opens_once_clearing_closes_and_refire_reopens(self):
         tracker = FakeTracker()
         now = 1_000_000.0

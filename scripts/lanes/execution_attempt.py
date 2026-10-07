@@ -3,6 +3,9 @@
 from __future__ import annotations
 import base64, fcntl, hashlib, json, math, os, re, subprocess, time, uuid, zlib
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 SCHEMA, GITHUB_LEDGER_ANCHOR = "jovie-execution-attempt/v1", "cd29469b1fa2c433135f23bbfca273e674934676"
 TERMINAL = frozenset({"succeeded", "no_op_stale", "canceled", "failed_known", "failed_unknown", "budget_exhausted", "quarantined", "superseded", "dead_lettered"})
 RETRYABLE = frozenset({"provider_outage", "flaky_infra", "repair_incomplete"})
@@ -30,7 +33,7 @@ def _gh(coordination: dict, method: str, endpoint: str, body=None):
     # one per call); requiring GH_TOKEN here crashed every fix run once the shim landed.
     args = ["gh", "api", "-X", method, endpoint]
     args += ["--paginate", "--slurp"] if method == "GET" else ["--input", "-"]
-    ran = subprocess.run(args, input=None if body is None else json.dumps(body), capture_output=True, text=True,
+    ran = lifecycle.run(args, input=None if body is None else json.dumps(body), capture_output=True, text=True,
                          env={**os.environ, "GH_TOKEN": token} if token else None, timeout=30)
     if ran.returncode:
         if body and body.get("ref") and "422" in ran.stderr: return None

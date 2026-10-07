@@ -33,11 +33,11 @@ import {
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_BLOCK_LABEL,
   SHELL_RAIL_LABEL,
-  SHELL_RAIL_STAGE,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
 import { BASE_URL } from '@/constants/domains';
@@ -73,6 +73,8 @@ export interface UnifiedSidebarProps {
   readonly section: AppShellSection;
   /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
   readonly variant?: BrandVariant;
+  /** Only transfer the collapsed browser action when a header is present. */
+  readonly headerOwnsCollapsedToggle?: boolean;
 }
 
 /** Render a group of nav items */
@@ -250,6 +252,7 @@ function SettingsNavigation({
 
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
+  headerOwnsCollapsedToggle,
   isRouteSidebar,
   isOperatorSection,
   canSwitchWorkspaces,
@@ -259,6 +262,7 @@ function SidebarHeaderNav({
   routeBackHref = APP_ROUTES.DASHBOARD,
   routeBackLabel = 'Back to App',
 }: Readonly<{
+  headerOwnsCollapsedToggle: boolean;
   isRouteSidebar: boolean;
   isOperatorSection: boolean;
   canSwitchWorkspaces: boolean;
@@ -269,6 +273,8 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
+  const { state, isMobile, open: pinned } = useSidebar();
+  const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation } = useDashboardData();
 
   return (
@@ -278,7 +284,7 @@ function SidebarHeaderNav({
           first and centered — stays reachable. Before this, the fixed-width
           chrome pushed the toggle past the clipped rail edge and the sidebar
           could not be reopened from the rail itself (JOV-4522). */}
-      <div className={cn('min-w-0 flex-1', SHELL_RAIL_STAGE)}>
+      <RailStagedContent hidden={chromeHidden} className='min-w-0 flex-1'>
         {(() => {
           if (isRouteSidebar) {
             return (
@@ -367,19 +373,26 @@ function SidebarHeaderNav({
             </div>
           );
         })()}
-      </div>
+      </RailStagedContent>
       {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
-        <div
-          className={cn('flex items-center', SHELL_RAIL_STAGE)}
+        <RailStagedContent
+          hidden={chromeHidden}
+          className='flex items-center'
           data-sidebar-header-actions='true'
         >
           <SidebarInboxLink availability={inboxNavigation} />
           <HeaderSearchSurfaceFromContext compact />
-        </div>
+        </RailStagedContent>
       ) : null}
 
       {!isDesktop ? (
-        <SidebarCollapseButton className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto' />
+        <RailStagedContent
+          hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}
+          stage={headerOwnsCollapsedToggle}
+          className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
+        >
+          <SidebarCollapseButton />
+        </RailStagedContent>
       ) : null}
     </div>
   );
@@ -428,6 +441,7 @@ export function SidebarDock({ children }: PropsWithChildren) {
 export function UnifiedSidebar({
   section,
   variant = 'jovie',
+  headerOwnsCollapsedToggle = false,
 }: UnifiedSidebarProps) {
   const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
@@ -481,6 +495,7 @@ export function UnifiedSidebar({
         )}
       >
         <SidebarHeaderNav
+          headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
           isRouteSidebar={isRouteSidebar}
           isOperatorSection={isOperatorSection}
           canSwitchWorkspaces={canSwitchWorkspaces}

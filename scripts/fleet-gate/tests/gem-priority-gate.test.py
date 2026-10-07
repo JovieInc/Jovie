@@ -4756,5 +4756,45 @@ class ClosureObservationContractTests(unittest.TestCase):
         self.assertFalse(no_capacity["concurrency"]["gem"]["evidenceAccepted"])
 
 
+class PublicTrustDiagnosticsTest(unittest.TestCase):
+    def test_public_diagnostics_never_read_account_credentials_or_accept_capacity(self):
+        import symphony_proof_context as context
+        now = MODULE.utc_now()
+        runtime = {"schema": context.contract.V2_RUNTIME_IDENTITY_SCHEMA,
+                   "service": context.contract.V2_OFFICIAL_RUNTIME_SERVICE,
+                   "sourceRevision": "a" * 40, "binarySha256": "b" * 64,
+                   "workflowSha256": "c" * 64,
+                   "contractSha256": context.digest(pathlib.Path(context.contract.__file__))}
+        value = {"runtime": runtime, "observedAt": MODULE.isoformat(now),
+                 "accounts": [{"authPath": "/must-not-read"}], "secret": "must-not-emit"}
+        with mock.patch.object(context, "private_json", return_value=value), \
+                mock.patch.object(context, "validate_account_row", side_effect=AssertionError("credential read")), \
+                mock.patch.object(context, "live_runtime", side_effect=AssertionError("runtime probe")):
+            result = context.public_context_diagnostics(now)
+            self.assertEqual(result["status"], "unknown")
+            self.assertFalse(result["capacityProven"])
+            self.assertFalse(result["credentialReads"])
+            self.assertNotIn("must-not", json.dumps(result))
+            value["runtime"] = {**runtime, "contractSha256": "0" * 64}
+            self.assertEqual(context.public_context_diagnostics(now)["reason"], "imported-contract-mismatch")
+            value["runtime"] = runtime
+            value["observedAt"] = "2020-01-01T00:00:00Z"
+            self.assertEqual(context.public_context_diagnostics(now)["reason"], "stale-enrollment")
+        with mock.patch.object(context, "private_json", side_effect=ValueError("secret-value")):
+            self.assertNotIn("secret-value", json.dumps(context.public_context_diagnostics(now)))
+
+    def test_observation_diagnostics_do_not_change_rejected_admission(self):
+        now = MODULE.utc_now()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "receipt.json"
+            path.write_text(json.dumps({"maxConcurrent": 99}))
+            with mock.patch.object(MODULE, "validate_capacity_receipt", return_value=(False, "capacity-evidence-trust-context-unavailable", [])), \
+                    mock.patch.object(MODULE, "public_context_diagnostics", return_value={"capacityProven": False}):
+                result = MODULE.observe_concurrency(path, now)
+        self.assertFalse(result["accepted"])
+        self.assertEqual(result["acceptedEvidence"], [])
+        self.assertEqual(result["reason"], "capacity-evidence-trust-context-unavailable")
+
+
 if __name__ == "__main__":
     unittest.main()
