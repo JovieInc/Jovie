@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Configuration options for the useTableGrouping hook
@@ -152,39 +152,20 @@ export function useTableGrouping<T>({
     }));
   }, [enabled, data, getGroupKey, getGroupLabel]);
 
-  // Handle intersection entry for sticky header tracking
-  const handleIntersectionEntry = useCallback(
-    (entry: IntersectionObserverEntry, groups: GroupedData<T>[]) => {
-      const stickyTop =
-        (scrollRoot?.getBoundingClientRect().top ?? 0) + stickyOffset;
-      if (!entry.isIntersecting || entry.boundingClientRect.top > stickyTop + 1)
-        return;
-
-      // Use .dataset API instead of getAttribute for cleaner access
-      const key = (entry.target as HTMLElement).dataset.groupKey;
-      if (!key) return;
-
-      const index = groups.findIndex(g => g.key === key);
-      if (index !== -1) {
-        setVisibleGroupIndex(index);
-      }
-    },
-    [scrollRoot, stickyOffset]
-  );
-
   // Set up Intersection Observer for sticky header behavior
   useEffect(() => {
     if (!enabled || groupedData.length === 0) return;
-
-    // Clean up previous observer
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    // Create new observer with extracted handler to reduce nesting
-    observerRef.current = new IntersectionObserver(
+    const observer = new IntersectionObserver(
       entries => {
-        entries.forEach(entry => handleIntersectionEntry(entry, groupedData));
+        const stickyTop =
+          (scrollRoot?.getBoundingClientRect().top ?? 0) + stickyOffset + 1;
+        for (const entry of entries) {
+          if (!entry.isIntersecting || entry.boundingClientRect.top > stickyTop)
+            continue;
+          const key = (entry.target as HTMLElement).dataset.groupKey;
+          const index = groupedData.findIndex(group => group.key === key);
+          if (index >= 0) setVisibleGroupIndex(index);
+        }
       },
       {
         threshold: [0, 1],
@@ -193,19 +174,13 @@ export function useTableGrouping<T>({
       }
     );
 
-    // Observe all group headers
-    headerRefs.current.forEach(header => {
-      if (observerRef.current) {
-        observerRef.current.observe(header);
-      }
-    });
-
+    observerRef.current = observer;
+    headerRefs.current.forEach(header => observer.observe(header));
     return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
+      observer.disconnect();
+      observerRef.current = null;
     };
-  }, [enabled, groupedData, handleIntersectionEntry, scrollRoot, stickyOffset]);
+  }, [enabled, groupedData, scrollRoot, stickyOffset]);
 
   // Function to register a group header for observation
   const observeGroupHeader = (key: string, element: HTMLElement | null) => {
@@ -217,9 +192,7 @@ export function useTableGrouping<T>({
     element.dataset.groupKey = key;
     headerRefs.current.set(key, element);
 
-    if (observerRef.current) {
-      observerRef.current.observe(element);
-    }
+    observerRef.current?.observe(element);
   };
 
   return {

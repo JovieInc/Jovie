@@ -686,12 +686,10 @@ function UnifiedTableContent<TData extends RowData>({
   const keyboardRows = useMemo(
     () =>
       groupingEnabled
-        ? groupedData.flatMap(group =>
-            group.rows.flatMap(item => {
-              const row = groupedRowMap.get(getRowId ? getRowId(item) : item);
-              return row ? [row] : [];
-            })
-          )
+        ? groupedData
+            .flatMap(group => group.rows)
+            .map(item => groupedRowMap.get(getRowId ? getRowId(item) : item))
+            .filter(row => row !== undefined)
         : rows,
     [groupingEnabled, groupedData, groupedRowMap, getRowId, rows]
   );
