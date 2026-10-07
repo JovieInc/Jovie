@@ -64,6 +64,19 @@ describe('DropdownMenu', () => {
       });
     });
 
+    it('opens from the keyboard and focuses the first menu item', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(<TestDropdownMenu />);
+
+      const trigger = screen.getByRole('button', { name: /open menu/i });
+      trigger.focus();
+      await user.keyboard('{ArrowDown}');
+
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'Profile' })).toHaveFocus();
+      });
+    });
+
     it('shows menu items when open', () => {
       render(<TestDropdownMenu open={true} />);
       expect(screen.getByRole('menu')).toBeInTheDocument();
