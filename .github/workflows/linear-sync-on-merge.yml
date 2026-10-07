@@ -64,6 +64,7 @@ jobs:
             scripts/lib/founder-taste-order.mjs
             scripts/lib/ci-harness.mjs
             scripts/lib/remediation-signal.mjs
+            scripts/lib/deprecation-observation.mjs
             scripts/lib/linear-issue-intake.mjs
             scripts/lib/linear-cooldown.mjs
             scripts/invariants/assurance-matrix.mjs

@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
 import {
   formatValidationReceipt,
@@ -664,9 +665,11 @@ export async function reconcileIssueLifecycle(ctx) {
     );
     return { action: 'skip', identifier: '', target: null, comment: '' };
   }
-  const checkGreen = (issue.commentRecords ?? []).some(comment =>
-    String(comment?.body ?? '').includes(GREEN_MARKER)
-  );
+  const checkGreen =
+    deprecationCheckGreen(issue) ??
+    (issue.commentRecords ?? []).some(comment =>
+      String(comment?.body ?? '').includes(GREEN_MARKER)
+    );
   const { holds } = lifecycleHolds({
     issue,
     pullRequests: ctx.openPulls.pulls,
