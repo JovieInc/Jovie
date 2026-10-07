@@ -31,7 +31,7 @@ describe('isInstantlyOutboundEnabled', () => {
 describe('isOutreachQuietHours', () => {
   const at = (hour: number) => new Date(Date.UTC(2026, 9, 3, hour, 30));
 
-  it('uses the default quiet window (01:00-15:00 UTC) when env is unset', () => {
+  it('uses the default quiet-hours range (01:00-15:00 UTC) when env is unset', () => {
     const env = {};
     expect(isOutreachQuietHours(at(5), env)).toBe(true);
     expect(isOutreachQuietHours(at(16), env)).toBe(false);
