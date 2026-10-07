@@ -1,0 +1,11 @@
+Implemented and opened draft PR [#20525](https://github.com/JovieInc/Jovie/pull/20525).
+
+- Removed unavailable capabilities from pricing, help docs, and public marketing copy.
+- Added a regression guard covering all six internal-only capabilities.
+- Updated affected copy/pricing tests.
+- Pushed final SHA `fc08bcdb09`; branch is clean and synchronized.
+- Verified Biome, docs lint/tests, 102 focused web tests, test typecheck, full typecheck, copy checks, and article validation.
+- Hosted CI is fully green, including source validation, exact-head coverage, security, and visual capture.
+- JOV-7617 is In Review. PR remains draft and unmerged.
+
+Concerns/deviations: GBrain was unavailable. The local qualification hook encountered eight unrelated iOS authorization failures caused by an unusable temporary OpenSSL key; publication checks and all hosted exact-head CI passed.
