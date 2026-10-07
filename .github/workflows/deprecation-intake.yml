@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: TimWhite
-# capability-gap: No existing controller reads build logs for deprecation warnings; this only files deduped Linear intake for the devin lane and writes no code, branches, or deploys.
+# capability-gap: No existing controller reads build logs for deprecation warnings; this emits deduped intake and bounded build-check evidence; the canonical lifecycle owns state and completion. It writes no code, branches, or deploys.
 # removal-trigger: Remove when Summer or the build pipeline emits deprecation findings into Linear intake natively.
 name: Deprecation Intake (Linear devin lane)
 
@@ -52,12 +52,15 @@ jobs:
           fi
           : > build.log
           for run_id in $run_ids; do
+            : > build.log
+            job_ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | select((.name | test("^Build")) and (.conclusion == "success")) | .id')"
             # Skipped jobs have no log blob — the logs endpoint 404s on them.
-            for job in $(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | select((.name | test("^Build")) and (.conclusion == "success")) | .id'); do
+            for job in $job_ids; do
               if chunk="$(gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs")"; then
                 printf '%s\n' "$chunk" >> build.log
               else
-                echo "::warning::Could not fetch log for job $job (run $run_id); skipping."
+                echo "::error::Incomplete build log for job $job (run $run_id); no clearance may be inferred."
+                exit 1
               fi
             done
             if [ -s build.log ]; then
@@ -70,9 +73,31 @@ jobs:
             echo "::error::No successful merge-queue CI run with Build logs found."
             exit 1
           fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > build-run.json
+          export OBSERVED_BUILD_JOB_IDS="$job_ids"
+          node --input-type=module -e 'import {readFileSync,writeFileSync} from "node:fs"; import {createHash} from "node:crypto"; const run=JSON.parse(readFileSync("build-run.json","utf8")); writeFileSync("build-observation.json",JSON.stringify({schema:"jovie.build-log-observation/v1",complete:true,runUrl:run.html_url,headSha:run.head_sha,jobIds:process.env.OBSERVED_BUILD_JOB_IDS.trim().split(/\s+/).map(Number),logSha256:createHash("sha256").update(readFileSync("build.log")).digest("hex")}));'
           echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_OUTPUT"
 
       - name: File deduped deprecation issues
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: node scripts/deprecation-intake.mjs build.log "${{ steps.log.outputs.url }}"
+
+      - name: Record bounded warning check observations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          set -euo pipefail
+          timeout 90s node scripts/deprecation-clearance.mjs build.log build-observation.json | tee deprecation-observations.json
+
+      - name: Preserve warning observation receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deprecation-observations-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build-observation.json
+            deprecation-observations.json
+          retention-days: 14
+          if-no-files-found: warn
