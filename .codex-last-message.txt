@@ -1,0 +1,14 @@
+JOV-7559 is already fixed on `origin/main`:
+
+- [PR #20243](https://github.com/JovieInc/Jovie/pull/20243) repaired the auth bootstrap.
+- [PR #20412](https://github.com/JovieInc/Jovie/pull/20412) prevented cancelled runs and `/signin` server logs from producing false login-timeout remediation signals.
+- Replaying the [cited Firefox log](https://github.com/JovieInc/Jovie/actions/runs/37138288366) through current logic returns `{"action":"skip"}`.
+
+Verified:
+
+- Remediation detector: 9/9 tests passed.
+- Auth helper: 8/8 tests passed.
+- Biome: four relevant files clean.
+- Worktree remains identical to `origin/main`; no commit, push, or PR created.
+
+NOT-SHIPPABLE: JOV-7559 was already fixed on origin/main by merged PRs #20243 and #20412.
