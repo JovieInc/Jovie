@@ -73,13 +73,13 @@ function installObserver() {
         );
         if (targets.length === 0) continue;
         observer.callback(
-          targets.map(
-            target =>
-              ({
-                target,
-                contentRect: { width },
-              }) as ResizeObserverEntry
-          ),
+          targets.map(target => ({
+            target,
+            contentRect: new DOMRect(0, 0, width, 0),
+            borderBoxSize: [],
+            contentBoxSize: [],
+            devicePixelContentBoxSize: [],
+          })),
           observer as unknown as ResizeObserver
         );
       }
