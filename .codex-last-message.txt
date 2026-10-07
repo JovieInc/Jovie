@@ -1,0 +1,5 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T230222Z-JOV-4911-codex-brief-74c464/.design-brief.md).
+
+Design-gate validation passed: `complete: true`, no missing steps or invalid capability IDs. No implementation, build, commit, push, or PR actions were performed.
+
+GBrain and the supplied macOS packet path were unavailable, so its SHA-256 was not independently revalidated.
