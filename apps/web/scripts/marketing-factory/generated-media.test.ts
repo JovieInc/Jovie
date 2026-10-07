@@ -261,7 +261,8 @@ describe('factory generated image admission', () => {
     const hero = artifactOf(ctx, 'layout').sections.find(
       section => section.sectionId === 'hero'
     );
-    if (!ref || !hero) throw new Error('missing fixture reference or hero');
+    if (!ref || !hero || !hero.sectionInstanceId)
+      throw new Error('missing fixture reference or hero');
     ref.sectionInstanceId = hero.sectionInstanceId;
     hero.variantId = 'split-screenshot-right';
     expect(generatedFactoryMedia(ctx).issues.join('; ')).toContain(
