@@ -21,12 +21,12 @@
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
-    "@vercel/blob": "2.8.0",
+    "@vercel/blob": "2.8.1",
     "ai": "7.0.122",
     "braintrust": "3.36.0",
-    "eve": "0.70.3",
+    "eve": "0.71.0",
     "just-bash": "3.6.0",
-    "microsandbox": "0.7.6",
+    "microsandbox": "0.7.7",
     "zod": "4.6.5"
   },
   "devDependencies": {
@@ -38,7 +38,7 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "eve@0.70.3": "patches/eve@0.70.3.patch"
+      "eve@0.71.0": "patches/eve@0.71.0.patch"
     }
   }
 }
