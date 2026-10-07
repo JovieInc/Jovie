@@ -834,6 +834,62 @@ describe('stale lease guard', () => {
     assert.equal(result.skipped[0].reason, 'active-pr');
   });
 
+  it('preserves native PR ownership and fresh lane evidence over historical terminal comments', () => {
+    assert.equal(
+      staleLease.classifyStaleLease(
+        {
+          ...staleIssue(),
+          attachments: {
+            nodes: [{ url: 'https://github.com/JovieInc/Jovie/pull/20771' }],
+          },
+        },
+        { now }
+      ).reason,
+      'active-pr'
+    );
+    assert.equal(
+      staleLease.classifyStaleLease(
+        staleIssue({
+          comments: [
+            terminalComment,
+            {
+              body: '🤖 lane `claude`: exact-head gate remains owned',
+              createdAt: now,
+            },
+          ],
+        }),
+        { now }
+      ).reason,
+      'latest-agent-evidence-not-terminal'
+    );
+    assert.equal(
+      staleLease.classifyStaleLease(
+        {
+          ...staleIssue(),
+          comments: {
+            nodes: [terminalComment],
+            pageInfo: { hasNextPage: true },
+          },
+        },
+        { now }
+      ).reason,
+      'nested-evidence-incomplete'
+    );
+  });
+
+  it('never releases a missing current issue using a stale snapshot', async () => {
+    const issue = staleIssue();
+    const client = fakeClient(issue);
+    client.fetchIssue = async () => null;
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
+    assert.equal(result.failed[0].reason, 'reread-failed');
+    assert.equal(client.calls.transitions.length, 0);
+  });
+
   it('does not recover assigned or unknown leases', async () => {
     const assigned = staleIssue({
       assignee: { id: 'other', name: 'Other Owner' },

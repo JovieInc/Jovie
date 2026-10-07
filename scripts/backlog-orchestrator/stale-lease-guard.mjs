@@ -23,7 +23,7 @@ export const DEFAULT_PROTECTED_LABELS = new Set([
 ]);
 
 const MACHINE_AGENT_PATTERN =
-  /jovie agent|codex issue shipper|machine-agent|machine agent/i;
+  /jovie agent|codex issue shipper|machine-agent|machine agent|🤖 lane/i;
 const TERMINAL_PATTERN =
   /released|stopped|completed|finished|terminal|exited\s+(?:0|without|with)/i;
 const NEGATED_OPEN_PR_PATTERN =
@@ -50,6 +50,7 @@ function commentsOf(issue) {
 
 function latestMachineAgentEvidence(issue) {
   return commentsOf(issue).find(comment => {
+    if (comment.body.trim() === STALE_LEASE_RECOVERY_COMMENT) return false;
     const author = `${comment.author?.name || ''} ${comment.author?.email || ''}`;
     return (
       comment.machineAgent === true ||
@@ -60,6 +61,14 @@ function latestMachineAgentEvidence(issue) {
 }
 
 function hasOpenPullRequest(issue) {
+  // A native PR attachment is an ownership evidence gap until the canonical
+  // delivery writer proves its live state. Old terminal prose cannot release it.
+  if (
+    (issue?.attachments?.nodes ?? []).some(attachment =>
+      PR_URL_PATTERN.test(attachment.url ?? '')
+    )
+  )
+    return true;
   const directReferences = [
     issue?.pullRequestUrl,
     issue?.githubPrUrl,
@@ -118,6 +127,11 @@ export function classifyStaleLease(
   if (issue?.state?.name !== 'In Progress') {
     return { eligible: false, reason: 'not-in-progress' };
   }
+  if (
+    issue.comments?.pageInfo?.hasNextPage ||
+    issue.attachments?.pageInfo?.hasNextPage
+  )
+    return { eligible: false, reason: 'nested-evidence-incomplete' };
   if (issue.assignee && !isFounderSteeringAssignee(issue)) {
     return { eligible: false, reason: 'assigned' };
   }
@@ -159,6 +173,19 @@ function mutationSucceeded(result) {
   return nestedSuccess.length === 0 || nestedSuccess.every(Boolean);
 }
 
+function ownershipSnapshot(issue) {
+  return JSON.stringify([
+    issue.state,
+    issue.assignee,
+    issue.labels,
+    issue.attachments,
+    issue.pullRequestUrl,
+    issue.githubPrUrl,
+    issue.activePullRequestUrl,
+    latestMachineAgentEvidence(issue)?.body,
+  ]);
+}
+
 /**
  * Sweep and safely release stale leases. Every mutation is followed by an
  * authoritative fetchIssue reread; an unproven mutation is reported failed.
@@ -175,7 +202,9 @@ export async function sweepStaleLeases({
   for (const snapshot of issues) {
     let issue = snapshot;
     try {
-      issue = (await client.fetchIssue(snapshot.identifier)) || snapshot;
+      issue = await client.fetchIssue(snapshot.identifier);
+      if (!issue || issue.id !== snapshot.id)
+        throw new Error('missing-or-mismatched-current-issue');
     } catch (error) {
       result.failed.push({
         identifier: snapshot.identifier,
@@ -195,6 +224,7 @@ export async function sweepStaleLeases({
     }
 
     try {
+      const ownership = ownershipSnapshot(issue);
       if (!decision.hasRecoveryComment) {
         const commentResult = await client.addComment(
           issue.id,
@@ -207,7 +237,8 @@ export async function sweepStaleLeases({
         const afterCommentCount = recoveryCommentCount(afterComment);
         if (
           afterComment?.state?.name !== 'In Progress' ||
-          afterCommentCount !== 1
+          afterCommentCount !== 1 ||
+          ownershipSnapshot(afterComment) !== ownership
         ) {
           result.failed.push({
             identifier: issue.identifier,
