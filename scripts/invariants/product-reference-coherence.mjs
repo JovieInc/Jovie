@@ -42,9 +42,8 @@ export function readProductReferenceOwner(repoRoot = ROOT) {
     new Function('exports', 'require', outputText)(exports, restrictedRequire);
     return exports;
   };
-  const routes = evaluate('apps/web/constants/routes.ts');
   const owner = evaluate(PRODUCT_REFERENCE_SOURCE, {
-    '@/constants/routes': routes,
+    '@/constants/routes': evaluate('apps/web/constants/routes.ts'),
   });
   owners.set(repoRoot, owner);
   return owner;
