@@ -4502,7 +4502,9 @@ class WorkflowContractTests(unittest.TestCase):
             content,
         )
         self.assertIn("jovie-fixed", content)
-        self.assertIn("cancel-in-progress: true", content)
+        self.assertIn("cancel-in-progress: false", content)
+        self.assertIn("group: fleet-gate-receipt", content)
+        self.assertIn("--sweep", content)
         self.assertIn("fleet-gate-receipt", content)
         self.assertIn("0 <= age < 120", content)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)

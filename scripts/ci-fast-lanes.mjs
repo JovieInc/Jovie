@@ -377,6 +377,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/execution_attempt.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/merge_evidence.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_pool.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/dependency_diff.py" --fail-under=95',
     ].join(' && ')
   ),
   ...STRUCTURAL_PYTEST_PARTS,
@@ -412,6 +413,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',
+  'scripts/deprecation-clearance.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
@@ -471,7 +473,9 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/web-ai-health-intake.test.mjs',
   'scripts/weekly-agent-readiness.test.mjs',
 ]);
-export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')} && node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/customer-notes-ready.test.js`;
+export const DEPRECATION_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')} && node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/customer-notes-ready.test.js`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/blog-content-ci.test.mjs',

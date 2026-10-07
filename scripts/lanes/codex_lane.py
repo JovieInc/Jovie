@@ -671,7 +671,10 @@ def run(args) -> int:
             "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
     if current_login_mode():
         base.remove("--dangerously-bypass-approvals-and-sandbox")
-        base += ["--approve-for-me", "-c", 'model_provider="openai"',
+        # The installed CLI supports these configuration keys but not the TUI's
+        # --approve-for-me shortcut. Keep the sandbox and reviewer explicit.
+        base += ["--sandbox", "workspace-write", "-c", 'approval_policy="on-request"',
+                 "-c", 'approvals_reviewer="auto_review"', "-c", 'model_provider="openai"',
                  "-c", 'forced_login_method="chatgpt"']
     if args.model:
         base += ["-m", args.model]

@@ -501,6 +501,295 @@ class PromptTest(unittest.TestCase):
         self.assertEqual(lane.context_pack(issue(), run=boom), "")
 
 
+class DependencyOnlyGateTest(unittest.TestCase):
+    """Actual git blobs distinguish version chores from source/configuration changes."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = Path(self.tmp.name) / "repo"
+        self.repo.mkdir()
+        self.git("init", "-q")
+        self.git("config", "user.name", "Fixture")
+        self.git("config", "user.email", "fixture@example.invalid")
+        self.manifests = ["apps/web/package.json", "packages/ui/package.json"]
+        self.original = {"name": "fixture", "scripts": {"test": "vitest"},
+                         "dependencies": {"@radix-ui/react-tabs": "^1.1.21", "local": "workspace:*"}}
+        for path in self.manifests:
+            self.write(path, self.original)
+        self.write("pnpm-lock.yaml", "lockfileVersion: 9.0\n")
+        self.base = self.commit("chore: fixture base")
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.pr = {"number": 7, "title": "deps(deps): bump Radix Tabs", "body": "Dependency chore",
+                   "headRefName": "dependabot/npm_and_yarn/radix-tabs", "labels": [], "state": "OPEN"}
+
+    def git(self, *args):
+        return subprocess.run(["git", *args], cwd=self.repo, check=True, capture_output=True,
+                              text=True).stdout.strip()
+
+    def write(self, path, value):
+        target = self.repo / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(value) if isinstance(value, dict) else value)
+
+    def commit(self, subject="chore(deps): update Radix Tabs"):
+        self.git("add", "-A")
+        # These model-free fixtures never execute a user's global hooks.
+        self.git("-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", subject)
+        return self.git("rev-parse", "HEAD")
+
+    def bump(self, extra=None, subject="chore(deps): update Radix Tabs"):
+        for path in self.manifests:
+            value = json.loads(json.dumps(self.original))
+            value["dependencies"]["@radix-ui/react-tabs"] = "^1.1.22"
+            if extra:
+                extra(value)
+            self.write(path, value)
+        self.write("pnpm-lock.yaml", "lockfileVersion: 9.0\n# updated\n")
+        self.pr["headRefOid"] = self.commit(subject)
+        return self.changes()
+
+    def changes(self):
+        return lane.parse_numstat(self.git("diff", "--numstat", f"{self.base}...HEAD"))
+
+    def classify(self, changes=None, pr=None):
+        changes = self.changes() if changes is None else changes
+        pr = self.pr if pr is None else pr
+        return lane.dependency_diff.classify(self.repo, pr.get("headRefOid"), [c.path for c in changes], pr)
+
+    def test_version_chore_proves_exact_base_head_and_immutable_manifests(self):
+        changes = self.bump()
+        versions = self.classify(changes)
+        self.assertEqual((versions["baseSha"], versions["headSha"]), (self.base, self.pr["headRefOid"]))
+        self.assertEqual(len(versions["manifests"]), 2)
+        self.assertEqual(lane.gate_rules(changes), ["code-change-without-test"])
+        self.assertEqual(lane.gate_rules(changes, worktree=self.repo, pr=self.pr), [])
+        self.write(self.manifests[0], {"scripts": {"postinstall": "untrusted working tree"}})
+        self.assertEqual(self.classify(changes), versions)
+        self.assertIn(lane.CANONICAL_GATE, lane.check_commands([c.path for c in changes], self.pr))
+
+    def test_configuration_changes_and_json_type_changes_are_not_version_chores(self):
+        for key, value in [("scripts", {"test": "skip"}), ("exports", "./new.js"), ("engines", {"node": "30"}),
+                           ("packageManager", "pnpm@10"), ("pnpm", {"overrides": {"dep": "1.0.0"}}),
+                           ("overrides", {"dep": "1.0.0"}), ("name", "new"), ("version", "2.0.0")]:
+            with self.subTest(key=key):
+                changes = self.bump(lambda value_, key=key, value=value: value_.update({key: value}))
+                self.assertIsNone(self.classify(changes))
+                self.assertIn("code-change-without-test", lane.gate_rules(changes, worktree=self.repo, pr=self.pr))
+        self.original["private"] = True
+        for path in self.manifests:
+            self.write(path, self.original)
+        self.commit("chore: boolean base")
+        self.base = self.git("rev-parse", "HEAD")
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.bump(lambda value: value.update(private=1))
+        self.assertIsNone(self.classify())
+
+    def test_dependency_add_remove_map_changes_and_unsafe_specifiers_fail_closed(self):
+        changes = self.bump(lambda value: value["dependencies"].update(new="1.0.0"))
+        self.assertIsNone(self.classify(changes))
+        changes = self.bump(lambda value: value["dependencies"].pop("local"))
+        self.assertIsNone(self.classify(changes))
+        for spec in [False, None, {}, "", "file:../src", "workspace:^", "git+https://example.invalid/repo", "npm:other@1.2.3", "latest"]:
+            with self.subTest(spec=spec):
+                changes = self.bump(lambda value, spec=spec: value["dependencies"].update({"@radix-ui/react-tabs": spec}))
+                self.assertIsNone(self.classify(changes))
+        self.bump(lambda value: value.update(dependencies=["1.1.22"]))
+        self.assertIsNone(self.classify())
+        self.bump(lambda value: value.update(devDependencies={"added": "1.0.0"}))
+        self.assertIsNone(self.classify())
+
+    def test_duplicate_keys_invalid_json_nonobjects_and_nonnumbers_fail_closed(self):
+        self.bump()
+        for raw in ['{"dependencies":{"dep":"1.0.0","dep":"2.0.0"}}', "{broken", "[]", "null",
+                    '{"dependencies":{"dep":"1.0.0"},"other":NaN}']:
+            with self.subTest(raw=raw):
+                self.write(self.manifests[0], raw); self.pr["headRefOid"] = self.commit()
+                self.assertIsNone(self.classify())
+
+    def test_oversized_format_only_and_malformed_git_evidence_fail_closed(self):
+        self.bump()
+        self.write(self.manifests[0], {**self.original, "large": "x" * (1024 * 1024)})
+        self.pr["headRefOid"] = self.commit()
+        self.assertIsNone(self.classify())
+        self.git("reset", "--hard", self.base)
+        self.bump()
+        self.write(self.manifests[0], '{"deep":' + '[' * 10000 + '0' + ']' * 10000 + '}')
+        self.pr["headRefOid"] = self.commit()
+        self.assertIsNone(self.classify())
+        self.assertIn("code-change-without-test", lane.gate_rules(self.changes(), worktree=self.repo, pr=self.pr))
+        self.git("reset", "--hard", self.base)
+        self.bump()
+        self.write(self.manifests[0], json.dumps(self.original, indent=2))
+        self.pr["headRefOid"] = self.commit()
+        self.assertIsNone(self.classify())
+        self.git("reset", "--hard", self.base)
+        self.bump()
+        git = lane.dependency_diff._git
+        for verb, output in [("merge-base", "unknown"), ("diff", "unreadable\0")]:
+            with self.subTest(verb=verb):
+                def read(repo, *args):
+                    return output if args[0] == verb else git(repo, *args)
+                with patch.object(lane.dependency_diff, "_git", read):
+                    self.assertIsNone(self.classify())
+
+    def test_mixed_source_workflow_secret_and_lockfile_only_changes_keep_existing_guards(self):
+        for path in ["apps/web/lib/runtime.ts", ".github/workflows/ci.yml", "apps/web/.env.local"]:
+            with self.subTest(path=path):
+                self.bump(); self.write(path, "changed\n"); self.pr["headRefOid"] = self.commit()
+                changes = self.changes()
+                self.assertIsNone(self.classify(changes))
+                reasons = lane.gate_rules(changes, worktree=self.repo, pr=self.pr)
+                self.assertIn("code-change-without-test", reasons)
+                if ".env" in path:
+                    self.assertIn("secret-like-file-changed", reasons)
+                self.git("reset", "--hard", self.base)
+        self.write("pnpm-lock.yaml", "only lock\n"); self.pr["headRefOid"] = self.commit()
+        self.assertIsNone(self.classify())
+        self.assertIn("lockfile-without-manifest", lane.gate_rules(self.changes(), worktree=self.repo, pr=self.pr))
+
+    def test_renamed_symlink_executable_and_new_manifests_cannot_earn_exemption(self):
+        for kind in ["rename", "symlink", "executable", "new"]:
+            with self.subTest(kind=kind):
+                self.git("reset", "--hard", self.base); self.bump()
+                target = self.repo / self.manifests[0]
+                if kind == "rename": target.rename(target.with_name("renamed.json"))
+                elif kind == "symlink": target.unlink(); target.symlink_to("../ui/package.json")
+                elif kind == "executable": target.chmod(0o755)
+                else: self.write("apps/new/package.json", self.original)
+                self.pr["headRefOid"] = self.commit()
+                self.assertIsNone(self.classify())
+
+    def test_unreadable_refs_wrong_head_and_incomplete_diff_evidence_fail_closed(self):
+        changes = self.bump()
+        for head in [None, "not-a-sha", self.base]:
+            self.assertIsNone(self.classify(changes, {**self.pr, "headRefOid": head}))
+        self.assertIsNone(self.classify(changes[:-1]))
+        self.assertIsNone(self.classify(changes + changes[:1]))
+        self.git("update-ref", "-d", "refs/remotes/origin/main")
+        self.assertIsNone(self.classify(changes))
+        with patch.object(lane.dependency_diff, "_git", side_effect=subprocess.TimeoutExpired("git", 30)):
+            self.assertIsNone(self.classify(changes))
+        with patch.object(lane.dependency_diff, "_git", side_effect=UnicodeError("unreadable")):
+            self.assertIsNone(self.classify(changes))
+
+    def test_bugfix_signals_or_unreadable_metadata_require_changed_regression_test(self):
+        changes = self.bump()
+        for metadata in [{"title": "fix(deps): Radix bug"}, {"headRefName": "fix/radix"},
+                         {"headRefName": "codex/fix-radix"},
+                         {"body": "- [x] Bug fix (non-breaking change which fixes an issue)"},
+                         {"title": None}, {"body": None}, {"title": "refactor: dependency behavior"}]:
+            with self.subTest(metadata=metadata):
+                pr = {**self.pr, **metadata}
+                self.assertIsNone(self.classify(changes, pr))
+                self.assertIn("code-change-without-test", lane.gate_rules(changes, worktree=self.repo, pr=pr))
+        self.git("reset", "--hard", self.base)
+        self.bump(subject="fix(deps): regression")
+        self.assertIsNone(self.classify())
+
+    def test_size_cap_and_completed_proof_metadata_remain_authoritative(self):
+        changes = self.bump()
+        self.assertIn("diff-too-large:2000", lane.gate_rules(
+            [lane.Change(c.path, 1000, 0) if c.path != "pnpm-lock.yaml" else c for c in changes],
+            lane.SENSITIVE_REVIEWABLE_LINES, worktree=self.repo, pr=self.pr))
+        proof = {**gate_proof(self.pr["headRefOid"]), "dependencyVersionDiff": self.classify()}
+        key = f"7:{self.pr['headRefOid']}"
+        self.assertIs(lane.terminal_gate(self.pr, {key: proof}), proof)
+        self.assertIsNone(lane.terminal_gate({**self.pr, "body": "changed"}, {key: proof}))
+        self.assertIsNone(lane.terminal_gate(self.pr, {key: {**proof, "dependencyVersionDiff": {}}}))
+
+    def test_classifier_policy_change_invalidates_completed_receipt(self):
+        self.bump()
+        proof = {**gate_proof(self.pr["headRefOid"]), "dependencyVersionDiff": self.classify()}
+        real_read = Path.read_bytes
+        helper = Path(lane.dependency_diff.__file__)
+        def changed_read(path):
+            return real_read(path) + (b"\n# changed policy" if path == helper else b"")
+        with patch.object(Path, "read_bytes", changed_read):
+            changed_digest = lane.gate_policy_digest()
+        self.assertNotEqual(changed_digest, lane.GATE_POLICY_DIGEST)
+        with patch.object(lane, "GATE_POLICY_DIGEST", changed_digest):
+            self.assertIsNone(lane.terminal_gate(self.pr, {f"7:{self.pr['headRefOid']}": proof}))
+
+    def test_incomplete_live_metadata_cannot_inherit_cached_chore_authority(self):
+        self.bump()
+        for field in ["title", "body", "headRefName"]:
+            for missing in [True, False]:
+                with self.subTest(field=field, missing=missing):
+                    live = repair_target_page(self.pr)["data"]["repository"]["pullRequest"]
+                    if missing:
+                        live.pop(field)
+                    else:
+                        live[field] = None
+                    fresh = lane.repair_target_node(self.pr, live)
+                    if fresh is not None:
+                        self.assertIsNone(lane.dependency_diff.metadata_digest(fresh))
+                        self.assertIsNone(self.classify(pr=fresh))
+
+    def test_lost_diff_proof_or_new_bugfix_metadata_after_qualification_holds(self):
+        self.bump()
+        versions = self.classify()
+        for fault in ["read-failed", "bugfix"]:
+            with self.subTest(fault=fault):
+                host = lane.Host(state=Path(self.tmp.name) / fault)
+                calls = []
+                def shell(args, **kwargs):
+                    calls.append(args)
+                    if args[:2] == ["git", "fetch"]:
+                        return SimpleNamespace(returncode=0, stdout="", stderr="")
+                    if args[0] == "git":
+                        return subprocess.run(args, cwd=self.repo, capture_output=True, text=True)
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
+                reads = 0
+                def target(*args, **kwargs):
+                    nonlocal reads
+                    reads += 1
+                    body = "- [x] Bug fix (non-breaking change which fixes an issue)"
+                    return {**self.pr, **({"body": body} if fault == "bugfix" and reads > 1 else {})}
+                with (self.repo / "gate.log").open("w+") as log, patch.object(lane, "sh", shell), \
+                     patch.object(lane, "reconcile_fix_target", side_effect=target), \
+                     patch.object(lane, "claimed_elsewhere", return_value=False), \
+                     patch.object(lane, "publication_revocation", return_value=None), \
+                     patch.object(lane, "publish_verified") as publish:
+                    if fault == "read-failed":
+                        with patch.object(lane.dependency_diff, "classify", side_effect=[versions, None]) as prove:
+                            result = lane.gate_pr(host, self.pr, self.repo, log)
+                            self.assertEqual(prove.call_count, 2)
+                    else:
+                        result = lane.gate_pr(host, self.pr, self.repo, log)
+                    publish.assert_not_called()
+                self.assertEqual(result["verdict"], "held")
+                self.assertEqual(result["dependencyVersionDiff"], versions)
+                self.assertIn("dependency-version-evidence-changed", result["reasons"])
+                self.assertIn("code-change-without-test", result["reasons"])
+                self.assertEqual(calls.count(lane.CANONICAL_GATE), 1)
+                self.assertFalse((host.state / "fix-attempts.json").exists())
+
+    def test_dependency_chore_still_runs_canonical_gate_and_cannot_publish_on_failure(self):
+        self.bump()
+        host = lane.Host(state=Path(self.tmp.name) / "state")
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            if args[:2] == ["git", "fetch"]:
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if args[0] == "git":
+                return subprocess.run(args, cwd=self.repo, capture_output=True, text=True)
+            return SimpleNamespace(returncode=1 if args == lane.CANONICAL_GATE else 0, stdout="", stderr="")
+        with (self.repo / "gate.log").open("w+") as log, patch.object(lane, "sh", shell), \
+             patch.object(lane, "reconcile_fix_target", return_value=dict(self.pr)), \
+             patch.object(lane, "claimed_elsewhere", return_value=False), \
+             patch.object(lane, "publication_revocation", return_value=None), \
+             patch.object(lane, "publish_verified") as publish:
+            result = lane.gate_pr(host, self.pr, self.repo, log)
+            publish.assert_not_called()
+        self.assertEqual(result["verdict"], "held")
+        self.assertNotIn("code-change-without-test", result["reasons"])
+        self.assertTrue(any(reason.startswith("check-failed:") for reason in result["reasons"]))
+        self.assertEqual(calls.count(lane.CANONICAL_GATE), 1)
+        self.assertFalse(any(args[:3] == ["gh", "pr", "merge"] for args in calls))
+        self.assertFalse((host.state / "fix-attempts.json").exists())
+
+
 class GateTest(unittest.TestCase):
     def change(self, path, added=10, deleted=0):
         return lane.Change(path, added, deleted)
@@ -754,11 +1043,20 @@ class ProviderAndLockTest(unittest.TestCase):
     def test_slot_lock_is_exclusive_and_released(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "slot.lock"
-            first = lane.Locked(path, blocking=False)
+            with patch.object(lane, "now_iso", return_value="2026-10-06T23:02:30Z"):
+                first = lane.Locked(path, blocking=False)
             self.assertTrue(first.held)
-            self.assertFalse(lane.Locked(path, blocking=False).held)
+            owner = json.loads(path.read_text())
+            contender = lane.Locked(path, blocking=False)
+            self.assertFalse(contender.held)
+            self.assertEqual(json.loads(path.read_text()), owner, "a contender must preserve the owner's receipt")
+            contender.release()
+            self.assertEqual(owner, {"pid": os.getpid(), "host": lane.HOST,
+                                     "acquiredAt": "2026-10-06T23:02:30Z"})
             first.release()
-            self.assertTrue(lane.Locked(path, blocking=False).held)
+            next_owner = lane.Locked(path, blocking=False)
+            self.assertTrue(next_owner.held)
+            next_owner.release()
 
     def test_needs_update_only_on_a_new_tree(self):
         self.assertTrue(lane.needs_update(None, "t1"))
@@ -4745,6 +5043,16 @@ class RepairCheckPaginationTest(unittest.TestCase):
         self.assertIn("cursor=page-1", command.call_args_list[1].args[0])
         self.assertTrue(all(call.kwargs["timeout"] == 30 for call in command.call_args_list))
 
+    def test_dependency_metadata_transition_cannot_splice_paginated_authority(self):
+        for field in ["title", "body"]:
+            first, second = self.page(), self.page(100, 1, more=False)
+            for page in [first, second]:
+                page["data"]["repository"]["pullRequest"].update(title="chore(deps): bump", body="Dependency chore")
+            second["data"]["repository"]["pullRequest"][field] = "fix(deps): regression"
+            live, command = self.read([first, second])
+            self.assertIsNone(live)
+            self.assertEqual(command.call_count, 2)
+
     def test_pending_on_later_page_cannot_be_hidden_by_earlier_failure(self):
         for state in ("IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED", "UNKNOWN"):
             first, second = self.page(), self.page(100, 1, more=False)
@@ -6364,6 +6672,62 @@ process.stdout.write(JSON.stringify({ loaded: typeof metrics.computeMetrics === 
                                 capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 1)
         self.assertEqual(json.loads(result.stdout)['blockers'], ['evidence-unavailable'])
+
+
+class RemediationEventRecoveryTest(unittest.TestCase):
+    def setUp(self):
+        from scripts.tests.test_remediation import linear_issue, providers
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.host = lane.Host(state=root, repo=root)
+        self.issue = linear_issue('JOV-1', 'delivery-stalled', title='Gem delivery stalled')
+        self.linear = SimpleNamespace(gql=lambda *_: {}, comment=lambda *_: None)
+        for target, value in [('fetch_labeled_events', [self.issue]), ('load_providers', providers()),
+                              ('cooling', False), ('provider_healthy', True)]:
+            mock = patch.object(lane, target, return_value=value)
+            mock.start()
+            self.addCleanup(mock.stop)
+
+    def test_completed_event_recurrence_dispatches_one_owner_after_restart(self):
+        lane.save_escalation(self.host, {'events': {'delivery-stalled': {
+            'issueId': self.issue['id'], 'status': 'done', 'attempts': []}}})
+        report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(report['eventsClaimed'], 1)
+        first = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(first.identifier, 'JOV-1')
+        before = lane.load_escalation(self.host)['events']['delivery-stalled']
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        after = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(after['attempts'], before['attempts'])
+        self.assertEqual(after['claimedAt'], before['claimedAt'])
+
+    def test_concurrent_terminal_receipt_and_attempts_win_whole_row(self):
+        lane.save_escalation(self.host, {'events': {'delivery-stalled': {
+            'issueId': self.issue['id'], 'status': 'done', 'attempts': []}}})
+        terminal = {'issueId': self.issue['id'], 'status': 'exhausted', 'running': False,
+                    'attempts': [{'kind': 'model', 'lane': 'codex', 'head': 'delivery-stalled'}],
+                    'receipt': 'newer-worker-finish'}
+        def finish(*_):
+            lane.save_escalation(self.host, {'events': {'delivery-stalled': terminal,
+                                  'other': {'status': 'claimed', 'running': True}}})
+        with patch.object(lane, '_apply_event_plan', side_effect=finish):
+            report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(lane.load_escalation(self.host)['events']['delivery-stalled'], terminal)
+        self.assertTrue(lane.load_escalation(self.host)['events']['other']['running'])
+        self.assertEqual(report['eventsExhausted'], 1)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+
+    def test_exhausted_attempts_are_not_reset_by_recurrence(self):
+        attempts = [{'kind': 'model', 'lane': name, 'head': 'delivery-stalled', 'at': 1}
+                    for name in ('codex', 'devin')]
+        lane.save_escalation(self.host, {'events': {'delivery-stalled': {
+            'issueId': self.issue['id'], 'status': 'done', 'attempts': attempts}}})
+        report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(report['eventsExhausted'], 1)
+        self.assertEqual(lane.load_escalation(self.host)['events']['delivery-stalled']['attempts'], attempts)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
 
 
 class BundledAdmissionTest(unittest.TestCase):

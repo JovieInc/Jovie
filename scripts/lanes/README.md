@@ -277,7 +277,13 @@ healthy provider, configured slots, repeated dispatch attempts, and zero workers
 is being lost. `spawn-exit` fires when workers spawn every tick but no run starts or ends
 and no worktree exists; a worker that finishes its claim scan with nothing to do records a
 clean exit in `worker-idle.json`, so the alert only means workers are dying before or during
-the claim — a clean 'nothing claimable' exit is not a deadlock. Every alert also produces a generation-deduped
+the claim — a clean 'nothing claimable' exit is not a deadlock. `workers-without-completions`
+requires both an hour without a terminal run receipt and a current slot lease older than an
+hour; unknown legacy lease ages stay degraded, while newly acquired leases do not inherit an
+old completion age. `admission-repair-needed`
+requires five continuous minutes of known qualified demand blocked by an over-budget or
+terminal PR inventory, so the normal transition into existing-PR recovery does not create
+another issue. Every alert also produces a generation-deduped
 `jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
 status feed. The receipt carries its owner, affected resources, first observation, source
 freshness, ten-minute escalation deadline, recovery result, next action, and terminal
@@ -302,14 +308,19 @@ ChatGPT auth without reading credential files or discovering other accounts.
 `CODEX_LANE_CLI` may name an already installed executable when the host's PATH
 entry is broken; it does not install a CLI. API credentials are removed from the
 child environment, execution pins OpenAI plus `forced_login_method="chatgpt"`,
-and `--approve-for-me` retains the workspace sandbox and automatic approval review.
+and the supported `--sandbox workspace-write`, `approval_policy="on-request"`,
+and `approvals_reviewer="auto_review"` options retain the workspace sandbox and
+automatic approval review. The installed CLI need not support the TUI's
+`--approve-for-me` shortcut.
 An auth or rate/usage limit banks this one login and returns exit 75 to the existing
 handoff policy. This mode never rotates profiles, redeems reset credits, or probes
 private quota services. Auth status establishes login, not available plan quota.
 
 Enabling the mode and any nonzero `LANES_SLOTS_CODEX` value is a host configuration
-change, separate from landing source. Review the activation and rollback plan
-before changing the service. Existing issue/PR ownership, file-overlap admission,
+change, separate from landing source. Record the activation and rollback plan
+before changing the service. Routine repair or reactivation of the established
+shipping service uses its standing authority; genuinely new access or spend still
+requires its specific authority. Existing issue/PR ownership, file-overlap admission,
 slot limits, PR backlog budgets, capability floors, and independent security,
 review, queue and production gates still apply. Summer reasoning/notification
 failures are ancillary to `dispatch()`; they do not authorize bypassing an intake
@@ -330,7 +341,7 @@ Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, bank
 
 `claude_lane.py run --model <id>` runs `claude -p` (`bypassPermissions`, JSON output, no session files, hooks on) on the host's claude.ai subscription or a `claude setup-token` in `~/.config/jovie-lanes/claude.env`. Anthropic API credentials are stripped and `health` refuses an API-key login. A usage limit banks the lane until its reset (default 5h); a burst limit backs off 5 minutes; a banked run exits 75 so the harness fails over. Repairs use Sonnet.
 
-Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy.
+Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy. Only the owner can write the attestation — the API exposes no balance or cap for an agent to read back — so a host that lacks it must scope the lane off with `LANES_SLOTS_HYPERAGENT=0` (no probe, no `provider-down` alert) rather than page on a credential that does not exist.
 
 ## Install on a host
 

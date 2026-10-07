@@ -218,7 +218,12 @@ describe('Certification Inbox convergence', () => {
       updatedAt: inventory.generatedAt,
       links: [],
       history: [],
-      decision: { available: true, reason: null, evidenceDigest: 'current' },
+      decision: {
+        available: true,
+        reason: null,
+        evidenceDigest: 'current',
+        currentDecision: null,
+      },
       source: null,
     };
     const queueItem: OvieCertificationInventory['queue']['needsYou'][number] = {
