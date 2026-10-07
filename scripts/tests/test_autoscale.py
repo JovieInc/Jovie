@@ -4,6 +4,12 @@ import importlib.util; import io; import json; import os; import sys; import tem
 def load(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / f"scripts/lanes/{name}.py"); module = importlib.util.module_from_spec(spec); sys.modules[name] = module; spec.loader.exec_module(module); return module
 A, lane, doctor = load("autoscale"), load("lane_runner"), load("doctor")
+# Autoscaling fixtures describe an eligible provider independent of trial date.
+_devin_free_fixture = patch.object(lane.devin_free_policy, "admission_open", return_value=True)
+def setUpModule():
+    _devin_free_fixture.start()
+def tearDownModule():
+    _devin_free_fixture.stop()
 @contextmanager
 def env(**updates):
     with patch.dict(os.environ, updates, clear=False):

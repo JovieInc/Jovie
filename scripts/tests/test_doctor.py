@@ -28,6 +28,13 @@ def load(name):
 
 doctor = load("doctor")
 
+# Capacity fixtures model an eligible lane; expiry has its own real guard suite.
+_devin_free_fixture = mock.patch('devin_free_policy.admission_open', return_value=True)
+def setUpModule():
+    _devin_free_fixture.start()
+def tearDownModule():
+    _devin_free_fixture.stop()
+
 
 def obs(**overrides):
     base = {"now": 1_000_000.0, "tick": {"at": "2026-09-26T21:00:00Z", "unhealthy": [], "error": None},
