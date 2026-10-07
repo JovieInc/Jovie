@@ -1,5 +1,4 @@
-/* This route is excluded from the public Tailwind source scan. Keep its table
-   geometry local rather than relying on an ungenerated utility. */
+/* Shared Presence geometry for creator and company adapters. */
 .table {
   table-layout: fixed;
 }
