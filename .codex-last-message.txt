@@ -1,0 +1,13 @@
+Implemented and opened draft PR [#20533](https://github.com/JovieInc/Jovie/pull/20533).
+
+- Added daily detection and Linear remediation events for terminal-red, non-draft `summer-config` PRs.
+- Preserved the Jovie-only fix loop boundary.
+- Correctly ignores superseded check attempts, drafts, pending/cancelled checks, and green PR #143.
+- Added regression coverage and updated cron documentation.
+- Verified focused tests, typecheck, control tests, actionlint, workflow references, documentation checks, and live dry-run.
+- All hosted PR checks passed.
+- Commit: `cccbbe645540ba6d97314c1eb373e651e92f3d6e`
+- PR remains draft with auto-merge disabled; worktree is clean.
+- JOV-7592 is In Review.
+
+Deviation: #138 had already merged before this run. Newer JOV-7645 authority explicitly recognizes that merge as the intended implementation, so it was not reverted or otherwise disturbed.
