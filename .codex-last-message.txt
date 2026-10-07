@@ -1,0 +1,9 @@
+Implemented and opened draft PR [#20589](https://github.com/JovieInc/Jovie/pull/20589).
+
+- Replaced the GraphQL `gh pr list` lookup with paginated REST.
+- Added a regression test that fails with the previous implementation.
+- Verified 35/35 targeted tests, Biome, actionlint, CI harness validation, secret scans, and publication hooks.
+- Commit: `62a6b1fd48`
+- Hosted CI was queued at handoff; PR remains draft and unmerged.
+
+Deviations: GBrain was unavailable as noted. Linear reauthentication prevented independently confirming its status transition; required linking markers remain intact.
