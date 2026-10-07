@@ -1,0 +1,12 @@
+NOT-SHIPPABLE: required test failure is an unrelated lane-infrastructure defect on `main`.
+
+Evidence:
+
+- Exact test with lane `gh` shim: **8 failed, 12 passed**.
+- Same unchanged test with `/usr/bin/gh`: **20 passed**.
+- The shim unconditionally invokes OpenSSL after the harness replaces `HOME`, so the signing key does not exist.
+- Existing JOV-7707 commit `e18188c6ed` fixes this exact defect, but it has not landed on `main`.
+- PR #20515 only changes the Profiles workspace flag and its regression assertion.
+- Source Validation and PR Ready have since passed on the current head after release metadata was added.
+
+Per your contract, I made no changes and did not push. The worktree remains clean at `0ff65a5f17c1c2ae1d60918b7cacad6d88e4fdbb`.
