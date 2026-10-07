@@ -844,7 +844,9 @@ describe('live rendered evaluation section', () => {
         : renderedSection(options, response);
     if (calls.length)
       expect(calls[0].timeoutMs).toBe(
-        options.requireRendered ? undefined : 300_000
+        'requireRendered' in options && options.requireRendered
+          ? undefined
+          : 300_000
       );
     expect(result).toMatchObject({ ok, section });
   });

@@ -1877,6 +1877,17 @@ function runRatchet() {
   return { ok: comparison.ok, comparison, measurement };
 }
 
+/**
+ * @param {{
+ *   timeoutMs?: number,
+ *   spawn?: (command: string, args: string[], options: import('node:child_process').SpawnSyncOptionsWithStringEncoding) => import('node:child_process').SpawnSyncReturns<string>,
+ *   storybookUrl: string,
+ *   captureDir?: string | null,
+ *   components: string[],
+ *   storyPaths?: string[],
+ *   expectedFamilies?: string[],
+ * }} options
+ */
 export function runRenderedEvaluation({
   timeoutMs,
   spawn = spawnSync,
