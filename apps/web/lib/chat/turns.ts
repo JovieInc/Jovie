@@ -10,6 +10,7 @@ import {
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 import { logger } from '@/lib/utils/logger';
 import { sanitizeConversationTitle } from './title';
+import { conversationTitleSource } from './title-source';
 import type { PersistedToolEvent } from './tool-events';
 
 export type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
@@ -112,7 +113,7 @@ function toChatMessage(row: ChatMessageCoreRow): ChatMessage {
 }
 
 function toConversationTitle(text: string): string | null {
-  return sanitizeConversationTitle(text, 50);
+  return sanitizeConversationTitle(conversationTitleSource(text).text, 50);
 }
 
 function ephemeralAssistantMessage(input: {
