@@ -265,6 +265,10 @@ The example above says one thing three times. Jovie should say it once.
 - Hover feedback should stay visual, not positional. Prefer color, border, or shadow changes. Do not make the interface jump on hover unless the motion communicates direct manipulation.
 - Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
 
+### Icon and Emoji Surfaces
+
+EVENT: icon/emoji glyphs are transparent at rest. A hover background must be circular, with equal dimensions and full rounding, owned by `IconGlyphFrame`. Keep an interactive parent's focus ring, hit target, accessible name, tooltip, and selected/pressed semantics. Do not put a rounded-square plate behind the glyph. Semantic status badges, avatars, and complete text actions keep their existing contracts. This applies to Jovie, Ovie, and generated marketing previews.
+
 ### Icon and Text Alignment
 
 - **Geometric centering is the default** for icon-and-text pairs and icon controls. It is the stable choice for Lucide and other arbitrary web SVGs, whose CSS baseline is synthesized rather than a compatible typographic metric.
@@ -801,6 +805,11 @@ shift.
 | 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox; JOV-7159 later names this root destination Home while retaining the route and outcome. | Ship now: keep `/app` as Home. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
 
 ## Component Patterns
+
+### Tooltips and History
+
+EVENT: tooltips share the canonical compact surface, viewport-safe full wrapping, and 300ms discovery/300ms warm-up timing. Default nested providers reuse the app timing scope; explicit isolated notices and fixtures retain their own timing. History titles use single-line ellipsis with reserved date/action tracks; tooltips preserve the full clean display title.
+
 
 ### Buttons
 
