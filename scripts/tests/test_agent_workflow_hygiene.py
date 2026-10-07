@@ -1775,6 +1775,31 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     assert "retention-days: 14" in receipt
 
 
+def test_triage_catch_up_survives_failed_reconciliation_with_trusted_prerequisites() -> None:
+    """Run37682841982 timed out remediation and skipped catch-up under success()."""
+    block = _job_block("fleet-gate-refresh.yml", "refresh")
+    checkout = block.split("- name: Checkout exact main gate code", 1)[1].split(
+        "- name: Setup Node.js", 1
+    )[0]
+    node_setup = block.split("- name: Setup Node.js", 1)[1].split(
+        "- name: Refresh canonical receipt", 1
+    )[0]
+    assert "id: main-checkout" in checkout
+    assert "ref: main" in checkout
+    assert "id: main-node" in node_setup
+    catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
+        "- name: Wake existing picker", 1
+    )[0]
+    condition = re.search(r"if: >-\n(.*?)\n        env:", catch_up, re.DOTALL)
+    assert condition is not None, "Default success() skips recovery after upstream failure"
+    assert " ".join(condition.group(1).split()) == (
+        "always() && steps.main-checkout.outcome == 'success' && "
+        "steps.main-node.outcome == 'success'"
+    ), "Recovery must survive upstream failure but reject failed/skipped trusted setup"
+    # The timed-out remediation must still fail the job; recovery is not a CI bypass.
+    assert "continue-on-error:" not in block
+
+
 def test_symphony_wake_requires_verified_admitted_receipt() -> None:
     """The assess job writes the exact-issue receipt before any Symphony wake,
     and the wake is conditioned on the reconciler's mutated Todo transition."""

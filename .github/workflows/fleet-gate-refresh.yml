@@ -101,11 +101,13 @@ jobs:
           permission-contents: read
           permission-pull-requests: read
       - name: Checkout exact main gate code
+        id: main-checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
       - name: Setup Node.js
+        id: main-node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -160,6 +162,12 @@ jobs:
       - name: Recover missed Linear Triage events
         # Independent of the receipt debounce and new-work admission. A missed
         # webhook must not wait for another issue edit or a main push.
+        # Preserve upstream failures while recovering after their bounded timeout.
+        # Candidate or incomplete checkout/setup must never execute this writer.
+        if: >-
+          always() &&
+          steps.main-checkout.outcome == 'success' &&
+          steps.main-node.outcome == 'success'
         env:
           RECEIPT_FILE: ${{ runner.temp }}/linear-triage-catch-up.json
         shell: bash
