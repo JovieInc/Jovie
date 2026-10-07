@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from disk_guard import ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
+import lifecycle  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
@@ -230,7 +231,7 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
         report["errors"].append(f"remove:{path}:{removed.stderr.strip()[:120]}")
 
 
-def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=subprocess.run,
+def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "backup/mac",
           date: str | None = None) -> dict:
@@ -300,17 +301,11 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
     stamp.write_text(json.dumps({"startedAt": now}))
     subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--state", str(state), "--repo", str(repo)],
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     start_new_session=True)
+                     start_new_session=True, **lifecycle.spawn_kwargs())
     return "spawned"
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--state", type=Path, default=Path(os.environ.get(
-        "LANES_STATE", Path.home() / ".local/state/jovie-lanes")))
-    parser.add_argument("--repo", type=Path, default=Path(os.environ.get(
-        "LANES_REPO", Path.home() / "devin-sweep/Jovie")))
-    args = parser.parse_args(argv)
+def guarded_main(args) -> int:
     ensure_sbin_on_path()
     home = Path.home()
     args.state.mkdir(parents=True, exist_ok=True)
@@ -330,6 +325,21 @@ def main(argv: list[str] | None = None) -> int:
         started = None
     stamp.write_text(json.dumps({"startedAt": started or time.time(), **report}, indent=1))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--state", type=Path, default=Path(os.environ.get(
+        "LANES_STATE", Path.home() / ".local/state/jovie-lanes")))
+    parser.add_argument("--repo", type=Path, default=Path(os.environ.get(
+        "LANES_REPO", Path.home() / "devin-sweep/Jovie")))
+    args = parser.parse_args(argv)
+    try:
+        with lifecycle.Guard(args.state):
+            return guarded_main(args)
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":
