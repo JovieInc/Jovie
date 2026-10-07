@@ -363,10 +363,6 @@ export interface UnifiedTableProps<TData extends RowData> {
  * Humanize a column id (e.g. "releaseDate" -> "Release date") for sort
  * provenance when no string header label is available.
  */
-function identityGroupLabel(key: string): string {
-  return key;
-}
-
 function humanizeColumnId(id: string): string {
   const words = id
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -669,7 +665,7 @@ function UnifiedTableContent<TData extends RowData>({
     useTableGrouping({
       data: rows,
       getGroupKey,
-      getGroupLabel: groupingConfig?.getGroupLabel ?? identityGroupLabel,
+      getGroupLabel: groupingConfig?.getGroupLabel ?? String,
       enabled: groupingEnabled,
       scrollRoot,
       stickyOffset,

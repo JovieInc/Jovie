@@ -134,12 +134,7 @@ export function useTableGrouping<T>({
       data.reduce(
         (groups, row) => {
           const key = getGroupKey(row);
-          // Initialize empty array for new group keys
-          if (!groups[key]) {
-            groups[key] = [];
-          }
-          // Add row to its group
-          groups[key].push(row);
+          (groups[key] ??= []).push(row);
           return groups;
         },
         {} as Record<string, T[]>
