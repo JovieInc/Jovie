@@ -330,7 +330,7 @@ describe('ChatEntityRightPanelHost', () => {
     });
   });
 
-  it('does not register the profile sidebar when preview is closed', () => {
+  it('keeps the profile drawer registered while closed so it can animate without remount', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
 
@@ -341,7 +341,12 @@ describe('ChatEntityRightPanelHost', () => {
     );
 
     const lastCall = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
-    expect(lastCall).toBeNull();
+    expect(lastCall).not.toBeNull();
+    render(lastCall as React.ReactElement);
+    expect(screen.getByTestId('chat-profile-preview-rail')).toHaveAttribute(
+      'data-shell-profile-only',
+      'true'
+    );
   });
 
   it('registers the profile sidebar when preview is open', () => {

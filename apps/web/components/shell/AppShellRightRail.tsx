@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { useOptionalPreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SHELL_RAIL_ALLOCATION } from '@/components/shell/rail-motion';
 import { cn } from '@/lib/utils';
 
@@ -26,11 +29,20 @@ export function AppShellRightRail({
   children,
   className,
 }: AppShellRightRailProps) {
+  const previewState = useOptionalPreviewPanelState();
+  const preview = previewState?.isFloating === true;
   return (
     <aside
       data-testid='app-shell-right-rail'
       data-shell-rail-motion='right'
       aria-label='Context Panel'
+      data-rail-preview={previewState?.isPreview || undefined}
+      data-rail-preview-region='right'
+      style={
+        preview
+          ? { width: 0, padding: 0, overflow: 'visible', zIndex: 30 }
+          : undefined
+      }
       className={cn(
         // The mobile RightDrawer is viewport-fixed. Keep this mount neutral
         // below lg so it cannot clip the sheet; desktop alone owns the
@@ -41,10 +53,16 @@ export function AppShellRightRail({
         // identical timing.
         SHELL_RAIL_ALLOCATION,
         'lg:rounded-(--app-shell-radius)',
+        // A mounted closed profile preserves drawer state but reserves no seam.
+        'lg:[&:has([data-shell-profile-only]_[aria-hidden=true])]:p-0',
         className
       )}
     >
-      {children}
+      <div
+        className={preview ? 'absolute right-0 top-0 h-full w-fit' : 'contents'}
+      >
+        {children}
+      </div>
     </aside>
   );
 }

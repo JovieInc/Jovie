@@ -68,6 +68,54 @@ describe('RightDrawer', () => {
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 
+  it('keeps the inspector content width stable through interrupted closes', () => {
+    const { rerender } = render(
+      <RightDrawer isOpen width={360} ariaLabel='Stable inspector'>
+        <button type='button'>Long inspector action</button>
+      </RightDrawer>
+    );
+    const action = screen.getByRole('button', {
+      name: 'Long inspector action',
+    });
+    const inner = action.closest('aside')?.firstElementChild as HTMLElement;
+    expect(inner.style.width).toBe('358px');
+    action.focus();
+    rerender(
+      <RightDrawer isOpen={false} width={360} ariaLabel='Stable inspector'>
+        <button type='button'>Long inspector action</button>
+      </RightDrawer>
+    );
+    expect(inner.style.width).toBe('358px');
+    rerender(
+      <RightDrawer isOpen width={360} ariaLabel='Stable inspector'>
+        <button type='button'>Long inspector action</button>
+      </RightDrawer>
+    );
+    expect(screen.getByRole('button', { name: 'Long inspector action' })).toBe(
+      action
+    );
+    expect(inner.style.width).toBe('358px');
+  });
+
+  it('returns focus from a closing desktop inspector to its rail toggle', () => {
+    const fixture = (isOpen: boolean) => (
+      <>
+        <button type='button' data-rail-toggle='right'>
+          Toggle inspector
+        </button>
+        <RightDrawer isOpen={isOpen} width={360} ariaLabel='Focus inspector'>
+          <button type='button'>Inside inspector</button>
+        </RightDrawer>
+      </>
+    );
+    const { rerender } = render(fixture(true));
+    screen.getByRole('button', { name: 'Inside inspector' }).focus();
+    rerender(fixture(false));
+    expect(
+      screen.getByRole('button', { name: 'Toggle inspector' })
+    ).toHaveFocus();
+  });
+
   it('handles Escape while open even when focus remains outside the drawer', () => {
     const onKeyDown = vi.fn();
 

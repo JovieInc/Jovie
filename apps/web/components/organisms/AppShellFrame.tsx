@@ -106,7 +106,11 @@ export const AppShellFrame = memo(function AppShellFrame({
           <div
             data-app-shell-main-plane='true'
             className={cn(
-              'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+              // This plane clips shell chrome; route panes own scrolling.
+              // overflow:hidden is still programmatically scrollable, so a
+              // hovering inspector's travel can let scrollIntoView move the
+              // entire header and route by 6px. Clip without a scroll box.
+              'flex min-h-0 min-w-0 flex-1 overflow-clip',
               SHELL_RAIL_MAIN_PLANE
             )}
           >
@@ -126,10 +130,18 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // frame, header, and content read as unrelated backgrounds.
                   // Founder lock 2026-09-25: one rounded, borderless, clipped
                   // panel — no border, soft elevation only.
-                  'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--app-shell-content-surface)',
+                  'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
                   'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
                 )}
               >
+                {header ? (
+                  <div
+                    data-app-shell-header='true'
+                    className='relative z-40 shrink-0'
+                  >
+                    {header}
+                  </div>
+                ) : null}
                 <div
                   data-app-shell-main-content='true'
                   // No inset here: the header spans the panel edge-to-edge so
@@ -152,7 +164,6 @@ export const AppShellFrame = memo(function AppShellFrame({
                       style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
                     />
                   ) : null}
-                  {header}
                   <div
                     data-app-shell-content-inset='true'
                     className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'

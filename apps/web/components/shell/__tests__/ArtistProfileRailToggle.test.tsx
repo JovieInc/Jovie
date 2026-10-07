@@ -5,10 +5,13 @@ import { ArtistProfileRailToggle } from '../ArtistProfileRailToggle';
 
 const toggleMock = vi.fn();
 let mockIsOpen = false;
+let mockIsPreview = false;
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({
     isOpen: mockIsOpen,
+    isPreview: mockIsPreview,
+    isPinned: mockIsOpen && !mockIsPreview,
     toggle: toggleMock,
   }),
 }));
@@ -65,6 +68,7 @@ vi.mock('@jovie/ui', () => ({
 describe('ArtistProfileRailToggle', () => {
   beforeEach(() => {
     mockIsOpen = false;
+    mockIsPreview = false;
     mockCreatorProfiles = [mockSelectedProfile];
     toggleMock.mockReset();
   });
@@ -104,6 +108,21 @@ describe('ArtistProfileRailToggle', () => {
     expect(screen.getByTestId('artist-profile-rail-toggle')).toHaveAttribute(
       'aria-label',
       'Hide Tim White profile'
+    );
+  });
+
+  it('offers pinning without claiming a transient preview is pinned', () => {
+    mockIsOpen = true;
+    mockIsPreview = true;
+    render(<ArtistProfileRailToggle />);
+    const control = screen.getByRole('button', {
+      name: 'Pin Tim White profile',
+    });
+    expect(control).toHaveAttribute('aria-pressed', 'false');
+    expect(control).toHaveAttribute('aria-expanded', 'true');
+    expect(control).toHaveAttribute(
+      'aria-controls',
+      'shell-artist-profile-rail'
     );
   });
 
