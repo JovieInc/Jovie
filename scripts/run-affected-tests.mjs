@@ -1110,6 +1110,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
   ]),
   // The merge reader is exercised by the doctor transport/window regressions.
   'scripts/lanes/merge_evidence.py',
+  // Immutable dependency classification is covered by the real lane gate tests.
+  'scripts/lanes/dependency_diff.py',
 ]);
 
 // Service ownership and maintenance qualification changes are Python controls.
@@ -1128,6 +1130,14 @@ const SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS = [
   ...AFFECTED_TEST_SELECTOR_TESTS,
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
+const DEPENDENCY_GATE_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/dependency_diff.py',
+  'scripts/lanes/lane_runner.py',
+  'scripts/tests/test_lane_runner.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1200,6 +1210,29 @@ function planAffectedTests(
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (
+    files.length === DEPENDENCY_GATE_QUALIFICATION_MANIFEST.size &&
+    files.every(file => DEPENDENCY_GATE_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...DEPENDENCY_GATE_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'dependency gate qualification proof is unavailable'
+      );
+    }
+    // Preserve the entire canonical structural Python command and its floors,
+    // plus the selector and CI plumbing tests, for this exact source closure.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
   }
   const isExactServiceCensusQualification =
     files.length === SERVICE_CENSUS_QUALIFICATION_MANIFEST.size &&
