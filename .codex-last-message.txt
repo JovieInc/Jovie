@@ -1,0 +1,9 @@
+BLOCKED
+
+- Merged `origin/main`, resolved the generated changelog conflict via `pnpm version:stamp -- --set 26.10.1`, and pushed commit `20114bb40d`.
+- PR is now mergeable and the worktree is clean.
+- Local version, desktop-release, topology, formatting, and 69 focused tests passed.
+- Hosted checks passed except [Capture changed UI](https://github.com/JovieInc/Jovie/actions/runs/37229573900/job/111516208411).
+- Root cause: unrelated transient Playwright/Chromium `Page.captureScreenshot` protocol failure in code unchanged from `main`. No unrelated changes were made.
+
+NOT-SHIPPABLE: unrelated CI infrastructure failure in the UI-capture check.
