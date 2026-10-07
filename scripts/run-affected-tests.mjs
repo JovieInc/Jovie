@@ -1100,6 +1100,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'hud',
     'disk_guard',
     'worktree_sweep',
+    'service_census',
     'hyperagent_lane',
     'execution_attempt',
     'gh_app_token',

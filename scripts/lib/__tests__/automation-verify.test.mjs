@@ -171,6 +171,32 @@ describe('merge evidence coverage selection', () => {
 });
 
 describe('lane coverage full fallback', () => {
+  it('qualifies service ownership evidence through the real branch-coverage selector', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/lanes/service_census.py',
+      'scripts/tests/test_service_census.py',
+    ]);
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    const command = buildSelectedTestCommands(plan, '1').find(
+      ([binary, args]) =>
+        binary === 'env' &&
+        args.some(arg => arg.includes('coverage run --branch'))
+    );
+    expect(command).toBeDefined();
+    expect(command[1].join(' ')).toContain(
+      'scripts/tests/test_service_census.py'
+    );
+    expect(command[1].join(' ')).toContain(
+      '*/scripts/lanes/service_census.py" --fail-under=85'
+    );
+    expect(
+      buildAffectedTestPlan([
+        'scripts/lanes/service_census.py',
+        'scripts/lanes/unknown-new.py',
+      ]).mode
+    ).toBe('full');
+  });
   it('does not treat an unknown Python peer as covered by the known lane suite', () => {
     const plan = buildAffectedTestPlan([
       'scripts/lanes/hyperagent_lane.py',
