@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { PresenceWorkspaceBoundary } from './workspace-controller';
 
-// Edit the draft, then change a scope control: the owned draft must reset.
 const meta = {
   title: 'Presence/SharedWorkspaceBoundary',
   component: PresenceWorkspaceBoundary,
@@ -11,9 +10,7 @@ const meta = {
       workspaceId: 'qa-workspace',
       target: 'creator',
     },
-    children: (
-      <input aria-label='Workspace draft' defaultValue='Scoped draft' />
-    ),
+    children: <input aria-label='Workspace draft' />,
   },
 } satisfies Meta<typeof PresenceWorkspaceBoundary>;
 export default meta;
