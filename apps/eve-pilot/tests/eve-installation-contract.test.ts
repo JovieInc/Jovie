@@ -45,7 +45,7 @@ describe('Eve installation contract', () => {
       `      ai:\n        specifier: ${packageJson.dependencies?.ai}\n`
     );
     expect(lockfile).toContain(`  ai@${packageJson.dependencies?.ai}:`);
-    expect(packageJson.dependencies?.microsandbox).toBe('0.7.6');
+    expect(packageJson.dependencies?.microsandbox).toBe('0.7.7');
     expect(lockfile).toContain(
       `      microsandbox:\n        specifier: ${packageJson.dependencies?.microsandbox}\n        version: ${packageJson.dependencies?.microsandbox}\n`
     );
