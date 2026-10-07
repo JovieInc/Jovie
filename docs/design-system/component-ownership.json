@@ -27,6 +27,48 @@
       ],
       "duplicateConstructors": ["OperatorNavigationRow", "OvieNavigationRow"]
     },
+    "presence-workspace": {
+      "owner": "apps/web/components/features/presence/workspace-controller.tsx",
+      "publicImport": "@/components/features/presence/workspace-controller",
+      "exports": [
+        "PresenceWorkspaceBoundary",
+        "usePresenceWorkspaceController"
+      ],
+      "contracts": [
+        "actor-workspace-target-isolation",
+        "shared-filter-selection"
+      ],
+      "duplicateConstructors": [
+        "usePresenceWorkspaceController",
+        "useCreatorPresenceController",
+        "useCompanyPresenceController",
+        "useOviePresenceController"
+      ]
+    },
+    "presence-status": {
+      "owner": "apps/web/components/features/presence/PresenceStatusParts.tsx",
+      "publicImport": "@/components/features/presence/PresenceStatusParts",
+      "exports": ["PresenceStatusBadge", "PresenceSignalList"],
+      "duplicateConstructors": [
+        "PresenceStatusBadge",
+        "PresenceSignalList",
+        "CompanyPresenceStatusBadge",
+        "CreatorPresenceStatusBadge"
+      ]
+    },
+    "presence-evidence": {
+      "owner": "apps/web/components/features/presence/evidence.ts",
+      "publicImport": "@/components/features/presence/evidence",
+      "exports": ["evaluatePresenceChecks", "isPresenceObservationStale"],
+      "contracts": ["unconfigured-is-not-healthy", "shared-freshness-severity"],
+      "duplicateConstructors": [
+        "evaluatePresenceChecks",
+        "isPresenceObservationStale",
+        "evaluateCreatorPresenceEvidence",
+        "evaluateCompanyPresenceEvidence",
+        "evaluateOviePresenceEvidence"
+      ]
+    },
     "application-shell": {
       "owner": "apps/web/components/organisms/AppShellFrame.tsx",
       "publicImport": "@/components/canonical",
