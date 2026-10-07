@@ -1,7 +1,7 @@
 /** Helpers for the existing JOV-INV-038/018 gates; productOntology is the owner. */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const PRODUCT_REFERENCE_SOURCE = 'apps/web/data/productOntology.ts';
@@ -16,7 +16,7 @@ export const PRODUCT_REFERENCE_KINDS = Object.freeze([
   'localized-copy',
   'illustration',
 ]);
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const requireHere = createRequire(import.meta.url);
 let ts;
 const owners = new Map();

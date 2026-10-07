@@ -49,7 +49,7 @@ describe('DashboardNav interactions', () => {
     }
   });
 
-  it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
+  it('keeps one shared New Chat link in the utility row with an expanded hit target', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
       navChildren: <button type='button'>Search</button>,
@@ -65,13 +65,16 @@ describe('DashboardNav interactions', () => {
     expect(inbox).toHaveAccessibleName('Inbox');
 
     expect(newChat).toHaveClass(
-      'size-6',
-      'rounded-full',
-      'bg-foreground',
-      'text-(--color-bg-base)'
+      'h-7',
+      'rounded-lg',
+      'w-fit',
+      'after:-inset-y-1'
     );
-    expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
-    expect(searchSlot).toHaveClass('h-9', 'shrink-0');
+    expect(newChat).toHaveTextContent('New Chat');
+    expect(newChat).toHaveAttribute('href', APP_ROUTES.CHAT);
+    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
+    expect(newChat).not.toHaveClass('bg-foreground', 'w-full');
+    expect(searchSlot).toHaveClass('min-h-9', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
     expect(searchSlot).toContainElement(inbox);
     expect(searchSlot).toContainElement(newChat);
