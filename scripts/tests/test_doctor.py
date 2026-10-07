@@ -89,6 +89,15 @@ class JudgeTest(unittest.TestCase):
         alerts = doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0 - 1801})
         self.assertIn("Summer: route work", alerts["pool-empty"])
 
+    def test_admission_repair_needs_five_sustained_minutes(self):
+        blocked = obs(eligiblePool=49, pool=0,
+                      newIssueBudgetByProvider={"claude": {"reason": "over-budget"}})
+        self.assertNotIn("admission-repair-needed", doctor.judge(blocked))
+        recent = {"admissionRepairSince": blocked["now"] - doctor.ADMISSION_REPAIR_S + 1}
+        self.assertNotIn("admission-repair-needed", doctor.judge(blocked, recent))
+        sustained = {"admissionRepairSince": blocked["now"] - doctor.ADMISSION_REPAIR_S - 1}
+        self.assertIn("on claude", doctor.judge(blocked, sustained)["admission-repair-needed"])
+
     def test_no_landing_needs_work_and_busy_slots(self):
         self.assertEqual(doctor.judge(obs(lastLandingAge=None, busy=0)), {})
         self.assertEqual(doctor.judge(obs(lastLandingAge=None, pool=0), {"poolEmptySince": 1_000_000.0}), {})
@@ -100,6 +109,15 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(doctor.judge(obs(**{**idle, "worktrees": 2}, lastWorkAge=None)), {})
         self.assertIn("workers exit on claim", doctor.judge(obs(**idle, lastWorkAge=301))["spawn-exit"])
         self.assertIn("spawn-exit", doctor.judge(obs(**idle, lastWorkAge=None)))
+
+    def test_fresh_slot_leases_do_not_inherit_an_old_completion_age(self):
+        fresh = obs(eligiblePool=59, busy=4, lastWorkAge=505 * 60,
+                    leaseAgesComplete=True, oldestLeaseAge=13)
+        self.assertNotIn("workers-without-completions", doctor.judge(fresh))
+        stale = doctor.judge({**fresh, "oldestLeaseAge": 61 * 60})
+        self.assertIn("oldest current lease 61m", stale["workers-without-completions"])
+        unknown = doctor.judge({**fresh, "leaseAgesComplete": False, "oldestLeaseAge": 13})
+        self.assertIn("current lease ages unknown", unknown["workers-without-completions"])
 
     def test_spawn_exit_ignores_workers_that_reached_the_claim_scan_cleanly(self):
         """Workers spawning and exiting because the pool held nothing claimable is not the
@@ -281,8 +299,10 @@ class ReconcileTest(unittest.TestCase):
 
     def test_admission_alarm_survives_unknown_inventory_until_observed_recovery(self):
         observed = obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "over-budget"}})
-        alerts = doctor.judge(observed)
-        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, observed, "gem")}
+        started = observed["now"] - doctor.ADMISSION_REPAIR_S - 1
+        alerts = doctor.judge(observed, {"admissionRepairSince": started})
+        prior = {"admissionRepairSince": started, "alerts": alerts,
+                 "conditions": doctor.condition_receipts(alerts, {}, observed, "gem")}
         for unknown in (obs(eligiblePool=None, pool=None, newIssueBudgetByProvider={}),
                         obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "pr-inventory-unavailable"}})):
             carried = doctor.judge(unknown, prior)
@@ -295,7 +315,8 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(receipts["admission-repair-needed"]["state"], "resolved")
 
     def test_busy_scanners_without_completions_require_diagnosis_not_more_slots(self):
-        observed = obs(eligiblePool=59, busy=5, lastWorkAge=20482)
+        observed = obs(eligiblePool=59, busy=5, lastWorkAge=20482,
+                       leaseAgesComplete=True, oldestLeaseAge=7200)
         alerts = doctor.judge(observed)
         receipt = doctor.condition_receipts(alerts, {}, observed, "gem")["workers-without-completions"]
         self.assertEqual(receipt["recovery"]["action"], "verify-process-and-fenced-repair-ownership")
@@ -942,12 +963,27 @@ class RunnablePoolTest(unittest.TestCase):
                         mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
                     capacity = doctor.host_capacity(lane.Host(state=state), lane)
                 self.assertEqual(capacity, {"devin": {"slots": 4, "running": 0, "base": 4},
-                    "codex": {"slots": 0, "running": 1, "base": 0}, "claude": {"slots": 0, "running": 0, "base": 0}})
+                    "codex": {"slots": 0, "running": 1, "base": 0,
+                              "leaseAgesComplete": False, "oldestLeaseAge": None},
+                    "claude": {"slots": 0, "running": 0, "base": 0}})
                 feed_lane = SimpleNamespace(HOST="mac", provider_throughput=throughput_stub)
                 feed = doctor.status_feed(SimpleNamespace(state=state), feed_lane,
                                           obs(capacityByProvider=capacity), {}, {})
                 self.assertEqual((feed["running"], feed["idle"]), (1, 4))
                 self.assertNotIn("retired", feed["lanes"])
+
+    def test_capacity_reports_the_current_fenced_lease_age(self):
+        lane = load("lane_runner")
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            host = lane.Host(state=state)
+            with mock.patch.object(lane, "now_iso", return_value="1970-01-01T00:01:40Z"), \
+                    mock.patch.object(lane, "load_providers", return_value={"devin": {"slots": 1}}):
+                lease = lane.Locked(state / "slots/devin.0.lock", blocking=False)
+                capacity = doctor.host_capacity(host, lane, now=150)
+            lease.release()
+        self.assertEqual(capacity["devin"], {"slots": 1, "running": 1, "base": 1,
+                                             "leaseAgesComplete": True, "oldestLeaseAge": 50})
 
 class SloFeedTest(unittest.TestCase):
     def test_feed_passes_the_slo_block_through(self):

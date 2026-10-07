@@ -55,6 +55,7 @@ import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
+import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -997,23 +998,34 @@ class Change:
     deleted: int
 
 
-def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES) -> list[str]:
+def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES, *,
+               worktree: Path | None = None, pr: dict | None = None) -> list[str]:
     """Deterministic checks on the diff itself; returns failure reasons (empty = pass)."""
+    return gate_assessment(changes, max_reviewable_lines, worktree=worktree, pr=pr)[0]
+
+
+def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES, *,
+                    worktree: Path | None = None, pr: dict | None = None) -> tuple[list[str], dict | None]:
+    """Retain the same bound evidence that justifies a version-chore classification."""
     if not changes:
-        return ["empty-diff"]
+        return ["empty-diff"], None
     failures = []
+    versions = None
     paths = [change.path for change in changes]
     if any(SECRET_FILE.search(path) for path in paths):
         failures.append("secret-like-file-changed")
     code = [p for p in paths if not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
     if code and not any(TEST_FILE.search(p) for p in paths):
-        failures.append("code-change-without-test")
+        versions = (dependency_diff.classify(worktree, pr.get("headRefOid"), paths, pr)
+                    if worktree is not None and isinstance(pr, dict) else None)
+        if versions is None:
+            failures.append("code-change-without-test")
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
         failures.append("lockfile-without-manifest")
     reviewable = sum(c.added + c.deleted for c in changes if not GENERATED.search(c.path))
     if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
-    return failures
+    return failures, versions
 
 
 def not_shippable_reason(output: str) -> str | None:
@@ -1660,10 +1672,22 @@ class Locked:
     """flock-held file: released by the kernel if the holder dies, so no stale locks."""
     def __init__(self, path: Path, blocking: bool):
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.handle = open(path, "w")
+        # A contender must not erase the current owner's acquisition receipt before
+        # failing LOCK_NB.  The doctor uses that receipt to distinguish a newly busy
+        # slot from a worker that has made no progress for an hour.
+        self.handle = open(path, "a+")
         try:
             fcntl.flock(self.handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
             self.held = True
+            try:
+                self.handle.seek(0)
+                self.handle.truncate()
+                self.handle.write(json.dumps({"pid": os.getpid(), "host": HOST, "acquiredAt": now_iso()}))
+                self.handle.flush()
+            except OSError:
+                # The kernel lease is still authoritative.  Missing metadata keeps
+                # the doctor's diagnosis degraded instead of forfeiting ownership.
+                pass
         except BlockingIOError:
             self.held = False
 
@@ -2371,7 +2395,12 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
 
 
 GATE_RESULT_SCHEMA = "jovie.lane-gate-result/v1"
-GATE_POLICY_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+def gate_policy_digest() -> str:
+    return hashlib.sha256(Path(__file__).read_bytes() + b"\0dependency_diff\0" +
+                          Path(dependency_diff.__file__).read_bytes()).hexdigest()
+
+
+GATE_POLICY_DIGEST = gate_policy_digest()
 
 
 @dataclass
@@ -2391,6 +2420,14 @@ def reserve_gate(host: Host, pr: dict) -> GateClaim | None:
 
 def terminal_gate(pr: dict, verified: dict, sensitive: bool = False) -> dict | None:
     result = verified.get(f"{pr['number']}:{pr['headRefOid']}") if isinstance(verified, dict) else None
+    if isinstance(result, dict) and result.get("dependencyVersionDiff") is not None:
+        versions = result["dependencyVersionDiff"]
+        if (not isinstance(versions, dict) or versions.get("schema") != "jovie-dependency-version-diff/v1"
+                or not dependency_diff.SHA.fullmatch(str(versions.get("baseSha", "")))
+                or not isinstance(versions.get("manifests"), list) or not versions["manifests"]
+                or dependency_diff.metadata_digest(pr) is None or versions.get("headSha") != pr["headRefOid"]
+                or versions.get("metadataDigest") != dependency_diff.metadata_digest(pr)):
+            return None
     # Old SHA strings were written at claim time, so they cannot certify anything.
     if (isinstance(result, dict) and result.get("schema") == GATE_RESULT_SCHEMA
             and result.get("headSha") == pr["headRefOid"]
@@ -2520,7 +2557,10 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
         raise RepairStopped("gate-checkout-head-mismatch", pr, "before-gate-checks")
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
-    reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
+    reasons, versions = gate_assessment(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES,
+                                       worktree=worktree, pr=pr)
+    if versions is not None:
+        result["dependencyVersionDiff"] = versions
     evidence = []
     # The caller retains this same receipt if a later authority read refuses.
     result.update(changedFiles=len(changes), reasons=reasons)
@@ -2561,6 +2601,12 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
                 seat.release()
         result["reasons"] = reasons
     live = require_gate_authority(host, pr, "after-gate", sensitive)
+    if result.get("dependencyVersionDiff") is not None:
+        live_reasons, live_versions = gate_assessment(changes,
+            SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES, worktree=worktree, pr=live)
+        reasons.extend(reason for reason in live_reasons if reason not in reasons)
+        if live_versions != result["dependencyVersionDiff"]:
+            reasons.append("dependency-version-evidence-changed")
     checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
     if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
         raise RepairStopped("gate-checkout-head-mismatch", live, "after-gate")
@@ -3560,7 +3606,7 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
-REPAIR_TARGET_FIELDS = """number title state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+REPAIR_TARGET_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
 commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
 totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
@@ -3633,6 +3679,7 @@ def reconcile_fix_target(pr: dict) -> dict | None:
             ownership = {key: normalized[key] for key in
                          ("number", "state", "headRefOid", "headRefName", "isInMergeQueue",
                           "isCrossRepository", "isDraft", "mergeStateStatus", "reviewDecision", "labels")}
+            ownership["dependencyMetadataDigest"] = normalized["dependencyMetadataDigest"]
             if anchor is not None and ownership != anchor:
                 return None  # Never splice checks across a head, queue, review or hold transition.
             anchor = ownership
@@ -3721,6 +3768,7 @@ def repair_target_node(pr: dict, live) -> dict | None:
                             or (check["conclusion"] is not None and not isinstance(check["conclusion"], str))))):
                     return None
         fresh = {**pr, **live, "labels": labels["nodes"], "statusCheckRollup": checks}
+        fresh["dependencyMetadataDigest"] = dependency_diff.metadata_digest(live)
         fresh.pop("commits", None)
         return fresh
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):

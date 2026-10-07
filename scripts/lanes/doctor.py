@@ -37,6 +37,7 @@ NO_LANDING_S = 6 * 3600
 # (every worker exited on claim), which looked busy to every other rule.
 NO_WORK_S = 5 * 60
 PROVIDER_IDLE_S = 5 * 60
+ADMISSION_REPAIR_S = 5 * 60
 ESCALATION_S = 10 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
@@ -79,16 +80,23 @@ def age_s(stamp: str | None, now: float) -> float | None:
 
 # ---------------------------------------------------------------- observations
 
-def host_capacity(host, lane) -> dict:
+def host_capacity(host, lane, now: float | None = None) -> dict:
     """Configured seats, including draining workers but not stale lock files."""
+    now = time.time() if now is None else now
     capacity = {}
     for name, spec in lane.load_providers().items():
         enabled = spec.get("enabled", True)
         configured = spec.get("slots", 1)
         base = host.base_slots(name, configured) if enabled else 0
         slots = max(0, host.slots(name, configured)) if enabled else 0
-        running = sum(_locked(path) for path in (host.state / "slots").glob(f"{name}.*.lock"))
-        capacity[name] = {"slots": slots, "running": running, "base": base}
+        leases = [_active_lease(path, now) for path in (host.state / "slots").glob(f"{name}.*.lock")]
+        leases = [lease for lease in leases if lease is not None]
+        row = {"slots": slots, "running": len(leases), "base": base}
+        if leases:
+            ages = [lease["age"] for lease in leases if lease.get("age") is not None]
+            row["leaseAgesComplete"] = len(ages) == len(leases)
+            row["oldestLeaseAge"] = max(ages) if ages else None
+        capacity[name] = row
     return capacity
 
 
@@ -148,7 +156,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     except Exception as error:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     account_observed_at = sample_clock()
-    capacity_by_provider = host_capacity(host, lane)
+    capacity_by_provider = host_capacity(host, lane, now)
+    busy_capacity = [row for row in capacity_by_provider.values() if row["running"]]
+    known_lease_ages = [row["oldestLeaseAge"] for row in busy_capacity
+                        if row.get("oldestLeaseAge") is not None]
     design_census = None
     linear_skipped = None
     try:
@@ -231,6 +242,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
                         for name, row in idle_exit.items() if isinstance(row, dict)},
         "worktrees": len(list((state / "worktrees").glob("*"))),
         "busy": sum(seats["running"] for seats in capacity_by_provider.values()),
+        "leaseAgesComplete": all(row.get("leaseAgesComplete") is True for row in busy_capacity),
+        "oldestLeaseAge": max(known_lease_ages) if known_lease_ages else None,
         "capacityByProvider": capacity_by_provider,
         "codex": accounts, "pool": pool, "candidatePool": candidate_pool, "poolByProvider": pool_by_provider,
         "eligiblePool": eligible_pool, "eligiblePoolByProvider": eligible_by_provider,
@@ -340,6 +353,15 @@ def _locked(path: Path) -> bool:
         return True
 
 
+def _active_lease(path: Path, now: float) -> dict | None:
+    """Current kernel ownership plus best-effort acquisition age from its fenced writer."""
+    if not _locked(path):
+        return None
+    owner = read_json(path, {})
+    age = age_s(owner.get("acquiredAt"), now)
+    return {"age": max(0.0, age) if age is not None else None}
+
+
 def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     """The tick attempted recovery, but no worker owns any configured slot."""
     capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
@@ -414,6 +436,22 @@ def new_work_empty(obs: dict) -> bool:
                     for row in budgets.values()))
 
 
+def admission_repair_holds(obs: dict) -> list[str] | None:
+    """Providers whose known PR budgets block an otherwise qualified pool.
+
+    A transient cap is normal backpressure while existing PR recovery starts. Unknown
+    inventory cannot prove either a new alarm or recovery of an existing one.
+    """
+    budgets = obs.get("newIssueBudgetByProvider") or {}
+    if obs.get("eligiblePool") is None or obs.get("pool") is None or any(
+            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
+        return None
+    if not obs.get("eligiblePool") or obs.get("pool") != 0:
+        return []
+    return sorted(name for name, budget in budgets.items()
+                  if budget.get("reason") in {"over-budget", "terminal-pr-backlog"})
+
+
 # ---------------------------------------------------------------- judgement
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -458,22 +496,26 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         prior_alarm = ((previous or {}).get("alerts") or {}).get("no-landing")
         if prior_alarm:
             alerts["no-landing"] = prior_alarm
-    if busy and waiting and isinstance(obs.get("lastWorkAge"), (int, float)) and obs["lastWorkAge"] > 3600:
+    current_lease_stale = (obs.get("leaseAgesComplete") is not True
+                           or (isinstance(obs.get("oldestLeaseAge"), (int, float))
+                               and obs["oldestLeaseAge"] > 3600))
+    if (busy and waiting and isinstance(obs.get("lastWorkAge"), (int, float))
+            and obs["lastWorkAge"] > 3600 and current_lease_stale):
+        lease_age = ("current lease ages unknown" if obs.get("leaseAgesComplete") is not True else
+                     f"oldest current lease {int(obs['oldestLeaseAge'] // 60)}m")
         alerts["workers-without-completions"] = (
             f"{busy} slot leases occupied but no completed run for {int(obs['lastWorkAge'] // 60)}m; "
-            "check current processes, fenced ownership and repair holds before adding workers")
-    budgets = obs.get("newIssueBudgetByProvider") or {}
-    inventory_holds = [name for name, budget in budgets.items()
-                       if budget.get("reason") in {"over-budget", "terminal-pr-backlog"}]
-    if obs.get("eligiblePool") and obs.get("pool") == 0 and inventory_holds:
+            f"{lease_age}; check current processes, fenced ownership and repair holds before adding workers")
+    inventory_holds = admission_repair_holds(obs)
+    prior_admission_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
+    blocked_since = (previous or {}).get("admissionRepairSince")
+    if inventory_holds and (prior_admission_alarm or (
+            isinstance(blocked_since, (int, float)) and obs["now"] - blocked_since >= ADMISSION_REPAIR_S)):
         alerts["admission-repair-needed"] = (
             f"{obs['eligiblePool']} qualified issues await PR inventory recovery on {', '.join(sorted(inventory_holds))}; "
             "repair existing owned PRs or reconcile held dependencies; retain concurrency and retry limits")
-    elif obs.get("eligiblePool") is None or obs.get("pool") is None or any(
-            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
-        prior_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
-        if prior_alarm:
-            alerts["admission-repair-needed"] = prior_alarm
+    elif inventory_holds is None and prior_admission_alarm:
+        alerts["admission-repair-needed"] = prior_admission_alarm
     if obs.get("lastWorkAge") is None:
         prior_alarm = ((previous or {}).get("alerts") or {}).get("workers-without-completions")
         if prior_alarm:
@@ -598,7 +640,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                 or any(row.get("reason") == "pr-inventory-unavailable"
                        for row in (obs.get("newIssueBudgetByProvider") or {}).values())):
             source_status = "unknown"
-        if key == "workers-without-completions" and obs.get("lastWorkAge") is None:
+        if key == "workers-without-completions" and (obs.get("lastWorkAge") is None
+                or obs.get("leaseAgesComplete") is not True):
             source_status = "unknown"
         if key == "github-quota" and obs.get("githubRemaining") is None:
             source_status = "unknown"
@@ -640,7 +683,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                          "nextAction": "none", "terminalOutcome": "health-proven"}
         fields = {"github-quota": ("githubRemaining",),
                   "linear-down": ("linearError", "linearSkipped", "pool", "eligiblePool"),
-                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider")}
+                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider"),
+                  "workers-without-completions": ("busy", "lastWorkAge", "leaseAgesComplete", "oldestLeaseAge")}
         if key in fields:
             receipts[key]["source"] = {**old.get("source", {}), "status": "healthy",
                                        "observedAt": epoch_iso(now), "freshnessSeconds": 0}
@@ -1093,6 +1137,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]
     else:
         previous["poolEmptySince"] = None
+    repair_holds = admission_repair_holds(obs)
+    if repair_holds:
+        previous["admissionRepairSince"] = previous.get("admissionRepairSince") or obs["now"]
+    elif repair_holds is not None or not (previous.get("alerts") or {}).get("admission-repair-needed"):
+        previous["admissionRepairSince"] = None
     previous["providerIdleSince"] = provider_idle_since(obs, previous)
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     alerts = judge(obs, previous)
@@ -1106,6 +1155,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
     result["poolEmptySince"] = previous["poolEmptySince"]
+    result["admissionRepairSince"] = previous["admissionRepairSince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()
