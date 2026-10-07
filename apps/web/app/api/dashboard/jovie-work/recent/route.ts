@@ -5,12 +5,14 @@ import { captureError } from '@/lib/error-tracking';
 import { recentJovieWorkQuerySchema } from '@/lib/validation/schemas/dashboard/jovie-work';
 
 const CACHE_HEADERS = {
-  'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+  'Cache-Control': 'private, no-store',
 } as const;
 
 export const GET = withDashboardRoute(async (ctx, request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const parsed = recentJovieWorkQuerySchema.safeParse({
+    profileId: searchParams.get('profileId') ?? undefined,
+    phase: searchParams.get('phase') ?? undefined,
     limit: searchParams.get('limit') ?? undefined,
     range: searchParams.get('range') ?? undefined,
   });
@@ -22,7 +24,14 @@ export const GET = withDashboardRoute(async (ctx, request: NextRequest) => {
     );
   }
 
-  const { limit, range } = parsed.data;
+  const { limit, range, profileId, phase } = parsed.data;
+
+  if (profileId && profileId !== ctx.profile.id) {
+    return NextResponse.json(
+      { error: 'Profile context changed. Reload your inbox.' },
+      { status: 409, headers: CACHE_HEADERS }
+    );
+  }
 
   try {
     const items = await loadJovieWorkFeed({
@@ -30,6 +39,7 @@ export const GET = withDashboardRoute(async (ctx, request: NextRequest) => {
       creatorProfileId: ctx.profile.id,
       limit,
       range,
+      phase,
     });
 
     return NextResponse.json(
