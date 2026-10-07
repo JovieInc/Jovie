@@ -6,6 +6,27 @@ import {
 } from './title';
 
 describe('sanitizeConversationTitle', () => {
+  it('preserves quoted subject names and apostrophes while removing a whole-title quote wrapper', () => {
+    expect(sanitizeConversationTitle('Seaside Heights "Live"')).toBe(
+      'Seaside Heights "Live"'
+    );
+    expect(sanitizeConversationTitle("'Tis a new release")).toBe(
+      "'Tis a new release"
+    );
+    expect(sanitizeConversationTitle('"Seaside Heights"')).toBe(
+      'Seaside Heights'
+    );
+  });
+
+  it('truncates long Unicode titles at whole grapheme boundaries', () => {
+    expect(sanitizeConversationTitle('👩🏽‍🎤'.repeat(10), 6)).toBe(
+      '👩🏽‍🎤'.repeat(3) + '...'
+    );
+    expect(sanitizeConversationTitle('e\u0301'.repeat(10), 6)).toBe(
+      'e\u0301'.repeat(3) + '...'
+    );
+  });
+
   it('renders skill and entity tokens as readable title text', () => {
     expect(
       sanitizeConversationTitle(
