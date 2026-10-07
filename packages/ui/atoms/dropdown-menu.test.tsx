@@ -361,6 +361,29 @@ describe('DropdownMenu', () => {
   });
 });
 
+describe('DropdownMenu content viewport fit', () => {
+  it('clamps root content into the viewport rect Radix reports as available', () => {
+    render(
+      <DropdownMenu open>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent data-testid='fit-content'>
+          <DropdownMenuItem>Profile</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+    const style = screen.getByTestId('fit-content').getAttribute('style') ?? '';
+    expect(style).toContain(
+      'max-width: var(--radix-dropdown-menu-content-available-width)'
+    );
+    expect(style).toContain(
+      'min-width: min(12rem, var(--radix-dropdown-menu-content-available-width))'
+    );
+    expect(style).toContain(
+      'max-height: min(24rem, var(--radix-dropdown-menu-content-available-height))'
+    );
+  });
+});
+
 describe('DropdownMenu submenu viewport fit', () => {
   it('narrows submenus into the width Radix reports as available', () => {
     render(
