@@ -6674,6 +6674,62 @@ process.stdout.write(JSON.stringify({ loaded: typeof metrics.computeMetrics === 
         self.assertEqual(json.loads(result.stdout)['blockers'], ['evidence-unavailable'])
 
 
+class RemediationEventRecoveryTest(unittest.TestCase):
+    def setUp(self):
+        from scripts.tests.test_remediation import linear_issue, providers
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.host = lane.Host(state=root, repo=root)
+        self.issue = linear_issue('JOV-1', 'delivery-stalled', title='Gem delivery stalled')
+        self.linear = SimpleNamespace(gql=lambda *_: {}, comment=lambda *_: None)
+        for target, value in [('fetch_labeled_events', [self.issue]), ('load_providers', providers()),
+                              ('cooling', False), ('provider_healthy', True)]:
+            mock = patch.object(lane, target, return_value=value)
+            mock.start()
+            self.addCleanup(mock.stop)
+
+    def test_completed_event_recurrence_dispatches_one_owner_after_restart(self):
+        lane.save_escalation(self.host, {'events': {'delivery-stalled': {
+            'issueId': self.issue['id'], 'status': 'done', 'attempts': []}}})
+        report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(report['eventsClaimed'], 1)
+        first = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(first.identifier, 'JOV-1')
+        before = lane.load_escalation(self.host)['events']['delivery-stalled']
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        after = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(after['attempts'], before['attempts'])
+        self.assertEqual(after['claimedAt'], before['claimedAt'])
+
+    def test_concurrent_terminal_receipt_and_attempts_win_whole_row(self):
+        lane.save_escalation(self.host, {'events': {'delivery-stalled': {
+            'issueId': self.issue['id'], 'status': 'done', 'attempts': []}}})
+        terminal = {'issueId': self.issue['id'], 'status': 'exhausted', 'running': False,
+                    'attempts': [{'kind': 'model', 'lane': 'codex', 'head': 'delivery-stalled'}],
+                    'receipt': 'newer-worker-finish'}
+        def finish(*_):
+            lane.save_escalation(self.host, {'events': {'delivery-stalled': terminal,
+                                  'other': {'status': 'claimed', 'running': True}}})
+        with patch.object(lane, '_apply_event_plan', side_effect=finish):
+            report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(lane.load_escalation(self.host)['events']['delivery-stalled'], terminal)
+        self.assertTrue(lane.load_escalation(self.host)['events']['other']['running'])
+        self.assertEqual(report['eventsExhausted'], 1)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+
+    def test_exhausted_attempts_are_not_reset_by_recurrence(self):
+        attempts = [{'kind': 'model', 'lane': name, 'head': 'delivery-stalled', 'at': 1}
+                    for name in ('codex', 'devin')]
+        lane.save_escalation(self.host, {'events': {'delivery-stalled': {
+            'issueId': self.issue['id'], 'status': 'done', 'attempts': attempts}}})
+        report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(report['eventsExhausted'], 1)
+        self.assertEqual(lane.load_escalation(self.host)['events']['delivery-stalled']['attempts'], attempts)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+
+
 class BundledAdmissionTest(unittest.TestCase):
     def test_transport_keeps_canonical_holds_pagination_and_fail_closed_reads(self):
         node = shutil.which("node")

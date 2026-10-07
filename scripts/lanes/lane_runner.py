@@ -3292,6 +3292,8 @@ def claim_remediation_events(host: Host, linear) -> dict:
         return provider_healthy(spec)
 
     data = load_escalation(host)
+    # Freeze the read version before the planner mutates nested event metadata.
+    baseline = json.loads(json.dumps(data.get("events") or {}))
     plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
                                            healthy=healthy, cooled=cooled)
     _apply_event_plan(linear, plan)
@@ -3299,29 +3301,16 @@ def claim_remediation_events(host: Host, linear) -> dict:
     try:
         current = load_escalation(host)
         previous = current.get("events") or {}
-        merged = plan["events"]
-        for fingerprint, row in merged.items():
-            prior = previous.get(fingerprint) or {}
-            if not isinstance(prior, dict):
-                continue
-            # A worker can finish while this plan was being built. Keep that outcome.
-            if prior.get("status") in {"done", "exhausted"} and row.get("status") not in {"done", "exhausted"}:
-                row["status"] = prior["status"]
-                row["running"] = False
-                row["lane"] = prior.get("lane")
-                row["release"] = prior.get("release", False)
-            elif prior.get("release") and not row.get("release"):
-                row["release"] = True
-                row["running"] = False
-                row["lane"] = None
-                row["status"] = prior.get("status") or row.get("status")
-            elif prior.get("running") and not row.get("release"):
-                row["running"] = True
-                row["claimedAt"] = prior.get("claimedAt")
-                row["lane"] = prior.get("lane", row.get("lane"))
-                row["status"] = prior.get("status", row.get("status"))
+        merged = dict(previous)
+        for fingerprint, row in plan["events"].items():
+            # A new worker claim/finish or another planner wins the whole row,
+            # including its attempts. An unchanged terminal row may transition
+            # only as allowed by the existing recurrence/cap/cooldown planner.
+            if previous.get(fingerprint) == baseline.get(fingerprint):
+                merged[fingerprint] = row
         current["events"] = merged
         save_escalation(host, current)
+        plan["events"] = merged
     finally:
         lock.release()
     summary = remediation.events_summary({"events": plan["events"]})
