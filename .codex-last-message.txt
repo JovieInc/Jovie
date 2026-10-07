@@ -1,0 +1,20 @@
+Implemented and opened draft PR [#20515](https://github.com/JovieInc/Jovie/pull/20515).
+
+Handoff:
+
+- Enabled `PROFILES_WORKSPACE` by default so Identity resolves to `/app/presence`.
+- Updated the registry regression test; confirmed it failed before the runtime change.
+- Commit: `0ff65a5f17c1c2ae1d60918b7cacad6d88e4fdbb`
+- Changed [contracts.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T023936Z-JOV-7623-codex-f0860e/apps/web/lib/flags/contracts.ts:57) and [feature-flags-registry.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T023936Z-JOV-7623-codex-f0860e/apps/web/tests/unit/lib/feature-flags-registry.test.ts:100).
+
+Verified:
+
+- Vitest: 8/8 passed
+- Biome: passed
+- Monorepo typecheck: 18/18 tasks passed
+- Pre-commit/publication hooks: passed
+- Hosted Source Validation, Exact-head Coverage, Migration Guard, Security Evidence, and PR Ready: passed
+
+The PR remains draft and unmerged as required. Initial CI failed only because the PR lacked changelog-decision metadata; that was corrected and the exact-head rerun passed.
+
+Deviation: GBrain was unavailable, and Linear could not be transitioned to In Review because both the local credential and connected app authentication were unavailable.
