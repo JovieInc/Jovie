@@ -1,0 +1,17 @@
+Implemented and published JOV-7588.
+
+- Draft PR: [#20545](https://github.com/JovieInc/Jovie/pull/20545)
+- Commit: `41805e9797 fix(lanes): stop conflict label thrash`
+- Prevents relabeling fix-exhausted or actively claimed heads.
+- Retains repair labels until a verified resolution push, then removes them.
+- Linear issue moved to **In Review**.
+
+Verified:
+
+- 111 event tests and 94 subtests passed.
+- 4 focused lane-runner tests passed.
+- All 18 typecheck tasks passed.
+- Hosted PR checks are green.
+- Branch is clean and synchronized with the remote.
+
+Concern: a broader lane-runner sweep exposed five pre-existing test-isolation failures involving live runtime state. Tracked separately as JOV-7817 and linked to the PR. GBrain was unavailable as noted; repository evidence was used.
