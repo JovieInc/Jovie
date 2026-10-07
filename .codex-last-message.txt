@@ -1,0 +1,10 @@
+Implemented and shipped to draft PR [#20639](https://github.com/JovieInc/Jovie/pull/20639).
+
+- Removed deprecated `preferredRegion` from the [catch-all route](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T173959Z-JOV-7877-codex-e8ebb4/apps/web/app/[username]/[...slug]/page.tsx).
+- Added regression coverage and registered the route under existing SmartLink screen certification.
+- Verified Vitest 22/22, invariant tests 82/82, Biome, typecheck 18/18, screen-registration gate, and production build.
+- Confirmed the deprecation warning is absent.
+- All hosted PR checks pass; PR remains draft against `main`.
+- JOV-7877 is In Review.
+
+Concerns: none. Deviation: GBrain was unavailable as noted in the task context.
