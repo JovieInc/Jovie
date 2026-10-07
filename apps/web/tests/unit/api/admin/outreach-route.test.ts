@@ -137,6 +137,8 @@ vi.mock('@/lib/db/schema/leads', () => ({
     claimTokenExpiresAt: 'claim-token-expires-at',
     instantlyLeadId: 'instantly-lead-id',
     outreachQueuedAt: 'outreach-queued-at',
+    outreachConsentAt: 'outreach-consent-at',
+    outreachConsentSource: 'outreach-consent-source',
     dmSentAt: 'dm-sent-at',
     firstContactedAt: 'first-contacted-at',
     lastContactedAt: 'last-contacted-at',
@@ -228,6 +230,8 @@ function approvedLedger(lead: {
 describe('GET /api/admin/outreach', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAnd.mockImplementation(() => 'and-clause');
+    mockIsNotNull.mockImplementation(() => 'not-null-clause');
     vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
     mockSelect.mockReset();
     mockSelect.mockImplementation(() => ({
@@ -266,6 +270,10 @@ describe('GET /api/admin/outreach', () => {
     const legacyRows = [
       { id: 'lead-1', createdAt: new Date('2025-01-01T00:00:00.000Z') },
     ];
+    const normalPendingWhere = vi.fn().mockResolvedValue([{ total: 1 }]);
+    const legacyPendingWhere = vi.fn().mockResolvedValue([{ total: 1 }]);
+    mockAnd.mockImplementation((...clauses: unknown[]) => ({ clauses }));
+    mockIsNotNull.mockImplementation(column => `not-null:${column}`);
 
     mockSelect
       .mockImplementationOnce(() => ({
@@ -290,7 +298,7 @@ describe('GET /api/admin/outreach', () => {
       }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 1 }]),
+          where: normalPendingWhere,
         })),
       }))
       .mockImplementationOnce(() => ({
@@ -311,13 +319,13 @@ describe('GET /api/admin/outreach', () => {
       }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 1 }]),
+          where: legacyPendingWhere,
         })),
       }));
 
     const request = {
       nextUrl: new URL(
-        'http://localhost/api/admin/outreach?queue=all&page=1&limit=25'
+        'http://localhost/api/admin/outreach?queue=email&page=1&limit=25'
       ),
     } as never;
 
@@ -332,6 +340,16 @@ describe('GET /api/admin/outreach', () => {
       },
     ]);
     expect(data.pendingTotal).toBe(1);
+    expect(normalPendingWhere).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clauses: expect.arrayContaining(['not-null:outreach-consent-at']),
+      })
+    );
+    expect(legacyPendingWhere).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clauses: expect.not.arrayContaining(['not-null:outreach-consent-at']),
+      })
+    );
     expect(mockCaptureWarning).toHaveBeenCalledWith(
       '[admin/outreach] leads schema columns missing; falling back to legacy select',
       expect.any(Error),
