@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  eve@0.70.3:
+  eve@0.71.0:
     hash: vgeeehthhccalc4vunvllmlgj4
-    path: patches/eve@0.70.3.patch
+    path: patches/eve@0.71.0.patch
 
 importers:
 
@@ -26,8 +26,8 @@ importers:
         specifier: 3.36.0
         version: 3.36.0(zod@4.6.5)
       eve:
-        specifier: 0.70.3
-        version: 0.70.3(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.6)
+        specifier: 0.71.0
+        version: 0.71.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.6)
       just-bash:
         specifier: 3.6.0
         version: 3.6.0
@@ -1855,8 +1855,8 @@ packages:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
 
-  eve@0.70.3:
-    resolution: {integrity: sha512-IdIIDuGLXdYiwX8mVubu8GTOoHWsyN8m3lxePkDbXHyrqj8KppMQpYiOqAzY+St+OKPT24DicR1/HoAG90v+SA==}
+  eve@0.71.0:
+    resolution: {integrity: sha512-BQn1TBB8booio8tAnKRqxLEJPorHqWwD8DMXFUV4Cbk2TF9XCqqlFpasjxURHoW58G/rq5S6sx2LafpfAmAGVQ==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
@@ -4844,7 +4844,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.70.3(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.6):
+  eve@0.71.0(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.122(zod@4.6.5))(braintrust@3.36.0(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.6):
     dependencies:
       ai: 7.0.122(zod@4.6.5)
       nitro: 3.0.260903-beta

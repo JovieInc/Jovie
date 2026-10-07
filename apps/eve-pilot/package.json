@@ -38,7 +38,7 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "eve@0.70.3": "patches/eve@0.70.3.patch"
+      "eve@0.71.0": "patches/eve@0.71.0.patch"
     }
   }
 }
