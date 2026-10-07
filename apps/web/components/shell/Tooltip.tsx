@@ -183,6 +183,7 @@ export function Tooltip({
         <TooltipContent
           data-slot='shell-tooltip-content'
           contentVariant='rich'
+          style={{ zIndex: 'calc(var(--jovie-shell-overlay-z-index) + 1)' }}
           side={side}
           sideOffset={sideOffset}
         >
