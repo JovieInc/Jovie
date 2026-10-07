@@ -35,7 +35,7 @@ for (const theme of ['dark', 'light'] as const) {
           })),
         };
       });
-      await testInfo.attach('dock-geometry', {
+      await testInfo.attach('dock-geometry.json', {
         body: JSON.stringify(dockWidth),
         contentType: 'application/json',
       });
