@@ -116,7 +116,20 @@
     "tables-and-lists": {
       "owner": "apps/web/components/organisms/table/index.ts",
       "publicImport": "@/components/canonical",
-      "exports": ["UnifiedTable", "UnifiedTableSkeleton"]
+      "exports": ["UnifiedTable", "UnifiedTableSkeleton"],
+      "contracts": [
+        "customer-operator-parity",
+        "grouped-pagination",
+        "sticky-offset",
+        "virtual-focus-ownership"
+      ],
+      "duplicateConstructors": [
+        "CreatorPresenceTable",
+        "CompanyPresenceTable",
+        "OviePresenceTable",
+        "useCreatorTableKeyboardNav",
+        "useCompanyTableKeyboardNav"
+      ]
     },
     "form-fields-and-buttons": {
       "owner": "packages/ui/atoms/index.ts",

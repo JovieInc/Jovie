@@ -60,6 +60,9 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain(
       '*/scripts/lanes/worktree_pool.py" --fail-under=85'
     );
+    expect(command).toContain(
+      '*/scripts/lanes/dependency_diff.py" --fail-under=95'
+    );
     expect(command).toContain('coverage run --branch -m pytest');
   });
   it('preserves the existing lane floor and enforces fenced-attempt coverage', () => {

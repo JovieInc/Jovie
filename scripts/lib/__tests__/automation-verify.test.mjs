@@ -187,6 +187,54 @@ describe('merge evidence coverage selection', () => {
   });
 });
 
+describe('dependency gate qualification plumbing', () => {
+  const files = [
+    'scripts/lanes/dependency_diff.py',
+    'scripts/lanes/lane_runner.py',
+    'scripts/tests/test_lane_runner.py',
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  it('retains full structural coverage and both plumbing suites for the exact source closure', () => {
+    const plan = buildAffectedTestPlan(files);
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    expect(plan.scriptVitestTests).toEqual(SERVICE_CENSUS_SELECTOR_TESTS);
+    expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toContain(
+      '*/scripts/lanes/dependency_diff.py" --fail-under=95'
+    );
+  });
+  it.each(files)(
+    'fails closed when qualification file %s is unreadable',
+    missing => {
+      const plan = buildAffectedTestPlan(files, {
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.lanePythonCoverage).toBe(true);
+      expect(plan.fallbackReason).toBe(
+        'dependency gate qualification proof is unavailable'
+      );
+    }
+  );
+  it.each([
+    'apps/web/lib/unrelated.ts',
+    'scripts/lanes/unknown.py',
+    'package.json',
+    'docs/unrelated.md',
+  ])('retains the full fallback for mixed peer %s', peer => {
+    const plan = buildAffectedTestPlan([...files, peer]);
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
+});
+
 describe('service census qualification plumbing', () => {
   it('qualifies the complete eight-file source shape with Python coverage and both selector suites', () => {
     const plan = buildAffectedTestPlan(SERVICE_CENSUS_QUALIFICATION_INPUTS);

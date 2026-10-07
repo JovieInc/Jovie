@@ -1248,6 +1248,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('data-table-row-mode', 'two-line');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
+      '48px'
+    );
     expect(table.parentElement).toHaveClass(
       'overflow-auto',
       'min-h-0',
