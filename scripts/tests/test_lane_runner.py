@@ -5098,6 +5098,50 @@ class LifecycleOwnershipTest(unittest.TestCase):
                 process.kill()
             process.communicate(timeout=5)
 
+    def test_drain_request_blocks_new_controller_before_any_effect(self):
+        (self.state / "lifecycle-drain.json").write_text("{malformed")
+        for command in (["update"], ["dispatch"], ["worker", "--provider", "codex"],
+                        ["gate-command", "--timeout", "1", "--", "true"]):
+            with self.subTest(command=command), patch.object(lane, "Host", return_value=self.host), \
+                    patch.object(lane, "guarded_main") as effects:
+                self.assertEqual(lane.main(command), 75)
+                effects.assert_not_called()
+
+    def test_drain_request_allows_admitted_command_to_finish(self):
+        with lane.lifecycle.Guard(self.state):
+            (self.state / "lifecycle-drain.json").write_text("operator hold")
+            result = lane.lifecycle.run([sys.executable, "-c", "print('completed')"],
+                                        capture_output=True, text=True, timeout=5)
+            self.assertEqual((result.returncode, result.stdout), (0, "completed\n"))
+            with patch.object(lane.os, "execv") as execute:
+                self.assertEqual(lane.reexec(self.host, "codex"), 0)
+                execute.assert_not_called()
+        with self.exclusive():
+            pass
+        self.assertTrue(lane.lifecycle.draining(self.state))
+
+    def test_inherited_non_gate_controllers_cannot_start_during_drain(self):
+        commands = [("reason_lane.py", ["drain"]),
+                    ("yc_corpus.py", ["refresh", "--state", str(self.state / "yc.json")]),
+                    ("worktree_sweep.py", ["--state", str(self.state)]),
+                    ("worktree_pool.py", ["--repo", str(self.state), "--fill"])]
+        with lane.lifecycle.Guard(self.state):
+            (self.state / "lifecycle-drain.json").write_text("hold")
+            for script, args in commands:
+                with self.subTest(script=script):
+                    process = subprocess.run([sys.executable, str(ROOT / "scripts/lanes" / script), *args],
+                        capture_output=True, text=True, timeout=5, **lane.lifecycle.spawn_kwargs())
+                    self.assertEqual(process.returncode, 75, process.stderr)
+        self.assertFalse((self.state / "yc.json").exists())
+        self.assertFalse((self.state / "worktree-sweep.json").exists())
+
+    def test_broken_symlink_drain_request_remains_held(self):
+        (self.state / "lifecycle-drain.json").symlink_to(self.state / "absent")
+        self.assertTrue(lane.lifecycle.draining(self.state))
+        with self.assertRaises(lane.lifecycle.AdmissionHeld):
+            with lane.lifecycle.Guard(self.state):
+                self.fail("broken hold resumed admission")
+
     def test_dispatch_worker_spawn_retains_controller_guard(self):
         with lane.lifecycle.Guard(self.state) as guard, \
                 patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \

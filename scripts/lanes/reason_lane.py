@@ -863,6 +863,8 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
             research = parse_job(job["identifier"], job["title"], job.get("description") or "")["decisionType"] == "research"
             return ready["research" if research else "decision"] and budget_allows(host.state, config, research)
         while True:
+            if lifecycle.draining(host.state):
+                return {"status": "operator-draining", "done": done}
             jobs = queued_jobs(linear, config["label"])
             issue = next((job for job in jobs if job["identifier"] not in attempted and runnable(job)), None)
             if issue is None:
@@ -870,6 +872,8 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
                 return {"status": "budget-exhausted" if waiting else "idle", "done": done}
             claim = lane.Locked(host.state / "claim.lock", blocking=True)
             try:
+                if lifecycle.draining(host.state):
+                    return {"status": "operator-draining", "done": done}
                 if linear.state_of(issue["id"]) != "Todo":
                     attempted.add(issue["identifier"])
                     continue  # another host took it; a cached queue must not spin on it

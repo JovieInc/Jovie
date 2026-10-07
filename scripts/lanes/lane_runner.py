@@ -5041,6 +5041,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
 
 def reexec(host: Host, name: str) -> int:
     """Slot free -> pull the next piece of work now, on whatever release is current (drain-safe)."""
+    if lifecycle.draining(host.state):
+        return 0  # admitted unit finished; do not acquire another assignment
     current = host.state / "current" / "lane_runner.py"
     lifecycle.prepare_reexec()
     os.execv(sys.executable, [sys.executable, str(current if current.exists() else Path(__file__)),
@@ -5449,7 +5451,11 @@ def guarded_main(argv: list[str] | None = None) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     try:
-        with lifecycle.Guard(Host().state):
+        host = Host()
+        arguments = sys.argv[1:] if argv is None else argv
+        with lifecycle.Guard(host.state, allow_drain=arguments[:1] == ["gate-command"]):
+            if lifecycle.draining(host.state) and arguments[:1] != ["gate-command"]:
+                return 75
             return guarded_main(argv)
     except lifecycle.AdmissionHeld as error:
         print(f"lifecycle admission held: {error}", file=sys.stderr)

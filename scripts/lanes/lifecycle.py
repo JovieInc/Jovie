@@ -24,7 +24,8 @@ class AdmissionHeld(RuntimeError):
 
 
 class Guard:
-    def __init__(self, state: Path):
+    def __init__(self, state: Path, *, allow_drain=False):
+        self.allow_drain = allow_drain
         self.state = Path(state).resolve()
         self.path = self.state / "lifecycle.lock"
         self.fd = None
@@ -42,6 +43,8 @@ class Guard:
             raise AdmissionHeld("nested lifecycle ownership")
         inherited = os.environ.get(FD_ENV)
         try:
+            if draining(self.state) and not (self.allow_drain and inherited is not None):
+                raise AdmissionHeld("operator requested natural controller drain")
             if inherited is not None:
                 if not inherited.isdecimal() or int(inherited) < 3:
                     raise AdmissionHeld("malformed inherited lifecycle descriptor")
@@ -139,3 +142,18 @@ def run(args, **kwargs):
     if check and code:
         raise subprocess.CalledProcessError(code, args, result.stdout, result.stderr)
     return subprocess.CompletedProcess(args, code, result.stdout, result.stderr)
+
+
+def draining(state):
+    """An operator hold blocks new units; admitted command helpers may finish.
+
+    No automatic expiry resumes uncertain work. Any unreadable or malformed hold
+    remains a hold until the operator reconciles and removes the exact request.
+    """
+    try:
+        (Path(state) / "lifecycle-drain.json").lstat()
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
