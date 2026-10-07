@@ -85,6 +85,25 @@ test('Presence controller and evaluator forks fail for both targets', () => {
   }
 });
 
+test('creator and company table forks fail the existing shared owner', () => {
+  for (const target of ['profiles', 'admin/presence']) {
+    for (const name of [
+      'CreatorPresenceTable',
+      'CompanyPresenceTable',
+      'useCreatorTableKeyboardNav',
+      'useCompanyTableKeyboardNav',
+    ]) {
+      assert.equal(
+        findChromeOverrideViolations(
+          `apps/web/app/app/(shell)/${target}/Workspace.tsx`,
+          `function ${name}() { return null; }`
+        ).length,
+        1
+      );
+    }
+  }
+});
+
 test('deliberate route-local duplicate fails the structural boundary', () => {
   const violations = findOwnershipViolations(
     'apps/web/app/app/(shell)/settings/page.tsx',

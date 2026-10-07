@@ -107,11 +107,17 @@ describe('UnifiedTable keyboard interaction', () => {
         hideHeader
         enableVirtualization={false}
         getRowId={row => row.id}
+        getRowTestId={row => `row-${row.id}`}
         onRowClick={vi.fn()}
       />
     );
 
-    expect(scrollIntoView).toHaveBeenCalledWith({
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    const first = screen.getByTestId('row-one');
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+    expect(screen.getByTestId('row-two')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({
       block: 'nearest',
       behavior: 'auto',
     });

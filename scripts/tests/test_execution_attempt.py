@@ -95,6 +95,29 @@ class ExecutionAttemptTest(unittest.TestCase):
         terminal = self.finish(self.ident, self.claim(now=102), "failed_known", detail, 103)
         self.assertEqual((terminal["retryDecision"], terminal["terminalState"]), ("quarantine", "quarantined"))
         self.assertEqual(len(terminal["diagnosis"]["attempts"]), 2)
+    def test_unreadable_target_keeps_attempt_spend_fence_and_repeated_failure_bounds(self):
+        detail = {"failureClass": "target_state_unavailable", "failureFingerprint": "target-read",
+                  "confidence": "unknown", "dependencies": ["codex", "github-target-state"]}
+        first = self.claim()
+        attempt.boundary(self.path, self.ident, first["fencingToken"], {"spend": 1, "mutations": 1}, 100.5, coordination=LOCAL)
+        ended = self.finish(self.ident, first, "failed_known", detail, 101)
+        self.assertEqual((ended["retryDecision"], ended["terminalState"]), ("retry", None))
+        with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"):
+            attempt.boundary(self.path, self.ident, first["fencingToken"], {}, 101.5, coordination=LOCAL)
+        second = self.claim(now=102)
+        self.assertEqual(second["attempt"], 2)
+        self.assertEqual(second["remainingBudgets"]["attempts"], 0)
+        self.assertEqual(second["remainingBudgets"]["spend"], 1)
+        self.assertNotEqual(first["fencingToken"], second["fencingToken"])
+        with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"):
+            attempt.boundary(self.path, self.ident, first["fencingToken"], {}, 102.5, coordination=LOCAL)
+        attempt.boundary(self.path, self.ident, second["fencingToken"], {"spend": 1, "mutations": 1}, 102.5, coordination=LOCAL)
+        terminal = self.finish(self.ident, second, "failed_known", detail, 103)
+        self.assertEqual((terminal["retryDecision"], terminal["terminalState"]), ("quarantine", "quarantined"))
+        self.assertEqual(terminal["remainingBudgets"]["spend"], 0)
+        self.assertEqual(terminal["remainingBudgets"]["mutations"], 0)
+        self.assertEqual(self.claim(now=104)["reason"], "generation_terminal")
+
     def test_deterministic_unknown_and_new_revision_fail_closed(self):
         deterministic = {"failureClass": "deterministic_code", "failureFingerprint": "assert:x", "costs": {}, "dependencies": []}
         self.assertEqual(self.finish(self.ident, self.claim(), "failed_known", deterministic, 101)["terminalState"], "failed_known")

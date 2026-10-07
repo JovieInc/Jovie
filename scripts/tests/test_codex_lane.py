@@ -104,6 +104,7 @@ class CurrentLoginTest(Isolated):
             f"#!{sys.executable}\nimport json,os,sys\nfrom pathlib import Path\n"
             f"root=Path({str(self.root)!r})\n"
             f"if sys.argv[1:]==['login','status']:\n print({auth!r}); sys.exit({auth_code})\n"
+            "if '--approve-for-me' in sys.argv:\n print(\"error: unexpected argument '--approve-for-me' found\"); sys.exit(2)\n"
             "assert not any(k in os.environ for k in ['OPENAI_API_KEY','OPENAI_BASE_URL','CODEX_API_KEY'])\n"
             "assert os.environ['CODEX_HOME'].endswith('existing-login')\n"
             "(root/'launch.json').write_text(json.dumps(sys.argv))\n"
@@ -124,7 +125,11 @@ class CurrentLoginTest(Isolated):
         argv = json.loads((self.root / "launch.json").read_text())
         self.assertIn('forced_login_method="chatgpt"', argv)
         self.assertIn('model_provider="openai"', argv)
-        self.assertIn("--approve-for-me", argv)
+        self.assertEqual(argv[argv.index('--sandbox') + 1], 'workspace-write')
+        self.assertIn('approval_policy="on-request"', argv)
+        self.assertIn('approvals_reviewer="auto_review"', argv)
+        self.assertNotIn("--approve-for-me", argv)
+        self.assertNotIn('approval_policy="never"', argv)
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", argv)
         self.assertEqual([json.loads(row)["account"] for row in (self.root / "receipt.jsonl").read_text().splitlines()],
                          ["current-login", "current-login"])

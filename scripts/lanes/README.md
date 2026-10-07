@@ -277,7 +277,13 @@ healthy provider, configured slots, repeated dispatch attempts, and zero workers
 is being lost. `spawn-exit` fires when workers spawn every tick but no run starts or ends
 and no worktree exists; a worker that finishes its claim scan with nothing to do records a
 clean exit in `worker-idle.json`, so the alert only means workers are dying before or during
-the claim — a clean 'nothing claimable' exit is not a deadlock. Every alert also produces a generation-deduped
+the claim — a clean 'nothing claimable' exit is not a deadlock. `workers-without-completions`
+requires both an hour without a terminal run receipt and a current slot lease older than an
+hour; unknown legacy lease ages stay degraded, while newly acquired leases do not inherit an
+old completion age. `admission-repair-needed`
+requires five continuous minutes of known qualified demand blocked by an over-budget or
+terminal PR inventory, so the normal transition into existing-PR recovery does not create
+another issue. Every alert also produces a generation-deduped
 `jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
 status feed. The receipt carries its owner, affected resources, first observation, source
 freshness, ten-minute escalation deadline, recovery result, next action, and terminal
@@ -302,14 +308,19 @@ ChatGPT auth without reading credential files or discovering other accounts.
 `CODEX_LANE_CLI` may name an already installed executable when the host's PATH
 entry is broken; it does not install a CLI. API credentials are removed from the
 child environment, execution pins OpenAI plus `forced_login_method="chatgpt"`,
-and `--approve-for-me` retains the workspace sandbox and automatic approval review.
+and the supported `--sandbox workspace-write`, `approval_policy="on-request"`,
+and `approvals_reviewer="auto_review"` options retain the workspace sandbox and
+automatic approval review. The installed CLI need not support the TUI's
+`--approve-for-me` shortcut.
 An auth or rate/usage limit banks this one login and returns exit 75 to the existing
 handoff policy. This mode never rotates profiles, redeems reset credits, or probes
 private quota services. Auth status establishes login, not available plan quota.
 
 Enabling the mode and any nonzero `LANES_SLOTS_CODEX` value is a host configuration
-change, separate from landing source. Review the activation and rollback plan
-before changing the service. Existing issue/PR ownership, file-overlap admission,
+change, separate from landing source. Record the activation and rollback plan
+before changing the service. Routine repair or reactivation of the established
+shipping service uses its standing authority; genuinely new access or spend still
+requires its specific authority. Existing issue/PR ownership, file-overlap admission,
 slot limits, PR backlog budgets, capability floors, and independent security,
 review, queue and production gates still apply. Summer reasoning/notification
 failures are ancillary to `dispatch()`; they do not authorize bypassing an intake
