@@ -401,7 +401,11 @@ export function mergedUiEvidence(files, assuranceMatrix) {
     /** @type {{ rows?: { id?: string, ui?: { judgment?: string } }[] }} */ (
       assuranceMatrix
     ).rows;
-  return uiEvidenceRequirements(assuranceMatrix, [...files]).map(entry => ({
+  // The invariant registry is control-plane metadata. A queue/security entry
+  // must not invalidate product UI taste merely because the shared file also
+  // contains design invariants. Actual UI/detector paths remain authoritative.
+  const productPaths = files.filter(path => path !== 'canon/invariants.jsonl');
+  return uiEvidenceRequirements(assuranceMatrix, productPaths).map(entry => ({
     row: String(entry.row),
     failureClass: String(entry.failureClass),
     // A row without a judgment is machine-checked; taste is never assumed.
