@@ -1,0 +1,9 @@
+Implemented and opened draft PR [#20581](https://github.com/JovieInc/Jovie/pull/20581).
+
+- Updated [the audience guide](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T074715Z-JOV-6911-codex-f30ccd/apps/docs/app/docs/build-your-presence/audience/understand-audience-data/page.mdx:12) for `Unique Visitors` and `Subscribers`.
+- Quarantined it as `stale`, unverified, non-searchable, with certification proof references cleared.
+- Commit: `ac02c07ec6`
+- Pinned-Node verification passed: metadata validator, 75 docs tests, 19 analytics tests, affected-article simulation, and diff checks.
+- All 16 applicable PR checks passed; PR remains draft.
+
+Deviations: Biome ignores MDX. Linear state transition could not be confirmed because the connector requires reauthentication. The full visual-proof audit has existing corpus-wide failures and now correctly reports the obsolete screenshot as orphaned from certification.
