@@ -1070,11 +1070,11 @@ jobs:
           deploy_json=""
           export VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"
           export NEXT_PUBLIC_BUILD_SHA="$expected"
-          # A transient upload failure must not strand the release without any
-          # deployment evidence; mirror the staging deploy's bounded retry.
+          # Return after Vercel accepts the deployment; the exact-ID inspect
+          # below owns readiness, while this loop retries pre-acceptance errors.
           for deploy_attempt in 1 2 3; do
             if deploy_json="$(./node_modules/.bin/vercel deploy \
-              --prebuilt --archive=tgz --prod --skip-domain --format=json \
+              --prebuilt --archive=tgz --prod --skip-domain --no-wait --format=json \
               --env VERCEL_GIT_COMMIT_SHA \
               --env NEXT_PUBLIC_BUILD_SHA \
               "${runtime_env_args[@]}" \

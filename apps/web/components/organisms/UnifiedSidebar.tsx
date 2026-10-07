@@ -2,21 +2,14 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type PropsWithChildren, useCallback, useMemo } from 'react';
+import { type PropsWithChildren, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
-import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
@@ -27,20 +20,17 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   useSidebar,
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_BLOCK_LABEL,
   SHELL_RAIL_LABEL,
-  SHELL_RAIL_STAGE,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
-import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -49,9 +39,8 @@ import {
   paymentsNavItem,
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
+import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
-import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
@@ -73,6 +62,8 @@ export interface UnifiedSidebarProps {
   readonly section: AppShellSection;
   /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
   readonly variant?: BrandVariant;
+  /** Only transfer the collapsed browser action when a header is present. */
+  readonly headerOwnsCollapsedToggle?: boolean;
 }
 
 /** Render a group of nav items */
@@ -92,46 +83,7 @@ function SettingsNavGroup({
           isItemActive?.(item) ??
           (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
-          <ContextMenu key={item.id}>
-            <ContextMenuTrigger asChild>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive}
-                  tooltip={item.name}
-                >
-                  <Link
-                    href={item.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    className='flex w-full min-w-0 items-center gap-2'
-                  >
-                    <item.icon className='size-3.5' />
-                    <span className='truncate'>{item.name}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem
-                onSelect={async () => {
-                  const origin =
-                    globalThis.window === undefined
-                      ? BASE_URL
-                      : globalThis.location.origin;
-                  const url = `${origin}${item.href}`;
-                  const ok = await copyToClipboard(url);
-                  if (ok) {
-                    toast.success('Link copied');
-                  } else {
-                    toast.error('Failed to copy link');
-                  }
-                }}
-              >
-                <Copy className='mr-2 h-4 w-4' />
-                Copy link
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
+          <NavMenuItem key={item.id} item={item} isActive={isActive} calm />
         );
       })}
     </SidebarMenu>
@@ -143,7 +95,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
     <nav
       aria-label='OV Navigation'
-      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
+      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       {OPERATOR_NAV_SECTIONS.map(section => (
         <div key={section.label}>
@@ -220,7 +172,7 @@ function SettingsNavigation({
   return (
     <nav
       aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
+      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       <div>
         <span
@@ -250,6 +202,7 @@ function SettingsNavigation({
 
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
+  headerOwnsCollapsedToggle,
   isRouteSidebar,
   isOperatorSection,
   canSwitchWorkspaces,
@@ -259,6 +212,7 @@ function SidebarHeaderNav({
   routeBackHref = APP_ROUTES.DASHBOARD,
   routeBackLabel = 'Back to App',
 }: Readonly<{
+  headerOwnsCollapsedToggle: boolean;
   isRouteSidebar: boolean;
   isOperatorSection: boolean;
   canSwitchWorkspaces: boolean;
@@ -269,6 +223,8 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
+  const { state, isMobile, open: pinned } = useSidebar();
+  const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation } = useDashboardData();
 
   return (
@@ -278,7 +234,7 @@ function SidebarHeaderNav({
           first and centered — stays reachable. Before this, the fixed-width
           chrome pushed the toggle past the clipped rail edge and the sidebar
           could not be reopened from the rail itself (JOV-4522). */}
-      <div className={cn('min-w-0 flex-1', SHELL_RAIL_STAGE)}>
+      <RailStagedContent hidden={chromeHidden} className='min-w-0 flex-1'>
         {(() => {
           if (isRouteSidebar) {
             return (
@@ -367,42 +323,27 @@ function SidebarHeaderNav({
             </div>
           );
         })()}
-      </div>
+      </RailStagedContent>
       {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
-        <div
-          className={cn('flex items-center', SHELL_RAIL_STAGE)}
+        <RailStagedContent
+          hidden={chromeHidden}
+          className='flex items-center'
           data-sidebar-header-actions='true'
         >
           <SidebarInboxLink availability={inboxNavigation} />
           <HeaderSearchSurfaceFromContext compact />
-        </div>
+        </RailStagedContent>
       ) : null}
 
       {!isDesktop ? (
-        <SidebarCollapseButton className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto' />
+        <RailStagedContent
+          hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}
+          stage={headerOwnsCollapsedToggle}
+          className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
+        >
+          <SidebarCollapseButton />
+        </RailStagedContent>
       ) : null}
-    </div>
-  );
-}
-
-function OperatorSessionControls() {
-  const { signOut } = useAuthSafe();
-  const handleSignOut = useCallback(async () => {
-    await signOut({ redirectUrl: '/' });
-  }, [signOut]);
-
-  return (
-    <div className='px-2.5 py-0.5'>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton tooltip='Sign Out' onClick={handleSignOut}>
-            <LogOut className='size-3.5' aria-hidden='true' />
-            {/* The menu-button variant stages the last span (max-width +
-                opacity + travel); a local `hidden` would snap it (JOV-4522). */}
-            <span className='truncate'>Sign Out</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
     </div>
   );
 }
@@ -428,6 +369,7 @@ export function SidebarDock({ children }: PropsWithChildren) {
 export function UnifiedSidebar({
   section,
   variant = 'jovie',
+  headerOwnsCollapsedToggle = false,
 }: UnifiedSidebarProps) {
   const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
@@ -481,6 +423,7 @@ export function UnifiedSidebar({
         )}
       >
         <SidebarHeaderNav
+          headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
           isRouteSidebar={isRouteSidebar}
           isOperatorSection={isOperatorSection}
           canSwitchWorkspaces={canSwitchWorkspaces}
@@ -514,23 +457,14 @@ export function UnifiedSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      {section === 'ov' ? (
-        <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
-          {ambientDock}
-          <OperatorSessionControls />
-        </SidebarFooter>
-      ) : (
-        // SidebarFooter is shrink-0; with the restored full-height flex chain
-        // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
-        // absorbs free space so media and the protected account panel pin bottom.
-        <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
-          {ambientDock}
-          <SidebarIdentityGroup
-            calm={!isRouteSidebar}
-            profileHref={profileHref}
-          />
-        </SidebarFooter>
-      )}
+      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
+        {ambientDock}
+        <SidebarIdentityGroup
+          calm={!isRouteSidebar}
+          profileHref={section === 'ov' ? undefined : profileHref}
+          label={section === 'ov' ? 'Account' : undefined}
+        />
+      </SidebarFooter>
     </Sidebar>
   );
 }

@@ -20,6 +20,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
@@ -35,6 +37,7 @@ NO_LANDING_S = 6 * 3600
 # (every worker exited on claim), which looked busy to every other rule.
 NO_WORK_S = 5 * 60
 PROVIDER_IDLE_S = 5 * 60
+ADMISSION_REPAIR_S = 5 * 60
 ESCALATION_S = 10 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
@@ -271,7 +274,7 @@ def open_pr_numbers() -> set[int] | None:
     if os.environ.get("LANES_SELFTEST"):
         return None
     try:
-        result = subprocess.run(["gh", "pr", "list", "--repo", pr_events.REPO, "--state", "open", "--limit", "500",
+        result = lifecycle.run(["gh", "pr", "list", "--repo", pr_events.REPO, "--state", "open", "--limit", "500",
                                  "--json", "number", "--jq", ".[].number"], capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -287,7 +290,7 @@ def merged_prs_24h(lane, now: float) -> list[dict]:
     return merge_evidence.require_complete(merge_evidence.collect(lane.REPO_SLUG, now - 86400, now))
 
 
-def sample_merge_throughput(state: Path, now: float, run=subprocess.run) -> tuple[dict | None, str | None]:
+def sample_merge_throughput(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
     """Refresh the one-hour GitHub queue signal at most every five minutes."""
     path = Path(state) / "merge-throughput.json"
     cached = read_json(path, {})
@@ -433,6 +436,22 @@ def new_work_empty(obs: dict) -> bool:
                     for row in budgets.values()))
 
 
+def admission_repair_holds(obs: dict) -> list[str] | None:
+    """Providers whose known PR budgets block an otherwise qualified pool.
+
+    A transient cap is normal backpressure while existing PR recovery starts. Unknown
+    inventory cannot prove either a new alarm or recovery of an existing one.
+    """
+    budgets = obs.get("newIssueBudgetByProvider") or {}
+    if obs.get("eligiblePool") is None or obs.get("pool") is None or any(
+            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
+        return None
+    if not obs.get("eligiblePool") or obs.get("pool") != 0:
+        return []
+    return sorted(name for name, budget in budgets.items()
+                  if budget.get("reason") in {"over-budget", "terminal-pr-backlog"})
+
+
 # ---------------------------------------------------------------- judgement
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -487,18 +506,16 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["workers-without-completions"] = (
             f"{busy} slot leases occupied but no completed run for {int(obs['lastWorkAge'] // 60)}m; "
             f"{lease_age}; check current processes, fenced ownership and repair holds before adding workers")
-    budgets = obs.get("newIssueBudgetByProvider") or {}
-    inventory_holds = [name for name, budget in budgets.items()
-                       if budget.get("reason") in {"over-budget", "terminal-pr-backlog"}]
-    if obs.get("eligiblePool") and obs.get("pool") == 0 and inventory_holds:
+    inventory_holds = admission_repair_holds(obs)
+    prior_admission_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
+    blocked_since = (previous or {}).get("admissionRepairSince")
+    if inventory_holds and (prior_admission_alarm or (
+            isinstance(blocked_since, (int, float)) and obs["now"] - blocked_since >= ADMISSION_REPAIR_S)):
         alerts["admission-repair-needed"] = (
             f"{obs['eligiblePool']} qualified issues await PR inventory recovery on {', '.join(sorted(inventory_holds))}; "
             "repair existing owned PRs or reconcile held dependencies; retain concurrency and retry limits")
-    elif obs.get("eligiblePool") is None or obs.get("pool") is None or any(
-            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
-        prior_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
-        if prior_alarm:
-            alerts["admission-repair-needed"] = prior_alarm
+    elif inventory_holds is None and prior_admission_alarm:
+        alerts["admission-repair-needed"] = prior_admission_alarm
     if obs.get("lastWorkAge") is None:
         prior_alarm = ((previous or {}).get("alerts") or {}).get("workers-without-completions")
         if prior_alarm:
@@ -907,7 +924,7 @@ def fetch_slo(host, lane) -> dict | None:
         return record["snapshot"]
     try:
         lane.load_github_env()
-        raw = subprocess.run(
+        raw = lifecycle.run(
             ["gh", "api", "repos/JovieInc/Jovie/contents/docs/metrics/shipping-slo-latest.json",
              "-H", "Accept: application/vnd.github.raw"],
             capture_output=True, text=True, timeout=20)
@@ -1054,7 +1071,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     body.write_text(json.dumps(feed, indent=1))
     lane.load_github_env()
     if not record.get("url"):
-        created = subprocess.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
+        created = lifecycle.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
                                   "--filename", "lanes-status.json", str(body)], capture_output=True, text=True, timeout=60)
         url = (created.stdout or "").strip().splitlines()[-1] if created.returncode == 0 and created.stdout.strip() else None
         if not url:
@@ -1067,7 +1084,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         except Exception:
             pass
         return url
-    subprocess.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
+    lifecycle.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
                    capture_output=True, text=True, timeout=60)
     return record["url"]
 
@@ -1120,6 +1137,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]
     else:
         previous["poolEmptySince"] = None
+    repair_holds = admission_repair_holds(obs)
+    if repair_holds:
+        previous["admissionRepairSince"] = previous.get("admissionRepairSince") or obs["now"]
+    elif repair_holds is not None or not (previous.get("alerts") or {}).get("admission-repair-needed"):
+        previous["admissionRepairSince"] = None
     previous["providerIdleSince"] = provider_idle_since(obs, previous)
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     alerts = judge(obs, previous)
@@ -1133,6 +1155,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
     result["poolEmptySince"] = previous["poolEmptySince"]
+    result["admissionRepairSince"] = previous["admissionRepairSince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()

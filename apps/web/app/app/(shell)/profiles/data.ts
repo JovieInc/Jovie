@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import type {
+  ProfilesWorkspaceData,
+  ProfileWorkspaceSurfaceRow,
+} from '@/components/features/presence/types';
 import { db } from '@/lib/db';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import {
@@ -26,76 +30,17 @@ import {
   selectAdditionalMonitoredSurfaceIds,
   selectCanonicalProfileSurfaces,
 } from '@/lib/profile-surfaces/contracts';
-import {
-  type PresenceIdentityPhoto,
-  resolveIdentityPhoto,
-} from '@/lib/profile-surfaces/presence-identity';
+import { resolveIdentityPhoto } from '@/lib/profile-surfaces/presence-identity';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
-import type { SettingsConnectorState } from '../settings/connectors/connectors-data';
 
-export type ProfilesWorkspaceFilter =
-  | 'all'
-  | 'identity'
-  | 'profiles'
-  | 'catalog'
-  | 'connector';
-
-export interface ProfileWorkspaceSurfaceRow {
-  readonly id: string;
-  readonly rowType: 'surface';
-  readonly kind: ProfileSurfaceKind;
-  readonly platform: string;
-  readonly label: string;
-  readonly handle: string | null;
-  readonly url: string;
-  readonly trackedUrl: string | null;
-  readonly qualificationStatus: ProfileQualificationStatus;
-  readonly isOfficial: boolean;
-  readonly monitoringState: 'active' | 'paused' | 'locked' | 'unavailable';
-  readonly rank: number | null;
-  readonly previousRank: number | null;
-  readonly lastObservedAt: string | null;
-  readonly identityEvidence?: {
-    readonly sourceCount: number;
-    readonly sourceTypes: readonly string[];
-    readonly confidence: number | null;
-  };
-  readonly identityPhoto?: PresenceIdentityPhoto;
-}
-
-export interface ProfileWorkspaceConnectorRow {
-  readonly id: string;
-  readonly rowType: 'connector';
-  readonly kind: 'connector';
-  readonly platform: 'gmail' | 'google_calendar';
-  readonly label: string;
-  readonly handle: string | null;
-  readonly url: string;
-  readonly status: SettingsConnectorState['status'];
-  readonly monitoringState: 'active' | 'paused' | 'unavailable';
-}
-
-export type ProfileWorkspaceRow =
-  | ProfileWorkspaceSurfaceRow
-  | ProfileWorkspaceConnectorRow;
-
-export interface ProfilesWorkspaceData {
-  readonly profileId: string;
-  readonly artist: {
-    readonly name: string;
-    readonly username: string;
-    readonly avatarUrl: string | null;
-    readonly isPublic: boolean;
-  };
-  readonly rows: ProfileWorkspaceRow[];
-  readonly monitoringLimit: number | null;
-  readonly monitoredCount: number;
-  readonly qualifiedShare: number | null;
-  readonly bestJovieRank: number | null;
-  readonly lastObservedAt: string | null;
-  readonly providerAvailable: boolean;
-}
+export type {
+  ProfilesWorkspaceData,
+  ProfilesWorkspaceFilter,
+  ProfileWorkspaceConnectorRow,
+  ProfileWorkspaceRow,
+  ProfileWorkspaceSurfaceRow,
+} from '@/components/features/presence/types';
 
 async function ensureWorkspaceSeeded(input: {
   readonly profileId: string;

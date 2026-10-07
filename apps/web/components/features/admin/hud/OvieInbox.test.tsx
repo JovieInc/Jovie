@@ -4,6 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OvieInboxCase } from '@/lib/ovie/inbox';
 import { OvieInbox } from './OvieInbox';
 
+vi.mock(
+  '@/components/features/opportunity-inbox/FounderReviewRecorder',
+  () => ({
+    FounderReviewRecorder: ({ target }: { target: { sourceKind: string } }) => (
+      <div data-testid='operator-note-capture'>{target.sourceKind}</div>
+    ),
+  })
+);
+
 const item: OvieInboxCase = {
   contract: 'jovie.interaction-case/v1',
   id: 'summer:one',
@@ -75,6 +84,15 @@ describe('Ovie Inbox', () => {
       'Do not buy this'
     );
     expect(screen.getByText('First decision')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('operator-note-capture')
+    ).not.toBeInTheDocument();
+    const disclosure = screen.getByText('Capture A Note').closest('details')!;
+    disclosure.open = true;
+    fireEvent(disclosure, new Event('toggle'));
+    expect(screen.getByTestId('operator-note-capture')).toHaveTextContent(
+      'founder.brain_dump'
+    );
   });
   it('does not carry old notes onto a new decision after a conflict', async () => {
     mount(

@@ -668,6 +668,22 @@ class DrainAndTickTest(unittest.TestCase):
         backend.start()
         self.addCleanup(backend.stop)
 
+    def test_operator_drain_finishes_active_job_without_claiming_the_next(self):
+        jobs = [{"id": f"i-{i}", "identifier": f"JOV-{i}", "title": "rank",
+                 "description": description(), "createdAt": str(i)} for i in (1, 2)]
+        linear = FakeLinear(jobs=jobs)
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
+            def admitted_job(*args, **kwargs):
+                (host.state / "lifecycle-drain.json").write_text("operator hold")
+                return {"confidence": "high"}
+            with patch.object(reason, "healthy", return_value=True), \
+                    patch.object(reason, "one_job", side_effect=admitted_job) as job:
+                result = reason.drain(host, self.lane(linear), CONFIG)
+                self.assertEqual(job.call_count, 1)
+        self.assertEqual(result, {"status": "operator-draining", "done": [{"job": "JOV-1", "confidence": "high"}]})
+        self.assertNotIn(("i-2", "In Progress"), linear.moves)
+
     def test_drain_runs_queued_jobs_and_skips_ones_another_host_took(self):
         jobs = [{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "2"},
                 {"id": "i-2", "identifier": "JOV-2", "title": "b", "description": "", "createdAt": "1"}]

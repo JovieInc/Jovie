@@ -89,6 +89,15 @@ class JudgeTest(unittest.TestCase):
         alerts = doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0 - 1801})
         self.assertIn("Summer: route work", alerts["pool-empty"])
 
+    def test_admission_repair_needs_five_sustained_minutes(self):
+        blocked = obs(eligiblePool=49, pool=0,
+                      newIssueBudgetByProvider={"claude": {"reason": "over-budget"}})
+        self.assertNotIn("admission-repair-needed", doctor.judge(blocked))
+        recent = {"admissionRepairSince": blocked["now"] - doctor.ADMISSION_REPAIR_S + 1}
+        self.assertNotIn("admission-repair-needed", doctor.judge(blocked, recent))
+        sustained = {"admissionRepairSince": blocked["now"] - doctor.ADMISSION_REPAIR_S - 1}
+        self.assertIn("on claude", doctor.judge(blocked, sustained)["admission-repair-needed"])
+
     def test_no_landing_needs_work_and_busy_slots(self):
         self.assertEqual(doctor.judge(obs(lastLandingAge=None, busy=0)), {})
         self.assertEqual(doctor.judge(obs(lastLandingAge=None, pool=0), {"poolEmptySince": 1_000_000.0}), {})
@@ -290,8 +299,10 @@ class ReconcileTest(unittest.TestCase):
 
     def test_admission_alarm_survives_unknown_inventory_until_observed_recovery(self):
         observed = obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "over-budget"}})
-        alerts = doctor.judge(observed)
-        prior = {"alerts": alerts, "conditions": doctor.condition_receipts(alerts, {}, observed, "gem")}
+        started = observed["now"] - doctor.ADMISSION_REPAIR_S - 1
+        alerts = doctor.judge(observed, {"admissionRepairSince": started})
+        prior = {"admissionRepairSince": started, "alerts": alerts,
+                 "conditions": doctor.condition_receipts(alerts, {}, observed, "gem")}
         for unknown in (obs(eligiblePool=None, pool=None, newIssueBudgetByProvider={}),
                         obs(eligiblePool=59, pool=0, newIssueBudgetByProvider={"codex": {"reason": "pr-inventory-unavailable"}})):
             carried = doctor.judge(unknown, prior)

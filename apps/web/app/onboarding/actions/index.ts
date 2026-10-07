@@ -64,7 +64,7 @@ import {
   fetchExistingUser,
   updateExistingProfile,
 } from './profile-setup';
-import type { CompletionResult } from './types';
+import type { CompletionResult, OnboardingCompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
 
 function hasVerifiedTokenBackedFixtureClaim(
@@ -324,7 +324,7 @@ export async function completeOnboarding({
   displayName?: string;
   email?: string | null;
   redirectToDashboard?: boolean;
-}): Promise<CompletionResult> {
+}): Promise<OnboardingCompletionResult> {
   let pendingClaim: Awaited<ReturnType<typeof readPendingClaimContext>> = null;
 
   try {
@@ -591,11 +591,16 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    const claimExpired =
+      pendingClaim?.mode === 'token_backed' &&
+      error instanceof Error &&
+      error.message.startsWith('[CLAIM_EXPIRED]');
     if (
       pendingClaim &&
       error instanceof Error &&
       (error.message.includes('PROFILE_CONFLICT') ||
-        error.message.includes('CLAIM_NOT_FOUND'))
+        error.message.includes('CLAIM_NOT_FOUND') ||
+        claimExpired)
     ) {
       await clearPendingClaimContext();
     }
@@ -611,6 +616,14 @@ export async function completeOnboarding({
     await captureError('completeOnboarding failed', error, {
       route: 'onboarding',
     });
-    throw logOnboardingError(error, { username, displayName, email });
+    const loggedError = logOnboardingError(error, {
+      username,
+      displayName,
+      email,
+    });
+    // Next hides thrown Server Action messages in production. Return only the
+    // known recovery code; provider/database errors remain on the thrown path.
+    if (claimExpired) return { error: 'CLAIM_EXPIRED' };
+    throw loggedError;
   }
 }

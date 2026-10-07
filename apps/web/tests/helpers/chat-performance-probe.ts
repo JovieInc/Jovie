@@ -163,7 +163,11 @@ export function installBrowserChatProbe({
     ) {
       probe.usableStateMs = now - probe.start;
       renderStart = now;
-    } else if (
+    }
+    // The reply has already had a paint opportunity. An enabled composer
+    // at this same checkpoint is interactive now; another double-rAF would
+    // add the probe's own frame delay to the product's readiness latency.
+    if (
       renderStart !== undefined &&
       probe.renderToInteractiveMs === undefined
     ) {

@@ -280,7 +280,10 @@ clean exit in `worker-idle.json`, so the alert only means workers are dying befo
 the claim — a clean 'nothing claimable' exit is not a deadlock. `workers-without-completions`
 requires both an hour without a terminal run receipt and a current slot lease older than an
 hour; unknown legacy lease ages stay degraded, while newly acquired leases do not inherit an
-old completion age. Every alert also produces a generation-deduped
+old completion age. `admission-repair-needed`
+requires five continuous minutes of known qualified demand blocked by an over-budget or
+terminal PR inventory, so the normal transition into existing-PR recovery does not create
+another issue. Every alert also produces a generation-deduped
 `jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
 status feed. The receipt carries its owner, affected resources, first observation, source
 freshness, ten-minute escalation deadline, recovery result, next action, and terminal

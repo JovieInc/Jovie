@@ -382,8 +382,9 @@ export function SearchableSubmenu({
                 role='combobox'
                 aria-expanded={isOpen}
                 aria-activedescendant={
+                  !flatItems[highlightedIndex]?.disabled &&
                   flatItems[highlightedIndex]
-                    ? `item-${flatItems[highlightedIndex].id}`
+                    ? `${listId}-item-${flatItems[highlightedIndex].id}`
                     : undefined
                 }
               />
@@ -426,7 +427,12 @@ export function SearchableSubmenu({
             {filteredSections.map(section => (
               <optgroup key={section.id} label={section.label}>
                 {section.items.map(item => (
-                  <option key={item.id} id={`item-${item.id}`} value={item.id}>
+                  <option
+                    key={item.id}
+                    id={`${listId}-item-${item.id}`}
+                    disabled={item.disabled}
+                    value={item.id}
+                  >
                     {item.label}
                     {item.description ? ` — ${item.description}` : ''}
                   </option>
@@ -435,6 +441,13 @@ export function SearchableSubmenu({
             ))}
           </select>
 
+          <p role='status' aria-live='polite' className='sr-only'>
+            {isLoading
+              ? 'Loading results'
+              : !hasResults
+                ? `0 results. ${emptyMessage}`
+                : `${flatItems.length} results`}
+          </p>
           {/* Scrollable Content */}
           <div
             data-slot='search-results'
@@ -671,8 +684,9 @@ export function SearchableList({
             aria-autocomplete='list'
             aria-expanded='true'
             aria-activedescendant={
+              !filteredItems[highlightedIndex]?.disabled &&
               filteredItems[highlightedIndex]
-                ? `item-${filteredItems[highlightedIndex].id}`
+                ? `${listId}-item-${filteredItems[highlightedIndex].id}`
                 : undefined
             }
             role='combobox'
@@ -721,13 +735,23 @@ export function SearchableList({
           Select an item
         </option>
         {filteredItems.map(item => (
-          <option key={item.id} id={`item-${item.id}`} value={item.id}>
+          <option
+            key={item.id}
+            id={`${listId}-item-${item.id}`}
+            disabled={item.disabled}
+            value={item.id}
+          >
             {item.label}
             {item.description ? ` — ${item.description}` : ''}
           </option>
         ))}
       </select>
 
+      <p role='status' aria-live='polite' className='sr-only'>
+        {filteredItems.length === 0
+          ? `0 results. ${emptyMessage}`
+          : `${filteredItems.length} results`}
+      </p>
       {/* Items */}
       <div
         className='flex-1 overflow-y-auto p-1.5 pt-0'

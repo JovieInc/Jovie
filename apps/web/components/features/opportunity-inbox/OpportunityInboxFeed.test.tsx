@@ -97,8 +97,25 @@ const SOCIAL_REPLY_CARD: OpportunityInboxCardViewModel = {
   },
 };
 
+describe('creator inbox composition', () => {
+  it('uses creator decisions without a founder stack or recorder when Inbox Home is on', () => {
+    render(
+      <OpportunityInboxFeed
+        cards={[{ ...SUGGESTION_CARD, sourceKind: undefined }]}
+        onApprove={vi.fn()}
+        onDismiss={vi.fn()}
+        onFeedback={vi.fn()}
+        enableStackInteractions
+      />
+    );
+    expect(screen.queryByTestId('founder-stack')).not.toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-card-stack')).toBeVisible();
+    expect(screen.getByText(SUGGESTION_CARD.title)).toBeVisible();
+  });
+});
+
 describe('OpportunityInboxFeed workflow handoffs', () => {
-  it('keeps Record requests visible and outside the founder decision stack', () => {
+  it('keeps workflow capture outside the creator decision stack', () => {
     render(
       <OpportunityInboxFeed
         cards={[CAPTURE_CARD, SUGGESTION_CARD]}
@@ -109,16 +126,18 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Record' })).toBeVisible();
-    expect(screen.getByTestId('founder-stack')).toHaveTextContent(
-      'suggestion-1'
+    expect(
+      screen.queryByRole('button', { name: 'Record' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-card-stack')).toHaveTextContent(
+      SUGGESTION_CARD.title
     );
-    expect(screen.getByTestId('founder-stack')).not.toHaveTextContent(
-      'capture-1'
+    expect(screen.getByTestId('opportunity-card-stack')).not.toHaveTextContent(
+      CAPTURE_CARD.title
     );
   });
 
-  it('keeps YouTube thumbnail candidates on the founder stack when swipe review is on', () => {
+  it('keeps YouTube thumbnail candidates on the creator stack when swipe review is on', () => {
     render(
       <OpportunityInboxFeed
         cards={[YOUTUBE_CARD, SUGGESTION_CARD]}
@@ -129,9 +148,10 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
       />
     );
 
-    expect(screen.getByTestId('founder-stack')).toHaveTextContent(
-      'yt-feed-1,suggestion-1'
-    );
+    expect(
+      screen.getByTestId('opportunity-inbox-youtube-thumbnail-yt-feed-1')
+    ).toBeVisible();
+    expect(screen.queryByTestId('founder-stack')).not.toBeInTheDocument();
   });
 
   it('renders the YouTube swipe card in the list feed and wires decision actions', async () => {
@@ -162,40 +182,49 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
     expect(onDismiss).toHaveBeenCalledWith('yt-feed-1');
   });
 
-  it('renders the social reply card in the list feed and wires approve/dismiss/revise', async () => {
-    const user = userEvent.setup();
-    const onApprove = vi.fn();
-    const onDismiss = vi.fn();
-    const onRevise = vi.fn();
+  it.each([false, true])(
+    'preserves social reply actions and provenance (stack=%s)',
+    async enableStackInteractions => {
+      const user = userEvent.setup();
+      const onApprove = vi.fn();
+      const onDismiss = vi.fn();
+      const onRevise = vi.fn();
 
-    render(
-      <OpportunityInboxFeed
-        cards={[SOCIAL_REPLY_CARD]}
-        onApprove={onApprove}
-        onDismiss={onDismiss}
-        onFeedback={vi.fn()}
-        onRevise={onRevise}
-      />
-    );
+      render(
+        <OpportunityInboxFeed
+          enableStackInteractions={enableStackInteractions}
+          cards={[SOCIAL_REPLY_CARD]}
+          onApprove={onApprove}
+          onDismiss={onDismiss}
+          onFeedback={vi.fn()}
+          onRevise={onRevise}
+        />
+      );
 
-    expect(
-      screen.getByTestId('opportunity-inbox-card-reply-1')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('social-reply-draft-reply-1')
-    ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('opportunity-inbox-card-reply-1')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('social-reply-draft-reply-1')
+      ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Approve Reply/ }));
-    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
-    await user.click(screen.getByRole('button', { name: 'Revise' }));
-    await user.type(
-      screen.getByLabelText('Revision feedback for Jovie'),
-      'Make it warmer'
-    );
-    await user.click(screen.getByRole('button', { name: 'Request revision' }));
+      await user.click(screen.getByRole('button', { name: /Approve Reply/ }));
+      await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+      await user.click(screen.getByRole('button', { name: 'Revise' }));
+      await user.type(
+        screen.getByLabelText('Revision feedback for Jovie'),
+        'Make it warmer'
+      );
+      await user.click(
+        screen.getByRole('button', { name: 'Request revision' })
+      );
 
-    expect(onApprove).toHaveBeenCalledWith('reply-1');
-    expect(onDismiss).toHaveBeenCalledWith('reply-1');
-    expect(onRevise).toHaveBeenCalledWith('reply-1', 'Make it warmer');
-  });
+      expect(onApprove).toHaveBeenCalledWith('reply-1');
+      expect(onDismiss).toHaveBeenCalledWith('reply-1');
+      expect(onRevise).toHaveBeenCalledWith('reply-1', 'Make it warmer');
+      expect(screen.getByLabelText('Revision feedback for Jovie')).toHaveValue(
+        'Make it warmer'
+      );
+    }
+  );
 });

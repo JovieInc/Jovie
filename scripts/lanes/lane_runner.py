@@ -39,6 +39,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import lifecycle  # noqa: E402
 import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
@@ -54,6 +55,7 @@ import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
+import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -94,7 +96,7 @@ LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lan
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
-              "scripts/tests/test_worktree_sweep.py",
+              "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
@@ -975,7 +977,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
     ])
 
 
-def context_pack(issue: Issue, run=subprocess.run) -> str:
+def context_pack(issue: Issue, run=lifecycle.run) -> str:
     """Bounded, best-effort GBrain recall. A miss is reported, never invented."""
     try:
         result = run(["gbrain", "search", issue.title[:200]], capture_output=True, text=True, timeout=20)
@@ -996,23 +998,34 @@ class Change:
     deleted: int
 
 
-def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES) -> list[str]:
+def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES, *,
+               worktree: Path | None = None, pr: dict | None = None) -> list[str]:
     """Deterministic checks on the diff itself; returns failure reasons (empty = pass)."""
+    return gate_assessment(changes, max_reviewable_lines, worktree=worktree, pr=pr)[0]
+
+
+def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES, *,
+                    worktree: Path | None = None, pr: dict | None = None) -> tuple[list[str], dict | None]:
+    """Retain the same bound evidence that justifies a version-chore classification."""
     if not changes:
-        return ["empty-diff"]
+        return ["empty-diff"], None
     failures = []
+    versions = None
     paths = [change.path for change in changes]
     if any(SECRET_FILE.search(path) for path in paths):
         failures.append("secret-like-file-changed")
     code = [p for p in paths if not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
     if code and not any(TEST_FILE.search(p) for p in paths):
-        failures.append("code-change-without-test")
+        versions = (dependency_diff.classify(worktree, pr.get("headRefOid"), paths, pr)
+                    if worktree is not None and isinstance(pr, dict) else None)
+        if versions is None:
+            failures.append("code-change-without-test")
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
         failures.append("lockfile-without-manifest")
     reviewable = sum(c.added + c.deleted for c in changes if not GENERATED.search(c.path))
     if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
-    return failures
+    return failures, versions
 
 
 def not_shippable_reason(output: str) -> str | None:
@@ -1095,8 +1108,9 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
             log.flush()
         command = [sys.executable, str(Path(__file__).resolve()), "gate-command",
                    "--timeout", str(timeout), "--", *args]
-        with subprocess.Popen(command, cwd=cwd, env=env, text=True, start_new_session=True,
-                              pass_fds=tuple(pass_fds), stdout=log if stream and log else subprocess.PIPE,
+        with subprocess.Popen(command, cwd=cwd, text=True, start_new_session=True,
+                              **lifecycle.spawn_kwargs(env=env, pass_fds=pass_fds),
+                              stdout=log if stream and log else subprocess.PIPE,
                               stderr=subprocess.STDOUT if stream and log else subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
         if log is not None:
@@ -1107,11 +1121,11 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
     if stream and log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n")
         log.flush()
-        result = subprocess.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
+        result = lifecycle.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
                                 timeout=timeout, env=env)
         log.flush()
         return subprocess.CompletedProcess(args, result.returncode, "", "")
-    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
+    result = lifecycle.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
     if log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n{result.stdout[-4000:]}{result.stderr[-4000:]}\n")
     return result
@@ -1684,7 +1698,7 @@ class Locked:
 
 def provider_healthy(spec: dict) -> bool:
     try:
-        result = subprocess.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
+        result = lifecycle.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and re.search(spec.get("healthy", "."), result.stdout + result.stderr) is not None
@@ -1767,8 +1781,14 @@ class RunStopped(BaseException):
     before the owned process tree is killed."""
 
 
+class CommandNotStarted(OSError):
+    """Popen failed before any command child existed."""
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
-              guard_interval: float = 30, on_kill=None) -> subprocess.CompletedProcess:
+              guard_interval: float = 30, on_kill=None,
+              _lifecycle_helper: bool = False, _lifecycle_terminal: bool = False,
+              stderr=subprocess.STDOUT) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
@@ -1781,8 +1801,18 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     if guard:
         guard()
     env = {**os.environ, "npm_config_package_import_method": "hardlink"}
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
-                            start_new_session=True, env=env)
+    # The tracked helper retains controller ownership if its worker dies. It
+    # also keeps the guard while descendant cleanup is unproven. Its own agent
+    # launch is the terminal rung, so this cannot recursively wrap itself.
+    command = ([sys.executable, str(Path(__file__).resolve()), "gate-command",
+                "--timeout", str(timeout), "--", *cmd]
+               if lifecycle.active() and not _lifecycle_helper else cmd)
+    try:
+        proc = subprocess.Popen(command, cwd=cwd, stdout=log, stderr=stderr, text=True,
+                                start_new_session=True,
+                                **({"env": env} if _lifecycle_terminal else lifecycle.spawn_kwargs(env=env)))
+    except OSError as error:
+        raise CommandNotStarted(error.errno, error.strerror, error.filename) from error
     owned = AgentProcesses(proc.pid)
     restored = {}
 
@@ -2365,7 +2395,12 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
 
 
 GATE_RESULT_SCHEMA = "jovie.lane-gate-result/v1"
-GATE_POLICY_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+def gate_policy_digest() -> str:
+    return hashlib.sha256(Path(__file__).read_bytes() + b"\0dependency_diff\0" +
+                          Path(dependency_diff.__file__).read_bytes()).hexdigest()
+
+
+GATE_POLICY_DIGEST = gate_policy_digest()
 
 
 @dataclass
@@ -2385,6 +2420,14 @@ def reserve_gate(host: Host, pr: dict) -> GateClaim | None:
 
 def terminal_gate(pr: dict, verified: dict, sensitive: bool = False) -> dict | None:
     result = verified.get(f"{pr['number']}:{pr['headRefOid']}") if isinstance(verified, dict) else None
+    if isinstance(result, dict) and result.get("dependencyVersionDiff") is not None:
+        versions = result["dependencyVersionDiff"]
+        if (not isinstance(versions, dict) or versions.get("schema") != "jovie-dependency-version-diff/v1"
+                or not dependency_diff.SHA.fullmatch(str(versions.get("baseSha", "")))
+                or not isinstance(versions.get("manifests"), list) or not versions["manifests"]
+                or dependency_diff.metadata_digest(pr) is None or versions.get("headSha") != pr["headRefOid"]
+                or versions.get("metadataDigest") != dependency_diff.metadata_digest(pr)):
+            return None
     # Old SHA strings were written at claim time, so they cannot certify anything.
     if (isinstance(result, dict) and result.get("schema") == GATE_RESULT_SCHEMA
             and result.get("headSha") == pr["headRefOid"]
@@ -2514,7 +2557,10 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
         raise RepairStopped("gate-checkout-head-mismatch", pr, "before-gate-checks")
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
-    reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
+    reasons, versions = gate_assessment(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES,
+                                       worktree=worktree, pr=pr)
+    if versions is not None:
+        result["dependencyVersionDiff"] = versions
     evidence = []
     # The caller retains this same receipt if a later authority read refuses.
     result.update(changedFiles=len(changes), reasons=reasons)
@@ -2555,6 +2601,12 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
                 seat.release()
         result["reasons"] = reasons
     live = require_gate_authority(host, pr, "after-gate", sensitive)
+    if result.get("dependencyVersionDiff") is not None:
+        live_reasons, live_versions = gate_assessment(changes,
+            SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES, worktree=worktree, pr=live)
+        reasons.extend(reason for reason in live_reasons if reason not in reasons)
+        if live_versions != result["dependencyVersionDiff"]:
+            reasons.append("dependency-version-evidence-changed")
     checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
     if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
         raise RepairStopped("gate-checkout-head-mismatch", live, "after-gate")
@@ -2878,7 +2930,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
         gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
         if not conflicted and not gate_held and not reviewed:
-            if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
+            if any((check.get("status") is not None and check["status"] != "COMPLETED")
+                   or check.get("state") in ("PENDING", "EXPECTED") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
@@ -3553,29 +3606,117 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
-REPAIR_TARGET_FIELDS = """number title state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+REPAIR_TARGET_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
-commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{__typename
-... on CheckRun{name status conclusion detailsUrl startedAt completedAt}
-... on StatusContext{context state targetUrl}}}}}}}"""
-REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
+totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
+pageInfo{hasNextPage endCursor} nodes{__typename
+... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
+... on StatusContext{id context state targetUrl}}}}}}}"""
+REPAIR_CHECK_PAGES = 5  # At most 500 contexts; incomplete authority still refuses repair.
+REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
 
 
+def repair_checks_census(contexts: dict) -> tuple:
+    """Canonical count evidence for the entire mutable connection, not just this page."""
+    counts = [contexts[key] for key in ("totalCount", "checkRunCount", "statusContextCount")]
+    if any(type(count) is not int or count < 0 for count in counts) or sum(counts[1:]) != counts[0]:
+        raise ValueError("repair-check-counts-invalid")
+    states = []
+    for key, total in zip(("checkRunCountsByState", "statusContextCountsByState"), counts[1:]):
+        rows = contexts[key]
+        if not isinstance(rows, list) or len(rows) > 32:
+            raise ValueError("repair-check-state-counts-invalid")
+        grouped = {}
+        for row in rows:
+            name, count = row["state"], row["count"]
+            if (not isinstance(name, str) or not name or name in grouped
+                    or type(count) is not int or count < 0):
+                raise ValueError("repair-check-state-counts-invalid")
+            grouped[name] = count
+        if sum(grouped.values()) != total:
+            raise ValueError("repair-check-state-counts-incomplete")
+        states.append({name: count for name, count in grouped.items() if count})
+    return (*counts, *states)
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
-    """One fresh target read binds repair ownership and complete checks to the same head."""
+    """Bounded fresh pages bind complete checks to one unchanged ownership/head snapshot."""
     try:
         owner, name = REPO_SLUG.split("/")
         number = pr["number"]
         if type(number) is not int or number <= 0:
             return None
-        viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
-                     "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"], timeout=30)
-        data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
-        if not isinstance(data, dict) or data.get("errors"):
-            return None
-        return repair_target_node(pr, data["data"]["repository"]["pullRequest"])
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        cursor, cursors, seen, checks, anchor, census = None, set(), set(), [], None, None
+        for page in range(REPAIR_CHECK_PAGES):
+            args = ["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
+                    "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"]
+            if cursor is not None:
+                args += ["-f", f"cursor={cursor}"]
+            viewed = sh(args, timeout=30)
+            data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+            if not isinstance(data, dict) or data.get("errors"):
+                return None
+            live = data["data"]["repository"]["pullRequest"]
+            if isinstance(live, dict) and live.get("state") in {"MERGED", "CLOSED"}:
+                return repair_target_node(pr, live)  # Positive terminal evidence still cancels work.
+            rollup = live["commits"]["nodes"][0]["commit"]["statusCheckRollup"]
+            if rollup is None:
+                return repair_target_node(pr, live) if page == 0 else None
+            contexts = rollup["contexts"]
+            info, rows = contexts["pageInfo"], contexts["nodes"]
+            if (type(info.get("hasNextPage")) is not bool or not isinstance(rows, list)
+                    or len(rows) > 100 or (page and not rows)):
+                return None
+            # Validate every page with the normal strict target validator; this
+            # temporary page copy never escapes as complete repair authority.
+            snapshot = json.loads(json.dumps(live))
+            snapshot["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]["pageInfo"]["hasNextPage"] = False
+            normalized = repair_target_node(pr, snapshot)
+            if normalized is None:
+                return None
+            ownership = {key: normalized[key] for key in
+                         ("number", "state", "headRefOid", "headRefName", "isInMergeQueue",
+                          "isCrossRepository", "isDraft", "mergeStateStatus", "reviewDecision", "labels")}
+            ownership["dependencyMetadataDigest"] = normalized["dependencyMetadataDigest"]
+            if anchor is not None and ownership != anchor:
+                return None  # Never splice checks across a head, queue, review or hold transition.
+            anchor = ownership
+            if page or info["hasNextPage"]:
+                current_census = repair_checks_census(contexts)
+                if current_census[0] > 100 * REPAIR_CHECK_PAGES or (census is not None and current_census != census):
+                    return None
+                census = current_census
+                ids = [row.get("id") for row in rows]
+                if (any(not isinstance(key, str) or not key for key in ids)
+                        or len(set(ids)) != len(ids) or seen.intersection(ids)):
+                    return None
+                seen.update(ids)
+            checks.extend(rows)
+            if not info["hasNextPage"]:
+                if census is not None:
+                    # Counts catch insertions before an already consumed cursor;
+                    # state counts also catch a pending transition on an earlier page.
+                    run_states, status_states = {}, {}
+                    for check in checks:
+                        if check["__typename"] == "CheckRun":
+                            state = check.get("conclusion") if check["status"] == "COMPLETED" else check["status"]
+                            grouped = run_states
+                        else:
+                            state, grouped = check["state"], status_states
+                        grouped[state] = grouped.get(state, 0) + 1
+                    if (len(checks) != census[0] or sum(run_states.values()) != census[1]
+                            or sum(status_states.values()) != census[2]
+                            or run_states != census[3] or status_states != census[4]):
+                        return None
+                return {**normalized, "statusCheckRollup": checks}
+            cursor = info.get("endCursor")
+            if not isinstance(cursor, str) or not cursor or cursor in cursors or not rows:
+                return None
+            cursors.add(cursor)
+        return None
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None
 
 
@@ -3627,6 +3768,7 @@ def repair_target_node(pr: dict, live) -> dict | None:
                             or (check["conclusion"] is not None and not isinstance(check["conclusion"], str))))):
                     return None
         fresh = {**pr, **live, "labels": labels["nodes"], "statusCheckRollup": checks}
+        fresh["dependencyMetadataDigest"] = dependency_diff.metadata_digest(live)
         fresh.pop("commits", None)
         return fresh
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
@@ -4144,13 +4286,22 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     pushed = receipt.get("verdict") == "fix-pushed"
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headAfter"),
                          "pr": receipt.get("pr")}
+    # An unreadable ownership boundary is not evidence of a coding/provider failure.
+    # Preserve the existing bounded recovery envelope and repeated-failure fingerprint.
+    target_unavailable = (receipt.get("verdict") == "reconcile-unavailable"
+                          and receipt.get("cancellation", {}).get("reason") == "target-state-unavailable")
+    evidence = {"before": pr["headRefOid"], "after": receipt.get("headAfter")}
+    if target_unavailable:
+        evidence["targetObservation"] = {key: receipt["cancellation"].get(key)
+                                       for key in ("reason", "stage", "observedState")}
     receipt["execution"] = execution_attempt.finish(
         runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], "succeeded" if pushed else "failed_known",
-        {"failureClass": None if pushed else "repair_incomplete",
+        {"failureClass": None if pushed else "target_state_unavailable" if target_unavailable else "repair_incomplete",
          "failureFingerprint": None if pushed else execution_attempt.digest(receipt.get("reasons", ["no-head-change"])),
-         "evidenceDigest": execution_attempt.digest({"before": pr["headRefOid"], "after": receipt.get("headAfter")}),
+         "evidenceDigest": execution_attempt.digest(evidence),
          "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
-         "confidence": "high", "dependencies": [name]}, coordination=coordination)
+         "confidence": "unknown" if target_unavailable else "high",
+         "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -5035,7 +5186,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
 
 def reexec(host: Host, name: str) -> int:
     """Slot free -> pull the next piece of work now, on whatever release is current (drain-safe)."""
+    if lifecycle.draining(host.state):
+        return 0  # admitted unit finished; do not acquire another assignment
     current = host.state / "current" / "lane_runner.py"
+    lifecycle.prepare_reexec()
     os.execv(sys.executable, [sys.executable, str(current if current.exists() else Path(__file__)),
                               "worker", "--provider", name])
     return 0
@@ -5082,7 +5236,7 @@ def dispatch(host: Host) -> int:
             for _ in range(slots):
                 subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 start_new_session=True)
+                                 start_new_session=True, **lifecycle.spawn_kwargs())
                 tick["spawned"].append(name)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
@@ -5283,9 +5437,9 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+        archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
-        subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+        lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.
         scratch = staging / ".selftest-state"
         scratch.mkdir(exist_ok=True)
@@ -5295,7 +5449,7 @@ def install_release(host: Host) -> int:
             refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
             return 1
         try:
-            test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                                   cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
                                   env=selftest_env(scratch))
         except subprocess.TimeoutExpired:
@@ -5367,7 +5521,7 @@ def graphql_budget() -> tuple[int, str] | None:
         return None
 
 
-def main(argv: list[str] | None = None) -> int:
+def guarded_main(argv: list[str] | None = None) -> int:
     disk_guard.ensure_sbin_on_path()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -5375,6 +5529,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("update")
     gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
     gate.add_argument("--timeout", type=float, required=True)
+    gate.add_argument("--result-fd", type=int)
+    gate.add_argument("--separate-stderr", action="store_true")
+    gate.add_argument("--child-state")
     gate.add_argument("args", nargs=argparse.REMAINDER)
     context = sub.add_parser("context-manifest", help="check or generate the local context contract")
     context.add_argument("--write", action="store_true")
@@ -5383,11 +5540,29 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "gate-command":
         command = args.args[1:] if args.args[:1] == ["--"] else args.args
+        if args.child_state is not None:
+            os.environ["LANES_STATE"] = args.child_state
+        def report_outcome(receipt):
+            if args.result_fd is not None:
+                try:
+                    os.write(args.result_fd, json.dumps(receipt).encode())
+                except BrokenPipeError:
+                    pass  # dead controller; command is already proven drained
+                finally:
+                    os.close(args.result_fd)
         try:
-            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1).returncode
+            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1,
+                             _lifecycle_helper=True, _lifecycle_terminal=args.result_fd is not None,
+                             stderr=sys.stderr if args.separate_stderr else subprocess.STDOUT).returncode
+            report_outcome({"returncode": code, "timeout": False})
             return 125 if code == 124 else code  # 124 is reserved for a drained timeout
         except subprocess.TimeoutExpired:
+            report_outcome({"returncode": None, "timeout": True})
             return 124  # run_agent has drained its observed descendants before raising
+        except CommandNotStarted as error:
+            report_outcome({"spawnError": {"errno": error.errno,
+                            "strerror": error.strerror, "filename": error.filename}})
+            return 127
         except RunStopped:
             return 143  # explicit stop also completes the existing drain protocol
         except BaseException as error:
@@ -5417,6 +5592,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        host = Host()
+        arguments = sys.argv[1:] if argv is None else argv
+        with lifecycle.Guard(host.state, allow_drain=arguments[:1] == ["gate-command"]):
+            if lifecycle.draining(host.state) and arguments[:1] != ["gate-command"]:
+                return 75
+            return guarded_main(argv)
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":
