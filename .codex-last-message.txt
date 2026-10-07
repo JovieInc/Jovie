@@ -1,0 +1,19 @@
+Implemented and opened [draft PR #20524](https://github.com/JovieInc/Jovie/pull/20524).
+
+- Removed the disabled `MERCH_QA_GATE`, stub reviewer, quarantine/remediation APIs, and runtime hooks.
+- Preserved real content, sellability, production-warning, and mockup-failure safeguards.
+- Added regression coverage preventing the stub control’s return.
+- Commit: `8d3b23575a`
+
+Verified:
+
+- 41 focused tests passed.
+- Biome and web typecheck passed.
+- Exact-head CI is fully green, including coverage, security, migration, size, visual review, and Source Validation.
+- PR remains draft against `main`.
+
+Concerns/deviations:
+
+- Historical QA database schema remains for compatibility but is unused.
+- GBrain was unavailable.
+- The Linear `In Review` transition could not be written because no Linear/Doppler token was available; JOV-7613 remains the tracking issue.
