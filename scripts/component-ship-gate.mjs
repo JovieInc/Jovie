@@ -1877,7 +1877,9 @@ function runRatchet() {
   return { ok: comparison.ok, comparison, measurement };
 }
 
-function runRenderedEvaluation({
+export function runRenderedEvaluation({
+  timeoutMs,
+  spawn = spawnSync,
   storybookUrl,
   captureDir,
   components,
@@ -1891,12 +1893,14 @@ function runRenderedEvaluation({
   for (const storyPath of storyPaths) args.push(`--story-path=${storyPath}`);
   for (const family of expectedFamilies)
     args.push(`--expected-family=${family}`);
-  const result = spawnSync(process.execPath, args, {
+  const result = spawn(process.execPath, args, {
     cwd: REPO_ROOT,
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
+    timeout: timeoutMs,
   });
-  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  const output =
+    `${result.error?.message ?? ''}${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
   let report = null;
   try {
     report = JSON.parse(result.stdout?.trim() ?? '');
@@ -1955,6 +1959,8 @@ export function resolveRenderedEvaluationSection({
     ...new Set(changedComponents.map(componentFamilyName).filter(Boolean)),
   ];
   const rendered = evaluateRendered({
+    // Advisory work must leave time for the required surface matrix.
+    timeoutMs: requireRendered ? undefined : 300_000,
     storybookUrl,
     captureDir,
     components: changedComponents.filter(

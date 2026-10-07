@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import {
   isStoryRequirementExempt,
   resolveRenderedEvaluationSection,
   runComponentShipGate,
+  runRenderedEvaluation,
 } from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
@@ -809,12 +811,41 @@ describe('diff gate', () => {
 function renderedSection(options = {}, response = renderedPass) { const calls = []; const result = resolveRenderedEvaluationSection({ changedComponents: [BADGE_COMPONENT_REL], storybookUrl: STORYBOOK_URL, evaluateRendered: args => { calls.push(args); return response; }, ...options }); return { calls, result }; }
 
 describe('live rendered evaluation section', () => {
+  it('reports a real evaluator timeout as failed evidence with its diagnostic', () => {
+    const result = runRenderedEvaluation({
+      storybookUrl: STORYBOOK_URL,
+      components: [],
+      timeoutMs: 50,
+      spawn: (_command, _args, options) =>
+        spawnSync(
+          process.execPath,
+          ['-e', 'setTimeout(() => {}, 60000)'],
+          options
+        ),
+    });
+    expect(result).toMatchObject({ ok: false, status: 1, report: null });
+    expect(result.output).toContain('ETIMEDOUT');
+    for (const requireRendered of [false, true]) {
+      const evaluated = renderedSection({ requireRendered }, result).result;
+      expect(evaluated.ok).toBe(!requireRendered);
+      expect(evaluated.section).toMatchObject({
+        ok: false,
+        report: null,
+        output: expect.stringContaining('ETIMEDOUT'),
+      });
+    }
+  });
+
   // biome-ignore format: compact matrix keeps this source-PR under the hard size cap
   it.each([['empty', {}, true, { applicable: false, skipped: true }, renderedPass], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }, renderedPass], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }, renderedPass], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
-    const result =
+    const { calls, result } =
       _name === 'empty'
-        ? resolveRenderedEvaluationSection()
-        : renderedSection(options, response).result;
+        ? { calls: [], result: resolveRenderedEvaluationSection() }
+        : renderedSection(options, response);
+    if (calls.length)
+      expect(calls[0].timeoutMs).toBe(
+        options.requireRendered ? undefined : 300_000
+      );
     expect(result).toMatchObject({ ok, section });
   });
 
@@ -823,7 +854,7 @@ describe('live rendered evaluation section', () => {
       captureDir: '/tmp/component-evidence',
     });
     // biome-ignore format: compact assertion keeps this source-PR under the hard size cap
-    expect(calls).toEqual([{ storybookUrl: STORYBOOK_URL, captureDir: '/tmp/component-evidence', components: [BADGE_COMPONENT_REL], storyPaths: [], expectedFamilies: ['badge'] }]);
+    expect(calls).toEqual([{ storybookUrl: STORYBOOK_URL, captureDir: '/tmp/component-evidence', components: [BADGE_COMPONENT_REL], storyPaths: [], expectedFamilies: ['badge'], timeoutMs: 300_000 }]);
     expect(result.section).toMatchObject({
       ok: true,
       required: false,
