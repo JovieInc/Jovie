@@ -1,0 +1,10 @@
+Implemented and published JOV-7598.
+
+- Added a persistent “Jovie Did This” link from Home/Inbox to `/app/jovie-work` in [OpportunityInboxPageClient.tsx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T051230Z-JOV-7598-codex-71a6fd/apps/web/components/features/opportunity-inbox/OpportunityInboxPageClient.tsx:524).
+- Added regression coverage and updated the route rationale.
+- Passed Biome, ESLint, accessibility lint, 37 focused tests, and typecheck across 18 packages.
+- Commit: `0b1fa75b95`
+- Draft PR: [#20531](https://github.com/JovieInc/Jovie/pull/20531)
+- Linear moved to `In Review`.
+
+Concern: Source Validation, exact-head coverage, security evidence, and automated visual capture remain pending in CI. The PR remains draft and was not merged or marked ready. GBrain was unavailable due connector reauthentication; repository evidence was used as directed.
