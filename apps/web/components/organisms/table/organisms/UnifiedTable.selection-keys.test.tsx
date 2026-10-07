@@ -20,14 +20,24 @@ const columns: ColumnDef<Row, unknown>[] = [
 function ConsumerOwnedSelection({
   onSelection,
   provideSelectionState = true,
+  grouped = false,
 }: {
   readonly onSelection: (ids: string[]) => void;
   readonly provideSelectionState?: boolean;
+  readonly grouped?: boolean;
 }) {
   const [selected, setSelected] = useState<RowSelectionState>({});
   return (
     <UnifiedTable
-      data={data}
+      data={grouped ? data.slice(0, 3) : data}
+      groupingConfig={
+        grouped
+          ? {
+              getGroupKey: row => (row.id === 'b' ? 'Second' : 'First'),
+              getGroupLabel: key => key,
+            }
+          : undefined
+      }
       columns={columns}
       rowMode='dense'
       enableVirtualization={false}
@@ -139,6 +149,22 @@ describe('UnifiedTable keyboard selection', () => {
     expect(onSelection).toHaveBeenLastCalledWith(['a', 'b', 'c', 'd']);
     expect(onSelection).toHaveBeenCalledTimes(selectionCalls);
     expect(screen.getByTestId('row-c')).toHaveFocus();
+  });
+
+  it('extends selection in grouped display order instead of interleaved source order', () => {
+    const onSelection = vi.fn();
+    render(<ConsumerOwnedSelection onSelection={onSelection} grouped />);
+    act(() => screen.getByTestId('row-a').focus());
+    fireEvent.keyDown(document.activeElement as HTMLElement, {
+      key: 'ArrowDown',
+      shiftKey: true,
+    });
+    expect(onSelection).toHaveBeenLastCalledWith(['a', 'c']);
+    expect(screen.getByTestId('row-c')).toHaveFocus();
+    expect(screen.getByTestId('row-b')).not.toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 
   it('requires controlled state before extending consumer-owned selection', () => {
