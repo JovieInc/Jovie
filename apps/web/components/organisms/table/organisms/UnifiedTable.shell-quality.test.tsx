@@ -1,7 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ColumnDef } from '@/lib/tanstack-table';
+import type {
+  ColumnDef,
+  RowSelectionState,
+  Updater,
+} from '@/lib/tanstack-table';
 import { UnifiedTable } from './UnifiedTable';
 
 const qa = vi.hoisted(() => ({ scroll: vi.fn() }));
@@ -246,5 +250,27 @@ describe.each(['creator', 'company'])('%s shared table lifecycle', target => {
     expect(last).toHaveFocus();
     fireEvent.keyDown(last, { key: 'Home' });
     expect(screen.getByTestId(`${target}-0`)).toHaveFocus();
+  });
+
+  it('preserves distinct table identities when grouped rows share an original object', () => {
+    const selection = vi.fn<(update: Updater<RowSelectionState>) => void>();
+    render(
+      <UnifiedTable
+        data={[rows[0], rows[0]]}
+        columns={columns}
+        groupingConfig={groups}
+        enableVirtualization={false}
+        enableKeyboardNavigation
+        rowSelection={{}}
+        onRowSelectionChange={selection}
+        getRowTestId={(_, index) => `${target}-position-${index}`}
+      />
+    );
+    fireEvent.keyDown(screen.getByTestId(`${target}-position-0`), { key: 'x' });
+    const update = selection.mock.calls[0]?.[0];
+    expect(typeof update).toBe('function');
+    expect(typeof update === 'function' ? update({}) : update).toEqual({
+      '0': true,
+    });
   });
 });

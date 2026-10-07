@@ -20,6 +20,7 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   type OnChangeFn,
+  type Row,
   type RowData,
   type RowSelectionState,
   type SortingState,
@@ -362,6 +363,10 @@ export interface UnifiedTableProps<TData extends RowData> {
  * Humanize a column id (e.g. "releaseDate" -> "Release date") for sort
  * provenance when no string header label is available.
  */
+function identityGroupLabel(key: string): string {
+  return key;
+}
+
 function humanizeColumnId(id: string): string {
   const words = id
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -651,47 +656,28 @@ function UnifiedTableContent<TData extends RowData>({
     table.getHeaderGroups(),
     table.getState().sorting
   );
-  const groupingSourceData = useMemo(
-    () => (groupingEnabled ? rows.map(r => r.original) : []),
-    [groupingEnabled, rows]
+  // Group the actual TanStack rows so rendering and keyboard selection share
+  // one identity/order without copying originals into a second lookup map.
+  const groupingKey = groupingConfig?.getGroupKey;
+  const getGroupKey = useCallback(
+    (row: Row<TData>) => groupingKey?.(row.original) ?? '',
+    [groupingKey]
   );
-
-  // Stable fallback functions for grouping (prevents recreation on every render)
-  const noopGetGroupKey = useCallback(() => '', []);
-  const identityGetGroupLabel = useCallback((key: string) => key, []);
 
   // Initialize grouping (uses TanStack-sorted row order)
   const { groupedData, observeGroupHeader, visibleGroupIndex } =
     useTableGrouping({
-      data: groupingSourceData,
-      getGroupKey: groupingConfig?.getGroupKey ?? noopGetGroupKey,
-      getGroupLabel: groupingConfig?.getGroupLabel ?? identityGetGroupLabel,
+      data: rows,
+      getGroupKey,
+      getGroupLabel: groupingConfig?.getGroupLabel ?? identityGroupLabel,
       enabled: groupingEnabled,
       scrollRoot,
       stickyOffset,
     });
 
-  // Row lookup map for grouped table mode — rebuilt when rows change
-  const groupedRowMap = useMemo(
-    () =>
-      new Map(
-        table
-          .getRowModel()
-          .rows.map(r => [getRowId ? getRowId(r.original) : r.original, r])
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rows` triggers table model rebuild
-    [rows, getRowId, table]
-  );
-
   const keyboardRows = useMemo(
-    () =>
-      groupingEnabled
-        ? groupedData
-            .flatMap(group => group.rows)
-            .map(item => groupedRowMap.get(getRowId ? getRowId(item) : item))
-            .filter(row => row !== undefined)
-        : rows,
-    [groupingEnabled, groupedData, groupedRowMap, getRowId, rows]
+    () => (groupingEnabled ? groupedData.flatMap(group => group.rows) : rows),
+    [groupingEnabled, groupedData, rows]
   );
 
   // Initialize virtualization
@@ -739,14 +725,9 @@ function UnifiedTableContent<TData extends RowData>({
   );
 
   const revealRow = useCallback(
-    (index: number) => {
-      if (shouldVirtualize)
-        rowVirtualizer.scrollToIndex(index, {
-          align: 'auto',
-          behavior: 'auto',
-        });
-    },
-    [rowVirtualizer, shouldVirtualize]
+    // TanStack defaults to auto alignment/behavior and supersedes pending scrolls.
+    (index: number) => rowVirtualizer.scrollToIndex(index),
+    [rowVirtualizer]
   );
 
   const { handleKeyDown } = useTableKeyboardNav({
@@ -768,11 +749,8 @@ function UnifiedTableContent<TData extends RowData>({
 
   // Memoized row renderer for grouped table mode
   const renderGroupedRow = useCallback(
-    (item: TData, index: number) => {
-      const row = groupedRowMap.get(getRowId ? getRowId(item) : item);
-      if (!row) return null;
-
-      const rowData = row.original as TData;
+    (row: Row<TData>, index: number) => {
+      const rowData = row.original;
 
       const rowElement = (
         <VirtualizedTableRow
@@ -836,7 +814,6 @@ function UnifiedTableContent<TData extends RowData>({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibility invalidates stable TanStack rows so compiled grouped bodies recompute cells
     [
-      groupedRowMap,
       // TanStack keeps row identity stable when visibility changes. Invalidate
       // the callback so compiled GroupedTableBody renders fresh visible cells.
       resolvedColumnVisibility,

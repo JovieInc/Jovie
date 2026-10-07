@@ -64,8 +64,10 @@ export function useTableKeyboardNav<TData>({
       pendingFocus.current = null;
       setFocusedIndex(nextIndex);
       const row = rowRefsMap.get(nextIndex);
-      if (row) row.focus();
-      else if (revealRow) {
+      if (row) {
+        row.focus({ preventScroll: true });
+        row.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+      } else if (revealRow) {
         pendingFocus.current = {
           index: nextIndex,
           origin: document.activeElement,
@@ -126,29 +128,20 @@ export function useTableKeyboardNav<TData>({
 
       switch (action) {
         case 'next':
+        case 'prev': {
           event.preventDefault();
-          if (rowIndex < rowCount - 1) {
-            extend?.(rowIndex, rowIndex + 1);
-            moveFocus(rowIndex + 1);
+          const nextIndex = rowIndex + (action === 'next' ? 1 : -1);
+          if (nextIndex >= 0 && nextIndex < rowCount) {
+            extend?.(rowIndex, nextIndex);
+            moveFocus(nextIndex);
           }
           break;
-
-        case 'prev':
-          event.preventDefault();
-          if (rowIndex > 0) {
-            extend?.(rowIndex, rowIndex - 1);
-            moveFocus(rowIndex - 1);
-          }
-          break;
+        }
 
         case 'first':
-          event.preventDefault();
-          moveFocus(0);
-          break;
-
         case 'last':
           event.preventDefault();
-          moveFocus(rowCount - 1);
+          moveFocus(action === 'first' ? 0 : rowCount - 1);
           break;
 
         case 'activate':
@@ -177,20 +170,6 @@ export function useTableKeyboardNav<TData>({
       onExtendSelection,
     ]
   );
-
-  // Scroll focused row into view when it changes
-  useEffect(() => {
-    if (focusedIndex >= 0 && enabled) {
-      const rowElement = rowRefsMap.get(focusedIndex);
-      const prefersReducedMotion = window.matchMedia?.(
-        '(prefers-reduced-motion: reduce)'
-      ).matches;
-      rowElement?.scrollIntoView?.({
-        block: 'nearest',
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      });
-    }
-  }, [focusedIndex, enabled, rowRefsMap]);
 
   return { handleKeyDown };
 }

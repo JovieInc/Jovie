@@ -54,6 +54,51 @@ function mountedRow() {
   return row;
 }
 
+it.each([false, true])(
+  'reveals keyboard rows immediately without scrolling unrelated focus updates (reduced motion: %s)',
+  reducedMotion => {
+    const originalMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion });
+    const rows = [mountedRow(), mountedRow(), mountedRow()];
+    const scrolls = rows.map(row => {
+      const scroll = vi.fn();
+      row.scrollIntoView = scroll;
+      return scroll;
+    });
+    const { result, rerender, unmount } = renderHook(
+      ({ focusedIndex }) =>
+        useTableKeyboardNav({
+          enabled: true,
+          focusedIndex,
+          rowCount: rows.length,
+          rowRefsMap: new Map(rows.map((row, index) => [index, row])),
+          setFocusedIndex: vi.fn(),
+        }),
+      { initialProps: { focusedIndex: 0 } }
+    );
+    try {
+      rerender({ focusedIndex: 1 });
+      for (const scroll of scrolls) expect(scroll).not.toHaveBeenCalled();
+      for (const [key, index] of [
+        ['ArrowDown', 1],
+        ['Home', 0],
+        ['End', 2],
+      ] as const) {
+        result.current.handleKeyDown(keyEvent(key), 0, 'row');
+        expect(rows[index]).toHaveFocus();
+        expect(scrolls[index]).toHaveBeenLastCalledWith({
+          block: 'nearest',
+          behavior: 'auto',
+        });
+      }
+    } finally {
+      unmount();
+      for (const row of rows) row.remove();
+      window.matchMedia = originalMedia;
+    }
+  }
+);
+
 it.each(['mounted', 'interrupted', 'scope-changed', 'superseded'] as const)(
   'owns virtual focus when the pending request is %s',
   state => {
