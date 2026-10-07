@@ -334,6 +334,30 @@ def validate_account_row(row: dict, now: datetime) -> dict:
     return {**row, "accountStateSha256": account_binding}
 
 
+def public_context_diagnostics(now: datetime, path: Path | None = None) -> dict:
+    """Explain public enrollment failures without reading credentials or proving capacity."""
+    result = {"schema": "symphony-public-trust-diagnostics/v1", "status": "unknown",
+              "capacityProven": False, "credentialReads": False, "requiresOperatorReview": True}
+    path = path or Path(os.environ.get("SYMPHONY_PROOF_CONTEXT", "/home/timwhite/gem-workspace/state/proof-context.json"))
+    try:
+        value = private_json(path)
+        runtime = contract.v2_validate_runtime_identity(value.get("runtime")) if isinstance(value, dict) else None
+        if runtime is None:
+            return {**result, "status": "blocked", "reason": "runtime-identity-invalid"}
+        current = digest(Path(contract.__file__))
+        observed = contract.v2_parse_time(value.get("observedAt"))
+        fresh = observed is not None and 0 <= (now - observed).total_seconds() <= 600
+        result.update(currentContractSha256=current, enrolledContractSha256=runtime["contractSha256"],
+                      enrollmentFresh=fresh)
+        if runtime["contractSha256"] != current:
+            return {**result, "status": "blocked", "reason": "imported-contract-mismatch"}
+        if not fresh:
+            return {**result, "status": "blocked", "reason": "stale-enrollment"}
+        return {**result, "reason": "public-pins-do-not-prove-enrollment-or-capacity"}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {**result, "reason": "context-unreadable-or-untrusted"}
+
+
 def load_context(now: datetime, path: Path | None = None) -> dict:
     path = path or Path(os.environ.get("SYMPHONY_PROOF_CONTEXT", "/home/timwhite/gem-workspace/state/proof-context.json"))
     value = private_json(path)

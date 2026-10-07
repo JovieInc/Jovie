@@ -37,6 +37,10 @@ import * as classifier from './classifier.mjs';
 import * as contextGate from './context-gate.mjs';
 import { reconcileConversationRequest } from './conversation-intake.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
+import {
+  buildEligibilityCensus,
+  completeAuditInventory,
+} from './eligibility-census.mjs';
 import * as gateNextHold from './gate-next-hold.mjs';
 import { cliGbrainClient } from './gbrain-client.mjs';
 import * as intakeReadiness from './intake-readiness.mjs';
@@ -985,13 +989,7 @@ async function runAudit(cache, isDryRun) {
   const teamFetches = await Promise.allSettled(
     TEAM_CONFIGS.map(team => linear.fetchTeamActiveIssues(team.id))
   );
-  const allIssues = teamFetches.flatMap((result, index) => {
-    if (result.status === 'fulfilled') return result.value;
-    console.error(
-      `Failed to fetch ${TEAM_CONFIGS[index].key}: ${result.reason.message}`
-    );
-    return [];
-  });
+  const allIssues = completeAuditInventory(teamFetches, TEAM_CONFIGS);
   console.log(`Fetched ${allIssues.length} issues`);
 
   const classifications = [];
@@ -1007,7 +1005,6 @@ async function runAudit(cache, isDryRun) {
       if (stored.fp === c.fingerprint) {
         c.needsModel = false;
         skipped++;
-        continue;
       }
     }
 
@@ -1033,6 +1030,8 @@ async function runAudit(cache, isDryRun) {
         schema: 'backlog-orchestrator/audit/v1',
         mode: isDryRun ? 'dry-run' : 'shadow',
         issueCount: allIssues.length,
+        inventoryComplete: true,
+        eligibility: buildEligibilityCensus(allIssues, classifications),
         triageCount: allIssues.filter(issue => issue.state?.name === 'Triage')
           .length,
         classified: classifications.length,

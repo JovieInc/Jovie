@@ -1144,6 +1144,10 @@ LINEAR_BUDGET_HEADERS = (
 LINEAR_RESET_HEADERS = ("X-RateLimit-Requests-Reset", "X-RateLimit-Complexity-Reset")
 
 
+class LaneInventoryUnknown(RuntimeError):
+    """A bounded native scan did not prove complete candidate/ownership coverage."""
+
+
 class LinearRateLimited(RuntimeError):
     """The shared Linear budget is cooling down. Callers must not hit the API."""
 
@@ -1546,21 +1550,39 @@ class Linear:
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
 
-    def _paginated_lane_issues(self, label: str) -> list[dict]:
-        """Up to 500 Todo issues. Only the claim-scan cache fill calls this."""
-        nodes, after = [], None
+    def _bounded_lane_nodes(self, query: str, variables: dict) -> list[dict]:
+        """Retain the request cap, but never treat a truncated inventory as complete."""
+        nodes, ids, cursors, after = [], set(), set(), None
         for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+            data = self.gql(query, {**variables, "after": after})
+            edge = data.get("issues") if isinstance(data, dict) else None
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise LaneInventoryUnknown("lane-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"]:
+                    raise LaneInventoryUnknown("lane-inventory-malformed")
+                if row["id"] not in ids:
+                    nodes.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return nodes
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
+            cursors.add(after)
+        raise LaneInventoryUnknown("lane-inventory-page-limit")
+
+    def _paginated_lane_issues(self, label: str) -> list[dict]:
+        """Complete Todo inventory within 500 rows, only on a claim-scan cache fill."""
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt '
-                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL], "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
         return [{"id": n["id"], "identifier": n["identifier"], "title": n["title"],
                  "description": n.get("description") or "", "priority": n.get("priority") or 0,
                  "created_at": n["createdAt"], "labels": [l["name"] for l in n["labels"]["nodes"]]}
@@ -1571,7 +1593,7 @@ class Linear:
 
         The 500-issue read (JOV-7514) runs only as the shared claim-scan fill. A hit
         within CLAIM_SCAN_TTL_S returns the stored pool and does not paginate."""
-        rows = shared(f"claim-lane-issues-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
+        rows = shared(f"claim-lane-issues-v2-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
                       lambda: self._paginated_lane_issues(label)) or []
         return [Issue(row["id"], row["identifier"], row["title"], row.get("description") or "",
                       row.get("priority") or 0, row["created_at"], list(row.get("labels") or []))
@@ -1579,19 +1601,12 @@ class Linear:
 
     def active_lane_issues(self, labels: list[str]) -> list[Issue]:
         """In Progress work claimed from a lane pool, for cross-host overlap admission."""
-        nodes, after = [], None
-        for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
-                {"labels": labels, "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                {"labels": labels})
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
                 for n in nodes]
@@ -2851,7 +2866,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
         gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
         if not conflicted and not gate_held and not reviewed:
-            if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
+            if any((check.get("status") is not None and check["status"] != "COMPLETED")
+                   or check.get("state") in ("PENDING", "EXPECTED") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
@@ -3142,16 +3158,37 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
 
 
 def fetch_labeled_events(linear) -> list:
-    """The one label-filtered Linear read per tick, shared across workers via `shared`.
+    """One complete bounded inventory per cache fill; never plan from a truncated page.
 
     JOV and LYB issues labeled `remediation:<fingerprint>` come back together.
     Callers must not issue a follow-up read per issue.
     """
     def fetch():
-        data = linear.gql(remediation.LABELED_EVENT_QUERY, {})
-        return (data.get("issues") or {}).get("nodes") or []
+        rows, ids, cursors, after = [], set(), set(), None
+        for _ in range(remediation.EVENT_INVENTORY_PAGES):
+            data = linear.gql(remediation.LABELED_EVENT_QUERY, {"after": after})
+            edge = data.get("issues")
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise RuntimeError("remediation-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not row.get("id"):
+                    raise RuntimeError("remediation-inventory-malformed")
+                if row["id"] not in ids:
+                    rows.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise RuntimeError("remediation-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return rows
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise RuntimeError("remediation-inventory-cursor-invalid")
+            cursors.add(after)
+        raise RuntimeError("remediation-inventory-page-limit")
 
-    return shared("remediation-events", SUMMARY_TTL_S, fetch) or []
+    # New cache namespace fences old first-page-only receipts after source installation.
+    return shared("remediation-events-v2", SUMMARY_TTL_S, fetch) or []
 
 
 def _apply_event_plan(linear, plan: dict) -> None:
@@ -3507,27 +3544,114 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
 
 REPAIR_TARGET_FIELDS = """number title state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
-commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{__typename
-... on CheckRun{name status conclusion detailsUrl startedAt completedAt}
-... on StatusContext{context state targetUrl}}}}}}}"""
-REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
+totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
+pageInfo{hasNextPage endCursor} nodes{__typename
+... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
+... on StatusContext{id context state targetUrl}}}}}}}"""
+REPAIR_CHECK_PAGES = 5  # At most 500 contexts; incomplete authority still refuses repair.
+REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
 
 
+def repair_checks_census(contexts: dict) -> tuple:
+    """Canonical count evidence for the entire mutable connection, not just this page."""
+    counts = [contexts[key] for key in ("totalCount", "checkRunCount", "statusContextCount")]
+    if any(type(count) is not int or count < 0 for count in counts) or sum(counts[1:]) != counts[0]:
+        raise ValueError("repair-check-counts-invalid")
+    states = []
+    for key, total in zip(("checkRunCountsByState", "statusContextCountsByState"), counts[1:]):
+        rows = contexts[key]
+        if not isinstance(rows, list) or len(rows) > 32:
+            raise ValueError("repair-check-state-counts-invalid")
+        grouped = {}
+        for row in rows:
+            name, count = row["state"], row["count"]
+            if (not isinstance(name, str) or not name or name in grouped
+                    or type(count) is not int or count < 0):
+                raise ValueError("repair-check-state-counts-invalid")
+            grouped[name] = count
+        if sum(grouped.values()) != total:
+            raise ValueError("repair-check-state-counts-incomplete")
+        states.append({name: count for name, count in grouped.items() if count})
+    return (*counts, *states)
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
-    """One fresh target read binds repair ownership and complete checks to the same head."""
+    """Bounded fresh pages bind complete checks to one unchanged ownership/head snapshot."""
     try:
         owner, name = REPO_SLUG.split("/")
         number = pr["number"]
         if type(number) is not int or number <= 0:
             return None
-        viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
-                     "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"], timeout=30)
-        data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
-        if not isinstance(data, dict) or data.get("errors"):
-            return None
-        return repair_target_node(pr, data["data"]["repository"]["pullRequest"])
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        cursor, cursors, seen, checks, anchor, census = None, set(), set(), [], None, None
+        for page in range(REPAIR_CHECK_PAGES):
+            args = ["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
+                    "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"]
+            if cursor is not None:
+                args += ["-f", f"cursor={cursor}"]
+            viewed = sh(args, timeout=30)
+            data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+            if not isinstance(data, dict) or data.get("errors"):
+                return None
+            live = data["data"]["repository"]["pullRequest"]
+            if isinstance(live, dict) and live.get("state") in {"MERGED", "CLOSED"}:
+                return repair_target_node(pr, live)  # Positive terminal evidence still cancels work.
+            rollup = live["commits"]["nodes"][0]["commit"]["statusCheckRollup"]
+            if rollup is None:
+                return repair_target_node(pr, live) if page == 0 else None
+            contexts = rollup["contexts"]
+            info, rows = contexts["pageInfo"], contexts["nodes"]
+            if (type(info.get("hasNextPage")) is not bool or not isinstance(rows, list)
+                    or len(rows) > 100 or (page and not rows)):
+                return None
+            # Validate every page with the normal strict target validator; this
+            # temporary page copy never escapes as complete repair authority.
+            snapshot = json.loads(json.dumps(live))
+            snapshot["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]["pageInfo"]["hasNextPage"] = False
+            normalized = repair_target_node(pr, snapshot)
+            if normalized is None:
+                return None
+            ownership = {key: normalized[key] for key in
+                         ("number", "state", "headRefOid", "headRefName", "isInMergeQueue",
+                          "isCrossRepository", "isDraft", "mergeStateStatus", "reviewDecision", "labels")}
+            if anchor is not None and ownership != anchor:
+                return None  # Never splice checks across a head, queue, review or hold transition.
+            anchor = ownership
+            if page or info["hasNextPage"]:
+                current_census = repair_checks_census(contexts)
+                if current_census[0] > 100 * REPAIR_CHECK_PAGES or (census is not None and current_census != census):
+                    return None
+                census = current_census
+                ids = [row.get("id") for row in rows]
+                if (any(not isinstance(key, str) or not key for key in ids)
+                        or len(set(ids)) != len(ids) or seen.intersection(ids)):
+                    return None
+                seen.update(ids)
+            checks.extend(rows)
+            if not info["hasNextPage"]:
+                if census is not None:
+                    # Counts catch insertions before an already consumed cursor;
+                    # state counts also catch a pending transition on an earlier page.
+                    run_states, status_states = {}, {}
+                    for check in checks:
+                        if check["__typename"] == "CheckRun":
+                            state = check.get("conclusion") if check["status"] == "COMPLETED" else check["status"]
+                            grouped = run_states
+                        else:
+                            state, grouped = check["state"], status_states
+                        grouped[state] = grouped.get(state, 0) + 1
+                    if (len(checks) != census[0] or sum(run_states.values()) != census[1]
+                            or sum(status_states.values()) != census[2]
+                            or run_states != census[3] or status_states != census[4]):
+                        return None
+                return {**normalized, "statusCheckRollup": checks}
+            cursor = info.get("endCursor")
+            if not isinstance(cursor, str) or not cursor or cursor in cursors or not rows:
+                return None
+            cursors.add(cursor)
+        return None
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None
 
 
@@ -4303,7 +4427,7 @@ def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict
                  "createdAt": issue.created_at, "labels": issue.labels}
                 for issue in linear.active_lane_issues([SHARED_LABEL, *provider_labels])]
     try:
-        active = shared("file-overlap-tasks", SUMMARY_TTL_S, fetch_active)
+        active = shared("file-overlap-tasks-v2", SUMMARY_TTL_S, fetch_active)
     except LinearRateLimited:
         raise
     except Exception:
@@ -5208,7 +5332,7 @@ def release_identity(host: Host) -> dict:
 
 # Per-host tuning (LANES_SLOTS_DEVIN=2, SYMPHONY_FILE_OVERLAP_GUARD=flag, ...) must not reach the
 # release self-test: the fixtures assume defaults, so a tuned host refused every release.
-HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_")
+HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 
 
 def selftest_env(scratch: Path) -> dict:
