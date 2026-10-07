@@ -154,3 +154,11 @@
     justify-content: space-between;
   }
 }
+
+/* Expanded footers own a full navigation section. Keep the route content at
+   its natural height while that HTML arrives: flex-growing main would borrow
+   space from a partial footer and then move the footer upward as it fills in.
+   Minimal footers retain the shell's short-page bottom anchoring. */
+[data-public-page-shell]:has(> [data-footer-variant="expanded"]) > main {
+  flex: none;
+}
