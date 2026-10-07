@@ -1,5 +1,13 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  closeSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,11 +27,30 @@ export const GH_FAKE_HOST = 'github.localhost';
 /** Absolute path of the real gh binary, or null when it is not installed. */
 export function resolveRealGh() {
   try {
-    return (
-      execFileSync('sh', ['-c', 'command -v gh'], {
-        encoding: 'utf8',
-      }).trim() || null
-    );
+    // Enumerate every `gh` on PATH and skip `#!` script shims (e.g. a token-
+    // minting lanes wrapper): the harness must exercise the real CLI binary.
+    const candidates = execFileSync(
+      'sh',
+      [
+        '-c',
+        'IFS=:; for d in $PATH; do [ -x "$d/gh" ] && [ -f "$d/gh" ] && printf \'%s\\n\' "$d/gh"; done; exit 0',
+      ],
+      { encoding: 'utf8' }
+    )
+      .split('\n')
+      .filter(Boolean);
+    for (const candidate of candidates) {
+      const fd = openSync(candidate, 'r');
+      try {
+        const head = Buffer.alloc(2);
+        if (readSync(fd, head, 0, 2, 0) === 2 && head.toString() === '#!')
+          continue;
+      } finally {
+        closeSync(fd);
+      }
+      return candidate;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -112,11 +139,16 @@ export async function runWithRealGh({ script, env = {}, route, gh }) {
   const proxy = `http://127.0.0.1:${address.port}`;
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
+  // A `gh` earlier on PATH may be a script shim (e.g. a token-minting lanes
+  // wrapper), so pin the resolved real binary ahead of the caller's PATH.
+  const ghShim = join(home, 'bin');
+  mkdirSync(ghShim);
+  symlinkSync(binary, join(ghShim, 'gh'));
   try {
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
-          PATH: process.env.PATH,
+          PATH: `${ghShim}:${env.PATH ?? process.env.PATH}`,
           HOME: home,
           GH_CONFIG_DIR: join(home, 'config'),
           GH_HOST: GH_FAKE_HOST,
