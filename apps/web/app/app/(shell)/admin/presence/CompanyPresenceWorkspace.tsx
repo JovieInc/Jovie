@@ -2,8 +2,19 @@
 
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
+import {
+  PresenceSignalList,
+  PresenceStatusBadge,
+} from '@/components/features/presence/PresenceStatusParts';
+import styles from '@/components/features/presence/presence-workspace.module.css';
+import { COMPANY_PRESENCE_ADAPTER } from '@/components/features/presence/workspace-adapters';
+import {
+  PresenceWorkspaceBoundary,
+  type PresenceWorkspaceScope,
+  usePresenceWorkspaceController,
+} from '@/components/features/presence/workspace-controller';
 import {
   DrawerSection,
   EntityHeader,
@@ -29,19 +40,12 @@ import {
   type CompanyPresenceData,
   type CompanyPresenceFilter,
   type CompanyPresencePage,
-  filterCompanyPresencePages,
   getCompanyPageLastCheckedAt,
   getCompanyPageSignals,
   getCompanyPageStatus,
-  sortCompanyPresencePages,
 } from '@/lib/ovie/company-presence/model';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
-import {
-  PresenceSignalList,
-  PresenceStatusBadge,
-} from '../../profiles/PresenceStatusParts';
-import styles from '../../profiles/profiles-workspace.module.css';
 
 const columnHelper = createColumnHelper<CompanyPresencePage>();
 
@@ -221,21 +225,29 @@ function checkColumn(
 /** Jovie's own pages using the creator Presence workspace primitives. */
 export function CompanyPresenceWorkspace({
   data,
-}: Readonly<{ data: CompanyPresenceData }>) {
-  const [filter, setFilter] = useState<CompanyPresenceFilter>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const rows = useMemo(
-    () =>
-      sortCompanyPresencePages(filterCompanyPresencePages(data.pages, filter)),
-    [data.pages, filter]
+  scope,
+}: Readonly<{ data: CompanyPresenceData; scope: PresenceWorkspaceScope }>) {
+  return (
+    <PresenceWorkspaceBoundary scope={scope}>
+      <CompanyPresenceWorkspaceContent data={data} />
+    </PresenceWorkspaceBoundary>
   );
-  const selected = data.pages.find(page => page.id === selectedId) ?? null;
+}
+
+function CompanyPresenceWorkspaceContent({
+  data,
+}: Readonly<{ data: CompanyPresenceData }>) {
+  const { filter, setFilter, rows, selected, setSelected } =
+    usePresenceWorkspaceController({
+      sourceRows: data.pages,
+      initialFilter: 'all',
+      adapter: COMPANY_PRESENCE_ADAPTER,
+    });
   const configuredSources = data.sources.filter(source => source.configured);
 
   useRegisterRightPanel(
     selected ? (
-      <CompanyPageRail page={selected} onClose={() => setSelectedId(null)} />
+      <CompanyPageRail page={selected} onClose={() => setSelected(null)} />
     ) : null
   );
 
@@ -317,7 +329,7 @@ export function CompanyPresenceWorkspace({
               active={filter === option.id}
               onClick={() => {
                 setFilter(option.id);
-                setSelectedId(null);
+                setSelected(null);
               }}
             />
           ))}
@@ -348,12 +360,12 @@ export function CompanyPresenceWorkspace({
         data={rows}
         columns={columns as ColumnDef<CompanyPresencePage, unknown>[]}
         getRowId={page => page.id}
-        onRowClick={page => setSelectedId(page.id)}
+        onRowClick={setSelected}
         rowHeight={56}
         containerClassName='min-h-0 flex-1'
         minWidth='0'
         className={styles.table}
-        isRowSelected={page => page.id === selectedId}
+        isRowSelected={page => page.id === selected?.id}
         emptyState={
           filter === 'profile' && data.profilesUnavailable ? (
             <TableEmptyState

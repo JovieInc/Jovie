@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PresenceStatusBadge } from '@/components/features/presence/PresenceStatusParts';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
@@ -12,6 +13,7 @@ import type {
   CompanyPresenceData,
   CompanyPresencePage,
 } from '@/lib/ovie/company-presence/model';
+import { getCompanyPageStatus } from '@/lib/ovie/company-presence/model';
 import { CompanyPresenceWorkspace } from './CompanyPresenceWorkspace';
 
 vi.mock('next/navigation', () => ({
@@ -59,7 +61,14 @@ function renderWorkspace(data: CompanyPresenceData) {
   return render(
     <HeaderActionsProvider>
       <TooltipProvider>
-        <CompanyPresenceWorkspace data={data} />
+        <CompanyPresenceWorkspace
+          scope={{
+            actorId: 'test-actor',
+            workspaceId: 'test-workspace',
+            target: 'company',
+          }}
+          data={data}
+        />
       </TooltipProvider>
     </HeaderActionsProvider>
   );
@@ -91,6 +100,17 @@ describe('CompanyPresenceWorkspace', () => {
       row.getAllByText('Unconfigured', { selector: 'span.min-w-0' }).length
     ).toBeGreaterThan(0);
     expect(pricingRow?.textContent).not.toMatch(/\b0\b/);
+  });
+
+  it('keeps the shared unwired badge truthful', () => {
+    const status = getCompanyPageStatus(unconfiguredData.pages[0]);
+    render(
+      <TooltipProvider>
+        <PresenceStatusBadge status={status} />
+      </TooltipProvider>
+    );
+    expect(screen.getByText('Unconfigured')).toBeVisible();
+    expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
   });
 
   it('states how many sources are connected', () => {
