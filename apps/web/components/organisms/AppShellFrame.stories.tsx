@@ -123,7 +123,9 @@ function OverlayInspectorFixture() {
                 defaultValue='Keep this draft'
               />
             </label>
-            <div className='h-[1600px] p-4'>Scrollable work content</div>
+            <div className='p-4' style={{ height: 1600 }}>
+              Scrollable work content
+            </div>
           </div>
         }
         rightPanel={
