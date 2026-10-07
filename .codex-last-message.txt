@@ -1,0 +1,10 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T060640Z-JOV-7579-codex-brief-f6baab/.design-brief.md).
+
+- Uses the certified `smart-links` capability.
+- Preserves the release example and default-off flag.
+- Uses only allowed section and imagery IDs.
+- Parser validates Steps 1–8 with no invalid capabilities.
+- Step 9 is intentionally blank for the design pass.
+- `git diff --check` passes.
+
+No build, commit, push, or PR was performed.
