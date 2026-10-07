@@ -18,7 +18,7 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Home', APP_ROUTES.DASHBOARD],
+  ['Inbox', APP_ROUTES.DASHBOARD],
   ['Identity', APP_ROUTES.PRESENCE],
   ['Work', APP_ROUTES.LIBRARY],
   ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
@@ -105,7 +105,7 @@ describe('DashboardNav', () => {
     const inbox = document.querySelector('[data-navigation-item-id="inbox"]');
     expect(inbox).toBeInstanceOf(HTMLElement);
     if (!(inbox instanceof HTMLElement)) return;
-    expect(inbox).toHaveAccessibleName('Home');
+    expect(inbox).toHaveAccessibleName('Inbox');
     const search = getByRole('button', { name: 'Search' });
     const newChat = getByRole('link', { name: 'New Chat' });
 
@@ -115,7 +115,10 @@ describe('DashboardNav', () => {
     expect(
       search.compareDocumentPosition(newChat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(search.parentElement).toHaveClass('h-9', 'shrink-0');
+    expect(search.closest('[data-sidebar-search-slot]')).toHaveClass(
+      'min-h-9',
+      'shrink-0'
+    );
   });
 
   it('hides Identity when PROFILES_WORKSPACE is off so the rail cannot 404', () => {
@@ -129,7 +132,7 @@ describe('DashboardNav', () => {
         link.getAttribute('href'),
       ])
     ).toEqual([
-      ['Home', APP_ROUTES.DASHBOARD],
+      ['Inbox', APP_ROUTES.DASHBOARD],
       ['Work', APP_ROUTES.LIBRARY],
       ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
     ]);
@@ -149,7 +152,7 @@ describe('DashboardNav', () => {
 
     expect(
       document.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Home');
+    ).toHaveAccessibleName('Inbox');
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
@@ -180,7 +183,7 @@ describe('DashboardNav', () => {
 
     expect(
       document.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Home');
+    ).toHaveAccessibleName('Inbox');
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {
@@ -341,10 +344,10 @@ describe('DashboardNav', () => {
 
     const chatLink = getByRole('link', { name: 'New Chat' });
     expect(chatLink).toHaveClass(
-      'size-6',
-      'rounded-full',
-      'bg-foreground',
-      'text-(--color-bg-base)'
+      'h-7',
+      'rounded-lg',
+      'bg-sidebar-accent/40',
+      'text-sidebar-item-foreground'
     );
     expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
     expect(chatLink).not.toHaveAttribute('aria-current');
@@ -404,12 +407,14 @@ describe('DashboardNav', () => {
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
-    // JOV-4522: the search/inbox pill stages out (max-height + opacity +
-    // travel) rather than popping to display:none at frame one.
-    expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
-      'group-data-[collapsible=icon]:max-h-0',
+    // The shared New control remains available; its label stages out with
+    // the same rail-motion owner as the other navigation labels.
+    const newChat = getByRole('link', { name: 'New Chat' });
+    expect(newChat.querySelector('span')).toHaveClass(
       'group-data-[collapsible=icon]:opacity-0'
     );
+    expect(newChat).not.toHaveAttribute('aria-hidden', 'true');
+    expect(newChat).not.toHaveClass('group-data-[collapsible=icon]:hidden');
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: false,

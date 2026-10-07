@@ -55,7 +55,7 @@ export function validateProductReferenceSnapshot(
   snapshot,
   {
     repoRoot = ROOT,
-    screenId,
+    screenId = '',
     owner = readProductReferenceOwner(repoRoot),
   } = {}
 ) {
