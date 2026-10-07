@@ -224,7 +224,10 @@ export function getContentStyle(
   const requested =
     typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight;
   return {
-    maxHeight: requested ? `min(${requested}, ${available})` : available,
+    maxHeight:
+      requested && requested !== available
+        ? `min(${requested}, ${available})`
+        : available,
     minWidth,
     overflowY: 'auto',
   };
