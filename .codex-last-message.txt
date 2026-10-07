@@ -1,0 +1,8 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T225418Z-JOV-4260-codex-brief-374f21/.design-brief.md).
+
+Validation:
+
+- `git diff --check` passed.
+- Only `.design-brief.md` was added.
+- Capability and creative-artifact fields remain empty because no supported certified capability or real Pen/ImageGen artifact exists.
+- No build, tests, commit, push, PR, or skill workflow was run.
