@@ -192,7 +192,7 @@ describe('AppShellFrame', () => {
     const mount = screen.getByTestId('app-shell-sidebar-mount');
     expect(mount).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col');
     expect(mount).toHaveClass(
-      'transition-[flex-basis,width,opacity,transform]',
+      'transition-shell-rail-allocation',
       'duration-cinematic',
       'ease-cinematic',
       'motion-reduce:transition-none'
