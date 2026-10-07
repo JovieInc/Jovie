@@ -60,6 +60,31 @@ test('customer and operator account/navigation forks fail the existing ownership
   }
 });
 
+test('Presence controller and evaluator forks fail for both targets', () => {
+  for (const target of ['profiles', 'admin/presence']) {
+    for (const name of [
+      'useCreatorPresenceController',
+      'useCompanyPresenceController',
+      'evaluateCompanyPresenceEvidence',
+      'evaluateCreatorPresenceEvidence',
+    ]) {
+      const file = `apps/web/app/app/(shell)/${target}/Workspace.tsx`;
+      assert.equal(
+        findChromeOverrideViolations(file, `function ${name}() { return {}; }`)
+          .length,
+        1
+      );
+      assert.deepEqual(
+        findChromeOverrideViolations(
+          file,
+          "import { usePresenceWorkspaceController } from '@/components/features/presence/workspace-controller'; import { evaluatePresenceChecks } from '@/components/features/presence/evidence';"
+        ),
+        []
+      );
+    }
+  }
+});
+
 test('deliberate route-local duplicate fails the structural boundary', () => {
   const violations = findOwnershipViolations(
     'apps/web/app/app/(shell)/settings/page.tsx',
