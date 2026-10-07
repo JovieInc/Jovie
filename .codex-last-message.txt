@@ -1,0 +1,19 @@
+Draft PR opened: [#20575](https://github.com/JovieInc/Jovie/pull/20575) at commit `d43dd4fadc`.
+
+Changed:
+
+- Golden Path dispatch now uses the shared bounded GitHub retry helper.
+- HTTP 500 is classified as transient.
+- Added workflow-contract and retry-behavior regressions.
+
+Verified:
+
+- Vitest: 3 passed
+- Pytest: 6 passed
+- Actionlint/shellcheck passed
+- Biome passed
+- CI harness passed
+- Turbo typecheck: 18/18 tasks passed
+- Pre-commit and publication hooks passed
+
+JOV-7192 is In Review and remains open pending a green nightly runtime receipt. Hosted PR checks were still running at handoff. The earlier visual failure is independently addressed by existing PR #20505; no duplicate UI changes were made. GBrain was unavailable as noted in the issue.
