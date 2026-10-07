@@ -1,0 +1,10 @@
+The requested fix is already on `origin/main` via commit `d9c7a19197` / PR #20196.
+
+- Modal consistently says “Request Early Access”; “coming soon” was removed.
+- Placeholder now reads “What would you use Growth for?”
+- Existing regression test enforces the single status.
+- Verification: focused Vitest passed; Biome passed on both files.
+- No files changed, commit created, branch pushed, or PR opened.
+- Limitation: tests passed under Node 22, with a warning that the repository requires Node 24. Linear required reauthentication; GBrain was unavailable.
+
+NOT-SHIPPABLE: H-11 and its regression test are already implemented on current origin/main.
