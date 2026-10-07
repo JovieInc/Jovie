@@ -4176,6 +4176,28 @@ class FixRedTest(unittest.TestCase):
             finally:
                 lane.SHARED_CACHE_DIR, os.environ["LANES_EXECUTION_BACKEND"] = saved
 
+    def test_shared_cache_serializes_concurrent_expired_fills(self):
+        start = threading.Barrier(4)
+        calls = []
+        def fetch():
+            calls.append(1)
+            time.sleep(.05)
+            return [{"number": 1, "headRefOid": "exact-head"}]
+        def reader():
+            start.wait()
+            return lane.shared("open-prs", 60, fetch)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "SHARED_CACHE_DIR", Path(tmp)), patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "fixture"}):
+            (Path(tmp)/'open-prs.json').write_text(json.dumps({"at": time.time()-61, "value": [{"headRefOid": "stale"}]}))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                results = list(pool.map(lambda _: reader(), range(4)))
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(results, [[{"number": 1, "headRefOid": "exact-head"}]]*4)
+
+    def test_shared_cache_rejects_future_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "SHARED_CACHE_DIR", Path(tmp)), patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "fixture"}):
+            (Path(tmp)/'open-prs.json').write_text(json.dumps({"at": time.time()+60, "value": ['unverified-future']}))
+            self.assertEqual(lane.shared('open-prs', 60, lambda: ['fresh']), ['fresh'])
+
     def test_a_head_claimed_elsewhere_is_skipped_not_a_stop(self):
         first, second = {**self.pr(number=4), "headRefName": "devin/jov-4-20260925204809"}, \
             {**self.pr(), "headRefName": "devin/jov-1-20260925204809"}

@@ -4430,19 +4430,24 @@ def shared(key: str, ttl: float, fetch):
     if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
         return fetch()
     path = SHARED_CACHE_DIR / f"{key}.json"
-    try:
-        cached = json.loads(path.read_text())
-        if time.time() - cached["at"] < ttl:
-            return cached["value"]
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    value = fetch()
-    if value is not None:
-        SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(f".{os.getpid()}.tmp")
-        tmp.write_text(json.dumps({"at": time.time(), "value": value}))
-        os.replace(tmp, path)
-    return value
+    SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # Independent idle workers can miss the same expired cache simultaneously.
+    # Serialize the fill, then re-read under the lock; shared storage alone did
+    # not prevent duplicate GraphQL censuses consuming the installation budget.
+    with open(path.with_suffix('.lock'), 'a+') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            cached = json.loads(path.read_text())
+            if 0 <= time.time() - cached["at"] < ttl:
+                return cached["value"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        value = fetch()
+        if value is not None:
+            tmp = path.with_suffix(f".{os.getpid()}.tmp")
+            tmp.write_text(json.dumps({"at": time.time(), "value": value}))
+            os.replace(tmp, path)
+        return value
 
 
 def open_prs_summary() -> list[dict]:
