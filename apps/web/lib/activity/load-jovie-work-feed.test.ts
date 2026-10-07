@@ -154,3 +154,64 @@ describe('loadJovieWorkFeed outcome readback', () => {
     ).toEqual({ state: 'unavailable', metrics: null });
   });
 });
+
+describe('creator work projection', () => {
+  it('removes explicit operator sources before serialization and limits Done for you to completed records', async () => {
+    mockDbSelect.mockReset();
+    const timestamp = new Date('2026-10-01T12:00:00Z');
+    const agents = queryChain([
+      ...[
+        'gmail-event-extractor',
+        'founder.review',
+        'ops.healthcheck',
+        'ovie.queue',
+      ].map(agentSlug => ({
+        id: agentSlug,
+        agentSlug,
+        status: 'completed',
+        completedAt: timestamp,
+        startedAt: timestamp,
+      })),
+      {
+        id: 'pending',
+        agentSlug: 'gmail-event-extractor',
+        status: 'running',
+        completedAt: null,
+        startedAt: timestamp,
+      },
+    ]);
+    const chains = [
+      queryChain([]),
+      agents,
+      queryChain([]),
+      queryChain([]),
+      queryChain([]),
+      queryChain([]),
+      queryChain([]),
+    ];
+    for (const chain of chains) mockDbSelect.mockReturnValueOnce(chain);
+    const items = await loadJovieWorkFeed({
+      userId: 'owner',
+      creatorProfileId: 'creator-profile',
+      limit: 20,
+      range: '30d',
+      phase: 'completed',
+    });
+    expect(items.map(item => item.id)).toEqual(['agent:gmail-event-extractor']);
+    for (const index of [0, 1, 2]) {
+      const query = new PgDialect().sqlToQuery(
+        chains[index].where.mock.calls[0][0]
+      );
+      expect(query.params).toContain('owner');
+      expect(query.params).toContain('founder.%');
+      expect(query.params).toContain('ops.%');
+      expect(query.params).toContain('ovie.%');
+    }
+    for (const index of [4, 5, 6]) {
+      const query = new PgDialect().sqlToQuery(
+        chains[index].where.mock.calls[0][0]
+      );
+      expect(query.params).toContain('creator-profile');
+    }
+  });
+});

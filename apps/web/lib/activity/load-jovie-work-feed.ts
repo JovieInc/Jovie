@@ -13,6 +13,8 @@ import {
   mapWorkflowRunToJovieWorkItem,
   mergeJovieWorkItems,
 } from '@/lib/activity/jovie-work-feed';
+import { isCreatorInboxSourceKind } from '@/lib/connectors/creator-inbox-source-policy';
+import { creatorInboxSourceCondition } from '@/lib/connectors/creator-inbox-source-policy.server';
 import { resolveReleaseOutcomeMeasurementState } from '@/lib/connectors/workflows/outcome-attribution';
 import { db } from '@/lib/db';
 import { retouchJobs } from '@/lib/db/schema/agents';
@@ -39,6 +41,7 @@ export interface LoadJovieWorkFeedInput {
   readonly creatorProfileId: string;
   readonly limit: number;
   readonly range: ActivityRange;
+  readonly phase?: 'completed';
 }
 
 function toJovieWorkOutcome(input: {
@@ -109,6 +112,7 @@ export async function loadJovieWorkFeed(
       .where(
         and(
           eq(workflowRuns.userId, input.userId),
+          creatorInboxSourceCondition(workflowRuns.kind),
           or(
             gte(workflowRuns.updatedAt, since),
             gte(workflowRunOutcomes.windowEnd, since)
@@ -130,6 +134,7 @@ export async function loadJovieWorkFeed(
       .where(
         and(
           eq(agentRuns.userId, input.userId),
+          creatorInboxSourceCondition(agentRuns.agentSlug),
           or(gte(agentRuns.startedAt, since), gte(agentRuns.completedAt, since))
         )
       )
@@ -151,6 +156,7 @@ export async function loadJovieWorkFeed(
       .where(
         and(
           eq(suggestedActions.userId, input.userId),
+          creatorInboxSourceCondition(suggestedActions.kind),
           gte(suggestedActions.createdAt, since)
         )
       )
@@ -251,32 +257,41 @@ export async function loadJovieWorkFeed(
   ]);
 
   const items: JovieWorkItem[] = [
-    ...workflowRows.map(row =>
-      mapWorkflowRunToJovieWorkItem({
-        id: row.id,
-        kind: row.kind,
-        status: row.status,
-        currentStep: row.currentStep,
-        stepOutputs: row.stepOutputs,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-        outcome: toJovieWorkOutcome({
-          windowStart: row.outcomeWindowStart,
-          windowEnd: row.outcomeWindowEnd,
-          gmvDeltaCents: row.outcomeGmvDeltaCents,
-          clickDelta: row.outcomeClickDelta,
-          dspClickDelta: row.outcomeDspClickDelta,
-          newFansDelta: row.outcomeNewFansDelta,
-        }),
-      })
-    ),
-    ...agentRows.map(mapAgentRunToJovieWorkItem),
-    ...suggestedActionRows.map(mapSuggestedActionToJovieWorkItem),
+    ...workflowRows
+      .filter(row => isCreatorInboxSourceKind(row.kind))
+      .map(row =>
+        mapWorkflowRunToJovieWorkItem({
+          id: row.id,
+          kind: row.kind,
+          status: row.status,
+          currentStep: row.currentStep,
+          stepOutputs: row.stepOutputs,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          outcome: toJovieWorkOutcome({
+            windowStart: row.outcomeWindowStart,
+            windowEnd: row.outcomeWindowEnd,
+            gmvDeltaCents: row.outcomeGmvDeltaCents,
+            clickDelta: row.outcomeClickDelta,
+            dspClickDelta: row.outcomeDspClickDelta,
+            newFansDelta: row.outcomeNewFansDelta,
+          }),
+        })
+      ),
+    ...agentRows
+      .filter(row => isCreatorInboxSourceKind(row.agentSlug))
+      .map(mapAgentRunToJovieWorkItem),
+    ...suggestedActionRows
+      .filter(row => isCreatorInboxSourceKind(row.kind))
+      .map(mapSuggestedActionToJovieWorkItem),
     ...retouchRows.map(mapRetouchJobToJovieWorkItem),
     ...merchFulfillmentRows.map(mapMerchFulfillmentJobToJovieWorkItem),
     ...metadataRows.map(mapMetadataSubmissionToJovieWorkItem),
     ...fanNotificationRows.map(mapFanNotificationToJovieWorkItem),
   ];
 
-  return mergeJovieWorkItems(items, input.limit);
+  return mergeJovieWorkItems(
+    input.phase ? items.filter(item => item.phase === input.phase) : items,
+    input.limit
+  );
 }
