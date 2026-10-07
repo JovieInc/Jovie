@@ -27,8 +27,42 @@ const ROUTE = '/summer/v1/symphony/triage-assessments';
  *   decision: 'stale-event' | 'urgent-investigation-required' | 'existing-intake-reconcile',
  *   authorizesDispatch: false,
  *   acceptedInvestigation: false,
+ *   assessment?: {
+ *     schema: 'summer.jev-triage/v1', model: 'typesafe-ai/jev',
+ *     status: 'decided' | 'ambiguous' | 'unavailable',
+ *     destination: 'Todo' | 'Backlog' | null, priority: number | null,
+ *     category: string, confidence: number, reason: string, assessmentKey: string,
+ *   },
  * }} SummerTriageAssessmentReceipt
  */
+
+export function validJevTriageAssessment(value) {
+  return Boolean(
+    value &&
+      value.schema === 'summer.jev-triage/v1' &&
+      value.model === 'typesafe-ai/jev' &&
+      ['decided', 'ambiguous', 'unavailable'].includes(value.status) &&
+      typeof value.category === 'string' &&
+      value.category.length > 0 &&
+      value.category.length <= 128 &&
+      typeof value.reason === 'string' &&
+      value.reason.length > 0 &&
+      value.reason.length <= 2000 &&
+      typeof value.assessmentKey === 'string' &&
+      value.assessmentKey.length > 0 &&
+      value.assessmentKey.length <= 200 &&
+      typeof value.confidence === 'number' &&
+      Number.isFinite(value.confidence) &&
+      value.confidence >= 0 &&
+      value.confidence <= 1 &&
+      (value.status === 'decided'
+        ? ['Todo', 'Backlog'].includes(value.destination) &&
+          Number.isInteger(value.priority) &&
+          value.priority >= 1 &&
+          value.priority <= 4
+        : value.destination === null && value.priority === null)
+  );
+}
 
 export function summerAssessmentConfig(environment = process.env) {
   const origin = new URL(environment.SUMMER_BOTTLENECK_ORIGIN ?? '');
@@ -99,6 +133,8 @@ export async function requestSummerAssessment(
     !Number.isFinite(Date.parse(receipt.linearUpdatedAt)) ||
     receipt.authorizesDispatch !== false ||
     receipt.acceptedInvestigation !== false ||
+    (receipt.assessment !== undefined &&
+      !validJevTriageAssessment(receipt.assessment)) ||
     ![
       'stale-event',
       'urgent-investigation-required',

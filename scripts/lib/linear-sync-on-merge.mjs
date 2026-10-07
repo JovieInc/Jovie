@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
 import {
   formatValidationReceipt,
@@ -88,11 +89,17 @@ export function extractMergeIssueRef(input = {}) {
   const identifierMarker =
     /linear-issue-identifier:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
   const idMarker = /linear-issue-id:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
+  const summerIdentifier =
+    /<!--\s*summer-issue-bind\s*-->\s*(JOV-\d+)(?![A-Za-z0-9-])/i.exec(
+      body
+    )?.[1] ?? '';
   const identifier = IDENTIFIER_RE.test(identifierMarker)
     ? identifierMarker.toUpperCase()
     : IDENTIFIER_RE.test(idMarker)
       ? idMarker.toUpperCase()
-      : linearIdentifierFromText(input.headRef);
+      : summerIdentifier
+        ? summerIdentifier.toUpperCase()
+        : linearIdentifierFromText(input.headRef);
   const issueId =
     idMarker && !IDENTIFIER_RE.test(idMarker) ? idMarker : identifier;
   return { identifier, issueId };
@@ -188,6 +195,8 @@ export function pullRequestLinksIssue(pull, issue) {
   ].map(match => match[1].toUpperCase());
   if (issueId && idMarkers.includes(issueId)) return true;
   if (identifier && identifierMarkers.includes(identifier)) return true;
+  if (identifier && extractMergeIssueRef({ body }).identifier === identifier)
+    return true;
   return idMarkers.some(marker => marker.toUpperCase() === identifier);
 }
 
@@ -546,7 +555,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier updatedAt }
+    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -664,9 +673,11 @@ export async function reconcileIssueLifecycle(ctx) {
     );
     return { action: 'skip', identifier: '', target: null, comment: '' };
   }
-  const checkGreen = (issue.commentRecords ?? []).some(comment =>
-    String(comment?.body ?? '').includes(GREEN_MARKER)
-  );
+  const checkGreen =
+    deprecationCheckGreen(issue) ??
+    (issue.commentRecords ?? []).some(comment =>
+      String(comment?.body ?? '').includes(GREEN_MARKER)
+    );
   const { holds } = lifecycleHolds({
     issue,
     pullRequests: ctx.openPulls.pulls,
@@ -824,6 +835,8 @@ export async function syncLinearIssueOnMerge(options = {}) {
     for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
       const data = await linearGraphql(fetchImpl, apiKey, SWEEP_QUERY, {
         states: [
+          'In Progress',
+          'In Review',
           LIFECYCLE_STATES.merging,
           LIFECYCLE_STATES.validating,
           LIFECYCLE_STATES.rework,
@@ -831,6 +844,20 @@ export async function syncLinearIssueOnMerge(options = {}) {
         after,
       });
       for (const node of data.issues?.nodes ?? []) {
+        // A missed merge event can strand linked work before Merging. Scan
+        // that delivery evidence, without pulling unrelated active writers
+        // into the lifecycle or interpreting age/status as completion.
+        if (
+          ['In Progress', 'In Review'].includes(node.state?.name) &&
+          !(node.attachments?.nodes ?? []).some(attachment =>
+            String(attachment.url ?? '')
+              .toLowerCase()
+              .startsWith(
+                `https://github.com/${repository}/pull/`.toLowerCase()
+              )
+          )
+        )
+          continue;
         if (typeof node?.identifier === 'string') {
           found.push({
             identifier: node.identifier,

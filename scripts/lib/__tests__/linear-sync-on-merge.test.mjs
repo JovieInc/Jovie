@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { formatDeprecationObservation } from '../deprecation-observation.mjs';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
   extractMergeIssueRef,
@@ -123,6 +124,34 @@ function sweep(fetchImpl) {
 }
 
 describe('linear sync on merge', () => {
+  it('enters the validation lifecycle for a Summer-bound bot merge', async () => {
+    const body = '<!-- summer-issue-bind -->\nJOV-1\ntaskKey:abc';
+    expect(
+      extractMergeIssueRef({
+        body,
+        headRef: 'bot/coverage-audit-37652202419-1',
+      })
+    ).toEqual({ identifier: 'JOV-1', issueId: 'JOV-1' });
+    expect(
+      pullRequestLinksIssue(
+        { body, title: 'Coverage report', headRef: 'bot/report' },
+        { identifier: 'JOV-1', issueId: 'uuid-1' }
+      )
+    ).toBe(true);
+    expect(
+      extractMergeIssueRef({ body: 'Related: JOV-1', headRef: 'bot/report' })
+    ).toEqual({ identifier: '', issueId: '' });
+    expect(
+      extractMergeIssueRef({
+        body: '<!-- summer-issue-bind -->\nJOV-12',
+        headRef: 'bot/report',
+      })
+    ).toEqual({ identifier: 'JOV-12', issueId: 'JOV-12' });
+    const { world, fetchImpl } = createWorld();
+    const result = await mergeEvent(fetchImpl, 101, 'JOV-1', { PR_BODY: body });
+    expect(result.identifier).toBe('JOV-1');
+    expect(world.updates.length).toBeGreaterThan(0);
+  });
   it('reads the JOV-6586 branch the way the merge workflow did', () => {
     expect(
       extractMergeIssueRef({
@@ -237,6 +266,33 @@ describe('linear sync on merge', () => {
     await sweep(paged);
     expect(pages).toBe(2);
     expect(world.updates).toEqual(['JOV-1:Merging', 'JOV-1:Done']);
+  });
+
+  it('recovers a missed merge from In Progress while preserving unmerged and unlinked writers', async () => {
+    const { world, fetchImpl } = createWorld({ served: MAIN[0].slice(0, 7) });
+    world.issues['JOV-1'].state = 'In Progress';
+    world.issues['JOV-2'] = {
+      ...world.issues['JOV-1'],
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      attachments: [],
+    };
+    world.issues['JOV-3'] = {
+      ...world.issues['JOV-1'],
+      id: 'uuid-3',
+      identifier: 'JOV-3',
+      attachments: ['https://github.com/JovieInc/Jovie/pull/102'],
+    };
+    world.pulls[102] = {
+      ...world.pulls[101],
+      mergedAt: null,
+      headRef: 'codex/jov-3-active',
+    };
+    await sweep(fetchImpl);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+    expect(world.issues['JOV-2'].state).toBe('In Progress');
+    expect(world.issues['JOV-3'].state).toBe('In Progress');
+    expect(world.updates).toEqual(['JOV-1:Merging']);
   });
 
   it('moves the real escaped-defect merge path to Validating and never Done', async () => {
@@ -594,4 +650,29 @@ it('loads every transitive dependency from the workflow sparse checkout', () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+it('a recurring warning retains the remediation hold after a previous green observation', async () => {
+  const { world, fetchImpl } = createWorld();
+  const issue = world.issues['JOV-1'];
+  issue.title = '[deprecation-ec4e6e5b9ffb] Resolve warning';
+  issue.labels = ['remediation:deprecation-ec4e6e5b9ffb'];
+  issue.comments = ['green', 'red'].map((status, index) => ({
+    body: formatDeprecationObservation({
+      schema: 'jovie.deprecation-observation/v1',
+      issue: 'JOV-1',
+      fingerprint: 'deprecation-ec4e6e5b9ffb',
+      status,
+      headSha: MAIN[2],
+      runUrl: `https://github.com/JovieInc/Jovie/actions/runs/${123 + index}`,
+      observedAt: `2026-10-07T${12 + index}:00:00Z`,
+    }),
+    createdAt: `2026-10-07T${12 + index}:00:00Z`,
+  }));
+  const result = await mergeEvent(fetchImpl, 101);
+  expect(result.action).toBe('hold');
+  expect(result.comment).toContain(
+    'Fingerprinted remediation issues stay open'
+  );
+  expect(world.updates).toEqual([]);
 });
