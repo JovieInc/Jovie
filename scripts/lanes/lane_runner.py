@@ -146,6 +146,7 @@ GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snaps
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
 TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
 DOC_FILE = re.compile(r"(\.mdx?c?$|^docs/|^canon/|\.txt$)")
+DEPENDENCY_MANIFEST = re.compile(r"(^|/)package\.json$")
 SECRET_FILE = re.compile(r"(^|/)\.env(\.|$)|\.pem$|credentials|id_rsa")
 MAX_REVIEWABLE_LINES = 1500
 PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
@@ -1004,7 +1005,13 @@ def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE
     paths = [change.path for change in changes]
     if any(SECRET_FILE.search(path) for path in paths):
         failures.append("secret-like-file-changed")
-    code = [p for p in paths if not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
+    code = [
+        p for p in paths
+        if not DOC_FILE.search(p)
+        and not TEST_FILE.search(p)
+        and not GENERATED.search(p)
+        and not DEPENDENCY_MANIFEST.search(p)
+    ]
     if code and not any(TEST_FILE.search(p) for p in paths):
         failures.append("code-change-without-test")
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
