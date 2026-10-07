@@ -310,7 +310,14 @@ function renderWorkspace(workspaceData: ProfilesWorkspaceData | null) {
       <HeaderActionsProvider>
         <TooltipProvider>
           <RegisteredHeaderActions />
-          <ProfilesWorkspace data={workspaceData} />
+          <ProfilesWorkspace
+            scope={{
+              actorId: 'test-actor',
+              workspaceId: 'test-workspace',
+              target: 'creator',
+            }}
+            data={workspaceData}
+          />
         </TooltipProvider>
       </HeaderActionsProvider>
     </QueryClientProvider>

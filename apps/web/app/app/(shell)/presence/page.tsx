@@ -26,7 +26,12 @@ export default async function PresencePage() {
   if (!routeContext.ok) return routeContext.error;
 
   const identityId = routeContext.activeIdentityId;
-  if (!identityId) return <ProfilesWorkspace data={null} />;
+  const scope = {
+    actorId: routeContext.userId,
+    workspaceId: identityId ?? 'no-identity',
+    target: 'creator' as const,
+  };
+  if (!identityId) return <ProfilesWorkspace data={null} scope={scope} />;
 
   const data = await loadProfilesWorkspaceData({
     clerkUserId: routeContext.userId,
@@ -37,5 +42,5 @@ export default async function PresencePage() {
     profileId: identityId,
   });
 
-  return <ProfilesWorkspace data={data} />;
+  return <ProfilesWorkspace data={data} scope={scope} />;
 }
