@@ -100,7 +100,10 @@ export const Sidebar = React.forwardRef<
           data-rail-preview-region='left'
           data-rail-preview={isPreview || undefined}
           data-rail-pinned={pinned}
-          className='group peer relative max-lg:hidden h-full min-h-0 shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10 transition-[width] duration-cinematic ease-cinematic motion-reduce:transition-none'
+          className={cn(
+            'group peer relative max-lg:hidden h-full min-h-0 shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10',
+            SHELL_RAIL_ALLOCATION
+          )}
           id={!isMobile ? 'shell-left-rail' : undefined}
           data-state={state}
           data-rail-phase={railPhase}

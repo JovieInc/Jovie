@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import Link from 'next/link';
 import { beforeEach, expect, it } from 'vitest';
 import { SidebarProvider } from './context';
 import { Sidebar } from './sidebar';
@@ -11,7 +12,7 @@ it('removes a closed offcanvas rail from keyboard and assistive navigation', () 
   render(
     <SidebarProvider defaultOpen={false}>
       <Sidebar collapsible='offcanvas'>
-        <a href='/app'>Home</a>
+        <Link href='/app'>Home</Link>
       </Sidebar>
     </SidebarProvider>
   );
@@ -25,7 +26,7 @@ it('keeps compact icon navigation reachable without pinning the rail', () => {
   render(
     <SidebarProvider defaultOpen={false}>
       <Sidebar collapsible='icon'>
-        <a href='/app'>Home</a>
+        <Link href='/app'>Home</Link>
       </Sidebar>
     </SidebarProvider>
   );
@@ -35,4 +36,6 @@ it('keeps compact icon navigation reachable without pinning the rail', () => {
   expect(rail).toHaveAttribute('data-rail-pinned', 'false');
   expect(rail).not.toHaveAttribute('inert');
   expect(rail).toHaveStyle({ width: '52px' });
+  expect(rail).toHaveClass('transition-shell-rail-allocation');
+  expect(rail).not.toHaveClass('transition-[width]');
 });
