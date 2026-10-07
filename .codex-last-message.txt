@@ -1,0 +1,10 @@
+Opened draft PR [#20625](https://github.com/JovieInc/Jovie/pull/20625) against `main` at commit `82dee20b7d`.
+
+- Restored the remaining default-off smart-link API, persistence, public pages, maker UI, and MCP integration.
+- Added atomic anonymous quotas and Drizzle migration.
+- Closed obsolete PR #20116 and removed both `lane-fix-exhausted` and `lane-fix-conflict`.
+- Moved JOV-7870 to In Review.
+- Verified 129 targeted tests, typecheck, Biome, ESLint, a11y, server boundaries, copy policy, migration validation/guard, Drizzle consistency, and secret scans.
+- PR remains draft and mergeable with `lane-fix-green`.
+
+Current CI: exact-head coverage is still running; the corrected source-validation run is queued behind it. The initial source failure was solely a missing changelog marker, which is now present. Local CodeRabbit was unavailable because its CLI is not installed.
