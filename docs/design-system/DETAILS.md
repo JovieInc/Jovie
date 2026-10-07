@@ -265,10 +265,6 @@ The example above says one thing three times. Jovie should say it once.
 - Hover feedback should stay visual, not positional. Prefer color, border, or shadow changes. Do not make the interface jump on hover unless the motion communicates direct manipulation.
 - Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
 
-### Icon and Emoji Surfaces
-
-EVENT: icon/emoji glyphs are transparent at rest. A hover background must be circular, with equal dimensions and full rounding, owned by `IconGlyphFrame`. Keep an interactive parent's focus ring, hit target, accessible name, tooltip, and selected/pressed semantics. Do not put a rounded-square plate behind the glyph. Semantic status badges, avatars, and complete text actions keep their existing contracts. This applies to Jovie, Ovie, and generated marketing previews.
-
 ### Icon and Text Alignment
 
 - **Geometric centering is the default** for icon-and-text pairs and icon controls. It is the stable choice for Lucide and other arbitrary web SVGs, whose CSS baseline is synthesized rather than a compatible typographic metric.
@@ -806,11 +802,6 @@ shift.
 
 ## Component Patterns
 
-### Tooltips and History
-
-EVENT: tooltips share the canonical compact surface, viewport-safe full wrapping, and 300ms discovery/300ms warm-up timing. Default nested providers reuse the app timing scope; explicit isolated notices and fixtures retain their own timing. History titles use single-line ellipsis with reserved date/action tracks; tooltips preserve the full clean display title.
-
-
 ### Buttons
 
 | Variant | Visual | Use case |
@@ -1109,3 +1100,7 @@ the JSX-comment form for a text child).
 | 2026-09-29 | **EVENT: Focused task actions follow the recommended next step.** | Tim review on JOV-6709. Alternate completion paths form one progressively disclosed peer group; routine cancellation is a separate quiet exit. This specializes JOV-6942 hierarchy rules without creating a whole-app control cap. |
 
 | 2026-09-14 | BlogCard editorial titles: full live-text titles, no truncation or global fixed height, per-row subgrid tracks (`data-wrap="editorial-title"`) | Founder decision, PR #17852. Only BlogCard is exempt from heading bounds via the explicit marker + both required subgrid tracks; all other heading bounds remain enforced. |
+
+## Shell
+
+EVENT: icon/emoji glyphs are transparent at rest. A hover background must be circular, with equal dimensions and full rounding, owned by `IconGlyphFrame`. Keep an interactive parent's focus ring, hit target, accessible name, tooltip, and selected/pressed semantics. Do not put a rounded-square plate behind the glyph. Semantic status badges, avatars, and complete text actions keep their existing contracts. This applies to Jovie, Ovie, and generated marketing previews. EVENT: tooltips share the canonical compact surface, viewport-safe full wrapping, and 300ms discovery/300ms warm-up timing. Default nested providers reuse the app timing scope; explicit isolated notices and fixtures retain their own timing. History titles use single-line ellipsis with reserved date/action tracks; tooltips preserve the full clean display title.

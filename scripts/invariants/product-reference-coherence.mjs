@@ -184,6 +184,15 @@ export function scanProductNavigationBindings(path, source) {
         detail: `${id}.${key} must consume ${wanted}`,
       });
   };
+  const assertProjection = (id, concept, labelKey, read) => {
+    const bindings = [
+      [labelKey, 'label'],
+      ['href', 'canonicalRoute'],
+    ];
+    if (concept === 'identity') bindings.push(['requiredFlag', 'requiredFlag']);
+    for (const [key, field] of bindings)
+      assertBinding(id, key, read(key), `PRODUCT_ONTOLOGY.${concept}.${field}`);
+  };
   const visit = node => {
     if (
       ts.isVariableDeclaration(node) &&
@@ -200,25 +209,7 @@ export function scanProductNavigationBindings(path, source) {
           .filter(ts.isPropertyAssignment)
           .map(prop => [prop.name.getText(ast), prop.initializer.getText(ast)])
       );
-      assertBinding(
-        id,
-        'name',
-        props.get('name'),
-        `PRODUCT_ONTOLOGY.${concept}.label`
-      );
-      assertBinding(
-        id,
-        'href',
-        props.get('href'),
-        `PRODUCT_ONTOLOGY.${concept}.canonicalRoute`
-      );
-      if (concept === 'identity')
-        assertBinding(
-          id,
-          'requiredFlag',
-          props.get('requiredFlag'),
-          'PRODUCT_ONTOLOGY.identity.requiredFlag'
-        );
+      assertProjection(id, concept, 'name', key => props.get(key));
     }
     if (
       ts.isCallExpression(node) &&
@@ -229,25 +220,10 @@ export function scanProductNavigationBindings(path, source) {
       const id = node.arguments[0].text;
       const concept = expected[id];
       seen.add(id);
-      assertBinding(
-        id,
-        'label',
-        node.arguments[1]?.getText(ast),
-        `PRODUCT_ONTOLOGY.${concept}.label`
+      const slots = { label: 1, href: 4, requiredFlag: 5 };
+      assertProjection(id, concept, 'label', key =>
+        node.arguments[slots[key]]?.getText(ast)
       );
-      assertBinding(
-        id,
-        'href',
-        node.arguments[4]?.getText(ast),
-        `PRODUCT_ONTOLOGY.${concept}.canonicalRoute`
-      );
-      if (concept === 'identity')
-        assertBinding(
-          id,
-          'requiredFlag',
-          node.arguments[5]?.getText(ast),
-          'PRODUCT_ONTOLOGY.identity.requiredFlag'
-        );
     }
     ts.forEachChild(node, visit);
   };
