@@ -1,6 +1,6 @@
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 // JOV-INV-019 follow-up: smartlink-release-screen-proof.spec.ts and
 // smartlink-track-screen-proof.spec.ts were added to
@@ -15,6 +15,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 // ours are always string globs (see the array literal in
 // playwright.config.screenshots.ts), so assert that here rather than at
 // every call site.
+// Load the real configuration during module collection, like other test
+// dependencies. Cold Playwright initialization must not consume the timed
+// discovery assertions' budget; importing this config does not start a server.
 function toGlobFilenames(testMatch: readonly (string | RegExp)[]): string[] {
   return testMatch.map(pattern => {
     if (typeof pattern !== 'string') {
@@ -26,23 +29,25 @@ function toGlobFilenames(testMatch: readonly (string | RegExp)[]): string[] {
   });
 }
 
+async function loadScreenshotsConfig() {
+  const originalBaseUrl = process.env.BASE_URL;
+  try {
+    process.env.BASE_URL = 'http://localhost:3100';
+    return (await import('../../../playwright.config.screenshots')).default;
+  } finally {
+    if (originalBaseUrl === undefined) delete process.env.BASE_URL;
+    else process.env.BASE_URL = originalBaseUrl;
+  }
+}
+
+const config = await loadScreenshotsConfig();
+
 describe('screenshots Playwright config test discovery', () => {
   const productScreenshotsDir = resolve(
     import.meta.dirname,
     '../../../tests/product-screenshots'
   );
-  const originalBaseUrl = process.env.BASE_URL;
-
-  afterEach(() => {
-    if (originalBaseUrl === undefined) delete process.env.BASE_URL;
-    else process.env.BASE_URL = originalBaseUrl;
-  });
-
-  it('matches every *-screen-proof.spec.ts producer on disk', async () => {
-    process.env.BASE_URL = 'http://localhost:3100';
-    const { default: config } = await import(
-      '../../../playwright.config.screenshots'
-    );
+  it('matches every *-screen-proof.spec.ts producer on disk', () => {
     const testMatch = config.testMatch;
     if (!Array.isArray(testMatch)) {
       throw new Error(
@@ -65,11 +70,7 @@ describe('screenshots Playwright config test discovery', () => {
     ).toEqual([]);
   });
 
-  it('does not carry a testMatch entry for a spec that no longer exists', async () => {
-    process.env.BASE_URL = 'http://localhost:3100';
-    const { default: config } = await import(
-      '../../../playwright.config.screenshots'
-    );
+  it('does not carry a testMatch entry for a spec that no longer exists', () => {
     const testMatch = config.testMatch;
     if (!Array.isArray(testMatch)) {
       throw new Error(
