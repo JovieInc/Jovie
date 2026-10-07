@@ -56,13 +56,13 @@ export const chatNavItem: NavItem = {
 };
 
 export const homeNavItem: NavItem = {
-  name: 'Home',
+  name: 'Inbox',
   href: APP_ROUTES.DASHBOARD,
   id: 'home',
   icon: Home,
   iconName: 'Home',
   tier: 'core',
-  description: 'Open your Jovie home',
+  description: 'Review attention, approvals, and replies',
 };
 
 export const libraryNavItem: NavItem = {
