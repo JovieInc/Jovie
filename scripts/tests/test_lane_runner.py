@@ -138,6 +138,44 @@ class ContextManifestTest(unittest.TestCase):
 
 
 class SelectionTest(unittest.TestCase):
+    def test_dispatch_next_precedes_aged_product_and_compounding_work(self):
+        now = datetime(2026, 10, 5, tzinfo=timezone.utc).timestamp()
+        target = issue("JOV-7896", priority=2, created="2026-10-05T00:00:00Z",
+                       labels=["agent-ready", "dispatch-next"])
+        target.title = "Repair account to claim conversion"
+        old = issue("JOV-4258", priority=1, created="2026-09-01T00:00:00Z")
+        old.title = "Strict typography audit"
+        ci = issue("JOV-CI", priority=1, created="2026-09-01T00:00:00Z")
+        ci.title = "Fix CI throughput"
+        for pool in ([old, ci, target], [target, ci, old]):
+            self.assertIs(lane.pick_issue(pool, {}, now=now), target)
+        target.labels.remove("dispatch-next")
+        self.assertIs(lane.pick_issue([old, ci, target], {}, now=now), ci)
+
+    def test_dispatch_next_preserves_admission_and_lane_routing(self):
+        now = 10000.0
+        target = issue("JOV-PIN", labels=["agent-ready", "dispatch-next"])
+        other = issue("JOV-OTHER", priority=1)
+        for kwargs, failures in [
+            ({"in_flight": frozenset({"jov-pin"})}, {}),
+            ({"held_back": frozenset({"JOV-PIN"})}, {}),
+            ({}, {"JOV-PIN": 3}),
+            ({}, {"JOV-PIN": {"count": 1, "at": 9990}}),
+        ]:
+            with self.subTest(kwargs=kwargs, failures=failures):
+                self.assertIs(lane.pick_issue([target, other], failures, now=now, **kwargs), other)
+        for label in ("no-symphony", "type:epic", "auth"):
+            target.labels = ["agent-ready", "dispatch-next", label]
+            self.assertIs(lane.pick_issue([target, other], {}, now=now, provider="devin"), other)
+        target.labels = ["agent-ready", "dispatch-next", "devin"]
+        self.assertIs(lane.pick_issue([target, other], {}, now=now, provider="codex",
+            route=lambda task: {"chosen": {"lane": "devin" if task is target else "codex"}}), other)
+
+    def test_dispatch_next_without_pool_admission_keeps_default_order(self):
+        unadmitted = issue("JOV-PIN", priority=4, labels=["dispatch-next"])
+        urgent = issue("JOV-URGENT", priority=1)
+        self.assertIs(lane.pick_issue([unadmitted, urgent], {}, now=10000), urgent)
+
     def test_rejection_reasons_match_final_worker_admission(self):
         red = issue("JOV-RED")
         red.title = "Rotate production credentials"
@@ -788,7 +826,7 @@ class LinearClientTest(unittest.TestCase):
             env.write_text('export LINEAR_API_KEY="lin_api_x"\n')
             client = lane.Linear(env)
             self.assertEqual(client.key, "lin_api_x")
-            payload = {"data": {"issues": {"nodes": [{
+            payload = {"data": {"issues": {"pageInfo": {"hasNextPage": False}, "nodes": [{
                 "id": "i1", "identifier": "JOV-5", "title": "t", "description": None, "priority": 2,
                 "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": [{"name": "devin"}]}}]}}}
             real = lane.urllib.request.urlopen
@@ -834,7 +872,8 @@ class LinearClientTest(unittest.TestCase):
         self.assertEqual(seen, [None, "c1"])
         endless = {"issues": {"pageInfo": {"hasNextPage": True, "endCursor": "c"}, "nodes": [node(3)]}}
         client.gql = lambda query, variables: endless
-        self.assertEqual(len(client.lane_issues("codex")), lane.LANE_ISSUE_PAGES)
+        with self.assertRaises(lane.LaneInventoryUnknown):
+            client.lane_issues("codex")
 
     def test_missing_key_is_a_clear_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -842,6 +881,74 @@ class LinearClientTest(unittest.TestCase):
             env.write_text("OTHER=1\n")
             with self.assertRaises(SystemExit):
                 lane.Linear(env)
+
+
+class NativeInventoryBoundaryTest(unittest.TestCase):
+    def client(self, pages):
+        client = lane.Linear.__new__(lane.Linear)
+        calls = []
+        def gql(query, variables):
+            calls.append((query, variables["after"]))
+            page = pages[len(calls) - 1]
+            if isinstance(page, Exception):
+                raise page
+            return page
+        client.gql = gql
+        return client, calls
+
+    def node(self, index):
+        return {"id": str(index), "identifier": f"JOV-{index}", "title": "task", "description": "",
+                "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": []}}
+
+    def test_complete_native_candidate_and_ownership_scans_include_page101_and_dedupe(self):
+        for method in ("lane_issues", "active_lane_issues"):
+            first = [self.node(i) for i in range(100)]
+            client, calls = self.client([
+                {"issues": {"nodes": first, "pageInfo": {"hasNextPage": True, "endCursor": "next"}}},
+                {"issues": {"nodes": [first[-1], self.node(100)], "pageInfo": {"hasNextPage": False}}},
+            ])
+            rows = getattr(client, method)("codex" if method == "lane_issues" else ["codex"])
+            self.assertEqual(len(rows), 101)
+            self.assertEqual([after for _, after in calls], [None, "next"])
+
+    def test_native_scans_reject_unknown_coverage_without_increasing_request_cap(self):
+        cases = [
+            [{"issues": {"nodes": [self.node(1)]}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True}}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "same"}}}] * 2,
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": str(i)}}}
+             for i in range(lane.LANE_ISSUE_PAGES)],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "next"}}}, RuntimeError("read failed")],
+        ]
+        for method in ("lane_issues", "active_lane_issues"):
+            for pages in cases:
+                with self.subTest(method=method, pages=len(pages)):
+                    client, calls = self.client(pages)
+                    with self.assertRaises(RuntimeError):
+                        getattr(client, method)("codex" if method == "lane_issues" else ["codex"])
+                    self.assertLessEqual(len(calls), lane.LANE_ISSUE_PAGES)
+                    self.assertTrue(all(query.startswith("query(") for query, _ in calls))
+
+    def test_partial_cross_host_inventory_is_unknown_and_old_cache_cannot_admit(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}), \
+                patch.object(lane, "SHARED_CACHE_DIR", Path(tmp)), \
+                patch.object(lane.file_overlap, "guard_mode", return_value="enforce"), \
+                patch.object(lane.file_overlap, "local_tasks", return_value=[]), \
+                patch.object(lane, "overlap_prs_summary", return_value=[]), \
+                patch.object(lane, "load_providers", return_value={"codex": {"label": "codex"}}):
+            (Path(tmp) / "file-overlap-tasks.json").write_text(json.dumps({"at": time.time(), "value": []}))
+            (Path(tmp) / "claim-lane-issues-codex.json").write_text(json.dumps({"at": time.time(), "value": []}))
+            pages = [{"issues": {"nodes": [self.node(1)], "pageInfo": {"hasNextPage": True}}}]
+            client, calls = self.client(pages)
+            self.assertIsNone(lane.overlap_inventory(SimpleNamespace(state=Path(tmp)), client))
+            self.assertEqual(len(calls), 1)
+            self.assertFalse((Path(tmp) / "file-overlap-tasks-v2.json").exists())
+            client, calls = self.client(pages)
+            with self.assertRaises(lane.LaneInventoryUnknown):
+                client.lane_issues("codex")
+            self.assertEqual(len(calls), 1)
+            self.assertFalse((Path(tmp) / "claim-lane-issues-v2-codex.json").exists())
 
 
 class LinearRateLimitTest(unittest.TestCase):
@@ -1169,7 +1276,7 @@ class ClaimScanCacheTest(unittest.TestCase):
         saved = lane.shared
 
         def cached(key, ttl, fetch):
-            self.assertEqual(key, "claim-lane-issues-codex")
+            self.assertEqual(key, "claim-lane-issues-v2-codex")
             self.assertLessEqual(ttl, 60)
             self.assertEqual(calls, [], "pagination must not run before the cache fill")
             return [{"id": "i", "identifier": "JOV-9", "title": "t", "description": "", "priority": 1,
@@ -1973,6 +2080,68 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(fixed, [9])
         self.assertEqual(self.linear.moves, [])
 
+    def test_subscription_slot_reaches_existing_repair_adapter_without_new_intake(self):
+        # Exercise the real provider command with a model-free CLI. Repair target
+        # admission remains the existing claim seam; no remote assignment is made.
+        root = self.host.state
+        cli = root / "fake-codex"
+        cli.write_text(f"#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n"
+                       "if sys.argv[1:]==['login','status']:\n print('Logged in using ChatGPT'); sys.exit(0)\n"
+                       f"Path({str(root / 'repair-launch.json')!r}).write_text(json.dumps(sys.argv))\n"
+                       "sys.stdin.read(); print('repair completed')\n")
+        cli.chmod(0o700)
+        spec = json.loads((ROOT / "scripts/lanes/providers.json").read_text())["codex"]
+        spec = {**spec, "slots": 1}
+        lane.load_providers = lambda: {"codex": spec}
+        lane.claim_red_pr = lambda *a: {"number": 9}
+        lane.read_new_issue_budget = lambda *a: self.fail("repair must precede new-intake budget")
+        prompt = root / "repair.prompt"
+        prompt.write_text("Repair the admitted existing PR")
+        receipt = root / "provider.jsonl"
+        def repair(host, name, provider, pr):
+            self.assertEqual((name, pr["number"]), ("codex", 9))
+            command = lane.template(provider["cmd"], {"prompt_file": str(prompt),
+                                    "provider_receipt": str(receipt), "cwd": str(root)})
+            command[0] = sys.executable
+            result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        lane.fix_red_pr = repair
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login",
+                        "CODEX_LANE_CLI": str(cli), "CODEX_HOME": str(root / "existing-login"),
+                        "LANES_STATE": str(root), "LANES_SLOTS_CODEX": "0"}):
+            self.assertEqual(lane.worker(self.host, "codex"), 0)
+            self.assertFalse(receipt.exists(), "an inactive adapter cannot restore repair throughput")
+            os.environ["LANES_SLOTS_CODEX"] = "1"
+            self.assertEqual(lane.worker(self.host, "codex"), 0)
+        rows = [json.loads(row) for row in receipt.read_text().splitlines()]
+        self.assertEqual([(row["event"], row["account"]) for row in rows],
+                         [("account-leased", "current-login"), ("cli-launch", "current-login")])
+        argv = json.loads((root / "repair-launch.json").read_text())
+        self.assertIn('forced_login_method="chatgpt"', argv)
+        self.assertEqual(self.linear.moves, [], "repair does not create another issue assignment")
+
+    def test_terminal_publication_precedes_the_unchanged_new_issue_budget(self):
+        pr = {"number": 9, "headRefOid": "h", "headRefName": "devin/jov-9-20261005",
+              "state": "OPEN", "isDraft": True, "mergeStateStatus": "DIRTY", "labels": []}
+        record = {"sha": "h", "count": 2, "lane": "devin", "at": time.time() - 2,
+                  "endedAt": time.time() - 1, "pushed": False, "repairVerdict": "failed",
+                  "repairRunId": "run", "repairBranch": pr["headRefName"], "repairHeadBefore": "h"}
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"9": record}))
+        other = {**pr, "number": 10, "headRefName": "devin/jov-10-20261005", "labels": []}
+        lane.fix_candidates = lambda name: [pr]
+        lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, [pr, other])
+        claimed = []
+        lane.run_issue = lambda host, name, spec, linear, issue: claimed.append(issue.identifier) or {"verdict": "landing"}
+        def publish(number, kind, sh):
+            pr["labels"].append({"name": "lane-fix-exhausted"})
+            return True
+        with patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.pr_events, "add_label", side_effect=publish):
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(claimed, ["JOV-3"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["9"], record)
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -1980,6 +2149,111 @@ class WorkerTest(unittest.TestCase):
         self.linear.issues = []
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(self.linear.moves, [])
+
+
+class ExhaustedRepairPublicationTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=ROOT, linear_env=Path("unused"))
+        self.pr = {"number": 20590, "headRefName": "devin/jov-7596-20261004t090735",
+                   "headRefOid": "h", "state": "OPEN", "isDraft": True,
+                   "mergeStateStatus": "DIRTY", "labels": [{"name": "lane-fix-conflict"}]}
+        self.record = {"sha": "h", "count": 2, "lane": "devin", "at": 100,
+                       "endedAt": 200, "pushed": False, "repairRunId": "ended-run",
+                       "repairBranch": self.pr["headRefName"], "repairHeadBefore": "h", "repairVerdict": "failed"}
+        self.save(self.record)
+
+    def save(self, record):
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"20590": record}))
+
+    def test_finished_exhaustion_publishes_terminal_label_and_unblocks_original_budget(self):
+        rows = [self.pr, {**self.pr, "number": 20672, "headRefName": "devin/jov-2135-20261005", "labels": []}]
+        self.assertFalse(lane.new_issue_budget("devin", 1, rows)["allowed"])
+        def publish(number, kind, sh):
+            self.assertEqual((number, kind), (20590, "exhausted"))
+            self.pr["labels"].append({"name": "lane-fix-exhausted"})
+            return True
+        with patch.object(lane, "reconcile_fix_target", return_value=dict(self.pr)), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.pr_events, "add_label", side_effect=publish) as published:
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", rows, now=300), 1)
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", rows, now=300), 0)
+        result = lane.new_issue_budget("devin", 1, rows)
+        self.assertEqual((result["allowed"], result["used"], result["cap"], result["terminal"],
+                          result["terminalCap"]), (True, 1, 2, 1, 4))
+        self.assertEqual(published.call_count, 1)
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["20590"], self.record)
+
+    def test_missing_or_unfinished_provenance_never_authorizes_publication(self):
+        cases = [{**self.record, key: value} for key, value in [
+            ("sha", "other"), ("count", 1), ("count", True), ("pushed", True),
+            ("endedAt", None), ("endedAt", 301), ("endedAt", 50), ("at", float("nan")),
+            ("repairRunId", None), ("repairBranch", "other"), ("repairHeadBefore", "other"),
+            ("lane", "codex"), ("repairVerdict", None), ("repairVerdict", "cancelled"),
+            ("repairVerdict", "disk-held")]]
+        for record in cases:
+            with self.subTest(record=record), patch.object(lane, "reconcile_fix_target") as fresh, \
+                    patch.object(lane.pr_events, "add_label") as published:
+                self.save(record)
+                self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                fresh.assert_not_called(); published.assert_not_called()
+
+    def test_fresh_head_queue_holds_and_cross_host_claims_remain_protected(self):
+        cases = [None, {**self.pr, "headRefOid": "new"}, {**self.pr, "state": "MERGED"},
+                 {**self.pr, "headRefName": "other"}, {**self.pr, "isCrossRepository": True},
+                 {**self.pr, "isInMergeQueue": True}, {**self.pr, "mergeStateStatus": "CLEAN", "isDraft": False},
+                 {**self.pr, "labels": [{"name": "tim-hold"}]},
+                 {**self.pr, "labels": [{"name": "lane-fix-escalating"}]}]
+        for live in cases:
+            with self.subTest(live=live), patch.object(lane, "reconcile_fix_target", return_value=live), \
+                    patch.object(lane.pr_events, "claim_active", return_value=False), \
+                    patch.object(lane.pr_events, "add_label") as published:
+                self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                published.assert_not_called()
+        for claims in [(True, False), (False, True)]:
+            with patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                    patch.object(lane.pr_events, "claim_active", side_effect=claims), \
+                    patch.object(lane.pr_events, "add_label") as published:
+                self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                published.assert_not_called()
+
+    def test_failed_label_write_keeps_the_same_receipt_retryable(self):
+        with patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.pr_events, "add_label", side_effect=[False, True]) as published:
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 1)
+        self.assertEqual(published.call_count, 2)
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["20590"], self.record)
+
+    def test_running_local_repair_or_gate_prevents_publication(self):
+        for kind in ("repair", "gate"):
+            lock = (lane.Locked(self.host.state / "locks/repair-pr-20590.lock", blocking=False)
+                    if kind == "repair" else lane.reserve_gate(self.host, self.pr).lock)
+            try:
+                with patch.object(lane, "reconcile_fix_target") as fresh, \
+                        patch.object(lane.pr_events, "add_label") as published:
+                    self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+                    fresh.assert_not_called(); published.assert_not_called()
+            finally:
+                lock.release()
+
+    def test_receipt_verdict_is_recorded_without_resetting_attempts(self):
+        old = {key: value for key, value in self.record.items() if key != "repairVerdict"}
+        self.save(old)
+        lane.end_local_fix_attempt(self.host, self.pr, {"verdict": "failed", "runId": "ended-run",
+                                   "branch": self.pr["headRefName"], "headBefore": "h"})
+        saved = json.loads((self.host.state / "fix-attempts.json").read_text())["20590"]
+        self.assertEqual((saved["repairVerdict"], saved["count"], saved["sha"], saved["pushed"]),
+                         ("failed", 2, "h", False))
+
+    def test_unreadable_claim_does_not_fabricate_terminal_publication(self):
+        with patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                patch.object(lane.pr_events, "claim_active", side_effect=subprocess.TimeoutExpired("gh", 30)), \
+                patch.object(lane.pr_events, "add_label") as published:
+            self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", [self.pr], now=300), 0)
+            published.assert_not_called()
 
 
 class NewIssueBudgetTest(unittest.TestCase):
@@ -2339,6 +2613,32 @@ class DispatchTest(unittest.TestCase):
         clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
         clock.start()
         self.addCleanup(clock.stop)
+
+    def test_coding_dispatch_continues_when_coordinator_reasoning_and_alerts_are_unavailable(self):
+        # Summer/Gateway failure affects optional reasoning and observability, not
+        # the independently admitted coding lane. Keep all existing disk/slot gates.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane.pr_events, "tick", return_value={}), \
+                patch.object(lane.reason_lane, "tick", side_effect=RuntimeError("credits unavailable")), \
+                patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.dispatch(host), 0)
+            self.assertEqual(spawn.call_count, 1)
+            self.assertEqual(spawn.call_args.args[0][-1], "codex")
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertEqual(tick["spawned"], ["codex"])
+            self.assertIsNone(tick["error"])
+            self.assertIn("reasonError", tick)
+            self.assertIn("doctorError", tick)
 
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
@@ -3714,7 +4014,8 @@ class UpdateTest(unittest.TestCase):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 
     def test_release_selftest_never_sees_host_tuning(self):
-        knobs = {"LANES_SLOTS_DEVIN": "2", "SYMPHONY_FILE_OVERLAP_GUARD": "flag", "LANES_PARKED_RETIRE": "0"}
+        knobs = {"LANES_SLOTS_DEVIN": "2", "SYMPHONY_FILE_OVERLAP_GUARD": "flag", "LANES_PARKED_RETIRE": "0",
+                 "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": "/host/codex"}
         with patch.dict(os.environ, {**knobs, "PATH": "/bin"}):
             env = lane.selftest_env(Path("/scratch"))
         self.assertFalse(set(knobs) & set(env))
@@ -4370,6 +4671,155 @@ class RequeueTest(unittest.TestCase):
 
 
 
+class RepairCheckPaginationTest(unittest.TestCase):
+    def target(self):
+        return {"number": 5, "headRefName": "devin/jov-1-20260926t0900", "headRefOid": "h1",
+                "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
+                "state": "OPEN", "labels": [], "statusCheckRollup": []}
+
+    def page(self, start=0, count=100, *, more=True, cursor="page-1"):
+        page = repair_target_page(self.target())
+        contexts = page["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]
+        contexts.update(pageInfo={"hasNextPage": more, "endCursor": cursor}, nodes=[
+            {"__typename": "CheckRun", "id": f"check-{index}", "name": f"required-{index}",
+             "status": "COMPLETED", "conclusion": "SUCCESS"} for index in range(start, start + count)])
+        contexts.update(totalCount=101, checkRunCount=101, statusContextCount=0,
+                        checkRunCountsByState=[{"state": "SUCCESS", "count": 101}],
+                        statusContextCountsByState=[])
+        return page
+
+    def contexts(self, page):
+        return page["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]
+
+    def census(self, pages):
+        groups = ({}, {})
+        for page in pages:
+            for row in self.contexts(page)["nodes"]:
+                index = 0 if row["__typename"] == "CheckRun" else 1
+                state = (row.get("conclusion") if row["status"] == "COMPLETED" else row["status"]) \
+                    if index == 0 else row["state"]
+                groups[index][state] = groups[index].get(state, 0) + 1
+        totals = [sum(group.values()) for group in groups]
+        for page in pages:
+            self.contexts(page).update(totalCount=sum(totals), checkRunCount=totals[0],
+                statusContextCount=totals[1],
+                checkRunCountsByState=[{"state": key, "count": count} for key, count in groups[0].items()],
+                statusContextCountsByState=[{"state": key, "count": count} for key, count in groups[1].items()])
+
+    def read(self, pages, *, census=True):
+        if census and all(page.get("data", {}).get("repository", {}).get("pullRequest", {}).get("state") == "OPEN" for page in pages):
+            self.census(pages)
+        responses = [SimpleNamespace(returncode=0, stdout=json.dumps(page), stderr="") for page in pages]
+        with patch.object(lane, "sh", side_effect=responses) as command:
+            result = lane.reconcile_fix_target(self.target())
+        return result, command
+
+    def test_required_failure_beyond_first_hundred_is_complete_repair_evidence(self):
+        first, second = self.page(), self.page(100, 1, more=False)
+        self.contexts(second)["nodes"][0]["conclusion"] = "FAILURE"
+        live, command = self.read([first, second])
+        self.assertEqual(len(live["statusCheckRollup"]), 101)
+        self.assertEqual(lane.red_pr([live], {})["number"], 5)
+        self.assertNotIn("cursor=page-1", command.call_args_list[0].args[0])
+        self.assertIn("cursor=page-1", command.call_args_list[1].args[0])
+        self.assertTrue(all(call.kwargs["timeout"] == 30 for call in command.call_args_list))
+
+    def test_pending_on_later_page_cannot_be_hidden_by_earlier_failure(self):
+        for state in ("IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED", "UNKNOWN"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            self.contexts(first)["nodes"][0]["conclusion"] = "FAILURE"
+            self.contexts(second)["nodes"][0].update(status=state, conclusion=None)
+            live, _ = self.read([first, second])
+            with self.subTest(state=state): self.assertIsNone(lane.red_pr([live], {}))
+
+    def test_legacy_pending_on_later_page_suppresses_repair_without_expanding_red_policy(self):
+        for state in ("PENDING", "EXPECTED", "ERROR", "FAILURE"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            self.contexts(second)["nodes"] = [{"__typename": "StatusContext", "id": "legacy",
+                                              "context": "legacy", "state": state}]
+            live, _ = self.read([first, second])
+            self.assertIsNone(lane.red_pr([live], {}), "legacy failures alone retain their original authority")
+            self.contexts(first)["nodes"][0]["conclusion"] = "FAILURE"
+            live, _ = self.read([first, second])
+            self.assertEqual(lane.red_pr([live], {}) is None, state in {"PENDING", "EXPECTED"})
+
+    def test_changed_global_count_or_pending_state_census_refuses_partial_snapshot(self):
+        for fault in ("inserted-before-cursor", "pending-earlier-page", "missing-counts", "wrong-length", "malformed-count"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            self.census([first, second])
+            connection = self.contexts(second)
+            if fault == "inserted-before-cursor":
+                connection.update(totalCount=102, checkRunCount=102,
+                                  checkRunCountsByState=[{"state": "SUCCESS", "count": 102}])
+            if fault == "pending-earlier-page":
+                connection["checkRunCountsByState"] = [{"state": "SUCCESS", "count": 100}, {"state": "IN_PROGRESS", "count": 1}]
+            if fault == "missing-counts": self.contexts(first).pop("checkRunCountsByState")
+            if fault == "wrong-length":
+                for page in (first, second):
+                    self.contexts(page).update(totalCount=102, checkRunCount=102,
+                        checkRunCountsByState=[{"state": "SUCCESS", "count": 102}])
+            if fault == "malformed-count": self.contexts(first)["totalCount"] = True
+            with self.subTest(fault=fault): self.assertIsNone(self.read([first, second], census=False)[0])
+
+    def test_stable_but_wrong_state_census_cannot_certify_stale_earlier_page(self):
+        first, second = self.page(), self.page(100, 1, more=False)
+        self.census([first, second])
+        for page in (first, second):
+            self.contexts(page)["checkRunCountsByState"] = [
+                {"state": "SUCCESS", "count": 100}, {"state": "QUEUED", "count": 1}]
+        self.assertIsNone(self.read([first, second], census=False)[0])
+
+    def test_changed_head_queue_review_or_hold_never_splices_page_authority(self):
+        for field, value in (("headRefOid", "h2"), ("headRefName", "other-branch"),
+                             ("isInMergeQueue", True), ("isCrossRepository", True),
+                             ("isDraft", True), ("mergeStateStatus", "DIRTY"),
+                             ("reviewDecision", "CHANGES_REQUESTED")):
+            first, second = self.page(), self.page(100, 1, more=False)
+            node = second["data"]["repository"]["pullRequest"]
+            node[field] = value
+            if field == "headRefOid":
+                node["commits"]["nodes"][0]["commit"]["oid"] = value
+            with self.subTest(field=field):
+                self.assertIsNone(self.read([first, second])[0])
+        first, second = self.page(), self.page(100, 1, more=False)
+        second["data"]["repository"]["pullRequest"]["labels"]["nodes"] = [{"name": "hold"}]
+        self.assertIsNone(self.read([first, second])[0])
+
+    def test_partial_error_duplicate_cursor_or_context_refuses_repair(self):
+        for fault in ("cursor", "missing-cursor", "duplicate-id", "missing-id", "empty", "errors"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            connection = self.contexts(second)
+            if fault == "cursor": connection["pageInfo"].update(hasNextPage=True, endCursor="page-1")
+            if fault == "missing-cursor": self.contexts(first)["pageInfo"].pop("endCursor")
+            if fault == "duplicate-id": connection["nodes"][0]["id"] = "check-0"
+            if fault == "missing-id": connection["nodes"][0].pop("id")
+            if fault == "empty": connection["nodes"] = []
+            if fault == "errors": second["errors"] = [{"message": "partial response"}]
+            with self.subTest(fault=fault): self.assertIsNone(self.read([first, second])[0])
+        for failure in (OSError("unavailable"), subprocess.TimeoutExpired("gh", 30),
+                        SimpleNamespace(returncode=75, stdout="", stderr="budget floor")):
+            with self.subTest(failure=type(failure).__name__), patch.object(lane, "sh", side_effect=[
+                    SimpleNamespace(returncode=0, stdout=json.dumps(self.page())), failure]):
+                self.assertIsNone(lane.reconcile_fix_target(self.target()))
+
+    def test_fixed_page_limit_refuses_overflow_without_more_reads(self):
+        pages = [self.page(index * 100, cursor=f"page-{index + 1}")
+                 for index in range(lane.REPAIR_CHECK_PAGES)]
+        live, command = self.read(pages)
+        self.assertIsNone(live)
+        self.assertEqual(command.call_count, 5)
+        self.contexts(pages[-1])["pageInfo"]["hasNextPage"] = False
+        live, command = self.read(pages)
+        self.assertEqual(len(live["statusCheckRollup"]), 500)
+        self.assertEqual(command.call_count, 5)
+
+    def test_positive_terminal_evidence_on_later_page_still_cancels_work(self):
+        terminal = {"data": {"repository": {"pullRequest": {"number": 5, "state": "MERGED"}}}}
+        live, command = self.read([self.page(), terminal])
+        self.assertEqual(live["state"], "MERGED")
+        self.assertEqual(command.call_count, 2)
+
+
 class RepairQueueAuthorityTest(unittest.TestCase):
     def target(self):
         return {"number": 5, "headRefName": "devin/jov-1-20260926t0900", "headRefOid": "h1",
@@ -4479,6 +4929,388 @@ class RepairQueueAuthorityTest(unittest.TestCase):
             self.assertEqual(receipt["reasons"], ["target-pr-queued"])
             self.assertNotIn("execution", receipt)
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["5"]["count"], 1)
+
+class LifecycleOwnershipTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.state = Path(self.temp.name)
+        self.host = lane.Host(state=self.state)
+        self.lock = self.state / "lifecycle.lock"
+
+    def exclusive(self):
+        handle = self.lock.open("a+")
+        try:
+            lane.fcntl.flock(handle, lane.fcntl.LOCK_EX | lane.fcntl.LOCK_NB)
+        except BaseException:
+            handle.close()
+            raise
+        return handle
+
+    def assert_activation_held(self):
+        with self.assertRaises(BlockingIOError):
+            self.exclusive()
+
+    def test_exclusive_fence_denies_all_controller_effects(self):
+        handle = self.exclusive()
+        try:
+            for command in (["update"], ["dispatch"], ["worker", "--provider", "codex"],
+                            ["gate-command", "--timeout", "1", "--", "true"]):
+                with self.subTest(command=command), patch.object(lane, "Host", return_value=self.host), \
+                        patch.object(lane, "load_github_env") as identity, \
+                        patch.object(lane, "guarded_main") as effects:
+                    self.assertEqual(lane.main(command), 75)
+                    identity.assert_not_called()
+                    effects.assert_not_called()
+            with patch.dict(sys.modules, {"lane_runner": lane}), \
+                    patch.object(lane, "Host", return_value=self.host), \
+                    patch.object(lane.reason_lane, "guarded_main") as reason, \
+                    patch.object(lane.yc_corpus, "refresh") as corpus, \
+                    patch.object(lane.worktree_sweep, "guarded_main") as sweep:
+                self.assertEqual(lane.reason_lane.main(["drain"]), 75)
+                self.assertEqual(lane.yc_corpus.main(["refresh", "--state", str(self.state / "yc.json")]), 75)
+                self.assertEqual(lane.worktree_sweep.main(["--state", str(self.state)]), 75)
+                for effect in (reason, corpus, sweep):
+                    effect.assert_not_called()
+        finally:
+            handle.close()
+
+    def test_controller_guard_precedes_identity_and_work(self):
+        for command, target in ((["update"], "update"), (["dispatch"], "dispatch"),
+                                (["worker", "--provider", "codex"], "worker")):
+            with self.subTest(command=command), patch.object(lane, "Host", return_value=self.host), \
+                    patch.object(lane, "load_github_env", side_effect=self.assert_activation_held), \
+                    patch.object(lane, target, side_effect=lambda *args: self.assert_activation_held() or 0):
+                self.assertEqual(lane.main(command), 0)
+            with self.exclusive():
+                pass
+
+    def test_forged_closed_and_wrong_inode_descriptors_fail_closed(self):
+        other = self.state / "other.lock"
+        with other.open("a+") as handle:
+            for value in ("not-a-fd", "2", "999999", str(handle.fileno())):
+                with self.subTest(value=value), patch.dict(os.environ, {lane.lifecycle.FD_ENV: value}):
+                    with self.assertRaises(lane.lifecycle.AdmissionHeld):
+                        with lane.lifecycle.Guard(self.state):
+                            self.fail("forged descriptor admitted")
+            self.assertEqual(os.fstat(handle.fileno()).st_ino, other.stat().st_ino)
+
+    def test_unlocked_canonical_descriptor_does_not_bypass_exclusive_owner(self):
+        with self.exclusive(), self.lock.open("r") as handle, \
+                patch.dict(os.environ, {lane.lifecycle.FD_ENV: str(handle.fileno())}):
+            with self.assertRaises(lane.lifecycle.AdmissionHeld):
+                with lane.lifecycle.Guard(self.state):
+                    self.fail("exclusive fence bypassed")
+
+    def test_symlink_and_replaced_canonical_lock_fail_closed(self):
+        other = self.state / "other.lock"
+        other.touch()
+        self.lock.symlink_to(other)
+        with self.assertRaises(lane.lifecycle.AdmissionHeld):
+            with lane.lifecycle.Guard(self.state):
+                pass
+        self.lock.unlink()
+        with lane.lifecycle.Guard(self.state):
+            self.lock.unlink()
+            self.lock.touch()
+            with self.assertRaises(lane.lifecycle.AdmissionHeld):
+                lane.lifecycle.spawn_kwargs()
+
+    def child_script(self, gate_fd):
+        return ("import os,sys; from pathlib import Path; "
+                f"sys.path.insert(0, {str(ROOT / 'scripts/lanes')!r}); import lifecycle; "
+                "print('waiting', flush=True); "
+                f"os.read({gate_fd},1); "
+                f"guard=lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                "print('admitted',flush=True); guard.__exit__()")
+
+    def test_delayed_detached_spawn_retains_guard_after_parent_close(self):
+        read, write = os.pipe()
+        process = None
+        try:
+            with lane.lifecycle.Guard(self.state):
+                process = subprocess.Popen([sys.executable, "-u", "-c", self.child_script(read)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
+                    **lane.lifecycle.spawn_kwargs(pass_fds=(read,)))
+                self.assertEqual(process.stdout.readline().strip(), "waiting")
+            self.assert_activation_held()
+            os.write(write, b"1")
+            stdout, stderr = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stdout.strip(), "admitted")
+            with self.exclusive():
+                pass
+        finally:
+            os.close(read); os.close(write)
+            if process is not None and process.poll() is None:
+                process.kill(); process.communicate(timeout=10)
+
+    def test_actual_exec_retains_guard_before_new_generation_adopts_it(self):
+        read, write = os.pipe()
+        process = None
+        try:
+            script = ("import os,sys; from pathlib import Path; "
+                      f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lifecycle; "
+                      f"guard=lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                      "lifecycle.prepare_reexec(); "
+                      f"os.set_inheritable({read},True); "
+                      f"os.execv(sys.executable,[sys.executable,'-u','-c',{self.child_script(read)!r}])")
+            process = subprocess.Popen([sys.executable, "-u", "-c", script], pass_fds=(read,),
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                env=lane.selftest_env(self.state))
+            self.assertEqual(process.stdout.readline().strip(), "waiting")
+            self.assert_activation_held()
+            os.write(write, b"1")
+            stdout, stderr = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stdout.strip(), "admitted")
+            with self.exclusive():
+                pass
+        finally:
+            os.close(read); os.close(write)
+            if process is not None and process.poll() is None:
+                process.kill(); process.communicate(timeout=10)
+
+    def test_owned_detached_controllers_inherit_the_same_guard(self):
+        repo = self.state / "repo"
+        (repo / ".git").mkdir(parents=True)
+        with lane.lifecycle.Guard(self.state) as guard, \
+                patch.object(lane.reason_lane, "queued_jobs", return_value=[{}]), \
+                patch.object(lane.worktree_sweep.subprocess, "Popen") as sweep, \
+                patch.object(lane.worktree_pool, "enabled", return_value=True):
+            reason = Mock(); corpus = Mock()
+            lane.reason_lane.tick(self.host, lane, Mock(), config={"label": "reasoning-job"}, spawn=reason)
+            lane.yc_corpus.tick(self.state, spawn=corpus, now=time.time())
+            lane.worktree_sweep.maybe_spawn(self.state, repo, 50, now=time.time())
+            sweep_call = sweep.call_args
+            lane.worktree_pool.refill_in_background(repo, self.state / "fill.log")
+            for call in (reason.call_args, corpus.call_args, sweep_call, sweep.call_args):
+                self.assertIn(guard.fd, call.kwargs["pass_fds"])
+                self.assertEqual(call.kwargs["env"][lane.lifecycle.FD_ENV], str(guard.fd))
+                self.assertEqual(call.kwargs["env"]["LANES_STATE"], str(self.state.resolve()))
+
+    def test_pool_refill_rejects_forged_inheritance_before_git_or_install(self):
+        with patch.dict(os.environ, {lane.lifecycle.FD_ENV: "999999", "LANES_STATE": str(self.state)}), \
+                patch.object(lane.worktree_pool, "guarded_main") as effects:
+            self.assertEqual(lane.worktree_pool.main(["--fill"]), 75)
+            effects.assert_not_called()
+
+    def test_standalone_pool_utility_keeps_its_existing_behavior(self):
+        with patch.dict(os.environ, {}, clear=False), \
+                patch.object(lane.worktree_pool, "guarded_main", return_value=0) as effects:
+            os.environ.pop(lane.lifecycle.FD_ENV, None)
+            self.assertEqual(lane.worktree_pool.main(["--status"]), 0)
+            effects.assert_called_once_with(["--status"])
+
+    def test_gate_child_retains_guard_after_parent_closes(self):
+        started = self.state / "gate-started"
+        done = self.state / "gate-done"
+        command = ("from pathlib import Path; import time; "
+                   f"Path({str(started)!r}).touch(); "
+                   f"deadline=time.monotonic()+8\nwhile not Path({str(done)!r}).exists():\n"
+                   " if time.monotonic()>deadline: raise RuntimeError('test gate not released')\n"
+                   " time.sleep(.01)\n")
+        results = []
+        with (self.state / "gate-owner.lock").open("a+") as owner:
+            with lane.lifecycle.Guard(self.state):
+                thread = threading.Thread(target=lambda: results.append(
+                    lane.sh([sys.executable, "-c", command], timeout=10, pass_fds=(owner.fileno(),))))
+                thread.start()
+                deadline = time.monotonic() + 8
+                while not started.exists() and time.monotonic() < deadline:
+                    time.sleep(.01)
+                self.assertTrue(started.exists(), "gate command did not start")
+            try:
+                self.assert_activation_held()
+            finally:
+                done.touch()
+                thread.join(timeout=12)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0].returncode, 0, results[0].stderr)
+            with self.exclusive():
+                pass
+
+    def test_worker_death_leaves_live_provider_under_helper_guard(self):
+        started = self.state / "provider-started"
+        done = self.state / "provider-done"
+        agent = ("from pathlib import Path; import os,time; "
+                 "os.fstat(int(os.environ['LANES_LIFECYCLE_FD'])); "
+                 f"Path({str(started)!r}).touch(); "
+                 f"deadline=time.monotonic()+10\nwhile not Path({str(done)!r}).exists():\n"
+                 " if time.monotonic()>deadline: raise RuntimeError('test provider not released')\n"
+                 " time.sleep(.01)\n")
+        worker = ("import sys; from pathlib import Path; "
+                  f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lane_runner as lane; "
+                  f"guard=lane.lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                  f"lane.run_agent([sys.executable,'-c',{agent!r}],Path({str(self.state)!r}),sys.stdout,15)")
+        process = subprocess.Popen([sys.executable, "-u", "-c", worker],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=lane.selftest_env(self.state))
+        try:
+            deadline = time.monotonic() + 8
+            while not started.exists() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertTrue(started.exists(), "fake provider did not start")
+            process.kill()  # this test-created parent; no real provider/assignment
+            process.wait(timeout=5)
+            self.assert_activation_held()
+            done.touch()
+            deadline = time.monotonic() + 10
+            while True:
+                try:
+                    with self.exclusive():
+                        break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        self.fail("fake provider helper did not drain")
+                    time.sleep(.01)
+        finally:
+            done.touch()
+            if process.poll() is None:
+                process.kill()
+            process.communicate(timeout=5)
+
+    def test_owned_command_preserves_stdin_streams_exit_and_child_state(self):
+        child_state = self.state / "scratch"
+        command = [sys.executable, "-c", "import os,sys; print(sys.stdin.read()); "
+                   "print(os.environ['LANES_STATE']); print('diagnostic',file=sys.stderr); sys.exit(124)"]
+        with lane.lifecycle.Guard(self.state):
+            result = lane.lifecycle.run(command, input="payload", capture_output=True, text=True,
+                env={**os.environ, "LANES_STATE": str(child_state)}, timeout=5)
+            self.assertEqual(result.args, command)
+            self.assertEqual(result.returncode, 124)
+            self.assertEqual(result.stdout.splitlines(), ["payload", str(child_state)])
+            self.assertEqual(result.stderr, "diagnostic\n")
+            with self.assertRaises(subprocess.CalledProcessError) as error:
+                lane.lifecycle.run([sys.executable, "-c", "raise SystemExit(7)"],
+                                   capture_output=True, text=True, check=True, timeout=5)
+            self.assertEqual(error.exception.returncode, 7)
+        with self.exclusive():
+            pass
+
+    def test_owned_missing_command_releases_without_a_child(self):
+        with lane.lifecycle.Guard(self.state):
+            started = time.monotonic()
+            with self.assertRaises(FileNotFoundError):
+                lane.lifecycle.run([str(self.state / "absent-command")],
+                                   capture_output=True, text=True, timeout=1)
+            self.assertLess(time.monotonic() - started, 5)
+        with self.exclusive():
+            pass
+
+    def test_owned_timeout_reports_only_after_child_drain(self):
+        marker = self.state / "started"
+        command = [sys.executable, "-c", "import time; from pathlib import Path; "
+                   f"Path({str(marker)!r}).touch(); time.sleep(20)"]
+        with lane.lifecycle.Guard(self.state):
+            with self.assertRaises(subprocess.TimeoutExpired) as error:
+                lane.lifecycle.run(command, capture_output=True, text=True, timeout=.3)
+            self.assertEqual(error.exception.cmd, command)
+            self.assertTrue(marker.exists())
+        with self.exclusive():
+            pass
+
+    def test_ordinary_command_helper_survives_controller_death(self):
+        started, done = self.state / "started", self.state / "done"
+        child = ("import os,time; from pathlib import Path; "
+                 f"Path({str(started)!r}).touch(); deadline=time.monotonic()+10\n"
+                 f"while not Path({str(done)!r}).exists():\n"
+                 " if time.monotonic()>deadline: raise RuntimeError('fixture not released')\n"
+                 " time.sleep(.01)\n")
+        worker = ("import sys; from pathlib import Path; "
+                  f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lane_runner as lane; "
+                  f"guard=lane.lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                  f"lane.sh([sys.executable,'-c',{child!r}],timeout=15)")
+        process = subprocess.Popen([sys.executable, "-u", "-c", worker],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=lane.selftest_env(self.state))
+        try:
+            deadline = time.monotonic() + 8
+            while not started.exists() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertTrue(started.exists(), "ordinary command fixture did not start")
+            process.kill()  # only this fake controller
+            process.wait(timeout=5)
+            self.assert_activation_held()
+            done.touch()
+            deadline = time.monotonic() + 10
+            while True:
+                try:
+                    with self.exclusive():
+                        break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        self.fail("ordinary command helper did not drain")
+                    time.sleep(.01)
+        finally:
+            done.touch()
+            if process.poll() is None:
+                process.kill()
+            process.communicate(timeout=5)
+
+    def test_drain_request_blocks_new_controller_before_any_effect(self):
+        (self.state / "lifecycle-drain.json").write_text("{malformed")
+        for command in (["update"], ["dispatch"], ["worker", "--provider", "codex"],
+                        ["gate-command", "--timeout", "1", "--", "true"]):
+            with self.subTest(command=command), patch.object(lane, "Host", return_value=self.host), \
+                    patch.object(lane, "guarded_main") as effects:
+                self.assertEqual(lane.main(command), 75)
+                effects.assert_not_called()
+
+    def test_drain_request_allows_admitted_command_to_finish(self):
+        with lane.lifecycle.Guard(self.state):
+            (self.state / "lifecycle-drain.json").write_text("operator hold")
+            result = lane.lifecycle.run([sys.executable, "-c", "print('completed')"],
+                                        capture_output=True, text=True, timeout=5)
+            self.assertEqual((result.returncode, result.stdout), (0, "completed\n"))
+            with patch.object(lane.os, "execv") as execute:
+                self.assertEqual(lane.reexec(self.host, "codex"), 0)
+                execute.assert_not_called()
+        with self.exclusive():
+            pass
+        self.assertTrue(lane.lifecycle.draining(self.state))
+
+    def test_inherited_non_gate_controllers_cannot_start_during_drain(self):
+        commands = [("reason_lane.py", ["drain"]),
+                    ("yc_corpus.py", ["refresh", "--state", str(self.state / "yc.json")]),
+                    ("worktree_sweep.py", ["--state", str(self.state)]),
+                    ("worktree_pool.py", ["--repo", str(self.state), "--fill"])]
+        with lane.lifecycle.Guard(self.state):
+            (self.state / "lifecycle-drain.json").write_text("hold")
+            for script, args in commands:
+                with self.subTest(script=script):
+                    process = subprocess.run([sys.executable, str(ROOT / "scripts/lanes" / script), *args],
+                        capture_output=True, text=True, timeout=5, **lane.lifecycle.spawn_kwargs())
+                    self.assertEqual(process.returncode, 75, process.stderr)
+        self.assertFalse((self.state / "yc.json").exists())
+        self.assertFalse((self.state / "worktree-sweep.json").exists())
+
+    def test_broken_symlink_drain_request_remains_held(self):
+        (self.state / "lifecycle-drain.json").symlink_to(self.state / "absent")
+        self.assertTrue(lane.lifecycle.draining(self.state))
+        with self.assertRaises(lane.lifecycle.AdmissionHeld):
+            with lane.lifecycle.Guard(self.state):
+                self.fail("broken hold resumed admission")
+
+    def test_dispatch_worker_spawn_retains_controller_guard(self):
+        with lane.lifecycle.Guard(self.state) as guard, \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(self.host, "slots", return_value=1), \
+                patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.worktree_sweep, "maybe_spawn"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "claim_remediation_events"), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane.pr_events, "tick"), \
+                patch.object(lane.reason_lane, "tick"), \
+                patch.object(lane.yc_corpus, "tick"), \
+                patch.object(lane, "finish_dispatch", return_value=0), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.dispatch(self.host), 0)
+            spawn.assert_called_once()
+            self.assertIn(guard.fd, spawn.call_args.kwargs["pass_fds"])
+            self.assertEqual(spawn.call_args.kwargs["env"][lane.lifecycle.FD_ENV], str(guard.fd))
+
 
 if __name__ == "__main__":
     unittest.main()

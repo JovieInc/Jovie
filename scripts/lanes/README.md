@@ -17,7 +17,7 @@ The harness, not the model, owns:
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
-| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
@@ -145,7 +145,14 @@ infrastructure first:
 `library-content` → `analytics-gtm` → `docs-changelog` → `lyb` → `memory-gbrain` →
 `general` → `human-decision`.
 
-`pick_issue()` orders candidates by `admission_order()`: tier 0 is urgent work
+`pick_issue()` orders candidates by `admission_order()`: an operator-designated
+`dispatch-next` issue carrying `agent-ready` is first among eligible new claims.
+Use it for the measured bottleneck (including binding CI or deployment work),
+clear a stale designation before replacing it, and verify the actual worker claim.
+It cannot interrupt active work or bypass repair-first, budget, routing, design,
+retry, duplicate, file-overlap or hotspot admission. Untagged aging is unchanged;
+multiple designations retain the existing priority/workstream/age tie-breakers.
+The Todo state filter consumes the designation when work starts. Otherwise tier 0 is urgent work
 (effective P1, including work aged to P1) or a compounding workstream (CI, Symphony
 throughput); then aged priority; then workstream rank; then age. Urgent-first and
 anti-starvation aging are preserved; a non-urgent CI or throughput fix runs ahead of
@@ -287,6 +294,26 @@ in the worktree. Usage-limit, rate-limit and auth messages in codex's output ban
 account until the reset it reports (default 5h). `codex_lane.py status` is the JSON the
 HUD and doctor read; `health` exits non-zero when no account is available, which keeps
 the lane from dispatching at all.
+
+For an existing supported CLI subscription login, operators can opt in with
+`CODEX_LANE_AUTH_MODE=current-login`. This uses the existing `CODEX_HOME` (default
+`~/.codex`) and a single `current-login` flock. It asks `codex login status` for
+ChatGPT auth without reading credential files or discovering other accounts.
+`CODEX_LANE_CLI` may name an already installed executable when the host's PATH
+entry is broken; it does not install a CLI. API credentials are removed from the
+child environment, execution pins OpenAI plus `forced_login_method="chatgpt"`,
+and `--approve-for-me` retains the workspace sandbox and automatic approval review.
+An auth or rate/usage limit banks this one login and returns exit 75 to the existing
+handoff policy. This mode never rotates profiles, redeems reset credits, or probes
+private quota services. Auth status establishes login, not available plan quota.
+
+Enabling the mode and any nonzero `LANES_SLOTS_CODEX` value is a host configuration
+change, separate from landing source. Review the activation and rollback plan
+before changing the service. Existing issue/PR ownership, file-overlap admission,
+slot limits, PR backlog budgets, capability floors, and independent security,
+review, queue and production gates still apply. Summer reasoning/notification
+failures are ancillary to `dispatch()`; they do not authorize bypassing an intake
+or release hold.
 
 Auth, billing, payment, infrastructure, and Vercel labels are admitted only by this lane.
 Those runs use maximum reasoning effort, carry the `sensitive-surface` PR label across
@@ -650,9 +677,10 @@ in sync with those registries.
    under `<!-- design-gate:brief-retry -->`.
 4. **Auto-admission.** After the retry, or 24h after `held-at`, an incomplete
    brief is admitted as `brief-auto`. The gate labels it, comments a warning,
-   and appends one founder `jovie.work-order/v1` block for the taste call.
-   Summer's founder path (JOV-7739) posts that block to Ovie with no model
-   turn.
+   and appends one founder `jovie.work-order/v1` block for the taste call. An
+   auto-admitted issue keeps brief-lane priority until its build claim, so the
+   24h escape cannot fall back into ordinary pool ordering. Summer's founder
+   path (JOV-7739) posts that block to Ovie with no model turn.
 5. **Linked briefs.** A linked `Design brief:` doc is never overwritten. It
    gets no brief run and follows the 24h rule.
 

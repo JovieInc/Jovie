@@ -429,7 +429,7 @@ describe('structural control stage execution', () => {
 
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(23);
+    expect(stages).toHaveLength(24);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -439,7 +439,20 @@ describe('structural control stage execution', () => {
     expect(stages[3][1]).toContain(
       '--coverage.include=lib/ownerless-recovery-policy.mjs'
     );
-    expect(stages[4]).toEqual([
+    expect(stages[4][0]).toBe('pnpm');
+    expect(stages[4][1]).toEqual(
+      expect.arrayContaining([
+        'lib/__tests__/production-lane-range.test.mjs',
+        '--coverage.include=lib/production-lane-range.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.statements=75',
+        '--coverage.thresholds.lines=75',
+        '--coverage.thresholds.branches=70',
+        '--coverage.thresholds.functions=90',
+        controlCoverageReportsDirectory('production-lane-range'),
+      ])
+    );
+    expect(stages[5]).toEqual([
       'node',
       [
         '--test',
@@ -449,7 +462,7 @@ describe('structural control stage execution', () => {
         'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
       ],
     ]);
-    expect(stages[5]).toEqual([
+    expect(stages[6]).toEqual([
       'pnpm',
       [
         'exec',
@@ -469,11 +482,11 @@ describe('structural control stage execution', () => {
         controlCoverageReportsDirectory('dependabot-update-policy'),
       ],
     ]);
-    expect(stages[6][1]).toContain(
+    expect(stages[7][1]).toContain(
       '--coverage.include=pr-conflict-handler.mjs'
     );
-    expect(stages[7][1]).toContain('@jovie/web');
-    expect(stages[8]).toEqual([
+    expect(stages[8][1]).toContain('@jovie/web');
+    expect(stages[9]).toEqual([
       'node',
       [
         '--test',
@@ -485,11 +498,11 @@ describe('structural control stage execution', () => {
         '.github/scripts/production-continuity.test.mjs',
       ],
     ]);
-    expect(stages[11]).toEqual([
+    expect(stages[12]).toEqual([
       'node',
       ['--test', '.github/scripts/production-continuity-workflow.test.mjs'],
     ]);
-    expect(stages[13]).toEqual([
+    expect(stages[14]).toEqual([
       'node',
       [
         '--test',
@@ -501,7 +514,7 @@ describe('structural control stage execution', () => {
         '.github/scripts/vercel-output-manifest.test.mjs',
       ],
     ]);
-    expect(stages[14]).toEqual([
+    expect(stages[15]).toEqual([
       'node',
       [
         '--test',
@@ -513,7 +526,7 @@ describe('structural control stage execution', () => {
         '.github/scripts/vercel-output-validate.test.mjs',
       ],
     ]);
-    expect(stages[15]).toEqual([
+    expect(stages[16]).toEqual([
       'node',
       [
         '--test',
@@ -525,7 +538,7 @@ describe('structural control stage execution', () => {
         '.github/scripts/production-input-provenance.test.mjs',
       ],
     ]);
-    expect(stages[16]).toEqual([
+    expect(stages[17]).toEqual([
       'node',
       [
         '--test',
@@ -537,7 +550,7 @@ describe('structural control stage execution', () => {
         'scripts/publish-coverage-report.test.mjs',
       ],
     ]);
-    expect(stages[17]).toEqual([
+    expect(stages[18]).toEqual([
       'node',
       [
         '--test',
@@ -549,7 +562,7 @@ describe('structural control stage execution', () => {
         'scripts/coverage-surface-files.test.mjs',
       ],
     ]);
-    expect(stages[18]).toEqual([
+    expect(stages[19]).toEqual([
       'node',
       [
         '--test',
@@ -561,7 +574,7 @@ describe('structural control stage execution', () => {
         'scripts/invariants/sonar-repair-contract.test.mjs',
       ],
     ]);
-    expect(stages[19]).toEqual([
+    expect(stages[20]).toEqual([
       'node',
       [
         '--test',
@@ -573,7 +586,7 @@ describe('structural control stage execution', () => {
         'scripts/normalize-sonar-lcov.test.mjs',
       ],
     ]);
-    expect(stages[20]).toEqual([
+    expect(stages[21]).toEqual([
       'node',
       [
         '--test',
@@ -585,7 +598,7 @@ describe('structural control stage execution', () => {
         '.github/scripts/internal-pr-review.test.mjs',
       ],
     ]);
-    expect(stages[21]).toEqual([
+    expect(stages[22]).toEqual([
       'node',
       [
         '--test',
@@ -597,7 +610,7 @@ describe('structural control stage execution', () => {
         'scripts/lib/__tests__/source-admission-policy.test.mjs',
       ],
     ]);
-    expect(stages[22]).toEqual([
+    expect(stages[23]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);
@@ -668,7 +681,7 @@ describe('structural control stage execution', () => {
         args.includes('vitest') &&
         args.some(argument => argument.startsWith('--coverage'))
     );
-    expect(vitestCoverageStages).toHaveLength(4);
+    expect(vitestCoverageStages).toHaveLength(5);
     const directories = vitestCoverageStages.map(([, args]) => {
       const flags = args.filter(argument =>
         argument.startsWith('--coverage.reportsDirectory=')

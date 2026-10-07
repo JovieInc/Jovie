@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/shell/__tests__/ArtistProfileRailToggle.test.tsx
+
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
@@ -15,7 +17,7 @@ import { RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useRightRailKeyboardS
  */
 export function ArtistProfileRailToggle() {
   const { selectedProfile } = useDashboardData();
-  const { isOpen, toggle } = usePreviewPanelState();
+  const { isOpen, isPreview, isPinned, toggle } = usePreviewPanelState();
 
   const primaryName = selectedProfile?.displayName?.trim() || 'Artist profile';
 
@@ -24,8 +26,12 @@ export function ArtistProfileRailToggle() {
   return (
     <RailToggleButton
       side='right'
+      controlsId='shell-artist-profile-rail'
       open={isOpen}
-      openLabel={`Hide ${primaryName} profile`}
+      pinned={isPinned}
+      openLabel={
+        isPreview ? `Pin ${primaryName} profile` : `Hide ${primaryName} profile`
+      }
       closedLabel={`Show ${primaryName} profile`}
       onToggle={toggle}
       shortcut={RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE}

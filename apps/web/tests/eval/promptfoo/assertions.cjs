@@ -4613,8 +4613,13 @@ function assertChatTitleContractCovered(output) {
   ) {
     return fail('chat title system prompt was unexpectedly short');
   }
-  if (payload.guardedNullUpdateCount < 2) {
-    return fail('chat title route did not guard both title update paths');
+  if (
+    payload.guardedNullUpdateCount !== 1 ||
+    payload.sourceFacts?.guardsGeneratedAndFallbackUpdates !== true
+  ) {
+    return fail(
+      'chat title paths did not share the owner-bound null-title guard'
+    );
   }
 
   for (const field of ['missingSourceFacts', 'missingRuntimeFacts']) {

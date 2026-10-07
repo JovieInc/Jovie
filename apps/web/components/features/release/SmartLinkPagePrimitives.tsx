@@ -98,7 +98,7 @@ export function SmartLinkArtistName({
 }
 
 const FOOTER_LINK_CLASSES =
-  'inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90';
+  'inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground/90';
 
 export function SmartLinkPoweredByFooter({
   reportHref = `${APP_ROUTES.REPORT}?type=smart_link`,

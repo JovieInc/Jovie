@@ -434,7 +434,7 @@ class LabeledEventTest(unittest.TestCase):
             def gql(self, query, variables):
                 calls.append(query)
                 if "issues(" in query:
-                    return {"issues": {"nodes": nodes}}
+                    return {"issues": {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}}
                 return {"issueUpdate": {"success": True}, "issueAddLabel": {"success": True}}
 
             def comment(self, issue_id, body):
@@ -545,6 +545,80 @@ class LabeledEventTest(unittest.TestCase):
 def json_providers():
     import json
     return json.loads((ROOT / "scripts/lanes/providers.json").read_text())
+
+
+class CompleteEventInventoryTest(unittest.TestCase):
+    def setUp(self):
+        self.runner = sys.modules.get("lane_runner") or load("lane_runner")
+
+    def fetch(self, pages):
+        from unittest.mock import patch
+        calls = []
+        class Linear:
+            def gql(self, query, variables):
+                calls.append(variables["after"])
+                result = pages[len(calls) - 1]
+                if isinstance(result, Exception):
+                    raise result
+                return result
+        with patch.object(self.runner, "shared", side_effect=lambda key, ttl, fetch: fetch()) as cache:
+            result = self.runner.fetch_labeled_events(Linear())
+            self.assertEqual(cache.call_args.args[0], "remediation-events-v2")
+        return result, calls
+
+    def test_reads_beyond_first_hundred_without_duplicate_ids(self):
+        first = [{"id": str(i)} for i in range(100)]
+        result, calls = self.fetch([
+            {"issues": {"nodes": first, "pageInfo": {"hasNextPage": True, "endCursor": "next"}}},
+            {"issues": {"nodes": [first[-1], {"id": "100"}], "pageInfo": {"hasNextPage": False}}},
+        ])
+        self.assertEqual(len(result), 101)
+        self.assertEqual(calls, [None, "next"])
+
+    def test_incomplete_inventory_never_returns_partial_rows(self):
+        for pages in (
+            [{"issues": {"nodes": [{"id": "1"}]}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True}}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "a"}}}, RuntimeError("read failed")],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "a"}}}] * 2,
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": str(i)}}}
+             for i in range(remediation.EVENT_INVENTORY_PAGES)],
+        ):
+            with self.subTest(pages=len(pages)), self.assertRaises(RuntimeError):
+                self.fetch(pages)
+
+    def test_cache_fences_old_partial_inventory_and_only_persists_complete_reads(self):
+        import json
+        import tempfile
+        from unittest.mock import patch
+        calls = []
+        class Linear:
+            def gql(self, query, variables):
+                calls.append(variables["after"])
+                return {"issues": {"nodes": [{"id": "new"}], "pageInfo": {"hasNextPage": False}}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}), \
+                patch.object(self.runner, "SHARED_CACHE_DIR", Path(tmp)):
+            (Path(tmp) / "remediation-events.json").write_text(json.dumps({"at": __import__('time').time(), "value": [{"id": "old"}]}))
+            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new"}])
+            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new"}])
+            self.assertEqual(calls, [None])
+            self.assertTrue((Path(tmp) / "remediation-events-v2.json").exists())
+
+    def test_incomplete_read_cannot_plan_events_or_write_state(self):
+        import tempfile
+        from unittest.mock import patch
+        class Linear:
+            def gql(self, query, variables):
+                return {"issues": {"nodes": [{"id": "partial"}]}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(self.runner, "shared", side_effect=lambda key, ttl, fetch: fetch()), \
+                patch.object(self.runner, "_apply_event_plan") as apply:
+            host = type("Host", (), {"state": Path(tmp)})()
+            with self.assertRaises(RuntimeError):
+                self.runner.claim_remediation_events(host, Linear())
+            apply.assert_not_called()
+            self.assertEqual(list(Path(tmp).iterdir()), [])
 
 
 if __name__ == "__main__":

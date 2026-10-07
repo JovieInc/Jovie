@@ -1133,11 +1133,16 @@ struct AppShellView<
           .foregroundStyle(JovieColor.textPrimary)
           .lineLimit(1)
 
-        Text("Offline")
-          .font(JovieFont.body(size: 11, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .opacity(isOffline ? 1 : 0)
-          .accessibilityHidden(!isOffline)
+        Group {
+          if isOffline {
+            Text("Offline")
+          } else {
+            Text("Offline").hidden()
+          }
+        }
+        .font(JovieFont.body(size: 11, weight: .medium))
+        .foregroundStyle(JovieColor.textTertiary)
+        .accessibilityHidden(!isOffline)
       }
 
       Spacer(minLength: 0)

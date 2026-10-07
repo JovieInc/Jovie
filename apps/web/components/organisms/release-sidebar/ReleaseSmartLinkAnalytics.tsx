@@ -9,7 +9,7 @@ import {
   DrawerInlineIconButton,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   TEST_AUTH_BYPASS_MODE,
@@ -125,7 +125,7 @@ function ReleaseSmartLinkControl({
   readonly artistName?: string | null;
   readonly helperText?: string;
 }) {
-  const smartLinkUrl = `${PROFILE_URL}${release.smartLinkPath}`;
+  const smartLinkUrl = `${BASE_URL}${release.smartLinkPath}`;
   const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
   const shareItems = useMemo(() => {
     const items = buildTrackedShareDropdownItems({

@@ -22,6 +22,8 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -91,7 +93,7 @@ RUN_FAILURES = (
 
 
 def run(args: list[str], timeout: int = 120):
-    return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    return lifecycle.run(args, capture_output=True, text=True, timeout=timeout)
 
 
 # ---------------------------------------------------------------- reason codes

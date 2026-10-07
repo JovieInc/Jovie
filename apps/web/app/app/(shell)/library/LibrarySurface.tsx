@@ -23,6 +23,7 @@ import {
   ArrowUpDown,
   Check,
   ChevronDown,
+  Columns3,
   ExternalLink,
   FileAudio2,
   FileText,
@@ -75,6 +76,7 @@ import {
   formatLibraryStatus,
   formatReleaseStatus,
   formatReleaseType,
+  LIBRARY_CATALOG_DEFAULT_COLUMNS,
   LIBRARY_CATALOG_TABLE_COLUMNS,
   LibraryCatalogProvidersCell,
   LibraryCatalogStatusCell,
@@ -180,6 +182,8 @@ import {
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
+  LIBRARY_CATALOG_ROW_MODE,
+  LIBRARY_CATALOG_SKELETON_CONFIG,
   LIBRARY_LIST_ROW_MODE,
   LIBRARY_TABLE_MIN_WIDTH,
   LIBRARY_TABLE_SKELETON_CONFIG,
@@ -656,8 +660,13 @@ function createLibraryActionColumn(metaClassName: string) {
 // recreated from the /exp/shell-v1 Tracks table in the shared layer. The
 // action menu column is appended here because it needs this surface's
 // entity-action context.
-const LIBRARY_CATALOG_COLUMNS = [
+export const LIBRARY_CATALOG_COLUMNS = [
   ...LIBRARY_CATALOG_TABLE_COLUMNS,
+  createLibraryActionColumn('w-10 pl-1 pr-2'),
+] as ColumnDef<LibraryReleaseAsset, unknown>[];
+
+export const LIBRARY_CATALOG_SCAN_COLUMNS = [
+  ...LIBRARY_CATALOG_DEFAULT_COLUMNS,
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
@@ -1418,6 +1427,8 @@ function LibraryToolbar({
   onView,
   gridDensity,
   onGridDensity,
+  expandedColumns,
+  onExpandedColumns,
   visibleCount,
   totalCount,
   filtersOpen,
@@ -1442,6 +1453,8 @@ function LibraryToolbar({
   readonly onView: (view: LibraryViewMode) => void;
   readonly gridDensity: LibraryGridDensity;
   readonly onGridDensity: (density: LibraryGridDensity) => void;
+  readonly expandedColumns: boolean;
+  readonly onExpandedColumns: (expanded: boolean) => void;
   readonly visibleCount: number;
   readonly totalCount: number;
   readonly filtersOpen: boolean;
@@ -1506,6 +1519,17 @@ function LibraryToolbar({
             <GridDensityToggle
               density={gridDensity}
               onDensity={onGridDensity}
+            />
+          ) : null}
+          {view === 'table' ? (
+            <PageToolbarActionButton
+              label='More Columns'
+              icon={<Columns3 className={PAGE_TOOLBAR_ICON_CLASS} />}
+              iconOnly
+              active={expandedColumns}
+              onClick={() => onExpandedColumns(!expandedColumns)}
+              tooltipLabel='Show technical and distribution columns when space permits'
+              ariaLabel='More Columns'
             />
           ) : null}
           <ViewToggle view={view} onView={onView} />
@@ -1872,6 +1896,7 @@ function LibraryReleaseTable({
       contextMenuSearchable
       contextMenuSearchPlaceholder='Search actions'
       contextMenuSearchMode='recursive'
+      columnSnap={false}
       enableVirtualization={assets.length >= 20}
       rowMode={rowMode}
       minWidth={LIBRARY_TABLE_MIN_WIDTH}
@@ -1879,7 +1904,11 @@ function LibraryReleaseTable({
       className='system-b-library-table'
       containerClassName='h-full'
       skeletonRows={SKELETON_ROW_COUNT.TABLE}
-      skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
+      skeletonColumnConfig={
+        rowMode === LIBRARY_CATALOG_ROW_MODE
+          ? LIBRARY_CATALOG_SKELETON_CONFIG
+          : LIBRARY_TABLE_SKELETON_CONFIG
+      }
     />
   );
   const tableWithActions = (
@@ -2847,6 +2876,7 @@ export function LibrarySurface({
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
   const { view, setView } = useLibraryViewMode();
+  const [expandedColumns, setExpandedColumns] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // The element that opened the inspector, so Escape can hand focus back.
@@ -3193,7 +3223,16 @@ export function LibrarySurface({
       : resolveLibraryReviewStep(event.key, target, gridColumns);
     if (!step || visibleAssets.length === 0) return;
 
-    const index = visibleAssets.findIndex(asset => asset.id === selectedId);
+    // Tab can move focus without changing selection. Item shortcuts follow
+    // that focus; page and toolbar shortcuts retain the selected cursor.
+    const focusedItemId =
+      inCatalog && target instanceof Element
+        ? target.closest<HTMLElement>('[data-library-item-id]')?.dataset
+            .libraryItemId
+        : undefined;
+    const index = visibleAssets.findIndex(
+      asset => asset.id === (focusedItemId ?? selectedId)
+    );
     const cursor = index === -1 ? null : visibleAssets[index];
     if (step.kind === 'play' || step.kind === 'open') {
       if (!cursor) return;
@@ -3689,6 +3728,8 @@ export function LibrarySurface({
           onView={setView}
           gridDensity={gridDensity}
           onGridDensity={setGridDensity}
+          expandedColumns={expandedColumns}
+          onExpandedColumns={setExpandedColumns}
           visibleCount={visibleAssets.length}
           totalCount={effectiveAssets.length}
           filtersOpen={filtersOpen}
@@ -3738,9 +3779,13 @@ export function LibrarySurface({
               <LibraryReleaseTable
                 assets={visibleAssets}
                 selectedId={selectedId}
-                columns={LIBRARY_CATALOG_COLUMNS}
+                columns={
+                  expandedColumns
+                    ? LIBRARY_CATALOG_COLUMNS
+                    : LIBRARY_CATALOG_SCAN_COLUMNS
+                }
                 rowTestIdPrefix='library-catalog-row'
-                rowMode='compact'
+                rowMode={LIBRARY_CATALOG_ROW_MODE}
                 onSelect={openAsset}
                 onCursor={setSelectedId}
                 onRowToggle={handleTogglePreview}
