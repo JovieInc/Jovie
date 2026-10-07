@@ -2866,7 +2866,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
         gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
         if not conflicted and not gate_held and not reviewed:
-            if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
+            if any((check.get("status") is not None and check["status"] != "COMPLETED")
+                   or check.get("state") in ("PENDING", "EXPECTED") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
@@ -3543,27 +3544,114 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
 
 REPAIR_TARGET_FIELDS = """number title state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
-commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{__typename
-... on CheckRun{name status conclusion detailsUrl startedAt completedAt}
-... on StatusContext{context state targetUrl}}}}}}}"""
-REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
+totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
+pageInfo{hasNextPage endCursor} nodes{__typename
+... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
+... on StatusContext{id context state targetUrl}}}}}}}"""
+REPAIR_CHECK_PAGES = 5  # At most 500 contexts; incomplete authority still refuses repair.
+REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
 
 
+def repair_checks_census(contexts: dict) -> tuple:
+    """Canonical count evidence for the entire mutable connection, not just this page."""
+    counts = [contexts[key] for key in ("totalCount", "checkRunCount", "statusContextCount")]
+    if any(type(count) is not int or count < 0 for count in counts) or sum(counts[1:]) != counts[0]:
+        raise ValueError("repair-check-counts-invalid")
+    states = []
+    for key, total in zip(("checkRunCountsByState", "statusContextCountsByState"), counts[1:]):
+        rows = contexts[key]
+        if not isinstance(rows, list) or len(rows) > 32:
+            raise ValueError("repair-check-state-counts-invalid")
+        grouped = {}
+        for row in rows:
+            name, count = row["state"], row["count"]
+            if (not isinstance(name, str) or not name or name in grouped
+                    or type(count) is not int or count < 0):
+                raise ValueError("repair-check-state-counts-invalid")
+            grouped[name] = count
+        if sum(grouped.values()) != total:
+            raise ValueError("repair-check-state-counts-incomplete")
+        states.append({name: count for name, count in grouped.items() if count})
+    return (*counts, *states)
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
-    """One fresh target read binds repair ownership and complete checks to the same head."""
+    """Bounded fresh pages bind complete checks to one unchanged ownership/head snapshot."""
     try:
         owner, name = REPO_SLUG.split("/")
         number = pr["number"]
         if type(number) is not int or number <= 0:
             return None
-        viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
-                     "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"], timeout=30)
-        data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
-        if not isinstance(data, dict) or data.get("errors"):
-            return None
-        return repair_target_node(pr, data["data"]["repository"]["pullRequest"])
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        cursor, cursors, seen, checks, anchor, census = None, set(), set(), [], None, None
+        for page in range(REPAIR_CHECK_PAGES):
+            args = ["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
+                    "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"]
+            if cursor is not None:
+                args += ["-f", f"cursor={cursor}"]
+            viewed = sh(args, timeout=30)
+            data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+            if not isinstance(data, dict) or data.get("errors"):
+                return None
+            live = data["data"]["repository"]["pullRequest"]
+            if isinstance(live, dict) and live.get("state") in {"MERGED", "CLOSED"}:
+                return repair_target_node(pr, live)  # Positive terminal evidence still cancels work.
+            rollup = live["commits"]["nodes"][0]["commit"]["statusCheckRollup"]
+            if rollup is None:
+                return repair_target_node(pr, live) if page == 0 else None
+            contexts = rollup["contexts"]
+            info, rows = contexts["pageInfo"], contexts["nodes"]
+            if (type(info.get("hasNextPage")) is not bool or not isinstance(rows, list)
+                    or len(rows) > 100 or (page and not rows)):
+                return None
+            # Validate every page with the normal strict target validator; this
+            # temporary page copy never escapes as complete repair authority.
+            snapshot = json.loads(json.dumps(live))
+            snapshot["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]["pageInfo"]["hasNextPage"] = False
+            normalized = repair_target_node(pr, snapshot)
+            if normalized is None:
+                return None
+            ownership = {key: normalized[key] for key in
+                         ("number", "state", "headRefOid", "headRefName", "isInMergeQueue",
+                          "isCrossRepository", "isDraft", "mergeStateStatus", "reviewDecision", "labels")}
+            if anchor is not None and ownership != anchor:
+                return None  # Never splice checks across a head, queue, review or hold transition.
+            anchor = ownership
+            if page or info["hasNextPage"]:
+                current_census = repair_checks_census(contexts)
+                if current_census[0] > 100 * REPAIR_CHECK_PAGES or (census is not None and current_census != census):
+                    return None
+                census = current_census
+                ids = [row.get("id") for row in rows]
+                if (any(not isinstance(key, str) or not key for key in ids)
+                        or len(set(ids)) != len(ids) or seen.intersection(ids)):
+                    return None
+                seen.update(ids)
+            checks.extend(rows)
+            if not info["hasNextPage"]:
+                if census is not None:
+                    # Counts catch insertions before an already consumed cursor;
+                    # state counts also catch a pending transition on an earlier page.
+                    run_states, status_states = {}, {}
+                    for check in checks:
+                        if check["__typename"] == "CheckRun":
+                            state = check.get("conclusion") if check["status"] == "COMPLETED" else check["status"]
+                            grouped = run_states
+                        else:
+                            state, grouped = check["state"], status_states
+                        grouped[state] = grouped.get(state, 0) + 1
+                    if (len(checks) != census[0] or sum(run_states.values()) != census[1]
+                            or sum(status_states.values()) != census[2]
+                            or run_states != census[3] or status_states != census[4]):
+                        return None
+                return {**normalized, "statusCheckRollup": checks}
+            cursor = info.get("endCursor")
+            if not isinstance(cursor, str) or not cursor or cursor in cursors or not rows:
+                return None
+            cursors.add(cursor)
+        return None
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None
 
 

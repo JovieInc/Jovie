@@ -4671,6 +4671,155 @@ class RequeueTest(unittest.TestCase):
 
 
 
+class RepairCheckPaginationTest(unittest.TestCase):
+    def target(self):
+        return {"number": 5, "headRefName": "devin/jov-1-20260926t0900", "headRefOid": "h1",
+                "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
+                "state": "OPEN", "labels": [], "statusCheckRollup": []}
+
+    def page(self, start=0, count=100, *, more=True, cursor="page-1"):
+        page = repair_target_page(self.target())
+        contexts = page["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]
+        contexts.update(pageInfo={"hasNextPage": more, "endCursor": cursor}, nodes=[
+            {"__typename": "CheckRun", "id": f"check-{index}", "name": f"required-{index}",
+             "status": "COMPLETED", "conclusion": "SUCCESS"} for index in range(start, start + count)])
+        contexts.update(totalCount=101, checkRunCount=101, statusContextCount=0,
+                        checkRunCountsByState=[{"state": "SUCCESS", "count": 101}],
+                        statusContextCountsByState=[])
+        return page
+
+    def contexts(self, page):
+        return page["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]
+
+    def census(self, pages):
+        groups = ({}, {})
+        for page in pages:
+            for row in self.contexts(page)["nodes"]:
+                index = 0 if row["__typename"] == "CheckRun" else 1
+                state = (row.get("conclusion") if row["status"] == "COMPLETED" else row["status"]) \
+                    if index == 0 else row["state"]
+                groups[index][state] = groups[index].get(state, 0) + 1
+        totals = [sum(group.values()) for group in groups]
+        for page in pages:
+            self.contexts(page).update(totalCount=sum(totals), checkRunCount=totals[0],
+                statusContextCount=totals[1],
+                checkRunCountsByState=[{"state": key, "count": count} for key, count in groups[0].items()],
+                statusContextCountsByState=[{"state": key, "count": count} for key, count in groups[1].items()])
+
+    def read(self, pages, *, census=True):
+        if census and all(page.get("data", {}).get("repository", {}).get("pullRequest", {}).get("state") == "OPEN" for page in pages):
+            self.census(pages)
+        responses = [SimpleNamespace(returncode=0, stdout=json.dumps(page), stderr="") for page in pages]
+        with patch.object(lane, "sh", side_effect=responses) as command:
+            result = lane.reconcile_fix_target(self.target())
+        return result, command
+
+    def test_required_failure_beyond_first_hundred_is_complete_repair_evidence(self):
+        first, second = self.page(), self.page(100, 1, more=False)
+        self.contexts(second)["nodes"][0]["conclusion"] = "FAILURE"
+        live, command = self.read([first, second])
+        self.assertEqual(len(live["statusCheckRollup"]), 101)
+        self.assertEqual(lane.red_pr([live], {})["number"], 5)
+        self.assertNotIn("cursor=page-1", command.call_args_list[0].args[0])
+        self.assertIn("cursor=page-1", command.call_args_list[1].args[0])
+        self.assertTrue(all(call.kwargs["timeout"] == 30 for call in command.call_args_list))
+
+    def test_pending_on_later_page_cannot_be_hidden_by_earlier_failure(self):
+        for state in ("IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED", "UNKNOWN"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            self.contexts(first)["nodes"][0]["conclusion"] = "FAILURE"
+            self.contexts(second)["nodes"][0].update(status=state, conclusion=None)
+            live, _ = self.read([first, second])
+            with self.subTest(state=state): self.assertIsNone(lane.red_pr([live], {}))
+
+    def test_legacy_pending_on_later_page_suppresses_repair_without_expanding_red_policy(self):
+        for state in ("PENDING", "EXPECTED", "ERROR", "FAILURE"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            self.contexts(second)["nodes"] = [{"__typename": "StatusContext", "id": "legacy",
+                                              "context": "legacy", "state": state}]
+            live, _ = self.read([first, second])
+            self.assertIsNone(lane.red_pr([live], {}), "legacy failures alone retain their original authority")
+            self.contexts(first)["nodes"][0]["conclusion"] = "FAILURE"
+            live, _ = self.read([first, second])
+            self.assertEqual(lane.red_pr([live], {}) is None, state in {"PENDING", "EXPECTED"})
+
+    def test_changed_global_count_or_pending_state_census_refuses_partial_snapshot(self):
+        for fault in ("inserted-before-cursor", "pending-earlier-page", "missing-counts", "wrong-length", "malformed-count"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            self.census([first, second])
+            connection = self.contexts(second)
+            if fault == "inserted-before-cursor":
+                connection.update(totalCount=102, checkRunCount=102,
+                                  checkRunCountsByState=[{"state": "SUCCESS", "count": 102}])
+            if fault == "pending-earlier-page":
+                connection["checkRunCountsByState"] = [{"state": "SUCCESS", "count": 100}, {"state": "IN_PROGRESS", "count": 1}]
+            if fault == "missing-counts": self.contexts(first).pop("checkRunCountsByState")
+            if fault == "wrong-length":
+                for page in (first, second):
+                    self.contexts(page).update(totalCount=102, checkRunCount=102,
+                        checkRunCountsByState=[{"state": "SUCCESS", "count": 102}])
+            if fault == "malformed-count": self.contexts(first)["totalCount"] = True
+            with self.subTest(fault=fault): self.assertIsNone(self.read([first, second], census=False)[0])
+
+    def test_stable_but_wrong_state_census_cannot_certify_stale_earlier_page(self):
+        first, second = self.page(), self.page(100, 1, more=False)
+        self.census([first, second])
+        for page in (first, second):
+            self.contexts(page)["checkRunCountsByState"] = [
+                {"state": "SUCCESS", "count": 100}, {"state": "QUEUED", "count": 1}]
+        self.assertIsNone(self.read([first, second], census=False)[0])
+
+    def test_changed_head_queue_review_or_hold_never_splices_page_authority(self):
+        for field, value in (("headRefOid", "h2"), ("headRefName", "other-branch"),
+                             ("isInMergeQueue", True), ("isCrossRepository", True),
+                             ("isDraft", True), ("mergeStateStatus", "DIRTY"),
+                             ("reviewDecision", "CHANGES_REQUESTED")):
+            first, second = self.page(), self.page(100, 1, more=False)
+            node = second["data"]["repository"]["pullRequest"]
+            node[field] = value
+            if field == "headRefOid":
+                node["commits"]["nodes"][0]["commit"]["oid"] = value
+            with self.subTest(field=field):
+                self.assertIsNone(self.read([first, second])[0])
+        first, second = self.page(), self.page(100, 1, more=False)
+        second["data"]["repository"]["pullRequest"]["labels"]["nodes"] = [{"name": "hold"}]
+        self.assertIsNone(self.read([first, second])[0])
+
+    def test_partial_error_duplicate_cursor_or_context_refuses_repair(self):
+        for fault in ("cursor", "missing-cursor", "duplicate-id", "missing-id", "empty", "errors"):
+            first, second = self.page(), self.page(100, 1, more=False)
+            connection = self.contexts(second)
+            if fault == "cursor": connection["pageInfo"].update(hasNextPage=True, endCursor="page-1")
+            if fault == "missing-cursor": self.contexts(first)["pageInfo"].pop("endCursor")
+            if fault == "duplicate-id": connection["nodes"][0]["id"] = "check-0"
+            if fault == "missing-id": connection["nodes"][0].pop("id")
+            if fault == "empty": connection["nodes"] = []
+            if fault == "errors": second["errors"] = [{"message": "partial response"}]
+            with self.subTest(fault=fault): self.assertIsNone(self.read([first, second])[0])
+        for failure in (OSError("unavailable"), subprocess.TimeoutExpired("gh", 30),
+                        SimpleNamespace(returncode=75, stdout="", stderr="budget floor")):
+            with self.subTest(failure=type(failure).__name__), patch.object(lane, "sh", side_effect=[
+                    SimpleNamespace(returncode=0, stdout=json.dumps(self.page())), failure]):
+                self.assertIsNone(lane.reconcile_fix_target(self.target()))
+
+    def test_fixed_page_limit_refuses_overflow_without_more_reads(self):
+        pages = [self.page(index * 100, cursor=f"page-{index + 1}")
+                 for index in range(lane.REPAIR_CHECK_PAGES)]
+        live, command = self.read(pages)
+        self.assertIsNone(live)
+        self.assertEqual(command.call_count, 5)
+        self.contexts(pages[-1])["pageInfo"]["hasNextPage"] = False
+        live, command = self.read(pages)
+        self.assertEqual(len(live["statusCheckRollup"]), 500)
+        self.assertEqual(command.call_count, 5)
+
+    def test_positive_terminal_evidence_on_later_page_still_cancels_work(self):
+        terminal = {"data": {"repository": {"pullRequest": {"number": 5, "state": "MERGED"}}}}
+        live, command = self.read([self.page(), terminal])
+        self.assertEqual(live["state"], "MERGED")
+        self.assertEqual(command.call_count, 2)
+
+
 class RepairQueueAuthorityTest(unittest.TestCase):
     def target(self):
         return {"number": 5, "headRefName": "devin/jov-1-20260926t0900", "headRefOid": "h1",
