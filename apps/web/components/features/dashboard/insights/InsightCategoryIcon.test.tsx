@@ -37,11 +37,15 @@ describe('InsightCategoryIcon carbon tokens', () => {
       expect(icon.getAttribute('class') ?? '').not.toMatch(RAW_COLOR);
 
       if (expectedSolid) {
-        expect(chip.style.backgroundColor).toContain('--color-accent-');
+        expect(chip.style.backgroundColor).toBe('');
+        expect(
+          chip.style.getPropertyValue('--icon-glyph-hover-surface')
+        ).toContain('--color-accent-');
         expect(icon.getAttribute('style') ?? '').toContain(expectedSolid);
       } else {
         // Neutral timing category uses greyscale tokens, no inline accent var.
-        expect(chip.className).toContain('bg-surface-0');
+        expect(chip.className).toContain('icon-glyph');
+        expect(chip.style.backgroundColor).toBe('');
         expect(icon.getAttribute('class') ?? '').toContain(
           'text-tertiary-token'
         );

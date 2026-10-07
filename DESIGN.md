@@ -90,6 +90,10 @@ Read [the typography reference](docs/design-system/DETAILS.md#typography) when c
 
 Read [the copywriting reference](docs/design-system/DETAILS.md#copywriting) when changing this area.
 
+### Icon and Emoji Surfaces
+
+EVENT: icon/emoji glyphs are transparent at rest. A hover background must be circular, with equal dimensions and full rounding, owned by `IconGlyphFrame`. Keep an interactive parent's focus ring, hit target, accessible name, tooltip, and selected/pressed semantics. Do not put a rounded-square plate behind the glyph. Semantic status badges, avatars, and complete text actions keep their existing contracts. This applies to Jovie, Ovie, and generated marketing previews.
+
 ### Icon and Text Alignment
 
 - **Geometric centering is the default** for icon-and-text pairs and icon controls. It is the stable choice for Lucide and other arbitrary web SVGs, whose CSS baseline is synthesized rather than a compatible typographic metric.

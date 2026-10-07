@@ -140,7 +140,9 @@ describe('DashboardNav route warming', () => {
     expect(newChat).toHaveAttribute('aria-busy', 'true');
     expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
     expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
-    expect(newChat).toHaveClass('size-6', 'rounded-full', 'opacity-70');
+    expect(newChat).toHaveClass('rounded-lg');
+    expect(newChat).toHaveTextContent('New Chat');
+    expect(newChat).not.toHaveClass('bg-foreground');
     expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
       'Current route'
     );
@@ -292,14 +294,15 @@ describe('DashboardNav route warming', () => {
   // JOV-6181: the rail's New Chat affordance must never carry the terminal
   // label fade — on the compact create treatment it sheared the trailing "t"
   // ("Chat" -> "Cha") with rail space free. The canonical rail renders the
-  // action icon-only inside the search slot; this walks the real production
+  // action on the shared navigation grid; this walks the real production
   // tree so any future labelled New Chat row stays unmasked.
   it('keeps the New Chat affordance unmasked in the production rail', () => {
     const { container } = renderDashboardNav({ renderFn: render });
 
     const newChatAction = screen.getByRole('link', { name: 'New Chat' });
     expect(newChatAction).toBeInTheDocument();
-    expect(newChatAction).toHaveAttribute('aria-label', 'New Chat');
+    expect(newChatAction).toHaveAccessibleName('New Chat');
+    expect(newChatAction).toHaveTextContent('New Chat');
 
     const nav = container.querySelector('nav');
     expect(nav).not.toBeNull();
@@ -310,15 +313,14 @@ describe('DashboardNav route warming', () => {
     }
   });
 
-  it('stages the search slot exit on the shared rail-motion contract (JOV-4522)', () => {
-    const source = readWebSource(
-      'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
+  it('retains the New action while its label stages with collapsed navigation', () => {
+    renderDashboardNav({ renderFn: render });
+    const action = screen.getByRole('link', { name: 'New Chat' });
+    expect(action).not.toHaveAttribute('aria-hidden', 'true');
+    expect(action.querySelector('span')).toHaveClass(
+      'group-data-[collapsible=icon]:opacity-0'
     );
-    // The search pill collapses vertically (max-height + fade) in lockstep
-    // with the rail instead of snapping to display:none at frame one.
-    const slot = source.slice(source.indexOf('data-sidebar-search-slot'));
-    expect(slot).toContain('SHELL_RAIL_BLOCK_LABEL');
-    expect(slot).not.toContain('group-data-[collapsible=icon]:hidden');
+    expect(action).not.toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
   it('imports sidebar chrome from the modular sidebar specifier', () => {

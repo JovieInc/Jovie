@@ -3466,3 +3466,14 @@ html:not(.dark) .smart-link-powered-by {
   /* Rotation order — blue, purple, pink, amber, green, teal, red, cyan, yellow.
    * Apple-style hue rotation across feature surfaces. */
 }
+
+/* Icon/emoji decoration is transparent at rest; hover owns a circular surface.
+   The enclosing semantic control retains its focus ring and hit target. */
+.icon-glyph {
+  background-color: transparent;
+}
+@media (hover: hover) {
+  .icon-glyph:hover {
+    background-color: var(--icon-glyph-hover-surface, var(--color-surface-1));
+  }
+}
