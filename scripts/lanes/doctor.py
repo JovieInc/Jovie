@@ -13,6 +13,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import shutil
 import statistics
 import subprocess
@@ -38,6 +39,7 @@ NO_LANDING_S = 6 * 3600
 NO_WORK_S = 5 * 60
 PROVIDER_IDLE_S = 5 * 60
 ADMISSION_REPAIR_S = 5 * 60
+DELIVERY_STALE_S = 2 * 3600
 ESCALATION_S = 10 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
@@ -253,6 +255,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
+        "operatorDraining": lifecycle.draining(state),
         "_receipts24h": receipts, "_allReceipts": all_receipts,
     }
 
@@ -339,6 +342,94 @@ def _locked(path: Path) -> bool:
             return False
     except (OSError, BlockingIOError):
         return True
+
+
+def delivery_evidence(obs: dict, previous: dict) -> dict:
+    """Use the existing complete merge census and local exact-head coding receipts.
+
+    Gate success and another host's merge cannot clear a local delivery failure.
+    No added collector, API calls, claim authority or provider routes.
+    """
+    now = obs["now"]
+    window = obs.get("mergedWindow") or {}
+    bounds = window.get("window") or {}
+    complete = (window.get("complete") is True and not obs.get("mergedAttributionError")
+                and isinstance(bounds.get("until"), (int, float))
+                and 0 <= now - bounds["until"] <= MERGE_THROUGHPUT_CACHE_S
+                and isinstance(bounds.get("since"), (int, float))
+                and bounds["since"] <= now - DELIVERY_STALE_S)
+    delivered = []
+    useful = []
+    for row in obs.get("_allReceipts") or []:
+        head = row.get("headAfter") if row.get("kind") == "fix-red" else row.get("headSha")
+        ended = age_s(row.get("endedAt"), now)
+        if (row.get("agentExit") != 0 or isinstance(row.get("agentExit"), bool)
+                or row.get("verdict") not in ("fix-pushed", "landing", "verified-not-queued")
+                or (row.get("kind") == "fix-red" and head == row.get("headBefore"))
+                or not isinstance(head, str) or not re.fullmatch(r"[0-9a-f]{40}", head)
+                or type(row.get("pr")) is not int or ended is None or ended < 0):
+            continue
+        useful.append({"pr": row["pr"], "headSha": head, "runId": row.get("runId"),
+                       "provider": row.get("provider"), "endedAt": row["endedAt"]})
+        if not complete:
+            continue
+        for pr in obs.get("merged24h") or []:
+            merge_age = age_s(pr.get("mergedAt"), now)
+            merge_commit = (pr.get("mergeCommit") or {}).get("oid")
+            if (pr.get("number") == row["pr"] and pr.get("headRefOid") == head
+                    and isinstance(merge_commit, str) and re.fullmatch(r"[0-9a-f]{40}", merge_commit)
+                    and merge_age is not None and 0 <= merge_age <= ended):
+                delivered.append({**useful[-1], "mergedAt": pr["mergedAt"], "mergeCommit": merge_commit})
+    latest = max(delivered, key=lambda row: row["mergedAt"], default=None)
+    capacity = obs.get("capacityByProvider") or {}
+    # Lifecycle intentionally holds on malformed/unreadable requests too. A hold
+    # blocks intake but never proves an authorized pause or delivery recovery.
+    held = obs.get("operatorDraining") is True
+    paused = bool(capacity) and all(row.get("base", row.get("slots")) == 0 for row in capacity.values())
+    # Only post-budget qualified work grants demand. Held work is diagnosed by
+    # its existing admission/ownership condition, never force-admitted here.
+    known = (type(obs.get("pool")) is int and not obs.get("linearSkipped") and bool(capacity)
+             and isinstance(obs.get("tickAge"), (int, float)) and 0 <= obs["tickAge"] <= PROVIDER_IDLE_S)
+    tick = obs.get("tick") or {}
+    healthy = [name for name, seats in capacity.items() if seats.get("slots", 0) > 0
+               and name in tick.get("spawned", []) and not tick.get("error")
+               and (tick.get("disk") or {}).get("admitted") is True
+               and name not in tick.get("unhealthy", [])]
+    qualified = obs.get("poolByProvider") or {}
+    runnable = sum(qualified.get(name) or 0 for name in healthy)
+    census = obs.get("reconcile") or {}
+    census_age = age_s(census.get("at"), now)
+    admitted = []
+    if census_age is not None and 0 <= census_age <= pr_events.RECONCILE_S:
+        for row in census.get("dispositions") or []:
+            if row.get("state") not in ("ready", "queued"):
+                continue
+            matched = next((run for run in useful if run["pr"] == row.get("pr")
+                            and run["headSha"] == row.get("headSha")), None)
+            if matched:
+                admitted.append({"pr": row["pr"], "headSha": row["headSha"], "state": row["state"]})
+    waiting = known and (runnable > 0 or bool(admitted)) and not paused and not held
+    since = previous.get("deliveryDemandSince")
+    if held or paused or (known and not waiting):
+        since = None
+    elif waiting:
+        since = since if isinstance(since, (float, int)) else now
+    if latest and since is not None:
+        merged_epoch = now - age_s(latest["mergedAt"], now)
+        if merged_epoch >= since:
+            since = now if waiting else None
+    status = ("controller-held" if held else "intentional-pause" if paused else "no-eligible-work" if known and new_work_empty(obs)
+              else "unknown" if not complete or not known
+              else "eligible-work" if waiting else "admission-blocked")
+    stale = status == "eligible-work" and since is not None and now - since >= DELIVERY_STALE_S
+    return {"schema": "jovie-lane-delivery/v1", "state": "stalled" if stale else status,
+            "demandSince": since, "staleAfterSeconds": DELIVERY_STALE_S,
+            "mergeEvidenceComplete": complete, "lastUsefulExecution": max(useful, key=lambda r: r["endedAt"], default=None),
+            "lastDeliveredMerge": latest, "deployedVerification": None,
+            "admission": {"eligiblePool": obs.get("eligiblePool"), "runnablePool": runnable if known else None,
+                          "admittedLocalOutputs": admitted,
+                          "budgets": obs.get("newIssueBudgetByProvider") or {}},
+            "workerLiveness": {"busySlots": obs.get("busy"), "capacity": capacity}}
 
 
 def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
@@ -451,6 +542,19 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["codex-all-banked"] = (f"all {account_state['count']} codex accounts have recorded usage-limit holds; "
                                       f"earliest reset in {account_state['earliestCooldownS'] // 60}m")
     pool, busy = obs.get("eligiblePool", obs.get("pool")), obs.get("busy", 0)
+    delivery = obs.get("delivery") or {}
+    if delivery.get("state") == "stalled":
+        alerts["delivery-stalled"] = (
+            "qualified admitted work has no exact-head locally executed merge for 2h; "
+            "investigate, repair and verify through existing leases and native delivery gates. "
+            "Routine recovery is authorized. Receipt: " + json.dumps(delivery, sort_keys=True))
+    elif (previous or {}).get("alerts", {}).get("delivery-stalled"):
+        old = ((previous or {}).get("conditions") or {}).get("delivery-stalled") or {}
+        merged = delivery.get("lastDeliveredMerge") or {}
+        delivered_after_alarm = (delivery.get("mergeEvidenceComplete") and merged.get("mergedAt")
+                                 and merged["mergedAt"] >= old.get("firstObservedAt", "~"))
+        if not delivered_after_alarm and delivery.get("state") not in ("no-eligible-work", "intentional-pause"):
+            alerts["delivery-stalled"] = previous["alerts"]["delivery-stalled"]
     waiting = pool or obs.get("openPRCount")
     for name, budget in (obs.get("newIssueBudgetByProvider") or {}).items():
         if budget.get("reason") == "pr-inventory-unavailable":
@@ -579,7 +683,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
     prior = previous.get("conditions") or {}
     receipts: dict[str, dict] = {}
     now = float(obs["now"])
-    critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical")
+    critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical", "delivery-stalled")
     actions = {
         "tick-error": "retry-dispatch-tick",
         "linear-down": "retry-linear-read-and-publish-independent-receipt",
@@ -589,6 +693,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
+        "delivery-stalled": "investigate-repair-and-verify-native-delivery",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -597,6 +702,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "spawn-exit": ["dispatch-tick", "worker-pool"],
         "hud-stale": ["tty1-hud", "status-feed"],
         "no-landing": ["shipping-throughput"],
+        "delivery-stalled": ["local-useful-execution", "native-merge", "deployed-verification"],
         "bottleneck:merge-queue": ["merge-queue", "lane-slots"],
     }
     for key, evidence in alerts.items():
@@ -607,6 +713,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         first = (float(old["firstObservedEpoch"]) if continuing and old.get("firstObservedEpoch") is not None
                  else float((previous.get("providerIdleSince") or {}).get(provider, now)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
+        if key == "delivery-stalled" and (obs.get("delivery") or {}).get("state") in ("unknown", "controller-held"):
+            source_status = "unknown"
         if key == "design-brief-stale" and obs.get("designGate") is None:
             source_status = "unknown"
         if key == "admission-repair-needed" and (obs.get("eligiblePool") is None or obs.get("pool") is None
@@ -653,6 +761,11 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             continue
         receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(now),
                          "nextAction": "none", "terminalOutcome": "health-proven"}
+        if key == "delivery-stalled":
+            delivery = obs.get("delivery") or {}
+            receipts[key]["terminalOutcome"] = (delivery["state"] if delivery.get("state") in
+                                                  ("no-eligible-work", "intentional-pause") else "merge-proven")
+            receipts[key]["recoveryEvidence"] = delivery
         fields = {"github-quota": ("githubRemaining",),
                   "linear-down": ("linearError", "linearSkipped", "pool", "eligiblePool"),
                   "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider")}
@@ -753,7 +866,7 @@ class Tracker:
             return found
         try:
             priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:")) or key in (
-                "linear-down", "spawn-exit", "tick-error") else 2
+                "linear-down", "spawn-exit", "tick-error", "delivery-stalled") else 2
             team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
@@ -1000,6 +1113,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "codexAvailable": account_state.get("unleasedAvailable"),
             "codexAttribution": account_state,
             "alerts": alerts, "conditions": conditions or {},
+            "delivery": obs.get("delivery"),
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
@@ -1115,6 +1229,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["admissionRepairSince"] = None
     previous["providerIdleSince"] = provider_idle_since(obs, previous)
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
+    obs["delivery"] = delivery_evidence(obs, previous)
+    previous["deliveryDemandSince"] = obs["delivery"]["demandSince"]
     alerts = judge(obs, previous)
     conditions = condition_receipts(alerts, previous, obs, lane.HOST)
     if obs.get("linearSkipped"):
@@ -1126,7 +1242,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
     result["poolEmptySince"] = previous["poolEmptySince"]
-    result["admissionRepairSince"] = previous["admissionRepairSince"]
+    result["admissionRepairSince"] = previous.get("admissionRepairSince")
+    result["deliveryDemandSince"] = previous.get("deliveryDemandSince")
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
     result["escalation"] = obs.get("escalation") or remediation.empty_escalation()

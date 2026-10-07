@@ -1145,7 +1145,201 @@ class PublishTest(unittest.TestCase):
                 doctor.PRIMARY_FLAG = saved
 
 
+class DeliveryTest(unittest.TestCase):
+    HEAD = "a" * 40
+
+    def observation(self, **overrides):
+        now = 1_000_000
+        observation = obs(mergedWindow={"complete": True, "window": {"since": now - 86400, "until": now}},
+                          merged24h=[], _allReceipts=[], tickAge=1,
+                          tick={"spawned": ["codex"], "unhealthy": [], "error": None, "disk": {"admitted": True}},
+                          capacityByProvider={"codex": {"slots": 1, "base": 1}}, poolByProvider={"codex": 40})
+        observation.update(overrides)
+        if observation["pool"] == 0:
+            observation["poolByProvider"] = {"codex": 0}
+        return observation
+
+    def coding(self, **overrides):
+        row = {"kind": "fix-red", "runId": "gem-codex-repair", "pr": 7, "provider": "codex",
+               "agentExit": 0, "verdict": "fix-pushed", "headBefore": "b" * 40,
+               "headAfter": self.HEAD, "endedAt": doctor.epoch_iso(990000)}
+        row.update(overrides)
+        return row
+
+    def merge(self, **overrides):
+        row = {"number": 7, "headRefOid": self.HEAD, "mergeCommit": {"oid": "c" * 40},
+               "mergedAt": doctor.epoch_iso(999990)}
+        row.update(overrides)
+        return row
+
+    def evaluate(self, observation, previous):
+        observation["delivery"] = doctor.delivery_evidence(observation, previous)
+        alerts = doctor.judge(observation, previous)
+        return doctor.condition_receipts(alerts, previous, observation, "gem"), alerts
+
+    def test_gate_scanner_and_other_heads_are_not_delivered_output(self):
+        for receipt, merged in ((self.coding(agentExit=None), self.merge()),
+                                (self.coding(verdict="recovery-handoff"), self.merge()),
+                                (self.coding(headBefore=self.HEAD), self.merge()),
+                                (self.coding(), self.merge(headRefOid="d" * 40)),
+                                (self.coding(), self.merge(number=8)),
+                                (self.coding(), self.merge(mergedAt=doctor.epoch_iso(989000)))):
+            observed = self.observation()
+            observed.update(_allReceipts=[receipt], merged24h=[merged])
+            result = doctor.delivery_evidence(observed, {"deliveryDemandSince": 990000})
+            self.assertIsNone(result["lastDeliveredMerge"])
+            self.assertEqual(result["state"], "stalled")
+            self.assertIsNone(result["deployedVerification"])
+
+    def test_known_idle_pause_and_budget_holds_never_grant_repair_demand(self):
+        for overrides, expected in (({"pool": 0, "eligiblePool": 0, "openPRCount": 0}, "no-eligible-work"),
+                                     ({"operatorDraining": True}, "controller-held"),
+                                     ({"capacityByProvider": {"codex": {"slots": 0, "base": 0}}}, "intentional-pause"),
+                                     ({"tick": {"unhealthy": ["codex"]}}, "admission-blocked"),
+                                     ({"tick": {"error": "disk denied"}}, "admission-blocked"),
+                                     ({"tick": {"spawned": [], "unhealthy": [], "disk": {"admitted": True}}}, "admission-blocked"),
+                                     ({"pool": 0, "eligiblePool": 50, "openPRCount": 7}, "admission-blocked")):
+            result = doctor.delivery_evidence(self.observation(**overrides), {"deliveryDemandSince": 990000})
+            self.assertEqual(result["state"], expected)
+            self.assertNotEqual(result["state"], "stalled")
+
+    def test_partial_stale_or_unknown_reads_preserve_alarm_until_exact_merge(self):
+        first = self.observation()
+        events, alerts = self.evaluate(first, {"deliveryDemandSince": 990000})
+        prior = {"alerts": alerts, "conditions": events, "deliveryDemandSince": 990000}
+        for overrides in ({"pool": None}, {"mergedWindow": {"complete": False}},
+                          {"mergedWindow": {"complete": True, "window": {"since": 900000, "until": 998000}}}):
+            observed = self.observation()
+            observed.update(overrides, _allReceipts=[self.coding()], merged24h=[self.merge()])
+            carried, _ = self.evaluate(observed, prior)
+            self.assertEqual(carried["delivery-stalled"]["state"], "active")
+            self.assertEqual(carried["delivery-stalled"]["generation"], 1)
+            self.assertEqual(carried["delivery-stalled"]["source"]["status"], "unknown")
+        recovered = self.observation()
+        recovered.update(_allReceipts=[self.coding()], merged24h=[self.merge(mergedAt=doctor.epoch_iso(1000000))])
+        events, _ = self.evaluate(recovered, prior)
+        receipt = events["delivery-stalled"]
+        self.assertEqual(receipt["state"], "resolved")
+        self.assertEqual(receipt["terminalOutcome"], "merge-proven")
+        self.assertEqual(receipt["recoveryEvidence"]["lastDeliveredMerge"]["runId"], "gem-codex-repair")
+
+    def test_unknown_drain_cannot_resolve_an_alarm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            path = state / "lifecycle-drain.json"
+            for content in ("{", "{}", "[]"):
+                path.write_text(content)
+                self.assertTrue(doctor.lifecycle.draining(state))
+            path.unlink()
+            target = state / "request"
+            target.write_text(json.dumps({"schema": doctor.lifecycle.PROTOCOL, "owner": "test",
+                                          "reason": "repair", "at": doctor.now_iso()}))
+            path.symlink_to(target)
+            self.assertTrue(doctor.lifecycle.draining(state))
+            path.unlink()
+            path.write_text(target.read_text())
+            self.assertTrue(doctor.lifecycle.draining(state))
+            with mock.patch.object(Path, "lstat", side_effect=PermissionError):
+                self.assertTrue(doctor.lifecycle.draining(state))
+        first = self.observation()
+        events, alerts = self.evaluate(first, {"deliveryDemandSince": 990000})
+        carried, _ = self.evaluate(self.observation(operatorDraining=True),
+                                   {"alerts": alerts, "conditions": events, "deliveryDemandSince": 990000})
+        self.assertEqual(carried["delivery-stalled"]["state"], "active")
+        self.assertEqual(carried["delivery-stalled"]["source"]["status"], "unknown")
+
+    def test_admission_hold_resets_timer_but_does_not_clear_active_failure(self):
+        blocked = self.observation(pool=0, eligiblePool=50, openPRCount=7)
+        held = doctor.delivery_evidence(blocked, {"deliveryDemandSince": 980000})
+        self.assertIsNone(held["demandSince"])
+        resumed = doctor.delivery_evidence(self.observation(), {"deliveryDemandSince": held["demandSince"]})
+        self.assertEqual(resumed["demandSince"], 1000000)
+        self.assertEqual(resumed["state"], "eligible-work")
+        events, alerts = self.evaluate(self.observation(), {"deliveryDemandSince": 980000})
+        carried, _ = self.evaluate(blocked, {"alerts": alerts, "conditions": events, "deliveryDemandSince": 980000})
+        self.assertEqual(carried["delivery-stalled"]["state"], "active")
+
+    def test_existing_ready_or_queued_exact_output_has_delivery_demand_without_new_intake(self):
+        for state in ("ready", "queued"):
+            observed = self.observation(pool=0, eligiblePool=50, openPRCount=7)
+            observed.update(_allReceipts=[self.coding()],
+                            reconcile={"at": doctor.epoch_iso(observed["now"]), "dispositions": [
+                                {"pr": 7, "headSha": self.HEAD, "state": state}]})
+            result = doctor.delivery_evidence(observed, {"deliveryDemandSince": 990000})
+            self.assertEqual(result["state"], "stalled")
+            self.assertEqual(result["admission"]["runnablePool"], 0)
+            self.assertEqual(len(result["admission"]["admittedLocalOutputs"]), 1)
+        for state, head, age in (("hold:fix-exhausted", self.HEAD, 0),
+                                 ("draft", self.HEAD, 0), ("ready", "f" * 40, 0),
+                                 ("queued", self.HEAD, doctor.pr_events.RECONCILE_S + 1)):
+            observed = self.observation(pool=0, eligiblePool=50, openPRCount=7)
+            observed.update(_allReceipts=[self.coding()],
+                            reconcile={"at": doctor.epoch_iso(observed["now"] - age), "dispositions": [
+                                {"pr": 7, "headSha": head, "state": state}]})
+            result = doctor.delivery_evidence(observed, {"deliveryDemandSince": 990000})
+            self.assertEqual(result["state"], "admission-blocked")
+            self.assertEqual(result["admission"]["admittedLocalOutputs"], [])
+
+    def test_failure_restart_existing_router_claim_and_verified_rearm(self):
+        from scripts.tests.test_remediation import linear_issue, providers
+        observed = self.observation()
+        events, alerts = self.evaluate(observed, {"deliveryDemandSince": 990000})
+        tracker = FakeTracker()
+        state = doctor.reconcile(alerts, {}, tracker, observed["now"], events)
+        restarted = json.loads(json.dumps(state))
+        state = doctor.reconcile(alerts, restarted, tracker, observed["now"] + 1, events)
+        self.assertEqual([key for key, _ in tracker.opened].count("delivery-stalled"), 1)
+        issue = linear_issue("JOV-1", "delivery-stalled", title="Gem delivery stalled", description=alerts["delivery-stalled"])
+        plan = doctor.remediation.plan_labeled_events([issue], {}, providers(), observed["now"])
+        owner = plan["events"]["delivery-stalled"]
+        self.assertEqual(owner["cls"], "fixable-by-agent")
+        self.assertEqual(owner["status"], "claimed")
+        self.assertEqual(owner["lane"], "codex")
+        again = doctor.remediation.plan_labeled_events([issue], plan["events"], providers(), observed["now"] + 1)
+        self.assertEqual(again["events"]["delivery-stalled"]["attempts"], owner["attempts"])
+        recovered = self.observation()
+        recovered.update(_allReceipts=[self.coding()], merged24h=[self.merge(mergedAt=doctor.epoch_iso(1000000))])
+        cleared, clean = self.evaluate(recovered, state)
+        state = doctor.reconcile(clean, state, tracker, observed["now"] + 2, cleared)
+        self.assertEqual(state["conditions"]["delivery-stalled"]["terminalOutcome"], "merge-proven")
+        refired, _ = self.evaluate(self.observation(), {**state, "deliveryDemandSince": 990000})
+        self.assertEqual(refired["delivery-stalled"]["generation"], 2)
+
+
 class RunTest(unittest.TestCase):
+    def test_legacy_admission_alarm_survives_unknown_inventory_and_restart(self):
+        for timer in (None, 998000):
+            with self.subTest(timer=timer), tempfile.TemporaryDirectory() as tmp:
+                state = Path(tmp)
+                host = SimpleNamespace(state=state)
+                lane = SimpleNamespace(HOST="gem")
+                tracker = FakeTracker()
+                previous = {"alerts": {"admission-repair-needed": "existing inventory blocked"}}
+                if timer is not None:
+                    previous["admissionRepairSince"] = timer
+                (state / "doctor.json").write_text(json.dumps(previous))
+                unknown = obs(pool=None, eligiblePool=None, newIssueBudgetByProvider={})
+                with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+                        mock.patch.object(doctor, "observe", return_value=unknown):
+                    first = doctor.run(host, lane, None, tracker)
+                    restarted = doctor.run(host, lane, None, tracker)
+                for result in (first, restarted):
+                    receipt = result["conditions"]["admission-repair-needed"]
+                    self.assertEqual(result["admissionRepairSince"], timer)
+                    self.assertEqual(receipt["state"], "active")
+                    self.assertEqual(receipt["source"]["status"], "unknown")
+                    self.assertEqual(receipt["generation"], 1)
+                self.assertEqual(first["conditions"]["admission-repair-needed"]["deadlineAt"],
+                                 restarted["conditions"]["admission-repair-needed"]["deadlineAt"])
+                self.assertEqual(json.loads((state / "doctor.json").read_text())["admissionRepairSince"], timer)
+                self.assertEqual(len(tracker.opened), 1)
+                recovered = obs(pool=59, eligiblePool=59)
+                with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+                        mock.patch.object(doctor, "observe", return_value=recovered):
+                    result = doctor.run(host, lane, None, tracker)
+                self.assertIsNone(result["admissionRepairSince"])
+                self.assertEqual(result["conditions"]["admission-repair-needed"]["state"], "resolved")
+
     def test_run_writes_doctor_json_from_observations(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
