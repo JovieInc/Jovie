@@ -1,0 +1,10 @@
+No changes were needed. The audit finding is stale:
+
+- PR [#20188](https://github.com/JovieInc/Jovie/pull/20188) fixed the shortcut to open `?tab=earn#pay` directly.
+- Later PR [#20266](https://github.com/JovieInc/Jovie/pull/20266) intentionally removed the uncertified earnings shortcut for privacy.
+- Focused tests: 34 passed.
+- Biome: 3 relevant files passed.
+- Branch remains identical to `origin/main` at `70eb80cbae`.
+- No commit, push, or PR was created. GBrain was unavailable as noted.
+
+NOT-SHIPPABLE: The shortcut defect was already fixed, and the shortcut was subsequently intentionally removed from current main.
