@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
+import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
 import remediation  # noqa: E402
@@ -47,7 +48,7 @@ GATE_TIMEOUT_ALERT = 5
 FAILED_RUN_ALERT = 10
 DISK_MIN_PCT = 10
 DISK_CRIT_PCT = 5
-GITHUB_MIN_REMAINING = 300
+GITHUB_MIN_REMAINING = gh_app_token.FLOOR
 # An open PR older than this is a governor signal (JOV-7079): the cockpit names it and its
 # disposition instead of letting it age silently.
 AGED_PR_S = 7 * 24 * 3600
@@ -577,8 +578,15 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         if not delivered_after_alarm and delivery.get("state") not in ("no-eligible-work", "intentional-pause"):
             alerts["delivery-stalled"] = previous["alerts"]["delivery-stalled"]
     waiting = pool or obs.get("openPRCount")
+    github_reads_held = (obs.get("githubRemaining") is not None
+                         and obs["githubRemaining"] < GITHUB_MIN_REMAINING)
     for name, budget in (obs.get("newIssueBudgetByProvider") or {}).items():
         if budget.get("reason") == "pr-inventory-unavailable":
+            # The shared GitHub guard deliberately stops polling below its read floor.
+            # Report that once as github-quota instead of opening one derivative issue
+            # per provider; new-issue admission remains fail-closed either way.
+            if github_reads_held and budget.get("error") == "pr-read-failed":
+                continue
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     if obs.get("linearError"):
@@ -660,8 +668,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
-    if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
-        alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    if github_reads_held:
+        alerts["github-quota"] = (f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; read-only polling "
+                                  f"held below the {GITHUB_MIN_REMAINING}-point floor to preserve writes")
     elif obs.get("githubRemaining") is None:
         prior_alarm = ((previous or {}).get("alerts") or {}).get("github-quota")
         if prior_alarm:
