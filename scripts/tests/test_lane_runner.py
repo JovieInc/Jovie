@@ -36,9 +36,12 @@ SPEC.loader.exec_module(lane)
 # remains exercised by the explicit free_pct overrides and test_disk_guard.py;
 # these unit tests must neither depend on host capacity nor sweep host caches.
 _disk_capacity_fixture = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+_devin_free_fixture = patch.object(lane.devin_free_policy, "admission_open", return_value=True)
 def setUpModule():
     _disk_capacity_fixture.start()
+    _devin_free_fixture.start()
 def tearDownModule():
+    _devin_free_fixture.stop()
     _disk_capacity_fixture.stop()
 
 

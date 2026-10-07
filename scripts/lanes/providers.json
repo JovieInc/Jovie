@@ -4,8 +4,13 @@
     "tier": 0,
     "model": "swe-2-medium",
     "slots": 4,
-    "health": ["devin", "auth", "status"],
-    "healthy": "Logged in",
+    "health": ["python3", "{here}/devin_free_policy.py"],
+    "healthy": "available: true",
+    "freeOnly": {
+      "email": "t@timwhite.co",
+      "teamId": "devin-team$account-ac57d50ecbeb4e148bdb230ffa8afc1b",
+      "stopBefore": "2026-10-14T07:00:00Z"
+    },
     "cmd": [
       "devin",
       "-p",

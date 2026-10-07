@@ -187,6 +187,51 @@ describe('merge evidence coverage selection', () => {
   });
 });
 
+describe('Devin Free expiry coverage selection', () => {
+  const inputs = [
+    'scripts/lanes/devin_free_policy.py',
+    'scripts/tests/test_devin_free_policy.py',
+  ];
+  it('runs the required free-only failure and cutoff suite with branch coverage', () => {
+    const plan = buildAffectedTestPlan(inputs, { isFileAvailable: () => true });
+    expect(plan.lanePythonCoverage).toBe(true);
+    const commands = buildSelectedTestCommands(plan, '1');
+    const command = commands.find(
+      ([binary, args]) =>
+        binary === 'env' &&
+        Array.isArray(args) &&
+        args.some(arg => arg.includes('coverage run --branch'))
+    );
+    expect(command).toBeDefined();
+    if (!command || !Array.isArray(command[1])) {
+      throw new Error(
+        'Expected Devin Free structural Python command arguments'
+      );
+    }
+    expect(command[1].join(' ')).toContain(
+      'scripts/tests/test_devin_free_policy.py'
+    );
+    expect(command[1].join(' ')).toContain(
+      '*/scripts/lanes/devin_free_policy.py" --fail-under=85'
+    );
+  });
+  it('fails closed with missing tests and preserves unknown mixed-peer fallback', () => {
+    const missing = buildAffectedTestPlan(inputs, {
+      isFileAvailable: file => file !== inputs[1],
+    });
+    expect(missing.mode).toBe('full');
+    expect(missing.fallbackReason).toBe(
+      'Devin Free expiry coverage proof is unavailable'
+    );
+    const mixed = buildAffectedTestPlan(
+      [...inputs, 'scripts/lanes/unknown-new.py'],
+      { isFileAvailable: () => true }
+    );
+    expect(mixed.mode).toBe('full');
+    expect(mixed.lanePythonCoverage).toBe(true);
+  });
+});
+
 describe('dependency gate qualification plumbing', () => {
   const files = [
     'scripts/lanes/dependency_diff.py',
