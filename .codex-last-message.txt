@@ -1,0 +1,17 @@
+Implemented and published as draft PR [#20532](https://github.com/JovieInc/Jovie/pull/20532).
+
+- Added a direct “YouTube Ledger” action to Work’s empty and populated states.
+- `/app/youtube` now keeps Work selected in primary navigation.
+- Added regression coverage for both behaviors.
+- Commit: `772c87969948afb94ed9f5babc8234b90e3406b8`
+- Linear: JOV-7599 → In Review.
+
+Verification:
+
+- Biome and focused ESLint passed.
+- Vitest: 68/68 passed.
+- Turbo typecheck: 18/18 tasks passed.
+- Commit and pre-push hooks passed.
+- Working tree is clean.
+
+The PR remains draft and unmerged. GitHub’s coverage, source-validation, security, migration, and UI-capture checks are currently running. Manual authenticated browser evidence was unavailable; automated UI capture is in progress. The pre-push hook advised the UI integration branch, but the commissioning contract explicitly required `main`, which the PR targets.
