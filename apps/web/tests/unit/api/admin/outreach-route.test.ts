@@ -8,11 +8,17 @@ const mockPushLeadToInstantly = vi.hoisted(() => vi.fn());
 const mockGetAppUrl = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
 const mockGte = vi.hoisted(() => vi.fn(() => 'gte-clause'));
-const mockAnd = vi.hoisted(() => vi.fn(() => 'and-clause'));
+const mockAnd = vi.hoisted(() =>
+  vi.fn<(...clauses: unknown[]) => string | { clauses: unknown[] }>(
+    () => 'and-clause'
+  )
+);
 const mockAsc = vi.hoisted(() => vi.fn(() => 'asc-clause'));
 const mockDesc = vi.hoisted(() => vi.fn(() => 'desc-clause'));
 const mockCount = vi.hoisted(() => vi.fn(() => 'count-clause'));
-const mockIsNotNull = vi.hoisted(() => vi.fn(() => 'not-null-clause'));
+const mockIsNotNull = vi.hoisted(() =>
+  vi.fn<(column: unknown) => string>(() => 'not-null-clause')
+);
 const mockIsNull = vi.hoisted(() => vi.fn(() => 'is-null-clause'));
 const mockLt = vi.hoisted(() => vi.fn(() => 'lt-clause'));
 const mockNe = vi.hoisted(() => vi.fn(() => 'ne-clause'));
