@@ -1436,6 +1436,70 @@ describe('private Ovie MCP authorization boundary', () => {
     ).not.toContain('synthetic-private');
   });
 
+  it.each([
+    {
+      name: 'get_proof_brief',
+      args: { audience: 'synthetic-private-audience' },
+      message:
+        'audience must be investor, customer, manager, founder, or internal',
+    },
+    {
+      name: 'record_operational_memory',
+      args: { kind: 'synthetic-private-kind' },
+      message:
+        'kind must be observed, inference, proposal, or approved-decision',
+    },
+    {
+      name: 'get_bounded_approval',
+      args: {
+        id: 'synthetic-private-approval',
+        actor: 'synthetic-private-actor',
+      },
+      message:
+        'verification requires action and repository together with actor',
+    },
+  ])(
+    'returns a safe client validation error for $name after authorization',
+    async ({ name, args, message }) => {
+      const store = new MemoryOperatingStore();
+      const getDecision = vi.spyOn(store, 'getDecision');
+      const putDecision = vi.spyOn(store, 'putDecision');
+      const writeMemory = vi.mocked(putPage);
+      const previousWrites = writeMemory.mock.calls.length;
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const warnLog = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      for (const [principal, status] of [
+        [guest, 401],
+        [user, 403],
+      ] as const) {
+        const denied = await handleOvieMcpRequest({
+          principal,
+          store,
+          body: rpc('tools/call', { name, arguments: args }),
+        });
+        expect(denied.status).toBe(status);
+        expect(denied.body).toMatchObject({ error: { code: -32001 } });
+      }
+
+      const response = await handleOvieMcpRequest({
+        principal: founder,
+        store,
+        body: rpc('tools/call', { name, arguments: args }),
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        error: { code: -32602, message },
+      });
+      expect(getDecision).not.toHaveBeenCalled();
+      expect(putDecision).not.toHaveBeenCalled();
+      expect(writeMemory.mock.calls.length).toBe(previousWrites);
+      expect(
+        JSON.stringify([response.body, errorLog.mock.calls, warnLog.mock.calls])
+      ).not.toContain('synthetic-private');
+    }
+  );
+
   it('contains default-store construction errors without exposing their payload', async () => {
     vi.spyOn(operatingStore, 'getDefaultOperatingStore').mockImplementationOnce(
       () => {

@@ -524,8 +524,8 @@ const PROOF_BRIEF_TOOL_SCHEMA = 'summer.proof-brief.v1' as const;
 function getProofBrief(args: Record<string, unknown>) {
   const audienceRaw = stringOpt(args.audience) ?? 'investor';
   if (!(PROOF_BRIEF_AUDIENCES as readonly string[]).includes(audienceRaw)) {
-    throw new Error(
-      `audience must be one of: ${PROOF_BRIEF_AUDIENCES.join(', ')}`
+    throw new OvieMcpInputError(
+      'audience must be investor, customer, manager, founder, or internal'
     );
   }
   const audience = audienceRaw as ProofBriefAudience;
@@ -1019,7 +1019,7 @@ async function recordOperationalMemory(
 ) {
   const kindRaw = stringOpt(args.kind);
   if (!isOperationalMemoryKind(kindRaw)) {
-    throw new Error(
+    throw new OvieMcpInputError(
       'kind must be observed, inference, proposal, or approved-decision'
     );
   }
@@ -1122,7 +1122,7 @@ async function getBoundedApprovalTool(
   const revision = stringOpt(args.revision);
   const diffDigest = stringOpt(args.diff_digest);
   if (actor && (!action || !repository)) {
-    throw new Error(
+    throw new OvieMcpInputError(
       'verification requires action and repository together with actor'
     );
   }
