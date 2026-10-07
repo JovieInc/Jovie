@@ -240,7 +240,7 @@ describe('RightDrawer', () => {
     const desktopAside = screen.getByLabelText('Responsive drawer');
     // Shared shell rail-motion allocation contract (JOV-4522).
     expect(desktopAside).toHaveClass(
-      'transition-[flex-basis,width,opacity,transform]',
+      'transition-shell-rail-allocation',
       'opacity-100'
     );
     expect(desktopAside).not.toHaveClass('lg:border');
