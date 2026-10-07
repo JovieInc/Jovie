@@ -6,8 +6,11 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -390,6 +393,71 @@ class LedgerSchemaTest(unittest.TestCase):
         broken["local"]["ledger24h"] = {None: 2, 5: 1, "landing": 3}
         text = "\n".join(plain(line) for line in hud.render(broken, 160, 45))
         self.assertIn("24h verdicts:", text)
+
+
+class ManagedReleaseRestartTest(unittest.TestCase):
+    def test_symlink_launched_process_executes_the_new_release_and_preserves_flags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            old, new = state / "old", state / "new"
+            shutil.copytree(ROOT / "scripts/lanes", old, ignore=shutil.ignore_patterns("__pycache__"))
+            new.mkdir()
+            receipt = state / "executed.json"
+            (new / "hud.py").write_text(
+                "import json, sys\nfrom pathlib import Path\n"
+                f"Path({str(receipt)!r}).write_text(json.dumps({{'source': __file__, 'args': sys.argv[1:]}}))\n")
+            (state / "current").symlink_to(old, target_is_directory=True)
+            harness = state / "launch.py"
+            harness.write_text(f"""
+import importlib.util, os
+from pathlib import Path
+from types import SimpleNamespace
+state = Path({str(state)!r})
+spec = importlib.util.spec_from_file_location('hud', state / 'current/hud.py')
+hud = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hud)
+hud.lane.Host = lambda: SimpleNamespace(state=state)
+hud.lane.load_github_env = lambda: None
+hud.Remote = lambda _: SimpleNamespace(start=lambda: None)
+hud.build_model = lambda *args: None
+frames = 0
+def render(*args):
+    global frames
+    if frames:
+        raise RuntimeError('old HUD rendered again instead of executing the new release')
+    frames += 1
+    replacement = state / '.current.tmp'
+    replacement.symlink_to(state / 'new', target_is_directory=True)
+    os.replace(replacement, state / 'current')
+    return ['old release before managed update']
+hud.render = render
+hud.main()
+""")
+            flags = ["--width", "160", "--height", "45", "--interval", "0.001"]
+            result = subprocess.run([sys.executable, str(harness), *flags],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(receipt.read_text()),
+                             {"source": str((new / "hud.py").resolve()), "args": flags})
+
+    def test_unchanged_or_missing_release_keeps_rendering_without_reexec(self):
+        class StopLoop(Exception):
+            pass
+        for candidate in (hud.HERE / "hud.py", None):
+            with self.subTest(candidate=candidate), \
+                    mock.patch.object(hud.lane, "Host", return_value=SimpleNamespace(state=Path('/unused'))), \
+                    mock.patch.object(hud.lane, "load_github_env"), \
+                    mock.patch.object(hud, "Remote"), \
+                    mock.patch.object(hud, "current_hud", return_value=candidate), \
+                    mock.patch.object(hud, "build_model", return_value=None), \
+                    mock.patch.object(hud, "render", return_value=["frame"]) as render, \
+                    mock.patch.object(hud.os, "execv") as execute, \
+                    mock.patch.object(hud.sys, "stdout", io.StringIO()), \
+                    mock.patch.object(hud.time, "sleep", side_effect=StopLoop):
+                with self.assertRaises(StopLoop):
+                    hud.main([])
+                render.assert_called_once()
+                execute.assert_not_called()
 
 
 if __name__ == "__main__":

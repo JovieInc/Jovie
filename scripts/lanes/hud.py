@@ -821,7 +821,9 @@ def main(argv=None) -> int:
     try:
         while True:
             newer = current_hud(host)
-            if newer and newer != Path(__file__).resolve():
+            # HERE binds the loaded release. Resolving __file__ again can follow
+            # the moved `current` symlink and incorrectly compare new to new.
+            if newer and newer != HERE / "hud.py":
                 sys.stdout.write("\x1b[?25h")
                 sys.stdout.flush()
                 os.execv(sys.executable, [sys.executable, str(newer), *sys.argv[1:]])
