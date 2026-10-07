@@ -1,3 +1,24 @@
+vi.mock(
+  '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed',
+  () => ({
+    JovieWorkFeed: ({
+      profileId,
+      completedOnly,
+    }: {
+      profileId: string;
+      completedOnly: boolean;
+    }) => (
+      <div
+        data-testid='completed-work'
+        data-profile={profileId}
+        data-completed-only={String(completedOnly)}
+      >
+        Verified work
+      </div>
+    ),
+  })
+);
+
 import {
   act,
   fireEvent,
@@ -7,7 +28,6 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
@@ -185,7 +205,8 @@ describe('OpportunityInboxPageClient', () => {
     refreshMock.mockReset();
   });
 
-  it('links the Inbox to the autonomous work history', () => {
+  it('switches to read-only completed work and preserves Needs you context', async () => {
+    const user = userEvent.setup();
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -193,12 +214,55 @@ describe('OpportunityInboxPageClient', () => {
           availability: HEALTHY_AVAILABILITY,
           emptyActionCards: [],
         }}
+        profileId='creator-profile'
       />
     );
-
+    expect(screen.getByRole('button', { name: 'Needs You' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await user.click(screen.getByRole('button', { name: 'Done For You' }));
+    expect(screen.getByTestId('completed-work')).toHaveAttribute(
+      'data-profile',
+      'creator-profile'
+    );
+    expect(screen.getByTestId('completed-work')).toHaveAttribute(
+      'data-completed-only',
+      'true'
+    );
     expect(
-      screen.getByRole('link', { name: 'Jovie Did This' })
-    ).toHaveAttribute('href', APP_ROUTES.JOVIE_WORK);
+      screen.queryByRole('link', { name: 'Start A Chat' })
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Needs You' }));
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
+  });
+
+  it('restores the route-selected view when navigating back or opening a deep link', () => {
+    const inbox = {
+      cards: [],
+      availability: HEALTHY_AVAILABILITY,
+      emptyActionCards: [],
+    };
+    const { rerender } = render(
+      <OpportunityInboxPageClient
+        inbox={inbox}
+        profileId='creator-profile'
+        initialView='done'
+      />
+    );
+    expect(screen.getByTestId('completed-work')).toBeVisible();
+    rerender(
+      <OpportunityInboxPageClient
+        inbox={inbox}
+        profileId='creator-profile'
+        initialView='needs'
+      />
+    );
+    expect(screen.queryByTestId('completed-work')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Needs You' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('does not claim a clear inbox when availability metadata is missing', () => {
@@ -301,7 +365,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(songFilter).toHaveFocus();
   });
 
-  it('keeps unknown founder inboxes distinct from healthy clear and brain-dump states', () => {
+  it('keeps unavailable creator inboxes distinct from a healthy empty state', () => {
     inboxHomeEnabled = true;
     render(
       <OpportunityInboxPageClient
@@ -835,8 +899,8 @@ describe('OpportunityInboxPageClient', () => {
       await user.keyboard('{ArrowRight}');
 
       expect(
-        screen.getByRole('button', {
-          name: hasUpdate ? 'Restart Jovie To Update' : 'Start Session',
+        screen.getByRole(hasUpdate ? 'button' : 'link', {
+          name: hasUpdate ? 'Restart Jovie To Update' : 'Start A Chat',
         })
       ).toHaveFocus();
     }
@@ -885,12 +949,14 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Run on 3 more videos' })
+    );
 
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
   });
 
   it('does not restore stack focus after a failed report next step', async () => {
@@ -937,7 +1003,9 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Run on 3 more videos' })
+    );
     const songs = screen.getByRole('button', { name: 'Songs' });
     await user.click(songs);
 
@@ -999,12 +1067,9 @@ describe('OpportunityInboxPageClient', () => {
     const user = userEvent.setup();
     inboxHomeEnabled = true;
     let rejectAction: (() => void) | undefined;
-    mutateAsyncMock.mockImplementationOnce(
-      () =>
-        new Promise((_resolve, reject) => {
-          rejectAction = () => reject(new Error('decision failed'));
-        })
-    );
+    mutateMock.mockImplementationOnce((_id, options) => {
+      rejectAction = () => options?.onError?.(new Error('decision failed'));
+    });
 
     render(
       <OpportunityInboxPageClient
@@ -1031,7 +1096,7 @@ describe('OpportunityInboxPageClient', () => {
 
     screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
 
     act(() => {
       rejectAction?.();
@@ -1149,5 +1214,22 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-tour-date-review')
     ).toBeInTheDocument();
+  });
+});
+
+describe('creator-only empty home', () => {
+  it('never offers founder capture when Inbox Home is enabled', () => {
+    inboxHomeEnabled = true;
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          emptyActionCards: [],
+          availability: HEALTHY_AVAILABILITY,
+        }}
+      />
+    );
+    expect(screen.queryByText('Start A Brain Dump')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
   });
 });

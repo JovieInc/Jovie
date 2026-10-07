@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, gte, or } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, or } from 'drizzle-orm';
 import {
   type JovieWorkItem,
   type JovieWorkOutcome,
@@ -113,6 +113,9 @@ export async function loadJovieWorkFeed(
         and(
           eq(workflowRuns.userId, input.userId),
           creatorInboxSourceCondition(workflowRuns.kind),
+          input.phase === 'completed'
+            ? eq(workflowRuns.status, 'completed')
+            : undefined,
           or(
             gte(workflowRuns.updatedAt, since),
             gte(workflowRunOutcomes.windowEnd, since)
@@ -135,6 +138,9 @@ export async function loadJovieWorkFeed(
         and(
           eq(agentRuns.userId, input.userId),
           creatorInboxSourceCondition(agentRuns.agentSlug),
+          input.phase === 'completed'
+            ? eq(agentRuns.status, 'completed')
+            : undefined,
           or(gte(agentRuns.startedAt, since), gte(agentRuns.completedAt, since))
         )
       )
@@ -157,6 +163,9 @@ export async function loadJovieWorkFeed(
         and(
           eq(suggestedActions.userId, input.userId),
           creatorInboxSourceCondition(suggestedActions.kind),
+          input.phase === 'completed'
+            ? eq(suggestedActions.status, 'executed')
+            : undefined,
           gte(suggestedActions.createdAt, since)
         )
       )
@@ -176,6 +185,9 @@ export async function loadJovieWorkFeed(
       .where(
         and(
           eq(retouchJobs.userId, input.userId),
+          input.phase === 'completed'
+            ? inArray(retouchJobs.status, ['completed', 'accepted_by_user'])
+            : undefined,
           gte(retouchJobs.createdAt, since)
         )
       )
@@ -198,6 +210,9 @@ export async function loadJovieWorkFeed(
       .where(
         and(
           eq(merchOrders.creatorProfileId, input.creatorProfileId),
+          input.phase === 'completed'
+            ? eq(merchFulfillmentJobs.status, 'succeeded')
+            : undefined,
           gte(merchFulfillmentJobs.createdAt, since)
         )
       )
@@ -225,6 +240,9 @@ export async function loadJovieWorkFeed(
             metadataSubmissionRequests.creatorProfileId,
             input.creatorProfileId
           ),
+          input.phase === 'completed'
+            ? eq(metadataSubmissionRequests.status, 'live')
+            : undefined,
           gte(metadataSubmissionRequests.createdAt, since)
         )
       )
@@ -249,6 +267,9 @@ export async function loadJovieWorkFeed(
       .where(
         and(
           eq(fanReleaseNotifications.creatorProfileId, input.creatorProfileId),
+          input.phase === 'completed'
+            ? eq(fanReleaseNotifications.status, 'sent')
+            : undefined,
           gte(fanReleaseNotifications.createdAt, since)
         )
       )
