@@ -1,0 +1,10 @@
+PR #20064 is no longer orphaned. Live GitHub data shows it `OPEN`, `CLEAN`, and `QUEUED` at position 23 on head `d03ca04a2f9746429470a30bff6a5d11e23e8dbc`.
+
+- Local reconciliation reports `orphans: []` and classifies #20064 as `queued`.
+- Branch remains clean and identical to `origin/main`.
+- No files, commits, pushes, or PRs were created.
+- No tests were applicable.
+- GBrain was unavailable as documented.
+- The mac doctor owns the eventual Linear `Done` transition.
+
+NOT-SHIPPABLE: the reported condition already cleared through the existing merge-queue reconciliation path; a code PR would add no fix.
