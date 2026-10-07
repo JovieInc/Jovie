@@ -21,8 +21,10 @@ describe('sidebar full-height flex chain (JOV-3960)', () => {
         />
       </SidebarProvider>
     );
-    const rail = container.querySelector('#shell-left-rail');
-    const mount = container.querySelector('[data-app-shell-sidebar-mount]');
+    const rail = container.querySelector<HTMLElement>('#shell-left-rail');
+    const mount = container.querySelector<HTMLElement>(
+      '[data-app-shell-sidebar-mount]'
+    );
     expect(rail).toHaveClass('group', 'peer', 'h-full', 'min-h-0', 'shrink-0');
     expect(mount).toHaveClass('h-full', 'min-h-0', 'flex-col');
     expect(mount).toContainElement(rail);
