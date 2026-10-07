@@ -1,0 +1,12 @@
+Already fixed on `origin/main` by commit `90caa9fccc` / [PR #20188](https://github.com/JovieInc/Jovie/pull/20188). `/new` redirects to `/`, is `noindex`, and declares `/` canonical.
+
+Verification:
+
+- 3 relevant test files passed
+- 32 tests passed
+- Branch remains clean and identical to `origin/main`
+- No commit, push, or duplicate PR created
+
+Validation ran with Node 24.21.0 and pnpm 9.15.9.
+
+NOT-SHIPPABLE: requested redirect and regression coverage already landed on main.
