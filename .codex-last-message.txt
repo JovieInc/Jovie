@@ -1,0 +1,5 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T223723Z-JOV-2135-codex-brief-402bf2/.design-brief.md:1).
+
+Triage: implement as one follow-up using versioned Jovie-owned `public/` PNG assets. Repository validation passes steps 1–8 with no invalid IDs; Step 9 is intentionally empty for the later design pass.
+
+No build, commit, push, or PR was performed. Bootstrap warned that local Node/pnpm versions do not match repository pins, but the Python brief validator and `git diff --check` passed.
