@@ -36,7 +36,7 @@ const LINK_KINDS = new Set<OvieCertificationLinkKind>([
 ]);
 
 export interface CertificationPacketFile {
-  readonly domain: PacketFileDomain;
+  readonly domain: OvieCertificationDomainId;
   readonly surface: string;
   readonly packetUpdatedAt: string;
   readonly links: readonly OvieCertificationLink[];
