@@ -1,0 +1,5 @@
+Root cause: LogYourBody’s iOS launch-quality audit hit its 34-minute timeout during a still-running chaos test. The same SHA passed the merge-group gate in 16m35s.
+
+The repair belongs to LogYourBody’s workflow/iOS sources, which are absent from the contractually mandated Jovie repository. The Jovie worktree remains clean at `origin/main`; no tests, commit, push, or PR were appropriate. GBrain was unavailable.
+
+NOT-SHIPPABLE: the failing workflow is owned by JovieInc/LogYourBody, while this lane is restricted to JovieInc/Jovie.
