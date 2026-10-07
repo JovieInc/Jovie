@@ -4238,13 +4238,22 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     pushed = receipt.get("verdict") == "fix-pushed"
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headAfter"),
                          "pr": receipt.get("pr")}
+    # An unreadable ownership boundary is not evidence of a coding/provider failure.
+    # Preserve the existing bounded recovery envelope and repeated-failure fingerprint.
+    target_unavailable = (receipt.get("verdict") == "reconcile-unavailable"
+                          and receipt.get("cancellation", {}).get("reason") == "target-state-unavailable")
+    evidence = {"before": pr["headRefOid"], "after": receipt.get("headAfter")}
+    if target_unavailable:
+        evidence["targetObservation"] = {key: receipt["cancellation"].get(key)
+                                       for key in ("reason", "stage", "observedState")}
     receipt["execution"] = execution_attempt.finish(
         runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], "succeeded" if pushed else "failed_known",
-        {"failureClass": None if pushed else "repair_incomplete",
+        {"failureClass": None if pushed else "target_state_unavailable" if target_unavailable else "repair_incomplete",
          "failureFingerprint": None if pushed else execution_attempt.digest(receipt.get("reasons", ["no-head-change"])),
-         "evidenceDigest": execution_attempt.digest({"before": pr["headRefOid"], "after": receipt.get("headAfter")}),
+         "evidenceDigest": execution_attempt.digest(evidence),
          "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
-         "confidence": "high", "dependencies": [name]}, coordination=coordination)
+         "confidence": "unknown" if target_unavailable else "high",
+         "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
