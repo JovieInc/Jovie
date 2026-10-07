@@ -26,7 +26,7 @@ export type RailMotionPhase = 'closed' | 'opening' | 'open' | 'closing';
  * and its content travel together.
  */
 export const SHELL_RAIL_ALLOCATION =
-  'transition-[flex-basis,width,border-width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none';
+  'transition-shell-rail-allocation duration-cinematic ease-cinematic motion-reduce:transition-none';
 
 /** Main-plane geometry: the shell-owned surfaces that yield/reclaim canvas. */
 export const SHELL_RAIL_MAIN_PLANE =

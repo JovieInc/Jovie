@@ -195,6 +195,11 @@
   max-height: calc(100dvh - var(--space-4));
 }
 
+/* Canonical allocation transition shared by sidebar, inspector, and drawers. */
+@utility transition-shell-rail-allocation {
+  transition-property: flex-basis, width, border-width, opacity, transform;
+}
+
 @utility scale-press {
   scale: var(--scale-press);
 }
