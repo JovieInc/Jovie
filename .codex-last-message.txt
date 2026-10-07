@@ -1,0 +1,19 @@
+Draft PR opened: [#20576 — staged vendor-off controls](https://github.com/JovieInc/Jovie/pull/20576)
+
+- Added independent provider-link and release-fact cutover flags.
+- Vendor-off activates only after both families are explicitly enabled.
+- Added immediate environment rollback and exact startup configuration receipts.
+- Routed vendor-off enrichment jobs to Jovie DSP discovery.
+- Listed all residual Musicfetch adapters explicitly.
+- Commit: `81f64d706a`
+- Linear: JOV-7323 → In Review.
+
+Verification:
+
+- 251 related tests passed, plus a 26-test final rerun.
+- Biome and ESLint passed.
+- Full typecheck passed: 18/18 tasks.
+- Pre-commit secret and policy checks passed.
+- Hosted Migration Guard passed; remaining draft CI checks are pending with no failures.
+
+Production cutover was intentionally not activated: repository evidence still lacks certified false-link and production parity receipts. The PR documents this limitation and emits the post-deploy receipt needed for the eventual before/after comparison.
