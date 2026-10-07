@@ -1,0 +1,11 @@
+No repository changes or PR were created.
+
+Handoff:
+
+- LYB PRs [#1096](https://github.com/JovieInc/LogYourBody/pull/1096) and [#1097](https://github.com/JovieInc/LogYourBody/pull/1097) are merged.
+- Live LYB ruleset enables Copilot review-on-push, but recent non-draft PRs—including merged #1210—received no review or review request.
+- LYB has no `.github/CODEOWNERS`.
+- The required fix belongs in `JovieInc/LogYourBody`; Jovie invariant `JOV-INV-025` explicitly forbids cross-repository mutation authority.
+- The commissioned Jovie branch remains clean. No tests were run because no valid Jovie change exists.
+
+NOT-SHIPPABLE: reviewer auto-assignment must be implemented in JovieInc/LogYourBody, but this contract restricts changes and the draft PR to JovieInc/Jovie.
