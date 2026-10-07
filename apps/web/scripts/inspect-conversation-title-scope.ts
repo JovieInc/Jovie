@@ -1,14 +1,16 @@
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { neon } from '@neondatabase/serverless';
 import {
   type ConversationTitleRepairRecord,
   planConversationTitleRepairs,
 } from '@/lib/chat/conversation-title-repair';
 
-async function main() {
-  const [email, outputDir] = process.argv.slice(2);
+export async function inspectConversationTitleScope(
+  args = process.argv.slice(2)
+) {
+  const [email, outputDir] = args;
   if (!email || !outputDir || !process.env.DATABASE_URL)
     throw new Error(
       'Expected verified owner email, private output directory, and DATABASE_URL.'
@@ -63,9 +65,14 @@ async function main() {
     })
   );
 }
-void main().catch(() => {
-  console.error(
-    'Scope inspection failed. Check credentials, connectivity, and the explicit owner scope.'
-  );
-  process.exitCode = 1;
-});
+if (
+  basename(process.argv[1] ?? '').match(
+    /^inspect-conversation-title-scope\.(?:ts|js)$/
+  )
+)
+  void inspectConversationTitleScope().catch(() => {
+    console.error(
+      'Scope inspection failed. Check credentials, connectivity, and the explicit owner scope.'
+    );
+    process.exitCode = 1;
+  });

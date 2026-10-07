@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { parseArgs } from 'node:util';
 import { neon } from '@neondatabase/serverless';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
@@ -8,12 +9,13 @@ import { z } from 'zod';
 import { planConversationTitleRepairs } from '@/lib/chat/conversation-title-repair';
 import { chatConversations } from '@/lib/db/schema/chat';
 
-async function main() {
+export async function repairConversationTitles(args = process.argv.slice(2)) {
   // Standalone scripts are exempt from the app connection singleton. This
   // requires only DATABASE_URL, without unrelated restricted app secrets.
   const db = drizzle(neon(z.string().min(1).parse(process.env.DATABASE_URL)));
   // Explicit owner/profile scope is mandatory for planning, application, and rollback.
   const { values } = parseArgs({
+    args,
     options: {
       'user-id': { type: 'string' },
       'profile-id': { type: 'string' },
@@ -196,11 +198,16 @@ async function main() {
     );
   }
 }
-void main()
-  .then(() => process.exit(0))
-  .catch(() => {
-    console.error(
-      'Title repair failed. Check the explicit scope, mapping, and database connectivity.'
-    );
-    process.exit(1);
-  });
+if (
+  basename(process.argv[1] ?? '').match(
+    /^repair-conversation-titles\.(?:ts|js)$/
+  )
+)
+  void repairConversationTitles()
+    .then(() => process.exit(0))
+    .catch(() => {
+      console.error(
+        'Title repair failed. Check the explicit scope, mapping, and database connectivity.'
+      );
+      process.exit(1);
+    });
