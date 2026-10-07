@@ -20,6 +20,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
@@ -259,7 +261,7 @@ def open_pr_numbers() -> set[int] | None:
     if os.environ.get("LANES_SELFTEST"):
         return None
     try:
-        result = subprocess.run(["gh", "pr", "list", "--repo", pr_events.REPO, "--state", "open", "--limit", "500",
+        result = lifecycle.run(["gh", "pr", "list", "--repo", pr_events.REPO, "--state", "open", "--limit", "500",
                                  "--json", "number", "--jq", ".[].number"], capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -275,7 +277,7 @@ def merged_prs_24h(lane, now: float) -> list[dict]:
     return merge_evidence.require_complete(merge_evidence.collect(lane.REPO_SLUG, now - 86400, now))
 
 
-def sample_merge_throughput(state: Path, now: float, run=subprocess.run) -> tuple[dict | None, str | None]:
+def sample_merge_throughput(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
     """Refresh the one-hour GitHub queue signal at most every five minutes."""
     path = Path(state) / "merge-throughput.json"
     cached = read_json(path, {})
@@ -878,7 +880,7 @@ def fetch_slo(host, lane) -> dict | None:
         return record["snapshot"]
     try:
         lane.load_github_env()
-        raw = subprocess.run(
+        raw = lifecycle.run(
             ["gh", "api", "repos/JovieInc/Jovie/contents/docs/metrics/shipping-slo-latest.json",
              "-H", "Accept: application/vnd.github.raw"],
             capture_output=True, text=True, timeout=20)
@@ -1025,7 +1027,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     body.write_text(json.dumps(feed, indent=1))
     lane.load_github_env()
     if not record.get("url"):
-        created = subprocess.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
+        created = lifecycle.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
                                   "--filename", "lanes-status.json", str(body)], capture_output=True, text=True, timeout=60)
         url = (created.stdout or "").strip().splitlines()[-1] if created.returncode == 0 and created.stdout.strip() else None
         if not url:
@@ -1038,7 +1040,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         except Exception:
             pass
         return url
-    subprocess.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
+    lifecycle.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
                    capture_output=True, text=True, timeout=60)
     return record["url"]
 

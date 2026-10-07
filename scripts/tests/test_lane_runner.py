@@ -4781,6 +4781,344 @@ class RepairQueueAuthorityTest(unittest.TestCase):
             self.assertNotIn("execution", receipt)
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["5"]["count"], 1)
 
+class LifecycleOwnershipTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.state = Path(self.temp.name)
+        self.host = lane.Host(state=self.state)
+        self.lock = self.state / "lifecycle.lock"
+
+    def exclusive(self):
+        handle = self.lock.open("a+")
+        try:
+            lane.fcntl.flock(handle, lane.fcntl.LOCK_EX | lane.fcntl.LOCK_NB)
+        except BaseException:
+            handle.close()
+            raise
+        return handle
+
+    def assert_activation_held(self):
+        with self.assertRaises(BlockingIOError):
+            self.exclusive()
+
+    def test_exclusive_fence_denies_all_controller_effects(self):
+        handle = self.exclusive()
+        try:
+            for command in (["update"], ["dispatch"], ["worker", "--provider", "codex"],
+                            ["gate-command", "--timeout", "1", "--", "true"]):
+                with self.subTest(command=command), patch.object(lane, "Host", return_value=self.host), \
+                        patch.object(lane, "load_github_env") as identity, \
+                        patch.object(lane, "guarded_main") as effects:
+                    self.assertEqual(lane.main(command), 75)
+                    identity.assert_not_called()
+                    effects.assert_not_called()
+            with patch.dict(sys.modules, {"lane_runner": lane}), \
+                    patch.object(lane, "Host", return_value=self.host), \
+                    patch.object(lane.reason_lane, "guarded_main") as reason, \
+                    patch.object(lane.yc_corpus, "refresh") as corpus, \
+                    patch.object(lane.worktree_sweep, "guarded_main") as sweep:
+                self.assertEqual(lane.reason_lane.main(["drain"]), 75)
+                self.assertEqual(lane.yc_corpus.main(["refresh", "--state", str(self.state / "yc.json")]), 75)
+                self.assertEqual(lane.worktree_sweep.main(["--state", str(self.state)]), 75)
+                for effect in (reason, corpus, sweep):
+                    effect.assert_not_called()
+        finally:
+            handle.close()
+
+    def test_controller_guard_precedes_identity_and_work(self):
+        for command, target in ((["update"], "update"), (["dispatch"], "dispatch"),
+                                (["worker", "--provider", "codex"], "worker")):
+            with self.subTest(command=command), patch.object(lane, "Host", return_value=self.host), \
+                    patch.object(lane, "load_github_env", side_effect=self.assert_activation_held), \
+                    patch.object(lane, target, side_effect=lambda *args: self.assert_activation_held() or 0):
+                self.assertEqual(lane.main(command), 0)
+            with self.exclusive():
+                pass
+
+    def test_forged_closed_and_wrong_inode_descriptors_fail_closed(self):
+        other = self.state / "other.lock"
+        with other.open("a+") as handle:
+            for value in ("not-a-fd", "2", "999999", str(handle.fileno())):
+                with self.subTest(value=value), patch.dict(os.environ, {lane.lifecycle.FD_ENV: value}):
+                    with self.assertRaises(lane.lifecycle.AdmissionHeld):
+                        with lane.lifecycle.Guard(self.state):
+                            self.fail("forged descriptor admitted")
+            self.assertEqual(os.fstat(handle.fileno()).st_ino, other.stat().st_ino)
+
+    def test_unlocked_canonical_descriptor_does_not_bypass_exclusive_owner(self):
+        with self.exclusive(), self.lock.open("r") as handle, \
+                patch.dict(os.environ, {lane.lifecycle.FD_ENV: str(handle.fileno())}):
+            with self.assertRaises(lane.lifecycle.AdmissionHeld):
+                with lane.lifecycle.Guard(self.state):
+                    self.fail("exclusive fence bypassed")
+
+    def test_symlink_and_replaced_canonical_lock_fail_closed(self):
+        other = self.state / "other.lock"
+        other.touch()
+        self.lock.symlink_to(other)
+        with self.assertRaises(lane.lifecycle.AdmissionHeld):
+            with lane.lifecycle.Guard(self.state):
+                pass
+        self.lock.unlink()
+        with lane.lifecycle.Guard(self.state):
+            self.lock.unlink()
+            self.lock.touch()
+            with self.assertRaises(lane.lifecycle.AdmissionHeld):
+                lane.lifecycle.spawn_kwargs()
+
+    def child_script(self, gate_fd):
+        return ("import os,sys; from pathlib import Path; "
+                f"sys.path.insert(0, {str(ROOT / 'scripts/lanes')!r}); import lifecycle; "
+                "print('waiting', flush=True); "
+                f"os.read({gate_fd},1); "
+                f"guard=lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                "print('admitted',flush=True); guard.__exit__()")
+
+    def test_delayed_detached_spawn_retains_guard_after_parent_close(self):
+        read, write = os.pipe()
+        process = None
+        try:
+            with lane.lifecycle.Guard(self.state):
+                process = subprocess.Popen([sys.executable, "-u", "-c", self.child_script(read)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
+                    **lane.lifecycle.spawn_kwargs(pass_fds=(read,)))
+                self.assertEqual(process.stdout.readline().strip(), "waiting")
+            self.assert_activation_held()
+            os.write(write, b"1")
+            stdout, stderr = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stdout.strip(), "admitted")
+            with self.exclusive():
+                pass
+        finally:
+            os.close(read); os.close(write)
+            if process is not None and process.poll() is None:
+                process.kill(); process.communicate(timeout=10)
+
+    def test_actual_exec_retains_guard_before_new_generation_adopts_it(self):
+        read, write = os.pipe()
+        process = None
+        try:
+            script = ("import os,sys; from pathlib import Path; "
+                      f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lifecycle; "
+                      f"guard=lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                      "lifecycle.prepare_reexec(); "
+                      f"os.set_inheritable({read},True); "
+                      f"os.execv(sys.executable,[sys.executable,'-u','-c',{self.child_script(read)!r}])")
+            process = subprocess.Popen([sys.executable, "-u", "-c", script], pass_fds=(read,),
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                env=lane.selftest_env(self.state))
+            self.assertEqual(process.stdout.readline().strip(), "waiting")
+            self.assert_activation_held()
+            os.write(write, b"1")
+            stdout, stderr = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stdout.strip(), "admitted")
+            with self.exclusive():
+                pass
+        finally:
+            os.close(read); os.close(write)
+            if process is not None and process.poll() is None:
+                process.kill(); process.communicate(timeout=10)
+
+    def test_owned_detached_controllers_inherit_the_same_guard(self):
+        repo = self.state / "repo"
+        (repo / ".git").mkdir(parents=True)
+        with lane.lifecycle.Guard(self.state) as guard, \
+                patch.object(lane.reason_lane, "queued_jobs", return_value=[{}]), \
+                patch.object(lane.worktree_sweep.subprocess, "Popen") as sweep, \
+                patch.object(lane.worktree_pool, "enabled", return_value=True):
+            reason = Mock(); corpus = Mock()
+            lane.reason_lane.tick(self.host, lane, Mock(), config={"label": "reasoning-job"}, spawn=reason)
+            lane.yc_corpus.tick(self.state, spawn=corpus, now=time.time())
+            lane.worktree_sweep.maybe_spawn(self.state, repo, 50, now=time.time())
+            sweep_call = sweep.call_args
+            lane.worktree_pool.refill_in_background(repo, self.state / "fill.log")
+            for call in (reason.call_args, corpus.call_args, sweep_call, sweep.call_args):
+                self.assertIn(guard.fd, call.kwargs["pass_fds"])
+                self.assertEqual(call.kwargs["env"][lane.lifecycle.FD_ENV], str(guard.fd))
+                self.assertEqual(call.kwargs["env"]["LANES_STATE"], str(self.state.resolve()))
+
+    def test_pool_refill_rejects_forged_inheritance_before_git_or_install(self):
+        with patch.dict(os.environ, {lane.lifecycle.FD_ENV: "999999", "LANES_STATE": str(self.state)}), \
+                patch.object(lane.worktree_pool, "guarded_main") as effects:
+            self.assertEqual(lane.worktree_pool.main(["--fill"]), 75)
+            effects.assert_not_called()
+
+    def test_standalone_pool_utility_keeps_its_existing_behavior(self):
+        with patch.dict(os.environ, {}, clear=False), \
+                patch.object(lane.worktree_pool, "guarded_main", return_value=0) as effects:
+            os.environ.pop(lane.lifecycle.FD_ENV, None)
+            self.assertEqual(lane.worktree_pool.main(["--status"]), 0)
+            effects.assert_called_once_with(["--status"])
+
+    def test_gate_child_retains_guard_after_parent_closes(self):
+        started = self.state / "gate-started"
+        done = self.state / "gate-done"
+        command = ("from pathlib import Path; import time; "
+                   f"Path({str(started)!r}).touch(); "
+                   f"deadline=time.monotonic()+8\nwhile not Path({str(done)!r}).exists():\n"
+                   " if time.monotonic()>deadline: raise RuntimeError('test gate not released')\n"
+                   " time.sleep(.01)\n")
+        results = []
+        with (self.state / "gate-owner.lock").open("a+") as owner:
+            with lane.lifecycle.Guard(self.state):
+                thread = threading.Thread(target=lambda: results.append(
+                    lane.sh([sys.executable, "-c", command], timeout=10, pass_fds=(owner.fileno(),))))
+                thread.start()
+                deadline = time.monotonic() + 8
+                while not started.exists() and time.monotonic() < deadline:
+                    time.sleep(.01)
+                self.assertTrue(started.exists(), "gate command did not start")
+            try:
+                self.assert_activation_held()
+            finally:
+                done.touch()
+                thread.join(timeout=12)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0].returncode, 0, results[0].stderr)
+            with self.exclusive():
+                pass
+
+    def test_worker_death_leaves_live_provider_under_helper_guard(self):
+        started = self.state / "provider-started"
+        done = self.state / "provider-done"
+        agent = ("from pathlib import Path; import os,time; "
+                 "os.fstat(int(os.environ['LANES_LIFECYCLE_FD'])); "
+                 f"Path({str(started)!r}).touch(); "
+                 f"deadline=time.monotonic()+10\nwhile not Path({str(done)!r}).exists():\n"
+                 " if time.monotonic()>deadline: raise RuntimeError('test provider not released')\n"
+                 " time.sleep(.01)\n")
+        worker = ("import sys; from pathlib import Path; "
+                  f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lane_runner as lane; "
+                  f"guard=lane.lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                  f"lane.run_agent([sys.executable,'-c',{agent!r}],Path({str(self.state)!r}),sys.stdout,15)")
+        process = subprocess.Popen([sys.executable, "-u", "-c", worker],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=lane.selftest_env(self.state))
+        try:
+            deadline = time.monotonic() + 8
+            while not started.exists() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertTrue(started.exists(), "fake provider did not start")
+            process.kill()  # this test-created parent; no real provider/assignment
+            process.wait(timeout=5)
+            self.assert_activation_held()
+            done.touch()
+            deadline = time.monotonic() + 10
+            while True:
+                try:
+                    with self.exclusive():
+                        break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        self.fail("fake provider helper did not drain")
+                    time.sleep(.01)
+        finally:
+            done.touch()
+            if process.poll() is None:
+                process.kill()
+            process.communicate(timeout=5)
+
+    def test_owned_command_preserves_stdin_streams_exit_and_child_state(self):
+        child_state = self.state / "scratch"
+        command = [sys.executable, "-c", "import os,sys; print(sys.stdin.read()); "
+                   "print(os.environ['LANES_STATE']); print('diagnostic',file=sys.stderr); sys.exit(124)"]
+        with lane.lifecycle.Guard(self.state):
+            result = lane.lifecycle.run(command, input="payload", capture_output=True, text=True,
+                env={**os.environ, "LANES_STATE": str(child_state)}, timeout=5)
+            self.assertEqual(result.args, command)
+            self.assertEqual(result.returncode, 124)
+            self.assertEqual(result.stdout.splitlines(), ["payload", str(child_state)])
+            self.assertEqual(result.stderr, "diagnostic\n")
+            with self.assertRaises(subprocess.CalledProcessError) as error:
+                lane.lifecycle.run([sys.executable, "-c", "raise SystemExit(7)"],
+                                   capture_output=True, text=True, check=True, timeout=5)
+            self.assertEqual(error.exception.returncode, 7)
+        with self.exclusive():
+            pass
+
+    def test_owned_missing_command_releases_without_a_child(self):
+        with lane.lifecycle.Guard(self.state):
+            started = time.monotonic()
+            with self.assertRaises(FileNotFoundError):
+                lane.lifecycle.run([str(self.state / "absent-command")],
+                                   capture_output=True, text=True, timeout=1)
+            self.assertLess(time.monotonic() - started, 5)
+        with self.exclusive():
+            pass
+
+    def test_owned_timeout_reports_only_after_child_drain(self):
+        marker = self.state / "started"
+        command = [sys.executable, "-c", "import time; from pathlib import Path; "
+                   f"Path({str(marker)!r}).touch(); time.sleep(20)"]
+        with lane.lifecycle.Guard(self.state):
+            with self.assertRaises(subprocess.TimeoutExpired) as error:
+                lane.lifecycle.run(command, capture_output=True, text=True, timeout=.3)
+            self.assertEqual(error.exception.cmd, command)
+            self.assertTrue(marker.exists())
+        with self.exclusive():
+            pass
+
+    def test_ordinary_command_helper_survives_controller_death(self):
+        started, done = self.state / "started", self.state / "done"
+        child = ("import os,time; from pathlib import Path; "
+                 f"Path({str(started)!r}).touch(); deadline=time.monotonic()+10\n"
+                 f"while not Path({str(done)!r}).exists():\n"
+                 " if time.monotonic()>deadline: raise RuntimeError('fixture not released')\n"
+                 " time.sleep(.01)\n")
+        worker = ("import sys; from pathlib import Path; "
+                  f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lane_runner as lane; "
+                  f"guard=lane.lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
+                  f"lane.sh([sys.executable,'-c',{child!r}],timeout=15)")
+        process = subprocess.Popen([sys.executable, "-u", "-c", worker],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=lane.selftest_env(self.state))
+        try:
+            deadline = time.monotonic() + 8
+            while not started.exists() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertTrue(started.exists(), "ordinary command fixture did not start")
+            process.kill()  # only this fake controller
+            process.wait(timeout=5)
+            self.assert_activation_held()
+            done.touch()
+            deadline = time.monotonic() + 10
+            while True:
+                try:
+                    with self.exclusive():
+                        break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        self.fail("ordinary command helper did not drain")
+                    time.sleep(.01)
+        finally:
+            done.touch()
+            if process.poll() is None:
+                process.kill()
+            process.communicate(timeout=5)
+
+    def test_dispatch_worker_spawn_retains_controller_guard(self):
+        with lane.lifecycle.Guard(self.state) as guard, \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(self.host, "slots", return_value=1), \
+                patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.worktree_sweep, "maybe_spawn"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "claim_remediation_events"), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane.pr_events, "tick"), \
+                patch.object(lane.reason_lane, "tick"), \
+                patch.object(lane.yc_corpus, "tick"), \
+                patch.object(lane, "finish_dispatch", return_value=0), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.dispatch(self.host), 0)
+            spawn.assert_called_once()
+            self.assertIn(guard.fd, spawn.call_args.kwargs["pass_fds"])
+            self.assertEqual(spawn.call_args.kwargs["env"][lane.lifecycle.FD_ENV], str(guard.fd))
+
+
 if __name__ == "__main__":
     unittest.main()
 

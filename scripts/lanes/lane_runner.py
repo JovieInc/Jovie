@@ -39,6 +39,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import lifecycle  # noqa: E402
 import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
@@ -975,7 +976,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
     ])
 
 
-def context_pack(issue: Issue, run=subprocess.run) -> str:
+def context_pack(issue: Issue, run=lifecycle.run) -> str:
     """Bounded, best-effort GBrain recall. A miss is reported, never invented."""
     try:
         result = run(["gbrain", "search", issue.title[:200]], capture_output=True, text=True, timeout=20)
@@ -1095,8 +1096,9 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
             log.flush()
         command = [sys.executable, str(Path(__file__).resolve()), "gate-command",
                    "--timeout", str(timeout), "--", *args]
-        with subprocess.Popen(command, cwd=cwd, env=env, text=True, start_new_session=True,
-                              pass_fds=tuple(pass_fds), stdout=log if stream and log else subprocess.PIPE,
+        with subprocess.Popen(command, cwd=cwd, text=True, start_new_session=True,
+                              **lifecycle.spawn_kwargs(env=env, pass_fds=pass_fds),
+                              stdout=log if stream and log else subprocess.PIPE,
                               stderr=subprocess.STDOUT if stream and log else subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
         if log is not None:
@@ -1107,11 +1109,11 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
     if stream and log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n")
         log.flush()
-        result = subprocess.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
+        result = lifecycle.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
                                 timeout=timeout, env=env)
         log.flush()
         return subprocess.CompletedProcess(args, result.returncode, "", "")
-    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
+    result = lifecycle.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
     if log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n{result.stdout[-4000:]}{result.stderr[-4000:]}\n")
     return result
@@ -1672,7 +1674,7 @@ class Locked:
 
 def provider_healthy(spec: dict) -> bool:
     try:
-        result = subprocess.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
+        result = lifecycle.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and re.search(spec.get("healthy", "."), result.stdout + result.stderr) is not None
@@ -1755,8 +1757,14 @@ class RunStopped(BaseException):
     before the owned process tree is killed."""
 
 
+class CommandNotStarted(OSError):
+    """Popen failed before any command child existed."""
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
-              guard_interval: float = 30, on_kill=None) -> subprocess.CompletedProcess:
+              guard_interval: float = 30, on_kill=None,
+              _lifecycle_helper: bool = False, _lifecycle_terminal: bool = False,
+              stderr=subprocess.STDOUT) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
@@ -1769,8 +1777,18 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     if guard:
         guard()
     env = {**os.environ, "npm_config_package_import_method": "hardlink"}
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
-                            start_new_session=True, env=env)
+    # The tracked helper retains controller ownership if its worker dies. It
+    # also keeps the guard while descendant cleanup is unproven. Its own agent
+    # launch is the terminal rung, so this cannot recursively wrap itself.
+    command = ([sys.executable, str(Path(__file__).resolve()), "gate-command",
+                "--timeout", str(timeout), "--", *cmd]
+               if lifecycle.active() and not _lifecycle_helper else cmd)
+    try:
+        proc = subprocess.Popen(command, cwd=cwd, stdout=log, stderr=stderr, text=True,
+                                start_new_session=True,
+                                **({"env": env} if _lifecycle_terminal else lifecycle.spawn_kwargs(env=env)))
+    except OSError as error:
+        raise CommandNotStarted(error.errno, error.strerror, error.filename) from error
     owned = AgentProcesses(proc.pid)
     restored = {}
 
@@ -5024,6 +5042,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
 def reexec(host: Host, name: str) -> int:
     """Slot free -> pull the next piece of work now, on whatever release is current (drain-safe)."""
     current = host.state / "current" / "lane_runner.py"
+    lifecycle.prepare_reexec()
     os.execv(sys.executable, [sys.executable, str(current if current.exists() else Path(__file__)),
                               "worker", "--provider", name])
     return 0
@@ -5070,7 +5089,7 @@ def dispatch(host: Host) -> int:
             for _ in range(slots):
                 subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 start_new_session=True)
+                                 start_new_session=True, **lifecycle.spawn_kwargs())
                 tick["spawned"].append(name)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
@@ -5271,9 +5290,9 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+        archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
-        subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+        lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.
         scratch = staging / ".selftest-state"
         scratch.mkdir(exist_ok=True)
@@ -5283,7 +5302,7 @@ def install_release(host: Host) -> int:
             refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
             return 1
         try:
-            test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                                   cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
                                   env=selftest_env(scratch))
         except subprocess.TimeoutExpired:
@@ -5355,7 +5374,7 @@ def graphql_budget() -> tuple[int, str] | None:
         return None
 
 
-def main(argv: list[str] | None = None) -> int:
+def guarded_main(argv: list[str] | None = None) -> int:
     disk_guard.ensure_sbin_on_path()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -5363,6 +5382,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("update")
     gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
     gate.add_argument("--timeout", type=float, required=True)
+    gate.add_argument("--result-fd", type=int)
+    gate.add_argument("--separate-stderr", action="store_true")
+    gate.add_argument("--child-state")
     gate.add_argument("args", nargs=argparse.REMAINDER)
     context = sub.add_parser("context-manifest", help="check or generate the local context contract")
     context.add_argument("--write", action="store_true")
@@ -5371,11 +5393,29 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "gate-command":
         command = args.args[1:] if args.args[:1] == ["--"] else args.args
+        if args.child_state is not None:
+            os.environ["LANES_STATE"] = args.child_state
+        def report_outcome(receipt):
+            if args.result_fd is not None:
+                try:
+                    os.write(args.result_fd, json.dumps(receipt).encode())
+                except BrokenPipeError:
+                    pass  # dead controller; command is already proven drained
+                finally:
+                    os.close(args.result_fd)
         try:
-            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1).returncode
+            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1,
+                             _lifecycle_helper=True, _lifecycle_terminal=args.result_fd is not None,
+                             stderr=sys.stderr if args.separate_stderr else subprocess.STDOUT).returncode
+            report_outcome({"returncode": code, "timeout": False})
             return 125 if code == 124 else code  # 124 is reserved for a drained timeout
         except subprocess.TimeoutExpired:
+            report_outcome({"returncode": None, "timeout": True})
             return 124  # run_agent has drained its observed descendants before raising
+        except CommandNotStarted as error:
+            report_outcome({"spawnError": {"errno": error.errno,
+                            "strerror": error.strerror, "filename": error.filename}})
+            return 127
         except RunStopped:
             return 143  # explicit stop also completes the existing drain protocol
         except BaseException as error:
@@ -5405,6 +5445,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        with lifecycle.Guard(Host().state):
+            return guarded_main(argv)
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":
