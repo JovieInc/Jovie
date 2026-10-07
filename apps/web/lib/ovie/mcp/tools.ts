@@ -7,7 +7,10 @@ import {
 } from '@/lib/ovie/approvals';
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
-import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
+import {
+  normalizeLegacyEngineeringInitiative,
+  normalizeLegacyEngineeringInitiativeForStore,
+} from '@/lib/ovie/legacy-routing';
 import { coordinateLinearWork } from '@/lib/ovie/linear-coordination';
 import { createLiveLinearCoordinationDeps } from '@/lib/ovie/linear-coordination-live';
 import {
@@ -61,8 +64,10 @@ import {
   type InitiativeStatus,
   OVIE_FOUNDER_TOOLS,
   OVIE_MCP_IDENTITY,
+  OVIE_MCP_TOOL_SCOPES,
   OVIE_MCP_TOOLS,
   OVIE_WRITE_TOOLS,
+  OvieMcpInputError,
   type OvieMcpPrincipal,
   type OvieMcpToolName,
 } from './types';
@@ -75,27 +80,49 @@ export function isOvieFounderTool(name: string): boolean {
   return (OVIE_FOUNDER_TOOLS as readonly string[]).includes(name);
 }
 
+type OvieMcpAuthorization =
+  | { ok: true }
+  | { ok: false; status: 401 | 403; message: string };
+
+/** Shared boundary for discovery and direct private capability calls. */
+export function authorizeOvieMcpAccess(
+  principal: OvieMcpPrincipal
+): OvieMcpAuthorization {
+  if (principal.authenticated !== true) {
+    return { ok: false, status: 401, message: 'authentication required' };
+  }
+  const gate = authorizeSummerControl({
+    authenticated: principal.authenticated,
+    isAdmin: principal.isAdmin === true,
+  });
+  if (!gate.ok) {
+    return {
+      ok: false,
+      status: gate.status,
+      message: 'operator access required',
+    };
+  }
+  if (
+    !Array.isArray(principal.scopes) ||
+    !principal.scopes.includes('ovie:read')
+  ) {
+    return { ok: false, status: 403, message: 'operating scope required' };
+  }
+  return { ok: true };
+}
+
 export function authorizeOvieMcpTool(
   principal: OvieMcpPrincipal,
   tool: string
-): { ok: true } | { ok: false; status: 401 | 403; message: string } {
-  if (!principal.authenticated) {
-    return { ok: false, status: 401, message: 'authentication required' };
+): OvieMcpAuthorization {
+  const access = authorizeOvieMcpAccess(principal);
+  if (!access.ok) return access;
+  if (!(OVIE_MCP_TOOLS as readonly string[]).includes(tool)) {
+    return { ok: false, status: 403, message: 'unknown operating capability' };
   }
-  if (isOvieWriteTool(tool) || isOvieFounderTool(tool)) {
-    const gate = authorizeSummerControl({
-      authenticated: principal.authenticated,
-      isAdmin: principal.isAdmin,
-    });
-    if (!gate.ok) {
-      return {
-        ok: false,
-        status: gate.status,
-        message: isOvieWriteTool(tool)
-          ? 'founder authorization required for writes'
-          : 'founder authorization required for operating detail',
-      };
-    }
+  const scope = OVIE_MCP_TOOL_SCOPES[tool as OvieMcpToolName];
+  if (!principal.scopes.includes(scope)) {
+    return { ok: false, status: 403, message: 'operating scope required' };
   }
   return { ok: true };
 }
@@ -428,7 +455,7 @@ export async function callOvieMcpTool(
     case 'create_initiative':
       return { ok: true, result: await createInitiative(store, args) };
     case 'get_initiative':
-      return await getInitiative(store, args);
+      return await getInitiative(store, principal, args);
     case 'get_feature_state':
       return { ok: true, result: getFeatureState(args) };
     case 'certify_feature':
@@ -557,7 +584,8 @@ function getProofBrief(args: Record<string, unknown>) {
 
 function principalUserId(principal: OvieMcpPrincipal): string {
   const userId = principal.subject?.trim();
-  if (!userId) throw new Error('authenticated app user subject is required');
+  if (!userId)
+    throw new OvieMcpInputError('authenticated app user subject is required');
   return userId;
 }
 
@@ -574,7 +602,8 @@ async function requestWorkflowCapture(
     expiresInHours: args.expires_in_hours,
     requestedBy: 'jovie_agent',
   });
-  if (!parsed.success) throw new Error('invalid workflow capture request');
+  if (!parsed.success)
+    throw new OvieMcpInputError('invalid workflow capture request');
 
   const receipt = await createWorkflowCaptureRequest({
     userId: principalUserId(principal),
@@ -588,7 +617,7 @@ async function getWorkflowCapture(
   args: Record<string, unknown>
 ) {
   const captureId = stringOpt(args.capture_id)?.trim();
-  if (!captureId) throw new Error('capture_id is required');
+  if (!captureId) throw new OvieMcpInputError('capture_id is required');
   const receipt = await getWorkflowCaptureReceipt(
     captureId,
     principalUserId(principal)
@@ -692,7 +721,7 @@ async function recordDecision(
     stringOpt(args.what) ??
     ''
   ).trim();
-  if (!decided) throw new Error('decided is required');
+  if (!decided) throw new OvieMcpInputError('decided is required');
   const draft = {
     kind: 'decision' as const,
     decided,
@@ -716,7 +745,7 @@ function parseConfidence(value: unknown): InitiativeConfidence {
   ) {
     return value as InitiativeConfidence;
   }
-  throw new Error('confidence must be high, medium, or low');
+  throw new OvieMcpInputError('confidence must be high, medium, or low');
 }
 
 async function createInitiative(
@@ -724,7 +753,9 @@ async function createInitiative(
   args: Record<string, unknown>
 ) {
   const parsed = parseHandoff(args.handoff ?? args);
-  if (typeof parsed === 'string') throw new Error(parsed);
+  if (typeof parsed === 'string') {
+    throw new OvieMcpInputError('invalid initiative handoff');
+  }
   const classified = classifyHandoff(parsed);
   const now = new Date().toISOString();
   const draft = {
@@ -755,17 +786,19 @@ async function createInitiative(
 
 async function getInitiative(
   store: OperatingStore,
+  principal: OvieMcpPrincipal,
   args: Record<string, unknown>
 ) {
   const id = typeof args.id === 'string' ? args.id : '';
   const record = await store.getInitiative(id);
   if (!record)
     return { ok: false as const, message: `unknown initiative ${id}` };
-  const normalized = await normalizeLegacyEngineeringInitiativeForStore(
-    store,
-    record,
-    { persistence: 'best-effort' }
-  );
+  // Read-only credentials may project legacy routing, but never persist it.
+  const normalized = principal.scopes.includes('ovie:write')
+    ? await normalizeLegacyEngineeringInitiativeForStore(store, record, {
+        persistence: 'best-effort',
+      })
+    : normalizeLegacyEngineeringInitiative(record);
   return {
     ok: true as const,
     result: {
@@ -814,7 +847,7 @@ function certifyFeature(args: Record<string, unknown>) {
 
 async function searchGbrain(args: Record<string, unknown>) {
   const query = typeof args.query === 'string' ? args.query.trim() : '';
-  if (!query) throw new Error('query is required');
+  if (!query) throw new OvieMcpInputError('query is required');
   const limit = typeof args.limit === 'number' ? args.limit : 8;
   const hits = await searchPages(query, Math.min(Math.max(limit, 1), 20));
   return { query, write: false, hits };
@@ -822,7 +855,7 @@ async function searchGbrain(args: Record<string, unknown>) {
 
 async function getGbrainPage(args: Record<string, unknown>) {
   const slug = typeof args.slug === 'string' ? args.slug.trim() : '';
-  if (!slug) throw new Error('slug is required');
+  if (!slug) throw new OvieMcpInputError('slug is required');
   const page = await getPage(slug);
   return { slug, write: false, found: Boolean(page), page };
 }
@@ -830,7 +863,7 @@ async function getGbrainPage(args: Record<string, unknown>) {
 async function coordinateLinearWorkTool(args: Record<string, unknown>) {
   const actionRaw = stringOpt(args.action);
   if (actionRaw !== 'create' && actionRaw !== 'update') {
-    throw new Error("action must be 'create' or 'update'");
+    throw new OvieMcpInputError("action must be 'create' or 'update'");
   }
   const result = await coordinateLinearWork(
     {
@@ -847,6 +880,9 @@ async function coordinateLinearWorkTool(args: Record<string, unknown>) {
   );
   return {
     ...result,
+    ...(result.status !== 'ok'
+      ? { message: 'Linear coordination unavailable' }
+      : {}),
     identities: {
       knowledgeWrite: false,
       linearAccepted: result.status === 'ok',
@@ -864,7 +900,7 @@ function workListLimit(value: unknown): number {
     value < 1 ||
     value > 50
   ) {
-    throw new Error('limit must be an integer between 1 and 50');
+    throw new OvieMcpInputError('limit must be an integer between 1 and 50');
   }
   return value;
 }
@@ -872,12 +908,12 @@ function workListLimit(value: unknown): number {
 function workListState(value: unknown): OvieWorkListState {
   if (value === undefined) return 'open';
   if (value === 'open' || value === 'closed' || value === 'all') return value;
-  throw new Error('state must be open, closed, or all');
+  throw new OvieMcpInputError('state must be open, closed, or all');
 }
 
 function workItemNumber(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-    throw new Error('number must be a positive integer');
+    throw new OvieMcpInputError('number must be a positive integer');
   }
   return value;
 }
@@ -909,6 +945,9 @@ async function createLinearIssue(args: Record<string, unknown>) {
   );
   return {
     ...result,
+    ...(result.status !== 'ok'
+      ? { message: 'Linear coordination unavailable' }
+      : {}),
     provider: 'linear',
     team: OVIE_LINEAR_TEAM_KEY,
     trust: 'untrusted_external_data',
@@ -1025,6 +1064,9 @@ async function recordOperationalMemory(
 
   return {
     ...result,
+    ...(result.status === 'buffered'
+      ? { reason: 'operational memory provider unavailable' }
+      : {}),
     identities: {
       knowledgeWrite:
         result.status === 'written' || result.status === 'buffered',

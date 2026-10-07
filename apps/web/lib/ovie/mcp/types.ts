@@ -31,28 +31,61 @@ export const OVIE_MCP_TOOLS = [
 
 export type OvieMcpToolName = (typeof OVIE_MCP_TOOLS)[number];
 
-export const OVIE_WRITE_TOOLS = [
-  'record_decision',
-  'create_initiative',
-  'certify_feature',
-  'request_workflow_capture',
-  'record_operational_memory',
-  'coordinate_linear_work',
-  'create_linear_issue',
-  'record_bounded_approval',
-] as const;
+/** Every registered capability is founder-private and has an explicit scope. */
+export const OVIE_MCP_TOOL_SCOPES = {
+  get_org_state: 'ovie:read',
+  get_invariant_stewardship: 'ovie:read',
+  record_decision: 'ovie:write',
+  create_initiative: 'ovie:write',
+  get_initiative: 'ovie:read',
+  get_feature_state: 'ovie:read',
+  certify_feature: 'ovie:write',
+  request_workflow_capture: 'ovie:write',
+  get_workflow_capture: 'ovie:read',
+  search_gbrain: 'ovie:read',
+  get_gbrain_page: 'ovie:read',
+  record_operational_memory: 'ovie:write',
+  coordinate_linear_work: 'ovie:write',
+  record_bounded_approval: 'ovie:write',
+  get_bounded_approval: 'ovie:read',
+  get_proof_brief: 'ovie:read',
+  list_linear_issues: 'ovie:read',
+  create_linear_issue: 'ovie:write',
+  list_github_pull_requests: 'ovie:read',
+  get_github_pull_request: 'ovie:read',
+  list_github_issues: 'ovie:read',
+  get_github_issue: 'ovie:read',
+} as const satisfies Record<OvieMcpToolName, 'ovie:read' | 'ovie:write'>;
 
-/** Read-only operating detail that is still founder-private. */
-export const OVIE_FOUNDER_TOOLS = [
-  'get_invariant_stewardship',
-  'get_workflow_capture',
-  'get_proof_brief',
-  'list_linear_issues',
-  'list_github_pull_requests',
-  'get_github_pull_request',
-  'list_github_issues',
-  'get_github_issue',
-] as const;
+export const OVIE_WRITE_TOOLS = OVIE_MCP_TOOLS.filter(
+  name => OVIE_MCP_TOOL_SCOPES[name] === 'ovie:write'
+);
+
+export const OVIE_FOUNDER_TOOLS = OVIE_MCP_TOOLS.filter(
+  name => OVIE_MCP_TOOL_SCOPES[name] === 'ovie:read'
+);
+
+/** Only locally validated, static argument errors may be returned to callers. */
+export class OvieMcpInputError extends Error {
+  constructor(
+    readonly publicMessage:
+      | 'decided is required'
+      | 'confidence must be high, medium, or low'
+      | 'authenticated app user subject is required'
+      | 'invalid workflow capture request'
+      | 'capture_id is required'
+      | 'query is required'
+      | 'slug is required'
+      | "action must be 'create' or 'update'"
+      | 'limit must be an integer between 1 and 50'
+      | 'state must be open, closed, or all'
+      | 'number must be a positive integer'
+      | 'invalid initiative handoff'
+  ) {
+    super(publicMessage);
+    this.name = 'OvieMcpInputError';
+  }
+}
 
 export type CertLevel =
   | 'discovered'

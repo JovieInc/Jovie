@@ -1604,7 +1604,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(domainGuardStep).toContain(
       'failure_subtype=domain_project_mismatch'
     );
-    expect(stageStep).toContain('--prod --skip-domain --format=json');
+    expect(stageStep).toContain('--prod --skip-domain --no-wait --format=json');
     expect(stageStep).toContain(
       'assert-authorized-origin "$production_deploy_url" "$inspected_url"'
     );
@@ -4051,7 +4051,7 @@ describe('production promotion exact-artifact contract', () => {
     const pullIndex = stageStep.indexOf('--environment=production');
     const buildIndex = stageStep.indexOf('vercel build --prod');
     const deployIndex = stageStep.indexOf(
-      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+      '--prebuilt --archive=tgz --prod --skip-domain --no-wait --format=json'
     );
     const inspectIndex = stageStep.indexOf(
       'vercel inspect "$production_deploy_id"'
@@ -4117,7 +4117,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
   });
 
-  it('retries a transient production deploy before failing without evidence', () => {
+  it('hands accepted production deploys to exact-ID readiness before retrying', () => {
     // JOV-4373: a single `vercel deploy` transport failure stranded the release
     // with an empty deployment ID/URL. The exact-production deploy must retry
     // bounded inside stage-production, mirroring the staging deploy loop.
@@ -4130,8 +4130,9 @@ describe('production promotion exact-artifact contract', () => {
 
     const loopIndex = stageStep.indexOf('for deploy_attempt in 1 2 3; do');
     const deployIndex = stageStep.indexOf(
-      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+      '--prebuilt --archive=tgz --prod --skip-domain'
     );
+    const noWaitIndex = stageStep.indexOf('--no-wait');
     const retryIndex = stageStep.indexOf(
       'Production prebuilt deploy attempt ${deploy_attempt}/3 failed'
     );
@@ -4141,12 +4142,23 @@ describe('production promotion exact-artifact contract', () => {
     const outputIndex = stageStep.indexOf(
       'echo "production_deployment_id=$production_deploy_id"'
     );
+    const parseIndex = stageStep.indexOf('production_deploy_id="$(jq -r');
+    const inspectIndex = stageStep.indexOf(
+      'vercel inspect "$production_deploy_id"'
+    );
 
     expect(loopIndex).toBeGreaterThanOrEqual(0);
     expect(deployIndex).toBeGreaterThan(loopIndex);
+    // Return as soon as Vercel accepts the exact deployment. The explicit
+    // inspect below owns readiness, so an internal CLI polling failure cannot
+    // discard the accepted deployment ID and trigger duplicate deployments.
+    expect(noWaitIndex).toBeGreaterThan(deployIndex);
     expect(failIndex).toBeGreaterThan(deployIndex);
     expect(retryIndex).toBeGreaterThan(failIndex);
     expect(outputIndex).toBeGreaterThan(retryIndex);
+    expect(parseIndex).toBeGreaterThan(retryIndex);
+    expect(inspectIndex).toBeGreaterThan(parseIndex);
+    expect(outputIndex).toBeGreaterThan(inspectIndex);
     expect(stageStep).toContain('sleep 10');
     // Still fail-closed after the bounded retry exhausts.
     expect(stageStep).toContain(

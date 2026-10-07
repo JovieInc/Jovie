@@ -35,6 +35,7 @@ import {
 } from '@/lib/chat/run';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
+import { conversationTitleSource } from '@/lib/chat/title-source';
 import {
   extractSkill,
   parseTokens,
@@ -7975,6 +7976,17 @@ function evaluateChatTitleContract(vars: EvalVars) {
   );
   const fallbackTitle = sanitizeConversationTitle(sourceTitle, 50);
   const generatedTitle = sanitizeConversationTitle('"Neon Reef Launch Plan"');
+  const workTitle = conversationTitleSource(
+    'Help me with this work.\n' +
+      JSON.stringify({
+        workId: '808c9f4d-505c-4000-8000-000000000000',
+        workTitle: 'Seaside Heights',
+        revision: 'Keep the reply short.',
+      })
+  );
+  const probeTitle = conversationTitleSource(
+    'Prod health check: reply with one short sentence.'
+  );
   const sourceFacts = {
     importsUserFacingRouteDependencies: textIncludesAll(routeSource, [
       "import { gateway, generateText } from '@/lib/ai/sdk'",
@@ -8007,23 +8019,38 @@ function evaluateChatTitleContract(vars: EvalVars) {
         'recordOutputs: options.recordOutputs ?? false',
       ]),
     sanitizesAllTitleInputsAndOutputs: textIncludesAll(routeSource, [
-      'sanitizeConversationTitle(userMessage?.content, 200)',
-      'sanitizeConversationTitle(m.content, 200)',
+      'conversationTitleSource(',
+      'userMessage?.content',
+      'conversationTitleSource(m.content).text',
       'sanitizeConversationTitle(text)',
     ]),
-    guardsGeneratedAndFallbackUpdates: guardedNullUpdateCount >= 2,
+    guardsGeneratedAndFallbackUpdates:
+      guardedNullUpdateCount === 1 &&
+      textIncludesAll(routeSource, [
+        'const saveTitle = (title: string)',
+        'eq(chatConversations.id, conversationId)',
+        'eq(chatConversations.creatorProfileId, identity.creatorProfileId)',
+        'await saveTitle(titleSource)',
+        'await saveTitle(title)',
+        'await saveTitle(fallback)',
+      ]),
     fallsBackToSanitizedUserMessage: textIncludesAll(routeSource, [
       'const fallback = sanitizeConversationTitle(titleSource, 50)',
       'if (!fallback) return',
     ]),
     schedulesTitleGenerationAfterPersistence: textIncludesAll(routeSource, [
       'const titlePending = hasUserMessage && !conversation.title',
-      'after(async () =>',
+      'scheduleAfter(async () =>',
       'await maybeGenerateTitle(conversationId, messagesToInsert,',
       'userId: clerkUserId',
+      'creatorProfileId: profile.id',
     ]),
   };
   const runtimeFacts = {
+    machineWorkTitleUsesSubjectOnly:
+      workTitle.deterministic && workTitle.text === 'Seaside Heights',
+    probeTitleExcludesExecutionInstructions:
+      probeTitle.deterministic && probeTitle.text === 'Prod health check',
     syntheticGeneratedTitleSanitized:
       generatedTitle === 'Neon Reef Launch Plan',
     syntheticFallbackExists: typeof fallbackTitle === 'string',
@@ -8070,6 +8097,8 @@ function evaluateChatTitleContract(vars: EvalVars) {
       generatedTitle,
       sourceTitle,
       fallbackTitle,
+      workTitle,
+      probeTitle,
     },
     promptLeakPatterns: titlePromptLeakPatterns,
     toolCalls: [],
