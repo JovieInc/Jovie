@@ -308,14 +308,19 @@ ChatGPT auth without reading credential files or discovering other accounts.
 `CODEX_LANE_CLI` may name an already installed executable when the host's PATH
 entry is broken; it does not install a CLI. API credentials are removed from the
 child environment, execution pins OpenAI plus `forced_login_method="chatgpt"`,
-and `--approve-for-me` retains the workspace sandbox and automatic approval review.
+and the supported `--sandbox workspace-write`, `approval_policy="on-request"`,
+and `approvals_reviewer="auto_review"` options retain the workspace sandbox and
+automatic approval review. The installed CLI need not support the TUI's
+`--approve-for-me` shortcut.
 An auth or rate/usage limit banks this one login and returns exit 75 to the existing
 handoff policy. This mode never rotates profiles, redeems reset credits, or probes
 private quota services. Auth status establishes login, not available plan quota.
 
 Enabling the mode and any nonzero `LANES_SLOTS_CODEX` value is a host configuration
-change, separate from landing source. Review the activation and rollback plan
-before changing the service. Existing issue/PR ownership, file-overlap admission,
+change, separate from landing source. Record the activation and rollback plan
+before changing the service. Routine repair or reactivation of the established
+shipping service uses its standing authority; genuinely new access or spend still
+requires its specific authority. Existing issue/PR ownership, file-overlap admission,
 slot limits, PR backlog budgets, capability floors, and independent security,
 review, queue and production gates still apply. Summer reasoning/notification
 failures are ancillary to `dispatch()`; they do not authorize bypassing an intake
