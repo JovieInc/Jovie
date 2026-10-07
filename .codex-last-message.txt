@@ -1,0 +1,11 @@
+Implemented and opened draft PR [#20564](https://github.com/JovieInc/Jovie/pull/20564).
+
+- Weekly rollup now lists every draft with age, reviewer identities, and lane disposition.
+- Preserved thresholds, reopening behavior, and read-only PR handling.
+- Live dry-run reported all 43 observed drafts and one stale violation.
+- Biome, 7 focused tests, full typecheck, and all hosted source checks passed.
+- Commit: `1dbd69e966`
+- Linear JOV-7548 moved to In Review.
+- PR remains draft; no PRs were edited or closed.
+
+Concern: the live draft count remains above the fewer-than-20 operational target. JOV-7548 remains the tracking record for that remediation. GBrain was unavailable as disclosed.
