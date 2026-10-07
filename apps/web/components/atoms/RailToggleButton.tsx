@@ -6,7 +6,7 @@ import { railIconName } from '@/components/atoms/rail-icons';
 import { cn } from '@/lib/utils';
 
 export const RAIL_TOGGLE_BUTTON_CLASS =
-  'bg-transparent text-tertiary-token aria-pressed:text-primary-token focus-visible:bg-transparent active:bg-transparent';
+  'text-tertiary-token aria-pressed:text-primary-token active:bg-transparent';
 
 interface RailToggleButtonProps {
   readonly side: 'left' | 'right';
@@ -48,7 +48,7 @@ export function RailToggleButton({
   const button = (
     <IconButton
       type='button'
-      variant='secondary'
+      variant='ghost'
       size='sm'
       aria-label={label}
       aria-controls={controlsId}

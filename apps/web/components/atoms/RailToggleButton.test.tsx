@@ -2,24 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@jovie/ui', () => ({
-  IconButton: ({
-    children,
-    variant,
-    size,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    readonly variant?: string;
-    readonly size?: string;
-  }) => (
-    <button
-      data-icon-button-variant={variant}
-      data-icon-button-size={size}
-      {...props}
-    >
-      {children}
-    </button>
-  ),
+vi.mock('@jovie/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/ui')>()),
   TooltipShortcut: ({ children }: { readonly children: React.ReactNode }) =>
     children,
 }));
@@ -46,14 +30,20 @@ describe('RailToggleButton', () => {
 
     const button = screen.getByTestId('left-toggle');
     expect(button).toHaveAttribute('data-rail-toggle', 'left');
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
-    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
+    expect(button).toHaveClass(
+      'h-7',
+      'w-7',
+      'rounded-full',
+      'before:h-11',
+      'before:w-11'
+    );
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(button).toHaveAttribute('aria-pressed', 'true');
     expect(button.className).not.toContain('aria-pressed:bg-');
-    expect(button).toHaveClass(
-      'bg-transparent',
-      'focus-visible:bg-transparent'
+    expect(button).toHaveClass('bg-transparent');
+    expect(button).not.toHaveClass(
+      'focus-visible:bg-interactive-hover',
+      'focus-visible:bg-surface-1'
     );
     expect(button.className).not.toContain('active:scale');
     expect(screen.getByTestId('left-icon')).toHaveAttribute(
@@ -100,8 +90,13 @@ describe('RailToggleButton', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAttribute('aria-label', 'Show profile');
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
-    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
+    expect(button).toHaveClass(
+      'h-7',
+      'w-7',
+      'rounded-full',
+      'before:h-11',
+      'before:w-11'
+    );
   });
 
   it.each([

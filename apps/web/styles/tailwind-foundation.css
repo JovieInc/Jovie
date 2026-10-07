@@ -304,7 +304,7 @@
   height: 0;
   width: 0;
   overflow: visible;
-  @variant lg {
+  @media (min-width: 1024px) {
     position: absolute;
     inset-block: 0;
     inset-inline-end: 0;

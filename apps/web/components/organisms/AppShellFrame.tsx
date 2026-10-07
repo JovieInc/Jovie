@@ -144,7 +144,7 @@ export const AppShellFrame = memo(function AppShellFrame({
                 {header ? (
                   <div
                     data-app-shell-header='true'
-                    className='relative z-40 shrink-0'
+                    className='relative z-30 shrink-0'
                   >
                     {header}
                   </div>
