@@ -1,0 +1,9 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T225251Z-JOV-4258-codex-brief-d3945b/.design-brief.md).
+
+Validated:
+
+- Headings match template sections 1–9.
+- Capability and primitive IDs are valid.
+- States and viewports use allowed values.
+- `Pen:` and `ImageGen:` remain empty as required.
+- No other files changed; no build, commit, push, or PR performed.
