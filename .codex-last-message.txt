@@ -1,0 +1,6 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T224506Z-JOV-3834-codex-brief-b8345d/.design-brief.md).
+
+- Anchored to the existing Jovie `ChatAlbumArtCard`; source history confirms Tim White ownership.
+- Certified capabilities and creative artifact fields remain empty because no valid supporting IDs/artifacts exist.
+- Format and diff checks pass.
+- No build, tests, commit, push, or PR performed.
