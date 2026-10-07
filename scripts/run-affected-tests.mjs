@@ -1112,6 +1112,23 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
   'scripts/lanes/merge_evidence.py',
 ]);
 
+// Service ownership and maintenance qualification changes are Python controls.
+// Permit only the complete reviewed control/coverage-plumbing signature; extra
+// peers retain the existing full fallback, including selector infrastructure.
+const SERVICE_CENSUS_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/service_census.py',
+  'scripts/lanes/worktree_sweep.py',
+  'scripts/lanes/lane_runner.py',
+  'scripts/tests/test_service_census.py',
+  'scripts/tests/test_worktree_sweep.py',
+  'scripts/ci-fast-lanes.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS = [
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+];
+
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
   const plan = planAffectedTests(files, options);
@@ -1183,6 +1200,32 @@ function planAffectedTests(
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const isExactServiceCensusQualification =
+    files.length === SERVICE_CENSUS_QUALIFICATION_MANIFEST.size &&
+    files.every(file => SERVICE_CENSUS_QUALIFICATION_MANIFEST.has(file));
+  if (isExactServiceCensusQualification) {
+    if (
+      ![
+        ...SERVICE_CENSUS_QUALIFICATION_MANIFEST,
+        ...SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return fullSuitePlan('service census qualification proof is unavailable');
+    }
+    // buildAffectedTestPlan retains the complete structural Python coverage
+    // command. This selector only supplies both coverage-plumbing test suites.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
   }
   if (files.some(isBlogContentCandidatePath)) {
     if (
