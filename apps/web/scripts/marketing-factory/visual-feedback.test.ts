@@ -101,6 +101,7 @@ async function fixture(
         if (options.resumeAsset && prompts.length === 2) {
           return {
             status: 'credentials-unavailable',
+            provider: 'fixture',
             reason: 'fixture provider outage',
           };
         }
