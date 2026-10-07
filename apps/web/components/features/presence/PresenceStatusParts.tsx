@@ -1,3 +1,4 @@
+// @coverage-via apps/web/app/app/(shell)/admin/presence/CompanyPresenceWorkspace.test.tsx
 'use client';
 import { SimpleTooltip } from '@jovie/ui';
 import { Circle, CircleAlert, CircleCheck, CircleX } from 'lucide-react';
