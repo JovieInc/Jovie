@@ -1,0 +1,13 @@
+Implemented and shipped the reviewable fix.
+
+- Renamed `/app` shell heading and metadata from **Inbox** to **Home**, matching navigation and product canon.
+- Preserved the existing opportunity queue and Inbox notification utility.
+- Updated regression coverage across metadata, breadcrumbs, route config, and E2E expectations.
+- Verified Biome, 31 unit tests, full typecheck (18/18), bug-to-test policy, and source admission.
+- Hosted Source Validation, Security Evidence, Migration Guard, Exact-head Coverage, and desktop/mobile Visual Review all passed.
+- Local authenticated Playwright could not start because the lane lacks a Doppler token; hosted visual verification passed instead.
+
+Draft PR: [JOV-7609 #20527](https://github.com/JovieInc/Jovie/pull/20527)  
+Commit: `ede53a5942681890c077f70eb7aa6cbcc951e363`
+
+The branch is clean and matches the remote. The PR remains draft against `main`, and JOV-7609 is In Review.
