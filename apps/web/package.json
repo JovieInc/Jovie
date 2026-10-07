@@ -275,7 +275,7 @@
     "@upstash/ratelimit": "^2.2.0",
     "@upstash/redis": "^1.39.0",
     "@vercel/analytics": "^2.0.1",
-    "@vercel/blob": "^2.8.0",
+    "@vercel/blob": "^2.8.1",
     "@vercel/oidc": "3.8.10",
     "@vercel/toolbar": "^0.2.7",
     "ai": "^7.0.122",
