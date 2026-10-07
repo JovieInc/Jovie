@@ -1,6 +1,10 @@
+import { isPresenceObservationStale } from '@/components/features/presence/evidence';
 import { getDspDisplayName } from '@/lib/dsp-registry';
 
-export const PRESENCE_STALE_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
+export {
+  isPresenceObservationStale,
+  PRESENCE_STALE_AFTER_MS,
+} from '@/components/features/presence/evidence';
 
 export type PresenceIdentityPhotoKind = 'profile' | 'generic' | 'missing';
 export type PresenceIdentityPhotoSource =
@@ -101,16 +105,6 @@ function metadataUrl(
     if (url) return url;
   }
   return null;
-}
-
-export function isPresenceObservationStale(
-  observedAt: string | null | undefined,
-  now: Date = new Date()
-): boolean {
-  if (!observedAt) return false;
-  const observed = Date.parse(observedAt);
-  if (Number.isNaN(observed)) return false;
-  return now.getTime() - observed > PRESENCE_STALE_AFTER_MS;
 }
 
 export function identityPhotoFreshness(
