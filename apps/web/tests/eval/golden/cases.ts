@@ -242,7 +242,7 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
   {
     name: 'Entitlement gate: album art upsell on free plan',
     userPrompt: 'Generate album art for my new single',
-    mustSay: ['album art', 'pro plan'],
+    mustSay: ['album art', 'Artist Presence'],
     mustNotSay: [],
     harmfulBlacklist: [
       'your album art is ready',
