@@ -1,0 +1,11 @@
+Implemented and opened draft PR [#20529](https://github.com/JovieInc/Jovie/pull/20529).
+
+- Added “AI Operating System” linking to `/ai` in the Product footer.
+- Added a regression test, confirmed red before the fix and green afterward.
+- 56 focused tests passed.
+- Biome, ESLint, typecheck, secret scans, proxy guard, and commit/push hooks passed.
+- Commit: `14980a72a1b587f26cf278502c1b70ce5304f794`
+- JOV-7600 transitioned to In Review.
+- PR remains draft and unmerged; hosted checks are currently running.
+
+Deviations: GBrain was unavailable as declared. The Linear connector required reauthentication, so the repository’s authenticated GraphQL fallback was used successfully.
