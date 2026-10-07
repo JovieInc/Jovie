@@ -1,0 +1,11 @@
+No code change or PR was needed.
+
+- `JovieInc/Jovie` contains no `regenerate-certificates.yml`, including its history.
+- The actual workflow is in `JovieInc/LogYourBody` and was already fixed by merged [PR #1182](https://github.com/JovieInc/LogYourBody/pull/1182).
+- Current `main` is manual-only, requires `NUKE-AND-REGENERATE`, and has no schedule.
+- Run `36835366377` failed because `JovieInc/certificates` returned “Repository not found.” Certificate generation and testing were skipped; Slack notification succeeded and was not the root cause.
+- The nuke step reported success but swallows individual errors, so signing health remains tracked by LYB-74.
+- The Jovie worktree is clean and exactly aligned with `origin/main`.
+- GBrain and Linear reads were unavailable due connector reauthentication.
+
+NOT-SHIPPABLE: the requested remediation already landed in JovieInc/LogYourBody, while the contractually specified JovieInc/Jovie repository does not contain the workflow.
