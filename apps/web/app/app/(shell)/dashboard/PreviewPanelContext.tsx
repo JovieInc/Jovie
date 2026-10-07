@@ -11,6 +11,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useRailPreview } from '@/components/shell/useRailPreview';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 
 export interface PreviewPanelLink {
   id: string;
@@ -56,6 +58,9 @@ export interface PreviewPanelData {
 
 interface PreviewPanelStateContextValue {
   isOpen: boolean;
+  isPreview: boolean;
+  isFloating: boolean;
+  isPinned: boolean;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -120,6 +125,13 @@ export function PreviewPanelProvider({
 
   // Start closed to match SSR; the effect below opens on large screens after hydration
   const [isOpen, setIsOpen] = useState(false);
+  const isMobile = useBreakpointDown('lg');
+  const { isPreview, isFloating, dismissPreview } = useRailPreview({
+    side: 'right',
+    pinned: isOpen,
+    enabled: enabled && !isMobile,
+    resetKey: scope,
+  });
   const [previewData, setPreviewData] = useState<PreviewPanelData | null>(null);
 
   // Surface change (dashboard ↔ chat ↔ artist-profile settings) resets the
@@ -148,30 +160,45 @@ export function PreviewPanelProvider({
 
   const open = useCallback(() => {
     if (!enabled) return;
+    dismissPreview();
     setIsOpen(true);
-  }, [enabled]);
+  }, [enabled, dismissPreview]);
 
   const close = useCallback(() => {
     if (!enabled) return;
+    dismissPreview();
     setIsOpen(false);
-  }, [enabled]);
+  }, [enabled, dismissPreview]);
 
   const toggle = useCallback(() => {
     if (!enabled) return;
+    dismissPreview();
     setIsOpen(prev => !prev);
-  }, [enabled]);
+  }, [enabled, dismissPreview]);
 
-  const effectiveIsOpen = enabled ? isOpen : false;
+  const effectiveIsOpen = enabled ? isOpen || isPreview : false;
 
   // Separate memoized values for each context to prevent cascading re-renders
   const stateValue = useMemo<PreviewPanelStateContextValue>(
     () => ({
       isOpen: effectiveIsOpen,
+      isPinned: enabled && isOpen,
+      isPreview,
+      isFloating,
       open,
       close,
       toggle,
     }),
-    [effectiveIsOpen, open, close, toggle]
+    [
+      effectiveIsOpen,
+      enabled,
+      isOpen,
+      isPreview,
+      isFloating,
+      open,
+      close,
+      toggle,
+    ]
   );
 
   const dataValue = useMemo<PreviewPanelDataContextValue>(

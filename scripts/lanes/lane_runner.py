@@ -39,6 +39,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import lifecycle  # noqa: E402
 import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
@@ -975,7 +976,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
     ])
 
 
-def context_pack(issue: Issue, run=subprocess.run) -> str:
+def context_pack(issue: Issue, run=lifecycle.run) -> str:
     """Bounded, best-effort GBrain recall. A miss is reported, never invented."""
     try:
         result = run(["gbrain", "search", issue.title[:200]], capture_output=True, text=True, timeout=20)
@@ -1095,8 +1096,9 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
             log.flush()
         command = [sys.executable, str(Path(__file__).resolve()), "gate-command",
                    "--timeout", str(timeout), "--", *args]
-        with subprocess.Popen(command, cwd=cwd, env=env, text=True, start_new_session=True,
-                              pass_fds=tuple(pass_fds), stdout=log if stream and log else subprocess.PIPE,
+        with subprocess.Popen(command, cwd=cwd, text=True, start_new_session=True,
+                              **lifecycle.spawn_kwargs(env=env, pass_fds=pass_fds),
+                              stdout=log if stream and log else subprocess.PIPE,
                               stderr=subprocess.STDOUT if stream and log else subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
         if log is not None:
@@ -1107,11 +1109,11 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
     if stream and log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n")
         log.flush()
-        result = subprocess.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
+        result = lifecycle.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
                                 timeout=timeout, env=env)
         log.flush()
         return subprocess.CompletedProcess(args, result.returncode, "", "")
-    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
+    result = lifecycle.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
     if log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n{result.stdout[-4000:]}{result.stderr[-4000:]}\n")
     return result
@@ -1142,6 +1144,10 @@ LINEAR_BUDGET_HEADERS = (
     ("X-RateLimit-Complexity-Remaining", "X-RateLimit-Complexity-Limit", "X-RateLimit-Complexity-Reset"),
 )
 LINEAR_RESET_HEADERS = ("X-RateLimit-Requests-Reset", "X-RateLimit-Complexity-Reset")
+
+
+class LaneInventoryUnknown(RuntimeError):
+    """A bounded native scan did not prove complete candidate/ownership coverage."""
 
 
 class LinearRateLimited(RuntimeError):
@@ -1546,21 +1552,39 @@ class Linear:
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
 
-    def _paginated_lane_issues(self, label: str) -> list[dict]:
-        """Up to 500 Todo issues. Only the claim-scan cache fill calls this."""
-        nodes, after = [], None
+    def _bounded_lane_nodes(self, query: str, variables: dict) -> list[dict]:
+        """Retain the request cap, but never treat a truncated inventory as complete."""
+        nodes, ids, cursors, after = [], set(), set(), None
         for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+            data = self.gql(query, {**variables, "after": after})
+            edge = data.get("issues") if isinstance(data, dict) else None
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise LaneInventoryUnknown("lane-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"]:
+                    raise LaneInventoryUnknown("lane-inventory-malformed")
+                if row["id"] not in ids:
+                    nodes.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return nodes
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
+            cursors.add(after)
+        raise LaneInventoryUnknown("lane-inventory-page-limit")
+
+    def _paginated_lane_issues(self, label: str) -> list[dict]:
+        """Complete Todo inventory within 500 rows, only on a claim-scan cache fill."""
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt '
-                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL], "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
         return [{"id": n["id"], "identifier": n["identifier"], "title": n["title"],
                  "description": n.get("description") or "", "priority": n.get("priority") or 0,
                  "created_at": n["createdAt"], "labels": [l["name"] for l in n["labels"]["nodes"]]}
@@ -1571,7 +1595,7 @@ class Linear:
 
         The 500-issue read (JOV-7514) runs only as the shared claim-scan fill. A hit
         within CLAIM_SCAN_TTL_S returns the stored pool and does not paginate."""
-        rows = shared(f"claim-lane-issues-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
+        rows = shared(f"claim-lane-issues-v2-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
                       lambda: self._paginated_lane_issues(label)) or []
         return [Issue(row["id"], row["identifier"], row["title"], row.get("description") or "",
                       row.get("priority") or 0, row["created_at"], list(row.get("labels") or []))
@@ -1579,19 +1603,12 @@ class Linear:
 
     def active_lane_issues(self, labels: list[str]) -> list[Issue]:
         """In Progress work claimed from a lane pool, for cross-host overlap admission."""
-        nodes, after = [], None
-        for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
-                {"labels": labels, "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                {"labels": labels})
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
                 for n in nodes]
@@ -1657,7 +1674,7 @@ class Locked:
 
 def provider_healthy(spec: dict) -> bool:
     try:
-        result = subprocess.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
+        result = lifecycle.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and re.search(spec.get("healthy", "."), result.stdout + result.stderr) is not None
@@ -1740,8 +1757,14 @@ class RunStopped(BaseException):
     before the owned process tree is killed."""
 
 
+class CommandNotStarted(OSError):
+    """Popen failed before any command child existed."""
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
-              guard_interval: float = 30, on_kill=None) -> subprocess.CompletedProcess:
+              guard_interval: float = 30, on_kill=None,
+              _lifecycle_helper: bool = False, _lifecycle_terminal: bool = False,
+              stderr=subprocess.STDOUT) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
@@ -1754,8 +1777,18 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     if guard:
         guard()
     env = {**os.environ, "npm_config_package_import_method": "hardlink"}
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
-                            start_new_session=True, env=env)
+    # The tracked helper retains controller ownership if its worker dies. It
+    # also keeps the guard while descendant cleanup is unproven. Its own agent
+    # launch is the terminal rung, so this cannot recursively wrap itself.
+    command = ([sys.executable, str(Path(__file__).resolve()), "gate-command",
+                "--timeout", str(timeout), "--", *cmd]
+               if lifecycle.active() and not _lifecycle_helper else cmd)
+    try:
+        proc = subprocess.Popen(command, cwd=cwd, stdout=log, stderr=stderr, text=True,
+                                start_new_session=True,
+                                **({"env": env} if _lifecycle_terminal else lifecycle.spawn_kwargs(env=env)))
+    except OSError as error:
+        raise CommandNotStarted(error.errno, error.strerror, error.filename) from error
     owned = AgentProcesses(proc.pid)
     restored = {}
 
@@ -2851,7 +2884,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
         gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
         if not conflicted and not gate_held and not reviewed:
-            if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
+            if any((check.get("status") is not None and check["status"] != "COMPLETED")
+                   or check.get("state") in ("PENDING", "EXPECTED") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
@@ -3142,16 +3176,37 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
 
 
 def fetch_labeled_events(linear) -> list:
-    """The one label-filtered Linear read per tick, shared across workers via `shared`.
+    """One complete bounded inventory per cache fill; never plan from a truncated page.
 
     JOV and LYB issues labeled `remediation:<fingerprint>` come back together.
     Callers must not issue a follow-up read per issue.
     """
     def fetch():
-        data = linear.gql(remediation.LABELED_EVENT_QUERY, {})
-        return (data.get("issues") or {}).get("nodes") or []
+        rows, ids, cursors, after = [], set(), set(), None
+        for _ in range(remediation.EVENT_INVENTORY_PAGES):
+            data = linear.gql(remediation.LABELED_EVENT_QUERY, {"after": after})
+            edge = data.get("issues")
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise RuntimeError("remediation-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not row.get("id"):
+                    raise RuntimeError("remediation-inventory-malformed")
+                if row["id"] not in ids:
+                    rows.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise RuntimeError("remediation-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return rows
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise RuntimeError("remediation-inventory-cursor-invalid")
+            cursors.add(after)
+        raise RuntimeError("remediation-inventory-page-limit")
 
-    return shared("remediation-events", SUMMARY_TTL_S, fetch) or []
+    # New cache namespace fences old first-page-only receipts after source installation.
+    return shared("remediation-events-v2", SUMMARY_TTL_S, fetch) or []
 
 
 def _apply_event_plan(linear, plan: dict) -> None:
@@ -3507,27 +3562,114 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
 
 REPAIR_TARGET_FIELDS = """number title state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
-commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{__typename
-... on CheckRun{name status conclusion detailsUrl startedAt completedAt}
-... on StatusContext{context state targetUrl}}}}}}}"""
-REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
+totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
+pageInfo{hasNextPage endCursor} nodes{__typename
+... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
+... on StatusContext{id context state targetUrl}}}}}}}"""
+REPAIR_CHECK_PAGES = 5  # At most 500 contexts; incomplete authority still refuses repair.
+REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
 
 
+def repair_checks_census(contexts: dict) -> tuple:
+    """Canonical count evidence for the entire mutable connection, not just this page."""
+    counts = [contexts[key] for key in ("totalCount", "checkRunCount", "statusContextCount")]
+    if any(type(count) is not int or count < 0 for count in counts) or sum(counts[1:]) != counts[0]:
+        raise ValueError("repair-check-counts-invalid")
+    states = []
+    for key, total in zip(("checkRunCountsByState", "statusContextCountsByState"), counts[1:]):
+        rows = contexts[key]
+        if not isinstance(rows, list) or len(rows) > 32:
+            raise ValueError("repair-check-state-counts-invalid")
+        grouped = {}
+        for row in rows:
+            name, count = row["state"], row["count"]
+            if (not isinstance(name, str) or not name or name in grouped
+                    or type(count) is not int or count < 0):
+                raise ValueError("repair-check-state-counts-invalid")
+            grouped[name] = count
+        if sum(grouped.values()) != total:
+            raise ValueError("repair-check-state-counts-incomplete")
+        states.append({name: count for name, count in grouped.items() if count})
+    return (*counts, *states)
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
-    """One fresh target read binds repair ownership and complete checks to the same head."""
+    """Bounded fresh pages bind complete checks to one unchanged ownership/head snapshot."""
     try:
         owner, name = REPO_SLUG.split("/")
         number = pr["number"]
         if type(number) is not int or number <= 0:
             return None
-        viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
-                     "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"], timeout=30)
-        data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
-        if not isinstance(data, dict) or data.get("errors"):
-            return None
-        return repair_target_node(pr, data["data"]["repository"]["pullRequest"])
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        cursor, cursors, seen, checks, anchor, census = None, set(), set(), [], None, None
+        for page in range(REPAIR_CHECK_PAGES):
+            args = ["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
+                    "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"]
+            if cursor is not None:
+                args += ["-f", f"cursor={cursor}"]
+            viewed = sh(args, timeout=30)
+            data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+            if not isinstance(data, dict) or data.get("errors"):
+                return None
+            live = data["data"]["repository"]["pullRequest"]
+            if isinstance(live, dict) and live.get("state") in {"MERGED", "CLOSED"}:
+                return repair_target_node(pr, live)  # Positive terminal evidence still cancels work.
+            rollup = live["commits"]["nodes"][0]["commit"]["statusCheckRollup"]
+            if rollup is None:
+                return repair_target_node(pr, live) if page == 0 else None
+            contexts = rollup["contexts"]
+            info, rows = contexts["pageInfo"], contexts["nodes"]
+            if (type(info.get("hasNextPage")) is not bool or not isinstance(rows, list)
+                    or len(rows) > 100 or (page and not rows)):
+                return None
+            # Validate every page with the normal strict target validator; this
+            # temporary page copy never escapes as complete repair authority.
+            snapshot = json.loads(json.dumps(live))
+            snapshot["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]["pageInfo"]["hasNextPage"] = False
+            normalized = repair_target_node(pr, snapshot)
+            if normalized is None:
+                return None
+            ownership = {key: normalized[key] for key in
+                         ("number", "state", "headRefOid", "headRefName", "isInMergeQueue",
+                          "isCrossRepository", "isDraft", "mergeStateStatus", "reviewDecision", "labels")}
+            if anchor is not None and ownership != anchor:
+                return None  # Never splice checks across a head, queue, review or hold transition.
+            anchor = ownership
+            if page or info["hasNextPage"]:
+                current_census = repair_checks_census(contexts)
+                if current_census[0] > 100 * REPAIR_CHECK_PAGES or (census is not None and current_census != census):
+                    return None
+                census = current_census
+                ids = [row.get("id") for row in rows]
+                if (any(not isinstance(key, str) or not key for key in ids)
+                        or len(set(ids)) != len(ids) or seen.intersection(ids)):
+                    return None
+                seen.update(ids)
+            checks.extend(rows)
+            if not info["hasNextPage"]:
+                if census is not None:
+                    # Counts catch insertions before an already consumed cursor;
+                    # state counts also catch a pending transition on an earlier page.
+                    run_states, status_states = {}, {}
+                    for check in checks:
+                        if check["__typename"] == "CheckRun":
+                            state = check.get("conclusion") if check["status"] == "COMPLETED" else check["status"]
+                            grouped = run_states
+                        else:
+                            state, grouped = check["state"], status_states
+                        grouped[state] = grouped.get(state, 0) + 1
+                    if (len(checks) != census[0] or sum(run_states.values()) != census[1]
+                            or sum(status_states.values()) != census[2]
+                            or run_states != census[3] or status_states != census[4]):
+                        return None
+                return {**normalized, "statusCheckRollup": checks}
+            cursor = info.get("endCursor")
+            if not isinstance(cursor, str) or not cursor or cursor in cursors or not rows:
+                return None
+            cursors.add(cursor)
+        return None
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None
 
 
@@ -4303,7 +4445,7 @@ def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict
                  "createdAt": issue.created_at, "labels": issue.labels}
                 for issue in linear.active_lane_issues([SHARED_LABEL, *provider_labels])]
     try:
-        active = shared("file-overlap-tasks", SUMMARY_TTL_S, fetch_active)
+        active = shared("file-overlap-tasks-v2", SUMMARY_TTL_S, fetch_active)
     except LinearRateLimited:
         raise
     except Exception:
@@ -4987,7 +5129,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
 
 def reexec(host: Host, name: str) -> int:
     """Slot free -> pull the next piece of work now, on whatever release is current (drain-safe)."""
+    if lifecycle.draining(host.state):
+        return 0  # admitted unit finished; do not acquire another assignment
     current = host.state / "current" / "lane_runner.py"
+    lifecycle.prepare_reexec()
     os.execv(sys.executable, [sys.executable, str(current if current.exists() else Path(__file__)),
                               "worker", "--provider", name])
     return 0
@@ -5034,7 +5179,7 @@ def dispatch(host: Host) -> int:
             for _ in range(slots):
                 subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 start_new_session=True)
+                                 start_new_session=True, **lifecycle.spawn_kwargs())
                 tick["spawned"].append(name)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
@@ -5208,7 +5353,7 @@ def release_identity(host: Host) -> dict:
 
 # Per-host tuning (LANES_SLOTS_DEVIN=2, SYMPHONY_FILE_OVERLAP_GUARD=flag, ...) must not reach the
 # release self-test: the fixtures assume defaults, so a tuned host refused every release.
-HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_")
+HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 
 
 def selftest_env(scratch: Path) -> dict:
@@ -5235,9 +5380,9 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+        archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
-        subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+        lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.
         scratch = staging / ".selftest-state"
         scratch.mkdir(exist_ok=True)
@@ -5247,7 +5392,7 @@ def install_release(host: Host) -> int:
             refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
             return 1
         try:
-            test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                                   cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
                                   env=selftest_env(scratch))
         except subprocess.TimeoutExpired:
@@ -5319,7 +5464,7 @@ def graphql_budget() -> tuple[int, str] | None:
         return None
 
 
-def main(argv: list[str] | None = None) -> int:
+def guarded_main(argv: list[str] | None = None) -> int:
     disk_guard.ensure_sbin_on_path()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -5327,6 +5472,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("update")
     gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
     gate.add_argument("--timeout", type=float, required=True)
+    gate.add_argument("--result-fd", type=int)
+    gate.add_argument("--separate-stderr", action="store_true")
+    gate.add_argument("--child-state")
     gate.add_argument("args", nargs=argparse.REMAINDER)
     context = sub.add_parser("context-manifest", help="check or generate the local context contract")
     context.add_argument("--write", action="store_true")
@@ -5335,11 +5483,29 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "gate-command":
         command = args.args[1:] if args.args[:1] == ["--"] else args.args
+        if args.child_state is not None:
+            os.environ["LANES_STATE"] = args.child_state
+        def report_outcome(receipt):
+            if args.result_fd is not None:
+                try:
+                    os.write(args.result_fd, json.dumps(receipt).encode())
+                except BrokenPipeError:
+                    pass  # dead controller; command is already proven drained
+                finally:
+                    os.close(args.result_fd)
         try:
-            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1).returncode
+            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1,
+                             _lifecycle_helper=True, _lifecycle_terminal=args.result_fd is not None,
+                             stderr=sys.stderr if args.separate_stderr else subprocess.STDOUT).returncode
+            report_outcome({"returncode": code, "timeout": False})
             return 125 if code == 124 else code  # 124 is reserved for a drained timeout
         except subprocess.TimeoutExpired:
+            report_outcome({"returncode": None, "timeout": True})
             return 124  # run_agent has drained its observed descendants before raising
+        except CommandNotStarted as error:
+            report_outcome({"spawnError": {"errno": error.errno,
+                            "strerror": error.strerror, "filename": error.filename}})
+            return 127
         except RunStopped:
             return 143  # explicit stop also completes the existing drain protocol
         except BaseException as error:
@@ -5369,6 +5535,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        host = Host()
+        arguments = sys.argv[1:] if argv is None else argv
+        with lifecycle.Guard(host.state, allow_drain=arguments[:1] == ["gate-command"]):
+            if lifecycle.draining(host.state) and arguments[:1] != ["gate-command"]:
+                return 75
+            return guarded_main(argv)
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

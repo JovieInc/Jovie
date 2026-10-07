@@ -12,6 +12,8 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,6 +84,105 @@ class AccountsTest(Isolated):
         again, handle = codex.pick({}, 1.0)
         self.assertIsNotNone(again)
         handle.close()
+
+
+class CurrentLoginTest(Isolated):
+    def setUp(self):
+        super().setUp()
+        self.root = Path(self.tmp.name)
+        self.cli = self.root / "codex"
+        self.env = patch.dict(os.environ, {
+            "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
+            "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
+        })
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def fake_cli(self, output="OK", code=0, auth="Logged in using ChatGPT", auth_code=0):
+        self.cli.write_text(
+            f"#!{sys.executable}\nimport json,os,sys\nfrom pathlib import Path\n"
+            f"root=Path({str(self.root)!r})\n"
+            f"if sys.argv[1:]==['login','status']:\n print({auth!r}); sys.exit({auth_code})\n"
+            "assert not any(k in os.environ for k in ['OPENAI_API_KEY','OPENAI_BASE_URL','CODEX_API_KEY'])\n"
+            "assert os.environ['CODEX_HOME'].endswith('existing-login')\n"
+            "(root/'launch.json').write_text(json.dumps(sys.argv))\n"
+            f"sys.stdin.read(); print({output!r}); sys.exit({code})\n")
+        self.cli.chmod(0o700)
+
+    def invoke(self):
+        prompt = self.root / "prompt.txt"
+        prompt.write_text("Implement the assigned issue")
+        return codex.run(SimpleNamespace(prompt_file=str(prompt), receipt_file=str(self.root / "receipt.jsonl"),
+                                        cwd=str(self.root), model=None, reasoning_effort="high"))
+
+    def test_existing_cli_login_without_opening_credentials_or_scanning_profiles(self):
+        self.fake_cli()
+        with patch.object(Path, "glob", side_effect=AssertionError("profile discovery")):
+            self.assertEqual(codex.accounts(), ["current-login"])
+        self.assertEqual(self.invoke(), 0)
+        argv = json.loads((self.root / "launch.json").read_text())
+        self.assertIn('forced_login_method="chatgpt"', argv)
+        self.assertIn('model_provider="openai"', argv)
+        self.assertIn("--approve-for-me", argv)
+        self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", argv)
+        self.assertEqual([json.loads(row)["account"] for row in (self.root / "receipt.jsonl").read_text().splitlines()],
+                         ["current-login", "current-login"])
+
+    def test_missing_broken_api_or_unknown_login_never_launches_inference(self):
+        for auth, code in [("Logged in using an API key", 0), ("unknown", 0), ("Logged in using ChatGPT", 1)]:
+            with self.subTest(auth=auth, code=code):
+                self.fake_cli(auth=auth, auth_code=code)
+                self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+                self.assertFalse((self.root / "launch.json").exists())
+        self.cli.unlink()
+        self.assertEqual(codex.accounts(), [])
+
+    def test_auth_probe_timeout_fails_closed(self):
+        with patch.object(codex.subprocess, "run", side_effect=codex.subprocess.TimeoutExpired("codex", 10)):
+            self.assertEqual(codex.accounts(), [])
+
+    def test_one_exclusive_lease_and_no_duplicate_launch(self):
+        self.fake_cli()
+        name, handle = codex.pick({}, time.time())
+        self.assertEqual(name, "current-login")
+        try:
+            self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+            self.assertFalse((self.root / "launch.json").exists())
+        finally:
+            handle.close()
+        self.assertEqual(self.invoke(), 0)
+
+    def test_limit_banks_single_login_without_rotation_or_credit_redemption(self):
+        self.fake_cli("You've hit your usage limit. Try again in 2 hours.", 1)
+        with patch.object(codex, "maybe_redeem", side_effect=AssertionError("credit redemption")), \
+                patch.object(codex.time, "sleep", side_effect=AssertionError("rotation")):
+            self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+        state = codex.read_state()
+        self.assertEqual(list(state), ["current-login"])
+        self.assertEqual(state["current-login"]["lastKind"], "limit")
+        self.assertEqual(state["current-login"]["runs"], 1)
+        self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+        self.assertEqual(codex.read_state()["current-login"]["runs"], 1)
+        name, handle = codex.pick(state, state["current-login"]["exhaustedUntil"] + 1)
+        self.assertEqual(name, "current-login")
+        handle.close()
+
+    def test_rate_and_auth_failures_release_lease_and_bank_without_retry(self):
+        for output, kind in [("error: 429 Too Many Requests", "rate"), ("error: login required", "auth")]:
+            with self.subTest(kind=kind):
+                codex.write_state({})
+                self.fake_cli(output, 1)
+                self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+                self.assertEqual(codex.read_state()["current-login"]["lastKind"], kind)
+                handle = codex.lease("current-login")
+                self.assertIsNotNone(handle)
+                handle.close()
+
+    def test_reconciliation_never_contacts_credit_or_coordinator_services(self):
+        with patch.object(codex, "app_server_calls", side_effect=AssertionError("app server")):
+            self.assertEqual(codex.reconcile(fetch=lambda _: self.fail("quota service")),
+                             {"reconciled": False, "reason": "current-login-cli-only"})
 
 
 class ClassifyTest(unittest.TestCase):

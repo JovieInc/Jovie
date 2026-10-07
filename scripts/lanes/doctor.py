@@ -20,6 +20,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
@@ -259,7 +261,7 @@ def open_pr_numbers() -> set[int] | None:
     if os.environ.get("LANES_SELFTEST"):
         return None
     try:
-        result = subprocess.run(["gh", "pr", "list", "--repo", pr_events.REPO, "--state", "open", "--limit", "500",
+        result = lifecycle.run(["gh", "pr", "list", "--repo", pr_events.REPO, "--state", "open", "--limit", "500",
                                  "--json", "number", "--jq", ".[].number"], capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -275,7 +277,7 @@ def merged_prs_24h(lane, now: float) -> list[dict]:
     return merge_evidence.require_complete(merge_evidence.collect(lane.REPO_SLUG, now - 86400, now))
 
 
-def sample_merge_throughput(state: Path, now: float, run=subprocess.run) -> tuple[dict | None, str | None]:
+def sample_merge_throughput(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
     """Refresh the one-hour GitHub queue signal at most every five minutes."""
     path = Path(state) / "merge-throughput.json"
     cached = read_json(path, {})
@@ -439,6 +441,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
+    elif obs.get("linearSkipped") or obs.get("pool") is None:
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("linear-down")
+        if prior_alarm:
+            alerts["linear-down"] = prior_alarm
     elif new_work_empty(obs):
         since = (previous or {}).get("poolEmptySince") or obs["now"]
         if obs["now"] - since >= POOL_EMPTY_S:
@@ -447,6 +453,31 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = (f"{busy} slots busy with {pool if pool is not None else 'unknown'} eligible new issues "
                                 f"and {obs.get('openPRCount', 'unknown')} open PRs but nothing passed the gate ({last})")
+    elif (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S) and not new_work_empty(obs):
+        # Losing demand/worker visibility is not a new landing or observed absence of demand.
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("no-landing")
+        if prior_alarm:
+            alerts["no-landing"] = prior_alarm
+    if busy and waiting and isinstance(obs.get("lastWorkAge"), (int, float)) and obs["lastWorkAge"] > 3600:
+        alerts["workers-without-completions"] = (
+            f"{busy} slot leases occupied but no completed run for {int(obs['lastWorkAge'] // 60)}m; "
+            "check current processes, fenced ownership and repair holds before adding workers")
+    budgets = obs.get("newIssueBudgetByProvider") or {}
+    inventory_holds = [name for name, budget in budgets.items()
+                       if budget.get("reason") in {"over-budget", "terminal-pr-backlog"}]
+    if obs.get("eligiblePool") and obs.get("pool") == 0 and inventory_holds:
+        alerts["admission-repair-needed"] = (
+            f"{obs['eligiblePool']} qualified issues await PR inventory recovery on {', '.join(sorted(inventory_holds))}; "
+            "repair existing owned PRs or reconcile held dependencies; retain concurrency and retry limits")
+    elif obs.get("eligiblePool") is None or obs.get("pool") is None or any(
+            budget.get("reason") == "pr-inventory-unavailable" for budget in budgets.values()):
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("admission-repair-needed")
+        if prior_alarm:
+            alerts["admission-repair-needed"] = prior_alarm
+    if obs.get("lastWorkAge") is None:
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("workers-without-completions")
+        if prior_alarm:
+            alerts["workers-without-completions"] = prior_alarm
     spawned = (obs.get("tick") or {}).get("spawned") or []
     idle_ages = obs.get("idleExitAge") or {}
     clean_exit = bool(spawned) and all(
@@ -473,6 +504,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if stale_briefs:
         alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
                                         f"without a build claim ({', '.join(stale_briefs[:5])})")
+    elif obs.get("designGate") is None:
+        # A failed/cooldown census cannot prove recovery of a previously observed alarm.
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("design-brief-stale")
+        if prior_alarm:
+            alerts["design-brief-stale"] = prior_alarm
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -480,6 +516,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    elif obs.get("githubRemaining") is None:
+        prior_alarm = ((previous or {}).get("alerts") or {}).get("github-quota")
+        if prior_alarm:
+            alerts["github-quota"] = prior_alarm
     brake = (obs.get("autoscale") or {}).get("throughputBrake") or {}
     held_for = brake.get("heldForS")
     interval = brake.get("intervalS")
@@ -532,6 +572,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
+        "workers-without-completions": "verify-process-and-fenced-repair-ownership",
+        "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -550,6 +592,19 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         first = (float(old["firstObservedEpoch"]) if continuing and old.get("firstObservedEpoch") is not None
                  else float((previous.get("providerIdleSince") or {}).get(provider, now)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
+        if key == "design-brief-stale" and obs.get("designGate") is None:
+            source_status = "unknown"
+        if key == "admission-repair-needed" and (obs.get("eligiblePool") is None or obs.get("pool") is None
+                or any(row.get("reason") == "pr-inventory-unavailable"
+                       for row in (obs.get("newIssueBudgetByProvider") or {}).values())):
+            source_status = "unknown"
+        if key == "workers-without-completions" and obs.get("lastWorkAge") is None:
+            source_status = "unknown"
+        if key == "github-quota" and obs.get("githubRemaining") is None:
+            source_status = "unknown"
+        if key == "no-landing" and (obs.get("lastLandingAge") is None or obs.get("linearSkipped")
+                or (obs.get("eligiblePool", obs.get("pool")) is None and obs.get("openPRCount") is None)):
+            source_status = "unknown"
         freshness = (obs.get("hudBeatAge") if key == "hud-stale" else
                      obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)
         action = ("dispatch-provider-workers" if key.startswith("provider-idle:") else
@@ -583,6 +638,14 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             continue
         receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(now),
                          "nextAction": "none", "terminalOutcome": "health-proven"}
+        fields = {"github-quota": ("githubRemaining",),
+                  "linear-down": ("linearError", "linearSkipped", "pool", "eligiblePool"),
+                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider")}
+        if key in fields:
+            receipts[key]["source"] = {**old.get("source", {}), "status": "healthy",
+                                       "observedAt": epoch_iso(now), "freshnessSeconds": 0}
+            receipts[key]["recoveryEvidence"] = {"observedAt": epoch_iso(now),
+                                                  **{field: obs.get(field) for field in fields[key]}}
     return receipts
 
 
@@ -817,7 +880,7 @@ def fetch_slo(host, lane) -> dict | None:
         return record["snapshot"]
     try:
         lane.load_github_env()
-        raw = subprocess.run(
+        raw = lifecycle.run(
             ["gh", "api", "repos/JovieInc/Jovie/contents/docs/metrics/shipping-slo-latest.json",
              "-H", "Accept: application/vnd.github.raw"],
             capture_output=True, text=True, timeout=20)
@@ -964,7 +1027,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     body.write_text(json.dumps(feed, indent=1))
     lane.load_github_env()
     if not record.get("url"):
-        created = subprocess.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
+        created = lifecycle.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
                                   "--filename", "lanes-status.json", str(body)], capture_output=True, text=True, timeout=60)
         url = (created.stdout or "").strip().splitlines()[-1] if created.returncode == 0 and created.stdout.strip() else None
         if not url:
@@ -977,7 +1040,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         except Exception:
             pass
         return url
-    subprocess.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
+    lifecycle.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
                    capture_output=True, text=True, timeout=60)
     return record["url"]
 

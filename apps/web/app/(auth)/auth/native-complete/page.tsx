@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import {
   consumeDesktopAuthCompletion,
   getDesktopPasskeyState,
@@ -131,25 +131,24 @@ function isRecoverableCompletionReplayError(error: unknown): boolean {
 }
 
 function NativeCompleteContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const { replace } = useRouter();
+  const searchKey = useSearchParams().toString();
   const [state, setState] = useState<CompletionState>('loading');
   const [errorClass, setErrorClass] =
     useState<NativeCompleteErrorClass>('unknown');
   const [offerReturnTo, setOfferReturnTo] = useState<string | null>(null);
   const [enrollState, setEnrollState] = useState<TouchIdEnrollState>('idle');
-  const didStartCompletionRef = useRef(false);
 
   const openWorkspace = useCallback(
     (returnTo: string) => {
-      router.replace(returnTo);
+      replace(returnTo);
       globalThis.setTimeout(() => {
         if (globalThis.location?.pathname === '/auth/native-complete') {
           globalThis.location.assign(returnTo);
         }
       }, 500);
     },
-    [router]
+    [replace]
   );
 
   // The sign-in that just finished is fresh, which is exactly when the
@@ -179,11 +178,8 @@ function NativeCompleteContent() {
   }, [offerReturnTo, openWorkspace]);
 
   useEffect(() => {
-    if (didStartCompletionRef.current) {
-      return;
-    }
-    didStartCompletionRef.current = true;
-
+    // Every mounted effect needs its own live subscriber. The shared promise
+    // deduplicates the exchange when Strict Mode replays setup and cleanup.
     let isActive = true;
     setState('loading');
 
@@ -214,8 +210,9 @@ function NativeCompleteContent() {
           const returnTo = getStoredDesktopAuthReturnTo();
           try {
             const verification = await verifyDesktopReturnRoute(returnTo);
+            if (!isActive) return;
             if (verification === 'ready') {
-              router.replace(returnTo);
+              replace(returnTo);
               globalThis.setTimeout(() => {
                 if (globalThis.location?.pathname === '/auth/native-complete') {
                   globalThis.location.assign(returnTo);
@@ -228,6 +225,7 @@ function NativeCompleteContent() {
           }
         }
 
+        if (!isActive) return;
         setErrorClass(classifyCompletionError(error));
         setState('error');
       }
@@ -238,7 +236,7 @@ function NativeCompleteContent() {
     return () => {
       isActive = false;
     };
-  }, [openWorkspace, router, searchParams]);
+  }, [openWorkspace, replace, searchKey]);
 
   if (state === 'touch-id-offer') {
     return (

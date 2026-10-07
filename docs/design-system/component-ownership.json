@@ -3,7 +3,30 @@
   "publicImport": "@/components/canonical",
   "crossProductPrimitiveImport": "@jovie/ui",
   "firstMigratedRoute": "apps/web/app/app/(shell)/settings/layout.tsx",
+  "sharedTargetPolicy": "Customer and operator surfaces share component families, state, motion, focus and interaction logic by default. Target adapters may supply authorized data, destinations and permissions; a separate implementation requires a documented behavior that the owner cannot express.",
   "families": {
+    "account-menu": {
+      "owner": "apps/web/components/organisms/user-button/UserButton.tsx",
+      "publicImport": "@/components/organisms/user-button",
+      "exports": ["UserButton"],
+      "contracts": ["customer-operator-parity", "privacy-lock-disclosure"],
+      "duplicateConstructors": [
+        "OperatorSessionControls",
+        "OvieUserButton",
+        "OperatorUserButton"
+      ]
+    },
+    "sidebar-navigation": {
+      "owner": "apps/web/components/features/dashboard/dashboard-nav/NavMenuItem.tsx",
+      "publicImport": "@/features/dashboard/dashboard-nav/NavMenuItem",
+      "exports": ["NavMenuItem"],
+      "contracts": [
+        "customer-operator-parity",
+        "keyboard-focus",
+        "rail-motion"
+      ],
+      "duplicateConstructors": ["OperatorNavigationRow", "OvieNavigationRow"]
+    },
     "application-shell": {
       "owner": "apps/web/components/organisms/AppShellFrame.tsx",
       "publicImport": "@/components/canonical",
