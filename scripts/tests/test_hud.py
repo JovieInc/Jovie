@@ -156,6 +156,43 @@ class RenderTest(unittest.TestCase):
             for line in frame:
                 self.assertLessEqual(len(plain(line)), width, plain(line))
 
+    def test_multiline_provider_errors_do_not_scroll_header_off_console(self):
+        value = model()
+        value["github"]["promotion"] = {"error": "RuntimeError: quota read\ngh: budget-floor\rretry\tlater"}
+        frame = hud.render(value, 160, 45)
+        physical_rows = "\n".join(frame).splitlines()
+        self.assertEqual(len(physical_rows), 45)
+        self.assertIn("JOVIE · SYMPHONY", plain(physical_rows[0]))
+        self.assertIn("gh: budget-floor retry later", "\n".join(plain(row) for row in frame))
+
+    def test_unknown_capacity_is_not_colored_healthy(self):
+        value = model()
+        value["local"]["doctor"]["capacity"] = {
+            "schema": "jovie.capacity-horizon/v1", "incidents": [],
+            "topBlocker": "capacity source missing",
+            "leases": [{"alias": "current-login", "mode": "unknown", "freshness": {"status": "unknown"}}]}
+        row = next(row for row in hud.render(value, 160, 45) if "current-login ?" in row)
+        self.assertIn(hud.rgb(hud.ORANGE, "")[:-4] + "current-login ?", row)
+        self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4] + "current-login ?", row)
+
+    def test_dispatcher_slots_respect_zero_overrides_and_autoscaling(self):
+        now = hud.utcnow()
+        feed = {"at": now.isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 2, "base": 3}}}}
+        self.assertEqual(hud.dispatcher_slots(feed, {"devin": {}, "codex": {}}, now),
+                         ({"devin": 0, "codex": 2}, {"devin": 0, "codex": 3}))
+        for bad in (None, {}, {**feed, "at": "invalid"},
+                    {**feed, "at": (now - hud.timedelta(seconds=271)).isoformat()},
+                    {**feed, "at": (now + hud.timedelta(seconds=1)).isoformat()},
+                    {**feed, "observed": {"capacityByProvider": {"devin": {"slots": True, "base": 0}}}}):
+            with self.subTest(feed=bad):
+                self.assertIsNone(hud.dispatcher_slots(bad, {"devin": {}, "codex": {}}, now))
+        value = model()
+        value["local"]["slotEvidence"] = "unknown"
+        text = "\n".join(plain(row) for row in hud.render(value, 160, 45))
+        self.assertIn("running / unknown", text)
+        self.assertIn("codex 0/?", text)
+
     def test_running_and_vacant_slots_are_truthful(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
@@ -250,6 +287,17 @@ class RenderTest(unittest.TestCase):
         feed["at"] = "malformed"
         self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (doctor unread)")
 
+    def test_native_doctor_census_explains_real_admission_backpressure(self):
+        value = model()
+        feed = value["local"]["doctor"]
+        feed.update(at=hud.utcnow().isoformat(), observed={
+            "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 20},
+            "eligiblePoolByProvider": {"codex": 8}, "rejectedByProvider": {},
+            "newIssueBudgetByProvider": {"codex": {"used": 14, "cap": 6,
+                                                    "allowed": False, "reason": "over-budget"}}})
+        self.assertEqual(hud.pool_hint("codex", value["local"]),
+                         "new issues 0 · eligible 8/20 · PRs 14/6 over-budget")
+
     def test_new_issue_hint_separates_eligibility_budget_and_unknown(self):
         local = {"doctor": {"at": hud.utcnow().isoformat(), "admission": {
             "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 25},
@@ -288,6 +336,19 @@ class LedgerSchemaTest(unittest.TestCase):
                 row = {"runId": receipt.get("runId", "x"), "endedAt": receipt.pop("endedAt", stamp), **receipt}
                 handle.write(json.dumps(row) + "\n")
         return SimpleNamespace(state=state, slots=lambda _name, default: default, gate_slots=2)
+
+    def test_local_model_uses_dispatcher_overrides_instead_of_console_defaults(self):
+        host = self.host_with_ledger([])
+        feed = {"at": hud.utcnow().isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 3, "base": 3}}}}
+        (host.state / "doctor.json").write_text(json.dumps(feed))
+        with mock.patch.object(hud.lane, "load_providers", return_value={"devin": {"slots": 4}, "codex": {"slots": 3}}):
+            local = hud.local_model(host)
+        self.assertEqual(local["slots"], {"devin": 0, "codex": 3})
+        self.assertEqual(local["slotEvidence"], "fresh-dispatcher")
+        text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
+        self.assertIn("running / 3 (devin 0/0 · codex 0/3)", text)
+        self.assertNotIn("running / 7", text)
 
     def test_missing_and_null_verdicts_become_unclassified_not_a_crash(self):
         host = self.host_with_ledger([

@@ -1102,6 +1102,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'worktree_sweep',
     'service_census',
     'hyperagent_lane',
+    'devin_free_policy',
     'execution_attempt',
     'gh_app_token',
   ].flatMap(name => [
@@ -1163,6 +1164,9 @@ export function buildAffectedTestPlan(changedFiles, options) {
     !['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'].every(
       isFileAvailable
     );
+  const missingDevinFreeProof =
+    files.includes('scripts/lanes/devin_free_policy.py') &&
+    !isFileAvailable('scripts/tests/test_devin_free_policy.py');
   // Global/full early returns need the same command fields as focused plans.
   // Retain lane coverage even when an unrelated input requires the full suite.
   return {
@@ -1180,19 +1184,29 @@ export function buildAffectedTestPlan(changedFiles, options) {
       ? {
           lanePythonCoverage: true,
           mode:
-            unknownPythonPeer || missingMergeEvidenceProof
+            unknownPythonPeer ||
+            missingMergeEvidenceProof ||
+            missingDevinFreeProof
               ? 'full'
               : plan.mode === 'none'
                 ? 'selected'
                 : plan.mode,
-          ...(missingMergeEvidenceProof
-            ? { fallbackReason: 'merge evidence coverage proof is unavailable' }
-            : unknownPythonPeer
+          ...(missingDevinFreeProof
+            ? {
+                fallbackReason:
+                  'Devin Free expiry coverage proof is unavailable',
+              }
+            : missingMergeEvidenceProof
               ? {
                   fallbackReason:
-                    'unmapped Python peer mixed with lane coverage',
+                    'merge evidence coverage proof is unavailable',
                 }
-              : {}),
+              : unknownPythonPeer
+                ? {
+                    fallbackReason:
+                      'unmapped Python peer mixed with lane coverage',
+                  }
+                : {}),
         }
       : {}),
   };

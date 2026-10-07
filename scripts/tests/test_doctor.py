@@ -28,6 +28,13 @@ def load(name):
 
 doctor = load("doctor")
 
+# Capacity fixtures model an eligible lane; expiry has its own real guard suite.
+_devin_free_fixture = mock.patch('devin_free_policy.admission_open', return_value=True)
+def setUpModule():
+    _devin_free_fixture.start()
+def tearDownModule():
+    _devin_free_fixture.stop()
+
 
 def obs(**overrides):
     base = {"now": 1_000_000.0, "tick": {"at": "2026-09-26T21:00:00Z", "unhealthy": [], "error": None},
@@ -159,6 +166,20 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
         self.assertIn("codex-broken", doctor.judge(obs(codex={"error": "no codex", "accounts": {}, "available": []})))
         self.assertNotIn("hud-stale", doctor.judge(obs(hudExpected=False, hudBeatAge=None)))
+
+    def test_github_read_floor_is_one_global_alert_not_one_per_provider(self):
+        unavailable = {name: {"reason": "pr-inventory-unavailable", "error": "pr-read-failed"}
+                       for name in ("codex", "devin", "hyperagent")}
+        alerts = doctor.judge(obs(githubRemaining=doctor.GITHUB_MIN_REMAINING - 1,
+                                  newIssueBudgetByProvider=unavailable))
+        self.assertEqual(set(alerts), {"github-quota"})
+        self.assertIn(f"{doctor.GITHUB_MIN_REMAINING}-point floor", alerts["github-quota"])
+
+        # A failed read at or above the guard floor still needs provider-specific repair.
+        alerts = doctor.judge(obs(githubRemaining=doctor.GITHUB_MIN_REMAINING,
+                                  newIssueBudgetByProvider={"hyperagent": unavailable["hyperagent"]}))
+        self.assertIn("pr-inventory-unavailable:hyperagent", alerts)
+        self.assertNotIn("github-quota", alerts)
 
     def test_sustained_merge_queue_brake_files_only_after_one_interval(self):
         signal = {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6,

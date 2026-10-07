@@ -40,6 +40,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
 import lifecycle  # noqa: E402
+import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
@@ -91,7 +92,7 @@ CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
-              "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
+              "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
@@ -470,6 +471,8 @@ class Host:
     gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
 
     def base_slots(self, provider: str, default: int) -> int:
+        if provider == 'devin' and not devin_free_policy.admission_open(self.agent_timeout):
+            return 0
         return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
 
     def slots(self, provider: str, default: int) -> int:
@@ -1798,6 +1801,14 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     stopped run can never be published later (JOV-5060).
     """
     import signal
+    free_guard = devin_free_policy.command_guard(cmd, timeout)
+    if free_guard:
+        existing_guard = guard
+        def guard():
+            if existing_guard:
+                existing_guard()
+            free_guard()
+        guard_interval = min(guard_interval, 1)
     if guard:
         guard()
     env = {**os.environ, "npm_config_package_import_method": "hardlink"}
@@ -4430,19 +4441,24 @@ def shared(key: str, ttl: float, fetch):
     if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
         return fetch()
     path = SHARED_CACHE_DIR / f"{key}.json"
-    try:
-        cached = json.loads(path.read_text())
-        if time.time() - cached["at"] < ttl:
-            return cached["value"]
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    value = fetch()
-    if value is not None:
-        SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(f".{os.getpid()}.tmp")
-        tmp.write_text(json.dumps({"at": time.time(), "value": value}))
-        os.replace(tmp, path)
-    return value
+    SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # Independent idle workers can miss the same expired cache simultaneously.
+    # Serialize the fill, then re-read under the lock; shared storage alone did
+    # not prevent duplicate GraphQL censuses consuming the installation budget.
+    with open(path.with_suffix('.lock'), 'a+') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            cached = json.loads(path.read_text())
+            if 0 <= time.time() - cached["at"] < ttl:
+                return cached["value"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        value = fetch()
+        if value is not None:
+            tmp = path.with_suffix(f".{os.getpid()}.tmp")
+            tmp.write_text(json.dumps({"at": time.time(), "value": value}))
+            os.replace(tmp, path)
+        return value
 
 
 def open_prs_summary() -> list[dict]:
@@ -5554,6 +5570,13 @@ def guarded_main(argv: list[str] | None = None) -> int:
             return 127
         except RunStopped:
             return 143  # explicit stop also completes the existing drain protocol
+        except devin_free_policy.FreeProofHeld as error:
+            # This policy error is returned only after run_agent drained its owned
+            # tree (or refused Popen). A cleanup failure replaces the exception and
+            # still enters the cleanup-unproven lock hold below.
+            report_outcome({"returncode": 75, "policyHeld": str(error), "timeout": False})
+            print(f"devin-free-policy-held:{error}", file=sys.stderr, flush=True)
+            return 75
         except BaseException as error:
             # A cleanup error is not proof that the descendants stopped. Keep the
             # inherited locks and leave an observable operator boundary, not a retry.

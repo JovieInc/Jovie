@@ -36,9 +36,12 @@ SPEC.loader.exec_module(lane)
 # remains exercised by the explicit free_pct overrides and test_disk_guard.py;
 # these unit tests must neither depend on host capacity nor sweep host caches.
 _disk_capacity_fixture = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
+_devin_free_fixture = patch.object(lane.devin_free_policy, "admission_open", return_value=True)
 def setUpModule():
     _disk_capacity_fixture.start()
+    _devin_free_fixture.start()
 def tearDownModule():
+    _devin_free_fixture.stop()
     _disk_capacity_fixture.stop()
 
 
@@ -4175,6 +4178,28 @@ class FixRedTest(unittest.TestCase):
                 self.assertEqual(len(calls), 3, "expired value is re-read")
             finally:
                 lane.SHARED_CACHE_DIR, os.environ["LANES_EXECUTION_BACKEND"] = saved
+
+    def test_shared_cache_serializes_concurrent_expired_fills(self):
+        start = threading.Barrier(4)
+        calls = []
+        def fetch():
+            calls.append(1)
+            time.sleep(.05)
+            return [{"number": 1, "headRefOid": "exact-head"}]
+        def reader():
+            start.wait()
+            return lane.shared("open-prs", 60, fetch)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "SHARED_CACHE_DIR", Path(tmp)), patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "fixture"}):
+            (Path(tmp)/'open-prs.json').write_text(json.dumps({"at": time.time()-61, "value": [{"headRefOid": "stale"}]}))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                results = list(pool.map(lambda _: reader(), range(4)))
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(results, [[{"number": 1, "headRefOid": "exact-head"}]]*4)
+
+    def test_shared_cache_rejects_future_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "SHARED_CACHE_DIR", Path(tmp)), patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "fixture"}):
+            (Path(tmp)/'open-prs.json').write_text(json.dumps({"at": time.time()+60, "value": ['unverified-future']}))
+            self.assertEqual(lane.shared('open-prs', 60, lambda: ['fresh']), ['fresh'])
 
     def test_a_head_claimed_elsewhere_is_skipped_not_a_stop(self):
         first, second = {**self.pr(number=4), "headRefName": "devin/jov-4-20260925204809"}, \
