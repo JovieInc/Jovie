@@ -181,9 +181,13 @@ describe('lane coverage full fallback', () => {
     const command = buildSelectedTestCommands(plan, '1').find(
       ([binary, args]) =>
         binary === 'env' &&
+        Array.isArray(args) &&
         args.some(arg => arg.includes('coverage run --branch'))
     );
     expect(command).toBeDefined();
+    if (!command || !Array.isArray(command[1])) {
+      throw new Error('Expected an executable lane coverage command');
+    }
     expect(command[1].join(' ')).toContain(
       'scripts/tests/test_service_census.py'
     );
