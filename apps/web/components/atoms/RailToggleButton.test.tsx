@@ -50,7 +50,11 @@ describe('RailToggleButton', () => {
     expect(button).toHaveAttribute('data-icon-button-size', 'sm');
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    expect(button.className).toContain('aria-pressed:bg-interactive-active');
+    expect(button.className).not.toContain('aria-pressed:bg-');
+    expect(button).toHaveClass(
+      'bg-transparent',
+      'focus-visible:bg-transparent'
+    );
     expect(button.className).not.toContain('active:scale');
     expect(screen.getByTestId('left-icon')).toHaveAttribute(
       'aria-hidden',

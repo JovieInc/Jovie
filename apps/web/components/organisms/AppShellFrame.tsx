@@ -114,10 +114,8 @@ export const AppShellFrame = memo(function AppShellFrame({
               SHELL_RAIL_MAIN_PLANE
             )}
           >
-            {/* Main panel + audio dock share one column (JOV-6680): the dock
-                is exactly the main panel's width, and the right rail — an
-                in-flow sibling one elevation rung up (L3 over L1) — spans the
-                full column height so it stays above the dock. */}
+            {/* Main content and audio keep one stable width. The inspector
+                overlays within the route bounds and never allocates canvas. */}
             <div
               data-app-shell-main-column='true'
               className='flex min-h-0 min-w-0 flex-1 flex-col'
@@ -148,14 +146,12 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // the top row and route read as one clipped plane (JOV-7207).
                   // The route inset lives on the scroll wrapper below.
                   className={cn(
-                    'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+                    'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:shell-inspector-host',
                     SHELL_RAIL_MAIN_PLANE
                   )}
                 >
-                  {/* The chat wash belongs to the route plane, not the contextual
-                      inspector. Keeping the isolated paint layer in this column
-                      lets the in-flow rail narrow content without tinting its own
-                      raised surface. */}
+                  {/* The wash remains behind route content; the inspector keeps
+                      its own surface above this stable content plane. */}
                   {chatAmbientGradient ? (
                     <div
                       aria-hidden='true'
@@ -181,6 +177,9 @@ export const AppShellFrame = memo(function AppShellFrame({
                       {main}
                     </div>
                   </div>
+                  {rightPanel ? (
+                    <AppShellRightRail>{rightPanel}</AppShellRightRail>
+                  ) : null}
                 </div>
               </main>
               {/* The player is shell chrome, not content-card chrome. The dock
@@ -193,9 +192,6 @@ export const AppShellFrame = memo(function AppShellFrame({
                 </div>
               ) : null}
             </div>
-            {rightPanel ? (
-              <AppShellRightRail>{rightPanel}</AppShellRightRail>
-            ) : null}
           </div>
         </div>
       </div>

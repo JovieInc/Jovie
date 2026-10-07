@@ -6,7 +6,7 @@ import { railIconName } from '@/components/atoms/rail-icons';
 import { cn } from '@/lib/utils';
 
 export const RAIL_TOGGLE_BUTTON_CLASS =
-  'text-tertiary-token aria-pressed:bg-interactive-active aria-pressed:text-primary-token';
+  'bg-transparent text-tertiary-token aria-pressed:text-primary-token focus-visible:bg-transparent active:bg-transparent';
 
 interface RailToggleButtonProps {
   readonly side: 'left' | 'right';

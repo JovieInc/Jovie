@@ -87,7 +87,7 @@ describe('AppShellFrame', () => {
     expect(plane).toHaveClass('bg-(--app-shell-content-surface)');
   });
 
-  it('allocates the right rail beside the main column instead of overlaying it', () => {
+  it('contains the right overlay inside the main route without allocating a column', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -110,18 +110,15 @@ describe('AppShellFrame', () => {
     expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
     expect(mainPlane).toContainElement(main);
     expect(mainPlane).toContainElement(rightRail);
-    // The rail is a sibling of the main column (not clipped inside <main>) so
-    // it spans the full column height and stays above the audio dock — L3
-    // over L1 on the elevation ladder (JOV-6680).
-    expect(main).not.toContainElement(rightRail);
+    expect(main).toContainElement(rightRail);
     expect(main).toContainElement(routeContent as HTMLElement);
-    expect(rightRail.parentElement).toBe(mainPlane);
+    expect(rightRail.parentElement).toBe(routeContent);
     expect(routeContent?.parentElement).toBe(main);
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-rail')
     );
-    expect(rightRail).toHaveClass('lg:sticky', 'lg:top-0');
+    expect(rightRail).toHaveClass('shell-inspector-overlay');
     expect(mainPlane).toHaveClass(
       'transition-[flex-basis,width]',
       'duration-cinematic',
@@ -346,7 +343,7 @@ describe('AppShellFrame', () => {
     expect(tray).toHaveClass('shrink-0');
   });
 
-  it('keeps the right rail above the audio dock (rail spans full column height)', () => {
+  it('keeps the inspector within main while the audio dock retains the same column', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -361,16 +358,14 @@ describe('AppShellFrame', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
     const tray = screen.getByTestId('app-shell-audio-tray');
 
-    // The rail is a sibling of the main column — not clipped inside <main> —
-    // so it elevates above the dock while the dock matches panel width.
-    expect(main).not.toContainElement(rail);
+    expect(main).toContainElement(rail);
     expect(rail).not.toContainElement(tray);
     expect(tray.parentElement).toHaveAttribute(
       'data-app-shell-main-column',
       'true'
     );
     expect(rail.parentElement).toHaveAttribute(
-      'data-app-shell-main-plane',
+      'data-app-shell-main-content',
       'true'
     );
   });

@@ -1,9 +1,12 @@
 import '../../styles/system-b-app.css';
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import SettingsLayout from '@/app/app/(shell)/settings/layout';
+import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
+import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { AppShellFrame } from './AppShellFrame';
 import { Sidebar, SidebarProvider } from './sidebar';
 
@@ -86,4 +89,74 @@ export const SettingsHeaderAlignment: Story = {
       />
     </SidebarProvider>
   ),
+};
+
+function OverlayInspectorFixture() {
+  const [open, setOpen] = useState(false);
+  return (
+    <SidebarProvider defaultOpen={false}>
+      <AppShellFrame
+        containerClassName='h-dvh'
+        sidebar={<Sidebar collapsible='icon'>Navigation</Sidebar>}
+        header={
+          <div className='flex h-12 items-center justify-between px-3'>
+            <span>Work</span>
+            <RailToggleButton
+              side='right'
+              open={open}
+              openLabel='Collapse details'
+              closedLabel='Expand details'
+              controlsId='story-inspector'
+              onToggle={() => setOpen(value => !value)}
+            />
+          </div>
+        }
+        main={
+          <div
+            data-testid='story-route-scroll'
+            className='h-full overflow-auto'
+          >
+            <label className='block p-4'>
+              Notes
+              <textarea
+                className='block w-full'
+                defaultValue='Keep this draft'
+              />
+            </label>
+            <div className='h-[1600px] p-4'>Scrollable work content</div>
+          </div>
+        }
+        rightPanel={
+          <RightDrawer
+            id='story-inspector'
+            data-testid='story-inspector'
+            isOpen={open}
+            width={400}
+            ariaLabel='Work details'
+            onKeyDown={event => {
+              if (event.key === 'Escape') setOpen(false);
+            }}
+          >
+            <div className='h-full overflow-auto p-4'>
+              <Button type='button' onClick={() => setOpen(false)}>
+                Close details
+              </Button>
+              <label className='block py-4'>
+                Detail notes
+                <input
+                  className='block w-full'
+                  defaultValue='Inspector draft'
+                />
+              </label>
+              <p>Context stays inside the content panel, below its header.</p>
+            </div>
+          </RightDrawer>
+        }
+      />
+    </SidebarProvider>
+  );
+}
+
+export const OverlayInspector: Story = {
+  render: () => <OverlayInspectorFixture />,
 };
