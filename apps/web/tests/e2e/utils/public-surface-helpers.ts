@@ -590,8 +590,13 @@ async function runArtworkMenuInteraction(page: Page) {
 }
 
 export async function runDspInteraction(page: Page) {
+  // Generic platform links use link_ keys (toGenericPlatformLink), even when
+  // ActionDial renders them through the shared provider button. Audit music
+  // actions separately; unknown music keys must still fail the registry check.
+  const dspActionSelector =
+    '[data-dsp-provider]:not([data-dsp-provider^="link_"])';
   const visibleActions = page
-    .locator('[data-dsp-provider]')
+    .locator(dspActionSelector)
     .filter({ visible: true });
 
   const actionCount = await visibleActions.count();
@@ -728,12 +733,10 @@ export async function runDspInteraction(page: Page) {
   // than mistaking the initially selected Spotify action for the full fixture.
   const dials = page
     .getByTestId('action-dial')
-    .filter({ has: page.locator('[data-dsp-provider]') });
+    .filter({ has: page.locator(dspActionSelector) });
   for (let index = 0; index < (await dials.count()); index += 1) {
     const dial = dials.nth(index);
-    const action = dial
-      .locator('[data-dsp-provider]')
-      .filter({ visible: true });
+    const action = dial.locator(dspActionSelector).filter({ visible: true });
     const initialProvider = await action.getAttribute('data-dsp-provider');
     const visited = new Set<string | null>();
     while (true) {
