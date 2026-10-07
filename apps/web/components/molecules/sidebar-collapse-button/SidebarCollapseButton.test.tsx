@@ -1,33 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    children,
-    pressFeedback: _pressFeedback,
-    static: _static,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    readonly pressFeedback?: boolean;
-    readonly static?: boolean;
-  }) => <button {...props}>{children}</button>,
-  IconButton: ({
-    children,
-    variant,
-    size,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    readonly variant?: string;
-    readonly size?: string;
-  }) => (
-    <button
-      data-icon-button-variant={variant}
-      data-icon-button-size={size}
-      {...props}
-    >
-      {children}
-    </button>
-  ),
+vi.mock('@jovie/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/ui')>()),
   TooltipShortcut: ({ children }: { readonly children: React.ReactNode }) =>
     children,
 }));
@@ -47,8 +22,15 @@ describe('SidebarCollapseButton', () => {
 
     const button = screen.getByRole('button', { name: /collapse sidebar/i });
 
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
-    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
+    expect(button).toHaveClass(
+      'bg-transparent',
+      'rounded-full',
+      'h-7',
+      'w-7',
+      'before:h-11',
+      'before:w-11'
+    );
+    expect(button.className).not.toContain('aria-pressed:bg-');
     expect(button).toHaveAttribute('data-rail-toggle', 'left');
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(button.className).not.toMatch(/\bborder-(?:default|subtle|\[)/);
