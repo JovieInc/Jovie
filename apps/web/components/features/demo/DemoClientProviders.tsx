@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { ClerkSafeDefaultsProvider } from '@/hooks/useClerkSafe';
 
+// @coverage-via apps/web/components/features/demo/DemoAuthShell.test.tsx
 export function DemoClientProviders({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
