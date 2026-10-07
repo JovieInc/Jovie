@@ -27,7 +27,7 @@ export default async function ExpLayout({
 
   return (
     <QueryProvider>
-      <TooltipProvider delayDuration={400}>
+      <TooltipProvider>
         <div className='h-dvh w-dvw bg-(--linear-bg-page) text-primary-token'>
           {children}
         </div>

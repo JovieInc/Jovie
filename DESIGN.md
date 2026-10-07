@@ -310,3 +310,5 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 ## Decisions Log
 
 Read [the decisions log reference](docs/design-system/DETAILS.md#decisions-log) when changing this area.
+
+EVENT: tooltips share the canonical compact surface, viewport-safe full wrapping, and 300ms discovery/300ms warm-up timing. Default nested providers reuse the app timing scope; explicit isolated notices and fixtures retain their own timing. History titles use single-line ellipsis with reserved date/action tracks; tooltips preserve the full clean display title.

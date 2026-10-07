@@ -94,7 +94,7 @@ describe('getSeamSideOffset', () => {
 });
 
 describe('Tooltip (shell)', () => {
-  it('renders the label with a two-line clamp instead of nowrap clipping', () => {
+  it('preserves the full label without a line clamp', () => {
     render(
       <Tooltip
         label='Ask Jovie about my audience trends and engagement over the last quarter'
@@ -111,9 +111,13 @@ describe('Tooltip (shell)', () => {
 
     // Radix may duplicate content for accessibility — assert on the visible
     // label span inside the tooltip content.
-    const label = content.querySelector('span.line-clamp-2');
+    const label = content.querySelector('span.min-w-0');
     expect(label).not.toBeNull();
     expect(label?.textContent).toContain('Ask Jovie about my audience trends');
     expect(label?.className).toContain('break-words');
+    expect(label?.className).not.toContain('line-clamp');
+    expect(label?.textContent).toBe(
+      'Ask Jovie about my audience trends and engagement over the last quarter'
+    );
   });
 });

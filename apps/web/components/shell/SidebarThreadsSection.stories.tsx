@@ -58,3 +58,18 @@ export const NewChatEmpty: Story = {
     onNewThread: fn(),
   },
 };
+
+export const CalmLongTitles: Story = {
+  args: {
+    calm: true,
+    threads: threads.map((thread, index) => ({
+      ...thread,
+      title:
+        index === 0
+          ? 'Plan the full autumn release campaign with audience insights, touring updates, distribution timelines and every important detail preserved in the tooltip'
+          : thread.title,
+      unread: index === 1,
+    })),
+    onThreadContextMenu: fn(),
+  },
+};

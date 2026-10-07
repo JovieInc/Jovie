@@ -27,7 +27,7 @@ export function DemoClientProviders({
     <ClerkSafeDefaultsProvider>
       <QueryClientProvider client={queryClient}>
         <NuqsProvider>
-          <TooltipProvider delayDuration={1200}>{children}</TooltipProvider>
+          <TooltipProvider>{children}</TooltipProvider>
         </NuqsProvider>
       </QueryClientProvider>
     </ClerkSafeDefaultsProvider>

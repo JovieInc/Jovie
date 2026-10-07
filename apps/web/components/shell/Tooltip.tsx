@@ -7,6 +7,7 @@ import {
   Tooltip as TooltipRoot,
   TooltipTrigger,
 } from '@jovie/ui';
+import { OVERLAY_SIDE_OFFSET } from '@jovie/ui/lib/dropdown-styles';
 import {
   Children,
   cloneElement,
@@ -36,7 +37,7 @@ export interface TooltipProps {
   readonly defaultOpen?: boolean;
 }
 
-const DEFAULT_SIDE_OFFSET = 6;
+const DEFAULT_SIDE_OFFSET = OVERLAY_SIDE_OFFSET;
 
 // Gap between the seam boundary's right edge and the tooltip's left edge, so
 // every seam-aligned tooltip shares one consistent x just past the divider.
@@ -176,7 +177,7 @@ export function Tooltip({
     side === 'right' && seamOffset !== null ? seamOffset : DEFAULT_SIDE_OFFSET;
 
   return (
-    <TooltipProvider delayDuration={120} skipDelayDuration={40}>
+    <TooltipProvider>
       <TooltipRoot open={open} defaultOpen={defaultOpen}>
         <TooltipTrigger asChild>{triggerChild}</TooltipTrigger>
         <TooltipContent
@@ -184,12 +185,8 @@ export function Tooltip({
           contentVariant='rich'
           side={side}
           sideOffset={sideOffset}
-          style={{ zIndex: 'var(--jovie-shell-overlay-z-index)' }}
-          className='flex items-center gap-2'
         >
-          {/* Long labels (thread titles) wrap to at most two lines, then
-              ellipsize — never hard-clip mid-glyph. */}
-          <span className='line-clamp-2 min-w-0 break-words'>{label}</span>
+          <span className='min-w-0 break-words'>{label}</span>
           {shortcut ? (
             <Kbd variant='tooltip' className='shrink-0'>
               {shortcut.keys}
