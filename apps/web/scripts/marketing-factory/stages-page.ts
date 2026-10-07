@@ -698,6 +698,16 @@ async function publishStage(ctx: StageContext): Promise<StageResult> {
     (record as { status?: string }).status === 'shadow',
     'publish only writes shadow records until the ramp ships'
   );
+  if (checks.failed.length === 0) {
+    // A resumed publication may run after the public preview export was
+    // cleaned. Revalidate and restore the admitted bytes before writing URLs.
+    const mediaIssues = await materializeGeneratedFactoryMedia(ctx);
+    checks.check(
+      'publish-generated-media',
+      mediaIssues.length === 0,
+      mediaIssues.join('; ')
+    );
+  }
   return result(
     checks,
     { pageId: ctx.pageId, rampState: 'shadow', batchId: null },

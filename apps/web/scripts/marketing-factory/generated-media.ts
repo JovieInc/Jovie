@@ -63,15 +63,10 @@ export function generatedFactoryMedia(ctx: StageContext): {
         section => section.sectionInstanceId === ref.sectionInstanceId
       );
       // These are the existing SolutionsRecordBody adapters that mount the
-      // generated slot. Feature splits remain real product captures only.
+      // generated slot. Split heroes and features require real captures.
       if (
         !section ||
-        !(
-          section.sectionId === 'cta' ||
-          section.sectionId === 'feature-grid' ||
-          (section.sectionId === 'hero' &&
-            section.variantId === 'split-screenshot-right')
-        )
+        !(section.sectionId === 'cta' || section.sectionId === 'feature-grid')
       ) {
         throw new Error(
           'selected section variant cannot mount generated media'

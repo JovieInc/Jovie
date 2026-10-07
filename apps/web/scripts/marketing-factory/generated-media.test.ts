@@ -8,12 +8,13 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageRecordSchema } from '../../data/marketing/factory/pageRecord';
 import { sidecarPathFor } from '../marketing-media/provenance';
 import { loadFactoryBrief } from './brief';
+import * as generatedMedia from './generated-media';
 import {
   generatedFactoryMedia,
   materializeGeneratedFactoryMedia,
@@ -27,7 +28,20 @@ import { PAGE_STAGE_RUNNERS } from './stages-page';
 const { render: runRenderStage } = PAGE_STAGE_RUNNERS;
 
 const dirs: string[] = [];
+const realMaterialize = materializeGeneratedFactoryMedia;
+let fixturePublicDir: string;
+beforeEach(() => {
+  fixturePublicDir = mkdtempSync(join(tmpdir(), 'factory-generated-public-'));
+  dirs.push(fixturePublicDir);
+  vi.spyOn(
+    generatedMedia,
+    'materializeGeneratedFactoryMedia'
+  ).mockImplementation((ctx, publicDir) =>
+    realMaterialize(ctx, publicDir ?? fixturePublicDir)
+  );
+});
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const dir of dirs.splice(0))
     rmSync(dir, { recursive: true, force: true });
 });
@@ -86,7 +100,7 @@ describe('factory generated image carry', () => {
     expect(image?.id).toMatch(
       /^\/marketing\/factory\/generated\/[a-f0-9]{64}\.png$/u
     );
-    const file = join(import.meta.dirname, '../../public', image?.id ?? '');
+    const file = join(fixturePublicDir, image?.id ?? '');
     expect(existsSync(file)).toBe(true);
     expect(readFileSync(file)).toEqual(bytes);
   });
@@ -98,7 +112,7 @@ describe('factory generated image admission', () => {
   beforeEach(async () => {
     const runsDir = mkdtempSync(join(tmpdir(), 'factory-generated-admission-'));
     dirs.push(runsDir);
-    publicDir = mkdtempSync(join(tmpdir(), 'factory-generated-public-'));
+    publicDir = mkdtempSync(join(tmpdir(), 'factory-generated-export-'));
     dirs.push(publicDir);
     const bytes = await sharp({
       create: { width: 1600, height: 1000, channels: 3, background: '#191919' },
@@ -238,6 +252,56 @@ describe('factory generated image admission', () => {
     expect(generatedFactoryMedia(ctx).issues.join('; ')).toContain(
       'cannot mount generated media'
     );
+  });
+
+  it('refuses generated artwork in the capture-only split hero', () => {
+    const ref = artifactOf(ctx, 'ref-sourcing').refs.find(ref =>
+      ref.id.startsWith('generate:')
+    );
+    const hero = artifactOf(ctx, 'layout').sections.find(
+      section => section.sectionId === 'hero'
+    );
+    if (!ref || !hero) throw new Error('missing fixture reference or hero');
+    ref.sectionInstanceId = hero.sectionInstanceId;
+    hero.variantId = 'split-screenshot-right';
+    expect(generatedFactoryMedia(ctx).issues.join('; ')).toContain(
+      'cannot mount generated media'
+    );
+  });
+
+  async function resumePublication() {
+    return runFactory({
+      family: 'solutions',
+      slug: 'founders',
+      dry: true,
+      fromStage: 'publish',
+      runsDir: dirname(ctx.runDir),
+      brief: ctx.brief,
+      providers: ctx.providers,
+    });
+  }
+
+  it('restores a missing public image when resuming publication', async () => {
+    const media = generatedFactoryMedia(ctx).media['cta-1'];
+    if (!media) throw new Error('missing generated media');
+    const publicFile = join(fixturePublicDir, media.id);
+    rmSync(publicFile);
+    expect(await resumePublication()).toMatchObject({ status: 'complete' });
+    expect(readFileSync(publicFile)).toEqual(
+      readFileSync(join(ctx.runDir, generatedAsset().path))
+    );
+  });
+
+  it('refuses a replaced public image when resuming publication', async () => {
+    const media = generatedFactoryMedia(ctx).media['cta-1'];
+    if (!media) throw new Error('missing generated media');
+    const publicFile = join(fixturePublicDir, media.id);
+    writeFileSync(publicFile, 'replaced');
+    expect(await resumePublication()).toMatchObject({
+      status: 'failed',
+      stoppedAt: 'publish',
+    });
+    expect(readFileSync(publicFile, 'utf8')).toBe('replaced');
   });
 
   it('exports only the verified byte hash and refuses a replaced public asset', async () => {
