@@ -261,9 +261,11 @@ describe('RightDrawer', () => {
     );
 
     const mobileAside = screen.getByLabelText('Responsive drawer');
+    expect(mobileAside.parentElement).toBe(document.body);
     expect(mobileAside).toHaveClass(
       'fixed',
       'inset-0',
+      'z-sheet',
       'translate-x-full',
       'bg-(--app-shell-content-surface)',
       'outline-none',
@@ -663,7 +665,7 @@ describe('RightDrawer', () => {
     const first = screen.getByRole('button', { name: 'First action' });
     const last = screen.getByRole('button', { name: 'Last action' });
 
-    await waitFor(() => expect(background.inert).toBe(true));
+    await waitFor(() => expect(background.closest('[inert]')).not.toBeNull());
     expect(document.body.style.overflow).toBe('hidden');
 
     last.focus();
@@ -683,7 +685,7 @@ describe('RightDrawer', () => {
       </>
     );
 
-    await waitFor(() => expect(background.inert).toBeFalsy());
+    await waitFor(() => expect(background.closest('[inert]')).toBeNull());
     expect(document.body.style.overflow).toBe('');
   });
 

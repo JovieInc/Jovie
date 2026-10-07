@@ -28,6 +28,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const ChatAmbientGradient: Story = {
+  args: { chatAmbientGradient: true, containerClassName: 'h-dvh' },
+};
+
 export const WithInspector: Story = {
   args: {
     rightPanel: <aside className='h-full w-80 p-3'>Entity details</aside>,

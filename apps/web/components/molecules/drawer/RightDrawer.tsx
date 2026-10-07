@@ -5,6 +5,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_SHEET,
@@ -342,7 +343,10 @@ export function RightDrawer({
 
   // Mobile: full-screen overlay with slide-in-from-right animation
   if (isMobile) {
-    return (
+    // Escape the route's isolated stacking context so its header cannot paint
+    // above this modal. React context and the existing focus boundary survive
+    // the portal; dialogs opened from the sheet retain their higher layer.
+    return createPortal(
       <aside
         {...rest}
         ref={asideRef}
@@ -354,7 +358,7 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         data-rail-phase={railPhase}
         className={cn(
-          'fixed inset-0 z-50 flex flex-col',
+          'fixed inset-0 z-sheet flex flex-col',
           'overflow-hidden',
           'outline-none focus:outline-none focus-visible:ring-0',
           'border-l border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
@@ -368,7 +372,8 @@ export function RightDrawer({
         )}
       >
         {content}
-      </aside>
+      </aside>,
+      document.body
     );
   }
 

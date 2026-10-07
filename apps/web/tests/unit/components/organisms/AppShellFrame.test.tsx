@@ -282,21 +282,17 @@ describe('AppShellFrame', () => {
     const gradient = screen.getByTestId('chat-ambient-gradient');
     const header = screen.getByTestId('fixture-header');
 
-    // The gradient is a direct child of the route content column, spanning its
-    // full box (inset-0) — its top edge is the top of the panel, above the
-    // header band, not below it (#13386).
-    const routeContent = mainContent.querySelector(
-      '[data-app-shell-main-content]'
-    );
-    expect(gradient.parentElement).toBe(routeContent);
+    // Sharing the panel's positioning context keeps the wash behind both the
+    // header and route, even when the inspector is isolated below the header.
+    expect(gradient.parentElement).toBe(mainContent);
     expect(gradient).toHaveClass('absolute', 'inset-0', 'pointer-events-none');
     // Stacking guard: the wash is opaque, so it MUST paint beneath the
     // in-flow header — that requires a negative z-index inside an isolated
-    // isolated route column (an absolute z-auto sibling would paint on top of static
+    // panel (an absolute z-auto sibling would paint on top of static
     // content regardless of DOM order). jsdom can't compute stacking, so pin
     // the classes that make it correct.
     expect(gradient).toHaveClass('-z-10');
-    expect(routeContent).toHaveClass('isolate');
+    expect(mainContent).toHaveClass('isolate');
     expect(mainContent).toContainElement(header);
     expect(gradient.style.backgroundImage).toContain('radial-gradient');
   });

@@ -128,10 +128,19 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // frame, header, and content read as unrelated backgrounds.
                   // Founder lock 2026-09-25: one rounded, borderless, clipped
                   // panel — no border, soft elevation only.
-                  'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
+                  'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
                   'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
                 )}
               >
+                {/* The wash covers the full panel, including its header. */}
+                {chatAmbientGradient ? (
+                  <div
+                    aria-hidden='true'
+                    data-testid='chat-ambient-gradient'
+                    className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
+                    style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
+                  />
+                ) : null}
                 {header ? (
                   <div
                     data-app-shell-header='true'
@@ -150,16 +159,6 @@ export const AppShellFrame = memo(function AppShellFrame({
                     SHELL_RAIL_MAIN_PLANE
                   )}
                 >
-                  {/* The wash remains behind route content; the inspector keeps
-                      its own surface above this stable content plane. */}
-                  {chatAmbientGradient ? (
-                    <div
-                      aria-hidden='true'
-                      data-testid='chat-ambient-gradient'
-                      className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
-                      style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
-                    />
-                  ) : null}
                   <div
                     data-app-shell-content-inset='true'
                     className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'
