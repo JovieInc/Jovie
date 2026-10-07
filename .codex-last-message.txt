@@ -1,0 +1,9 @@
+PR [#17708](https://github.com/JovieInc/Jovie/pull/17708) was already remediated after the sweep:
+
+- Hold removed and native auto-merge enabled on October 2.
+- Merged at `2026-10-02 23:27 UTC` as `06956645ad79031f258c44194008c5fd06d63fd9`.
+- Hold rationale is documented in the PR body/comments.
+- Superseded child [#17709](https://github.com/JovieInc/Jovie/pull/17709) is closed.
+- No files changed; branch remains clean. No commit, push, tests, or draft PR were needed.
+
+NOT-SHIPPABLE: already fixed; PR #17708 merged and superseded child #17709 closed.
