@@ -8,7 +8,7 @@ export interface TypeBadgeProps {
 
 /**
  * TypeBadge — neutral 16px-tall pill for entity-type labels (release type,
- * track type, contact role). Renders the label uppercased with caption
+ * track type, contact role). Renders the label in Title Case with normal
  * tracking. The chip is decoration only; wrap it in a button or link if
  * the type is interactive.
  *
@@ -21,7 +21,7 @@ export function TypeBadge({ label, className }: TypeBadgeProps) {
   return (
     <span
       className={cn(
-        'shrink-0 inline-flex items-center h-4 px-1.5 rounded text-3xs font-medium uppercase tracking-[0.06em] border border-(--app-shell-border) text-tertiary-token bg-surface-1/40',
+        'shrink-0 inline-flex items-center h-4 px-1.5 rounded text-3xs font-medium capitalize tracking-normal border border-(--app-shell-border) text-tertiary-token bg-surface-1/40',
         className
       )}
     >
