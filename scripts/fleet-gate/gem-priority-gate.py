@@ -23,6 +23,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -860,15 +861,60 @@ def observe_lease(guard_bin: str) -> dict[str, Any]:
     }
 
 
+def observe_database(production_url: str) -> dict[str, str]:
+    """Observe public DB liveness on the configured production origin only.
+
+    Deploy liveness deliberately omits private dependency diagnostics. Never
+    infer database readiness from that aggregate response or carry diagnostics
+    into a fleet receipt. Uncertain DB evidence remains unknown.
+    """
+    def unknown(reason: str) -> dict[str, str]:
+        return {"status": "unknown", "detail": f"database health probe: {reason}"}
+
+    try:
+        origin = urllib.parse.urlsplit(production_url)
+        if (origin.scheme != "https" or not origin.hostname
+                or origin.username is not None or origin.password is not None
+                or origin.query or origin.fragment):
+            return unknown("untrusted production origin")
+        # Validate the port before constructing the credential-free same-origin URL.
+        origin.port
+        url = urllib.parse.urlunsplit((origin.scheme, origin.netloc, "/api/health/db", "", ""))
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
+                status, final_url = response.status, response.geturl()
+                value = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            status, final_url = error.code, error.geturl()
+            value = json.loads(error.read().decode("utf-8"))
+        if final_url != url:
+            return unknown("redirected away from the configured database endpoint")
+        if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
+            return unknown("malformed public liveness schema")
+        timestamp = value.get("timestamp")
+        if not isinstance(timestamp, str):
+            return unknown("missing observation timestamp")
+        observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if observed_at.tzinfo is None:
+            return unknown("timestamp has no timezone")
+        age = utc_now() - observed_at.astimezone(UTC)
+        if not timedelta(0) <= age <= timedelta(minutes=10):
+            return unknown("stale or future-dated observation")
+        if value["healthy"] is False and status in (200, 503):
+            return {"status": "red", "detail": "same-origin database health check failed"}
+        if value["healthy"] is True and status == 200:
+            return {"status": "green", "detail": "same-origin database health check passed"}
+        return unknown("unexpected HTTP status or contradictory liveness")
+    except (OSError, ValueError, OverflowError, urllib.error.URLError):
+        return unknown("transport or malformed response")
+
+
 def observe_production(url: str) -> dict[str, Any]:
     def dependencies(final_url: str, value: object) -> dict[str, Any]:
         alias_ok = (
             isinstance(value, dict)
             and final_url.rstrip("/") == url.rstrip("/")
         )
-        checks = value.get("checks") if isinstance(value, dict) else None
-        database = checks.get("database") if isinstance(checks, dict) else None
-        database_ok = database.get("ok") if isinstance(database, dict) else None
         return {
             "vercel-alias": {
                 "status": "green" if alias_ok else "red",
@@ -876,16 +922,7 @@ def observe_production(url: str) -> dict[str, Any]:
                 if alias_ok
                 else f"canonical alias redirected to {final_url}",
             },
-            "database": {
-                "status": "green"
-                if database_ok is True
-                else "red"
-                if database_ok is False
-                else "unknown",
-                "detail": database.get("error")
-                if isinstance(database, dict) and database.get("error")
-                else "deploy health database check",
-            },
+            "database": observe_database(url),
         }
 
     try:
