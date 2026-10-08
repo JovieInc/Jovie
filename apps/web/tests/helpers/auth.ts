@@ -147,7 +147,15 @@ async function enableTestAuthBypass(
 ): Promise<void> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
   const redirect = process.env.E2E_AUTH_REDIRECT ?? AUTH_READY_ROUTE;
-  const enterUrl = `${baseUrl}/api/dev/test-auth/enter?persona=${persona}&redirect=${redirect}`;
+  // session=better-auth mints a REAL Better Auth session cookie (not just
+  // the test-mode cookies). OnboardingSessionBoundary (JOV-7689) on /start
+  // cross-checks the browser's authClient identity against the
+  // server-resolved identityId; test-mode cookies alone leave the browser
+  // anonymous, the identities never match, and /start is stuck on its
+  // Try Again state — the shell-ready poll then times out (nightly +
+  // visual-regression lanes, Oct 8). performance-auth.ts already
+  // bootstraps this way.
+  const enterUrl = `${baseUrl}/api/dev/test-auth/enter?persona=${persona}&redirect=${redirect}&session=better-auth`;
 
   // Mint the session cookie through the request API instead of a browser
   // navigation: the enter route 303s into the app shell, so page.goto only
