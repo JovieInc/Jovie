@@ -1,0 +1,5 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T232937Z-JOV-5189-codex-brief-0b8d0f/.design-brief.md).
+
+Decision: retain Events as a stable destination and correct the stale §5.7 documentation. The brief references existing Pen node `NdEbB`.
+
+Validation passed: all steps complete, no missing or invalid IDs. No build, commit, push, or PR performed.
