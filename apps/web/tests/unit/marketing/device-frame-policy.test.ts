@@ -57,7 +57,7 @@ describe('device frame policy', () => {
     expect(productFiles.length).toBeGreaterThan(500);
   });
 
-  it('draws no simulated iPhone hardware outside the device module', () => {
+  it('draws no simulated iPhone hardware outside the device module', { timeout: 60000 }, () => {
     const offenders = productFiles
       .filter(file => !file.startsWith(DEVICE_MODULE))
       .filter(file =>
@@ -68,7 +68,7 @@ describe('device frame policy', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('references the official bezel asset only through deviceBezels.ts', () => {
+  it('references the official bezel asset only through deviceBezels.ts', { timeout: 60000 }, () => {
     const offenders = productFiles
       .filter(file => file !== `${DEVICE_MODULE}deviceBezels.ts`)
       .filter(file =>

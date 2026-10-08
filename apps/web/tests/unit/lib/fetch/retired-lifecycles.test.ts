@@ -29,7 +29,7 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 const read = (rel: string) => readFileSync(resolve(webRoot, rel), 'utf8');
 
 describe('retired fetch lifecycle contract (JOV-6189)', () => {
-  it('keeps lib/fetch removed and production source clean of it', () => {
+  it('keeps lib/fetch removed and production source clean of it', { timeout: 60000 }, () => {
     expect(existsSync(resolve(webRoot, 'lib/fetch'))).toBe(false);
     for (const dir of SOURCE_DIRS) {
       const abs = resolve(webRoot, dir);

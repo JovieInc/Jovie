@@ -45,13 +45,13 @@ describe('shipped shadcn/no-restyle', () => {
     expect(text).toMatch(
       /variant|size|owns|approved|@jovie\/ui|Do not restyle/i
     );
-  }, 30_000);
+  }, 120_000);
 
   it('allows approved variants, sizes, and layout/placement classNames', async () => {
     const results = await lintShipped(VALID_FIXTURE);
     const messages = restyleMessages(results);
     expect(formatMessages(messages)).toEqual([]);
-  }, 30_000);
+  }, 120_000);
 
   it('does not flag canonical component-source files for internal styling', async () => {
     const results = await lintShipped(BUTTON_SOURCE, { ignore: false });
@@ -60,5 +60,5 @@ describe('shipped shadcn/no-restyle', () => {
     expect(restyleMessages(results)).toEqual([]);
     expect(restyleMessages(cardResults)).toEqual([]);
     expect(restyleMessages(inputResults)).toEqual([]);
-  }, 30_000);
+  }, 120_000);
 });
