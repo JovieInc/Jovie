@@ -1765,7 +1765,12 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     assert "if: always()" in wake
     assert '[[ -s "$RECEIPT_FILE" ]]' in wake
     assert ".wakeSymphony == true" in wake
-    assert "--max-time 5" in wake
+    # JOV-8000: the Elixir :4041 refresh endpoint is retired. The wake is a
+    # recorded observation now — the lanes are event-driven and read the Todo
+    # pool on their own tick.
+    assert "--max-time 5" not in wake
+    assert "127.0.0.1:4041" not in wake
+    assert "lanes" in wake
     receipt = block.split("- name: Preserve Triage catch-up receipt", 1)[1]
     assert "if: always()" in receipt
     assert (
@@ -1807,9 +1812,11 @@ def test_symphony_wake_requires_verified_admitted_receipt() -> None:
     assert "github.event_name == 'repository_dispatch'" in block
     receipt_write = block.index('> "$RECEIPT_FILE"')
     wake_gate = block.index(".wakeSymphony == true")
-    wake_call = block.index("http://127.0.0.1:4041/api/v1/refresh")
-    assert receipt_write < wake_gate < wake_call
+    wake_note = block.index("lanes pick up the Todo transition")
+    assert receipt_write < wake_gate < wake_note
     assert "requiresImmediateInvestigation == true" in block
+    # JOV-8000: no workflow may wake the retired Elixir :4041 endpoint.
+    assert "127.0.0.1:4041" not in block
 
 
 def test_retired_admission_commands_stay_disabled() -> None:
