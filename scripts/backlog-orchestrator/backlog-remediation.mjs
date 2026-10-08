@@ -156,7 +156,11 @@ function isOpenPullRequest(pullRequest) {
 }
 
 function isConflictingPullRequest(pullRequest) {
-  return ['CONFLICTING', 'DIRTY', 'BEHIND'].includes(
+  // BEHIND is not a conflict: the base moved and a branch update resolves
+  // it automatically (the queue's update-branch / auto-rebase); counting it
+  // as a conflict mislabels an auto-fixable stale row as a hard merge
+  // conflict. CONFLICTING and DIRTY require human/model reconciliation.
+  return ['CONFLICTING', 'DIRTY'].includes(
     String(pullRequest?.mergeStateStatus || '').toUpperCase()
   );
 }

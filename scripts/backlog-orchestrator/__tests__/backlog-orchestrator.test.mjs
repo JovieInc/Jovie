@@ -1161,13 +1161,15 @@ describe('entrypoint contract', () => {
     );
   });
 
-  it('collects the pullRequests capacity evidence paginated with a 504 retry and fails closed with the cause named', async () => {
+  it('collects the pullRequests capacity evidence deduped, draft-free, with a 504 retry and fails closed with the cause named', async () => {
     // The PR inventory is the pullRequests capacity evidence (JOV-8000
-    // follow-up 7): the live residual failure was a GitHub GraphQL 504 on
-    // the single heavy open-PR query. The inventory drops statusCheckRollup
-    // (the error-rate signal survives via mergeStateStatus UNSTABLE), pages
-    // the open list into two 50-PR queries, retries transient 504/502 with
-    // a short backoff, and fails closed with the exact gh cause named.
+    // follow-up 8): the measured sample was biased — `gh pr list` has no
+    // page offset (two --limit 50 calls returned the same page, doubling
+    // rows: count 150 on an 84-PR repo), and 56 draft rows counted in the
+    // fleet's conflict/error rates. The inventory is one query per state
+    // (open --limit 100, merged --limit 50), deduped by number, and
+    // draft-free; a transient 504/502 retries with a short backoff; the
+    // fail-closed contract is unchanged with the exact gh cause named.
     const executableSource = await readFile(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
       'utf8'
@@ -1178,17 +1180,80 @@ describe('entrypoint contract', () => {
     // The rollup field is gone from the capacity inventory query;
     // mergeStateStatus carries the error signal.
     assert.doesNotMatch(executableSource, /statusCheckRollup',/);
-    assert.match(executableSource, /state === 'open' \? \[50, 50\] : \[50\]/);
+    assert.match(
+      executableSource,
+      /const limit = state === 'open' \? 100 : 50;/
+    );
 
     // Behavioral: a fake gh on PATH drives the exported collector through
-    // the pagination (two open pages + one merged page), a 504 retry, and
-    // the fail-closed non-gateway failure.
+    // the 504 retry, the dedup, and the draft exclusion.
     const tempDir = await mkdtemp('/tmp/backlog-gh-');
     const fakeBin = resolve(tempDir, 'bin');
     await mkdir(fakeBin, { recursive: true });
     const fakeGh = resolve(fakeBin, 'gh');
     const callsPath = resolve(tempDir, 'calls');
     const openAttemptsPath = resolve(tempDir, 'open-attempts');
+    const openPayload = JSON.stringify([
+      {
+        number: 1,
+        title: 'fix JOV-1',
+        body: 'JOV-1',
+        headRefName: 'symphony/JOV-1',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/1',
+        mergedAt: null,
+        isDraft: false,
+      },
+      // A duplicate number (paging overlap defense) and a draft row are
+      // dropped from the inventory.
+      {
+        number: 1,
+        title: 'fix JOV-1 (dup)',
+        body: 'JOV-1',
+        headRefName: 'symphony/JOV-1',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/1',
+        mergedAt: null,
+        isDraft: false,
+      },
+      {
+        number: 2,
+        title: 'draft JOV-2',
+        body: 'JOV-2',
+        headRefName: 'codex/JOV-2',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/2',
+        mergedAt: null,
+        isDraft: true,
+      },
+      {
+        number: 3,
+        title: 'fix JOV-3',
+        body: 'JOV-3',
+        headRefName: 'symphony/JOV-3',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/3',
+        mergedAt: null,
+        isDraft: false,
+      },
+    ]);
+    const mergedPayload = JSON.stringify([
+      {
+        number: 9,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
     await writeFile(
       fakeGh,
       [
@@ -1201,8 +1266,10 @@ describe('entrypoint contract', () => {
         '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)" >&2',
         '    exit 1',
         '  fi',
+        `printf '%s' '${openPayload.replace(/'/g, "'\\''")}'`,
+        'else',
+        `printf '%s' '${mergedPayload.replace(/'/g, "'\\''")}'`,
         'fi',
-        `printf '%s' '[{"number":1,"title":"fix JOV-1","body":"JOV-1","headRefName":"symphony/JOV-1","state":"OPEN","mergeStateStatus":"CLEAN","url":"https://example/pr/1","mergedAt":null,"isDraft":false}]'`,
       ].join('\n')
     );
     await chmod(fakeGh, 0o755);
@@ -1211,9 +1278,8 @@ describe('entrypoint contract', () => {
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
 
-    // Pagination + 504 retry: the first `--state open` call 504s once and
-    // its retry succeeds; the second open page runs (2 pages: one retried)
-    // plus one merged call — 4 logged gh calls, all paginated at 50.
+    // One query per state, the first open call 504s once and its retry
+    // succeeds; the inventory keeps one row per PR number, drafts excluded.
     await writeFile(callsPath, '');
     await writeFile(openAttemptsPath, '');
     const env = {
@@ -1222,17 +1288,16 @@ describe('entrypoint contract', () => {
       CALLS_PATH: callsPath,
       OPEN_ATTEMPTS_PATH: openAttemptsPath,
     };
-    const firstAttempt = await collectGitHubPullRequests(env);
-    assert.ok(Array.isArray(firstAttempt));
-    assert.equal(firstAttempt.length, 3);
+    const inventory = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(inventory));
+    const numbers = inventory.map(row => row.number).sort();
+    assert.deepEqual(numbers, [1, 3, 9]);
     const callLog = (await readFile(callsPath, 'utf8'))
       .trim()
       .split('\n')
       .filter(Boolean);
-    assert.equal(callLog.length, 4);
+    assert.equal(callLog.length, 3);
     assert.ok(callLog.every(call => call.includes('pr list')));
-    // The open pages use --limit 50 (pagination), not one --limit 100 query.
-    assert.equal(callLog.filter(call => call.includes('--limit 50')).length, 4);
 
     // Fail-closed path: a non-gateway failure does not burn the extra
     // retry; the collector names the cause with the exit code, signal, kill
@@ -1292,8 +1357,9 @@ describe('entrypoint contract', () => {
     };
     const inventory = await collectGitHubPullRequests(env);
     assert.ok(Array.isArray(inventory));
-    // Two open pages (2600 rows each) plus one merged page (2600 rows).
-    assert.equal(inventory.length, 7800);
+    // One open query plus one merged query, both 2600 unique rows; the
+    // dedup by number keeps one row per PR across the states.
+    assert.equal(inventory.length, 2600);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {
