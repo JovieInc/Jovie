@@ -337,11 +337,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
   if ('failed' in receipt) {
-    // Named rows, never an anonymous exit: an assessment-failure row fails
-    // the step (it names the exact issue that needs repair), while an
-    // urgent-investigation row is surfaced as a warning — the receipt and
-    // the preserved artifact carry it, a catch-up sweep must not go red on
-    // work the fleet already escalates.
+    // Named rows, never an anonymous exit: the exit rule is unchanged
+    // (failed > 0 || blocked > 0), but every failing or blocked row is now
+    // annotated with its issue identifier so a red step names its rows.
     for (const result of receipt.results ?? []) {
       if (result.disposition === 'assessment-failed')
         console.error(
@@ -352,6 +350,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
           `::warning title=Urgent Triage investigation required::${result.issue}: ${result.reason || result.disposition}`
         );
     }
-    if (receipt.failed > 0) process.exitCode = 1;
+    if (receipt.failed > 0 || receipt.blocked > 0) process.exitCode = 1;
   }
 }
