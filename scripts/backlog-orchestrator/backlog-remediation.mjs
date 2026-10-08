@@ -159,9 +159,14 @@ function isConflictingPullRequest(pullRequest) {
   // BEHIND is not a conflict: the base moved and a branch update resolves
   // it automatically (the queue's update-branch / auto-rebase); counting it
   // as a conflict mislabels an auto-fixable stale row as a hard merge
-  // conflict. CONFLICTING and DIRTY require human/model reconciliation.
-  return ['CONFLICTING', 'DIRTY'].includes(
-    String(pullRequest?.mergeStateStatus || '').toUpperCase()
+  // conflict. A conflict is `mergeable === 'CONFLICTING'` (gh computes
+  // MERGEABLE/CONFLICTING/UNKNOWN) OR `mergeStateStatus === 'DIRTY'` — both
+  // require human/model reconciliation.
+  return (
+    String(pullRequest?.mergeable ?? '').toUpperCase() === 'CONFLICTING' ||
+    ['CONFLICTING', 'DIRTY'].includes(
+      String(pullRequest?.mergeStateStatus || '').toUpperCase()
+    )
   );
 }
 
@@ -219,8 +224,17 @@ export function inventoryBacklog(
     unique.set(id, issue);
   }
   const prs = Array.isArray(pullRequests) ? pullRequests : [];
-  const byIssue = new Map();
+  // Defense in depth (JOV-8000 follow-up 10): one entry per PR number even
+  // if duplicate rows reach this function — an issue's PR count must never
+  // double or split from a duplicated row.
+  const byNumber = new Map();
   for (const pullRequest of prs) {
+    if (!Number.isInteger(pullRequest?.number)) continue;
+    if (!byNumber.has(pullRequest.number))
+      byNumber.set(pullRequest.number, pullRequest);
+  }
+  const byIssue = new Map();
+  for (const pullRequest of byNumber.values()) {
     for (const id of pullRequestIssueIds(pullRequest)) {
       const list = byIssue.get(id) || [];
       list.push(pullRequest);
@@ -648,6 +662,12 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
   const ci = signals?.ci;
   const mergeQueue = signals?.mergeQueue;
   const rates = pullRequestRates(signals?.pullRequests || []);
+  // The error gate needs each population row's check-rollup state
+  // (JOV-8000 follow-up 10): a missing rollup fetch is NEVER zero errored —
+  // the orchestrator fetches the population's rollups separately and passes
+  // prRollups:false when that fetch failed, failing the gate closed with
+  // the named cause instead of silently passing the error gate.
+  const prRollups = signals?.prRollups !== false;
   const required =
     signals?.schema === CAPACITY_SCHEMA &&
     freshTimestamp(signals?.observedAt, nowMs, CAPACITY_MAX_AGE_MS) &&
@@ -696,15 +716,17 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
               ? 'ci-saturating'
               : rates.conflictRate > HIGH_CONFLICT_RATE
                 ? 'pr-conflict-rate-high'
-                : rates.errorRate > HIGH_ERROR_RATE
-                  ? 'pr-error-rate-high'
-                  : rates.unknownRate > 0.2
-                    ? 'pr-mergeability-unknown'
-                    : mergeQueue.health === 'blocked'
-                      ? 'merge-queue-blocked'
-                      : remaining === 0
-                        ? 'workers-saturated'
-                        : null;
+                : !prRollups
+                  ? 'pr-check-rollup-unavailable'
+                  : rates.errorRate > HIGH_ERROR_RATE
+                    ? 'pr-error-rate-high'
+                    : rates.unknownRate > 0.2
+                      ? 'pr-mergeability-unknown'
+                      : mergeQueue.health === 'blocked'
+                        ? 'merge-queue-blocked'
+                        : remaining === 0
+                          ? 'workers-saturated'
+                          : null;
   if (hardStopReason) {
     return {
       allowed: false,
