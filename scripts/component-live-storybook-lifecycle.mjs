@@ -63,12 +63,12 @@ export function storybookBuildResourceDisposition(sample) {
 
 export function storybookHostMemory({
   platform = process.platform,
-  read = readFileSync,
+  read = path => readFileSync(path, 'utf8'),
   free = freemem,
   total = totalmem,
 } = {}) {
   if (platform === 'linux') {
-    const memory = read('/proc/meminfo', 'utf8');
+    const memory = read('/proc/meminfo');
     const total = memory.match(/^MemTotal:\s+(\d+) kB$/m);
     const available = memory.match(/^MemAvailable:\s+(\d+) kB$/m);
     if (!total || !available)
@@ -81,6 +81,7 @@ export function storybookHostMemory({
   return { totalBytes: total(), availableBytes: free() };
 }
 
+/** @param {() => {totalBytes?: number, availableBytes?: number}} memory */
 export function requireStorybookBuildMemory(memory = storybookHostMemory) {
   const sample = { ...memory(), rssBytes: 0 };
   const disposition = storybookBuildResourceDisposition(sample);
@@ -94,6 +95,12 @@ export function requireStorybookBuildMemory(memory = storybookHostMemory) {
     );
 }
 
+/**
+ * The census seam needs only these measured fields, not the complete native
+ * spawn result. Missing stdout remains an actionable measurement failure.
+ * @param {number} pid
+ * @param {{snapshot?: (command: string, args: string[], options: import('node:child_process').SpawnSyncOptionsWithStringEncoding) => {status: number | null, error?: Error, stdout?: string}, memory?: () => {totalBytes: number, availableBytes: number}}} options
+ */
 export function readStorybookBuildResources(
   pid,
   { snapshot = spawnSync, memory = storybookHostMemory } = {}
@@ -119,7 +126,7 @@ export function readStorybookBuildResources(
       maxBuffer: 16 * 1024 * 1024,
     }
   );
-  if (result.error || result.status !== 0)
+  if (result.error || result.status !== 0 || typeof result.stdout !== 'string')
     throw new Error('owned build memory census unavailable');
   const rows = result.stdout
     .split('\n')
@@ -150,7 +157,10 @@ export function readStorybookBuildResources(
   };
 }
 
-/** Existing detached-child ownership and timeout remain authoritative. */
+/**
+ * Existing detached-child ownership and timeout remain authoritative.
+ * @param {{pid: number, exitCode: number | null, signalCode: string | null, once: (event: string, listener: () => void) => unknown}} child
+ */
 export function watchStorybookBuildResources(
   child,
   onFailure,
