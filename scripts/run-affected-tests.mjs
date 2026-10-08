@@ -1102,6 +1102,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'worktree_sweep',
     'service_census',
     'hyperagent_lane',
+    'codex_lane',
     'devin_free_policy',
     'execution_attempt',
     'gh_app_token',
@@ -1139,6 +1140,13 @@ const DEPENDENCY_GATE_QUALIFICATION_MANIFEST = new Set([
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/codex_lane.py',
+  'scripts/tests/test_codex_lane.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1167,6 +1175,9 @@ export function buildAffectedTestPlan(changedFiles, options) {
   const missingDevinFreeProof =
     files.includes('scripts/lanes/devin_free_policy.py') &&
     !isFileAvailable('scripts/tests/test_devin_free_policy.py');
+  const missingCodexCapacityProof =
+    files.includes('scripts/lanes/codex_lane.py') &&
+    !isFileAvailable('scripts/tests/test_codex_lane.py');
   // Global/full early returns need the same command fields as focused plans.
   // Retain lane coverage even when an unrelated input requires the full suite.
   return {
@@ -1186,27 +1197,33 @@ export function buildAffectedTestPlan(changedFiles, options) {
           mode:
             unknownPythonPeer ||
             missingMergeEvidenceProof ||
-            missingDevinFreeProof
+            missingDevinFreeProof ||
+            missingCodexCapacityProof
               ? 'full'
               : plan.mode === 'none'
                 ? 'selected'
                 : plan.mode,
-          ...(missingDevinFreeProof
+          ...(missingCodexCapacityProof
             ? {
                 fallbackReason:
-                  'Devin Free expiry coverage proof is unavailable',
+                  'Codex subscription capacity coverage proof is unavailable',
               }
-            : missingMergeEvidenceProof
+            : missingDevinFreeProof
               ? {
                   fallbackReason:
-                    'merge evidence coverage proof is unavailable',
+                    'Devin Free expiry coverage proof is unavailable',
                 }
-              : unknownPythonPeer
+              : missingMergeEvidenceProof
                 ? {
                     fallbackReason:
-                      'unmapped Python peer mixed with lane coverage',
+                      'merge evidence coverage proof is unavailable',
                   }
-                : {}),
+                : unknownPythonPeer
+                  ? {
+                      fallbackReason:
+                        'unmapped Python peer mixed with lane coverage',
+                    }
+                  : {}),
         }
       : {}),
   };
@@ -1224,6 +1241,29 @@ function planAffectedTests(
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (
+    files.length === CODEX_CAPACITY_QUALIFICATION_MANIFEST.size &&
+    files.every(file => CODEX_CAPACITY_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...CODEX_CAPACITY_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'Codex subscription capacity qualification proof is unavailable'
+      );
+    }
+    // The reviewed source and selector closure retains the entire structural
+    // Python runner and both CI plumbing suites, including every coverage floor.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
   }
   if (
     files.length === DEPENDENCY_GATE_QUALIFICATION_MANIFEST.size &&
