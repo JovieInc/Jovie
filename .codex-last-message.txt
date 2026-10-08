@@ -1,0 +1,8 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T023443Z-JOV-5885-codex-brief-63b372/.design-brief.md).
+
+Validation:
+
+- Design gate: complete, no missing steps or invalid capabilities
+- Canonical homepage Pen artifact: `node oPZHQ`
+- Design-gate tests: 32 passed
+- No build, commit, push, or PR performed
