@@ -1,0 +1,18 @@
+Implemented and opened [draft PR #20677](https://github.com/JovieInc/Jovie/pull/20677) against `main`.
+
+- Docked activity/What’s New into the sidebar ambient stack.
+- Reduced the OV mark to 16px.
+- Moved registry filters into the single shell header row.
+- Unified DrawerSection heading/body insets.
+- Added six 1440×900 before/after screenshots.
+- Added regression coverage.
+
+Verification:
+
+- 149 focused tests passed.
+- Web typecheck, Biome, ESLint, accessibility, and desktop dogfood checks passed.
+- Static coverage audited all registered OV routes.
+- Commit: `71b2749a64820ef2cdfe3323141e568317f00112`
+- Branch is pushed and clean.
+
+Limitations are documented in the PR: authenticated route rendering lacked database/Doppler credentials, and packaged-Mac verification requires a macOS runner. The PR remains draft and unmerged as requested.
