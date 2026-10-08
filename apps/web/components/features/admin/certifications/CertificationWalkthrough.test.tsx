@@ -102,6 +102,23 @@ describe('CertificationWalkthrough', () => {
     expect(screen.getByRole('button', { name: 'Certify' })).toBeDisabled();
   });
 
+  it('opens loaded image proof at full size without submitting a decision', () => {
+    const { onDecide } = renderWalkthrough();
+    expect(
+      screen.queryByRole('link', { name: 'Open Full-Size Proof' })
+    ).toBeNull();
+    fireEvent.load(screen.getByTestId('walkthrough-image'));
+    const link = screen.getByRole('link', { name: 'Open Full-Size Proof' });
+    expect(link).toHaveAttribute('href', 'https://example.test/screenshot.png');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
+    expect(onDecide).not.toHaveBeenCalled();
+    fireEvent.error(screen.getByTestId('walkthrough-image'));
+    expect(
+      screen.queryByRole('link', { name: 'Open Full-Size Proof' })
+    ).toBeNull();
+  });
+
   it('captures dictation as anchored segments and ends the review', () => {
     renderWalkthrough();
 

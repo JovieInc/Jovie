@@ -288,6 +288,17 @@ export function CertificationWalkthrough({
                   </div>
                 )}
               </div>
+              {artifact?.kind === 'image' &&
+              artifact.href &&
+              mediaState === 'ready' ? (
+                <div className='flex justify-center border-t border-(--app-shell-frame-seam) py-2'>
+                  <Button asChild size='sm' variant='ghost'>
+                    <a href={artifact.href} target='_blank' rel='noreferrer'>
+                      Open Full-Size Proof
+                    </a>
+                  </Button>
+                </div>
+              ) : null}
               {artifact?.kind === 'video' ? (
                 <div
                   className='flex items-center justify-center gap-1 border-t border-white/10 py-1.5'
