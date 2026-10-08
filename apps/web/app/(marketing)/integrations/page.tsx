@@ -22,7 +22,7 @@ export default function IntegrationsDirectoryPage() {
   return (
     <MarketingContainer width='page' className='py-12 sm:py-16'>
       <header className='mb-8 max-w-prose-canonical space-y-3'>
-        <h1 className='text-3xl font-semibold tracking-tight text-primary'>
+        <h1 className='truncate text-3xl font-semibold tracking-tight text-primary'>
           Integrations
         </h1>
         <p className='text-secondary'>
@@ -46,7 +46,7 @@ export default function IntegrationsDirectoryPage() {
           >
             <h2
               id={`integration-${integration.id}`}
-              className='text-lg font-medium text-primary'
+              className='truncate text-lg font-medium text-primary'
             >
               {integration.label}
             </h2>

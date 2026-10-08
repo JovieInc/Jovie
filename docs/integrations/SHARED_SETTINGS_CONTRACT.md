@@ -62,9 +62,6 @@ this document does not certify those capabilities.
 
 ## Decision receipt
 
-Ship now: shared manifest and Settings truth/recovery behavior, generated public
-projection, and a thin authorized operator wrapper.
-Re-evaluate when: a provider/platform capability or account ownership boundary
-changes, or an operation lacks verified availability.
-Then: update the existing manifest/adapter and its behavior tests before exposing
-or advertising the operation. Broad epics require their own runtime receipts.
+- Ship now: shared manifest, Settings recovery, static public projection and operator entry.
+- Re-evaluate when: provider/platform capabilities, account ownership or availability changes.
+- Then: update the manifest/adapter and behavior tests before exposing operations. Broad epics need their own runtime receipts.
