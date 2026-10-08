@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -87,15 +87,48 @@ vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
   resolveTurnstileSiteKey: () => null,
 }));
 
-const claimState = vi.hoisted(() => ({ value: 'error', trigger: 0 }));
+const claimState = vi.hoisted(() => ({
+  value: 'error',
+  trigger: 0,
+  enabled: true,
+}));
 vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
-  useOnboardingClaim: (trigger: number) => {
+  useOnboardingClaim: (trigger: number, enabled: boolean) => {
     claimState.trigger = trigger;
+    claimState.enabled = enabled;
     return claimState.value;
   },
 }));
 
 describe('OnboardingShell status', () => {
+  it('keeps explicit restart/logout visible and prevents them during a pending turn', () => {
+    const restart = vi.fn();
+    const logout = vi.fn();
+    const { rerender } = render(
+      <OnboardingShell
+        sessionLabel='pending'
+        isSignedIn
+        onRestart={restart}
+        onLogout={logout}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Start Over' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log Out' }));
+    expect(restart).toHaveBeenCalledOnce();
+    expect(logout).toHaveBeenCalledOnce();
+    rerender(
+      <OnboardingShell
+        sessionLabel='pending'
+        isSignedIn
+        onRestart={restart}
+        onLogout={logout}
+        controlsDisabled
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Start Over' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Log Out' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+  });
   beforeEach(() => {
     claimState.value = 'error';
     claimState.trigger = 0;
@@ -236,6 +269,23 @@ describe('OnboardingShell status', () => {
     act(() => chatProps.current?.onConversationActivity());
     expect(claimState.trigger).toBe(1);
     expect(screen.getByRole('link', { name: 'Sign in' })).toBeVisible();
+  });
+
+  it('restores owned history without redirecting and retries the existing claim after a genuine turn', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='saved'
+        isSignedIn
+        resumeOwnedConversation
+      />
+    );
+    expect(claimState.trigger).toBe(0);
+    expect(claimState.enabled).toBe(false);
+
+    act(() => chatProps.current?.onConversationActivity());
+
+    expect(claimState.trigger).toBe(1);
+    expect(claimState.enabled).toBe(true);
   });
 
   it('clears a rejected challenge token and keeps a fresh verification action available', () => {
