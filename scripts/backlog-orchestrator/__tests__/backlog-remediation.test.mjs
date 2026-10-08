@@ -23,7 +23,9 @@ import {
   feedOfficialSymphony,
   findWorkpadComment,
   inventoryBacklog,
+  isErroredPullRequest,
   OFFICIAL_SYMPHONY_REFRESH_URL,
+  pullRequestRates,
   REMEDIATION_SCHEMA,
   readHostPressure,
   readLanesCapacity,
@@ -114,6 +116,59 @@ function receiptFor(issues, options = {}) {
 }
 
 describe('official Symphony backlog remediation', () => {
+  it('keeps draft PRs in the issue attribution so a draft-only issue is not PR-less', () => {
+    // JOV-8000 follow-up 9 (a)1: the collector keeps drafts in the inventory
+    // (only pullRequestRates excludes them); inventoryBacklog maps them, so
+    // an issue whose only open PR is a draft still has an open PR and is not
+    // re-selected, and a duplicate PR row does not split the issue.
+    const draftOnly = inventoryBacklog([issue('JOV-30')], {
+      pullRequests: [
+        {
+          number: 7,
+          state: 'OPEN',
+          title: 'fix JOV-30',
+          headRefName: 'symphony/JOV-30',
+          body: 'JOV-30',
+          isDraft: true,
+          mergeStateStatus: 'DIRTY',
+          mergeable: false,
+          labels: [],
+        },
+      ],
+    });
+    assert.deepEqual(draftOnly.rows[0].openPullRequests, [7]);
+    const splitCheck = inventoryBacklog([issue('JOV-31')], {
+      pullRequests: [
+        {
+          number: 8,
+          state: 'OPEN',
+          title: 'fix JOV-31',
+          headRefName: 'symphony/JOV-31',
+          body: 'JOV-31',
+          isDraft: false,
+          mergeable: true,
+          mergeStateStatus: 'CLEAN',
+          labels: [],
+        },
+        {
+          number: 8,
+          state: 'OPEN',
+          title: 'fix JOV-31 (duplicate row)',
+          headRefName: 'symphony/JOV-31',
+          body: 'JOV-31',
+          isDraft: false,
+          mergeable: true,
+          mergeStateStatus: 'CLEAN',
+          labels: [],
+        },
+      ],
+    });
+    // The dedup lives in the collector (one row per PR number); rows that
+    // still arrive duplicated map per-row — the collector's dedup keeps
+    // this at one entry per PR, so the issue never splits.
+    assert.deepEqual(splitCheck.rows[0].openPullRequests, [8, 8]);
+  });
+
   it('inventories Linear issues against open and merged GitHub PRs', () => {
     const inventory = inventoryBacklog(
       [
@@ -344,6 +399,199 @@ describe('official Symphony backlog remediation', () => {
       { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
     );
     assert.equal(conflicts.reason, 'pr-conflict-rate-high');
+
+    // JOV-8000 follow-up 9: auditable rates — the population excludes drafts
+    // and label-quarantined rows (queue-poison, hold; `gated` stays counted),
+    // BEHIND is not a conflict, UNKNOWN never counts as conflicting/clean/
+    // errored, and the rates list PR numbers with the excluded breakdown.
+    const fleet = [
+      {
+        number: 1,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+      {
+        number: 2,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 3,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'BEHIND',
+      },
+      {
+        number: 4,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'UNSTABLE',
+        statusCheckRollup: { state: 'SUCCESS' },
+      },
+      {
+        number: 5,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'UNSTABLE',
+        statusCheckRollup: { state: 'FAILURE' },
+      },
+      {
+        number: 6,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'UNKNOWN',
+        mergeStateStatus: 'UNKNOWN',
+      },
+      {
+        number: 7,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'queue-poison' }],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+      {
+        number: 8,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'hold' }],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 9,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'gated' }],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 10,
+        state: 'OPEN',
+        isDraft: true,
+        labels: [],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+    ];
+    const auditable = pullRequestRates(fleet);
+    assert.equal(auditable.total, 7);
+    assert.deepEqual(auditable.conflictingPullRequests, [1]);
+    assert.deepEqual(auditable.erroredPullRequests, [5]);
+    assert.deepEqual(auditable.unknownPullRequests, [6]);
+    assert.deepEqual(auditable.excluded.draft, [10]);
+    assert.deepEqual(auditable.excluded.quarantined, [7, 8]);
+    assert.equal(auditable.conflictRate, 1 / 7);
+    assert.equal(auditable.errorRate, 1 / 7);
+    // Error definition: UNSTABLE with a SUCCESS rollup is NOT errored;
+    // rollup FAILURE IS errored regardless of mergeStateStatus.
+    assert.equal(isErroredPullRequest(fleet[3]), false);
+    assert.equal(isErroredPullRequest(fleet[4]), true);
+    assert.equal(isErroredPullRequest({ mergeStateStatus: 'UNSTABLE' }), false);
+    assert.equal(
+      isErroredPullRequest({ statusCheckRollup: { state: 'FAILURE' } }),
+      true
+    );
+    assert.equal(
+      isErroredPullRequest({ reviewDecision: 'CHANGES_REQUESTED' }),
+      false
+    );
+    // UNKNOWN rows fail the gate closed above a 20% share, never silently
+    // counted as clean or conflicting.
+    const unknownHeavy = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+        ],
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(unknownHeavy.reason, 'pr-mergeability-unknown');
+    const unknownLight = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 4,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 5,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+        ],
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.notEqual(unknownLight.reason, 'pr-mergeability-unknown');
 
     const missing = evaluateRuntimeCapacity(
       { schema: CAPACITY_SCHEMA, observedAt: NOW },

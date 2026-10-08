@@ -1326,7 +1326,7 @@ const GH_TRANSIENT_GATEWAY = /HTTP 50[24]/;
 
 async function ghPullRequestList(state, limit, env) {
   const fields =
-    'number,title,body,headRefName,state,mergeStateStatus,url,mergedAt,isDraft';
+    'number,title,body,headRefName,state,mergeStateStatus,mergeable,labels,url,mergedAt,isDraft';
   const args = [
     'pr',
     'list',
@@ -1402,19 +1402,50 @@ export async function collectGitHubPullRequests(env = process.env) {
       error: failed.flatMap(list => list?.error ?? 'unknown').join('|'),
     };
   }
-  // The PR inventory is one row per PR: dedupe by number (defense against
-  // any future paging overlap) and drop drafts — a draft is not a merge
-  // candidate, so counting 56 draft rows in a 100-PR sample inflated the
-  // fleet's conflict/error rates (0.26/0.22) and closed capacity on rows
-  // that can never merge.
+  // The PR inventory is one row per PR number, drafts INCLUDED: the
+  // inventory feeds both the capacity rates (which exclude drafts and
+  // label-quarantined rows inside pullRequestRates) and the issue→PR
+  // attribution (which must see draft PRs too — an issue whose only open
+  // PR is a draft still has that PR and must not be re-selected).
   const byNumber = new Map();
+  let duplicatesDropped = 0;
+  let openUnique = 0;
   for (const row of lists.flat()) {
     const record = /** @type {Record<string, any>} */ (row ?? {});
-    if (record.isDraft === true) continue;
     if (!Number.isInteger(record.number)) continue;
-    if (!byNumber.has(record.number)) byNumber.set(record.number, record);
+    if (byNumber.has(record.number)) {
+      duplicatesDropped += 1;
+      continue;
+    }
+    byNumber.set(record.number, record);
+    if (String(record.state || '').toUpperCase() === 'OPEN') openUnique += 1;
   }
-  return [...byNumber.values()];
+  const inventory = [...byNumber.values()];
+  // Fail closed on silent truncation: `gh pr list` has no page offset, so
+  // one --limit N call can silently miss PRs beyond the first N. When the
+  // open page is full (returned exactly the limit), the inventory did not
+  // prove completeness — report it instead of guessing.
+  const openLimit = 100;
+  const openRows = inventory.filter(
+    row => String(row.state || '').toUpperCase() === 'OPEN'
+  ).length;
+  const truncated = openRows >= openLimit;
+  if (truncated) {
+    return {
+      error: `gh-pr-list-open:page-limit-reached:${openRows} open rows at --limit ${openLimit}; the inventory cannot prove completeness — fail closed`,
+      count: inventory.length,
+      openUnique,
+      duplicatesDropped,
+      truncated: true,
+    };
+  }
+  return {
+    pullRequests: inventory,
+    count: inventory.length,
+    openUnique,
+    duplicatesDropped,
+    truncated: false,
+  };
 }
 
 async function measureCloneLatencyMs() {
@@ -1463,7 +1494,54 @@ async function runRemediate(isDryRun) {
     linear.fetchTeamActiveIssues(team.id),
   ]);
   const issues = uniqueIssuesByIdentifier([...intake, ...active]);
-  const pullRequests = await collectGitHubPullRequests();
+  // The collector returns either a full inventory receipt
+  // ({pullRequests, count, openUnique, duplicatesDropped, truncated:false})
+  // or a failed-closed receipt ({error, truncated?, ...}) — never a bare
+  // array and never a silent truncation.
+  const pullRequestsReceipt = await collectGitHubPullRequests();
+  const pullRequests = Array.isArray(
+    /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})?.pullRequests
+  )
+    ? /** @type {Record<string, any>} */ (pullRequestsReceipt).pullRequests
+    : null;
+  // Mergeability re-poll (JOV-8000 follow-up 9): gh sometimes reports UNKNOWN
+  // mergeability for rows it has not computed yet. Re-poll each unknown row
+  // once (`gh pr view --json mergeable,mergeStateStatus` — a light single-PR
+  // query); a row still UNKNOWN after the re-poll stays unknown and the gate
+  // fails closed on the unknown share (pr-mergeability-unknown) instead of
+  // guessing it clean or conflicting.
+  if (Array.isArray(pullRequests)) {
+    const unknown = backlogRemediation
+      .pullRequestRates(pullRequests)
+      .unknownPullRequests.filter(number => Number.isInteger(number));
+    for (const number of unknown) {
+      try {
+        const { stdout } = await execFileAsync(
+          'gh',
+          [
+            'pr',
+            'view',
+            String(number),
+            '--repo',
+            'JovieInc/Jovie',
+            '--json',
+            'mergeable,mergeStateStatus',
+          ],
+          { timeout: 20_000, maxBuffer: 1024 * 1024, env: process.env }
+        );
+        const detail = /** @type {Record<string, any>} */ (JSON.parse(stdout));
+        const row = pullRequests.find(item => item?.number === number);
+        if (row) {
+          if (detail.mergeable !== undefined) row.mergeable = detail.mergeable;
+          if (detail.mergeStateStatus !== undefined)
+            row.mergeStateStatus = detail.mergeStateStatus;
+        }
+      } catch {
+        // A failed re-poll leaves the row unknown — the gate fails closed on
+        // the unknown share rather than treating the row as measured.
+      }
+    }
+  }
   const cloneLatencyMs = await measureCloneLatencyMs();
   const fleetGate = await fleetGateForTeam(team);
   const rawReceipt = loadFleetGateReceipt(team);
@@ -1532,15 +1610,35 @@ async function runRemediate(isDryRun) {
     workpad: undefined,
     workpadBody: receipt.workpad,
     // The pullRequests capacity evidence keeps failing closed inside the
-    // capacity verdict; the exact gh failure is surfaced here so a
-    // capacity-evidence gap names its producer. Access stays property-safe
-    // across the collector's return shapes (array, {error}, or null).
+    // capacity verdict; the exact gh failure and the inventory audit
+    // numbers are surfaced here so a capacity-evidence gap names its
+    // producer. Access stays property-safe across the collector's return
+    // shapes.
     pullRequestsEvidence: Array.isArray(pullRequests)
-      ? { count: pullRequests.length, error: null }
+      ? {
+          count:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.count ?? pullRequests.length,
+          openUnique:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.openUnique ?? null,
+          duplicatesDropped:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.duplicatesDropped ?? null,
+          truncated: false,
+          error: null,
+        }
       : {
-          count: null,
+          count:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.count ?? null,
+          truncated: Boolean(
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.truncated
+          ),
           error: String(
-            /** @type {Record<string, any>} */ (pullRequests ?? {})?.error ??
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.error ??
               (pullRequests === null
                 ? 'gh-pr-list:unparseable-output'
                 : 'gh-pr-list:unknown-failure')

@@ -1161,15 +1161,15 @@ describe('entrypoint contract', () => {
     );
   });
 
-  it('collects the pullRequests capacity evidence deduped, draft-free, with a 504 retry and fails closed with the cause named', async () => {
+  it('collects the pullRequests capacity evidence deduped with drafts kept for attribution, a 504 retry, and fails closed with the cause named', async () => {
     // The PR inventory is the pullRequests capacity evidence (JOV-8000
-    // follow-up 8): the measured sample was biased — `gh pr list` has no
-    // page offset (two --limit 50 calls returned the same page, doubling
-    // rows: count 150 on an 84-PR repo), and 56 draft rows counted in the
-    // fleet's conflict/error rates. The inventory is one query per state
-    // (open --limit 100, merged --limit 50), deduped by number, and
-    // draft-free; a transient 504/502 retries with a short backoff; the
-    // fail-closed contract is unchanged with the exact gh cause named.
+    // follow-up 9): one query per state (open --limit 100, merged --limit
+    // 50), deduped by number with drafts INCLUDED (the issue->PR
+    // attribution must see draft PRs; the capacity rates exclude drafts
+    // inside pullRequestRates). A full open page fails closed with a named
+    // cause instead of silently truncating; a transient 504/502 retries
+    // with a short backoff; any other failure fails closed with the exact
+    // gh cause named.
     const executableSource = await readFile(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
       'utf8'
@@ -1177,13 +1177,14 @@ describe('entrypoint contract', () => {
     assert.match(executableSource, /timeout: 45_000/);
     assert.match(executableSource, /HTTP 50\[24\]/);
     assert.match(executableSource, /gh-pr-list-\$\{state\}:/);
-    // The rollup field is gone from the capacity inventory query;
-    // mergeStateStatus carries the error signal.
+    // The rollup contexts are gone from the capacity inventory query;
+    // mergeable + labels + mergeStateStatus carry the signals.
     assert.doesNotMatch(executableSource, /statusCheckRollup',/);
     assert.match(
       executableSource,
       /const limit = state === 'open' \? 100 : 50;/
     );
+    assert.match(executableSource, /mergeable,labels/);
 
     // Behavioral: a fake gh on PATH drives the exported collector through
     // the 504 retry, the dedup, and the draft exclusion.
@@ -1279,7 +1280,8 @@ describe('entrypoint contract', () => {
     );
 
     // One query per state, the first open call 504s once and its retry
-    // succeeds; the inventory keeps one row per PR number, drafts excluded.
+    // succeeds; the receipt keeps one row per PR number (draft INCLUDED for
+    // attribution — the rates exclude it), and reports the audit numbers.
     await writeFile(callsPath, '');
     await writeFile(openAttemptsPath, '');
     const env = {
@@ -1288,10 +1290,16 @@ describe('entrypoint contract', () => {
       CALLS_PATH: callsPath,
       OPEN_ATTEMPTS_PATH: openAttemptsPath,
     };
-    const inventory = await collectGitHubPullRequests(env);
-    assert.ok(Array.isArray(inventory));
-    const numbers = inventory.map(row => row.number).sort();
-    assert.deepEqual(numbers, [1, 3, 9]);
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    assert.equal(receipt.truncated, false);
+    assert.equal(receipt.duplicatesDropped, 1);
+    assert.equal(receipt.openUnique, 3);
+    assert.equal(receipt.count, 4);
+    const numbers = receipt.pullRequests.map(row => row.number).sort();
+    assert.deepEqual(numbers, [1, 2, 3, 9]);
+    const draftRow = receipt.pullRequests.find(row => row.number === 2);
+    assert.equal(draftRow.isDraft, true);
     const callLog = (await readFile(callsPath, 'utf8'))
       .trim()
       .split('\n')
@@ -1309,7 +1317,7 @@ describe('entrypoint contract', () => {
     await chmod(fakeGh, 0o755);
     await writeFile(callsPath, '');
     const failed = await collectGitHubPullRequests(env);
-    assert.equal(Array.isArray(failed), false);
+    assert.equal(Array.isArray(failed?.pullRequests), false);
     assert.match(String(failed?.error), /gh-pr-list-(open|merged):/);
     assert.match(String(failed?.error), /exit=1/);
     assert.match(String(failed?.error), /signal=none/);
@@ -1326,13 +1334,13 @@ describe('entrypoint contract', () => {
     const fakeBin = resolve(tempDir, 'bin');
     await mkdir(fakeBin, { recursive: true });
     const fakeGh = resolve(fakeBin, 'gh');
-    const filler = 'x'.repeat(1024);
-    const rows = Array.from({ length: 2600 }, (_, i) => ({
+    const filler = 'x'.repeat(24 * 1024);
+    const rows = Array.from({ length: 90 }, (_, i) => ({
       number: i + 1,
       title: 'fix JOV-1',
       body: filler,
       headRefName: `symphony/JOV-1-${i}`,
-      state: 'OPEN',
+      state: i % 2 === 0 ? 'OPEN' : 'MERGED',
       mergeStateStatus: 'CLEAN',
       url: 'https://example/pr/1',
       mergedAt: null,
@@ -1355,11 +1363,14 @@ describe('entrypoint contract', () => {
       ...process.env,
       PATH: `${fakeBin}:${process.env.PATH}`,
     };
-    const inventory = await collectGitHubPullRequests(env);
-    assert.ok(Array.isArray(inventory));
-    // One open query plus one merged query, both 2600 unique rows; the
-    // dedup by number keeps one row per PR across the states.
-    assert.equal(inventory.length, 2600);
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    // 90 rows (~24KB bodies each ≈ 2.2MB payload) parse past the 1MB
+    // default; open rows stay under the page limit so the receipt is
+    // complete, not truncated.
+    assert.equal(receipt.pullRequests.length, 90);
+    assert.ok(receipt.openUnique < 100);
+    assert.equal(receipt.truncated, false);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {

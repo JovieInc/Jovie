@@ -165,18 +165,49 @@ function isConflictingPullRequest(pullRequest) {
   );
 }
 
-function isErroredPullRequest(pullRequest) {
-  const rollup = pullRequest?.statusCheckRollup;
-  const status = String(
-    typeof rollup === 'string'
-      ? rollup
-      : rollup?.state || pullRequest?.reviewDecision || ''
-  ).toUpperCase();
-  return (
-    status === 'FAILURE' ||
-    status === 'ERROR' ||
-    pullRequest?.mergeStateStatus === 'UNSTABLE'
+/**
+ * Error rate definition (Symphony Owner decision, JOV-8000 follow-up 9):
+ * a PR is errored when its check-rollup STATE is FAILURE or ERROR — a
+ * failing required check on its head. mergeStateStatus UNSTABLE alone is
+ * NOT that (UNSTABLE means a non-required check failed; a failing
+ * REQUIRED check shows BLOCKED), so the rollup state is the signal and
+ * UNSTABLE without a FAILURE/ERROR rollup does not count. The dead
+ * reviewDecision fallback is removed.
+ */
+export function isErroredPullRequest(pullRequest) {
+  const rollup = /** @type {Record<string, any>} */ (
+    pullRequest?.statusCheckRollup
   );
+  const status = String(rollup?.state ?? '').toUpperCase();
+  return status === 'FAILURE' || status === 'ERROR';
+}
+
+/**
+ * Mergeability is unknown when gh reported UNKNOWN for either signal:
+ * never counted as conflicting, clean, or errored — re-polled once by the
+ * caller and failing the gate closed above a 20% unknown share.
+ */
+export function mergeabilityUnknown(pullRequest) {
+  const mergeable = String(pullRequest?.mergeable ?? '').toUpperCase();
+  const mergeStateStatus = String(
+    pullRequest?.mergeStateStatus ?? ''
+  ).toUpperCase();
+  return mergeable === 'UNKNOWN' || mergeStateStatus === 'UNKNOWN';
+}
+
+const RATE_EXCLUDED_LABELS = new Set(['queue-poison', 'hold']);
+
+function rateExcludedByLabel(pullRequest) {
+  // `gated` stays COUNTED: the repo defines it as "Force manual production
+  // promotion (bypass fast lane)" — a promotion mode, not a parked row.
+  const labels = (pullRequest?.labels ?? []).map(label =>
+    String(
+      typeof label === 'string'
+        ? label
+        : /** @type {any} */ ((label)?.name ?? '')
+    ).toLowerCase()
+  );
+  return labels.some(name => RATE_EXCLUDED_LABELS.has(name));
 }
 
 export function inventoryBacklog(
@@ -506,19 +537,51 @@ function hostPressureClass(host) {
   return 'normal';
 }
 
-function pullRequestRates(pullRequests) {
+/**
+ * The capacity-rate population (JOV-8000 follow-up 9): open rows, deduped by
+ * number upstream, excluding drafts and label-quarantined rows
+ * (queue-poison, hold) — an intentionally parked PR is not fleet pressure.
+ * Returns the auditable rates: PR-number lists for conflicting/errored/
+ * unknown and the excluded breakdown so the receipt can be checked against
+ * the live fleet. Unknown rows are never counted as conflicting, clean, or
+ * errored; the caller re-polls them once and fails the gate closed above a
+ * 20% unknown share.
+ */
+export function pullRequestRates(pullRequests) {
   const open = (Array.isArray(pullRequests) ? pullRequests : []).filter(
     isOpenPullRequest
   );
-  const total = open.length;
-  const conflicting = open.filter(isConflictingPullRequest).length;
-  const errored = open.filter(isErroredPullRequest).length;
+  const population = open.filter(
+    row => row?.isDraft !== true && !rateExcludedByLabel(row)
+  );
+  const excludedDraft = open
+    .filter(row => row?.isDraft === true)
+    .map(row => row?.number);
+  const excludedQuarantined = open
+    .filter(row => row?.isDraft !== true && rateExcludedByLabel(row))
+    .map(row => row?.number);
+  const conflictingPullRequests = population
+    .filter(isConflictingPullRequest)
+    .map(row => row?.number);
+  const erroredPullRequests = population
+    .filter(isErroredPullRequest)
+    .map(row => row?.number);
+  const unknownPullRequests = population
+    .filter(mergeabilityUnknown)
+    .map(row => row?.number);
+  const total = population.length;
   return {
     total,
-    conflicting,
-    errored,
-    conflictRate: total === 0 ? 0 : conflicting / total,
-    errorRate: total === 0 ? 0 : errored / total,
+    conflicting: conflictingPullRequests.length,
+    errored: erroredPullRequests.length,
+    unknown: unknownPullRequests.length,
+    conflictRate: total === 0 ? 0 : conflictingPullRequests.length / total,
+    errorRate: total === 0 ? 0 : erroredPullRequests.length / total,
+    unknownRate: total === 0 ? 0 : unknownPullRequests.length / total,
+    conflictingPullRequests,
+    erroredPullRequests,
+    unknownPullRequests,
+    excluded: { draft: excludedDraft, quarantined: excludedQuarantined },
   };
 }
 
@@ -637,11 +700,13 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
                 ? 'pr-conflict-rate-high'
                 : rates.errorRate > HIGH_ERROR_RATE
                   ? 'pr-error-rate-high'
-                  : mergeQueue.health === 'blocked'
-                    ? 'merge-queue-blocked'
-                    : remaining === 0
-                      ? 'workers-saturated'
-                      : null;
+                  : rates.unknownRate > 0.2
+                    ? 'pr-mergeability-unknown'
+                    : mergeQueue.health === 'blocked'
+                      ? 'merge-queue-blocked'
+                      : remaining === 0
+                        ? 'workers-saturated'
+                        : null;
   if (hardStopReason) {
     return {
       allowed: false,
