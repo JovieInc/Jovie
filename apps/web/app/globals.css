@@ -110,8 +110,14 @@ body {
 }
 
 html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 40px;
-  --electron-controls-width: 200px;
+  --electron-titlebar-height: env(titlebar-area-height, 44px);
+  /* Native reserve + shell inset (8), cell padding (20), brand (38),
+     toggle (28), history controls (50), and three gaps (18). Reserve the
+     full hit targets so collapsing never squeezes a control into the title. */
+  --electron-controls-width: calc(
+    var(--electron-traffic-light-safe-width) +
+    162px
+  );
   --electron-traffic-light-safe-width: env(titlebar-area-x, 72px);
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;

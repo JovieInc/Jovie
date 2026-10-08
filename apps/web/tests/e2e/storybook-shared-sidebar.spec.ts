@@ -13,6 +13,71 @@ interface ScaleFlowWindow {
 }
 
 for (const operator of [false, true]) {
+  test(`Electron collapsed ${operator ? 'Ovie' : 'Jovie'} titlebar clears native controls`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 600 });
+    await page.addInitScript(() => {
+      // Layout-only bridge fixture. Actual Electron overlay bounds are covered
+      // separately; this CI regression exercises the real shell and stylesheet.
+      Object.assign(window, { electronAPI: { platform: 'darwin' } });
+      document.addEventListener('DOMContentLoaded', () => {
+        document.documentElement.dataset.desktopRuntime = 'electron';
+      });
+    });
+    await page.goto(story(operator), { waitUntil: 'domcontentloaded' });
+    const toggle = page.getByTestId('electron-sidebar-toggle');
+    await expect(toggle).toBeVisible();
+    const titlebar = page.getByTestId('electron-titlebar-row');
+    const header = page.locator('[data-app-shell-header="true"]');
+    const heading = header.getByRole('heading').first();
+    const navigation = page.getByTestId('electron-nav-pill');
+
+    // 72px is the compatibility fallback;100px was measured in Electron44.5.1.
+    // A larger native reserve must also preserve reachability after resize.
+    for (const nativeReserve of [100, 72, 120]) {
+      await page.evaluate(reserve => {
+        document.documentElement.style.setProperty(
+          '--electron-traffic-light-safe-width',
+          `${reserve}px`
+        );
+      }, nativeReserve);
+      const pinnedToggle = await toggle.boundingBox();
+      const pinnedHeader = await header.boundingBox();
+      await toggle.click();
+      await expect(page.locator('#shell-left-rail')).toHaveAttribute(
+        'data-rail-phase',
+        'closed'
+      );
+      const collapsedHeader = await header.boundingBox();
+      const collapsedToggle = await toggle.boundingBox();
+      const pageTitle = await heading.boundingBox();
+      const controls = await navigation.boundingBox();
+      expect(pageTitle!.x).toBeGreaterThanOrEqual(
+        controls!.x + controls!.width
+      );
+      expect(collapsedToggle).toEqual(pinnedToggle);
+      expect(collapsedHeader!.y).toBe(pinnedHeader!.y);
+      expect((await titlebar.boundingBox())!.height).toBe(44);
+      expect(collapsedHeader!.height).toBe(44);
+      await toggle.press('Enter');
+      await expect(page.locator('#shell-left-rail')).toHaveAttribute(
+        'data-rail-preview',
+        'true'
+      );
+      expect(await header.boundingBox()).toEqual(collapsedHeader);
+      await page.keyboard.press('Escape');
+      await expect(toggle).toBeFocused();
+      await toggle.press('Enter');
+      await page
+        .getByRole('button', { name: 'Pin Sidebar', exact: true })
+        .click();
+      await expect(toggle).toHaveAccessibleName('Collapse sidebar');
+    }
+  });
+}
+
+for (const operator of [false, true]) {
   test(`shared ${operator ? 'Ovie' : 'Jovie'} rail keeps vertical geometry and exclusive controls`, async ({
     page,
   }, info) => {

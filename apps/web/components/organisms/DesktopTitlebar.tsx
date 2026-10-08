@@ -195,6 +195,7 @@ export function DesktopTitlebar({
             onToggle={() => toggleSidebar?.()}
             disabled={!toggleSidebar}
             shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
+            className='shrink-0'
             dataTestId='electron-sidebar-toggle'
             iconTestId='electron-sidebar-toggle-icon'
           />

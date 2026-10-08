@@ -1504,7 +1504,10 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
-  assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
+  assert.match(
+    globalsCss,
+    /--electron-titlebar-height: env\(titlebar-area-height, 44px\);/
+  );
   assert.match(
     globalsCss,
     /--electron-traffic-light-safe-width: env\(titlebar-area-x, 72px\);/
@@ -1522,8 +1525,11 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     globalsCss,
     /grid-template-columns: var\(--electron-sidebar-width\)/
   );
-  // The overlay reserves a fixed control-row width for native window controls.
-  assert.match(globalsCss, /--electron-controls-width: 200px;/);
+  // The control row includes the measured native reserve and full hit targets.
+  assert.match(
+    globalsCss,
+    /--electron-controls-width: calc\(\s*var\(--electron-traffic-light-safe-width\) \+\s*162px\s*\);/
+  );
   assert.doesNotMatch(
     globalsCss,
     /grid-template-columns: var\(--linear-app-sidebar-width\)/
@@ -1552,7 +1558,9 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     mainSource.match(/const MACOS_TRAFFIC_LIGHT_Y = (\d+);/)?.[1]
   );
   const titlebarHeight = Number(
-    globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
+    globalsCss.match(
+      /--electron-titlebar-height: env\(titlebar-area-height, (\d+)px\);/
+    )?.[1]
   );
   const safeWidth = Number(
     globalsCss.match(
