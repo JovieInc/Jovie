@@ -1272,10 +1272,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     });
 
     const photo = within(screen.getByRole('table')).getByRole('img', {
-      name: /Unverified preview for Tim White on 7digital/i,
+      name: /No profile photo for Tim White on 7digital/i,
     });
     expect(photo).toHaveAttribute('data-photo-kind', 'generic');
     expect(photo).toHaveAttribute('data-photo-verified', 'false');
+    expect(photo.querySelector('img')).toBeNull();
 
     const lock = screen.getAllByTestId('presence-lock')[0];
     lock?.focus();
