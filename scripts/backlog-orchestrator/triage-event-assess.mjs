@@ -33,34 +33,50 @@ function triageSnapshot(issue) {
 /**
  * One Summer-attested provider-blocked escalation on the assessment receipt
  * (an upstream lane refusing its model capacity/cost binding, e.g. the Gem
- * reason lane's `reason-lane-model-capacity-cost-binding-unverified`). The
- * sweep still names and counts these rows, but a row that Summer already
- * escalated to a blocked provider does not need this workflow's red to stay
- * visible — the escalation itself is the tracked signal. Returns null when
- * the receipt carries no such escalation.
+ * reason lane's `reason-lane-model-capacity-cost-binding-unverified`).
+ * Summer has carried the escalation at more than one depth — top-level on
+ * the receipt, inside the Jev assessment, and as a list — so every known
+ * location is scanned with the same strict shape check (status exactly
+ * 'provider-block', code matching ^[a-z0-9-]{4,128}$). The sweep still names
+ * and counts these rows, but a row that Summer already escalated to a
+ * blocked provider does not need this workflow's red to stay visible — the
+ * escalation itself is the tracked signal. Returns null when the receipt
+ * carries no such escalation anywhere.
  */
 export function escalationBlockOf(summerReceipt) {
-  const escalation = /** @type {Record<string, any>} */ (
-    summerReceipt?.escalation
+  const candidates = [];
+  const receipt = /** @type {Record<string, any>} */ (summerReceipt ?? {});
+  candidates.push(receipt.escalation);
+  if (Array.isArray(receipt.escalations))
+    candidates.push(...receipt.escalations);
+  const assessment = /** @type {Record<string, any>} */ (
+    receipt.assessment ?? {}
   );
-  if (
-    !escalation ||
-    typeof escalation !== 'object' ||
-    String(escalation.status) !== 'provider-block'
-  ) {
-    return null;
+  candidates.push(assessment.escalation);
+  if (Array.isArray(assessment.escalations))
+    candidates.push(...assessment.escalations);
+  for (const candidate of candidates) {
+    const escalation = /** @type {Record<string, any>} */ (candidate ?? {});
+    if (
+      !candidate ||
+      typeof candidate !== 'object' ||
+      String(escalation.status) !== 'provider-block'
+    ) {
+      continue;
+    }
+    const code = String(escalation.code ?? 'provider-block-unspecified');
+    if (!/^[a-z0-9-]{4,128}$/.test(code)) continue;
+    return {
+      status: 'provider-block',
+      code,
+      owner: typeof escalation.owner === 'string' ? escalation.owner : null,
+      requestedModel:
+        typeof escalation.requestedModel === 'string'
+          ? escalation.requestedModel
+          : null,
+    };
   }
-  const code = String(escalation.code ?? 'provider-block-unspecified');
-  if (!/^[a-z0-9-]{4,128}$/.test(code)) return null;
-  return {
-    status: 'provider-block',
-    code,
-    owner: typeof escalation.owner === 'string' ? escalation.owner : null,
-    requestedModel:
-      typeof escalation.requestedModel === 'string'
-        ? escalation.requestedModel
-        : null,
-  };
+  return null;
 }
 
 /** Consume only a bounded recommendation; the existing picker still owns admission. */
@@ -238,9 +254,7 @@ export async function assessTriageSweep(
         'requiresImmediateInvestigation' in result &&
         result.requiresImmediateInvestigation
     ).length,
-    providerBlocked: results.filter(
-      result => 'escalation' in result && result.escalation
-    ).length,
+    providerBlocked: results.filter(result => result.escalation).length,
     wakeSymphony: results.some(result => result.wakeSymphony),
     results,
   };
@@ -297,7 +311,23 @@ export async function assessTriageEvent(
     };
   }
 
-  const summerReceipt = await summer(delivery);
+  // One bounded retry on a transient Summer 5xx: a 503 between attempts
+  // must not fail a row the next call answers. Only 5xx responses retry
+  // (once); 4xx, timeouts, and network errors fail the row immediately.
+  let summerReceipt;
+  try {
+    summerReceipt = await summer(delivery);
+  } catch (error) {
+    if (!/^summer-triage-assessment-http-5\d\d$/.test(String(error?.message)))
+      throw error;
+    summerReceipt = await summer(delivery);
+  }
+  // A provider-blocked escalation is exempt from the sweep's exit no matter
+  // which Summer decision branch carries it (urgent-investigation-required
+  // without an assessment, or existing-intake-reconcile with an ambiguous
+  // Jev assessment) — the row is provider-blocked either way, and the
+  // escalation itself is the tracked signal.
+  const providerBlockedEscalation = escalationBlockOf(summerReceipt);
   if (
     summerReceipt.decision !== 'existing-intake-reconcile' &&
     !summerReceipt.assessment
@@ -309,21 +339,24 @@ export async function assessTriageEvent(
       mutations: 0,
       wakeSymphony: false,
       requiresImmediateInvestigation:
-        summerReceipt.decision === 'urgent-investigation-required',
+        summerReceipt.decision === 'urgent-investigation-required' &&
+        !providerBlockedEscalation,
+      ...(providerBlockedEscalation
+        ? { escalation: providerBlockedEscalation }
+        : {}),
     };
   }
-  if (summerReceipt.decision === 'existing-intake-reconcile') {
-    const escalation = escalationBlockOf(summerReceipt);
-    if (escalation) {
-      return {
-        ...base,
-        disposition: summerReceipt.decision,
-        summerAssessment: summerReceipt,
-        mutations: 0,
-        wakeSymphony: false,
-        escalation,
-      };
-    }
+  if (providerBlockedEscalation) {
+    return {
+      ...base,
+      disposition: summerReceipt.decision,
+      reason: 'provider-blocked-escalation',
+      summerAssessment: summerReceipt,
+      mutations: 0,
+      wakeSymphony: false,
+      escalation: providerBlockedEscalation,
+      requiresImmediateInvestigation: false,
+    };
   }
 
   const current = await client.fetchIssue(delivery.identifier);
