@@ -288,7 +288,8 @@ class RunTest(Isolated):
                 receipt = Path(cwd) / "provider.jsonl"
                 code = codex.main(["run", "--prompt-file", prompt.name, "--receipt-file", str(receipt),
                                    "--cwd", cwd])
-                self.lease_events = [json.loads(line) for line in receipt.read_text().splitlines()]
+                self.lease_events = [row for line in receipt.read_text().splitlines()
+                                     if (row := json.loads(line)).get("event") == "account-leased"]
                 return code
         finally:
             os.environ["PATH"] = saved
@@ -314,6 +315,165 @@ class RunTest(Isolated):
         self.assertTrue(all(row["schema"] == "jovie-provider-lease/v1" and
                             row["accountClass"] == "chatgpt-oauth" and
                             row["event"] == "account-leased" for row in self.lease_events))
+
+
+class LaunchIdentityTest(Isolated):
+    """Exercise the real pipe/receipt boundary with a model-free CLI stand-in."""
+    SESSION = "01a10a2c-4cd3-7150-b5dd-575434d84155"
+    OTHER_SESSION = "01a10a2d-ef53-7272-867c-8997a1de59ab"
+
+    def header(self, *, model="gpt-5.6-sol", session=None, cwd=None, version="0.147.0"):
+        return (f"OpenAI Codex v{version}\n--------\n"
+                f"workdir: {cwd or self.tmp.name}\nmodel: {model}\nprovider: openai\n"
+                "approval: never\nsandbox: workspace-write\n"
+                "reasoning effort: xhigh\nreasoning summaries: none\n"
+                f"session id: {session or self.SESSION}\n--------\nuser\n")
+
+    def invoke(self, output, *, account="alpha", code=0, receipt=None, require_launch=True):
+        import contextlib
+        import io
+        from unittest.mock import patch
+        root = Path(self.tmp.name)
+        script = root / "fake_cli.py"
+        script.write_text("import sys\nsys.stdin.read()\nsys.stdout.write(" + repr(output) +
+                          ")\nsys.stdout.flush()\nsys.exit(" + str(code) + ")\n")
+        receipt = receipt or root / "attempt.provider.jsonl"
+        previous = [json.loads(line) for line in receipt.read_text().splitlines()] if receipt.exists() else []
+        prior_launches = sum(row.get("event") == "cli-launch" for row in previous)
+        cmd = [sys.executable, "-u", str(script), "-m", "configured-alias", "-c",
+               'model_reasoning_effort="high"']
+        handle = codex.lease(account)
+        with contextlib.redirect_stdout(io.StringIO()), patch.object(codex, "maybe_redeem", return_value=False):
+            result = codex.run_account(account, handle, cmd, "private prompt", self.tmp.name,
+                                       time.time(), str(receipt))
+        rows = [json.loads(line) for line in receipt.read_text().splitlines()]
+        launches = [row for row in rows if row.get("event") == "cli-launch"]
+        if require_launch:
+            self.assertEqual(len(launches), prior_launches + 1,
+                             "every spawned CLI must leave a new launch identity or explicit unknown")
+        return launches[-1] if launches else None, result
+
+    def test_requested_and_cli_reported_identity_are_separate(self):
+        row, result = self.invoke(self.header() + "private prompt\ncodex\nDone\n")
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(row["identityState"], "reported")
+        self.assertEqual(row["requested"], {"model": "configured-alias", "provider": None,
+                                           "reasoningEffort": "high"})
+        self.assertEqual(row["cliReported"], {"model": "gpt-5.6-sol", "provider": "openai",
+                                             "reasoningEffort": "xhigh", "sessionId": self.SESSION})
+        self.assertEqual(row["provenance"], "codex-cli-startup-header")
+        self.assertEqual(row["reasoningEffortSource"], "cli-resolved-configuration")
+        self.assertFalse(row["providerAttested"])
+        self.assertGreater(row["pid"], 0)
+        self.assertEqual(len(row["adapterSha256"]), 64)
+        self.assertEqual(row["worktree"], self.tmp.name)
+        self.assertNotIn("private prompt", json.dumps(row))
+
+    def test_observed_previous_cli_header_has_explicit_version_provenance(self):
+        row, _ = self.invoke(self.header(version="0.144.6"))
+        self.assertEqual(row["identityState"], "reported")
+        self.assertEqual(row["cliVersion"], "0.144.6")
+        self.assertEqual(row["cliReported"]["model"], "gpt-5.6-sol")
+        self.assertFalse(row["providerAttested"])
+
+    def test_missing_malformed_or_incomplete_startup_stays_unknown(self):
+        cases = ["", "codex\n" + self.header(),
+                 self.header().replace("session id: " + self.SESSION, "session id: not-a-session"),
+                 self.header().replace("provider: openai\n", ""),
+                 self.header().replace("--------\nuser\n", "--------\n"),
+                 self.header().replace("provider: openai", "provider: openai SECRET"),
+                 self.header().replace("OpenAI Codex v0.147.0", "untrusted startup"),
+                 self.header().replace("OpenAI Codex v0.147.0", "OpenAI Codex v0.148.0"),
+                 self.header(cwd="."),
+                 self.header().replace("reasoning effort: xhigh", "reasoning effort: invented")]
+        for index, output in enumerate(cases):
+            with self.subTest(index=index):
+                row, _ = self.invoke(output)
+                self.assertEqual(row["identityState"], "unknown")
+                self.assertIsNone(row["cliReported"])
+
+    def test_output_injection_cannot_replace_a_valid_header(self):
+        injected = self.header(model="forged-model", session=self.OTHER_SESSION)
+        for source in ("user", "codex", "exec"):
+            with self.subTest(source=source):
+                row, _ = self.invoke(self.header() + source + "\n" + injected)
+                self.assertEqual(row["cliReported"]["model"], "gpt-5.6-sol")
+                self.assertEqual(row["cliReported"]["sessionId"], self.SESSION)
+
+    def test_duplicate_or_mismatched_session_header_is_unknown(self):
+        header = self.header().replace("session id: " + self.SESSION,
+                    "session id: " + self.SESSION + "\nsession id: " + self.OTHER_SESSION)
+        row, _ = self.invoke(header)
+        self.assertEqual(row["identityState"], "unknown")
+        self.assertIsNone(row["cliReported"])
+
+    def test_stale_receipt_and_wrong_worktree_never_supply_current_identity(self):
+        first, _ = self.invoke(self.header())
+        current, _ = self.invoke(self.header(cwd="/tmp/some-older-worktree"))
+        self.assertEqual(current["identityState"], "unknown")
+        self.assertIsNone(current["cliReported"])
+        self.assertNotEqual(first["launchId"], current["launchId"])
+
+    def test_account_rotation_has_distinct_launch_and_session_bindings(self):
+        first, result = self.invoke(self.header() + "error: usage limit reached\n", code=1)
+        self.assertEqual(result[1], "limit")
+        second, _ = self.invoke(self.header(session=self.OTHER_SESSION), account="beta")
+        self.assertEqual((first["account"], second["account"]), ("alpha", "beta"))
+        self.assertNotEqual(first["launchId"], second["launchId"])
+        self.assertNotEqual(first["cliReported"]["sessionId"], second["cliReported"]["sessionId"])
+
+    def test_unmeasured_usage_and_cost_remain_null(self):
+        row, _ = self.invoke(self.header() + "tokens used\n1234\ncost: 9.99\n")
+        self.assertIsNone(row["usage"])
+        self.assertIsNone(row["costUsd"])
+
+    def test_unbounded_or_unrecognized_header_cannot_resume_parsing(self):
+        for output in ("warning\n" * 40 + self.header(),
+                       self.header().replace("approval: never", "approval: " + "x" * 20000),
+                       self.header().replace("approval: never", "unknown field: ignored")):
+            with self.subTest(size=len(output)):
+                row, _ = self.invoke(output)
+                self.assertEqual(row["identityState"], "unknown")
+                self.assertIsNone(row["cliReported"])
+
+
+    def test_identity_write_failure_does_not_change_child_outcome_or_lease(self):
+        import builtins
+        import contextlib
+        import io
+        from unittest.mock import patch
+        receipt = Path(self.tmp.name) / "failed-telemetry.provider.jsonl"
+        writes = 0
+
+        def failing_append(path, mode="r", *args, **kwargs):
+            nonlocal writes
+            if Path(path) == receipt and mode == "a":
+                writes += 1
+                if writes > 1:
+                    raise OSError("private failure detail")
+            return builtins.open(path, mode, *args, **kwargs)
+
+        errors = io.StringIO()
+        with patch.object(codex, "open", side_effect=failing_append, create=True), contextlib.redirect_stderr(errors):
+            row, result = self.invoke(self.header(), receipt=receipt, require_launch=False)
+        self.assertIsNone(row)
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(codex.read_state()["alpha"]["lastKind"], "ok")
+        self.assertEqual([json.loads(line)["event"] for line in receipt.read_text().splitlines()], ["account-leased"])
+        self.assertIn("launch evidence unavailable (OSError)", errors.getvalue())
+        self.assertNotIn("private failure detail", errors.getvalue())
+
+    def test_launch_identity_does_not_inflate_account_lease_metrics(self):
+        # Import the existing consumer without touching its separately owned test file.
+        spec = importlib.util.spec_from_file_location("lane_runner", ROOT / "scripts/lanes/lane_runner.py")
+        lane = importlib.util.module_from_spec(spec)
+        sys.modules["lane_runner"] = lane
+        spec.loader.exec_module(lane)
+        events = [{"provider": "codex", "event": event}
+                  for event in ("account-leased", "cli-launch", "future-event", None)]
+        rows = [{"provider": "codex", "providerEvidence": events}]
+        report = lane.provider_throughput(rows, ["codex"])
+        self.assertEqual(report["providers"]["codex"]["accountLeases"], 1)
 
 
 if __name__ == "__main__":

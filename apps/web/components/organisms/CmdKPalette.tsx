@@ -43,6 +43,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import { isFormElement } from '@/lib/utils/keyboard';
 import {
   artistResultToEntityRef,
   type ReleaseLikeRow,
@@ -298,52 +299,104 @@ export function CmdKPalette({
     [flatItems, additionalIds, onAdditionalSelect, handleClose, router]
   );
 
+  const focusSearchInput = useCallback(() => {
+    const input = document.getElementById(`${generatedListId}-input`);
+    if (input instanceof HTMLInputElement && document.activeElement !== input) {
+      input.focus();
+    }
+  }, [generatedListId]);
+
   const handleKeyboardCommand = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.isComposing) return;
+    (e: KeyboardEvent, focusedIndex?: number) => {
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
       if (
         (e.metaKey || e.ctrlKey) &&
+        !(e.metaKey && e.ctrlKey) &&
         !e.altKey &&
-        !e.shiftKey &&
-        (e.key === '1' || e.key === '2' || e.key === '3')
+        !e.shiftKey
       ) {
-        const nextIndex = Number(e.key) - 1;
-        if (nextIndex < flatItems.length) {
+        if (e.key.toLowerCase() === 'k') {
+          if (e.repeat) return;
           e.preventDefault();
-          setSelectedIndex(nextIndex);
+          handleClose();
+          return;
         }
-        return;
+        if (e.key === '1' || e.key === '2' || e.key === '3') {
+          const nextIndex = Number(e.key) - 1;
+          if (nextIndex < flatItems.length) {
+            e.preventDefault();
+            setSelectedIndex(nextIndex);
+            focusSearchInput();
+          }
+          return;
+        }
       }
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (e.repeat && (e.key === 'Enter' || e.key === 'Escape')) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex(prev =>
-          flatItems.length === 0 ? 0 : Math.min(prev + 1, flatItems.length - 1)
+          flatItems.length === 0
+            ? 0
+            : Math.min((focusedIndex ?? prev) + 1, flatItems.length - 1)
         );
+        focusSearchInput();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex(prev => Math.max(prev - 1, 0));
+        setSelectedIndex(prev => Math.max((focusedIndex ?? prev) - 1, 0));
+        focusSearchInput();
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (activeIndex !== null) commitIndex(activeIndex);
+        const index = focusedIndex ?? activeIndex;
+        if (index !== null) commitIndex(index);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         handleClose();
       }
     },
-    [activeIndex, commitIndex, flatItems.length, handleClose]
+    [activeIndex, commitIndex, flatItems.length, focusSearchInput, handleClose]
   );
   const handleKeyboardCommandRef = useRef(handleKeyboardCommand);
   useEffect(() => {
     handleKeyboardCommandRef.current = handleKeyboardCommand;
   }, [handleKeyboardCommand]);
 
-  // Keyboard nav: arrow up/down/enter/escape with IME guard.
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // The context-mounted header delegates directly. Global handling belongs
+  // to this palette's dialog input or result composite. Escape also dismisses
+  // Search from non-form controls; editors retain their own Escape handling.
   useEffect(() => {
     if (!open) return;
-    globalThis.addEventListener('keydown', handleKeyboardCommand);
-    return () =>
-      globalThis.removeEventListener('keydown', handleKeyboardCommand);
-  }, [handleKeyboardCommand, open]);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target === inputRef.current) {
+        handleKeyboardCommand(event);
+        return;
+      }
+      const target = event.target;
+      if (event.key === 'Escape' && !isFormElement(target)) {
+        handleKeyboardCommand(event);
+        return;
+      }
+      if (
+        !(target instanceof HTMLElement) ||
+        !resultsRef.current?.contains(target) ||
+        isFormElement(target)
+      ) {
+        return;
+      }
+      if (target.getAttribute('role') === 'option') {
+        const index = flatItems.findIndex(
+          (_, rowIndex) => target.id === `${generatedListId}-row-${rowIndex}`
+        );
+        if (index >= 0) handleKeyboardCommand(event, index);
+      } else if (target === resultsRef.current) {
+        handleKeyboardCommand(event);
+      }
+    };
+    globalThis.addEventListener('keydown', onKeyDown);
+    return () => globalThis.removeEventListener('keydown', onKeyDown);
+  }, [flatItems, generatedListId, handleKeyboardCommand, open]);
 
   const dialogInput = (
     <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
@@ -353,6 +406,7 @@ export function CmdKPalette({
       />
       <input
         ref={inputRef}
+        id={`${generatedListId}-input`}
         type='search'
         value={query}
         onChange={e => {
@@ -417,6 +471,7 @@ export function CmdKPalette({
         Type to search all matching items.
       </p>
       <div
+        ref={resultsRef}
         className='min-h-0 flex-1 overflow-y-auto pb-2 pt-1.5'
         role='listbox'
         aria-label='Command Palette Results'

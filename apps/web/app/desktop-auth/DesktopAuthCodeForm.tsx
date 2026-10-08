@@ -29,7 +29,7 @@ export function DesktopAuthCodeForm({
   const isRedeeming = redeemState === 'redeeming';
   return (
     <form
-      className='mt-6 flex w-full flex-col items-center justify-center gap-3'
+      className='mt-5 flex w-full flex-col items-center justify-center gap-4'
       data-desktop-auth-state={
         redeemState === 'redeemed' ? 'code-complete' : 'code'
       }
@@ -64,16 +64,18 @@ export function DesktopAuthCodeForm({
       >
         {isRedeeming ? 'Signing In...' : 'Continue'}
       </Button>
-      <Button
-        type='button'
-        variant='link'
-        size='sm'
-        disabled={isRedeeming}
-        onClick={onBack}
-      >
-        Back To Sign-in Options
-      </Button>
-      {cancelButton}
+      <div className='flex flex-wrap items-center justify-center gap-x-4 gap-y-4'>
+        <Button
+          type='button'
+          variant='link'
+          size='sm'
+          disabled={isRedeeming}
+          onClick={onBack}
+        >
+          Back To Sign-in Options
+        </Button>
+        {cancelButton}
+      </div>
     </form>
   );
 }
