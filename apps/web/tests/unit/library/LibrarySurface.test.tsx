@@ -304,7 +304,7 @@ describe('LibrarySurface', () => {
       title: 'Album Video',
       itemKind: 'video',
       linkedReleaseId: 'album',
-      source: { provider: 'youtube' },
+      source: { provider: 'youtube', canonicalId: 'video-child' },
       catalogType: 'media',
     });
     renderLibrary([child, album]);
