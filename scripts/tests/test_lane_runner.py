@@ -1000,7 +1000,7 @@ class VerifyAndLandTest(unittest.TestCase):
 
     def test_older_prs_for_the_same_issue_are_ignored(self):
         stale = {**self.pr, "createdAt": "2026-09-20T00:00:00Z"}
-        self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "no-change")
+        self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "pr-readback-pending")
 
     def test_fallback_pr_is_nonclosing_from_creation_and_retains_merge_sync_identity(self):
         fake = FakeShell([], ahead="2")
@@ -1013,9 +1013,105 @@ class VerifyAndLandTest(unittest.TestCase):
         self.assertIn("<!-- linear-issue-identifier:JOV-1 -->", body)
         self.assertNotIn("Closes", body)
 
+    def test_unavailable_or_malformed_inventory_is_not_empty(self):
+        for code, out, err in [(1, "", "gh: github-budget-floor: 523 < 600 private-token"),
+                               (1, "[]", "transport failure"), (0, "", ""),
+                               (0, "not-json", ""), (0, "null", ""),
+                               (0, json.dumps([{"number": 21010}]), "")]:
+            with self.subTest(code=code, out=out):
+                fake = FakeShell([], ahead="2")
+                def shell(args, **kwargs):
+                    result = fake(args, **kwargs)
+                    return SimpleNamespace(returncode=code, stdout=out, stderr=err) if args[:3] == ["gh", "pr", "list"] else result
+                result = self.run_gate(shell)
+                self.assertEqual(result["verdict"], "pr-readback-pending")
+                self.assertEqual(result["prReadback"]["state"], "unknown")
+                self.assertNotIn("private-token", json.dumps(result))
+                self.assertFalse(any(call[:2] == ["git", "push"] or call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_inventory_timeout_retains_unknown_without_publication(self):
+        fake = FakeShell([], ahead="2"); fake.hanging = ("list",)
+        result = self.run_gate(fake)
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertEqual(len(fake.calls), 1)
+
+    def test_wrong_branch_and_ambiguous_inventory_cannot_adopt_or_create(self):
+        for prs in ([{**self.pr, "headRefName": "another-owner"}], [self.pr, self.pr]):
+            with self.subTest(prs=prs):
+                fake = FakeShell(prs, ahead="2")
+                result = self.run_gate(fake)
+                self.assertEqual(result["verdict"], "pr-readback-pending")
+                self.assertEqual(len(fake.calls), 1)
+
+    def test_already_exists_then_refused_read_is_pending_not_definitive_failure(self):
+        fake = FakeShell([], ahead="2"); reads = []
+        def shell(args, **kwargs):
+            result = fake(args, **kwargs)
+            if args[:3] == ["gh", "pr", "list"]:
+                reads.append(args)
+                if len(reads) == 2:
+                    return SimpleNamespace(returncode=1, stdout="", stderr="github-budget-floor")
+            if args[:3] == ["gh", "pr", "create"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="already exists: https://github.com/JovieInc/Jovie/pull/21010")
+            return result
+        result = self.run_gate(shell)
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertEqual(result["prReadback"]["branch"], "devin/jov-1")
+        self.assertNotIn("pr", result)  # create output is not authoritative readback
+        self.assertEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
+    def test_same_branch_existing_pr_recovered_only_from_authoritative_read(self):
+        fake = FakeShell([], ahead="2")
+        def shell(args, **kwargs):
+            if args[:3] == ["gh", "pr", "create"]:
+                fake.prs = [self.pr]
+                result = fake(args, **kwargs)
+                return SimpleNamespace(returncode=1, stdout="", stderr="already exists, untrusted private payload")
+            return fake(args, **kwargs)
+        result = self.run_gate(shell)
+        self.assertEqual(result["verdict"], "landing")
+        self.assertEqual(result["pr"], 7)
+        self.assertEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
+    def test_failed_push_does_not_create_a_pr(self):
+        fake = FakeShell([], ahead="2", failing=("push",))
+        result = self.run_gate(fake)
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertFalse(any(call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_create_applied_then_timed_out_recovers_existing_pr_without_resend(self):
+        fake = FakeShell([], ahead="2")
+        def shell(args, **kwargs):
+            result = fake(args, **kwargs)
+            if args[:3] == ["gh", "pr", "create"]:
+                fake.prs = [self.pr]
+                raise subprocess.TimeoutExpired(args, 600, output="private-payload")
+            return result
+        result = self.run_gate(shell)
+        self.assertEqual((result["verdict"], result["pr"]), ("landing", 7))
+        self.assertEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
+    def test_ambiguous_transport_preserves_pending_when_authoritative_read_is_unavailable(self):
+        for step, error in [("push", OSError("private-payload")), ("create", subprocess.TimeoutExpired(["gh"], 600))]:
+            with self.subTest(step=step):
+                fake = FakeShell([], ahead="2"); reads = []
+                def shell(args, **kwargs):
+                    result = fake(args, **kwargs)
+                    if args[:3] == ["gh", "pr", "list"]:
+                        reads.append(args)
+                        if len(reads) > 1: return SimpleNamespace(returncode=1, stdout="", stderr="budget-floor")
+                    if step in args: raise error
+                    return result
+                result = self.run_gate(shell)
+                self.assertEqual(result["verdict"], "pr-readback-pending")
+                self.assertEqual(result["prReadback"]["state"], "unknown")
+                self.assertNotIn("private-payload", json.dumps(result))
+                self.assertLessEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
     def test_pr_creation_failure_does_not_loop(self):
         result = self.run_gate(FakeShell([], ahead="2"))
-        self.assertEqual(result, {"verdict": "failed", "reasons": ["pr-create-failed"]})
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertEqual(result["reasons"], ["pr-create-readback-unconfirmed"])
 
 
 class ProviderAndLockTest(unittest.TestCase):
@@ -1103,6 +1199,25 @@ class FakeLinear:
 
 
 class LinearClientTest(unittest.TestCase):
+    def test_unknown_graphql_code_and_private_message_are_not_retained(self):
+        error = lane.LinearRequestError({"message": "secret-token", "extensions": {"code": "secret-token", "statusCode": "secret-token"}})
+        self.assertEqual(error.diagnostic, {"class": "linear-graphql", "code": "UNKNOWN"})
+        self.assertEqual(str(error), "linear: request rejected")
+        missing = lane.LinearRequestError({"message": "Entity not found: Comment"})
+        self.assertEqual(str(missing), "linear: Entity not found: Comment")
+
+    def test_graphql_error_diagnostics_retain_only_allowlisted_metadata(self):
+        client = lane.Linear.__new__(lane.Linear); client.key = "test-only-no-live-credential"
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self): return json.dumps({"errors": [{"message": "private payload secret-token", "extensions": {"code": "FORBIDDEN", "statusCode": 403, "payload": "secret-token"}}]}).encode()
+        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), patch.object(lane.urllib.request, "urlopen", return_value=Response()):
+            with self.assertRaises(lane.LinearRequestError) as caught:
+                client.gql("mutation", {"body": "private payload"})
+        self.assertEqual(caught.exception.diagnostic, {"class": "linear-graphql", "code": "FORBIDDEN", "httpStatus": 403})
+        self.assertNotIn("secret-token", str(caught.exception))
+
     def test_comment_rejects_malformed_success_payloads_as_known_failure(self):
         for payload in (None, {"commentCreate": None}, {"commentCreate": []}, {"commentCreate": {"success": None}}):
             with self.subTest(payload=payload), patch.object(lane.Linear, "gql", return_value=payload):
@@ -1753,6 +1868,18 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
         self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
 
+    def test_unknown_pr_readback_preserves_source_and_failed_unknown_attempt(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "pr-readback-pending", "reasons": ["pr-inventory-unavailable"],
+                                               "prReadback": {"state": "unknown", "branch": "existing-branch"}}
+        with patch.object(lane, "remove_worktree") as remove:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue("JOV-8034"))
+        remove.assert_not_called()
+        self.assertTrue(Path(receipt["preservedWorktree"]).is_dir())
+        self.assertEqual(receipt["result"]["prReadback"]["state"], "unknown")
+        self.assertEqual(receipt["execution"]["result"], "failed_unknown")
+        self.assertEqual(receipt["execution"]["retryDecision"], "stop")
+        self.assertEqual(self.ledger()[-1]["result"], receipt["result"])
+
     def test_deferred_or_reused_gate_does_not_quarantine_completed_implementation(self):
         for index, verdict in enumerate(("gate-in-progress", "gate-deferred", "gate-already-completed")):
             with self.subTest(verdict=verdict):
@@ -2023,6 +2150,16 @@ class WorkerTest(unittest.TestCase):
                      patch.object(lane.pr_events, "cleanup_one_event") as cleanup:
                     lane.worker(self.host, "devin")
                     self.assertEqual(cleanup.call_count, int(chosen == "idle"))
+
+    def test_pending_readback_does_not_reclaim_downgrade_or_charge_generic_retry(self):
+        lane.run_issue = lambda *args: {"verdict": "pr-readback-pending", "reasons": ["pr-inventory-unavailable"]}
+        self.assertEqual(lane.worker(self.host, "devin"), 1)
+        self.assertEqual(self.execs, [])
+        self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
+        self.assertFalse(lane.failures_path(self.host).exists())
+        seat = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+        try: self.assertTrue(seat.held)
+        finally: seat.release()
 
     def test_notification_error_releases_the_slot_even_while_traceback_is_retained(self):
         lane.run_issue = lambda *args: {"verdict": "landing", "prUrl": "u"}
@@ -6816,6 +6953,56 @@ class EventDeliveryTest(unittest.TestCase):
         row = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
         self.assertTrue(any(x.get('error') == 'event-mutation-rejected' for x in row['history']))
         self.assertEqual(row['attempts'], 3)
+
+    def test_comment_send_failure_records_safe_phase_without_reset_or_fake_ack(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        original = self.linear.gql
+        def rejected(query, variables):
+            if query.startswith('mutation'):
+                self.writes.append((query, variables))
+                raise lane.LinearRequestError({'message': 'secret-token private payload', 'extensions': {'code': 'FORBIDDEN', 'statusCode': 403}})
+            return original(query, variables)
+        self.linear.gql = rejected
+        for now in [100, 160, 460]: self.drain(now)
+        before = lane._event_delivery_state(self.host)
+        row = next(iter(before['actions'].values()))
+        self.assertEqual((row['attempts'], row['status']), (3, 'exhausted'))
+        self.assertEqual(row['diagnostic'], {'phase': 'send', 'operation': 'comments', 'class': 'linear-graphql', 'code': 'FORBIDDEN', 'httpStatus': 403})
+        self.assertEqual(row['history'][-1]['diagnostic'], row['diagnostic'])
+        self.assertNotIn('secret-token', json.dumps(before))
+        self.drain(1000)
+        after = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+        self.assertEqual((after['attempts'], after['commentId'], after['deadline']), (3, row['commentId'], row['deadline']))
+        self.assertEqual(len(self.writes), 3)
+        self.assertNotEqual(after['status'], 'acknowledged')
+        self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
+
+    def test_readback_failure_classification_never_serializes_provider_messages(self):
+        cases = [(lane.LinearRateLimited(1000), "linear-rate-limited"),
+                 (TimeoutError("private-payload"), "transport-timeout"),
+                 (subprocess.TimeoutExpired(["private-command"], 10), "transport-timeout"),
+                 (lane.urllib.error.URLError("private-payload"), "transport-unavailable"),
+                 (OSError("private-payload"), "transport-unavailable"),
+                 (RuntimeError("event-private-payload"), "controller-error")]
+        for index, (error, expected) in enumerate(cases):
+            with self.subTest(expected=expected):
+                self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+                self.linear.gql = lambda *args, error=error: (_ for _ in ()).throw(error)
+                self.drain(100 + 600 * index)
+                row = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+                self.assertEqual(row['diagnostic']['class'], expected)
+                self.assertEqual(row['attempts'], 0)
+                self.assertNotIn('private-payload', json.dumps(row))
+
+    def test_readback_errors_log_safe_http_status_and_no_attempt(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        error = lane.urllib.error.HTTPError('private-url', 403, 'secret-token', {}, None)
+        self.linear.gql = lambda *args: (_ for _ in ()).throw(error)
+        self.drain()
+        row = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+        self.assertEqual(row['attempts'], 0)
+        self.assertEqual(row['diagnostic'], {'phase': 'readback', 'operation': 'comments', 'class': 'linear-http', 'httpStatus': 403})
+        self.assertNotIn('secret-token', json.dumps(row))
 
     def test_partial_plan_retries_only_unacknowledged_actions(self):
         self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}], labels=[{'id': 'issue', 'labelId': 'label'}])
