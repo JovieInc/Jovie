@@ -51,7 +51,13 @@ export const SidebarProvider = React.forwardRef<
       onOpenChange: setOpenProp,
     });
 
-    const { isPreview, isFloating, dismissPreview } = useRailPreview({
+    const {
+      isPreview,
+      isFloating,
+      dismissPreview,
+      openPreview,
+      togglePreview,
+    } = useRailPreview({
       side: 'left',
       pinned: open,
       enabled: !isMobile,
@@ -68,9 +74,31 @@ export const SidebarProvider = React.forwardRef<
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
+      if (isMobile) return setOpenMobile(value => !value);
+      if (open) {
+        dismissPreview();
+        setOpen(false);
+      } else {
+        togglePreview();
+      }
+    }, [isMobile, open, setOpen, dismissPreview, togglePreview]);
+
+    const closeSidebar = React.useCallback(() => {
       dismissPreview();
-      return isMobile ? setOpenMobile(open => !open) : setOpen(open => !open);
-    }, [isMobile, setOpen, setOpenMobile, dismissPreview]);
+      setOpenMobile(false);
+    }, [dismissPreview]);
+    const pinSidebar = React.useCallback(() => setOpen(true), [setOpen]);
+    const unpinSidebar = React.useCallback(() => {
+      dismissPreview();
+      setOpen(false);
+    }, [dismissPreview, setOpen]);
+    const presentation = isMobile
+      ? 'drawer'
+      : open
+        ? 'pinned'
+        : isPreview
+          ? 'floating'
+          : 'collapsed';
 
     useSidebarKeyboardShortcut(toggleSidebar, SIDEBAR_KEYBOARD_SHORTCUT);
 
@@ -82,6 +110,11 @@ export const SidebarProvider = React.forwardRef<
         open,
         isPreview,
         isFloating,
+        presentation,
+        previewSidebar: openPreview,
+        closeSidebar,
+        pinSidebar,
+        unpinSidebar,
         setOpen,
         isMobile,
         openMobile,
@@ -93,6 +126,11 @@ export const SidebarProvider = React.forwardRef<
         open,
         isPreview,
         isFloating,
+        presentation,
+        openPreview,
+        closeSidebar,
+        pinSidebar,
+        unpinSidebar,
         setOpen,
         isMobile,
         openMobile,

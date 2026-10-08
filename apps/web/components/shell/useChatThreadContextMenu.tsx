@@ -18,6 +18,7 @@ type ThreadContextMenuState = ContextMenuState;
 
 export type UseChatThreadContextMenuOptions = {
   readonly activeThreadId?: string | null;
+  readonly railOwner?: 'left' | 'right';
 };
 
 export function useChatThreadContextMenu(
@@ -88,7 +89,11 @@ export function useChatThreadContextMenu(
   );
 
   const contextMenuOverlay = (
-    <ContextMenuOverlay state={contextMenu} onClose={closeContextMenu} />
+    <ContextMenuOverlay
+      state={contextMenu}
+      onClose={closeContextMenu}
+      railOwner={options.railOwner}
+    />
   );
 
   return {

@@ -13,6 +13,12 @@ import { APP_ROUTES } from '@/constants/routes';
 import { renderDashboardNav } from '@/tests/utils/dashboard-nav-test-support';
 import { RuntimeUpdateProvider } from './RuntimeUpdateProvider';
 
+const work = vi.hoisted(() => ({
+  current: null as null | { hasDraft: boolean },
+}));
+vi.mock('@/lib/desktop/session-work-state', () => ({
+  getDesktopWorkState: () => work.current,
+}));
 const state = vi.hoisted(() => ({
   desktop: true,
   available: false,
@@ -42,6 +48,7 @@ function Surface({ inbox = true }: { inbox?: boolean }) {
   );
 }
 beforeEach(() => {
+  work.current = null;
   Object.assign(state, {
     desktop: true,
     available: false,
@@ -188,6 +195,27 @@ describe('updates in the central Inbox', () => {
     ).toHaveAccessibleDescription(
       'New Version Available (v26.9.1). Reload when ready.'
     );
+  });
+  it('defers an explicit reload while a live work owner has a draft and allows a later retry', () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { reload });
+    state.desktop = false;
+    state.mismatch = true;
+    work.current = { hasDraft: true };
+    render(<Surface />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reload Jovie To Update' })
+    );
+    expect(reload).not.toHaveBeenCalled();
+    const retry = screen.getByRole('button', {
+      name: 'Save current work before updating',
+    });
+    expect(retry).toHaveAccessibleDescription(
+      'The update is waiting for your draft, upload or active action to finish. Try again when ready.'
+    );
+    work.current = { hasDraft: false };
+    fireEvent.click(retry);
+    expect(reload).toHaveBeenCalledOnce();
   });
   it('reloads a browser update only after its explicit action', () => {
     const reload = vi.fn();

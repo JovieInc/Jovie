@@ -108,6 +108,7 @@ export function getSidebarNavRowClassName({
     calm &&
       !collapsed &&
       'h-7 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
+    'sidebar-touch-row',
     className
   );
 }

@@ -67,12 +67,12 @@ vi.mock('@/components/organisms/UnifiedSidebar', async () => {
     }: {
       headerOwnsCollapsedToggle?: boolean;
     }) => {
-      const { state } = useSidebar();
+      const { state, open } = useSidebar();
       return (
         <aside data-testid='composed-sidebar' data-state={state}>
           {!runtime.electron ? (
             <RailStagedContent
-              hidden={state === 'closed' && headerOwnsCollapsedToggle}
+              hidden={!open && headerOwnsCollapsedToggle}
               stage={headerOwnsCollapsedToggle}
             >
               <SidebarCollapseButton />
@@ -190,13 +190,20 @@ async function certifyLeftRail({
         fireEvent.keyDown(window, { key: '[' });
       }
     },
-    assertContinuity: observation => {
+    assertContinuity: (observation, transition) => {
       const toggle = currentToggle();
       const expanded = String(observation.state === 'open');
+      // Reopening a collapsed desktop rail is a floating preview. Only the
+      // initial expanded rail is pinned; repeated open/close must not repin it.
+      const pinned = transition === null && initialState === 'open';
       expect(toggle).toHaveAttribute('aria-expanded', expanded);
-      expect(toggle).toHaveAttribute('aria-pressed', expanded);
+      expect(toggle).toHaveAttribute('aria-pressed', String(pinned));
       expect(toggle).toHaveAccessibleName(
-        observation.state === 'open' ? 'Collapse sidebar' : 'Expand sidebar'
+        observation.state === 'open'
+          ? pinned
+            ? 'Collapse sidebar'
+            : 'Close sidebar'
+          : 'Expand sidebar'
       );
       expect(toggle).toBeEnabled();
       if (requireFocusContinuity) expect(toggle).toHaveFocus();
@@ -266,6 +273,7 @@ describe('proves repeated pointer, keyboard, mixed, and hydrated cycles on compo
   );
 
   it('hydrates restored collapsed state and still toggles both directions repeatedly', async () => {
+    document.cookie = 'sidebar:state=false; path=/';
     const container = document.createElement('div');
     container.innerHTML = renderToString(<Shell defaultOpen={false} />);
     document.body.append(container);

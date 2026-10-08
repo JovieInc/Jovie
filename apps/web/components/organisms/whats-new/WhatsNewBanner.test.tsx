@@ -188,6 +188,55 @@ describe('WhatsNewBanner', () => {
     });
   }
 
+  it('keeps compact release disclosure unseen on Escape and yields to an update', async () => {
+    localStorage.clear();
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(FEED));
+    const { rerender } = render(
+      <WhatsNewBanner enabled compact fetchImpl={fetchImpl} />
+    );
+    await settle();
+    const trigger = screen.getByRole('button', { name: "What's New" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(
+      screen.getByRole('link', { name: 'Full release notes' })
+    ).toBeVisible();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(trigger).toHaveFocus();
+    expect(localStorage.getItem(WHATS_NEW_LAST_SEEN_KEY)).toBeNull();
+    rerender(
+      <WhatsNewBanner enabled compact suppressed fetchImpl={fetchImpl} />
+    );
+    expect(
+      screen.queryByRole('button', { name: "What's New" })
+    ).not.toBeInTheDocument();
+  });
+  it('returns focus to the surviving rail control when compact details are dismissed', async () => {
+    localStorage.clear();
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(FEED));
+    render(
+      <>
+        <button type='button' data-rail-toggle='left'>
+          Collapse sidebar
+        </button>
+        <WhatsNewBanner enabled compact fetchImpl={fetchImpl} />
+      </>
+    );
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: "What's New" }));
+    const dismiss = screen.getByRole('button', {
+      name: 'Dismiss',
+    });
+    dismiss.focus();
+    fireEvent.click(dismiss);
+    expect(
+      screen.getByRole('button', { name: 'Collapse sidebar' })
+    ).toHaveFocus();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
   it('renders nothing while disabled', async () => {
     render(<WhatsNewBanner enabled={false} />);
     await settle();

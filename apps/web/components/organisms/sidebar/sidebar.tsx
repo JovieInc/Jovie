@@ -13,6 +13,7 @@ export const Sidebar = React.forwardRef<
     side?: 'left' | 'right';
     variant?: 'sidebar' | 'floating' | 'inset';
     collapsible?: 'offcanvas' | 'icon' | 'none';
+    toolbar?: React.ReactNode;
   }
 >(
   (
@@ -22,6 +23,7 @@ export const Sidebar = React.forwardRef<
       collapsible = 'offcanvas',
       className,
       children,
+      toolbar,
       ...props
     },
     ref
@@ -78,6 +80,11 @@ export const Sidebar = React.forwardRef<
             side={side}
           >
             <div className='flex h-full w-full flex-col overflow-hidden'>
+              {toolbar ? (
+                <div className='flex h-[calc(var(--app-shell-header-height)+env(safe-area-inset-top))] shrink-0 items-center px-3 pt-[env(safe-area-inset-top)]'>
+                  {toolbar}
+                </div>
+              ) : null}
               {children}
             </div>
           </SheetContent>
@@ -100,6 +107,7 @@ export const Sidebar = React.forwardRef<
           data-rail-preview-region='left'
           data-rail-preview={isPreview || undefined}
           data-rail-pinned={pinned}
+          data-rail-floating={isFloating || undefined}
           className={cn(
             'group peer relative max-lg:hidden h-full min-h-0 shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10',
             SHELL_RAIL_ALLOCATION
@@ -121,12 +129,31 @@ export const Sidebar = React.forwardRef<
             undefined
           }
         >
+          {toolbar ? (
+            <div
+              data-sidebar-toolbar='true'
+              hidden={!pinned || isMobile}
+              className='absolute top-0 left-0 flex h-(--app-shell-header-height) w-(--sidebar-width) items-center px-2'
+            >
+              {toolbar}
+            </div>
+          ) : null}
           <div
+            data-sidebar-surface='true'
+            style={
+              toolbar || isFloating
+                ? {
+                    top: 'var(--app-shell-floating-rail-top)',
+                    height: 'calc(100% - var(--app-shell-floating-rail-top))',
+                  }
+                : undefined
+            }
             className={cn(
               'h-full w-(--sidebar-width) overflow-hidden',
-              isFloating ? 'absolute top-0 left-0 z-30 shadow-xl' : 'relative',
-              SHELL_RAIL_ALLOCATION,
-              'group-data-[collapsible=offcanvas]:w-0',
+              isFloating
+                ? 'absolute left-0 z-30 shadow-xl transition-[transform,opacity] duration-shell-rail ease-cinematic motion-reduce:transition-none'
+                : cn('relative', SHELL_RAIL_ALLOCATION),
+              !isFloating && 'group-data-[collapsible=offcanvas]:w-0',
               state === 'closed' &&
                 collapsible === 'offcanvas' &&
                 side === 'left' &&
@@ -152,7 +179,7 @@ export const Sidebar = React.forwardRef<
               data-sidebar='sidebar'
               className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-(--app-shell-radius) lg:shadow-(--app-shell-sidebar-shadow) group-data-[variant=floating]:rounded-sidebar-floating group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
             >
-              {children}
+              {!isMobile ? children : null}
             </div>
           </div>
         </div>

@@ -112,7 +112,7 @@ body {
 html[data-desktop-runtime="electron"] {
   --electron-titlebar-height: 40px;
   --electron-controls-width: 200px;
-  --electron-traffic-light-safe-width: 72px;
+  --electron-traffic-light-safe-width: env(titlebar-area-x, 72px);
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;
   --electron-sidebar-width: var(--app-shell-sidebar-width);
@@ -163,6 +163,7 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
 
 html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
   padding-top: var(--electron-titlebar-height);
+  --app-shell-floating-rail-top: var(--app-shell-gap);
 }
 
 html[data-desktop-runtime="electron"]
@@ -186,12 +187,11 @@ html[data-desktop-runtime="electron"]
    reservation double-counted that offset and left a dead span before the
    title. */
 html[data-desktop-runtime="electron"]
-  [data-app-shell-frame="true"]:has([data-electron-collapsed-rail="icon"])
+  [data-app-shell-frame="true"]:has([data-electron-collapsed-rail="offcanvas"])
   [data-top-spacing-owner="shell-header"] {
   padding-left: calc(
     var(--electron-controls-width) -
-    (2 * var(--app-shell-gap)) -
-    var(--electron-sidebar-collapsed-width)
+    (2 * var(--app-shell-gap))
   );
 }
 

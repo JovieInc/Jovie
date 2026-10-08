@@ -3,10 +3,36 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useSidebarCookieState } from './useSidebarCookieState';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   document.cookie = 'sidebar:state=; path=/; max-age=0';
 });
 
 describe('sidebar requested state', () => {
+  it('keeps the safe default and session toggles when cookie access is denied', () => {
+    const original = Object.getOwnPropertyDescriptor(document, 'cookie');
+    Object.defineProperty(document, 'cookie', {
+      configurable: true,
+      get() {
+        throw new DOMException('denied', 'SecurityError');
+      },
+      set() {
+        throw new DOMException('denied', 'SecurityError');
+      },
+    });
+    try {
+      const onOpenChange = vi.fn();
+      const { result } = renderHook(() =>
+        useSidebarCookieState({ defaultOpen: true, onOpenChange })
+      );
+      expect(result.current.open).toBe(true);
+      act(() => result.current.setOpen(false));
+      expect(result.current.open).toBe(false);
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    } finally {
+      if (original) Object.defineProperty(document, 'cookie', original);
+      else Reflect.deleteProperty(document, 'cookie');
+    }
+  });
   it('honors every toggle before React commits the batch', () => {
     const { result } = renderHook(() =>
       useSidebarCookieState({ defaultOpen: true })

@@ -33,7 +33,7 @@ describe('AppShellFrame', () => {
     );
     expect(shellBody).toHaveClass(
       'transition-[gap,padding]',
-      'duration-cinematic',
+      'duration-shell-rail',
       'ease-cinematic',
       'motion-reduce:transition-none'
     );
@@ -121,7 +121,7 @@ describe('AppShellFrame', () => {
     expect(rightRail).toHaveClass('shell-inspector-overlay');
     expect(mainPlane).toHaveClass(
       'transition-[flex-basis,width]',
-      'duration-cinematic',
+      'duration-shell-rail',
       'motion-reduce:transition-none'
     );
   });
@@ -190,7 +190,7 @@ describe('AppShellFrame', () => {
     expect(mount).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col');
     expect(mount).toHaveClass(
       'transition-shell-rail-allocation',
-      'duration-cinematic',
+      'duration-shell-rail',
       'ease-cinematic',
       'motion-reduce:transition-none'
     );
@@ -249,12 +249,12 @@ describe('AppShellFrame', () => {
 
     expect(mainPlane).toHaveClass(
       'transition-[flex-basis,width]',
-      'duration-cinematic',
+      'duration-shell-rail',
       'motion-reduce:transition-none'
     );
     expect(screen.getByTestId('app-shell-scroll')).toHaveClass(
       'transition-[flex-basis,width]',
-      'duration-cinematic',
+      'duration-shell-rail',
       'motion-reduce:transition-none'
     );
     expect(
@@ -263,7 +263,7 @@ describe('AppShellFrame', () => {
         .closest('[data-app-shell-content-column]')
     ).toHaveClass(
       'transition-[flex-basis,width]',
-      'duration-cinematic',
+      'duration-shell-rail',
       'motion-reduce:transition-none'
     );
   });

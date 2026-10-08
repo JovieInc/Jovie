@@ -17,6 +17,7 @@ export interface ContextMenuOverlayProps {
   readonly state: ContextMenuState | null;
   /** Called when the user dismisses the menu (Esc, click backdrop, item activation). */
   readonly onClose: () => void;
+  readonly railOwner?: 'left' | 'right';
 }
 
 function isAction(item: ContextMenuItem): item is ContextMenuItemAction {
@@ -66,6 +67,7 @@ function resolveShortcut(
 export function ContextMenuOverlay({
   state,
   onClose,
+  railOwner,
 }: ContextMenuOverlayProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number }>({
@@ -73,14 +75,65 @@ export function ContextMenuOverlay({
     top: 0,
   });
   const groupId = useId();
+  const focusOwner = useRef<HTMLElement | null>(null);
+  const outsideDismissal = useRef(false);
+  const [maxHeight, setMaxHeight] = useState<number>();
 
   useEffect(() => {
     if (!state) return undefined;
+    const menu = ref.current;
+    focusOwner.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    outsideDismissal.current = false;
+    menu
+      ?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
+      ?.focus({ preventScroll: true });
+    function onOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !menu?.contains(event.target)) {
+        outsideDismissal.current = true;
+        onClose();
+      }
+    }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (
+        !e.defaultPrevented &&
+        menu?.contains(document.activeElement) &&
+        ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)
+      ) {
+        const items = Array.from(
+          menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')
+        );
+        if (!items.length) return;
+        e.preventDefault();
+        const index = items.indexOf(document.activeElement as HTMLElement);
+        const next =
+          e.key === 'Home'
+            ? 0
+            : e.key === 'End'
+              ? items.length - 1
+              : (index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) %
+                items.length;
+        items[next]?.focus({ preventScroll: true });
+      }
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        e.preventDefault();
+        onClose();
+      }
     }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onOutside, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onOutside, true);
+      if (
+        !outsideDismissal.current &&
+        (document.activeElement === document.body ||
+          menu?.contains(document.activeElement))
+      )
+        focusOwner.current?.focus({ preventScroll: true });
+    };
   }, [state, onClose]);
 
   // Use layout effect so the clamp math runs before paint and the menu
@@ -89,37 +142,45 @@ export function ContextMenuOverlay({
     if (!state || !ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const margin = 8;
+    const toolbar = railOwner
+      ? (document.querySelector<HTMLElement>(
+          '[data-electron-titlebar="true"]'
+        ) ??
+        document.querySelector<HTMLElement>('[data-app-shell-header="true"]'))
+      : null;
+    const clearance = Math.max(
+      margin,
+      (toolbar?.getBoundingClientRect().bottom ?? 0) + margin
+    );
+    const available = Math.max(0, window.innerHeight - clearance - margin);
+    setMaxHeight(available);
     let left = state.x;
-    let top = state.y;
+    let top = Math.max(clearance, state.y);
     if (left + rect.width + margin > window.innerWidth) {
       left = Math.max(margin, window.innerWidth - rect.width - margin);
     }
     if (top + rect.height + margin > window.innerHeight) {
-      top = Math.max(margin, window.innerHeight - rect.height - margin);
+      top = Math.max(
+        clearance,
+        window.innerHeight - Math.min(rect.height, available) - margin
+      );
     }
     setPos({ left, top });
-  }, [state]);
+  }, [state, railOwner]);
 
   if (!state) return null;
 
   return (
-    <div className='fixed inset-0 z-[110]'>
-      <button
-        type='button'
-        aria-label='Close Menu'
-        tabIndex={-1}
-        className='absolute inset-0 cursor-default'
-        onClick={onClose}
-        onContextMenu={e => {
-          e.preventDefault();
-          onClose();
-        }}
-      />
+    <div
+      className='pointer-events-none fixed inset-0 z-[110]'
+      data-rail-owned-overlay={railOwner}
+      data-state='open'
+    >
       <div
         ref={ref}
         role='menu'
-        className='absolute min-w-50 max-w-70 rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
-        style={{ left: pos.left, top: pos.top }}
+        className='pointer-events-auto absolute min-w-50 max-w-70 overflow-y-auto rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
+        style={{ left: pos.left, top: pos.top, maxHeight }}
       >
         {state.items.map((item, index) => {
           if (!isAction(item)) {

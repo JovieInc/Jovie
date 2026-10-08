@@ -7,6 +7,11 @@ export type SidebarContextValue = {
   open: boolean;
   isPreview: boolean;
   isFloating: boolean;
+  presentation?: 'pinned' | 'collapsed' | 'floating' | 'drawer';
+  previewSidebar?: () => void;
+  closeSidebar?: () => void;
+  pinSidebar?: () => void;
+  unpinSidebar?: () => void;
   setOpen: (open: boolean | ((value: boolean) => boolean)) => void;
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;

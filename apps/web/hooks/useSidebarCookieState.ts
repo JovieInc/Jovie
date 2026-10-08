@@ -16,10 +16,15 @@ function readSidebarCookie(defaultOpen: boolean) {
     return defaultOpen;
   }
 
-  const cookie = document.cookie
-    .split(';')
-    .map(entry => entry.trim())
-    .find(entry => entry.startsWith(`${SIDEBAR_COOKIE_NAME}=`));
+  let cookie: string | undefined;
+  try {
+    cookie = document.cookie
+      .split(';')
+      .map(entry => entry.trim())
+      .find(entry => entry.startsWith(`${SIDEBAR_COOKIE_NAME}=`));
+  } catch {
+    return defaultOpen;
+  }
 
   if (!cookie) return defaultOpen;
 
@@ -33,7 +38,11 @@ function readSidebarCookie(defaultOpen: boolean) {
 function persistSidebarCookie(nextOpen: boolean) {
   if (typeof document === 'undefined') return;
 
-  document.cookie = `${SIDEBAR_COOKIE_NAME}=${nextOpen}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  try {
+    document.cookie = `${SIDEBAR_COOKIE_NAME}=${nextOpen}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  } catch {
+    // Denied persistence must not disable session navigation.
+  }
 }
 
 export function useSidebarCookieState({

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 
@@ -30,7 +30,7 @@ describe('UpdateAvailablePill', () => {
     updateState.desktopAvailable = false;
     updateState.desktopDownloaded = false;
     updateState.webAvailable = false;
-    updateState.install.mockReset();
+    updateState.install.mockReset().mockResolvedValue(true);
     updateState.reload.mockReset();
   });
 
@@ -66,6 +66,28 @@ describe('UpdateAvailablePill', () => {
     expect(updateState.install).toHaveBeenCalledOnce();
     expect(pill).toBeDisabled();
     expect(pill).toHaveTextContent('Restarting…');
+  });
+
+  it('returns to an actionable restart after a declined install or rejected bridge', async () => {
+    updateState.desktopAvailable = true;
+    updateState.desktopDownloaded = true;
+    updateState.install
+      .mockResolvedValueOnce(false)
+      .mockRejectedValueOnce(new Error('bridge failed'));
+    render(<UpdateAvailablePill />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ready to restart' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Ready to restart' })
+      ).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Ready to restart' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Ready to restart' })
+      ).toBeEnabled()
+    );
+    expect(updateState.install).toHaveBeenCalledTimes(2);
   });
 
   it('preserves the web update action without using desktop download state', () => {

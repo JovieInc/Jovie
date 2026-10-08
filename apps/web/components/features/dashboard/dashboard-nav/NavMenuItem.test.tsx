@@ -147,7 +147,7 @@ describe('NavMenuItem', () => {
     expect(label.className).toContain(
       'group-data-[collapsible=icon]:opacity-0'
     );
-    expect(label.className).toContain('duration-cinematic');
+    expect(label.className).toContain('duration-shell-rail');
     expect(label.className).not.toContain(
       'group-data-[collapsible=icon]:hidden'
     );

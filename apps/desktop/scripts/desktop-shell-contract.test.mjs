@@ -1505,7 +1505,10 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
   assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
-  assert.match(globalsCss, /--electron-traffic-light-safe-width: 72px;/);
+  assert.match(
+    globalsCss,
+    /--electron-traffic-light-safe-width: env\(titlebar-area-x, 72px\);/
+  );
   assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
   assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
   assert.match(
@@ -1552,7 +1555,13 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
   );
   const safeWidth = Number(
-    globalsCss.match(/--electron-traffic-light-safe-width: (\d+)px;/)?.[1]
+    globalsCss.match(
+      /--electron-traffic-light-safe-width: env\(titlebar-area-x, (\d+)px\);/
+    )?.[1]
+  );
+  assert.match(
+    mainSource,
+    /titleBarOverlay: process\.platform === 'darwin' \? \{ height: 44 \} : false/
   );
 
   assert.ok(Number.isFinite(x) && Number.isFinite(y));

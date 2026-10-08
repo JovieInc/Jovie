@@ -10,7 +10,7 @@ import { type RailMotionPhase, SHELL_RAIL_MOTION_MS } from './rail-motion';
  *
  * The phase flips to `opening`/`closing` synchronously on the render where
  * `open` changes — there is no dead interval between input and visible
- * response — then settles to `open`/`closed` after one cinematic duration.
+ * response — then settles to `open`/`closed` after one shell rail duration.
  * A toggle mid-flight clears the pending settle and re-aims at the latest
  * requested state, so rapid open/close cycles cannot accumulate stale state.
  * Under prefers-reduced-motion the phase resolves directly to the final

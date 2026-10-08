@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let _state: Record<string, unknown> = {
@@ -48,9 +48,53 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('SidebarBottomNowPlayingBridge', () => {
+  it('keeps the detached dock above overlapping composer and visual keyboard, clamped in a short viewport', () => {
+    _state = { ..._state, activeTrackId: 'track-1', trackTitle: 'Sample' };
+    vi.stubGlobal('innerHeight', 700);
+    const viewport = Object.assign(new EventTarget(), {
+      height: 700,
+      offsetTop: 0,
+    });
+    vi.stubGlobal('visualViewport', viewport);
+    const composer = document.createElement('div');
+    composer.dataset.testid = 'chat-composer-surface';
+    let top = 500;
+    vi.spyOn(composer, 'getBoundingClientRect').mockImplementation(() => ({
+      top,
+      left: 0,
+      right: 1024,
+      width: 1024,
+      bottom: top + 120,
+      height: 120,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    }));
+    document.body.append(composer);
+    const { unmount } = render(<SidebarBottomNowPlayingBridge detached />);
+    const dock = document.querySelector(
+      '[data-shell-audio-surface="sidebar-compact"]'
+    );
+    expect(dock).toHaveStyle({ bottom: '208px' });
+    act(() => {
+      viewport.height = 400;
+      viewport.dispatchEvent(new Event('resize'));
+    });
+    expect(dock).toHaveStyle({ bottom: '308px' });
+    act(() => {
+      vi.stubGlobal('innerHeight', 320);
+      viewport.height = 320;
+      top = 200;
+      fireEvent.resize(window);
+    });
+    expect(dock).toHaveStyle({ bottom: '128px' });
+    unmount();
+    composer.remove();
+  });
   it('renders nothing when no active track is present', () => {
     const { container } = render(<SidebarBottomNowPlayingBridge />);
     expect(container.firstChild).toBeNull();

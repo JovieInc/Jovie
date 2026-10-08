@@ -5,9 +5,11 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useContext } from 'react';
+import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import {
   type DesktopBuildIdentity,
   useDesktopBuildIdentity,
@@ -140,7 +142,11 @@ export function DesktopReleaseIdentity({
 }
 
 /** Desktop-only controls share the page header's top row. */
-export function DesktopTitlebar() {
+export function DesktopTitlebar({
+  variant = 'jovie',
+}: {
+  readonly variant?: BrandVariant;
+}) {
   const isDesktop = useIsElectronRuntime();
   const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
@@ -157,7 +163,7 @@ export function DesktopTitlebar() {
       data-electron-titlebar='true'
       data-main-header-inset={!sidebarOpen || isMobile ? 'true' : undefined}
       data-electron-collapsed-rail={
-        !sidebarOpen && !isMobile ? 'icon' : undefined
+        !sidebarOpen && !isMobile ? 'offcanvas' : undefined
       }
       data-testid='electron-titlebar-row'
       data-electron-drag-region='true'
@@ -176,13 +182,14 @@ export function DesktopTitlebar() {
           {/* Single canonical sidebar toggle for Electron: the same rail
               control primitive the header uses in the browser. Buttons are
               no-drag via the Electron drag-region CSS. */}
+          <AskJovieMark variant={variant} railOwner='left' />
           <RailToggleButton
             side='left'
             controlsId='shell-left-rail'
             open={sidebarToggleOpen}
             pinned={isMobile ? sidebarCtx?.openMobile : sidebarCtx?.open}
             openLabel={
-              sidebarCtx?.isPreview ? 'Pin sidebar' : 'Collapse sidebar'
+              sidebarCtx?.isPreview ? 'Close sidebar' : 'Collapse sidebar'
             }
             closedLabel='Expand sidebar'
             onToggle={() => toggleSidebar?.()}

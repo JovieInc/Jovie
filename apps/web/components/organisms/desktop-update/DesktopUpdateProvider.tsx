@@ -12,6 +12,7 @@ import {
   type DesktopUpdateViewState,
   useDesktopUpdate,
 } from '@/lib/desktop/desktop-updates';
+import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { DesktopUpdateModal } from './DesktopUpdateModal';
 
 const DISMISSED_VERSION_KEY = 'jovie:desktop-update:dismissed';
@@ -20,6 +21,8 @@ export interface DesktopUpdateContextValue {
   readonly state: DesktopUpdateViewState;
   /** Open the update modal from the Update menu item. */
   readonly openModal: () => void;
+  readonly installing: boolean;
+  readonly deferred: boolean;
 }
 
 const DesktopUpdateContext = createContext<DesktopUpdateContextValue | null>(
@@ -57,6 +60,9 @@ export function DesktopUpdateProvider({
 }) {
   const update = useDesktopUpdate();
   const [open, setOpen] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installNotice, setInstallNotice] = useState<string | null>(null);
+  const [deferred, setDeferred] = useState(false);
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(
     readDismissedVersion
   );
@@ -81,9 +87,42 @@ export function DesktopUpdateProvider({
   };
 
   const value = useMemo<DesktopUpdateContextValue>(
-    () => ({ state, openModal: () => setOpen(true) }),
-    [state]
+    () => ({ state, installing, deferred, openModal: () => setOpen(true) }),
+    [state, installing, deferred]
   );
+
+  const install = () => {
+    if (installing) return;
+    const work = getDesktopWorkState();
+    if (work && Object.values(work).some(Boolean)) {
+      setDeferred(true);
+      setInstallNotice(
+        'Save your draft and finish active work, then try Restart again.'
+      );
+      return;
+    }
+    setDeferred(false);
+    setInstallNotice(null);
+    setInstalling(true);
+    void update
+      .install()
+      .then(result => {
+        if (
+          result === false ||
+          (typeof result === 'object' &&
+            result !== null &&
+            'ok' in result &&
+            result.ok === false)
+        ) {
+          setInstalling(false);
+          setInstallNotice('The update could not start. Try Restart again.');
+        }
+      })
+      .catch(() => {
+        setInstalling(false);
+        setInstallNotice('The update could not start. Try Restart again.');
+      });
+  };
 
   return (
     <DesktopUpdateContext.Provider value={value}>
@@ -93,7 +132,9 @@ export function DesktopUpdateProvider({
           open={open}
           state={state}
           onDownload={update.download}
-          onInstall={update.install}
+          onInstall={install}
+          installing={installing}
+          installNotice={installNotice}
           onRetry={update.check}
           onLater={later}
         />

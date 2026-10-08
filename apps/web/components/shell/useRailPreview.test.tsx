@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SHELL_RAIL_PREVIEW_GRACE_MS } from './rail-motion';
 import { useRailPreview } from './useRailPreview';
 
@@ -14,18 +14,23 @@ function Harness({
   enabled?: boolean;
 }) {
   const [pinned, setPinned] = useState(false);
-  const { isPreview, isFloating, dismissPreview } = useRailPreview({
-    side,
-    pinned,
-    enabled,
-    resetKey,
-  });
+  const { isPreview, isFloating, dismissPreview, openPreview } = useRailPreview(
+    {
+      side,
+      pinned,
+      enabled,
+      resetKey,
+    }
+  );
   return (
     <>
       <button
         type='button'
         data-testid='trigger'
         data-rail-toggle={side}
+        onKeyDown={event => {
+          if (side === 'left' && event.key === 'Enter') openPreview();
+        }}
         onClick={() => {
           dismissPreview();
           setPinned(v => !v);
@@ -49,7 +54,13 @@ function Harness({
   );
 }
 
+beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+function hover(target: HTMLElement) {
+  fireEvent.pointerOver(target);
+  act(() => vi.advanceTimersByTime(160));
+}
 
 describe.each(['left', 'right'] as const)(
   '%s shared transient rail owner',
@@ -59,13 +70,13 @@ describe.each(['left', 'right'] as const)(
       render(<Harness side={side} />);
       const trigger = screen.getByTestId('trigger');
       const rail = screen.getByTestId('rail');
-      fireEvent.pointerOver(trigger);
+      hover(trigger);
       expect(rail).toHaveAttribute('data-preview', 'true');
       expect(trigger).not.toHaveFocus();
       fireEvent.pointerOut(trigger);
       act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS - 1));
       expect(rail).toHaveAttribute('data-preview', 'true');
-      fireEvent.pointerOver(rail);
+      hover(rail);
       act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS * 2));
       expect(rail).toHaveAttribute('data-preview', 'true');
       fireEvent.pointerOut(rail);
@@ -77,7 +88,7 @@ describe.each(['left', 'right'] as const)(
     it('pins an active preview and never auto-hides the pin on leave', () => {
       vi.useFakeTimers();
       render(<Harness side={side} />);
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       fireEvent.click(screen.getByTestId('trigger'));
       fireEvent.pointerOut(screen.getByTestId('rail'));
       act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS * 2));
@@ -91,7 +102,7 @@ describe.each(['left', 'right'] as const)(
     it('retains overlay placement after dismissal until pinning or a scope reset', () => {
       vi.useFakeTimers();
       const { rerender } = render(<Harness side={side} />);
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       fireEvent.pointerOut(screen.getByTestId('trigger'));
       act(() => vi.advanceTimersByTime(1000));
       expect(screen.getByTestId('rail')).toHaveAttribute(
@@ -109,7 +120,7 @@ describe.each(['left', 'right'] as const)(
       );
       fireEvent.click(screen.getByTestId('trigger'));
       act(() => screen.getByTestId('outside').focus());
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-floating',
         'true'
@@ -128,6 +139,8 @@ describe.each(['left', 'right'] as const)(
     it('offers equivalent keyboard access and Escape does not reopen from retained focus', () => {
       render(<Harness side={side} />);
       act(() => screen.getByTestId('trigger').focus());
+      if (side === 'left')
+        fireEvent.keyDown(screen.getByTestId('trigger'), { key: 'Enter' });
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-preview',
         'true'
@@ -142,7 +155,7 @@ describe.each(['left', 'right'] as const)(
 
     it('retains the underlying preview when Escape is consumed by a nested overlay', () => {
       render(<Harness side={side} />);
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       const overlay = render(
         <div role='dialog' aria-label='Rail menu'>
           <button type='button'>Close menu</button>
@@ -175,13 +188,13 @@ describe.each(['left', 'right'] as const)(
 
     it('outside input and route changes cancel pending previews', () => {
       const { rerender } = render(<Harness side={side} />);
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       fireEvent.pointerDown(screen.getByTestId('outside'));
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-preview',
         'false'
       );
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       rerender(<Harness side={side} resetKey='chat' />);
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-preview',
@@ -193,7 +206,7 @@ describe.each(['left', 'right'] as const)(
       render(<Harness side={side} />);
       fireEvent.click(screen.getByTestId('trigger'));
       fireEvent.click(screen.getByTestId('trigger'));
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-preview',
         'false'
@@ -202,7 +215,7 @@ describe.each(['left', 'right'] as const)(
         clientX: 500,
         clientY: 500,
       });
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-preview',
         'true'
@@ -215,6 +228,8 @@ describe.each(['left', 'right'] as const)(
       fireEvent.click(screen.getByTestId('trigger'));
       act(() => screen.getByTestId('outside').focus());
       act(() => screen.getByTestId('trigger').focus());
+      if (side === 'left')
+        fireEvent.keyDown(screen.getByTestId('trigger'), { key: 'Enter' });
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-preview',
         'true'
@@ -227,8 +242,10 @@ describe.each(['left', 'right'] as const)(
 
     it('disables transient preview for the mobile adapter', () => {
       render(<Harness side={side} enabled={false} />);
-      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      hover(screen.getByTestId('trigger'));
       act(() => screen.getByTestId('trigger').focus());
+      if (side === 'left')
+        fireEvent.keyDown(screen.getByTestId('trigger'), { key: 'Enter' });
       expect(screen.getByTestId('rail')).toHaveAttribute(
         'data-preview',
         'false'
@@ -236,3 +253,21 @@ describe.each(['left', 'right'] as const)(
     });
   }
 );
+
+it('independent collapsed media retains ownership without opening navigation', () => {
+  render(
+    <>
+      <Harness side='left' />
+      <button type='button' data-rail-owned-overlay='left' data-state='visible'>
+        Audio play
+      </button>
+    </>
+  );
+  hover(screen.getByRole('button', { name: 'Audio play' }));
+  expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'false');
+  fireEvent.keyDown(screen.getByTestId('trigger'), { key: 'Enter' });
+  hover(screen.getByRole('button', { name: 'Audio play' }));
+  expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'true');
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'false');
+});

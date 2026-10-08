@@ -112,6 +112,10 @@
   --app-shell-header-padding-x: 12px;
   --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
   --app-shell-gap: 8px;
+  --app-shell-floating-rail-top: calc(
+    var(--app-shell-header-height) +
+    var(--app-shell-gap)
+  );
   --app-shell-radius: 12px;
   --app-shell-radius-item: 8px;
   --app-shell-radius-menu: 8px;
@@ -245,6 +249,7 @@
   --ds-motion-subtle-duration: 150ms;
   --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
   --ds-motion-cinematic-duration: 420ms;
+  --ds-motion-shell-rail-duration: 220ms;
   --ds-motion-cinematic-easing: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Core Theme Inputs */
@@ -2807,6 +2812,7 @@
   :root {
     --ds-motion-subtle-duration: 0ms;
     --ds-motion-cinematic-duration: 0ms;
+    --ds-motion-shell-rail-duration: 0ms;
     --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;
@@ -3465,4 +3471,25 @@ html:not(.dark) .smart-link-powered-by {
 
   /* Rotation order — blue, purple, pink, amber, green, teal, red, cyan, yellow.
    * Apple-style hue rotation across feature surfaces. */
+}
+
+/* Keep compact sidebar paint inside a separate, non-overlapping touch slot.
+ * Transparent borders belong to the hit container; background paint remains
+ * 28px tall. Desktop density and icon sizes stay unchanged. */
+@media (pointer: coarse) {
+  .sidebar-touch-row,
+  .sidebar-touch-menu [role="menuitem"] {
+    min-height: 44px;
+    min-width: 44px;
+    border-block: 8px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .sidebar-touch-menu [role="menuitem"] {
+    padding-block: 0;
+  }
+
+  .sidebar-touch-icon {
+    border-inline: 8px solid transparent;
+  }
 }

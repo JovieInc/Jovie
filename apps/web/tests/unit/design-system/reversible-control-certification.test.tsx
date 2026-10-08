@@ -32,7 +32,8 @@ const TOGGLE_NAME = /^(collapse|expand) sidebar$/i;
 
 function driverFor(
   renderTree: () => ReactNode,
-  inputs: readonly ReversibleInput[] = ['pointer', 'keyboard', 'shortcut']
+  inputs: readonly ReversibleInput[] = ['pointer', 'keyboard', 'shortcut'],
+  controlName: RegExp = TOGGLE_NAME
 ): ReversibleControlDriver<OpenState> {
   const user = userEvent.setup();
   let view = render(renderTree());
@@ -42,7 +43,7 @@ function driverFor(
     readState: () =>
       screen.getByTestId('rail-owner').dataset.state as OpenState,
     controls: () =>
-      screen.queryAllByRole('button', { name: TOGGLE_NAME, hidden: true }),
+      screen.queryAllByRole('button', { name: controlName, hidden: true }),
     ariaFor: state => ({ 'aria-expanded': String(state === 'open') }),
     async activate(input, control) {
       if (input === 'pointer') await user.click(control);
@@ -137,7 +138,19 @@ describe('reversible control certification (JOV-7713)', () => {
   });
 
   it('certifies the real sidebar toggle across pointer, keyboard, shortcut and remount', async () => {
-    expect(await certifyReversibleControl(driverFor(realSidebar))).toEqual([]);
+    expect(
+      await certifyReversibleControl(
+        driverFor(
+          realSidebar,
+          ['pointer', 'keyboard', 'shortcut'],
+          /^(collapse|expand|close) sidebar$/i
+        )
+      )
+    ).toEqual([]);
+    expect(
+      screen.getByRole('button', { name: 'Close sidebar' })
+    ).toHaveAttribute('aria-pressed', 'false');
+    expect(document.cookie).toContain('sidebar:state=false');
   });
 
   it.each<[Defect, ReversibleInput[], string]>([

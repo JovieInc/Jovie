@@ -173,13 +173,13 @@ describe('shell rail-motion tokens (JOV-4522)', () => {
       'utf8'
     );
     expect(css).toContain(
-      `--ds-motion-cinematic-duration: ${SHELL_RAIL_MOTION_MS}ms`
+      `--ds-motion-shell-rail-duration: ${SHELL_RAIL_MOTION_MS}ms`
     );
   });
 
   it('keeps allocation, sheet, and label staging on cinematic timing with a reduced-motion exit', () => {
     for (const classes of [SHELL_RAIL_ALLOCATION, SHELL_RAIL_SHEET]) {
-      expect(classes).toContain('duration-cinematic');
+      expect(classes).toContain('duration-shell-rail');
       expect(classes).toContain('ease-cinematic');
       expect(classes).toContain('motion-reduce:transition-none');
     }

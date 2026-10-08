@@ -7,6 +7,34 @@ import { ContextMenuOverlay } from './ContextMenuOverlay';
 import type { ContextMenuState } from './context-menu.types';
 
 describe('ContextMenuOverlay', () => {
+  it('focuses enabled menu actions, supports arrow navigation and restores the trigger on Escape', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <ContextMenuOverlay
+        state={{
+          x: 100,
+          y: 100,
+          items: [
+            { label: 'First', onSelect: vi.fn() },
+            { label: 'Disabled', onSelect: vi.fn(), disabled: true },
+            { label: 'Last', onSelect: vi.fn() },
+          ],
+        }}
+        onClose={onClose}
+      />
+    );
+    expect(screen.getByRole('menuitem', { name: 'First' })).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'Last' })).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+    rerender(<ContextMenuOverlay state={null} onClose={vi.fn()} />);
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  });
   it('renders nothing when state is null', () => {
     const { container } = render(
       <ContextMenuOverlay state={null} onClose={() => undefined} />
@@ -75,7 +103,7 @@ describe('ContextMenuOverlay', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('fires onClose when the backdrop is clicked', () => {
+  it('dismisses without intercepting the outside focus target', () => {
     const onClose = vi.fn();
     const state: ContextMenuState = {
       x: 0,
@@ -83,8 +111,13 @@ describe('ContextMenuOverlay', () => {
       items: [{ label: 'Play', onSelect: () => undefined }],
     };
     render(<ContextMenuOverlay state={state} onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Close Menu' }));
+    const target = document.createElement('button');
+    document.body.append(target);
+    fireEvent.pointerDown(target);
+    target.focus();
     expect(onClose).toHaveBeenCalledOnce();
+    expect(target).toHaveFocus();
+    target.remove();
   });
 
   it('renders an icon when supplied', () => {

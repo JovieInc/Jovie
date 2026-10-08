@@ -1,9 +1,16 @@
 'use client';
 
-import { IconButton } from '@jovie/ui';
+import {
+  Button,
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import { Sparkles, X } from 'lucide-react';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { useRailFocusReturn } from '@/components/shell/useRailFocusReturn';
+import { useSidebarFlyout } from '@/components/shell/useSidebarFlyout';
 import {
   parseDailyWhatsNewPrompt,
   WHATS_NEW_DAILY_DISMISS_PATH,
@@ -181,8 +188,74 @@ export function WhatsNewBannerView({
   );
 }
 
+/** A stable dock trigger discloses release details without changing rail geometry. */
+function CompactWhatsNew({
+  unseen,
+  onOpen,
+  onDismiss,
+  popupRef,
+}: WhatsNewBannerViewProps & {
+  readonly popupRef: RefObject<HTMLDivElement | null>;
+}) {
+  const flyout = useSidebarFlyout('whats-new');
+  return (
+    <Popover open={flyout.open} onOpenChange={flyout.onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant='ghost'
+          size='sm'
+          type='button'
+          onClick={flyout.activate}
+        >
+          <Sparkles aria-hidden='true' className='size-3.5' />
+          What&apos;s New
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        ref={popupRef}
+        side='right'
+        align='end'
+        collisionPadding={flyout.collisionPadding}
+        data-rail-owned-overlay='left'
+        data-sidebar-flyout='whats-new'
+        data-sidebar-flyout-owner='whats-new'
+        onCloseAutoFocus={flyout.onCloseAutoFocus}
+        className='w-80'
+      >
+        <p className='text-xs font-medium'>{unseen.entry.title}</p>
+        <p className='mt-1 text-xs text-secondary-token'>
+          {unseen.entry.summary}
+        </p>
+        {unseen.entry.highlights.length ? (
+          <ul className='mt-2 space-y-1 text-xs text-secondary-token'>
+            {unseen.entry.highlights.slice(0, 3).map(highlight => (
+              <li key={highlight}>{highlight}</li>
+            ))}
+          </ul>
+        ) : null}
+        <div className='mt-3 flex items-center justify-between gap-2'>
+          <a
+            href={unseen.href}
+            target='_blank'
+            rel='noopener noreferrer'
+            onClick={onOpen}
+            className='focus-ring-themed text-xs underline-offset-2 hover:underline'
+          >
+            Full release notes
+          </a>
+          <Button variant='ghost' size='sm' type='button' onClick={onDismiss}>
+            Dismiss
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface WhatsNewBannerProps {
   readonly enabled: boolean;
+  readonly compact?: boolean;
+  readonly suppressed?: boolean;
   /** Icon-only sidebar: the card has no room, so wait until it expands. */
   readonly collapsed?: boolean;
   /** Deterministic actual-component stories use the same loading contract. */
@@ -195,12 +268,20 @@ interface WhatsNewBannerProps {
  */
 export function WhatsNewBanner({
   enabled,
+  compact = false,
+  suppressed = false,
   collapsed = false,
   fetchImpl = fetch,
 }: WhatsNewBannerProps) {
   const [resolved, setResolved] = useState<ResolvedWhatsNew | null>(null);
   const regionRef = useRef<HTMLElement>(null);
+  const compactRef = useRef<HTMLDivElement>(null);
   useRailFocusReturn(regionRef, !enabled || collapsed || !resolved, 'left');
+  useRailFocusReturn(
+    compactRef,
+    !enabled || collapsed || !resolved || suppressed,
+    'left'
+  );
 
   useEffect(() => {
     if (!enabled) {
@@ -225,7 +306,7 @@ export function WhatsNewBanner({
     };
   }, [enabled, fetchImpl]);
 
-  if (!enabled || collapsed || !resolved) return null;
+  if (!enabled || collapsed || suppressed || !resolved) return null;
   const { unseen, postId } = resolved;
 
   const markSeen = () => {
@@ -246,6 +327,15 @@ export function WhatsNewBanner({
     setTimeout(() => setResolved(null), 0);
   };
 
+  if (compact)
+    return (
+      <CompactWhatsNew
+        popupRef={compactRef}
+        unseen={unseen}
+        onOpen={open}
+        onDismiss={dismiss}
+      />
+    );
   return (
     <WhatsNewBannerView
       regionRef={regionRef}

@@ -94,7 +94,7 @@ describe('WorkspaceSelector', () => {
     expect(label.className).toContain(
       'transition-[max-width,opacity,transform]'
     );
-    expect(label.className).toContain('duration-cinematic');
+    expect(label.className).toContain('duration-shell-rail');
     expect(label.className).toContain('group-data-[collapsible=icon]:max-w-0');
     expect(label.className).not.toContain(
       'group-data-[collapsible=icon]:hidden'

@@ -2,6 +2,8 @@
 
 import { Download, Loader2, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
+import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
+import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { useDesktopUpdate } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 import { useWebUpdate } from '@/lib/version/use-web-update';
@@ -11,7 +13,9 @@ export type UpdateAvailablePillState =
   | 'ready-to-restart'
   | 'restarting'
   | 'web-ready'
-  | 'web-updating';
+  | 'web-updating'
+  | 'retry'
+  | 'deferred';
 
 interface UpdateAvailablePillViewProps {
   readonly state: UpdateAvailablePillState;
@@ -22,7 +26,10 @@ export function UpdateAvailablePillView({
   state,
   onClick,
 }: UpdateAvailablePillViewProps) {
-  const isBusy = state === 'downloading' || state === 'restarting';
+  const isBusy =
+    state === 'downloading' ||
+    state === 'restarting' ||
+    state === 'web-updating';
   const isDownloading = state === 'downloading';
   const isDesktopReady = state === 'ready-to-restart';
 
@@ -32,6 +39,8 @@ export function UpdateAvailablePillView({
     restarting: 'Restarting…',
     'web-ready': 'Update',
     'web-updating': 'Updating…',
+    retry: 'Retry update',
+    deferred: 'Save work first',
   }[state];
 
   const ariaLabel = {
@@ -40,6 +49,8 @@ export function UpdateAvailablePillView({
     restarting: 'Restarting to update',
     'web-ready': 'Update available',
     'web-updating': 'Updating',
+    retry: 'Retry update',
+    deferred: 'Save work first',
   }[state];
 
   return (
@@ -75,7 +86,7 @@ export function UpdateAvailablePillView({
   );
 }
 
-export function UpdateAvailablePill() {
+function StandaloneUpdateAvailablePill() {
   const desktop = useDesktopUpdate();
   const web = useWebUpdate();
   const [updating, setUpdating] = useState(false);
@@ -90,7 +101,12 @@ export function UpdateAvailablePill() {
     setUpdating(true);
 
     if (desktop.available) {
-      desktop.install();
+      void desktop
+        .install()
+        .then(started => {
+          if (started === false) setUpdating(false);
+        })
+        .catch(() => setUpdating(false));
     } else {
       web.reload();
     }
@@ -106,4 +122,50 @@ export function UpdateAvailablePill() {
   })();
 
   return <UpdateAvailablePillView state={state} onClick={handleClick} />;
+}
+
+/** The mounted runtime owner supplies state; standalone stories retain the legacy adapter. */
+export function UpdateAvailablePill() {
+  const runtime = useRuntimeUpdate();
+  const desktop = useDesktopUpdateContext();
+  if (!runtime) return <StandaloneUpdateAvailablePill />;
+  const phase = desktop?.state.state;
+  if (phase === 'error')
+    return (
+      <UpdateAvailablePillView
+        state='retry'
+        onClick={() => desktop?.openModal()}
+      />
+    );
+  if (
+    !runtime.available &&
+    !['available', 'downloading', 'ready'].includes(phase ?? '')
+  )
+    return null;
+  const state: UpdateAvailablePillState =
+    runtime.busy || desktop?.installing
+      ? phase === 'downloading'
+        ? 'downloading'
+        : runtime.isDesktop
+          ? 'restarting'
+          : 'web-updating'
+      : runtime.deferred || desktop?.deferred
+        ? 'deferred'
+        : phase === 'downloading'
+          ? 'downloading'
+          : phase === 'ready'
+            ? 'ready-to-restart'
+            : runtime.isDesktop
+              ? 'ready-to-restart'
+              : 'web-ready';
+  return (
+    <UpdateAvailablePillView
+      state={state}
+      onClick={() =>
+        phase && phase !== 'unsupported'
+          ? desktop?.openModal()
+          : runtime.apply()
+      }
+    />
+  );
 }

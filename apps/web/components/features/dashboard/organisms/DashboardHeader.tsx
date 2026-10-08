@@ -8,6 +8,7 @@ export interface DashboardHeaderProps {
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly leading?: ReactNode;
   readonly sidebarTrigger?: ReactNode;
+  readonly sidebarTriggerOnMobile?: boolean;
   /** Mirrored shared right-rail control, reserved immediately before title seam. */
   readonly railToggle?: ReactNode;
   /** Content shown after breadcrumb (left side) */
@@ -75,6 +76,7 @@ export function DashboardHeader({
   breadcrumbs,
   leading,
   sidebarTrigger,
+  sidebarTriggerOnMobile = false,
   railToggle,
   breadcrumbSuffix,
   action,
@@ -124,7 +126,10 @@ export function DashboardHeader({
         {sidebarTrigger ? (
           <div
             data-web-sidebar-control='true'
-            className='max-lg:hidden items-center lg:flex'
+            className={cn(
+              'items-center lg:flex',
+              sidebarTriggerOnMobile ? 'flex' : 'max-lg:hidden'
+            )}
           >
             {sidebarTrigger}
           </div>

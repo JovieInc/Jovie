@@ -12,7 +12,7 @@ import {
   type AskJovieIntent,
   classifyAskJovieIntent,
 } from '@/lib/ask-jovie/intent';
-import type { BrandVariant } from '@/lib/brand/tokens';
+import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 interface AskJovieMessage {
@@ -199,6 +199,7 @@ function AskJoviePanel({ pathname }: AskJoviePanelProps) {
 
 export interface AskJovieMarkProps {
   readonly variant?: BrandVariant;
+  readonly railOwner?: 'left' | 'right';
 }
 
 /**
@@ -206,7 +207,10 @@ export interface AskJovieMarkProps {
  * spins the mark once and slides the wordmark out. Click opens the contextual
  * chat surface instead of navigating. Honors prefers-reduced-motion.
  */
-export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
+export function AskJovieMark({
+  variant = 'jovie',
+  railOwner,
+}: AskJovieMarkProps) {
   const pathname = usePathname();
 
   return (
@@ -217,7 +221,7 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
           aria-label='Ask Jovie'
           data-testid='ask-jovie-trigger'
           className={cn(
-            'ask-jovie-mark group flex h-7 items-center gap-1.5 rounded-md px-1',
+            'ask-jovie-mark group flex h-7 sidebar-touch-row items-center gap-1.5 rounded-md px-1',
             'text-sidebar-item-foreground opacity-60',
             'transition-opacity duration-subtle hover:opacity-100 focus-visible:opacity-100',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
@@ -235,12 +239,17 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
           </span>
           <span className='ask-jovie-wordmark'>
             <span className='overflow-hidden whitespace-nowrap text-app tracking-tight'>
-              Jovie
+              {BRAND_WORDMARKS[variant]}
             </span>
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent side='right' align='start' aria-label='Ask Jovie'>
+      <PopoverContent
+        side='right'
+        align='start'
+        aria-label='Ask Jovie'
+        data-rail-owned-overlay={railOwner}
+      >
         <AskJoviePanel pathname={pathname} />
       </PopoverContent>
     </Popover>

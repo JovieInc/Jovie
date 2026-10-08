@@ -2458,6 +2458,8 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     minHeight: 600,
     icon: getAppIconPath(),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    // Use Electron's native window-controls bounds in the hosted titlebar.
+    titleBarOverlay: process.platform === 'darwin' ? { height: 44 } : false,
     trafficLightPosition:
       process.platform === 'darwin' ? MACOS_TRAFFIC_LIGHT_POSITION : undefined,
     webPreferences: {

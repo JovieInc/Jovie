@@ -97,7 +97,7 @@ export interface DesktopUpdateSnapshot {
   readonly state: DesktopUpdateViewState;
   readonly check: () => void;
   readonly download: () => void;
-  readonly install: () => void;
+  readonly install: () => Promise<unknown>;
 }
 
 const noop = () => undefined;
@@ -140,7 +140,7 @@ export function useDesktopUpdate(): DesktopUpdateSnapshot {
       state: DESKTOP_UPDATE_UNSUPPORTED,
       check: noop,
       download: noop,
-      install: noop,
+      install: async () => false,
     };
   }
 
@@ -148,6 +148,6 @@ export function useDesktopUpdate(): DesktopUpdateSnapshot {
     state: phase ?? { state: 'idle' },
     check: () => void bridge.check().catch(() => undefined),
     download: () => void bridge.download().catch(() => undefined),
-    install: () => void bridge.install().catch(() => undefined),
+    install: () => bridge.install(),
   };
 }

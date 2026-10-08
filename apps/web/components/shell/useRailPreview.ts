@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SHELL_RAIL_PREVIEW_GRACE_MS } from './rail-motion';
+import { isAvailable } from './useRailFocusReturn';
 
 /** Transient access belongs to the rail owner, never its persisted pin bit.
  * Delegated events cover browser and native-titlebar affordances equally. */
@@ -21,6 +22,7 @@ export function useRailPreview({
     'preview' | 'pinned'
   >('pinned');
   const blocked = useRef(false);
+  const explicit = useRef(false);
   const pointerInside = useRef(false);
   const pointerPoint = useRef<{ x: number; y: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,14 +33,30 @@ export function useRailPreview({
   const dismissPreview = useCallback(() => {
     cancel();
     blocked.current = true;
+    explicit.current = false;
     setIsPreview(false);
   }, [cancel]);
+  const openPreview = useCallback(() => {
+    cancel();
+    blocked.current = false;
+    explicit.current = true;
+    setPresentationMode('preview');
+    setIsPreview(true);
+  }, [cancel]);
+
+  // Activation promotes hover access to explicit access. A slow pointer click
+  // must not close the preview that its own pointer entry just opened.
+  const togglePreview = useCallback(() => {
+    if (isPreview && explicit.current) dismissPreview();
+    else openPreview();
+  }, [isPreview, dismissPreview, openPreview]);
 
   useEffect(() => {
     cancel();
     setIsPreview(false);
     setPresentationMode('pinned');
     blocked.current = false;
+    explicit.current = false;
   }, [cancel, resetKey, enabled]);
 
   const previousPinned = useRef(pinned);
@@ -54,9 +72,27 @@ export function useRailPreview({
 
   useEffect(() => {
     if (!enabled) return;
-    const selector = `[data-rail-toggle="${side}"], [data-rail-preview-region="${side}"]`;
-    const inside = (target: EventTarget | null) =>
-      target instanceof Element && Boolean(target.closest(selector));
+    const selector = `[data-rail-toggle="${side}"], [data-rail-preview-region="${side}"], [data-rail-owned-overlay="${side}"]`;
+    const inside = (target: EventTarget | null, depth = 0): boolean => {
+      if (!(target instanceof Element)) return false;
+      if (target.closest(selector)) return true;
+      if (depth >= 3) return false;
+      // Radix menus label each portal with its real trigger. Follow that
+      // ownership through submenu portals instead of treating all menus as rails.
+      const menu = target.closest('[role="menu"][aria-labelledby]');
+      return Boolean(
+        menu
+          ?.getAttribute('aria-labelledby')
+          ?.split(' ')
+          .some(id => inside(document.getElementById(id), depth + 1))
+      );
+    };
+    const hasOwnedOverlay = () =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[role="menu"][data-state="open"], [data-rail-owned-overlay][data-state="open"], [data-rail-owned-overlay]:not([data-state])'
+        )
+      ).some(element => inside(element));
     const enter = (event: Event) => {
       if (!inside(event.target)) {
         // Fresh focus on a live outside control ends suppression even when
@@ -71,9 +107,19 @@ export function useRailPreview({
         return;
       }
       if (event.type === 'pointerover') {
+        if ((event as PointerEvent).pointerType === 'touch') return;
         pointerInside.current = true;
       }
       if (pinned) return;
+      // Owned portals retain a preview; independent media cannot create one.
+      if (
+        !isPreview &&
+        event.target instanceof Element &&
+        !event.target.closest(
+          `[data-rail-toggle="${side}"], [data-rail-preview-region="${side}"]`
+        )
+      )
+        return;
       // An entity inspector already owns the right surface. Hover must not
       // reinterpret it as an unsolicited artist-profile preview.
       if (
@@ -86,8 +132,21 @@ export function useRailPreview({
         return;
       cancel();
       if (!blocked.current) {
-        setPresentationMode('preview');
-        setIsPreview(true);
+        if (
+          side === 'left' &&
+          event.type === 'focusin' &&
+          event.target instanceof Element &&
+          event.target.closest('[data-rail-toggle="left"]')
+        )
+          return;
+        const show = () => {
+          setPresentationMode('preview');
+          setIsPreview(true);
+          timer.current = null;
+        };
+        if (side === 'left' && event.type === 'pointerover' && !isPreview) {
+          timer.current = setTimeout(show, 160);
+        } else show();
       }
     };
     const leave = (event: MouseEvent | FocusEvent) => {
@@ -101,9 +160,13 @@ export function useRailPreview({
         event.relatedTarget !== document.documentElement
       )
         blocked.current = false;
-      if (pinned || blocked.current) return;
+      if (pinned || blocked.current || explicit.current) return;
       cancel();
       timer.current = setTimeout(() => {
+        if (inside(document.activeElement) || hasOwnedOverlay()) {
+          timer.current = null;
+          return;
+        }
         setIsPreview(false);
         timer.current = null;
       }, SHELL_RAIL_PREVIEW_GRACE_MS);
@@ -130,6 +193,7 @@ export function useRailPreview({
         if (inside(event.target)) enter(event);
       }
     };
+
     const outside = (event: PointerEvent) => {
       if (isPreview && !inside(event.target)) {
         dismissPreview();
@@ -137,10 +201,15 @@ export function useRailPreview({
       }
     };
     const escape = (event: KeyboardEvent) => {
+      if (hasOwnedOverlay()) return;
       // A dialog/menu that consumed Escape in capture owns this dismissal.
       if (event.key === 'Escape' && !event.defaultPrevented && isPreview) {
         event.preventDefault();
         dismissPreview();
+        const trigger = Array.from(
+          document.querySelectorAll<HTMLElement>(`[data-rail-toggle="${side}"]`)
+        ).find(isAvailable);
+        trigger?.focus({ preventScroll: true });
       }
     };
     document.addEventListener('pointermove', move);
@@ -172,5 +241,7 @@ export function useRailPreview({
       // Pinning or a scope reset, rather than a timer, owns that transfer.
       presentationMode === 'preview',
     dismissPreview,
+    openPreview,
+    togglePreview,
   };
 }

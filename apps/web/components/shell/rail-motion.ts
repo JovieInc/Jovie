@@ -5,13 +5,13 @@
  * its exit/entry on the same timing so sidebar, right rail, and audio dock
  * move as one system. Route code must not introduce local width/transform
  * physics for shell rails — compose these classes instead of re-declaring
- * `duration-cinematic`/`ease-cinematic` pairs.
+ * `duration-shell-rail`/`ease-cinematic` pairs.
  *
- * `SHELL_RAIL_MOTION_MS` is the JS mirror of `--ds-motion-cinematic-duration`
+ * `SHELL_RAIL_MOTION_MS` is the JS mirror of `--ds-motion-shell-rail-duration`
  * (design-system.css). A source-contract test keeps them in sync so the
  * phase state machine settles exactly when the CSS transition does.
  */
-export const SHELL_RAIL_MOTION_MS = 420;
+export const SHELL_RAIL_MOTION_MS = 220;
 
 /** Pointer bridge grace shared by both transient desktop rails. */
 export const SHELL_RAIL_PREVIEW_GRACE_MS = 180;
@@ -26,19 +26,19 @@ export type RailMotionPhase = 'closed' | 'opening' | 'open' | 'closing';
  * and its content travel together.
  */
 export const SHELL_RAIL_ALLOCATION =
-  'transition-shell-rail-allocation duration-cinematic ease-cinematic motion-reduce:transition-none';
+  'transition-shell-rail-allocation duration-shell-rail ease-cinematic motion-reduce:transition-none';
 
 /** Main-plane geometry: the shell-owned surfaces that yield/reclaim canvas. */
 export const SHELL_RAIL_MAIN_PLANE =
-  'transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none';
+  'transition-[flex-basis,width] duration-shell-rail ease-cinematic motion-reduce:transition-none';
 
 /** Shell-level gap/padding allocation between the rail and the main plane. */
 export const SHELL_RAIL_FRAME_GAP =
-  'transition-[gap,padding] duration-cinematic ease-cinematic motion-reduce:transition-none';
+  'transition-[gap,padding] duration-shell-rail ease-cinematic motion-reduce:transition-none';
 
 /** Mobile sheet adapter: transform-only slide, no desktop allocation motion. */
 export const SHELL_RAIL_SHEET =
-  'transition-transform duration-cinematic ease-cinematic motion-reduce:transition-none';
+  'transition-transform duration-shell-rail ease-cinematic motion-reduce:transition-none';
 
 /** Directional travel staged on exiting/entering rail content (6–8px). */
 export const SHELL_RAIL_TRAVEL = {
@@ -53,7 +53,7 @@ export const SHELL_RAIL_TRAVEL = {
  * the layout progressively (header brand cluster, trailing chrome).
  */
 export const SHELL_RAIL_STAGE =
-  'min-w-0 max-w-full overflow-hidden transition-[max-width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
+  'min-w-0 max-w-full overflow-hidden transition-[max-width,opacity,transform] duration-shell-rail ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
 
 /**
  * Staged exit for single-line labels inside flex rows: max-width collapse
@@ -61,7 +61,7 @@ export const SHELL_RAIL_STAGE =
  * present during the exit instead of popping to display:none at frame one.
  */
 export const SHELL_RAIL_LABEL =
-  'max-w-full overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
+  'max-w-full overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-shell-rail ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
 
 /**
  * Staged exit for labels inside single-column collapsed grids: absolute
@@ -69,7 +69,7 @@ export const SHELL_RAIL_LABEL =
  * cannot wrap to a phantom second row, while opacity + travel still stage.
  */
 export const SHELL_RAIL_LABEL_OVERLAY =
-  'transition-[opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
+  'transition-[opacity,transform] duration-shell-rail ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
 
 /**
  * Staged exit for block-level rail labels (section headers): height and
@@ -77,4 +77,4 @@ export const SHELL_RAIL_LABEL_OVERLAY =
  * than jumping when the header leaves.
  */
 export const SHELL_RAIL_BLOCK_LABEL =
-  'max-h-8 overflow-hidden transition-[max-height,margin,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:max-h-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';
+  'max-h-8 overflow-hidden transition-[max-height,margin,opacity,transform] duration-shell-rail ease-cinematic motion-reduce:transition-none group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:max-h-0 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:-translate-x-1.5 group-data-[collapsible=icon]:pointer-events-none';

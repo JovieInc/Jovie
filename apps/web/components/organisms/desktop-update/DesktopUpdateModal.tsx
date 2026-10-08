@@ -31,6 +31,8 @@ export interface DesktopUpdateModalViewProps {
   readonly loading: boolean;
   readonly onDownload: () => void;
   readonly onInstall: () => void;
+  readonly installing?: boolean;
+  readonly installNotice?: string | null;
   readonly onRetry: () => void;
   /** "Later" and Esc both land here. */
   readonly onLater: () => void;
@@ -65,6 +67,8 @@ export function DesktopUpdateModalView({
   loading,
   onDownload,
   onInstall,
+  installing = false,
+  installNotice = null,
   onRetry,
   onLater,
 }: DesktopUpdateModalViewProps) {
@@ -169,14 +173,23 @@ export function DesktopUpdateModalView({
         </DialogBody>
       ) : null}
 
+      {installNotice ? (
+        <DialogBody role='status'>{installNotice}</DialogBody>
+      ) : null}
       <DialogActions>
         <Button variant='secondary' onClick={onLater}>
           {state.state === 'downloading' ? COPY.hideAction : COPY.laterAction}
         </Button>
         {primary ? (
           // Focus the one primary action so Return confirms it.
-          <Button variant='primary' onClick={primary.onClick} autoFocus>
-            {primary.label}
+          <Button
+            variant='primary'
+            onClick={primary.onClick}
+            disabled={installing}
+            aria-busy={installing}
+            autoFocus
+          >
+            {installing ? 'Restarting…' : primary.label}
           </Button>
         ) : null}
       </DialogActions>
@@ -226,6 +239,8 @@ export function DesktopUpdateModal({
   state,
   onDownload,
   onInstall,
+  installing,
+  installNotice,
   onRetry,
   onLater,
 }: {
@@ -233,6 +248,8 @@ export function DesktopUpdateModal({
   readonly state: DesktopUpdatePhase;
   readonly onDownload: () => void;
   readonly onInstall: () => void;
+  readonly installing?: boolean;
+  readonly installNotice?: string | null;
   readonly onRetry: () => void;
   readonly onLater: () => void;
 }) {
@@ -266,6 +283,8 @@ export function DesktopUpdateModal({
       loading={loading}
       onDownload={onDownload}
       onInstall={onInstall}
+      installing={installing}
+      installNotice={installNotice}
       onRetry={onRetry}
       onLater={onLater}
     />

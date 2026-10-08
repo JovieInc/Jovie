@@ -18,6 +18,11 @@ import {
   useDesktopUpdateContext,
 } from './DesktopUpdateProvider';
 
+const work = vi.hoisted(() => ({ blocked: false }));
+vi.mock('@/lib/desktop/session-work-state', () => ({
+  getDesktopWorkState: () => ({ hasDraft: work.blocked }),
+}));
+
 function ContextProbe() {
   const ctx = useDesktopUpdateContext();
   return (
@@ -31,6 +36,7 @@ function ContextProbe() {
 }
 
 beforeEach(() => {
+  work.blocked = false;
   uninstallDesktopUpdateBridge();
   window.sessionStorage.clear();
   vi.stubGlobal(
@@ -51,6 +57,53 @@ afterEach(() => {
 });
 
 describe('DesktopUpdateProvider', () => {
+  it('guards the modal restart action and permits a deliberate retry after saving', async () => {
+    const { bridge } = installBridge({ state: 'ready', version: '26.9.17' });
+    render(
+      <DesktopUpdateProvider>
+        <ContextProbe />
+      </DesktopUpdateProvider>
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('update-state')).toHaveTextContent('ready')
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Open modal' }));
+    work.blocked = true;
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Restart To Update' })
+    );
+    expect(bridge.install).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('Save your draft');
+    work.blocked = false;
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Restart To Update' })
+    );
+    expect(bridge.install).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Restarting…' })).toBeDisabled();
+  });
+
+  it('keeps restart retryable when the native install rejects', async () => {
+    const { bridge } = installBridge({ state: 'ready', version: '26.9.17' });
+    vi.mocked(bridge.install).mockRejectedValueOnce(new Error('offline'));
+    render(
+      <DesktopUpdateProvider>
+        <ContextProbe />
+      </DesktopUpdateProvider>
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('update-state')).toHaveTextContent('ready')
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Open modal' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Restart To Update' })
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'could not start'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Restart To Update' })
+    ).toBeEnabled();
+  });
   it('renders nothing update-related on web (no bridge)', async () => {
     render(
       <DesktopUpdateProvider>

@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
 import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
@@ -15,6 +16,7 @@ import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader'
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
@@ -68,10 +70,18 @@ function AuthShellInner({
   // left-sidebar toggle in Electron. Keep the initial client tree identical to
   // SSR; the runtime CSS hides the header slot before paint, and this hook
   // removes it after hydration without replacing the shell or losing drafts.
-  const sidebarTrigger =
-    isMobile || isElectron ? null : !sidebarPinned ? (
+  const sidebarTrigger = isElectron ? null : isMobile || !sidebarPinned ? (
+    <div
+      className={cn('flex items-center gap-1.5', !isMobile && '-ml-3')}
+      data-collapsed-brand-anchor='true'
+    >
+      <AskJovieMark
+        variant={section === 'ov' ? 'ov' : 'jovie'}
+        railOwner='left'
+      />
       <SidebarCollapseButton />
-    ) : null;
+    </div>
+  ) : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
@@ -108,12 +118,14 @@ function AuthShellInner({
   return (
     <RuntimeUpdateProvider>
       <AppShellFrame
+        brandVariant={section === 'ov' ? 'ov' : 'jovie'}
         sidebar={sidebar}
         header={
           hideTopHeader ? null : (
             <DashboardHeader
               breadcrumbs={breadcrumbs}
               sidebarTrigger={sidebarTrigger}
+              sidebarTriggerOnMobile={isMobile}
               railToggle={railToggle}
               breadcrumbSuffix={headerBadge}
               action={headerAction}

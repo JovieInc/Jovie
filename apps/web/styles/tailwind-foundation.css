@@ -112,6 +112,7 @@
      collision triggering a self-referential lookup. */
   --transition-duration-subtle: var(--duration-subtle);
   --transition-duration-cinematic: var(--duration-cinematic);
+  --transition-duration-shell-rail: var(--ds-motion-shell-rail-duration);
   --ease-subtle: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out
