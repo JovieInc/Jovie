@@ -349,6 +349,78 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('selects shared sidebar browser proof for presentation and interaction changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'sidebar-storybook-selection-'));
+    try {
+      for (const path of [
+        'apps/web/components/organisms/UnifiedSidebar.tsx',
+        'apps/web/components/features/dashboard/dashboard-nav/capacity.ts',
+        'apps/web/components/features/dashboard/dashboard-nav/config.ts',
+        'apps/web/components/organisms/sidebar/context.tsx',
+        'apps/web/components/shell/SidebarMoreMenu.tsx',
+        'apps/web/components/shell/SidebarSummerRecentMenu.tsx',
+        'apps/web/components/organisms/CmdKPalette.tsx',
+        'apps/web/contexts/HeaderActionsContext.tsx',
+        'apps/web/components/atoms/RailToggleButton.tsx',
+        'apps/web/components/shell/SidebarRecentMenu.tsx',
+        'apps/web/components/shell/useSidebarPins.ts',
+        'apps/web/components/shell/useRailPreview.ts',
+        'apps/web/components/molecules/sidebar-collapse-button/SidebarCollapseButton.tsx',
+        'apps/web/styles/design-system.css',
+        'apps/web/tests/e2e/storybook-shared-sidebar.spec.ts',
+        'apps/web/components/organisms/Other.tsx',
+      ]) {
+        const output = join(root, 'output');
+        writeFileSync(output, '');
+        const result = spawnSync(
+          'bash',
+          ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CHANGED_PATHS: path,
+              RUNNER_TEMP: root,
+              GITHUB_OUTPUT: output,
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const flags = Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        );
+        expect(flags.shared_sidebar, path).toBe(
+          path.endsWith('Other.tsx') ? 'false' : 'true'
+        );
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+    expect(remaining).toContain(
+      'RUN_SHARED_SIDEBAR: ${{ steps.storybook-browser.outputs.shared_sidebar }}'
+    );
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-shared-sidebar.spec.ts)'
+    );
+    expect(
+      jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+    ).toContain('tests/e2e/storybook-shared-sidebar.spec.ts');
+  });
+
   it('selects the crawler state proof through the maintained Storybook browser path', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -417,6 +489,7 @@ describe('ci-fast bounded parallel workflow', () => {
         kbd: 'false',
         crawler: 'true',
         desktop_update: 'false',
+        shared_sidebar: 'false',
         overlay: 'false',
         privacy: 'false',
         tasks: 'false',
@@ -624,6 +697,7 @@ describe('ci-fast bounded parallel workflow', () => {
         overlay: 'false',
         tasks: 'true',
         desktop_update: 'false',
+        shared_sidebar: 'false',
         privacy: 'false',
       });
 

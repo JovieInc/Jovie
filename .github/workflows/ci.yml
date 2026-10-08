@@ -2034,6 +2034,7 @@ jobs:
             echo "privacy=false"
             echo "tasks=false"
             echo "desktop_update=false"
+            echo "shared_sidebar=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2044,6 +2045,7 @@ jobs:
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
+          SHARED_SIDEBAR_STORYBOOK_PATTERN='^apps/web/(components/(organisms/(UnifiedSidebar(\.stories)?\.tsx|AuthShell\.tsx|AppShellFrame\.tsx|DesktopTitlebar\.tsx|CommandPalette\.tsx|CmdKPalette\.tsx|CmdKMainPlaneSearchInput\.tsx|SidebarBottomNowPlayingBridge\.tsx|operator-navigation\.ts|sidebar/.*)|shell/(Sidebar.*|useSidebar.*|useRail.*|rail-motion\.ts)|atoms/(RailToggleButton|UpdateAvailablePill)\.tsx|ask-jovie/AskJovie\.tsx|molecules/sidebar-collapse-button/.*|features/dashboard/(dashboard-nav/(DashboardNav\.tsx|capacity\.ts|config\.ts)|organisms/DashboardHeader\.tsx))|contexts/HeaderActionsContext\.tsx|styles/(design-system|tailwind-foundation)\.css|app/globals\.css|tests/e2e/storybook-shared-sidebar\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -2089,6 +2091,12 @@ jobs:
           if grep -qE "$PRIVACY_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "privacy=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$SHARED_SIDEBAR_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "shared_sidebar=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2171,6 +2179,7 @@ jobs:
           RUN_PRIVACY: ${{ steps.storybook-browser.outputs.privacy }}
           RUN_TASKS: ${{ steps.storybook-browser.outputs.tasks }}
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
+          RUN_SHARED_SIDEBAR: ${{ steps.storybook-browser.outputs.shared_sidebar }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2199,6 +2208,9 @@ jobs:
           fi
           if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
             specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
+          fi
+          if [[ "$RUN_SHARED_SIDEBAR" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-shared-sidebar.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -3411,6 +3423,7 @@ jobs:
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
+                  tests/e2e/storybook-shared-sidebar.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2
               exit 0

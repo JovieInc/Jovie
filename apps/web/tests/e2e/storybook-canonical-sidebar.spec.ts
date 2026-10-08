@@ -14,8 +14,9 @@ for (const theme of ['dark', 'light']) {
     );
     const nav = page.getByRole('navigation', { name: 'Dashboard Navigation' });
     await expect(nav).toBeVisible({ timeout: 60_000 });
-    await expect(nav.getByText('TODAY', { exact: true })).toBeVisible();
-    await expect(nav.getByText('EARLIER', { exact: true })).toBeVisible();
+    await expect(
+      nav.getByRole('button', { name: 'Recent Chats' })
+    ).toBeVisible();
     const footer = page.locator('[data-sidebar="footer"]');
     const before = await footer.boundingBox();
     expect(before).not.toBeNull();
@@ -25,24 +26,27 @@ for (const theme of ['dark', 'light']) {
     );
     const home = nav.getByRole('link', { name: 'Home' });
     const row = await home.boundingBox();
-    expect(row!.height).toBe(36);
+    expect(row!.height).toBe(28);
     const create = nav.getByRole('link', { name: 'New Chat' });
     const colors = await create.evaluate(element => ({
       foreground: getComputedStyle(element).color,
       background: getComputedStyle(element).backgroundColor,
     }));
     expect(colors.foreground).not.toBe(colors.background);
-    await nav.getByRole('button', { name: 'Filter Unread Chats' }).focus();
+    await nav.getByRole('button', { name: 'Recent Chats' }).click();
+    const recent = page.locator('[data-sidebar-flyout="recent"]');
+    await expect(recent.getByText('Today', { exact: true })).toBeVisible();
+    await expect(recent.getByText('Earlier', { exact: true })).toBeVisible();
+    await recent.getByRole('button', { name: 'Filter Unread Chats' }).focus();
     await page.keyboard.press('Enter');
-    await expect(nav.getByText('No unread chats')).toBeVisible();
+    await expect(recent.getByText('No unread chats')).toBeVisible();
     expect(await footer.boundingBox()).toEqual(before);
     await page.keyboard.press('Enter');
-    await expect(nav.getByText('Merch drop checklist')).toBeVisible();
+    await expect(recent.getByText('Merch drop checklist')).toBeVisible();
     expect(await footer.boundingBox()).toEqual(before);
-    await expect(nav.getByRole('link', { name: 'All chats' })).toHaveAttribute(
-      'href',
-      '/app/chats'
-    );
+    await expect(
+      recent.getByRole('link', { name: 'All chats' })
+    ).toHaveAttribute('href', '/app/chats');
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth
     );
