@@ -128,14 +128,12 @@ export function ConnectorCard({
     actionError ||
     (!available || status === 'unavailable'
       ? (unavailableReason ?? 'Connection is unavailable. Try again later.')
-      : isConnected
-        ? accountLabel?.trim()
-        : needsAttention
-          ? normalizedError ||
-            (status === 'needs_reauth'
-              ? 'Reconnect to continue syncing.'
-              : 'Connection failed. Try again.')
-          : undefined);
+      : needsAttention
+        ? normalizedError ||
+          (status === 'needs_reauth'
+            ? 'Reconnect to continue syncing.'
+            : 'Connection failed. Try again.')
+        : undefined);
   const grantedCapabilities = getGrantedConnectorCapabilities(
     definition,
     status,
@@ -206,7 +204,7 @@ export function ConnectorCard({
             </Badge>
           </div>
           <p className='text-xs text-secondary'>{definition.description}</p>
-          {(!isConnected || !available || actionError) && accountLabel && (
+          {accountLabel && (
             <p className='text-xs text-tertiary'>{accountLabel}</p>
           )}
           <p

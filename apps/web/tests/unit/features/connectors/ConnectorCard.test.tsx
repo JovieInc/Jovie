@@ -292,8 +292,22 @@ describe('ConnectorCard', () => {
     );
 
     const detail = screen.getByTestId('connector-detail-gmail');
-    expect(detail).toHaveTextContent('artist@example.com');
+    const account = screen.getByText('artist@example.com');
+    expect(account).toBeVisible();
+    expect(detail).not.toHaveTextContent('artist@example.com');
     expect(detail).not.toHaveTextContent('This should stay hidden.');
+
+    rerender(
+      <ConnectorCard
+        provider='gmail'
+        status='connected'
+        accountLabel='artist@example.com'
+        pending
+        pendingAction='disconnect'
+      />
+    );
+    expect(screen.getByText('artist@example.com')).toBe(account);
+    expect(screen.getByTestId('connector-detail-gmail')).toBe(detail);
 
     rerender(
       <ConnectorCard
@@ -307,7 +321,7 @@ describe('ConnectorCard', () => {
     expect(screen.getByTestId('connector-detail-gmail')).toBe(detail);
     expect(detail).toHaveTextContent('Google rejected the connection.');
     expect(detail).not.toHaveTextContent('artist@example.com');
-    expect(screen.getByText('artist@example.com')).toBeInTheDocument();
+    expect(screen.getByText('artist@example.com')).toBe(account);
 
     rerender(
       <ConnectorCard
@@ -318,7 +332,17 @@ describe('ConnectorCard', () => {
       />
     );
     expect(detail).toHaveTextContent('Disconnect failed');
-    expect(screen.getByText('artist@example.com')).toBeInTheDocument();
+    expect(screen.getByText('artist@example.com')).toBe(account);
+    rerender(
+      <ConnectorCard
+        provider='gmail'
+        status='disabled'
+        accountLabel='artist@example.com'
+      />
+    );
+    expect(screen.getByText('artist@example.com')).toBe(account);
+    expect(screen.getByTestId('connector-detail-gmail')).toBe(detail);
+    expect(detail).not.toHaveTextContent('Disconnect failed');
     rerender(<ConnectorCard provider='gmail' status='needs_reauth' />);
     expect(detail).toHaveTextContent('Reconnect to continue syncing.');
 
