@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   access,
+  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -1158,6 +1159,85 @@ describe('entrypoint contract', () => {
       executableSource,
       /CACHE_FILE = resolve\(__dirname, '\.orchestrator-cache\.json'\)/
     );
+  });
+
+  it('collects the pullRequests capacity evidence with one bounded retry and fails closed with the cause named', async () => {
+    // The PR inventory is the pullRequests capacity evidence (JOV-8000
+    // follow-up 5): one gh call per state with the rollup + body fields, the
+    // heaviest query in the remediate lane. It gets one bounded retry per
+    // state on any failure; a double failure keeps the inventory failed
+    // closed (never an empty-array pass) and names the gh cause.
+    const executableSource = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    assert.match(executableSource, /timeout: 45_000/);
+    assert.match(executableSource, /for \(let attempt = 0; attempt < 2/);
+    assert.match(executableSource, /gh-pr-list-\$\{state\}:/);
+
+    // Behavioral: a fake gh on PATH drives the exported collector through
+    // the retry (fail once, succeed on the second call) and through the
+    // fail-closed double failure.
+    const tempDir = await mkdtemp('/tmp/backlog-gh-');
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const callsPath = resolve(tempDir, 'calls');
+    const openAttemptsPath = resolve(tempDir, 'open-attempts');
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'echo "$@" >> "$CALLS_PATH"',
+        '# $6 is the --state value (pr list --repo JovieInc/Jovie --state <state>)',
+        'if [ "$6" = "open" ]; then',
+        '  echo x >> "$OPEN_ATTEMPTS_PATH"',
+        '  if [ "$(wc -l < "$OPEN_ATTEMPTS_PATH")" -le 1 ]; then',
+        '    exit 1',
+        '  fi',
+        'fi',
+        `printf '%s' '[{"number":1,"title":"fix JOV-1","body":"JOV-1","headRefName":"symphony/JOV-1","state":"OPEN","mergeStateStatus":"CLEAN","url":"https://example/pr/1","mergedAt":null,"isDraft":false,"statusCheckRollup":{"state":"SUCCESS"}}]'`,
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+
+    const { collectGitHubPullRequests } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+
+    // Retry path: the first `--state open` call fails once, its retry
+    // succeeds; the merged call succeeds first try. One PR per state.
+    await writeFile(callsPath, '');
+    await writeFile(openAttemptsPath, '');
+    const env = {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      CALLS_PATH: callsPath,
+      OPEN_ATTEMPTS_PATH: openAttemptsPath,
+    };
+    const firstAttempt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(firstAttempt));
+    assert.equal(firstAttempt.length, 2);
+    const openAttempts = (await readFile(openAttemptsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(openAttempts.length, 2);
+    const callLog = (await readFile(callsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(callLog.length, 3);
+    assert.ok(callLog.every(call => call.includes('pr list')));
+
+    // Fail-closed path: every attempt fails; the collector names the cause
+    // and stays failed closed (no empty-array pass).
+    await writeFile(fakeGh, ['#!/bin/sh', 'exit 1'].join('\n'));
+    await chmod(fakeGh, 0o755);
+    await writeFile(callsPath, '');
+    const failed = await collectGitHubPullRequests(env);
+    assert.equal(Array.isArray(failed), false);
+    assert.match(String(failed?.error), /gh-pr-list-(open|merged):/);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {

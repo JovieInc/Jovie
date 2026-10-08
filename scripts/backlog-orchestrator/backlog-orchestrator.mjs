@@ -1268,35 +1268,63 @@ function uniqueIssuesByIdentifier(issues) {
   return [...selected.values()];
 }
 
-async function collectGitHubPullRequests() {
+/**
+ * The PR inventory is the pullRequests capacity evidence for the remediate
+ * receipt. One `gh pr list --json` per state (open + merged) through gh's
+ * GraphQL; the rollup + body fields make it the heaviest query in the lane,
+ * so each call gets one bounded retry on any failure (transient API hiccup
+ * or slow-query overrun) before the inventory fails closed. The two states
+ * run in parallel; a state that fails twice leaves the whole inventory null
+ * and the capacity gate reports the exact gap (fail-closed, never guessed).
+ */
+async function ghPullRequestList(state, env) {
   const fields =
     'number,title,body,headRefName,state,mergeStateStatus,url,mergedAt,isDraft,statusCheckRollup';
+  const args = [
+    'pr',
+    'list',
+    '--repo',
+    'JovieInc/Jovie',
+    '--state',
+    state,
+    '--limit',
+    state === 'open' ? '100' : '50',
+    '--json',
+    fields,
+  ];
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { stdout } = await execFileAsync('gh', args, {
+        timeout: 45_000,
+        env,
+      });
+      return JSON.parse(stdout);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error('gh-pr-list-failed');
+}
+
+export async function collectGitHubPullRequests(env = process.env) {
   const lists = await Promise.all(
     ['open', 'merged'].map(async state => {
       try {
-        const { stdout } = await execFileAsync(
-          'gh',
-          [
-            'pr',
-            'list',
-            '--repo',
-            'JovieInc/Jovie',
-            '--state',
-            state,
-            '--limit',
-            state === 'open' ? '100' : '50',
-            '--json',
-            fields,
-          ],
-          { timeout: 20_000 }
-        );
-        return JSON.parse(stdout);
-      } catch {
-        return null;
+        return await ghPullRequestList(state, env);
+      } catch (error) {
+        return {
+          error: `gh-pr-list-${state}:${String(error?.message || error).slice(0, 160)}`,
+        };
       }
     })
   );
-  if (lists.some(list => list === null)) return null;
+  const failed = lists.filter(list => list && !Array.isArray(list));
+  if (failed.length > 0) {
+    return {
+      error: failed.flatMap(list => list?.error ?? 'unknown').join('|'),
+    };
+  }
   return lists.flat();
 }
 
@@ -1372,7 +1400,7 @@ async function runRemediate(isDryRun) {
   const previous = loadCache().backlogRemediation || {};
   const receipt = backlogRemediation.buildRemediationReceipt({
     issues,
-    pullRequests: pullRequests || [],
+    pullRequests: Array.isArray(pullRequests) ? pullRequests : [],
     mainSha: rawReceipt?.signals?.main?.sha || null,
     capacitySignals: {
       schema: backlogRemediation.CAPACITY_SCHEMA,
@@ -1414,6 +1442,20 @@ async function runRemediate(isDryRun) {
     mode: isDryRun ? 'dry-run' : 'mutating',
     workpad: undefined,
     workpadBody: receipt.workpad,
+    // The pullRequests capacity evidence keeps failing closed inside the
+    // capacity verdict; the exact gh failure is surfaced here so a
+    // capacity-evidence gap names its producer. Access stays property-safe
+    // across the collector's return shapes (array, {error}, or null).
+    pullRequestsEvidence: Array.isArray(pullRequests)
+      ? { count: pullRequests.length, error: null }
+      : {
+          count: null,
+          error:
+            /** @type {Record<string, any>} */ (pullRequests ?? {})?.error ??
+            (pullRequests === null
+              ? 'gh-pr-list:unparseable-output'
+              : 'gh-pr-list:unknown-failure'),
+        },
     feed: receipt.feed,
     workpadUpsert: null,
   };
