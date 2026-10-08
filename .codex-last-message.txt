@@ -1,0 +1,11 @@
+Implemented and pushed to draft PR [#20675](https://github.com/JovieInc/Jovie/pull/20675). JOV-5832 is In Review.
+
+- Migrated Investors to a fixed seven-column `UnifiedTable` with 760px minimum width and narrow-screen horizontal scrolling.
+- Added one-row, multi-row, loading, empty, 1512×949, narrow-width, geometry, token-interaction, screenshot, and CLS coverage.
+- Playwright: 3/3 passed with CLS 0.
+- Focused tests, Biome, ESLint, Tailwind, typecheck, component gates, and all exact-head CI checks passed: 19 successful, 0 failed/pending.
+- Branch is clean at `d65a5650d243`.
+
+Key files: [InvestorPipelineTable.tsx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T034627Z-JOV-5832-codex-ff228c/apps/web/components/features/admin/investors/InvestorPipelineTable.tsx), [layout audit](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T034627Z-JOV-5832-codex-ff228c/apps/web/tests/e2e/storybook-investor-pipeline-layout.spec.ts).
+
+Deviation: genuine packaged-Mac capture remains unavailable because this lane is Linux with no installed `.app` or authorized staging account. The PR records this explicitly; exact-size browser screenshots and the green CI visual artifact are not misrepresented as packaged-Mac proof.
