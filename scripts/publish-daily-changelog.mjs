@@ -74,11 +74,33 @@ const controller = {
   ),
 };
 const observedAt = new Date().toISOString();
-const buildResponse = await fetchPage('https://jov.ie/api/health/build-info');
-if (!buildResponse.ok) throw new Error('Public build identity unavailable');
-const buildInfo = await buildResponse.json();
-const binding = checkPublicationBinding(marker, buildInfo, controller);
-if (binding.status === 'deferred') {
+// The public readback and its binding proof are re-checked on failure with
+// bounded backoff (JOV-8013): run 37798337152 failed once when the readback
+// served an unexpected identity seconds after the alias gate re-proved it,
+// while the marker stayed verified. Transient readback divergence retries;
+// a persistent mismatch still fails the step (deferred bindings exit 0).
+const maxBindingAttempts = 4;
+/** @type {null | { status: string, [key: string]: unknown }} */
+let binding = null;
+let buildInfo = null;
+for (let attempt = 1; attempt <= maxBindingAttempts; attempt += 1) {
+  const buildResponse = await fetchPage('https://jov.ie/api/health/build-info');
+  if (!buildResponse.ok) throw new Error('Public build identity unavailable');
+  buildInfo = await buildResponse.json();
+  const candidate = checkPublicationBinding(marker, buildInfo, controller);
+  if (candidate.status !== 'deferred') {
+    binding = candidate;
+    break;
+  }
+  binding = candidate;
+  if (attempt < maxBindingAttempts) {
+    console.error(
+      `Public readback not bound to the verified generation yet (attempt ${attempt}/${maxBindingAttempts}); retrying`
+    );
+    await new Promise(resolve => setTimeout(resolve, attempt * 5_000));
+  }
+}
+if (binding?.status === 'deferred') {
   writeFileSync(
     resolve(output, 'plan.json'),
     `${JSON.stringify({ ...binding, observedAt }, null, 2)}\n`
