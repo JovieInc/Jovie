@@ -113,7 +113,7 @@ for (const viewport of [
         scrollBefore
       );
       expect(await tabs.boundingBox()).toEqual(before.tabs);
-      await testInfo.attach('refresh-geometry', {
+      await testInfo.attach('refresh-geometry.json', {
         body: JSON.stringify({ before, framePositions, scrollBefore }),
         contentType: 'application/json',
       });

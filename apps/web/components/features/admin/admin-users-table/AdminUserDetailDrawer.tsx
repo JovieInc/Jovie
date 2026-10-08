@@ -159,7 +159,7 @@ export function AdminUserDetailDrawer({
       }
     >
       {user && (
-        <div className='space-y-2.5 px-3 pb-3'>
+        <div className='space-y-3 px-3 pb-3'>
           <UserDrawerContent user={user} />
         </div>
       )}
