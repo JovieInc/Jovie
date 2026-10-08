@@ -339,160 +339,57 @@ describe('GET /api/admin/outreach', () => {
     );
   });
 
-  it('refuses delivery even when an operator explicitly triggers approved outreach', async () => {
-    mockSelect
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([
-              {
-                dailySendCap: 10,
-                maxPerHour: 5,
-              },
-            ]),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'lead-1',
-                  linktreeHandle: 'artist',
-                  displayName: 'Artist',
-                  contactEmail: 'artist@example.com',
-                  claimToken: 'claim-token',
-                  priorityScore: 88,
-                },
-              ]),
-            })),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
+  it.each([1, 100])(
+    'refuses explicitly triggered reviewed outreach with limit %s',
+    async limit => {
+      mockSelect.mockImplementation(() => ({
         from: vi.fn(() => ({
           where: vi.fn().mockResolvedValue([{ total: 1 }]),
         })),
       }));
+      mockPushLeadToInstantly.mockResolvedValue('would-send-if-called');
+      mockReadOutboundLedger.mockResolvedValue(
+        approvedLedger({
+          id: 'lead-1',
+          linktreeHandle: 'artist',
+          displayName: 'Artist',
+          contactEmail: 'artist@example.invalid',
+          claimToken: 'claim-token',
+        })
+      );
 
-    mockPushLeadToInstantly.mockResolvedValue('instantly-123');
-    mockReadOutboundLedger.mockResolvedValue(
-      approvedLedger({
-        id: 'lead-1',
-        linktreeHandle: 'artist',
-        displayName: 'Artist',
-        contactEmail: 'artist@example.com',
-        claimToken: 'claim-token',
-      })
-    );
+      const response = await POST(
+        new Request('http://localhost/api/admin/outreach', {
+          method: 'POST',
+          body: JSON.stringify({ limit }),
+        }) as never
+      );
+      const data = await response.json();
 
-    const response = await POST(
-      new Request('http://localhost/api/admin/outreach', {
-        method: 'POST',
-        body: JSON.stringify({ limit: 1 }),
-      }) as never
-    );
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(mockParseJsonBody).toHaveBeenCalled();
-    expect(mockOr).toHaveBeenCalledWith('eq-clause', 'eq-clause');
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
-    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(mockInsert).not.toHaveBeenCalled();
-    expect(data).toEqual({
-      ok: true,
-      attempted: 0,
-      queued: 0,
-      failed: 0,
-      dismissed: 0,
-      unapproved: 1,
-      remainingPending: 1,
-    });
-  });
-
-  it('skips leads already claimed by another queue request', async () => {
-    mockSelect
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([
-              {
-                dailySendCap: 10,
-                maxPerHour: 5,
-              },
-            ]),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'lead-1',
-                  linktreeHandle: 'artist',
-                  displayName: 'Artist',
-                  contactEmail: 'artist@example.com',
-                  claimToken: 'claim-token',
-                  priorityScore: 88,
-                },
-              ]),
-            })),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 1 }]),
-        })),
-      }));
-
-    mockUpdateReturning.mockResolvedValueOnce([]);
-
-    const response = await POST(
-      new Request('http://localhost/api/admin/outreach', {
-        method: 'POST',
-        body: JSON.stringify({ limit: 1 }),
-      }) as never
-    );
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(data).toEqual({
-      ok: true,
-      attempted: 0,
-      queued: 0,
-      failed: 0,
-      dismissed: 0,
-      unapproved: 0,
-      remainingPending: 1,
-    });
-  });
+      expect(response.status).toBe(200);
+      expect(mockParseJsonBody).toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+      expect(mockReadOutboundLedger).not.toHaveBeenCalled();
+      expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+      expect(mockInsert).not.toHaveBeenCalled();
+      expect(data).toMatchObject({
+        ok: true,
+        attempted: 0,
+        queued: 0,
+        failed: 0,
+        dismissed: 0,
+        unapproved: 0,
+        remainingPending: 1,
+        policyBlocked: {
+          reason: 'audience_delivery_disabled',
+          dispatchAllowed: false,
+          retryable: false,
+          queueDisposition: 'do_not_enqueue_or_retry',
+        },
+      });
+    }
+  );
 
   it('refuses a manual send while ACQUISITION_ELIGIBLE is false', async () => {
     mockEligibility.mockResolvedValue({

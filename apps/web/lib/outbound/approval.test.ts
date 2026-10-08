@@ -267,6 +267,47 @@ describe('manual contact history is local activity, never a dispatch grant', () 
       });
     }
   });
+
+  it.each(['target', 'copy'] as const)(
+    'refuses history review without a %s actor',
+    missingActor => {
+      const rows = [
+        targetRow('yes', TARGET, {
+          actorUserId: missingActor === 'target' ? null : 'tim',
+        }),
+        copyRow('yes', COPY, TARGET, {
+          actorUserId: missingActor === 'copy' ? null : 'tim',
+        }),
+      ];
+      expect(
+        evaluateOutboundHistoryRecord({
+          target: TARGET,
+          channel: 'email',
+          rows,
+        })
+      ).toEqual({
+        historyRecordAllowed: false,
+        dispatchAllowed: false,
+        reason:
+          missingActor === 'target'
+            ? 'target_not_approved'
+            : 'copy_not_approved',
+      });
+    }
+  );
+
+  it('refuses revision-valid history copy without the current claim link', () => {
+    const rotated = { ...TARGET, claimUrl: 'https://jov.ie/claim/tok-2' };
+    const rows = [targetRow('yes', rotated), copyRow('yes', COPY, rotated)];
+    expect(resolveOutboundApproval(rotated, rows).copy).toBe('approved');
+    expect(
+      evaluateOutboundHistoryRecord({ target: rotated, channel: 'email', rows })
+    ).toEqual({
+      historyRecordAllowed: false,
+      dispatchAllowed: false,
+      reason: 'copy_not_approved',
+    });
+  });
 });
 
 describe('draftOutboundCopy', () => {

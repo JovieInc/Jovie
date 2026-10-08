@@ -27,6 +27,10 @@ import {
   outboundCopyEvidenceKey,
 } from '@/lib/outbound/approval';
 import {
+  type BlockedEffectReceipt,
+  denyAudienceEffect,
+} from '@/lib/outbound/audience-effect-policy';
+import {
   outboundTargetFromLead,
   readOutboundLedger,
 } from '@/lib/outbound/ledger.server';
@@ -64,8 +68,7 @@ function getPendingEmailWhereClause(now = new Date()) {
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),
-    // Prefilter: only leads Tim has approved copy for. The exact-revision
-    // check runs per lead in processOutreachBatch before anything is pushed.
+    // Review-only prefilter. Matching approval never grants delivery.
     drizzleSql`exists (select 1 from ${contactEvidenceReviews} where ${contactEvidenceReviews.evidenceKey} = (${outboundCopyEvidenceKey('')} || ${leads.id}::text) and ${contactEvidenceReviews.decision} = 'yes')`,
     or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
   );
@@ -119,9 +122,11 @@ export interface OutreachBatchResult {
   queued: number;
   failed: number;
   dismissed: number;
-  /** Claimed leads refused because Tim's approval is missing or stale. */
+  /** Claimed leads refused because review evidence is missing or stale. */
   unapproved: number;
   remainingPending: number;
+  /** Policy refusal is distinct from review state and never retries delivery. */
+  policyBlocked?: BlockedEffectReceipt;
 }
 
 function getOutreachErrorStatusCode(error: unknown): number | null {
@@ -298,6 +303,25 @@ export async function processOutreachBatch(
   limit: number,
   options: ProcessOutreachBatchOptions = {}
 ): Promise<OutreachBatchResult> {
+  const policy = denyAudienceEffect('audience.campaign.enroll');
+  if (!policy.dispatchAllowed) {
+    // Cron, explicit triggers and repeated requests must not claim/release
+    // pending rows or load their private review ledger while delivery is closed.
+    const [remaining] = await db
+      .select({ total: count() })
+      .from(leads)
+      .where(getPendingEmailWhereClause());
+    return {
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      dismissed: 0,
+      unapproved: 0,
+      remainingPending: Number(remaining?.total ?? 0),
+      policyBlocked: policy,
+    };
+  }
+
   if (!isInstantlyOutboundEnabled()) {
     return {
       attempted: 0,
@@ -332,7 +356,7 @@ export async function processOutreachBatch(
       }
     }
 
-    // Never auto-send: Tim approves every target and every copy revision.
+    // Re-evaluate the policy immediately before any provider work.
     const permission = evaluateOutboundSend({
       target: outboundTargetFromLead(lead),
       channel: 'email',
