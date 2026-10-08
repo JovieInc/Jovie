@@ -17,7 +17,7 @@ describe('Storybook production React resolution', () => {
         typeof candidate === 'object' &&
         'name' in candidate &&
         candidate.name === 'jovie-storybook-rewrite-next-react'
-    ) as {
+    ) as unknown as {
       configResolved(config: { command: string }): void;
       resolveId(
         source: string,
@@ -25,6 +25,8 @@ describe('Storybook production React resolution', () => {
       ): Promise<{ id: string } | null>;
     };
     expect(plugin).toBeDefined();
+    expect(plugin.configResolved).toBeTypeOf('function');
+    expect(plugin.resolveId).toBeTypeOf('function');
     const resolve = vi.fn(async (bare: string) => ({ id: bare }));
     plugin.configResolved({ command: 'build' });
     for (const bare of [
