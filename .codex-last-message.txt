@@ -1,0 +1,14 @@
+Published `@jovie/cli@26.10.0`; npm `latest` now points to it. All macOS, Windows, and Ubuntu chaos jobs passed in [run 37362921607](https://github.com/JovieInc/Jovie/actions/runs/37362921607).
+
+Opened draft PR [#20782](https://github.com/JovieInc/Jovie/pull/20782), commit `63bbf6f9b3`. It extends npm registry propagation polling from one to five minutes and adds the regression assertion.
+
+Verified:
+
+- Clean published-package chaos: 25/25
+- CLI tests: 283 passed
+- Workflow tests: 53 passed
+- CLI lint and monorepo typecheck passed
+- PR currently has no failing checks
+- JOV-7915 moved to In Review
+
+Concern: the green nightly run’s remediation recorder and several PR aggregators remain queued due shared GitHub runner capacity. The PR remains draft and was not merged or marked ready, as required. GBrain was unavailable.
