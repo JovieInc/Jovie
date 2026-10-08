@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getConnectorDefinitions } from '@/lib/connectors/registry';
 
 const { configuration } = vi.hoisted(() => ({ configuration: vi.fn() }));
+const availability = (youtube: boolean) =>
+  Object.fromEntries(
+    getConnectorDefinitions().map(({ id }) => [
+      id,
+      { available: youtube && id === 'youtube' },
+    ])
+  );
 vi.mock('@/lib/connectors/availability.server', () => ({
   getConnectorAvailability: configuration,
 }));
@@ -10,16 +17,7 @@ vi.mock('@/lib/connectors/availability.server', () => ({
 import IntegrationsDirectoryPage from './page';
 
 describe('public integrations projection', () => {
-  beforeEach(() => {
-    configuration.mockReturnValue(
-      Object.fromEntries(
-        getConnectorDefinitions().map(definition => [
-          definition.id,
-          { available: definition.id === 'youtube' },
-        ])
-      )
-    );
-  });
+  beforeEach(() => configuration.mockReturnValue(availability(true)));
   it('renders implemented available operations rather than provider promises', () => {
     render(<IntegrationsDirectoryPage />);
     expect(
@@ -42,14 +40,7 @@ describe('public integrations projection', () => {
     ).toHaveAttribute('href', '/app/settings/connectors');
   });
   it('explains unavailable connection setup without offering placeholder connections', () => {
-    configuration.mockReturnValue(
-      Object.fromEntries(
-        getConnectorDefinitions().map(definition => [
-          definition.id,
-          { available: false },
-        ])
-      )
-    );
+    configuration.mockReturnValue(availability(false));
     render(<IntegrationsDirectoryPage />);
     expect(
       screen.getByText(/Account connections are currently unavailable/)
