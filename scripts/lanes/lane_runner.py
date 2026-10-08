@@ -5208,7 +5208,8 @@ def ensure_full_history(host: Host) -> None:
 
 
 def dispatch(host: Host) -> int:
-    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
+    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [],
+            "error": None, "admissionDenied": None}
     try:
         tick["disk"] = disk_guard.check(host)
         if autoscale.mode() != "off":
@@ -5243,9 +5244,14 @@ def dispatch(host: Host) -> int:
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  start_new_session=True, **lifecycle.spawn_kwargs())
                 tick["spawned"].append(name)
+    except DiskAdmissionError as error:
+        # Deliberate backpressure, not a tick fault: the doctor's disk-critical/disk-low
+        # alert already names the cause. Recording it as a tick error would raise a
+        # duplicate tick-error issue no agent can act on (JOV-8024).
+        tick["admissionDenied"] = str(error)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
-    if tick["error"]:
+    if tick["error"] or tick.get("admissionDenied"):
         # A denied tick must not launch another worker through ancillary event paths.
         return finish_dispatch(host, tick)
     try:
@@ -5276,7 +5282,7 @@ def finish_dispatch(host: Host, tick: dict) -> int:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
     except Exception as error:  # never let the doctor take dispatch down
         update_json(host.state / "tick.json", lambda data: data.update(doctorError=f"{type(error).__name__}: {error}"[:200]))
-    return 1 if tick["error"] else 0
+    return 1 if tick["error"] or tick.get("admissionDenied") else 0
 
 
 def read_marker(host: Host) -> str | None:
