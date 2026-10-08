@@ -1368,12 +1368,12 @@ async function ghPullRequestList(state, limit, env) {
 }
 
 async function ghPullRequestInventory(state, env) {
-  const pages = state === 'open' ? [50, 50] : [50];
-  const lists = [];
-  for (const limit of pages) {
-    lists.push(await ghPullRequestList(state, limit, env));
-  }
-  return lists.flat();
+  // `gh pr list` has no page offset — a second call with the same --limit
+  // returns the SAME page. One query per state; with statusCheckRollup
+  // dropped the 100-PR open query is the light form that stays under the
+  // GraphQL 504 threshold (the heavy 504-ing form was rollup + body).
+  const limit = state === 'open' ? 100 : 50;
+  return ghPullRequestList(state, limit, env);
 }
 
 export async function collectGitHubPullRequests(env = process.env) {
@@ -1402,7 +1402,19 @@ export async function collectGitHubPullRequests(env = process.env) {
       error: failed.flatMap(list => list?.error ?? 'unknown').join('|'),
     };
   }
-  return lists.flat();
+  // The PR inventory is one row per PR: dedupe by number (defense against
+  // any future paging overlap) and drop drafts — a draft is not a merge
+  // candidate, so counting 56 draft rows in a 100-PR sample inflated the
+  // fleet's conflict/error rates (0.26/0.22) and closed capacity on rows
+  // that can never merge.
+  const byNumber = new Map();
+  for (const row of lists.flat()) {
+    const record = /** @type {Record<string, any>} */ (row ?? {});
+    if (record.isDraft === true) continue;
+    if (!Number.isInteger(record.number)) continue;
+    if (!byNumber.has(record.number)) byNumber.set(record.number, record);
+  }
+  return [...byNumber.values()];
 }
 
 async function measureCloneLatencyMs() {
