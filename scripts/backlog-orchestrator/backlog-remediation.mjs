@@ -202,9 +202,7 @@ function rateExcludedByLabel(pullRequest) {
   // promotion (bypass fast lane)" — a promotion mode, not a parked row.
   const labels = (pullRequest?.labels ?? []).map(label =>
     String(
-      typeof label === 'string'
-        ? label
-        : /** @type {any} */ ((label)?.name ?? '')
+      typeof label === 'string' ? label : /** @type {any} */ (label?.name ?? '')
     ).toLowerCase()
   );
   return labels.some(name => RATE_EXCLUDED_LABELS.has(name));
