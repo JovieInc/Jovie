@@ -17,7 +17,6 @@ describe('connector configuration availability', () => {
     for (const key of Object.keys(credentials) as (keyof typeof credentials)[])
       credentials[key] = '';
   });
-
   it('requires both credentials and returns only safe availability, never tokens', () => {
     credentials.GOOGLE_OAUTH_CLIENT_ID = 'id';
     expect(getConnectorAvailability().youtube.available).toBe(false);
@@ -29,7 +28,6 @@ describe('connector configuration availability', () => {
     expect(state.spotify.available).toBe(false);
     expect(JSON.stringify(state)).not.toContain('secret');
   });
-
   it('isolates provider bundles without treating a fixture as configured OAuth', () => {
     credentials.SPOTIFY_CLIENT_ID = 'id';
     credentials.SPOTIFY_CLIENT_SECRET = 'secret';

@@ -207,7 +207,7 @@ export function ConnectorCard({
             </Badge>
           </div>
           <p className='text-xs text-secondary'>{definition.description}</p>
-          {(!isConnected || !available) && accountLabel && (
+          {(!isConnected || !available || actionError) && accountLabel && (
             <p className='text-xs text-tertiary'>{accountLabel}</p>
           )}
           <p

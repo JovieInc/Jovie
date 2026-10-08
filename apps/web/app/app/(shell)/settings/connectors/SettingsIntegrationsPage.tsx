@@ -31,6 +31,7 @@ export async function SettingsIntegrationsPage({
 
   return (
     <ConnectorsClient
+      key={`${routeContext.userId}:${routeContext.profileId ?? ''}`}
       {...data}
       returnTo={route}
       creatorProfileId={routeContext.profileId}

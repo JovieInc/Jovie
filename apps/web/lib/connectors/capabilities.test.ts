@@ -35,7 +35,6 @@ describe('connector capability access and advertising', () => {
       expect(capability.requiresApproval).toBe(true);
     }
   });
-
   it.each([
     'not_connected',
     'disabled',
@@ -52,7 +51,6 @@ describe('connector capability access and advertising', () => {
       )
     ).toEqual([]);
   });
-
   it('requires every permission for a multi-scope operation', () => {
     const spotify = getConnectorDefinition('spotify');
     expect(
@@ -62,7 +60,6 @@ describe('connector capability access and advertising', () => {
       ]).map(capability => capability.id)
     ).toEqual(['playlists.read']);
   });
-
   it('filters planned and blocked capabilities even if all permissions were granted', () => {
     const base = getConnectorDefinition('gmail');
     const definition: ConnectorDefinition = {
@@ -80,7 +77,6 @@ describe('connector capability access and advertising', () => {
       )
     ).toEqual([]);
   });
-
   it('advertises only configured providers and implemented operations supported on the platform', () => {
     const projection = getAdvertisedConnectorIntegrations({
       ...available,
@@ -104,7 +100,6 @@ describe('connector capability access and advertising', () => {
       4
     );
   });
-
   it('keeps capabilities scoped to permissions the actual OAuth connector requests', () => {
     const ids = new Set<string>();
     for (const provider of getConnectorDefinitions()) {

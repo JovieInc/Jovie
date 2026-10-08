@@ -32,6 +32,7 @@ describe('shared settings integrations loader', () => {
       expect(load).toHaveBeenCalledWith('session-user', 'selected-identity');
       expect(context).toHaveBeenCalledWith(expect.objectContaining({ route }));
       if (!isValidElement(element)) throw new Error('Expected rendered page');
+      expect(element.key).toBe('session-user:selected-identity');
       expect(element.props).toMatchObject({
         creatorProfileId: 'selected-identity',
         returnTo: route,

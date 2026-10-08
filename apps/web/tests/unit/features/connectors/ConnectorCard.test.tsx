@@ -237,6 +237,16 @@ describe('ConnectorCard', () => {
     expect(detail).not.toHaveTextContent('artist@example.com');
     expect(screen.getByText('artist@example.com')).toBeInTheDocument();
 
+    rerender(
+      <ConnectorCard
+        provider='gmail'
+        status='connected'
+        accountLabel='artist@example.com'
+        actionError='Disconnect failed'
+      />
+    );
+    expect(detail).toHaveTextContent('Disconnect failed');
+    expect(screen.getByText('artist@example.com')).toBeInTheDocument();
     rerender(<ConnectorCard provider='gmail' status='needs_reauth' />);
     expect(detail).toHaveTextContent('Reconnect to continue syncing.');
 

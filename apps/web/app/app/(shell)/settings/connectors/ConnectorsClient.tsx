@@ -45,9 +45,7 @@ export function ConnectorsClient({
   const oauthFailed = Boolean(useSearchParams().get('error'));
   const [isPendingExtract, startExtract] = useTransition();
   const [pendingBundle, setPendingBundle] = useState<string | null>(null);
-  const [disconnectedBundles, setDisconnectedBundles] = useState<
-    readonly string[]
-  >([]);
+  const [disconnected, setDisconnected] = useState<readonly string[]>([]);
   const [pendingAction, setPendingAction] = useState<'connect' | 'disconnect'>(
     'connect'
   );
@@ -101,7 +99,7 @@ export function ConnectorsClient({
         requestInit
       );
       if (!res.ok) throw new Error('Disconnect failed');
-      setDisconnectedBundles(bundles => [...bundles, definition.oauthBundle]);
+      setDisconnected(bundles => [...bundles, definition.oauthBundle]);
       toast.success(`${definition.label} disconnected`);
       router.refresh();
     } catch {
@@ -173,7 +171,7 @@ export function ConnectorsClient({
                 key={definition.id}
                 provider={definition.id}
                 status={
-                  disconnectedBundles.includes(definition.oauthBundle)
+                  disconnected.includes(definition.oauthBundle)
                     ? 'disabled'
                     : connector.status
                 }

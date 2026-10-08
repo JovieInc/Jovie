@@ -169,6 +169,47 @@ describe('ConnectorsClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it.each([true, false])(
+    'resets disconnect state when identity changes (pending=%s)',
+    async pending => {
+      let finish: (value: { ok: boolean }) => void = () => {};
+      fetchMock.mockReturnValueOnce(
+        new Promise(resolve => {
+          finish = resolve;
+        })
+      );
+      const status = () => youtubeRow().getByRole('status');
+      const connected = {
+        ...disconnectedConnectors,
+        youtube: { status: 'connected' as const, scopes: YOUTUBE_OAUTH_SCOPES },
+      };
+      const client = (identity: string) => (
+        <ConnectorsClient
+          key={`user:${identity}`}
+          connectors={connected}
+          creatorProfileId={identity}
+          isDev={false}
+        />
+      );
+      const { rerender } = render(client('identity-a'));
+      await userEvent.click(
+        youtubeRow().getByRole('button', { name: 'Disconnect YouTube' })
+      );
+      if (!pending) {
+        finish({ ok: true });
+        await waitFor(() => expect(status()).toHaveTextContent('Disconnected'));
+      }
+      rerender(client('identity-b'));
+      expect(status()).toHaveTextContent('Connected');
+      expect(
+        youtubeRow().getByRole('button', { name: 'Disconnect YouTube' })
+      ).toBeEnabled();
+      if (pending) finish({ ok: true });
+      await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+      expect(status()).toHaveTextContent('Connected');
+    }
+  );
+
   it('lists providers and discloses connected YouTube permissions', async () => {
     render(
       <ConnectorsClient
@@ -268,7 +309,6 @@ describe('ConnectorsClient', () => {
     ).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
-
   it('starts YouTube OAuth and disconnects the selected creator profile', async () => {
     const user = userEvent.setup();
     const creatorProfileId = '22222222-2222-4222-8222-222222222222';
