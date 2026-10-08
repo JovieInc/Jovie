@@ -186,7 +186,7 @@ export function ConnectorCard({
             )}
           </div>
         )}
-        <div className='min-w-0 space-y-0.5'>
+        <div className='min-w-0 space-y-0.5 break-words'>
           <div className='flex flex-wrap items-center gap-2'>
             <span className='text-sm font-medium text-primary'>
               {definition.label}
@@ -215,6 +215,9 @@ export function ConnectorCard({
             {definition.accountScope === 'identity'
               ? 'Selected identity'
               : 'Your signed-in account'}
+            {(!isConnected || !available) && accountLabel
+              ? ` · ${accountLabel}`
+              : ''}
           </p>
           <p
             className={cn(

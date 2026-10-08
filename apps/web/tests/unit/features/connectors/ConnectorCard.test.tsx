@@ -232,6 +232,9 @@ describe('ConnectorCard', () => {
     expect(screen.getByTestId('connector-detail-gmail')).toBe(detail);
     expect(detail).toHaveTextContent('Google rejected the connection.');
     expect(detail).not.toHaveTextContent('artist@example.com');
+    expect(
+      screen.getByText('Your signed-in account · artist@example.com')
+    ).toBeInTheDocument();
 
     rerender(<ConnectorCard provider='gmail' status='needs_reauth' />);
     expect(detail).toHaveTextContent('Reconnect to continue syncing.');
