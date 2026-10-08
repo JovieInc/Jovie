@@ -238,7 +238,9 @@ export async function assessTriageSweep(
         'requiresImmediateInvestigation' in result &&
         result.requiresImmediateInvestigation
     ).length,
-    providerBlocked: results.filter(result => result.escalation).length,
+    providerBlocked: results.filter(
+      result => 'escalation' in result && result.escalation
+    ).length,
     wakeSymphony: results.some(result => result.wakeSymphony),
     results,
   };
