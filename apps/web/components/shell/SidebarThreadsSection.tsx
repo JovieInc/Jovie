@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
@@ -65,6 +65,8 @@ export interface SidebarThreadsSectionProps {
   readonly tight?: boolean;
   // `collapsed` hides the section entirely (sidebar icon mode).
   readonly collapsed: boolean;
+  readonly preserveOrder?: boolean;
+  readonly hideAllThreadsLink?: boolean;
 }
 
 export function getSidebarThreadStatus(
@@ -85,9 +87,11 @@ export function getSidebarThreadStatus(
   return 'complete';
 }
 
-export function readThreadReadState(): Record<string, string> {
+export function readThreadReadState(
+  storageKey = THREAD_READ_STORAGE_KEY
+): Record<string, string> {
   try {
-    const stored = globalThis.localStorage?.getItem(THREAD_READ_STORAGE_KEY);
+    const stored = globalThis.localStorage?.getItem(storageKey);
     if (!stored) return {};
     const parsed = JSON.parse(stored) as unknown;
     if (!parsed || typeof parsed !== 'object') return {};
@@ -102,12 +106,12 @@ export function readThreadReadState(): Record<string, string> {
   }
 }
 
-export function writeThreadReadState(value: Record<string, string>): void {
+export function writeThreadReadState(
+  value: Record<string, string>,
+  storageKey = THREAD_READ_STORAGE_KEY
+): void {
   try {
-    globalThis.localStorage?.setItem(
-      THREAD_READ_STORAGE_KEY,
-      JSON.stringify(value)
-    );
+    globalThis.localStorage?.setItem(storageKey, JSON.stringify(value));
   } catch {
     // Storage can be unavailable in restricted browsers; row state still works.
   }
@@ -201,6 +205,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     thread: SidebarThread
   ) => void;
 }) {
+  const statusId = useId();
   const rowClasses = cn(
     getSidebarNavRowClassName({
       active,
@@ -216,9 +221,22 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   const rowContent = (
     <>
       <span
+        id={statusId}
+        role='status'
+        aria-label={
+          thread.status === 'running'
+            ? 'Running'
+            : thread.status === 'errored'
+              ? 'Error'
+              : unread
+                ? 'Unread'
+                : undefined
+        }
         className={cn(
           calm
-            ? 'sr-only'
+            ? thread.status !== 'complete' || unread
+              ? 'absolute left-0 top-1/2 size-1.5 -translate-y-1/2 rounded-full'
+              : 'sr-only'
             : 'h-1.5 w-1.5 rounded-full shrink-0 justify-self-center',
           thread.status === 'running'
             ? 'bg-cyan-300/85 anim-calm-breath'
@@ -228,7 +246,17 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
                 ? 'bg-cyan-300/85'
                 : 'bg-white/25'
         )}
-      />
+      >
+        <span className='sr-only'>
+          {thread.status === 'running'
+            ? 'Running'
+            : thread.status === 'errored'
+              ? 'Error'
+              : unread
+                ? 'Unread'
+                : ''}
+        </span>
+      </span>
       <span
         className={cn(
           // The label owns the complete middle grid track. A fixed terminal
@@ -264,9 +292,14 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       <Tooltip label={thread.title} side='right' block>
         {thread.href ? (
           <Link
+            aria-label={thread.title}
+            aria-describedby={
+              thread.status !== 'complete' || unread ? statusId : undefined
+            }
             href={thread.href}
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
+            onClick={() => onSelect?.(thread.id)}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
           >
             {rowContent}
@@ -274,6 +307,10 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         ) : (
           <Button
             type='button'
+            aria-label={thread.title}
+            aria-describedby={
+              thread.status !== 'complete' || unread ? statusId : undefined
+            }
             variant='ghost'
             onClick={() => onSelect?.(thread.id)}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
@@ -355,11 +392,16 @@ export function SidebarThreadsSection({
   onNewThread,
   tight,
   collapsed,
+  preserveOrder = false,
+  hideAllThreadsLink = false,
 }: SidebarThreadsSectionProps) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const sorted = useMemo(
-    () => [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [threads]
+    () =>
+      preserveOrder
+        ? [...threads]
+        : [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [threads, preserveOrder]
   );
 
   if (collapsed) return null;
@@ -374,43 +416,45 @@ export function SidebarThreadsSection({
 
   return (
     <div className={calm ? 'space-y-2' : 'space-y-1.5'}>
-      <div className='flex items-center justify-between px-2.5 pb-0.5 pt-2'>
-        <span
-          className={
-            calm
-              ? // Founder lock 2026-09-25: sentence case, no letterspacing,
-                // 11px medium, quiet color.
-                'text-(length:--text-2xs) font-medium text-sidebar-muted'
-              : 'text-xs font-caption tracking-normal text-sidebar-muted/90'
-          }
-        >
-          {calm
-            ? visible.some(
-                thread => new Date(thread.updatedAt).toDateString() === today
-              )
-              ? 'Today'
-              : 'Earlier'
-            : 'Recent'}
-        </span>
-        {calm ? (
-          <button
-            type='button'
-            aria-label='Filter Unread Chats'
-            aria-pressed={unreadOnly}
-            onClick={() => setUnreadOnly(value => !value)}
-            className='relative flex size-4 items-center justify-center text-sidebar-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-3.5 after:lg:hidden'
+      {hasThreads ? (
+        <div className='flex items-center justify-between px-2.5 pb-0.5 pt-2'>
+          <span
+            className={
+              calm
+                ? // Founder lock 2026-09-25: sentence case, no letterspacing,
+                  // 11px medium, quiet color.
+                  'text-(length:--text-2xs) font-medium text-sidebar-muted'
+                : 'text-xs font-caption tracking-normal text-sidebar-muted/90'
+            }
           >
-            <Icon name='Filter' className='size-3.5' aria-hidden='true' />
-          </button>
-        ) : null}
-        {!calm && unreadCount > 0 && (
-          <NavBadge
-            variant='count'
-            count={unreadCount}
-            aria-label={`${unreadCount} unread ${unreadCount === 1 ? 'chat' : 'chats'}`}
-          />
-        )}
-      </div>
+            {calm
+              ? visible.some(
+                  thread => new Date(thread.updatedAt).toDateString() === today
+                )
+                ? 'Today'
+                : 'Earlier'
+              : 'Recent'}
+          </span>
+          {calm ? (
+            <button
+              type='button'
+              aria-label='Filter Unread Chats'
+              aria-pressed={unreadOnly}
+              onClick={() => setUnreadOnly(value => !value)}
+              className='relative flex size-4 items-center justify-center text-sidebar-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-3.5 after:lg:hidden'
+            >
+              <Icon name='Filter' className='size-3.5' aria-hidden='true' />
+            </button>
+          ) : null}
+          {!calm && unreadCount > 0 && (
+            <NavBadge
+              variant='count'
+              count={unreadCount}
+              aria-label={`${unreadCount} unread ${unreadCount === 1 ? 'chat' : 'chats'}`}
+            />
+          )}
+        </div>
+      ) : null}
 
       <div className={calm ? 'flex flex-col gap-0.5' : 'flex flex-col gap-px'}>
         {state === 'loading' && !hasThreads ? (
@@ -514,7 +558,7 @@ export function SidebarThreadsSection({
             </React.Fragment>
           );
         })}
-        {hasThreads ? (
+        {hasThreads && !hideAllThreadsLink ? (
           <Link
             href={APP_ROUTES.CHATS}
             aria-current={allThreadsActive ? 'page' : undefined}

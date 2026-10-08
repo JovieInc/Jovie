@@ -16,14 +16,17 @@ import {
 } from '@/components/organisms/sidebar';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { SHELL_RAIL_BLOCK_LABEL } from '@/components/shell/rail-motion';
+import { SidebarMoreMenu } from '@/components/shell/SidebarMoreMenu';
+import { SidebarRecentMenu } from '@/components/shell/SidebarRecentMenu';
 import {
   readThreadReadState,
   type SidebarThread,
-  SidebarThreadsSection,
+  THREAD_READ_STORAGE_KEY,
   toSidebarThread,
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
+import { useSidebarPageSearch } from '@/components/shell/useSidebarPageSearch';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
@@ -37,6 +40,7 @@ import {
   trackNavigationImpressions,
 } from '@/lib/tracking/navigation-telemetry';
 import { cn } from '@/lib/utils';
+import { partitionCustomerSidebarNavigation } from './capacity';
 import {
   artistSettingsNavigation,
   canonicalSidebarNavigation,
@@ -75,7 +79,7 @@ export function DashboardNav({
   children: searchSurface,
   headerOwnsInbox = false,
 }: DashboardNavProps) {
-  const { selectedProfile, inboxNavigation } = useDashboardData();
+  const { user, selectedProfile, inboxNavigation } = useDashboardData();
   const runtimeUpdate = useRuntimeUpdate();
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const inboxHomeEnabled = useAppFlag('INBOX_HOME');
@@ -86,6 +90,11 @@ export function DashboardNav({
       }),
     [profilesWorkspaceEnabled]
   );
+  const partition = useMemo(
+    () => partitionCustomerSidebarNavigation(sidebarNavigation),
+    [sidebarNavigation]
+  );
+  const findPage = useSidebarPageSearch(sidebarNavigation);
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
   const homeAttentionLabel = inboxHomeEnabled ? 'Inbox' : 'Home';
   const homeAttentionName = hasRuntimeUpdate
@@ -112,9 +121,9 @@ export function DashboardNav({
   const [threadReadAtById, setThreadReadAtById] = useState<
     Record<string, string>
   >({});
-  const [hasHydratedPersistedState, setHasHydratedPersistedState] =
-    useState(false);
+  const readScopeRef = useRef<string | null>(null);
   const profileId = selectedProfile?.id ?? '';
+  const threadReadStorageKey = `${THREAD_READ_STORAGE_KEY}:${user?.id ?? 'anonymous'}:${profileId}`;
   const isDemo = isDemoRoutePath(pathname);
   const telemetryContext = useMemo<NavigationTelemetryContext>(
     () => ({
@@ -141,9 +150,9 @@ export function DashboardNav({
   });
 
   useEffect(() => {
-    setThreadReadAtById(readThreadReadState());
-    setHasHydratedPersistedState(true);
-  }, []);
+    readScopeRef.current = threadReadStorageKey;
+    setThreadReadAtById(readThreadReadState(threadReadStorageKey));
+  }, [threadReadStorageKey]);
 
   const schedulePendingNavigationClear = useCallback(
     (record: PendingNavigationRecord, delayMs: number) => {
@@ -218,29 +227,6 @@ export function DashboardNav({
   }, [pendingNavigation]);
 
   useEffect(() => {
-    if (
-      !hasHydratedPersistedState ||
-      !conversations ||
-      conversations.length === 0
-    ) {
-      return;
-    }
-
-    setThreadReadAtById(previous => {
-      if (Object.keys(previous).length > 0) return previous;
-
-      const baseline = Object.fromEntries(
-        conversations.map(conversation => [
-          conversation.id,
-          conversation.updatedAt,
-        ])
-      );
-      writeThreadReadState(baseline);
-      return baseline;
-    });
-  }, [conversations, hasHydratedPersistedState]);
-
-  useEffect(() => {
     if (isDemo || isMobile) return;
     trackNavigationImpressions(
       isInSettings
@@ -261,7 +247,7 @@ export function DashboardNav({
   const artistSettingsLabel = 'Artist';
 
   const navSections: readonly DashboardNavSection[] = [
-    { key: 'primary', items: [...sidebarNavigation] },
+    { key: 'primary', items: [...partition.visible] },
   ];
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
@@ -300,6 +286,7 @@ export function DashboardNav({
   }, [pathname]);
 
   const { onThreadContextMenu, contextMenuOverlay } = useChatThreadContextMenu({
+    railOwner: 'left',
     activeThreadId,
   });
 
@@ -320,10 +307,10 @@ export function DashboardNav({
         ...previous,
         [activeThreadId]: activeConversation.updatedAt,
       };
-      writeThreadReadState(next);
+      writeThreadReadState(next, threadReadStorageKey);
       return next;
     });
-  }, [activeThreadId, conversations]);
+  }, [activeThreadId, conversations, threadReadStorageKey]);
 
   const sidebarThreads = useMemo<SidebarThread[]>(
     () =>
@@ -469,7 +456,7 @@ export function DashboardNav({
             <div
               data-sidebar-search-slot='true'
               className={cn(
-                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5',
+                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5',
                 // Rail-motion staged exit (JOV-4522): the pill collapses
                 // vertically with a fade instead of snapping to display:none.
                 SHELL_RAIL_BLOCK_LABEL,
@@ -549,11 +536,12 @@ export function DashboardNav({
                   pendingNavigation?.itemId === chatNavItem.id || undefined
                 }
                 className={cn(
-                  'relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+                  'relative flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-primary-token hover:bg-sidebar-accent transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:inset-x-0 after:-inset-y-2 after:lg:hidden',
                   pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
                 )}
               >
-                <Plus className='size-3.5' aria-hidden='true' />
+                <Plus className='size-4 text-accent' aria-hidden='true' />
+                <span>New chat</span>
               </Link>
             </div>
             <SidebarGroupContent className='pb-2 pt-5'>
@@ -562,13 +550,23 @@ export function DashboardNav({
                   {renderSection(section.items)}
                 </div>
               ))}
+              <SidebarMoreMenu
+                items={partition.more}
+                isActive={item =>
+                  isNavigationItemActive(item, pathname, searchParams)
+                }
+                pinScope={
+                  user?.id && profileId ? `${user.id}:${profileId}` : undefined
+                }
+                onFindPage={findPage}
+              />
             </SidebarGroupContent>
           </SidebarGroup>
         )}
 
         {threadsVisible ? (
           <div className='pt-5'>
-            <SidebarThreadsSection
+            <SidebarRecentMenu
               threads={sidebarThreads}
               activeThreadId={activeThreadId}
               allThreadsActive={
@@ -583,8 +581,19 @@ export function DashboardNav({
                     : 'idle'
               }
               onRetry={handleRetryThreads}
+              onSelect={id => {
+                if (readScopeRef.current !== threadReadStorageKey) return;
+                const conversation = conversations?.find(
+                  thread => thread.id === id
+                );
+                if (!conversation) return;
+                setThreadReadAtById(previous => {
+                  const next = { ...previous, [id]: conversation.updatedAt };
+                  writeThreadReadState(next, threadReadStorageKey);
+                  return next;
+                });
+              }}
               calm
-              collapsed={false}
             />
           </div>
         ) : null}

@@ -3478,14 +3478,16 @@ html:not(.dark) .smart-link-powered-by {
  * 28px tall. Desktop density and icon sizes stay unchanged. */
 @media (pointer: coarse) {
   .sidebar-touch-row,
-  .sidebar-touch-menu [role="menuitem"] {
+  .sidebar-touch-menu [role="menuitem"],
+  [data-sidebar-touch-menu="true"] [role="menuitem"] {
     min-height: 44px;
     min-width: 44px;
     border-block: 8px solid transparent;
     background-clip: padding-box;
   }
 
-  .sidebar-touch-menu [role="menuitem"] {
+  .sidebar-touch-menu [role="menuitem"],
+  [data-sidebar-touch-menu="true"] [role="menuitem"] {
     padding-block: 0;
   }
 

@@ -26,6 +26,12 @@ import {
   ADMIN_NAV_REGISTRY,
   type AdminNavigationSection,
   type AdminWorkspaceId,
+  adminGrowthViews,
+  adminPeopleViews,
+  buildAdminGrowthHref,
+  buildAdminPeopleHref,
+  getAdminGrowthViewLabel,
+  getAdminPeopleViewLabel,
 } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
@@ -77,6 +83,22 @@ export const OPERATOR_NAV_ITEMS: readonly OperatorNavItem[] =
     description: item.description,
     section: item.section,
     icon: OPERATOR_ICON_BY_ID[item.id],
+    children:
+      item.id === 'people'
+        ? adminPeopleViews.map(view => ({
+            id: `ov_people_${view}`,
+            name: getAdminPeopleViewLabel(view),
+            href: buildAdminPeopleHref(view),
+            icon: OPERATOR_ICON_BY_ID.people,
+          }))
+        : item.id === 'growth'
+          ? adminGrowthViews.map(view => ({
+              id: `ov_growth_${view}`,
+              name: getAdminGrowthViewLabel(view),
+              href: buildAdminGrowthHref(view),
+              icon: OPERATOR_ICON_BY_ID.growth,
+            }))
+          : undefined,
   }));
 
 export const OPERATOR_NAV_SECTIONS = [

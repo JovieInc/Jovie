@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -10,12 +16,17 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
 import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
-import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import {
+  ADMIN_NAV_REGISTRY,
+  ADMIN_PRIMARY_WORKSPACE_IDS,
+} from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import {
   ShellSidebarOverrideProvider,
   useRegisterShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
+import * as breakpoints from '@/hooks/useBreakpoint';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
@@ -191,23 +202,25 @@ function renderUnifiedSidebar({
     <QueryClientProvider client={queryClient}>
       <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
         <DashboardDataProvider value={{ ...dashboardData, isAdmin, ...data }}>
-          <TooltipProvider>
-            <SidebarProvider defaultOpen={sidebarDefaultOpen}>
-              <ShellSidebarOverrideProvider>
-                {overrideContent ? (
-                  <LibrarySidebarOverride>
-                    {overrideContent}
-                  </LibrarySidebarOverride>
-                ) : null}
-                <UnifiedSidebar
-                  section={section}
-                  variant={variant}
-                  headerOwnsCollapsedToggle
-                />
-                <BrowserHeaderToggle />
-              </ShellSidebarOverrideProvider>
-            </SidebarProvider>
-          </TooltipProvider>
+          <HeaderActionsProvider>
+            <TooltipProvider>
+              <SidebarProvider defaultOpen={sidebarDefaultOpen}>
+                <ShellSidebarOverrideProvider>
+                  {overrideContent ? (
+                    <LibrarySidebarOverride>
+                      {overrideContent}
+                    </LibrarySidebarOverride>
+                  ) : null}
+                  <UnifiedSidebar
+                    section={section}
+                    variant={variant}
+                    headerOwnsCollapsedToggle
+                  />
+                  <BrowserHeaderToggle />
+                </ShellSidebarOverrideProvider>
+              </SidebarProvider>
+            </TooltipProvider>
+          </HeaderActionsProvider>
         </DashboardDataProvider>
       </AppFlagProvider>
     </QueryClientProvider>
@@ -276,6 +289,7 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
       collapsed: false,
+      detached: false,
     });
     const row = screen
       .getByRole('link', { name: /Inbox —/ })
@@ -409,7 +423,7 @@ describe('UnifiedSidebar library route', () => {
       'utf8'
     );
 
-    expect(source).toContain("'h-(--app-shell-header-height) py-0.5'");
+    expect(source).toContain("'h-(--app-shell-header-height) py-0 px-2'");
     expect(source).not.toContain(
       "'h-(--app-shell-header-height-compact) py-0.5'"
     );
@@ -449,8 +463,8 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Ask Jovie' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Ask Jovie' })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -475,6 +489,38 @@ describe('UnifiedSidebar library route', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps drawer controls and footer available when the saved desktop rail is collapsed', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+    const compact = vi
+      .spyOn(breakpoints, 'useBreakpointDown')
+      .mockReturnValue(true);
+    try {
+      renderUnifiedSidebar({
+        pathname: APP_ROUTES.DASHBOARD,
+        section: 'dashboard',
+        sidebarDefaultOpen: false,
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+      const drawer = screen.getByRole('dialog');
+      const collapse = within(drawer).getByRole('button', {
+        name: 'Collapse sidebar',
+      });
+      expect(collapse.parentElement?.parentElement).not.toHaveClass(
+        'invisible'
+      );
+      expect(
+        within(drawer).getByTestId('update-available-pill')
+      ).toBeInTheDocument();
+      expect(nowPlayingBridgePropsMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ collapsed: false })
+      );
+      fireEvent.click(collapse);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    } finally {
+      compact.mockRestore();
+    }
+  });
+
   it('stages browser header chrome without dropping the expanded toggle (JOV-4522)', () => {
     electronRuntimeMock.isElectronRuntime = false;
 
@@ -483,28 +529,14 @@ describe('UnifiedSidebar library route', () => {
       section: 'dashboard',
     });
 
-    // The wrapper stages the in-sidebar control out when the main header
-    // takes ownership in compact mode; the expanded control stays mounted.
     const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
-    expect(toggle.parentElement?.className).toContain(
-      'group-data-[collapsible=icon]:order-first'
-    );
-    expect(toggle.parentElement?.className).toContain(
-      'group-data-[collapsible=icon]:mx-auto'
-    );
-
-    const brandRow = toggle.closest('[data-sidebar-brand-row]');
-    expect(brandRow).not.toBeNull();
-    const stagedCluster = brandRow?.querySelector(
-      '[data-sidebar-header-actions]'
-    );
-    expect(stagedCluster).not.toBeNull();
-    expect(stagedCluster?.className).toContain(
-      'group-data-[collapsible=icon]:max-w-0'
-    );
-    expect(stagedCluster?.className).not.toContain(
-      'group-data-[collapsible=icon]:hidden'
-    );
+    const toolbar = toggle.closest('[data-sidebar-toolbar="true"]');
+    expect(toolbar).not.toHaveAttribute('hidden');
+    fireEvent.click(toggle);
+    expect(toolbar).toHaveAttribute('hidden');
+    expect(
+      screen.getAllByRole('button', { name: 'Expand sidebar' })
+    ).toHaveLength(1);
   });
 
   it('turns the logo into a workspace selector for admins', () => {
@@ -520,6 +552,7 @@ describe('UnifiedSidebar library route', () => {
   });
 
   it('does not expose the workspace selector to non-admins', () => {
+    electronRuntimeMock.isElectronRuntime = false;
     renderUnifiedSidebar({
       pathname: APP_ROUTES.DASHBOARD,
       section: 'dashboard',
@@ -548,7 +581,8 @@ describe('UnifiedSidebar library route', () => {
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
   });
 
-  it('keeps the static OV mark at nav-icon scale with no footer duplicate', () => {
+  it('keeps one permanent OV brand owner with no footer duplicate', () => {
+    electronRuntimeMock.isElectronRuntime = false;
     const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.OV,
       section: 'ov',
@@ -557,8 +591,8 @@ describe('UnifiedSidebar library route', () => {
 
     const marks = container.querySelectorAll('[data-brand-variant="ov"]');
     expect(marks).toHaveLength(1);
-    expect(marks[0]).toHaveAttribute('data-brand-mark-size', '16');
-    expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
+    expect(marks[0]).toHaveAttribute('data-brand-mark-size', '24');
+    expect(marks[0]?.closest('[data-sidebar-toolbar="true"]')).not.toBeNull();
   });
 
   it('renders dedicated operator navigation without the customer dashboard nav', () => {
@@ -582,7 +616,9 @@ describe('UnifiedSidebar library route', () => {
         href: link.getAttribute('href'),
       }))
     ).toEqual(
-      ADMIN_NAV_REGISTRY.map(item => ({
+      ADMIN_NAV_REGISTRY.filter(item =>
+        ADMIN_PRIMARY_WORKSPACE_IDS.includes(item.id)
+      ).map(item => ({
         label: item.label,
         href: item.href,
       }))
@@ -622,8 +658,8 @@ describe('UnifiedSidebar library route', () => {
       name: 'OV Navigation',
     });
     expect(
-      within(operatorNavigation).getByRole('link', { name: 'Chat' })
-    ).not.toHaveAttribute('aria-current');
+      within(operatorNavigation).queryByRole('link', { name: 'Chat' })
+    ).not.toBeInTheDocument();
     const operationsLink = within(operatorNavigation).getByRole('link', {
       name: 'Operations',
     });

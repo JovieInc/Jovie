@@ -106,7 +106,7 @@ describe('DashboardNav route warming', () => {
       appFlags: { PROFILES_WORKSPACE: true },
     });
 
-    for (const label of ['New Chat', 'Identity', 'Work', 'Audience']) {
+    for (const label of ['New Chat', 'Profiles', 'Work', 'Audience']) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
         'true'
@@ -140,7 +140,7 @@ describe('DashboardNav route warming', () => {
     expect(newChat).toHaveAttribute('aria-busy', 'true');
     expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
     expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
-    expect(newChat).toHaveClass('size-6', 'rounded-full', 'opacity-70');
+    expect(newChat).toHaveClass('h-7', 'rounded-md', 'opacity-70');
     expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
       'Current route'
     );

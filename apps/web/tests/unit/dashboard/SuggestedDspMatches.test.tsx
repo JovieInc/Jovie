@@ -435,10 +435,10 @@ describe('SuggestedDspMatches', () => {
 });
 
 describe('Navigation config', () => {
-  it('includes Identity as a top-level destination', () => {
+  it('includes Profiles as a top-level destination', () => {
     const presenceItem = primaryNavigation.find(item => item.id === 'presence');
     expect(presenceItem).toMatchObject({
-      name: 'Identity',
+      name: 'Profiles',
       href: APP_ROUTES.PRESENCE,
     });
   });

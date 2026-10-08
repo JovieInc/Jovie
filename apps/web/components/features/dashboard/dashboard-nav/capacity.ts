@@ -150,3 +150,24 @@ export function customerNavVisibleCap(
 ): number {
   return CUSTOMER_NAV_CAPACITY[breakpoint];
 }
+
+/** Stable root IDs: adding a permitted destination never makes it a root. */
+export const CUSTOMER_SIDEBAR_PRIMARY_IDS = [
+  'home',
+  'presence',
+  'library',
+  'audience',
+] as const;
+
+export function partitionCustomerSidebarNavigation(
+  items: readonly NavItem[]
+): CustomerNavPartition {
+  return {
+    visible: CUSTOMER_SIDEBAR_PRIMARY_IDS.flatMap(id =>
+      items.filter(item => item.id === id).slice(0, 1)
+    ),
+    more: items.filter(
+      item => !CUSTOMER_SIDEBAR_PRIMARY_IDS.some(id => id === item.id)
+    ),
+  };
+}

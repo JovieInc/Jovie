@@ -16,7 +16,7 @@ import {
 
 const CANONICAL_NAVIGATION = [
   ['home', 'Home', APP_ROUTES.DASHBOARD],
-  ['presence', 'Identity', APP_ROUTES.PRESENCE],
+  ['presence', 'Profiles', APP_ROUTES.PRESENCE],
   ['library', 'Work', APP_ROUTES.LIBRARY],
   ['audience', 'Audience', APP_ROUTES.CONTACTS_AUDIENCE],
 ] as const;

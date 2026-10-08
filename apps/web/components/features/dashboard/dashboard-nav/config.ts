@@ -86,7 +86,7 @@ export const contactsNavItem: NavItem = {
 };
 
 export const presenceNavItem: NavItem = {
-  name: PRODUCT_ONTOLOGY.identity.label,
+  name: 'Profiles',
   href: APP_ROUTES.PRESENCE,
   id: 'presence',
   icon: User,

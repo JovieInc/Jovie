@@ -22,7 +22,7 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
   prefetchForRoute: prefetchForRouteMock,
 }));
 
-const PRIMARY_LABELS = ['New Chat', 'Identity', 'Work', 'Audience'] as const;
+const PRIMARY_LABELS = ['New Chat', 'Profiles', 'Work', 'Audience'] as const;
 
 describe('DashboardNav interactions', () => {
   afterEach(() => {
@@ -64,12 +64,7 @@ describe('DashboardNav interactions', () => {
     if (!(inbox instanceof HTMLElement)) return;
     expect(inbox).toHaveAccessibleName('Home');
 
-    expect(newChat).toHaveClass(
-      'size-6',
-      'rounded-full',
-      'bg-foreground',
-      'text-(--color-bg-base)'
-    );
+    expect(newChat).toHaveClass('h-7', 'rounded-md', 'text-primary-token');
     expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
     expect(searchSlot).toHaveClass('h-9', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
@@ -117,7 +112,7 @@ describe('DashboardNav interactions', () => {
     }
   });
 
-  it('routes Identity through root navigation without a duplicate avatar button', () => {
+  it('routes Profiles through root navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
       appFlags: { PROFILES_WORKSPACE: true },
@@ -131,7 +126,7 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    expect(screen.getByRole('link', { name: 'Identity' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Profiles' })).toHaveAttribute(
       'href',
       APP_ROUTES.PRESENCE
     );
@@ -155,7 +150,7 @@ describe('DashboardNav interactions', () => {
     ).not.toHaveAttribute('aria-current');
   });
 
-  it('renders recent chats as App Router links', () => {
+  it('renders recent chats as App Router links when Recent opens', async () => {
     mockUseChatConversationsQuery.mockReturnValue({
       data: [
         {
@@ -171,6 +166,9 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Recent Chats' }));
     expect(screen.getByText('Earlier')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
       'href',
@@ -178,7 +176,7 @@ describe('DashboardNav interactions', () => {
     );
   });
 
-  it('keeps compact loading and empty thread states free of duplicate New Chat controls', () => {
+  it('keeps compact loading and empty thread states free of duplicate New Chat controls', async () => {
     mockUseChatConversationsQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -187,6 +185,9 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Recent Chats' }));
     expect(document.querySelector('.skeleton')).toBeInTheDocument();
     expect(screen.queryByText('Loading chats')).not.toBeInTheDocument();
     loading.unmount();
@@ -226,7 +227,9 @@ describe('DashboardNav interactions', () => {
 
     await waitFor(() => {
       expect(
-        JSON.parse(localStorage.getItem('jovie:sidebar-thread-read-at')!)
+        JSON.parse(
+          localStorage.getItem('jovie:sidebar-thread-read-at:user_123:')!
+        )
       ).toMatchObject({ 'thread-1': '2026-05-12T00:00:00.000Z' });
     });
     expect(screen.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
@@ -249,7 +252,7 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Identity' }));
+    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Profiles' }));
     expect(prefetchForRouteMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
 
@@ -291,12 +294,12 @@ describe('DashboardNav interactions', () => {
       appFlags: { PROFILES_WORKSPACE: true },
     });
 
-    const identityLink = screen.getByRole('link', { name: 'Identity' });
+    const identityLink = screen.getByRole('link', { name: 'Profiles' });
     expect(identityLink).toHaveAttribute('href', APP_ROUTES.PRESENCE);
     await user.click(identityLink);
 
     expect(mockToastInfo).toHaveBeenCalledWith(
-      'Identity is not available in demo mode'
+      'Profiles is not available in demo mode'
     );
   });
 });

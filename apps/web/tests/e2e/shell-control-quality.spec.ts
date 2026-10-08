@@ -300,7 +300,7 @@ test('route navigation keeps the shell attached and inspects rendered materials 
     );
     for (const [name, pathname] of [
       ['New Chat', '/app/chat'],
-      ['Identity', '/app/presence'],
+      ['Profiles', '/app/presence'],
       ['Work', '/app/library'],
       ['Home', '/app'],
     ] as const) {

@@ -5,11 +5,14 @@ import {
   CUSTOMER_NAV_CAPACITY,
   customerNavVisibleCap,
   partitionCustomerNavigation,
+  partitionCustomerSidebarNavigation,
 } from './capacity';
 import {
   artistNavigation,
+  calendarNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
+  navigationVisibleForFlags,
   primaryNavigation,
 } from './config';
 import type { NavItem } from './types';
@@ -189,5 +192,36 @@ describe('partitionCustomerNavigation', () => {
         item
       );
     }
+  });
+});
+
+describe('fixed customer sidebar roots', () => {
+  it('retains root order and sends a new authorized destination to More even when a root is flag-denied', () => {
+    const registry = [calendarNavItem, ...primaryNavigation].reverse();
+    const allowed = navigationVisibleForFlags(registry, {
+      PROFILES_WORKSPACE: false,
+    });
+    const partition = partitionCustomerSidebarNavigation(allowed);
+    expect(partition.visible.map(item => item.id)).toEqual([
+      'home',
+      'library',
+      'audience',
+    ]);
+    expect(partition.more.map(item => item.id)).toEqual(['calendar']);
+    expect(
+      [...partition.visible, ...partition.more].some(
+        item => item.id === 'presence'
+      )
+    ).toBe(false);
+    const enabled = partitionCustomerSidebarNavigation(
+      navigationVisibleForFlags(registry, { PROFILES_WORKSPACE: true })
+    );
+    expect(enabled.visible.map(item => item.id)).toEqual([
+      'home',
+      'presence',
+      'library',
+      'audience',
+    ]);
+    expect(enabled.more.map(item => item.id)).toEqual(['calendar']);
   });
 });

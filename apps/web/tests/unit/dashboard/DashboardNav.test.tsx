@@ -1,9 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fireEvent, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  calendarNavItem,
+  canonicalSidebarNavigation,
+} from '@/features/dashboard/dashboard-nav/config';
+import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import {
   mockUseChatConversationsQuery,
   mockUsePathname,
@@ -19,7 +25,7 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 
 const CANONICAL_NAV = [
   ['Home', APP_ROUTES.DASHBOARD],
-  ['Identity', APP_ROUTES.PRESENCE],
+  ['Profiles', APP_ROUTES.PRESENCE],
   ['Work', APP_ROUTES.LIBRARY],
   ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
 ] as const;
@@ -62,7 +68,9 @@ describe('DashboardNav', () => {
       'const [threadReadAtById, setThreadReadAtById] = useState<'
     );
     expect(source).toContain('>({});');
-    expect(source).toContain('setThreadReadAtById(readThreadReadState());');
+    expect(source).toContain(
+      'setThreadReadAtById(readThreadReadState(threadReadStorageKey));'
+    );
     expect(source).not.toContain(
       'useState<Record<string, string>>(readThreadReadState)'
     );
@@ -88,7 +96,7 @@ describe('DashboardNav', () => {
       expect(queryByRole('button', { name: label })).toBeNull();
     }
 
-    expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
       'href',
       APP_ROUTES.PRESENCE
     );
@@ -133,7 +141,7 @@ describe('DashboardNav', () => {
       ['Work', APP_ROUTES.LIBRARY],
       ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
     ]);
-    expect(queryByRole('link', { name: 'Identity' })).toBeNull();
+    expect(queryByRole('link', { name: 'Profiles' })).toBeNull();
     expect(
       container.querySelector(`a[href="${APP_ROUTES.PRESENCE}"]`)
     ).toBeNull();
@@ -253,8 +261,10 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(container.querySelector('[aria-expanded]')).toBeNull();
-    expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
+    expect(
+      container.querySelector('[data-nav-section="primary"] [aria-expanded]')
+    ).toBeNull();
+    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
       'href',
       APP_ROUTES.PRESENCE
     );
@@ -340,19 +350,15 @@ describe('DashboardNav', () => {
     });
 
     const chatLink = getByRole('link', { name: 'New Chat' });
-    expect(chatLink).toHaveClass(
-      'size-6',
-      'rounded-full',
-      'bg-foreground',
-      'text-(--color-bg-base)'
-    );
+    expect(chatLink).toHaveClass('h-7', 'text-primary-token');
+    expect(chatLink.querySelector('svg')).toHaveClass('text-accent');
     expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
     expect(chatLink).not.toHaveAttribute('aria-current');
   });
 
   it('maps real conversation metadata into unread and running thread rows', () => {
     localStorage.setItem(
-      'jovie:sidebar-thread-read-at',
+      'jovie:sidebar-thread-read-at:user_123:',
       JSON.stringify({
         'conv-unread': '2026-05-22T08:00:00.000Z',
         'conv-running': '2026-05-22T09:00:00.000Z',
@@ -382,9 +388,8 @@ describe('DashboardNav', () => {
       refetch: vi.fn(),
     });
 
-    const { container, getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-    });
+    const { getByRole } = renderDashboardNav({});
+    fireEvent.click(getByRole('button', { name: 'Recent Chats' }));
 
     expect(getByRole('link', { name: 'Unread answer' })).toHaveClass(
       'text-primary-token'
@@ -393,7 +398,106 @@ describe('DashboardNav', () => {
       'href',
       `${APP_ROUTES.CHAT}/conv-running`
     );
-    expect(container.querySelector('.anim-calm-breath')).toBeTruthy();
+    expect(getByRole('status', { name: 'Running' })).toHaveClass(
+      'anim-calm-breath'
+    );
+  });
+
+  it('opening Recent does not persist read timestamps; only selecting the chat does', async () => {
+    localStorage.clear();
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    mockUseChatConversationsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'unread-contract',
+          title: 'Unread answer',
+          updatedAt: '2026-10-07T20:00:00Z',
+          latestMessageRole: 'assistant',
+          latestTurnStatus: 'completed',
+        },
+      ],
+    });
+    const { getByRole } = renderDashboardNav({
+      overrides: { user: { id: 'read-contract-user' } },
+      appFlags: { PROFILES_WORKSPACE: true },
+    });
+    fireEvent.click(getByRole('button', { name: 'Recent Chats' }));
+    const recent = getByRole('dialog');
+    const answer = within(recent).getByRole('link', { name: 'Unread answer' });
+    expect(answer).toHaveAccessibleDescription('Unread');
+    expect(
+      Object.keys(localStorage).filter(key => key.includes('thread-read'))
+    ).toEqual([]);
+    fireEvent.click(answer);
+    await waitFor(() =>
+      expect(
+        Object.keys(localStorage).some(key => key.includes('thread-read'))
+      ).toBe(true)
+    );
+  });
+
+  it('keeps Recent selection usable when read-state storage is denied', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    mockUseChatConversationsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'denied',
+          title: 'Offline draft',
+          updatedAt: '2026-10-07T20:00:00Z',
+          latestMessageRole: 'assistant',
+          latestTurnStatus: 'completed',
+        },
+      ],
+    });
+    const storage = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new DOMException('Storage denied', 'SecurityError');
+      });
+    try {
+      const { getByRole, queryByRole } = renderDashboardNav({});
+      fireEvent.click(getByRole('button', { name: 'Recent Chats' }));
+      const answer = within(getByRole('dialog')).getByRole('link', {
+        name: 'Offline draft',
+      });
+      expect(answer).toHaveAccessibleDescription('Unread');
+      fireEvent.click(answer);
+      expect(queryByRole('dialog')).toBeNull();
+      fireEvent.click(getByRole('button', { name: 'Recent Chats' }));
+      expect(
+        within(getByRole('dialog')).getByRole('link', { name: 'Offline draft' })
+      ).not.toHaveAccessibleDescription('Unread');
+    } finally {
+      storage.mockRestore();
+    }
+  });
+
+  it('new permitted destinations default to More and flag denial excludes them', () => {
+    const registry = canonicalSidebarNavigation as unknown as NavItem[];
+    registry.push({ ...calendarNavItem, requiredFlag: 'PROFILES_WORKSPACE' });
+    try {
+      const result = renderDashboardNav({
+        appFlags: { PROFILES_WORKSPACE: true },
+      });
+      expect(
+        primaryLinks(result.container).map(link => link.textContent)
+      ).toEqual(['Home', 'Profiles', 'Work', 'Audience']);
+      fireEvent.pointerDown(
+        result.getByRole('button', { name: 'More Pages' }),
+        { button: 0, ctrlKey: false, pointerType: 'mouse' }
+      );
+      expect(
+        result.getByRole('menuitem', { name: 'Calendar', exact: true })
+      ).toHaveAttribute('href', APP_ROUTES.CALENDAR);
+      result.unmount();
+      const denied = renderDashboardNav({
+        appFlags: { PROFILES_WORKSPACE: false },
+      });
+      expect(denied.queryByRole('button', { name: 'More Pages' })).toBeNull();
+      expect(denied.queryByRole('link', { name: 'Calendar' })).toBeNull();
+    } finally {
+      registry.pop();
+    }
   });
 
   it('handles collapsed state without changing the canonical rows', () => {

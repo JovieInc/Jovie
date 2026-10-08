@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Pin, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type PropsWithChildren, useMemo } from 'react';
@@ -25,12 +25,18 @@ import {
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { RailStagedContent } from '@/components/shell/RailStagedContent';
+import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_BLOCK_LABEL,
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
+import { SidebarMoreMenu } from '@/components/shell/SidebarMoreMenu';
+import { SidebarSummerRecentMenu } from '@/components/shell/SidebarSummerRecentMenu';
+import { isAvailable } from '@/components/shell/useRailFocusReturn';
+import { useSidebarPageSearch } from '@/components/shell/useSidebarPageSearch';
+import { ADMIN_PRIMARY_WORKSPACE_IDS } from '@/constants/admin-navigation';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -50,9 +56,10 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
+import { useDesktopUpdateContext } from './desktop-update/DesktopUpdateProvider';
 import {
   isOperatorNavigationHrefActive,
-  OPERATOR_NAV_SECTIONS,
+  OPERATOR_NAV_ITEMS,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
@@ -92,30 +99,39 @@ function SettingsNavGroup({
 
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
+  const findPage = useSidebarPageSearch(OPERATOR_NAV_ITEMS);
+  const { user } = useDashboardData();
+  const primary = OPERATOR_NAV_ITEMS.filter(item =>
+    ADMIN_PRIMARY_WORKSPACE_IDS.some(id => id === item.registryId)
+  );
+  const overflow = OPERATOR_NAV_ITEMS.filter(
+    item => !ADMIN_PRIMARY_WORKSPACE_IDS.some(id => id === item.registryId)
+  );
   return (
     <nav
       aria-label='OV Navigation'
       className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
-      {OPERATOR_NAV_SECTIONS.map(section => (
-        <div key={section.label}>
-          <span
-            className={cn(
-              'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-              SHELL_RAIL_BLOCK_LABEL
-            )}
-          >
-            {section.label}
-          </span>
-          <SettingsNavGroup
-            items={section.items}
-            pathname={pathname}
-            isItemActive={item =>
-              isOperatorNavigationHrefActive(pathname, item.href)
-            }
-          />
-        </div>
-      ))}
+      <SettingsNavGroup
+        items={primary}
+        pathname={pathname}
+        isItemActive={item =>
+          isOperatorNavigationHrefActive(pathname, item.href)
+        }
+      />
+      <SidebarMoreMenu
+        items={overflow}
+        pinScope={user?.id ? `${user.id}:ov` : undefined}
+        isActive={item => isOperatorNavigationHrefActive(pathname, item.href)}
+        onFindPage={findPage}
+      />
+      {user?.id ? (
+        <SidebarSummerRecentMenu
+          key={user.id}
+          userId={user.id}
+          active={pathname === APP_ROUTES.ADMIN_CHAT}
+        />
+      ) : null}
     </nav>
   );
 }
@@ -297,6 +313,7 @@ function SidebarHeaderNav({
           // Clean header: the Jovie mark is the global "Ask Jovie" entry point
           // (JOV-6569). OV skin keeps its static identity wordmark; user menu
           // lives in the bottom Settings button.
+          if (headerOwnsCollapsedToggle) return null;
           return (
             <div
               className={cn(
@@ -318,7 +335,7 @@ function SidebarHeaderNav({
                   </span>
                 </>
               ) : (
-                <AskJovieMark variant={variant} />
+                <AskJovieMark variant={variant} railOwner='left' />
               )}
             </div>
           );
@@ -335,7 +352,7 @@ function SidebarHeaderNav({
         </RailStagedContent>
       ) : null}
 
-      {!isDesktop ? (
+      {!isDesktop && !headerOwnsCollapsedToggle ? (
         <RailStagedContent
           hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}
           stage={headerOwnsCollapsedToggle}
@@ -373,7 +390,13 @@ export function UnifiedSidebar({
 }: UnifiedSidebarProps) {
   const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
-  const { state: sidebarState } = useSidebar();
+  const {
+    state: sidebarState,
+    isMobile,
+    isFloating,
+    pinSidebar,
+    closeSidebar,
+  } = useSidebar();
   const isElectron = useIsElectronRuntime();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
@@ -386,14 +409,35 @@ export function UnifiedSidebar({
   // waiting for the effect-backed runtime hook would miss a boot-time event.
 
   const { profileHref } = useProfileData(section !== 'ov');
-  const isSidebarCollapsed = sidebarState === 'closed';
+  const isSidebarCollapsed = !isMobile && sidebarState === 'closed';
   const showWhatsNew =
     !env.IS_TEST && !env.IS_E2E && (isElectron || section === 'ov');
+  const update = useRuntimeUpdate();
+  const typedUpdate = useDesktopUpdateContext();
+  const updateOwnsSlot = Boolean(
+    update?.available ||
+      ['available', 'downloading', 'ready', 'error'].includes(
+        typedUpdate?.state.state ?? ''
+      )
+  );
   const ambientDock = (
     <SidebarDock>
-      {isSidebarCollapsed ? null : <UpdateAvailablePill />}
-      <WhatsNewBanner enabled={showWhatsNew} collapsed={isSidebarCollapsed} />
-      <SidebarBottomNowPlayingBridge collapsed={isSidebarCollapsed} />
+      <div
+        data-sidebar-attention-slot='true'
+        className='flex h-8 shrink-0 items-center px-2'
+      >
+        {isSidebarCollapsed ? null : <UpdateAvailablePill />}
+        <WhatsNewBanner
+          enabled={showWhatsNew}
+          collapsed={isSidebarCollapsed}
+          compact
+          suppressed={updateOwnsSlot}
+        />
+      </div>
+      <SidebarBottomNowPlayingBridge
+        collapsed={isSidebarCollapsed}
+        detached={headerOwnsCollapsedToggle && isSidebarCollapsed && !isMobile}
+      />
     </SidebarDock>
   );
 
@@ -401,7 +445,25 @@ export function UnifiedSidebar({
     <Sidebar
       variant='sidebar'
       data-shell-rail-motion='left'
-      collapsible='icon'
+      collapsible={headerOwnsCollapsedToggle ? 'offcanvas' : 'icon'}
+      toolbar={
+        headerOwnsCollapsedToggle && (isMobile || !isElectron) ? (
+          <div
+            className={cn(
+              'flex w-full items-center gap-1.5',
+              !isMobile &&
+                (isFloating || isSidebarCollapsed || isElectron) &&
+                'invisible'
+            )}
+            data-web-sidebar-control={isMobile ? undefined : 'true'}
+          >
+            <AskJovieMark variant={variant} railOwner='left' />
+            <div className='ml-auto'>
+              <SidebarCollapseButton />
+            </div>
+          </div>
+        ) : undefined
+      }
       className={cn(
         'bg-base',
         '[--sidebar-width:var(--app-shell-sidebar-width)]',
@@ -417,9 +479,7 @@ export function UnifiedSidebar({
         data-electron-drag-region='true'
         className={cn(
           'relative justify-center gap-0 px-(--space-2-5)',
-          isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pl-4 pr-3 pt-5 pb-4'
+          'h-(--app-shell-header-height) py-0 px-2'
         )}
       >
         <SidebarHeaderNav
@@ -433,6 +493,48 @@ export function UnifiedSidebar({
           routeBackHref={sidebarOverride?.backHref}
           routeBackLabel={sidebarOverride?.backLabel}
         />
+        {isFloating ? (
+          <div
+            className='absolute right-2 flex items-center gap-1 bg-sidebar'
+            data-electron-no-drag='true'
+          >
+            <button
+              type='button'
+              onClick={event => {
+                const returnFocus = event.detail === 0;
+                const trigger = event.currentTarget;
+                pinSidebar?.();
+                if (returnFocus)
+                  requestAnimationFrame(() => {
+                    if (
+                      document.activeElement !== document.body &&
+                      document.activeElement !== trigger
+                    )
+                      return;
+                    const toggle = Array.from(
+                      document.querySelectorAll<HTMLElement>(
+                        '[data-rail-toggle="left"]'
+                      )
+                    ).find(isAvailable);
+                    toggle?.focus({ preventScroll: true });
+                  });
+              }}
+              aria-label='Pin Sidebar'
+              className='focus-ring-themed flex h-7 items-center gap-1 rounded-md px-2 text-xs text-primary-token hover:bg-sidebar-accent'
+            >
+              <Pin aria-hidden='true' className='size-3.5' />
+              Pin
+            </button>
+            <button
+              type='button'
+              onClick={closeSidebar}
+              aria-label='Close Sidebar'
+              className='focus-ring-themed grid size-7 place-items-center rounded-md text-secondary-token hover:bg-sidebar-accent'
+            >
+              <X aria-hidden='true' className='size-3.5' />
+            </button>
+          </div>
+        ) : null}
       </SidebarHeader>
 
       <SidebarContent className='min-h-0 flex-1 px-2 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
