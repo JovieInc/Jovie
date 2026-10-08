@@ -1,0 +1,103 @@
+#!/usr/bin/env node
+/**
+ * Pin the standalone server's loopback bind to IPv4 (JOV-8015).
+ *
+ * The generated `.next/standalone/apps/web/server.js` starts with
+ * `hostname = process.env.HOSTNAME || '0.0.0.0'` and `start-server` calls
+ * `server.listen(port, hostname)`. With `HOSTNAME=localhost` (the nightly
+ * and full-matrix lanes) Node resolves `localhost` through `dns.lookup`
+ * with verbatim ordering, and GitHub-hosted runners map `::1 localhost` in
+ * `/etc/hosts`, so lookup returns `::1` first and the server binds the IPv6
+ * loopback ONLY. Every consumer — the readiness probe, Playwright's
+ * BASE_URL `http://127.0.0.1:3100`, the test-auth host gate — then gets
+ * `errno -7 (Couldn't connect)` against the IPv4 loopback and the lane
+ * fails at startup (every "Changed-Evidence E2E Suite" run since Oct 3,
+ * commit 3e4988bb / #20125).
+ *
+ * This postbuild step rewrites the generated default to `127.0.0.1` when
+ * the env var is unset or `localhost`/`::1`, which pins the bind to the
+ * IPv4 loopback the lanes actually probe. Explicit non-loopback HOSTNAME
+ * values (deployments that pass a real host) are left untouched.
+ */
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const GENERATED_DEFAULT = "const hostname = process.env.HOSTNAME || '0.0.0.0'";
+const PINNED_DEFAULT = `const hostname = process.env.HOSTNAME &&
+  !['localhost', '::1'].includes(process.env.HOSTNAME)
+  ? process.env.HOSTNAME
+  : '127.0.0.1'`;
+
+/**
+ * Pure transform: rewrite the generated default, or classify why not.
+ *
+ * @param {string} source the generated standalone server.js contents
+ * @returns {{ content: string, action: 'pinned' | 'already-pinned' | 'unknown-template' }}
+ */
+export function pinStandaloneLoopbackHostname(source) {
+  if (source.includes(PINNED_DEFAULT)) {
+    return { content: source, action: 'already-pinned' };
+  }
+  if (!source.includes(GENERATED_DEFAULT)) {
+    return { content: source, action: 'unknown-template' };
+  }
+  return {
+    content: source.replace(GENERATED_DEFAULT, PINNED_DEFAULT),
+    action: 'pinned',
+  };
+}
+
+/**
+ * One postbuild execution over the app's standalone output. All fs/log
+ * dependencies are injectable so the unit test exercises this in-process
+ * (the changed-line coverage ratchet only sees Vitest-worker execution).
+ *
+ * @param {{
+ *   appRoot?: string,
+ *   log?: (message: string) => void,
+ * }} [options]
+ * @returns {{ action: 'pinned' | 'already-pinned' | 'no-standalone' | 'unknown-template', message: string }}
+ * @throws when the generated template no longer matches (next version drift)
+ */
+export function runLoopbackPin(options = {}) {
+  const log = options.log ?? (message => console.log(message));
+  const appRoot =
+    options.appRoot ??
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const standaloneServerPath = path.join(
+    appRoot,
+    '.next',
+    'standalone',
+    'apps',
+    'web',
+    'server.js'
+  );
+  if (!existsSync(standaloneServerPath)) {
+    const message =
+      'No standalone server.js found; skipping loopback hostname pin (non-standalone or preview build).';
+    log(message);
+    return { action: 'no-standalone', message };
+  }
+  const { content, action } = pinStandaloneLoopbackHostname(
+    readFileSync(standaloneServerPath, 'utf8')
+  );
+  if (action === 'unknown-template') {
+    throw new Error(
+      'Standalone server.js does not match the expected hostname template; refusing to guess (next version changed?).'
+    );
+  }
+  if (action === 'pinned') writeFileSync(standaloneServerPath, content);
+  const message =
+    action === 'already-pinned'
+      ? 'Standalone server.js already pins the loopback hostname.'
+      : 'Pinned standalone server.js loopback hostname to 127.0.0.1 (HOSTNAME=localhost resolves ::1 first on some runners; JOV-8015).';
+  log(message);
+  return { action, message };
+}
+
+function main() {
+  runLoopbackPin();
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();
