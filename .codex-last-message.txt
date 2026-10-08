@@ -1,0 +1,11 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T010022Z-JOV-5842-codex-brief-3fed89/.design-brief.md).
+
+Decision: use a separate shared `ContentIconChipMetricCard` owner, preserving `ContentMetricCard` unchanged. This follows the design system’s bounded ownership and subtraction rules.
+
+Proof tiers:
+
+- Source: audited all three residual local owners and the JOV-5552 recurrence guard.
+- Tests: brief parser accepts steps 1–8 with no invalid capability IDs.
+- Creative artifact: step 9 intentionally blank; parser reports only `[9]` missing.
+- Hosted CI / queue / staging / runtime: not run or touched because this lane forbids build, commit, push, and PR actions.
+- Recurrence proof: focused owner coverage and a deliberate source-contract red case are specified in the brief.
