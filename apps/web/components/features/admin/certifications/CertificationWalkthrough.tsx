@@ -324,7 +324,7 @@ export function CertificationWalkthrough({
               ) : null}
             </div>
 
-            <aside className='flex max-h-[50%] w-full shrink-0 flex-col border-t border-(--app-shell-frame-seam) sm:max-h-none sm:w-80 sm:border-t-0 sm:border-l'>
+            <aside className='flex max-h-1/2 w-full shrink-0 flex-col border-t border-(--app-shell-frame-seam) sm:max-h-none sm:w-80 sm:border-t-0 sm:border-l'>
               <div className='border-b border-(--app-shell-frame-seam) p-3'>
                 <Button
                   type='button'
