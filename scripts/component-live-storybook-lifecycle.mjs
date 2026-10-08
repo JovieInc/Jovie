@@ -17,7 +17,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { freemem, tmpdir, totalmem } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,6 +26,196 @@ export const STORYBOOK_READY_TIMEOUT_MS = 8 * 60 * 1000;
 export const STORYBOOK_POLL_MS = 250;
 export const STORYBOOK_VITEST_OWNER_ARG = '--jovie-storybook-vitest-owner=';
 export const STORYBOOK_VITEST_RUN_TIMEOUT_MS = 12 * 60 * 1000;
+export const STORYBOOK_BUILD_RSS_LIMIT_BYTES = 8 * 1024 ** 3;
+const STORYBOOK_BUILD_OWNERS = new WeakMap();
+const STORYBOOK_BUILD_REPLACED = new WeakSet();
+
+/** Limit the owned build, not the story inventory or certification assertions. */
+export function storybookBuildEnvironment(env = process.env) {
+  return {
+    ...env,
+    JOVIE_LIVE_STORYBOOK_CERT: '1',
+    // Keep unrelated Node options. The final heap option wins over inherited
+    // larger limits. Native bundler memory is separately watched below.
+    NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --max-old-space-size=4096`.trim(),
+    RAYON_NUM_THREADS: '2',
+  };
+}
+
+export function storybookBuildResourceDisposition(sample) {
+  if (
+    !sample ||
+    !Number.isFinite(sample.totalBytes) ||
+    sample.totalBytes <= 0 ||
+    !Number.isFinite(sample.availableBytes) ||
+    sample.availableBytes < 0 ||
+    !Number.isFinite(sample.rssBytes) ||
+    sample.rssBytes < 0
+  )
+    return { ok: false, reason: 'resource-measurement-unavailable' };
+  const reserveBytes = Math.ceil(sample.totalBytes * 0.3);
+  if (sample.rssBytes > STORYBOOK_BUILD_RSS_LIMIT_BYTES)
+    return { ok: false, reason: 'owned-build-rss-limit', reserveBytes };
+  if (sample.availableBytes < reserveBytes)
+    return { ok: false, reason: 'host-memory-reserve', reserveBytes };
+  return { ok: true, reserveBytes };
+}
+
+export function storybookHostMemory({
+  platform = process.platform,
+  read = readFileSync,
+  free = freemem,
+  total = totalmem,
+} = {}) {
+  if (platform === 'linux') {
+    const memory = read('/proc/meminfo', 'utf8');
+    const total = memory.match(/^MemTotal:\s+(\d+) kB$/m);
+    const available = memory.match(/^MemAvailable:\s+(\d+) kB$/m);
+    if (!total || !available)
+      throw new Error('host memory measurement unavailable');
+    return {
+      totalBytes: Number(total[1]) * 1024,
+      availableBytes: Number(available[1]) * 1024,
+    };
+  }
+  return { totalBytes: total(), availableBytes: free() };
+}
+
+export function requireStorybookBuildMemory(memory = storybookHostMemory) {
+  const sample = { ...memory(), rssBytes: 0 };
+  const disposition = storybookBuildResourceDisposition(sample);
+  if (
+    !disposition.ok ||
+    sample.availableBytes <
+      disposition.reserveBytes + STORYBOOK_BUILD_RSS_LIMIT_BYTES
+  )
+    throw new Error(
+      `Storybook build resource admission held: ${disposition.reason ?? 'insufficient-owned-build-headroom'}`
+    );
+}
+
+export function readStorybookBuildResources(
+  pid,
+  { snapshot = spawnSync, memory = storybookHostMemory } = {}
+) {
+  const result = snapshot(
+    'ps',
+    [
+      '-e',
+      '-o',
+      'pid=',
+      '-o',
+      'pgid=',
+      '-o',
+      'rss=',
+      '-o',
+      'stat=',
+      '-o',
+      'lstart=',
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 2_000,
+      maxBuffer: 16 * 1024 * 1024,
+    }
+  );
+  if (result.error || result.status !== 0)
+    throw new Error('owned build memory census unavailable');
+  const rows = result.stdout
+    .split('\n')
+    .filter(line => line.trim() !== '')
+    .map(line => {
+      const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.+?)\s*$/);
+      if (!match || !Number.isFinite(Date.parse(match[5])))
+        throw new Error('owned build memory census malformed');
+      return {
+        pid: Number(match[1]),
+        pgid: Number(match[2]),
+        rss: Number(match[3]),
+        stat: match[4],
+        startedAt: match[5],
+      };
+    });
+  if (new Set(rows.map(row => row.pid)).size !== rows.length)
+    throw new Error('owned build memory census duplicate pid');
+  const members = rows.filter(
+    row => row.pgid === pid && !row.stat.startsWith('Z')
+  );
+  const leader = members.find(row => row.pid === pid);
+  return {
+    ...memory(),
+    leaderStartedAt: leader?.startedAt ?? null,
+    members: members.map(row => ({ pid: row.pid, startedAt: row.startedAt })),
+    rssBytes: members.reduce((sum, row) => sum + row.rss * 1024, 0),
+  };
+}
+
+/** Existing detached-child ownership and timeout remain authoritative. */
+export function watchStorybookBuildResources(
+  child,
+  onFailure,
+  {
+    sample = readStorybookBuildResources,
+    launchIdentity = pid =>
+      readProcessRows()?.find(row => row.pid === pid && row.pgid === pid)
+        ?.startedAt,
+    intervalMs = 250,
+    signal = killProcessGroup,
+  } = {}
+) {
+  // Bind launch identity independently of RSS measurement: a failed memory
+  // census must not erase the identity needed to clean up the owned group.
+  const startedAt = launchIdentity(child.pid);
+  const owner = { startedAt, sample, members: new Map() };
+  STORYBOOK_BUILD_OWNERS.set(child, owner);
+  let stopped = false;
+  let peakRssBytes = 0;
+  const stop = () => {
+    stopped = true;
+    clearInterval(timer);
+  };
+  const check = () => {
+    if (stopped || child.exitCode !== null || child.signalCode !== null) return;
+    try {
+      const observation = sample(child.pid);
+      if (!startedAt)
+        throw new Error('owned build launch identity unavailable');
+      if (
+        observation.leaderStartedAt !== null &&
+        observation.leaderStartedAt !== startedAt
+      ) {
+        STORYBOOK_BUILD_REPLACED.add(child);
+        stop();
+        onFailure(
+          new Error('Storybook build owner identity changed; fail closed')
+        );
+        return;
+      }
+      if (!observation.leaderStartedAt)
+        throw new Error('owned build identity unavailable');
+      for (const member of observation.members ?? [])
+        owner.members.set(member.pid, member.startedAt);
+      peakRssBytes = Math.max(peakRssBytes, observation.rssBytes);
+      const disposition = storybookBuildResourceDisposition(observation);
+      if (!disposition.ok) {
+        stop();
+        signal(child, 'SIGKILL');
+        onFailure(
+          new Error(
+            `Storybook build resource limit: ${disposition.reason}; peakRssBytes=${peakRssBytes}; fail closed`
+          )
+        );
+      }
+    } catch (error) {
+      stop();
+      onFailure(error);
+    }
+  };
+  const timer = setInterval(check, intervalMs);
+  child.once('exit', stop);
+  child.once('error', stop);
+  return { stop, check, peakRssBytes: () => peakRssBytes };
+}
 
 const SYSTEM_TMP_DIR = tmpdir();
 const STORYBOOK_VITEST_LEASE_DIR = join(
@@ -85,6 +275,41 @@ export function killProcessGroup(child, signal = 'SIGTERM') {
   // kill(0) and kill(-0) signal the caller's own process group, so a pid read
   // from a half-written pid file (Number('') === 0) would SIGKILL the runner.
   if (pid === null || !Number.isSafeInteger(pid) || pid <= 0) return;
+  // Fence every signal, including outer timeout and final cleanup, to the
+  // measured build identity. A rejected replacement never receives a signal.
+  if (STORYBOOK_BUILD_REPLACED.has(child)) return;
+  const owner = STORYBOOK_BUILD_OWNERS.get(child);
+  if (owner) {
+    if (!owner.startedAt) return;
+    try {
+      const current = owner.sample(pid);
+      if (
+        current.leaderStartedAt !== null &&
+        current.leaderStartedAt !== owner.startedAt
+      ) {
+        STORYBOOK_BUILD_REPLACED.add(child);
+        return;
+      }
+      if (current.leaderStartedAt === null) {
+        if (
+          !current.members?.some(
+            member => owner.members.get(member.pid) === member.startedAt
+          )
+        )
+          return;
+        // A positively identified surviving member proves the original group
+        // persists. Signal that group, never a departed/reused leader PID.
+        try {
+          process.kill(-pid, signal);
+        } catch {
+          /* group already gone */
+        }
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
   try {
     process.kill(-pid, signal);
   } catch {
@@ -910,9 +1135,32 @@ export default async function setupStorybookVitestLifecycle(project) {
 
 async function reapStarted(started) {
   for (const child of started) killProcessGroup(child, 'SIGKILL');
-  await Promise.all(
-    started.map(child => waitUntilProcessGone(child?.pid, 2_000))
+  const gone = await Promise.all(
+    started.map(async child => {
+      if (STORYBOOK_BUILD_REPLACED.has(child)) return true;
+      const owner = STORYBOOK_BUILD_OWNERS.get(child);
+      if (!owner) return waitUntilProcessGone(child?.pid, 2_000);
+      const until = Date.now() + 2_000;
+      while (Date.now() < until) {
+        try {
+          const current = owner.sample(child.pid);
+          if (current.members?.length === 0) return true;
+          if (
+            owner.startedAt &&
+            current.leaderStartedAt !== null &&
+            current.leaderStartedAt !== owner.startedAt
+          )
+            return true;
+        } catch {
+          /* unknown group departure is never a pass */
+        }
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      return false;
+    })
   );
+  if (gone.some(value => !value))
+    throw new Error('live Storybook owned child cleanup unproved; fail closed');
 }
 
 /**

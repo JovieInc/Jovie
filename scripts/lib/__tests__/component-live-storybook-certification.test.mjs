@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import {
   existsSync,
   mkdirSync,
@@ -42,10 +43,17 @@ import {
   killProcessGroup,
   mergeOwnedBrowserGroups,
   planOwnedBrowserSignals,
+  readStorybookBuildResources,
   reapStaleStorybookVitestLeases,
+  requireStorybookBuildMemory,
+  STORYBOOK_BUILD_RSS_LIMIT_BYTES,
   STORYBOOK_VITEST_OWNER_ARG,
   spawnProcessGroup,
+  storybookBuildEnvironment,
+  storybookBuildResourceDisposition,
+  storybookHostMemory,
   waitUntilProcessGone,
+  watchStorybookBuildResources as watchOwnedStorybookBuildResources,
   withBoundedLifecycle,
 } from '../../component-live-storybook-lifecycle.mjs';
 import { runComponentShipGate } from '../../component-ship-gate.mjs';
@@ -75,6 +83,504 @@ const LIFECYCLE_TEST_TIMEOUT_MS = 30_000;
 const BROWSER_LAUNCH_TIMEOUT_MS = LIFECYCLE_TEST_TIMEOUT_MS;
 const ownedPids = [];
 const lifecycleIt = process.platform === 'win32' ? it.skip : it;
+
+describe('live Storybook owned build resource bounds', () => {
+  const GiB = 1024 ** 3;
+  const healthy = {
+    totalBytes: 64 * GiB,
+    availableBytes: 40 * GiB,
+    rssBytes: GiB,
+    leaderStartedAt: 'Wed Oct 7 22:00:00 2026',
+  };
+  const child = () =>
+    Object.assign(new EventEmitter(), {
+      pid: 1234,
+      exitCode: null,
+      signalCode: null,
+    });
+  const watchStorybookBuildResources = (instance, failure, options = {}) =>
+    watchOwnedStorybookBuildResources(instance, failure, {
+      ...(instance.pid === 1234
+        ? { launchIdentity: () => healthy.leaderStartedAt }
+        : {}),
+      ...options,
+    });
+
+  it('admits only enough measured memory for the bounded build plus host reserve', () => {
+    expect(() => requireStorybookBuildMemory(() => healthy)).not.toThrow();
+    expect(() =>
+      requireStorybookBuildMemory(() => ({
+        ...healthy,
+        availableBytes: 25 * GiB,
+      }))
+    ).toThrow('insufficient-owned-build-headroom');
+    expect(() =>
+      requireStorybookBuildMemory(() => ({
+        ...healthy,
+        availableBytes: 5 * GiB,
+      }))
+    ).toThrow('host-memory-reserve');
+    expect(() => requireStorybookBuildMemory(() => ({}))).toThrow(
+      'resource-measurement-unavailable'
+    );
+  });
+
+  it('uses Linux available memory, and refuses missing or unreadable census', () => {
+    expect(
+      storybookHostMemory({
+        platform: 'linux',
+        read: () => 'MemTotal: 65536 kB\nMemAvailable: 32768 kB\n',
+      })
+    ).toEqual({ totalBytes: 65536 * 1024, availableBytes: 32768 * 1024 });
+    expect(() =>
+      storybookHostMemory({
+        platform: 'linux',
+        read: () => 'MemTotal: 64 kB\n',
+      })
+    ).toThrow('host memory measurement unavailable');
+    expect(() =>
+      storybookHostMemory({
+        platform: 'linux',
+        read: () => {
+          throw new Error('permission denied');
+        },
+      })
+    ).toThrow('permission denied');
+    expect(
+      storybookHostMemory({
+        platform: 'darwin',
+        free: () => GiB,
+        total: () => 32 * GiB,
+      })
+    ).toEqual({ availableBytes: GiB, totalBytes: 32 * GiB });
+  });
+
+  it('sums the owned detached process group only and fails closed on unreadable identity', () => {
+    const snapshot = vi.fn(() => ({
+      status: 0,
+      stdout:
+        ' 1234 1234 1024 S Wed Oct 7 22:00:00 2026\n 1235 1234 2048 S Wed Oct 7 22:00:01 2026\n 9999 9999 60000000 S Wed Oct 7 20:00:00 2026\n',
+    }));
+    expect(
+      readStorybookBuildResources(1234, { snapshot, memory: () => healthy })
+    ).toEqual({
+      ...healthy,
+      rssBytes: 3072 * 1024,
+      members: [
+        { pid: 1234, startedAt: healthy.leaderStartedAt },
+        { pid: 1235, startedAt: 'Wed Oct 7 22:00:01 2026' },
+      ],
+    });
+    expect(
+      readStorybookBuildResources(999, { snapshot, memory: () => healthy })
+    ).toMatchObject({ leaderStartedAt: null, members: [], rssBytes: 0 });
+    for (const result of [
+      { status: 1 },
+      { status: 0, error: new Error('unavailable') },
+    ])
+      expect(() =>
+        readStorybookBuildResources(1234, {
+          snapshot: () => result,
+          memory: () => healthy,
+        })
+      ).toThrow('owned build memory census unavailable');
+  });
+
+  it('measures a real owned child, stops it on excess, and leaves another group alive', async () => {
+    const own = spawnProcessGroup(
+      process.execPath,
+      ['-e', 'setInterval(() => {}, 1000)'],
+      { stdio: 'ignore' }
+    );
+    const other = spawnProcessGroup(
+      process.execPath,
+      ['-e', 'setInterval(() => {}, 1000)'],
+      { stdio: 'ignore' }
+    );
+    const failure = vi.fn();
+    let watch;
+    try {
+      await waitFor(() => {
+        try {
+          return readStorybookBuildResources(own.pid).rssBytes > 0;
+        } catch {
+          return false;
+        }
+      });
+      const measured = readStorybookBuildResources(own.pid);
+      expect(measured.rssBytes).toBeGreaterThan(0);
+      watch = watchStorybookBuildResources(own, failure, {
+        sample: pid => ({
+          ...readStorybookBuildResources(pid),
+          availableBytes: 40 * GiB,
+          totalBytes: 64 * GiB,
+          rssBytes: 60 * GiB,
+        }),
+      });
+      watch.check();
+      await waitForExit(own);
+      expect(failure.mock.calls[0][0].message).toContain(
+        'owned-build-rss-limit'
+      );
+      expect(other.exitCode).toBeNull();
+      expect(isProcessGone(other.pid)).toBe(false);
+    } finally {
+      watch?.stop();
+      killProcessGroup(own, 'SIGKILL');
+      killProcessGroup(other, 'SIGKILL');
+      await Promise.all([
+        waitUntilProcessGone(own.pid),
+        waitUntilProcessGone(other.pid),
+      ]);
+    }
+  });
+
+  it('rejects partial process census instead of undercounting an owned member', () => {
+    const leader = '1234 1234 1024 S Wed Oct 7 22:00:00 2026\n';
+    for (const tail of [
+      '1235 1234 UNKNOWN S Wed Oct 7 22:00:01 2026\n',
+      leader,
+      '1235 1234 2048 S invalid start identity\n',
+    ]) {
+      expect(() =>
+        readStorybookBuildResources(1234, {
+          snapshot: () => ({ status: 0, stdout: leader + tail }),
+          memory: () => healthy,
+        })
+      ).toThrow(/census malformed|census duplicate pid/);
+    }
+  });
+
+  it('fences outer catch/finally and timeout cleanup against a reused owner', async () => {
+    const signals = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const sample = vi
+      .fn()
+      .mockReturnValueOnce(healthy)
+      .mockReturnValue({
+        ...healthy,
+        leaderStartedAt: 'a replacement',
+        rssBytes: 60 * GiB,
+      });
+    try {
+      await expect(
+        withBoundedLifecycle({ timeoutMs: 1000 }, async ({ register }) => {
+          const instance = register(child());
+          const watch = watchStorybookBuildResources(
+            instance,
+            error => {
+              throw error;
+            },
+            { sample }
+          );
+          try {
+            watch.check();
+            watch.check();
+          } finally {
+            watch.stop();
+          }
+          throw new Error('owner mismatch');
+        })
+      ).rejects.toThrow(/owner identity changed|owner mismatch/);
+      expect(signals).not.toHaveBeenCalled();
+    } finally {
+      signals.mockRestore();
+    }
+  });
+
+  it('reaps proven surviving group members after their leader exits', async () => {
+    let leaderGone = false;
+    let departed = false;
+    const members = [
+      { pid: 1234, startedAt: healthy.leaderStartedAt },
+      { pid: 1235, startedAt: 'Wed Oct 7 22:00:01 2026' },
+    ];
+    const sample = () => ({
+      ...healthy,
+      leaderStartedAt: leaderGone ? null : healthy.leaderStartedAt,
+      members: departed ? [] : leaderGone ? members.slice(1) : members,
+    });
+    const signals = vi.spyOn(process, 'kill').mockImplementation(pid => {
+      if (pid === -1234) departed = true;
+      return true;
+    });
+    try {
+      await expect(
+        withBoundedLifecycle({ timeoutMs: 1000 }, async ({ register }) => {
+          const instance = register(child());
+          const watch = watchStorybookBuildResources(
+            instance,
+            error => {
+              throw error;
+            },
+            { sample }
+          );
+          watch.check();
+          watch.stop();
+          leaderGone = true;
+          return 'completed';
+        })
+      ).resolves.toBe('completed');
+      expect(signals).toHaveBeenCalledExactlyOnceWith(-1234, 'SIGKILL');
+      expect(departed).toBe(true);
+    } finally {
+      signals.mockRestore();
+    }
+  });
+
+  it('keeps launch ownership after a first RSS census failure and reaps on recovery', async () => {
+    let departed = false;
+    const sample = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('first RSS census unavailable');
+      })
+      .mockImplementation(() => ({
+        ...healthy,
+        leaderStartedAt: departed ? null : healthy.leaderStartedAt,
+        members: departed
+          ? []
+          : [{ pid: 1234, startedAt: healthy.leaderStartedAt }],
+      }));
+    const signals = vi.spyOn(process, 'kill').mockImplementation(() => {
+      departed = true;
+      return true;
+    });
+    try {
+      await expect(
+        withBoundedLifecycle({ timeoutMs: 1000 }, async ({ register }) => {
+          const instance = register(child());
+          const watch = watchStorybookBuildResources(
+            instance,
+            error => {
+              throw error;
+            },
+            { sample }
+          );
+          try {
+            watch.check();
+          } finally {
+            watch.stop();
+          }
+        })
+      ).rejects.toThrow('first RSS census unavailable');
+      expect(signals).toHaveBeenCalledWith(-1234, 'SIGKILL');
+      expect(departed).toBe(true);
+    } finally {
+      signals.mockRestore();
+    }
+  });
+
+  it('retains the work directory when launch identity is unknown and the group remains live', async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), 'storybook-resource-unknown-launch-')
+    );
+    temps.push(dir);
+    const signals = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    try {
+      await expect(
+        withBoundedLifecycle(
+          { timeoutMs: 1000, workDir: dir },
+          async ({ register }) => {
+            const instance = register(child());
+            const watch = watchStorybookBuildResources(instance, () => {}, {
+              launchIdentity: () => undefined,
+              sample: () => ({
+                ...healthy,
+                members: [{ pid: 1234, startedAt: healthy.leaderStartedAt }],
+              }),
+            });
+            watch.stop();
+            return 'not certified';
+          }
+        )
+      ).rejects.toThrow('cleanup unproved');
+      expect(existsSync(dir)).toBe(true);
+      expect(signals).not.toHaveBeenCalled();
+    } finally {
+      signals.mockRestore();
+    }
+  });
+
+  it('fails cleanup and retains the work directory when group departure is unreadable', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'storybook-resource-unproved-'));
+    temps.push(dir);
+    const signals = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    try {
+      await expect(
+        withBoundedLifecycle(
+          { timeoutMs: 1000, workDir: dir },
+          async ({ register }) => {
+            const instance = register(child());
+            const watch = watchStorybookBuildResources(instance, () => {}, {
+              sample: () => {
+                throw new Error('census unavailable');
+              },
+            });
+            watch.stop();
+            return 'not certified';
+          }
+        )
+      ).rejects.toThrow('cleanup unproved');
+      expect(existsSync(dir)).toBe(true);
+      expect(signals).not.toHaveBeenCalled();
+    } finally {
+      signals.mockRestore();
+    }
+  });
+
+  it('bounds native concurrency and JS heap while preserving unrelated options', () => {
+    const original = {
+      NODE_OPTIONS: '--trace-warnings --max-old-space-size=16384',
+      RAYON_NUM_THREADS: '64',
+      SOME_FLAG: 'keep',
+    };
+    expect(storybookBuildEnvironment(original)).toEqual({
+      NODE_OPTIONS:
+        '--trace-warnings --max-old-space-size=16384 --max-old-space-size=4096',
+      RAYON_NUM_THREADS: '2',
+      SOME_FLAG: 'keep',
+      JOVIE_LIVE_STORYBOOK_CERT: '1',
+    });
+    expect(original.RAYON_NUM_THREADS).toBe('64');
+    expect(storybookBuildEnvironment({}).NODE_OPTIONS).toBe(
+      '--max-old-space-size=4096'
+    );
+  });
+
+  it('retains the host reserve and includes native RSS outside the JS heap', () => {
+    expect(storybookBuildResourceDisposition(healthy).ok).toBe(true);
+    expect(
+      storybookBuildResourceDisposition({
+        ...healthy,
+        rssBytes: STORYBOOK_BUILD_RSS_LIMIT_BYTES,
+      }).ok
+    ).toBe(true);
+    expect(
+      storybookBuildResourceDisposition({
+        ...healthy,
+        rssBytes: STORYBOOK_BUILD_RSS_LIMIT_BYTES + 1,
+      }).reason
+    ).toBe('owned-build-rss-limit');
+    expect(
+      storybookBuildResourceDisposition({
+        ...healthy,
+        availableBytes: 19 * GiB,
+      }).reason
+    ).toBe('host-memory-reserve');
+    for (const sample of [
+      null,
+      {},
+      { ...healthy, rssBytes: NaN },
+      { ...healthy, totalBytes: 0 },
+      { ...healthy, availableBytes: -1 },
+    ])
+      expect(storybookBuildResourceDisposition(sample).ok).toBe(false);
+  });
+
+  it('stops only the owned build on measured native RSS excess, never certifies it', () => {
+    const instance = child();
+    const signal = vi.fn();
+    const failure = vi.fn();
+    const sample = vi
+      .fn()
+      .mockReturnValueOnce(healthy)
+      .mockReturnValue({ ...healthy, rssBytes: 60 * GiB });
+    const watch = watchStorybookBuildResources(instance, failure, {
+      sample,
+      signal,
+    });
+    try {
+      watch.check();
+      watch.check();
+      watch.check();
+      expect(signal).toHaveBeenCalledExactlyOnceWith(instance, 'SIGKILL');
+      expect(failure).toHaveBeenCalledOnce();
+      expect(failure.mock.calls[0][0].message).toContain(
+        'owned-build-rss-limit'
+      );
+      expect(watch.peakRssBytes()).toBe(60 * GiB);
+      expect(sample).toHaveBeenCalledTimes(2);
+    } finally {
+      watch.stop();
+    }
+  });
+
+  it('fails closed under host contention without signaling competing work', () => {
+    const instance = child();
+    const signal = vi.fn();
+    const failure = vi.fn();
+    const watch = watchStorybookBuildResources(instance, failure, {
+      sample: () => ({ ...healthy, availableBytes: GiB }),
+      signal,
+    });
+    try {
+      watch.check();
+      expect(signal).toHaveBeenCalledExactlyOnceWith(instance, 'SIGKILL');
+      expect(failure.mock.calls[0][0].message).toContain('host-memory-reserve');
+    } finally {
+      watch.stop();
+    }
+  });
+
+  it('refuses a reused leader identity and never signals that replacement', () => {
+    const instance = child();
+    const signal = vi.fn();
+    const failure = vi.fn();
+    const sample = vi
+      .fn()
+      .mockReturnValueOnce(healthy)
+      .mockReturnValue({
+        ...healthy,
+        leaderStartedAt: 'a later process',
+        rssBytes: 60 * GiB,
+      });
+    const watch = watchStorybookBuildResources(instance, failure, {
+      sample,
+      signal,
+    });
+    try {
+      watch.check();
+      watch.check();
+      expect(signal).not.toHaveBeenCalled();
+      expect(failure.mock.calls[0][0].message).toContain(
+        'owner identity changed'
+      );
+    } finally {
+      watch.stop();
+    }
+  });
+
+  it('retains an unknown census as failure and stops sampling after normal exit', () => {
+    const signal = vi.fn();
+    const failure = vi.fn();
+    const instance = child();
+    const sample = vi.fn(() => {
+      throw new Error('census unavailable');
+    });
+    const watch = watchStorybookBuildResources(instance, failure, {
+      sample,
+      signal,
+    });
+    try {
+      watch.check();
+      expect(failure.mock.calls[0][0].message).toBe('census unavailable');
+      expect(signal).not.toHaveBeenCalled();
+    } finally {
+      watch.stop();
+    }
+    const exited = child();
+    const census = vi.fn(() => healthy);
+    const done = watchStorybookBuildResources(exited, failure, {
+      sample: census,
+      signal,
+    });
+    exited.exitCode = 0;
+    exited.emit('exit', 0);
+    done.check();
+    expect(census).not.toHaveBeenCalled();
+    done.stop();
+  });
+});
 
 async function waitFor(predicate, timeoutMs = 15_000) {
   const started = Date.now();
