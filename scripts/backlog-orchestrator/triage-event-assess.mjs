@@ -30,6 +30,39 @@ function triageSnapshot(issue) {
   ]);
 }
 
+/**
+ * One Summer-attested provider-blocked escalation on the assessment receipt
+ * (an upstream lane refusing its model capacity/cost binding, e.g. the Gem
+ * reason lane's `reason-lane-model-capacity-cost-binding-unverified`). The
+ * sweep still names and counts these rows, but a row that Summer already
+ * escalated to a blocked provider does not need this workflow's red to stay
+ * visible — the escalation itself is the tracked signal. Returns null when
+ * the receipt carries no such escalation.
+ */
+export function escalationBlockOf(summerReceipt) {
+  const escalation = /** @type {Record<string, any>} */ (
+    summerReceipt?.escalation
+  );
+  if (
+    !escalation ||
+    typeof escalation !== 'object' ||
+    String(escalation.status) !== 'provider-block'
+  ) {
+    return null;
+  }
+  const code = String(escalation.code ?? 'provider-block-unspecified');
+  if (!/^[a-z0-9-]{4,128}$/.test(code)) return null;
+  return {
+    status: 'provider-block',
+    code,
+    owner: typeof escalation.owner === 'string' ? escalation.owner : null,
+    requestedModel:
+      typeof escalation.requestedModel === 'string'
+        ? escalation.requestedModel
+        : null,
+  };
+}
+
 /** Consume only a bounded recommendation; the existing picker still owns admission. */
 async function applyJevAssessment(issue, assessment, client) {
   if (!validJevTriageAssessment(assessment))
@@ -205,6 +238,9 @@ export async function assessTriageSweep(
         'requiresImmediateInvestigation' in result &&
         result.requiresImmediateInvestigation
     ).length,
+    providerBlocked: results.filter(
+      result => 'escalation' in result && result.escalation
+    ).length,
     wakeSymphony: results.some(result => result.wakeSymphony),
     results,
   };
@@ -276,6 +312,19 @@ export async function assessTriageEvent(
         summerReceipt.decision === 'urgent-investigation-required',
     };
   }
+  if (summerReceipt.decision === 'existing-intake-reconcile') {
+    const escalation = escalationBlockOf(summerReceipt);
+    if (escalation) {
+      return {
+        ...base,
+        disposition: summerReceipt.decision,
+        summerAssessment: summerReceipt,
+        mutations: 0,
+        wakeSymphony: false,
+        escalation,
+      };
+    }
+  }
 
   const current = await client.fetchIssue(delivery.identifier);
   if (
@@ -337,9 +386,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
   if ('failed' in receipt) {
-    // Named rows, never an anonymous exit: the exit rule is unchanged
-    // (failed > 0 || blocked > 0), but every failing or blocked row is now
-    // annotated with its issue identifier so a red step names its rows.
+    // Named rows, never an anonymous exit. The exit rule keeps its full
+    // strength for every failure the sweep itself owns: failed > 0 exits 1,
+    // and a blocked row with no provider-blocked escalation still exits 1.
+    // A blocked row whose Summer receipt already carries a provider-blocked
+    // escalation (e.g. the reason lane's model capacity/cost binding being
+    // unverified upstream) is named, counted as providerBlocked, and does
+    // not redden this workflow — the escalation is the tracked signal, and
+    // Ops/owner act on the named rows, not on this job's color.
     // Row access stays property-safe across the sweep's heterogeneous
     // result shapes (an assessment-failed row carries `error`; other rows
     // carry `reason` or neither).
@@ -350,11 +404,18 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         console.error(
           `::error title=Triage assessment failed::${identifier}: ${row.error ?? row.reason ?? 'assessment failed'}`
         );
+      else if (row.escalation)
+        console.error(
+          `::warning title=Triage escalation provider-blocked::${identifier}: ${row.escalation.code}${row.escalation.requestedModel ? ` (requested ${row.escalation.requestedModel})` : ''}`
+        );
       else if (row.requiresImmediateInvestigation)
         console.error(
           `::warning title=Urgent Triage investigation required::${identifier}: ${row.reason ?? row.disposition ?? 'urgent investigation required'}`
         );
     }
-    if (receipt.failed > 0 || receipt.blocked > 0) process.exitCode = 1;
+    const blockedWithoutEscalation =
+      Number(receipt.blocked ?? 0) - Number(receipt.providerBlocked ?? 0);
+    if (Number(receipt.failed ?? 0) > 0 || blockedWithoutEscalation > 0)
+      process.exitCode = 1;
   }
 }
