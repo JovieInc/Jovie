@@ -65,6 +65,85 @@ const STATUS_CASES = [
 }>;
 
 describe('ConnectorCard', () => {
+  it('allows revocation even when new connections are unconfigured', () => {
+    const onDisconnect = vi.fn();
+    const { rerender } = render(
+      <ConnectorCard
+        provider='gmail'
+        status='not_connected'
+        available={false}
+        unavailableReason='Setup unavailable'
+        onConnect={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Connect Gmail' })
+    ).toBeDisabled();
+    expect(screen.getByTestId('connector-detail-gmail')).toHaveTextContent(
+      'Setup unavailable'
+    );
+    rerender(
+      <ConnectorCard
+        provider='gmail'
+        status='connected'
+        available={false}
+        onDisconnect={onDisconnect}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect Gmail' }));
+    expect(onDisconnect).toHaveBeenCalledOnce();
+  });
+
+  it('shows partial permissions without claiming write access or completed sync', () => {
+    render(
+      <ConnectorCard
+        provider='youtube'
+        status='connected'
+        scopes={['https://www.googleapis.com/auth/youtube.readonly']}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Import channel videos')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Some permissions are missing. Reconnect to enable them.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('No completed sync recorded')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Reconnect/ })).toBeEnabled();
+  });
+
+  it('keeps unknown connection state unusable and pending actions visible', () => {
+    const { rerender, container } = render(
+      <ConnectorCard
+        provider='spotify'
+        status='unavailable'
+        onConnect={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('status', { name: 'Spotify status: Unavailable' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reconnect Spotify' })
+    ).toBeDisabled();
+    rerender(
+      <ConnectorCard
+        provider='spotify'
+        status='connected'
+        pending
+        pendingAction='disconnect'
+        onDisconnect={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Disconnect Spotify' })
+    ).toBeDisabled();
+    expect(screen.getByText('Disconnecting…')).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true');
+  });
+
   it.each(STATUS_CASES)(
     'maps $status to its semantic status and $actionLabel action',
     ({
@@ -93,7 +172,9 @@ describe('ConnectorCard', () => {
         })
       ).toHaveAttribute('data-variant', statusVariant);
 
-      const action = screen.getByRole('button', { name: actionLabel });
+      const action = screen.getByRole('button', {
+        name: `${actionLabel} Gmail`,
+      });
       expect(action).toHaveAttribute('data-variant', actionVariant);
       if (actionOwner === 'disconnect') {
         expect(action).toHaveAttribute('data-destructive', 'true');
@@ -116,13 +197,13 @@ describe('ConnectorCard', () => {
       <ConnectorCard provider='gmail' status='not_connected' />
     );
 
-    expect(screen.getByRole('button', { name: 'Connect' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Connect/ })).toBeDisabled();
 
     rerender(<ConnectorCard provider='gmail' status='disabled' />);
-    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Reconnect/ })).toBeDisabled();
 
     rerender(<ConnectorCard provider='gmail' status='connected' />);
-    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Disconnect/ })).toBeDisabled();
   });
 
   it('shows connected account or recovery detail in one stable status slot', () => {
@@ -185,7 +266,7 @@ describe('ConnectorCard', () => {
     );
 
     expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Disconnect/ }));
     expect(onDisconnect).toHaveBeenCalledOnce();
   });
 });

@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { getGrantedConnectorCapabilities } from '@/lib/connectors/capabilities';
 import {
   type ConnectorIconKey,
   type ConnectorProviderId,
@@ -31,9 +32,16 @@ interface ConnectorCardProps {
   readonly accountLabel?: string;
   readonly scopes?: readonly string[];
   readonly errorMessage?: string;
+  readonly actionError?: string;
   readonly onConnect?: () => void;
   readonly onDisconnect?: () => void;
   readonly className?: string;
+  readonly available?: boolean;
+  readonly unavailableReason?: string;
+  readonly lastSyncAt?: string;
+  readonly pending?: boolean;
+  readonly actionDisabled?: boolean;
+  readonly pendingAction?: 'connect' | 'disconnect';
 }
 
 const CONNECTOR_ICONS = {
@@ -69,6 +77,7 @@ const STATUS_BADGE: Record<
     icon: RefreshCw,
   },
   disabled: { label: 'Disconnected', variant: 'outline' },
+  unavailable: { label: 'Unavailable', variant: 'warning', icon: AlertCircle },
 };
 
 export function ConnectorCard({
@@ -77,9 +86,16 @@ export function ConnectorCard({
   accountLabel,
   scopes,
   errorMessage,
+  actionError,
   onConnect,
   onDisconnect,
   className,
+  available = true,
+  unavailableReason,
+  lastSyncAt,
+  pending = false,
+  actionDisabled = false,
+  pendingAction,
 }: ConnectorCardProps) {
   const definition = getConnectorDefinition(provider);
   const isSocialIcon =
@@ -89,34 +105,70 @@ export function ConnectorCard({
     label: statusLabel,
     variant: statusVariant,
     icon: StatusIcon,
-  } = STATUS_BADGE[status];
+  } = STATUS_BADGE[
+    (status === 'not_connected' || status === 'disabled') && !available
+      ? 'unavailable'
+      : status
+  ];
   const isConnected = status === 'connected' || status === 'syncing';
-  const needsAttention = status === 'error' || status === 'needs_reauth';
+  const needsAttention =
+    status === 'error' || status === 'needs_reauth' || status === 'unavailable';
   const actionLabel = isConnected
     ? 'Disconnect'
     : status === 'not_connected'
       ? 'Connect'
       : 'Reconnect';
   const actionHandler = isConnected ? onDisconnect : onConnect;
+  const canAct =
+    Boolean(actionHandler) &&
+    !actionDisabled &&
+    !pending &&
+    (isConnected || (available && status !== 'unavailable'));
   const normalizedError = errorMessage?.trim();
-  const detailLine = isConnected
-    ? accountLabel?.trim()
-    : needsAttention
-      ? normalizedError ||
-        (status === 'needs_reauth'
-          ? 'Reconnect to continue syncing.'
-          : 'Connection failed. Try again.')
-      : undefined;
+  const detailLine =
+    actionError ||
+    (!available || status === 'unavailable'
+      ? (unavailableReason ?? 'Connection is unavailable. Try again later.')
+      : isConnected
+        ? accountLabel?.trim()
+        : needsAttention
+          ? normalizedError ||
+            (status === 'needs_reauth'
+              ? 'Reconnect to continue syncing.'
+              : 'Connection failed. Try again.')
+          : undefined);
   const grantedScopeLabels = definition.oauthScopes.flatMap((scope, index) => {
     const label = definition.oauthScopeLabels[index];
     return scopes?.includes(scope) && label ? [label] : [];
   });
+  const grantedCapabilities = getGrantedConnectorCapabilities(
+    definition,
+    status,
+    scopes ?? []
+  );
+  const missingCapabilities =
+    isConnected &&
+    scopes !== undefined &&
+    grantedCapabilities.length <
+      definition.capabilities.filter(
+        capability => capability.availability === 'available'
+      ).length;
+  const syncedAt = lastSyncAt ? new Date(lastSyncAt) : null;
+  const syncLabel =
+    syncedAt && Number.isFinite(syncedAt.getTime())
+      ? `Last synced ${syncedAt.toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC`
+      : definition.syncRunner
+        ? 'No completed sync recorded'
+        : 'Sync runs when used';
 
   return (
     <div
-      className={cn('flex items-start justify-between gap-3 py-4', className)}
+      className={cn(
+        'grid grid-cols-1 items-start gap-3 py-4 sm:flex sm:justify-between',
+        className
+      )}
       data-status={status}
-      aria-busy={status === 'syncing' ? true : undefined}
+      aria-busy={pending || status === 'syncing' ? true : undefined}
     >
       <div className='flex min-w-0 flex-1 gap-3'>
         {isSocialIcon ? (
@@ -159,6 +211,11 @@ export function ConnectorCard({
             </Badge>
           </div>
           <p className='text-xs text-secondary'>{definition.description}</p>
+          <p className='text-xs text-tertiary'>
+            {definition.accountScope === 'identity'
+              ? 'Selected identity'
+              : 'Your signed-in account'}
+          </p>
           <p
             className={cn(
               'min-h-4 text-xs',
@@ -176,19 +233,63 @@ export function ConnectorCard({
               <li>Scopes: {grantedScopeLabels.join(', ')}</li>
             </ul>
           )}
+          {isConnected && (
+            <div className='min-h-8 text-xs text-tertiary'>
+              <p>
+                {grantedCapabilities.length > 0
+                  ? grantedCapabilities
+                      .map(capability => capability.label)
+                      .join(' · ')
+                  : 'No operation permissions verified'}
+              </p>
+              <p>{syncLabel}</p>
+            </div>
+          )}
+          {missingCapabilities && (
+            <p className='text-xs text-warning'>
+              Some permissions are missing. Reconnect to enable them.
+            </p>
+          )}
         </div>
       </div>
 
-      <div className='shrink-0'>
+      <div className='ml-11 flex min-w-0 shrink-0 flex-wrap justify-end gap-2 sm:ml-0'>
+        {missingCapabilities && onConnect && (
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={onConnect}
+            disabled={pending || actionDisabled || !available}
+          >
+            Reconnect
+          </Button>
+        )}
+        {needsAttention && accountLabel && onDisconnect && (
+          <Button
+            variant='tertiary'
+            destructive
+            size='sm'
+            onClick={onDisconnect}
+            disabled={pending || actionDisabled}
+            aria-label={`Disconnect ${definition.label}`}
+          >
+            Disconnect
+          </Button>
+        )}
         <Button
           variant={isConnected ? 'tertiary' : 'secondary'}
           destructive={isConnected}
           size='sm'
           onClick={actionHandler}
-          disabled={!actionHandler}
-          className='min-w-24'
+          disabled={!canAct}
+          aria-label={`${actionLabel} ${definition.label}`}
+          className='w-32'
         >
-          {actionLabel}
+          {pending
+            ? pendingAction === 'disconnect'
+              ? 'Disconnecting…'
+              : 'Connecting…'
+            : actionLabel}
         </Button>
       </div>
     </div>
