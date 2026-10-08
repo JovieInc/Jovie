@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { authCopy } from '@/components/providers/auth-copy';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -60,7 +60,20 @@ describe('auth front-door contract', () => {
   });
 
   it('redirects legacy hyphenated auth paths to the canonical auth routes', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    // workflow@5 `withWorkflow` eagerly loads esbuild when next.config.js is
+    // imported. esbuild asserts `new TextEncoder().encode("") instanceof
+    // Uint8Array`; jsdom replaces globalThis.Uint8Array with its own realm's
+    // constructor while TextEncoder stays on Node's, so the invariant fails.
+    // Align Uint8Array with TextEncoder's realm for the import.
+    const realmUint8Array = new TextEncoder().encode('')
+      .constructor as typeof Uint8Array;
+    vi.stubGlobal('Uint8Array', realmUint8Array);
+    let nextConfigModule;
+    try {
+      nextConfigModule = await import('../../../next.config.js');
+    } finally {
+      vi.unstubAllGlobals();
+    }
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = await nextConfig.redirects();
 
