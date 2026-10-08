@@ -1,8 +1,31 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminUserDetailDrawer } from '@/components/features/admin/admin-users-table/AdminUserDetailDrawer';
 import type { AdminUserRow } from '@/lib/admin/types';
+
+const clipboard = vi.hoisted(() => ({
+  copy: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock('@/hooks/useClipboard', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/hooks/useClipboard')>()),
+  copyToClipboard: clipboard.copy,
+}));
+
+vi.mock('@/components/feedback', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/feedback')>();
+  return {
+    ...actual,
+    toast: {
+      ...actual.toast,
+      success: clipboard.success,
+      error: clipboard.error,
+    },
+  };
+});
 
 vi.mock('@/components/molecules/drawer', async importOriginal => {
   const actual =
@@ -64,6 +87,44 @@ const user: AdminUserRow = {
 };
 
 describe('AdminUserDetailDrawer', () => {
+  it.each([true, false])(
+    'keeps header copy focus and targets the current user, including clipboard failure (%s)',
+    async succeeds => {
+      clipboard.copy.mockReset().mockResolvedValue(succeeds);
+      clipboard.success.mockClear();
+      clipboard.error.mockClear();
+      const props = { onClose: vi.fn(), contextMenuItems: [] };
+      const { rerender } = render(
+        <AdminUserDetailDrawer {...props} user={user} />
+      );
+      const copy = screen.getByRole('button', { name: 'Copy Email' });
+      copy.focus();
+      fireEvent.click(copy);
+      await waitFor(() => {
+        expect(clipboard.copy).toHaveBeenLastCalledWith('alex@example.com');
+        expect(
+          succeeds ? clipboard.success : clipboard.error
+        ).toHaveBeenCalledWith(
+          succeeds ? 'Email copied' : 'Failed to copy Email',
+          ...(succeeds ? [{ duration: 2000 }] : [])
+        );
+      });
+      rerender(
+        <AdminUserDetailDrawer
+          {...props}
+          user={{ ...user, name: 'Bea Chen', email: 'bea@example.com' }}
+        />
+      );
+      expect(screen.getByRole('button', { name: 'Copy Email' })).toBe(copy);
+      expect(copy).toHaveFocus();
+      expect(screen.queryByText('alex@example.com')).not.toBeInTheDocument();
+      fireEvent.click(copy);
+      await waitFor(() =>
+        expect(clipboard.copy).toHaveBeenLastCalledWith('bea@example.com')
+      );
+    }
+  );
+
   it('uses the compact raised entity hierarchy with summary before details', () => {
     render(
       <AdminUserDetailDrawer

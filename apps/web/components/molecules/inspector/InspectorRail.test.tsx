@@ -27,6 +27,65 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
 }));
 
 describe('InspectorShell', () => {
+  it.each([false, true])(
+    'hands focused content to its tab and respects subsequent focus movement (%s)',
+    moved => {
+      const props = {
+        isOpen: true,
+        ariaLabel: 'Release inspector',
+        tabs: LIBRARY_INSPECTOR_TABS,
+        activeTab: 'assets' as const,
+        onTabChange: vi.fn(),
+        tabsAriaLabel: 'Inspector tabs',
+        children: <input aria-label='Asset note' defaultValue='Unsaved note' />,
+      };
+      const { rerender } = render(<InspectorShell {...props} />);
+      const input = screen.getByRole('textbox', { name: 'Asset note' });
+      input.focus();
+      rerender(<InspectorShell {...props} isLoading />);
+      expect(screen.getByRole('tab', { name: 'Assets' })).toHaveFocus();
+      const rights = screen.getByRole('tab', { name: 'Rights' });
+      if (moved) rights.focus();
+      rerender(<InspectorShell {...props} />);
+      expect(moved ? rights : input).toHaveFocus();
+    }
+  );
+
+  it('preserves tab focus, selection, content state and scroll through a refresh', () => {
+    const props = {
+      isOpen: true,
+      ariaLabel: 'Release inspector',
+      tabs: LIBRARY_INSPECTOR_TABS,
+      activeTab: 'assets' as const,
+      onTabChange: vi.fn(),
+      tabsAriaLabel: 'Inspector tabs',
+      children: <input aria-label='Asset note' defaultValue='Unsaved note' />,
+    };
+    const { rerender } = render(<InspectorShell {...props} />);
+    const tab = screen.getByRole('tab', { name: 'Assets' });
+    const panel = screen.getByRole('tabpanel');
+    const input = screen.getByRole('textbox', { name: 'Asset note' });
+    fireEvent.change(input, { target: { value: 'Keep this edit' } });
+    panel.scrollTop = 120;
+    tab.focus();
+
+    rerender(<InspectorShell {...props} isLoading />);
+    expect(screen.getByRole('tab', { name: 'Assets' })).toBe(tab);
+    expect(tab).toHaveFocus();
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toBe(panel);
+    expect(panel).toHaveAttribute('aria-busy', 'true');
+    expect(panel.scrollTop).toBe(120);
+    expect(screen.queryByRole('textbox', { name: 'Asset note' })).toBeNull();
+
+    rerender(<InspectorShell {...props} />);
+    expect(screen.getByRole('textbox', { name: 'Asset note' })).toBe(input);
+    expect(input).toHaveValue('Keep this edit');
+    expect(panel.scrollTop).toBe(120);
+    expect(tab).toHaveFocus();
+    expect(panel).toHaveAttribute('aria-busy', 'false');
+  });
+
   it('keeps the object header sticky and selects one real tab', async () => {
     const onTabChange = vi.fn();
     const { container } = render(
