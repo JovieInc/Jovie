@@ -1318,11 +1318,15 @@ jobs:
         if: ${{ steps.final-current.outputs.is_current == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
           SECURITY_GATE_HEAD: ${{ inputs.expected_sha }}
           SECURITY_GATE_MODE: production
-        run: node scripts/security/security-gate.mjs
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=LINEAR_API_KEY --no-exit-on-missing-only-secrets
+          --no-fallback --
+          env -u DOPPLER_TOKEN node scripts/security/security-gate.mjs
 
       - name: Promote staged production deployment
         id: promote
