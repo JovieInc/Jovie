@@ -69,6 +69,18 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(receipt['recovery']['action'], 'repair-and-read-back-existing-event-delivery')
         self.assertEqual(doctor.judge(obs(tick={'remediationEvents': {'deliveryFailed': 0}})), {})
 
+    def test_reconciliation_error_reports_durable_delivery_state_instead_of_inventing_a_failure(self):
+        current = obs(tick={
+            'remediationEventsError': 'RuntimeError: remediation-inventory-unreadable',
+            'remediationEvents': {'deliveryFailed': 0, 'deliveryExhausted': 0, 'deliveryNextAt': None},
+        })
+        alert = doctor.judge(current)['remediation-delivery']
+        self.assertIn('reconciliation failed', alert)
+        self.assertIn('remediation-inventory-unreadable', alert)
+        self.assertIn('journal failed=0, exhausted=0, next retry=None', alert)
+        self.assertNotIn('lacks authoritative acknowledgement', alert)
+        self.assertNotIn('unknown', alert)
+
     def test_busy_unknown_and_stale_delivery_cannot_resolve_prior_failure(self):
         failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryObservedAt': 1_000_000.0}})
         prior = {'conditions': doctor.condition_receipts(doctor.judge(failed), {}, failed, 'gem')}

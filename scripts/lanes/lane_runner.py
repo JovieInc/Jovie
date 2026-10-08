@@ -3393,7 +3393,15 @@ def _queue_event_delivery(data: dict, plan: dict, issues: list, accepted: set[st
 def _event_delivery_readback(linear, row: dict) -> tuple[bool, dict]:
     payload = row["payload"]
     if row["kind"] == "comments":
-        result = linear.gql('query($id:String!){comment(id:$id){id body issue{id}}}', {"id": row["commentId"]})
+        try:
+            result = linear.gql('query($id:String!){comment(id:$id){id body issue{id}}}', {"id": row["commentId"]})
+        except RuntimeError as error:
+            # Linear reports a missing comment as a GraphQL error rather than
+            # `{comment: null}`. This is the expected preimage before attempt 1;
+            # every other read failure remains unknown and fails closed.
+            if str(error) == "linear: Entity not found: Comment":
+                return False, {"commentId": row["commentId"]}
+            raise
         if not isinstance(result, dict) or "comment" not in result:
             raise RuntimeError("event-comment-readback-unreadable")
         comment = result["comment"]
@@ -3416,6 +3424,27 @@ def _event_delivery_readback(linear, row: dict) -> tuple[bool, dict]:
     if not isinstance(nodes, list):
         raise RuntimeError("event-label-readback-unreadable")
     return any(label.get("id") == payload["labelId"] for label in nodes), {"issueId": issue["id"], "labelId": payload["labelId"]}
+
+
+def _event_delivery_report(data: dict, now: float) -> dict:
+    active = [row for row in data["actions"].values()
+              if row["status"] not in {"acknowledged", "superseded"}]
+    return {"deliveryPending": len(active),
+            "deliveryFailed": sum(row["status"] in {"failed", "exhausted", "sending"} for row in active),
+            "deliveryExhausted": sum(row["status"] == "exhausted" for row in active),
+            "deliveryAcknowledged": sum(row["status"] == "acknowledged" for row in data["actions"].values()),
+            "deliveryObservedAt": now,
+            "deliveryNextAt": min((row["nextAt"] for row in active), default=None)}
+
+
+def _event_delivery_snapshot(host: Host, now: float) -> dict:
+    """Report durable action state when the wider remediation pass fails."""
+    report = _event_delivery_report(_event_delivery_state(host), now)
+    starts = [row.get("startDelivery") or {}
+              for row in (_event_escalation(host).get("events") or {}).values()
+              if isinstance(row, dict)]
+    report["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
+    return report
 
 
 def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) -> dict:
@@ -3486,12 +3515,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
         row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
         _save_event_delivery(host, data)
         break  # Bounded work; a transport outage must not monopolize dispatch.
-    active = [row for row in data["actions"].values() if row["status"] not in {"acknowledged", "superseded"}]
-    return {"deliveryPending": len(active), "deliveryFailed": sum(row["status"] in {"failed", "exhausted", "sending"} for row in active),
-            "deliveryExhausted": sum(row["status"] == "exhausted" for row in active),
-            "deliveryAcknowledged": sum(row["status"] == "acknowledged" for row in data["actions"].values()),
-            "deliveryObservedAt": now,
-            "deliveryNextAt": min((row["nextAt"] for row in active), default=None)}
+    return _event_delivery_report(data, now)
 
 
 def claim_remediation_events(host: Host, linear) -> dict:
@@ -5501,6 +5525,10 @@ def dispatch(host: Host) -> int:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
         except Exception as error:  # the label scan never takes worker spawn down
             tick["remediationEventsError"] = f"{type(error).__name__}: {error}"[:200]
+            try:
+                tick["remediationEvents"] = _event_delivery_snapshot(host, time.time())
+            except Exception as status_error:
+                tick["remediationDeliveryStatusError"] = f"{type(status_error).__name__}: {status_error}"[:200]
         for name, spec in load_providers().items():
             slots = host.slots(name, spec.get("slots", 1))
             # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.

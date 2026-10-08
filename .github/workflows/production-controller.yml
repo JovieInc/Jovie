@@ -315,11 +315,15 @@ jobs:
           else
             # Queue-proven main pushes skip the classifier by design; the exact SHA
             # was classified in its successful merge-group CI run (same head SHA).
-            proof_run="$(gh api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
-              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml")] | max_by(.run_attempt) | .id // empty')"
-            if [[ "$proof_run" =~ ^[0-9]+$ ]]; then
-              proof_artifact="$(gh api "repos/$REPO/actions/runs/$proof_run/artifacts" \
-                --jq '[.artifacts[] | select(.name | startswith("ci-risk-classification-'"$proof_run"'-")) | select(.expired == false)] | max_by(.name) | .name // empty')"
+            proof="$(gh api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
+              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .head_sha == "'"$SOURCE_SHA"'" and .event == "merge_group" and .status == "completed" and .conclusion == "success")] | max_by(.run_started_at, .id) | if . == null then empty else [.id, .run_attempt] | @tsv end')"
+            IFS=$'\t' read -r proof_run proof_attempt <<< "$proof"
+            if [[ "$proof_run" =~ ^[0-9]+$ && "$proof_attempt" =~ ^[1-9][0-9]*$ ]]; then
+              # Follow every artifact page and bind the receipt to this exact attempt.
+              # gh --slurp cannot be combined with --jq; use the standalone parser.
+              proof_artifact="$(gh api --paginate --slurp "repos/$REPO/actions/runs/$proof_run/artifacts" \
+                | jq -r --arg name "ci-risk-classification-$proof_run-$proof_attempt" --arg sha "$SOURCE_SHA" --argjson run "$proof_run" \
+                  '[.[].artifacts[] | select(.name == $name and .expired == false and .workflow_run.id == $run and .workflow_run.head_sha == $sha)] | if length == 1 then .[0].name else empty end')"
               if [[ -n "$proof_artifact" ]] && gh run download "$proof_run" --name "$proof_artifact" --dir "$root"; then
                 risk_lane="$(jq -r '.riskLevel // "unknown"' "$root/ci-risk-classification.json")"
                 echo "::notice::Risk lane $risk_lane from merge-group CI run $proof_run for $SOURCE_SHA."
