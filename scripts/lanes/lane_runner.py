@@ -3266,31 +3266,232 @@ def fetch_labeled_events(linear) -> list:
     return shared("remediation-events-v2", SUMMARY_TTL_S, fetch) or []
 
 
-def _apply_event_plan(linear, plan: dict) -> None:
-    """Writes only: reopen, one comment, one needs-human label. No extra reads."""
-    for row in plan.get("reopens") or []:
-        if not row.get("id") or not row.get("stateId"):
+EVENT_DELIVERY_SCHEMA = "jovie.event-delivery/v1"
+EVENT_DELIVERY_ATTEMPTS = 3
+EVENT_DELIVERY_STALE_S = 3600
+
+
+def _event_digest(value) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _event_delivery_state(host: Host) -> dict:
+    path = host.state / "event-delivery.json"
+    if not path.exists():
+        return {"schema": EVENT_DELIVERY_SCHEMA, "actions": {}}
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or data.get("schema") != EVENT_DELIVERY_SCHEMA or not isinstance(data.get("actions"), dict):
+        raise RuntimeError("event-delivery-journal-unreadable")
+    for key, row in data["actions"].items():
+        if not isinstance(row, dict) or row.get("key") != key or row.get("kind") not in {"comments", "reopens", "labels"}:
+            raise RuntimeError("event-delivery-journal-unreadable")
+    return data
+
+
+def _save_event_json(host: Host, filename: str, data: dict) -> None:
+    # Intent and terminal readback survive a controller restart. A failed write
+    # leaves the prior journal intact and prevents the external mutation.
+    import tempfile
+    host.state.mkdir(parents=True, exist_ok=True)
+    path = host.state / filename
+    fd, name = tempfile.mkstemp(prefix=".event-delivery-", dir=host.state)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            json.dump(data, handle, sort_keys=True)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(name, path)
+        directory = os.open(host.state, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def _save_event_delivery(host: Host, data: dict) -> None:
+    _save_event_json(host, "event-delivery.json", data)
+
+
+def _event_escalation(host: Host) -> dict:
+    path = host.state / "escalation.json"
+    if not path.exists():
+        return load_escalation(host)
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or not isinstance(data.get("events", {}), dict):
+        raise RuntimeError("event-escalation-unreadable")
+    return data
+
+
+def _recover_event_preparation(host: Host, journal: dict) -> None:
+    """Finish the paired local commit before replanning; never renew attempts.
+
+    The durable journal is the write-ahead record for escalation.json. Each
+    row has its original preimage and exact prepared postimage. A concurrent
+    worker owns its whole changed row; recovery never overwrites that winner.
+    Caller holds event-delivery.lock and this function takes claim.lock.
+    """
+    prepared = journal.get("prepared")
+    if prepared is None:
+        return
+    if not isinstance(prepared, dict) or not isinstance(prepared.get("rows"), dict):
+        raise RuntimeError("event-delivery-preparation-unreadable")
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        current = _event_escalation(host)
+        events = current.setdefault("events", {})
+        conflicts = []
+        for fingerprint, pair in prepared["rows"].items():
+            if not isinstance(pair, dict) or "before" not in pair or not isinstance(pair.get("after"), dict):
+                raise RuntimeError("event-delivery-preparation-unreadable")
+            existing = events.get(fingerprint)
+            if existing == pair["before"]:
+                events[fingerprint] = pair["after"]
+            elif existing != pair["after"]:
+                conflicts.append(fingerprint)
+        _save_event_json(host, "escalation.json", current)
+        # Unsigned local preparation is never remote ownership. Only intents
+        # whose exact postimage survived are eligible for external delivery.
+        for action in journal["actions"].values():
+            if action["fingerprint"] in conflicts and action["status"] not in {"acknowledged", "superseded"}:
+                action["status"] = "superseded"
+                action["history"].append({"at": time.time(), "outcome": "prepared-owner-changed"})
+        journal.setdefault("commits", []).append({"id": prepared["id"], "at": time.time(),
+                                                  "outcome": "committed", "conflicts": conflicts})
+        journal.pop("prepared")
+        _save_event_delivery(host, journal)
+    finally:
+        lock.release()
+
+
+def _queue_event_delivery(data: dict, plan: dict, issues: list, accepted: set[str], now: float) -> None:
+    snapshots = {issue["id"]: issue for issue in issues}
+    for kind in ("reopens", "comments", "labels"):
+        for payload in plan.get(kind) or []:
+            target = payload.get("id")
+            owners = [fp for fp, row in plan["events"].items()
+                      if row.get("issueId") == target or f"fp={fp} -->" in payload.get("body", "")]
+            if len(owners) != 1 or owners[0] not in accepted:
+                continue  # A concurrently changed event owns its entire row.
+            fp = owners[0]
+            event = plan["events"][fp]
+            issue = snapshots.get(target) or {}
+            intent = {"kind": kind, "payload": payload, "fingerprint": fp,
+                      "ownerIssueId": event.get("issueId"),
+                      "generation": sorted(event.get("noted") or [])}
+            key = _event_digest(intent)
+            if key not in data["actions"]:
+                data["actions"][key] = {**intent, "key": key, "createdAt": now, "nextAt": now,
+                    "expectedState": (issue.get("state") or {}).get("name"),
+                    "deadline": now + EVENT_DELIVERY_STALE_S, "attempts": 0, "status": "pending",
+                    "expectedEvent": _event_digest(event), "history": [],
+                    "commentId": str(uuid.uuid5(uuid.NAMESPACE_URL, "jovie-event:" + key))}
+
+
+def _event_delivery_readback(linear, row: dict) -> tuple[bool, dict]:
+    payload = row["payload"]
+    if row["kind"] == "comments":
+        result = linear.gql('query($id:String!){comment(id:$id){id body issue{id}}}', {"id": row["commentId"]})
+        if not isinstance(result, dict) or "comment" not in result:
+            raise RuntimeError("event-comment-readback-unreadable")
+        comment = result["comment"]
+        if comment is None:
+            return False, {"commentId": row["commentId"]}
+        if comment.get("body") != payload.get("body") or (comment.get("issue") or {}).get("id") != payload["id"]:
+            raise RuntimeError("event-comment-readback-mismatch")
+        return True, {"commentId": comment["id"], "issueId": payload["id"]}
+    result = linear.gql('query($id:String!){issue(id:$id){id state{id name} labels{nodes{id}}}}', {"id": payload["id"]})
+    issue = result.get("issue") if isinstance(result, dict) else None
+    if not isinstance(issue, dict) or issue.get("id") != payload["id"] or not isinstance(issue.get("state"), dict):
+        raise RuntimeError("event-issue-readback-unreadable")
+    if row["kind"] == "reopens":
+        done = issue["state"].get("id") == payload["stateId"]
+        # Never downgrade a newly claimed/active issue on a stale reopen plan.
+        if not done and issue["state"].get("name") != row["expectedState"]:
+            raise RuntimeError("event-state-preimage-changed")
+        return done, {"issueId": issue["id"], "stateId": issue["state"].get("id")}
+    nodes = (issue.get("labels") or {}).get("nodes")
+    if not isinstance(nodes, list):
+        raise RuntimeError("event-label-readback-unreadable")
+    return any(label.get("id") == payload["labelId"] for label in nodes), {"issueId": issue["id"], "labelId": payload["labelId"]}
+
+
+def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) -> dict:
+    """Drain one durable intent per tick under the existing delivery/claim locks.
+
+    Transport attempts are separate from model attempts; none are refunded or
+    reset. An uncertain send is read back by its stable remote ID before retry.
+    The caller holds event-delivery.lock; claim.lock only covers the write fence.
+    """
+    for row in sorted(data["actions"].values(), key=lambda row: (
+            row["createdAt"], ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
+        if row["status"] in {"acknowledged", "superseded"} or now < row["nextAt"]:
             continue
         try:
-            linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
-                       {"id": row["id"], "s": row["stateId"]})
-        except Exception:
-            pass
-    for row in plan.get("comments") or []:
-        if not row.get("id") or not row.get("body"):
-            continue
-        try:
-            linear.comment(row["id"], row["body"])
-        except Exception:
-            pass
-    for row in plan.get("labels") or []:
-        if not row.get("id"):
-            continue
-        try:
-            linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
-                       {"id": row["id"], "l": row["labelId"]})
-        except Exception:
-            pass
+            acknowledged, receipt = _event_delivery_readback(linear, row)
+            if not acknowledged and row["attempts"] < EVENT_DELIVERY_ATTEMPTS and now < row["deadline"]:
+                lock = Locked(host.state / "claim.lock", blocking=True)
+                try:
+                    owner = (_event_escalation(host).get("events") or {}).get(row["fingerprint"]) or {}
+                    if owner.get("issueId") != row["ownerIssueId"]:
+                        row["status"] = "superseded"
+                        row["history"].append({"at": now, "outcome": "owner-changed"})
+                        _save_event_delivery(host, data)
+                        break
+                    if _event_digest(owner) != row["expectedEvent"]:
+                        raise RuntimeError("event-owner-preimage-changed")
+                    # The remote preimage is refreshed INSIDE the mutation fence.
+                    # A state changed since the earlier read is never downgraded.
+                    if row["kind"] == "reopens":
+                        acknowledged, receipt = _event_delivery_readback(linear, row)
+                        if acknowledged:
+                            row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
+                            row["history"].append({"at": now, "outcome": "authoritative-readback"})
+                            _save_event_delivery(host, data)
+                            break
+                    row["attempts"] += 1
+                    row["status"] = "sending"
+                    row["history"].append({"at": now, "outcome": "intent-persisted", "attempt": row["attempts"]})
+                    _save_event_delivery(host, data)
+                    payload = row["payload"]
+                    if row["kind"] == "comments":
+                        result = linear.gql('mutation($i:CommentCreateInput!){commentCreate(input:$i){success}}',
+                            {"i": {"id": row["commentId"], "issueId": payload["id"], "body": payload["body"]}})
+                        field = "commentCreate"
+                    elif row["kind"] == "reopens":
+                        result = linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                            {"id": payload["id"], "s": payload["stateId"]})
+                        field = "issueUpdate"
+                    else:
+                        result = linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                            {"id": payload["id"], "l": payload["labelId"]})
+                        field = "issueAddLabel"
+                    if not isinstance(result, dict) or not isinstance(result.get(field), dict) or result[field].get("success") is not True:
+                        raise RuntimeError("event-mutation-rejected")
+                finally:
+                    lock.release()
+                acknowledged, receipt = _event_delivery_readback(linear, row)
+            if acknowledged:
+                row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
+                row["history"].append({"at": now, "outcome": "authoritative-readback"})
+            else:
+                raise RuntimeError("event-delivery-unacknowledged")
+        except Exception as error:
+            # No provider response/credential content in controller health output.
+            row["error"] = str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__
+            row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
+            row["history"].append({"at": now, "outcome": row["status"], "error": row["error"]})
+        row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
+        _save_event_delivery(host, data)
+        break  # Bounded work; a transport outage must not monopolize dispatch.
+    active = [row for row in data["actions"].values() if row["status"] not in {"acknowledged", "superseded"}]
+    return {"deliveryPending": len(active), "deliveryFailed": sum(row["status"] in {"failed", "exhausted", "sending"} for row in active),
+            "deliveryExhausted": sum(row["status"] == "exhausted" for row in active),
+            "deliveryAcknowledged": sum(row["status"] == "acknowledged" for row in data["actions"].values()),
+            "deliveryObservedAt": now,
+            "deliveryNextAt": min((row["nextAt"] for row in active), default=None)}
 
 
 def claim_remediation_events(host: Host, linear) -> dict:
@@ -3302,36 +3503,56 @@ def claim_remediation_events(host: Host, linear) -> dict:
     def healthy(_name, spec):
         return provider_healthy(spec)
 
-    data = load_escalation(host)
-    # Freeze the read version before the planner mutates nested event metadata.
-    baseline = json.loads(json.dumps(data.get("events") or {}))
-    plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
-                                           healthy=healthy, cooled=cooled)
-    _apply_event_plan(linear, plan)
-    lock = Locked(host.state / "claim.lock", blocking=True)
+    delivery_lock = Locked(host.state / "event-delivery.lock", blocking=False)
+    if not delivery_lock.held:
+        delivery_lock.release()
+        return {"deliveryBusy": True}
     try:
-        current = load_escalation(host)
-        previous = current.get("events") or {}
-        merged = dict(previous)
-        for fingerprint, row in plan["events"].items():
-            # A new worker claim/finish or another planner wins the whole row,
-            # including its attempts. An unchanged terminal row may transition
-            # only as allowed by the existing recurrence/cap/cooldown planner.
-            if previous.get(fingerprint) == baseline.get(fingerprint):
-                merged[fingerprint] = row
-        current["events"] = merged
-        save_escalation(host, current)
-        plan["events"] = merged
+        journal = _event_delivery_state(host)  # Fail closed before changing event rows.
+        _recover_event_preparation(host, journal)
+        data = _event_escalation(host)
+        baseline = json.loads(json.dumps(data.get("events") or {}))
+        plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
+                                               healthy=healthy, cooled=cooled)
+        lock = Locked(host.state / "claim.lock", blocking=True)
+        try:
+            current = _event_escalation(host)
+            previous = current.get("events") or {}
+            merged = dict(previous)
+            accepted = set()
+            pairs = {}
+            for fingerprint, row in plan["events"].items():
+                if previous.get(fingerprint) == baseline.get(fingerprint):
+                    merged[fingerprint] = row
+                    accepted.add(fingerprint)
+                    pairs[fingerprint] = {"before": previous.get(fingerprint), "after": row}
+            _queue_event_delivery(journal, plan, issues, accepted, time.time())
+            # Pair the original plan (including attempt timestamps) with its
+            # actions before either file can expose a new owner generation.
+            journal["prepared"] = {"id": _event_digest(pairs), "rows": pairs}
+            _save_event_delivery(host, journal)
+            current["events"] = merged
+            _save_event_json(host, "escalation.json", current)
+            journal.setdefault("commits", []).append({"id": journal["prepared"]["id"], "at": time.time(),
+                                                      "outcome": "committed", "conflicts": []})
+            journal.pop("prepared")
+            _save_event_delivery(host, journal)
+            plan["events"] = merged
+        finally:
+            lock.release()
+        delivery = _apply_event_plan(linear, plan, host, journal, time.time())
     finally:
-        lock.release()
+        delivery_lock.release()
     summary = remediation.events_summary({"events": plan["events"]})
+    starts = [row.get("startDelivery") or {} for row in plan["events"].values()]
+    delivery["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
     return {"eventsOpen": summary["eventsOpen"], "eventsClaimed": summary["eventsClaimed"],
-            "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"]}
+            "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"], **delivery}
 
 
 def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
-    """Take a fixable event this lane was assigned. No Linear read; state comes from the tick."""
-    data = load_escalation(host)
+    """Under claim.lock: admit one event only after its remote start is acknowledged."""
+    data = _event_escalation(host)
     events = data.get("events") or {}
     now = time.time()
     held_back = held_back_issues(host, now)
@@ -3344,17 +3565,66 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
             continue
         if not row.get("issueId"):
             continue
+        deliveries = _event_delivery_state(host)["actions"].values()
+        if any(action["kind"] == "reopens" and action["ownerIssueId"] == row["issueId"]
+               and action["status"] not in {"acknowledged", "superseded"} for action in deliveries):
+            continue  # A planned reopen is not an accepted remote issue state.
+        started = row.get("startedStateId")
+        if started:
+            delivery = row.setdefault("startDelivery", {"attempts": 0, "status": "pending", "nextAt": now,
+                                                        "deadline": now + EVENT_DELIVERY_STALE_S})
+            if now < delivery.get("nextAt", 0):
+                continue
+            try:
+                query = 'query($id:String!){issue(id:$id){id state{id name}}}'
+                remote = linear.gql(query, {"id": row["issueId"]})
+                state = (remote.get("issue") or {}).get("state") if isinstance(remote, dict) else None
+                if not isinstance(state, dict):
+                    raise RuntimeError("event-start-readback-unreadable")
+                correlation = _event_digest({"issueId": row["issueId"], "startedStateId": started,
+                                             "owner": HOST, "generation": row.get("attempts") or []})
+                receipt = delivery.get("mutationReceipt") or {}
+                if state.get("id") == started and receipt != {"correlation": correlation, "success": True}:
+                    # A rejected/ambiguous intent never proves this host owns
+                    # another host's start. Preserve it for owned recovery.
+                    raise RuntimeError("event-start-ownership-unproven")
+                if state.get("id") != started:
+                    # Fresh contradictory state invalidates every earlier
+                    # success before any retry can be sent or adopted.
+                    delivery.pop("mutationReceipt", None)
+                    _save_event_json(host, "escalation.json", data)
+                    if state.get("name") != "Todo":
+                        raise RuntimeError("event-start-preimage-changed")
+                    if delivery["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= delivery["deadline"]:
+                        raise RuntimeError("event-start-cap-exhausted")
+                    delivery.update(status="sending", attempts=delivery["attempts"] + 1)
+                    _save_event_json(host, "escalation.json", data)
+                    result = linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                               {"id": row["issueId"], "s": started})
+                    if not isinstance(result, dict) or (result.get("issueUpdate") or {}).get("success") is not True:
+                        raise RuntimeError("event-start-mutation-rejected")
+                    delivery["mutationReceipt"] = {"correlation": correlation, "success": True}
+                    _save_event_json(host, "escalation.json", data)
+                    remote = linear.gql(query, {"id": row["issueId"]})
+                    observed_state = (remote.get("issue") or {}).get("state")
+                    if not isinstance(observed_state, dict):
+                        raise RuntimeError("event-start-readback-unreadable")
+                    if observed_state.get("id") != started:
+                        delivery.pop("mutationReceipt", None)
+                        _save_event_json(host, "escalation.json", data)
+                        raise RuntimeError("event-start-unacknowledged")
+                delivery.update(status="acknowledged", acknowledgedAt=now)
+            except Exception as error:
+                delivery.update(status="failed", error=str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__,
+                                nextAt=now + 60)
+                _save_event_json(host, "escalation.json", data)
+                continue  # No model invocation or local running claim from intent alone.
+        else:
+            continue  # Missing start-state evidence cannot admit a model repair.
         row["running"] = True
         row["claimedAt"] = now
         row["release"] = False
-        save_escalation(host, data)
-        started = row.get("startedStateId")
-        if started:
-            try:
-                linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
-                           {"id": row["issueId"], "s": started})
-            except Exception:
-                pass
+        _save_event_json(host, "escalation.json", data)
         description = row.get("description") or ""
         dossier = row.get("dossier") or ""
         if dossier:
@@ -4470,7 +4740,7 @@ def open_prs_summary() -> list[dict]:
     now = time.time()
     if now - _SUMMARY["at"] < SUMMARY_TTL_S:
         return _SUMMARY["prs"]
-    prs = shared("open-prs", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(THIS))
+    prs = shared("open-prs-labels-v2", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(THIS))
     if prs is None:
         _SUMMARY["readable"] = False
         return []

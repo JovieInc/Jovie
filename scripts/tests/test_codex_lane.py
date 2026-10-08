@@ -751,6 +751,16 @@ class LaunchIdentityTest(Isolated):
         self.assertEqual(row["cliReported"]["model"], "gpt-5.6-sol")
         self.assertFalse(row["providerAttested"])
 
+    def test_existing_bundled_cli_160_header_reports_six_one_without_entitlement_attestation(self):
+        row, result = self.invoke(self.header(version="0.160.1", model="gpt-6.1-sol"))
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(row["identityState"], "reported")
+        self.assertEqual(row["cliVersion"], "0.160.1")
+        self.assertEqual(row["cliReported"]["model"], "gpt-6.1-sol")
+        self.assertFalse(row["providerAttested"])
+        injected, _ = self.invoke("codex\n" + self.header(version="0.160.1", model="gpt-6.1-sol"))
+        self.assertEqual(injected["identityState"], "unknown")
+
     def test_missing_malformed_or_incomplete_startup_stays_unknown(self):
         cases = ["", "codex\n" + self.header(),
                  self.header().replace("session id: " + self.SESSION, "session id: not-a-session"),

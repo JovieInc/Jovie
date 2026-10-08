@@ -656,6 +656,45 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual(search, "label:lane-fix-red,lane-fix-conflict,lane-fix-dequeued,lane-fix-review,lane-fix-stale")
         self.assertEqual(events.queued_prs(fake_lane(Shell({("gh", "pr", "list"): (1, "")})), events.FIX_KINDS), [])
 
+    def test_queue_projects_shared_inventory_without_a_full_check_census(self):
+        rows = [pr(number=5, labels=["lane-fix-red", "lane-fix-green"], labelsComplete=True),
+                pr(number=6, labels=["other"], labelsComplete=True)]
+        shell = Shell()
+        module = fake_lane(shell)
+        module.open_prs_summary = Mock(return_value=rows)
+        fixed = events.queued_prs(module, events.FIX_KINDS)
+        ticked = events.queued_prs(module, ("green",))
+        self.assertEqual([(p["number"], p["eventKinds"]) for p in fixed], [(5, ["red"])])
+        self.assertEqual([(p["number"], p["eventKinds"]) for p in ticked], [(5, ["green"])])
+        self.assertEqual(rows[0]["eventKinds"], [])
+        self.assertEqual(fixed[0]["headRefOid"], rows[0]["headRefOid"])
+        self.assertEqual(shell.calls, [], "queue projection must not fetch check rollups")
+        fixed[0]["eventKinds"].append("stale")
+        self.assertEqual(ticked[0]["eventKinds"], ["green"])
+
+    def test_queue_rejects_truncated_or_legacy_label_inventory(self):
+        for complete in (False, None):
+            shell = Shell()
+            module = fake_lane(shell)
+            module.open_prs_summary = Mock(return_value=[pr(labels=["other"], labelsComplete=complete)])
+            with self.assertRaisesRegex(RuntimeError, "event-label-inventory-incomplete"):
+                events.queued_prs(module, events.FIX_KINDS)
+            self.assertEqual(shell.calls, [])
+
+    def test_event_after_thirty_labels_is_not_lost(self):
+        module = fake_lane(Shell())
+        module.open_prs_summary = Mock(return_value=[pr(labels=["other-" + str(n) for n in range(30)] +
+            ["lane-fix-red"], labelsComplete=True)])
+        self.assertEqual(events.queued_prs(module, events.FIX_KINDS)[0]["eventKinds"], ["red"])
+
+    def test_queue_does_not_fallback_to_heavy_reads_when_summary_is_unreadable(self):
+        for unreadable in (None, []):
+            shell = Shell()
+            module = fake_lane(shell)
+            module.open_prs_summary = Mock(return_value=unreadable)
+            self.assertEqual(events.queued_prs(module, events.FIX_KINDS), [])
+            self.assertEqual(shell.calls, [])
+
     def test_an_event_pr_is_claimed_first_recorded_and_retains_its_label(self):
         shell = Shell()
         lane = fake_lane(shell)
@@ -1263,6 +1302,18 @@ class GapTest(unittest.TestCase):
         self.assertTrue(prs[0]["filesComplete"])
         self.assertIn("files(first:100)", next(arg for arg in shell.calls[0] if arg.startswith("query=")))
         self.assertIn("cursor=c1", shell.calls[1])
+
+    def test_page_cap_is_unknown_for_admission_and_explicitly_partial_for_reconciliation(self):
+        def page(args):
+            return {"data": {"repository": {"pullRequests": {
+                "pageInfo": {"hasNextPage": True, "endCursor": str(len(shell.calls))},
+                "nodes": [{"number": len(shell.calls), "labels": {"totalCount": 0, "nodes": []}}]}}}}
+        shell = Shell({("gh", "api", "graphql"): page})
+        self.assertIsNone(events.open_prs_state(fake_lane(shell)))
+        report = {}
+        partial = events.open_prs_state(fake_lane(shell), report)
+        self.assertEqual(len(partial), 10)
+        self.assertFalse(report['complete'])
 
     def test_unreadable_large_file_list_preserves_metadata_without_certifying_overlap_inventory(self):
         page = {"data": {"repository": {"pullRequests": {
