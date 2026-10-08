@@ -559,8 +559,8 @@ importers:
         specifier: ^3.4.16
         version: 3.4.16
       dotenv:
-        specifier: ^18.0.5
-        version: 18.0.5
+        specifier: ^18.0.6
+        version: 18.0.6
       drizzle-orm:
         specifier: 0.45.3
         version: 0.45.3(@cloudflare/workers-types@5.20261002.1)(@libsql/client@0.17.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.39.0)(better-sqlite3@12.10.0)(kysely@0.28.17)(pg@8.23.0)(postgres@3.4.8)
@@ -10270,8 +10270,8 @@ packages:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
-  dotenv@18.0.5:
-    resolution: {integrity: sha512-aBrGvt6KhjxbEnatqMWOMidftwsrCiCvqh1yNIGB9QyF0J+VcWkKDMsvYOEm7ZS82oiV+BT1sTOtIlAmUlTpwQ==}
+  dotenv@18.0.6:
+    resolution: {integrity: sha512-ZMVmohV6CvAJtj++pZNyggluUt6hbRdQAxc2+Z635RL6/AG/ruXv5lHnybUFoxMPL/yrTL/tsF4paZu2l7RA6Q==}
     engines: {node: '>=12'}
     hasBin: true
 
@@ -27242,7 +27242,7 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  dotenv@18.0.5: {}
+  dotenv@18.0.6: {}
 
   drizzle-kit@0.31.11:
     dependencies:
