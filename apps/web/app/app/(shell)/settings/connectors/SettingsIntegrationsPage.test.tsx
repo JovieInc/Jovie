@@ -1,3 +1,4 @@
+import { isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { context, load } = vi.hoisted(() => ({
@@ -30,7 +31,8 @@ describe('shared settings integrations loader', () => {
       const element = await SettingsIntegrationsPage({ route });
       expect(load).toHaveBeenCalledWith('session-user', 'selected-identity');
       expect(context).toHaveBeenCalledWith(expect.objectContaining({ route }));
-      expect(element?.props).toMatchObject({
+      if (!isValidElement(element)) throw new Error('Expected rendered page');
+      expect(element.props).toMatchObject({
         creatorProfileId: 'selected-identity',
         returnTo: route,
         isDev: false,
@@ -46,7 +48,8 @@ describe('shared settings integrations loader', () => {
   it('keeps missing account data as an error rather than an empty connections list', async () => {
     load.mockResolvedValue(null);
     const element = await SettingsIntegrationsPage({});
-    expect(element?.props).toHaveProperty(
+    if (!isValidElement(element)) throw new Error('Expected error page');
+    expect(element.props).toHaveProperty(
       'message',
       'Unable to load your account connections. Please refresh the page.'
     );

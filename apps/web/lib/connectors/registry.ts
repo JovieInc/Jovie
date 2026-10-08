@@ -53,7 +53,7 @@ export const CONNECTOR_REGISTRY = {
   [CONNECTOR_PROVIDERS.gmail]: {
     id: CONNECTOR_PROVIDERS.gmail,
     label: 'Gmail',
-    description: 'Scan booking emails for tour confirmation signals.',
+    description: 'Find confirmed bookings in your email.',
     iconKey: 'mail',
     oauthBundle: 'google',
     oauthScopes: [
@@ -81,7 +81,7 @@ export const CONNECTOR_REGISTRY = {
   [CONNECTOR_PROVIDERS.google_calendar]: {
     id: CONNECTOR_PROVIDERS.google_calendar,
     label: 'Google Calendar',
-    description: 'Read events to detect conflicts and write approved bookings.',
+    description: 'Check scheduling conflicts and add approved bookings.',
     iconKey: 'calendar',
     oauthBundle: 'google',
     oauthScopes: [
@@ -122,8 +122,7 @@ export const CONNECTOR_REGISTRY = {
   [CONNECTOR_PROVIDERS.spotify]: {
     id: CONNECTOR_PROVIDERS.spotify,
     label: 'Spotify',
-    description:
-      'Connect Spotify so agent workflows can publish playlists and read catalog data.',
+    description: 'Read playlists and publish playlists you approve.',
     iconKey: 'spotify',
     oauthBundle: 'spotify',
     oauthScopes: [...SPOTIFY_OAUTH_SCOPES],
@@ -168,7 +167,7 @@ export const CONNECTOR_REGISTRY = {
     id: CONNECTOR_PROVIDERS.youtube,
     label: 'YouTube',
     description:
-      'Import channel videos into Work, verify approved thumbnail changes, and post approved comment replies.',
+      'Import videos into Work, apply thumbnail changes you approve, and post approved comment replies.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
     oauthScopes: YOUTUBE_OAUTH_SCOPES,

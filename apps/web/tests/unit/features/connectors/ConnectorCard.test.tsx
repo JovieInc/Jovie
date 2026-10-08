@@ -104,13 +104,16 @@ describe('ConnectorCard', () => {
         onDisconnect={vi.fn()}
       />
     );
-    expect(screen.getByText('Import channel videos')).toBeInTheDocument();
+    expect(screen.getByText('Import channel videos')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Details'));
+    expect(screen.getByText('Import channel videos')).toBeVisible();
     expect(
-      screen.getByText(
-        'Some permissions are missing. Reconnect to enable them.'
-      )
+      screen.queryByText(/Apply approved thumbnails/)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Reconnect to enable missing permissions.')
     ).toBeInTheDocument();
-    expect(screen.getByText('No completed sync recorded')).toBeInTheDocument();
+    expect(screen.getByText('No sync completed yet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Reconnect/ })).toBeEnabled();
   });
 
@@ -206,7 +209,7 @@ describe('ConnectorCard', () => {
     expect(screen.getByRole('button', { name: /^Disconnect/ })).toBeDisabled();
   });
 
-  it('shows connected account or recovery detail in one stable status slot', () => {
+  it('preserves account identity alongside recovery details', () => {
     const { rerender } = render(
       <ConnectorCard
         provider='gmail'
@@ -232,9 +235,7 @@ describe('ConnectorCard', () => {
     expect(screen.getByTestId('connector-detail-gmail')).toBe(detail);
     expect(detail).toHaveTextContent('Google rejected the connection.');
     expect(detail).not.toHaveTextContent('artist@example.com');
-    expect(
-      screen.getByText('Your signed-in account · artist@example.com')
-    ).toBeInTheDocument();
+    expect(screen.getByText('artist@example.com')).toBeInTheDocument();
 
     rerender(<ConnectorCard provider='gmail' status='needs_reauth' />);
     expect(detail).toHaveTextContent('Reconnect to continue syncing.');

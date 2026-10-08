@@ -1,10 +1,6 @@
 # Shared integrations Settings contract
 
-Owner: JOV-8012 (bounded implementation child of JOV-7363). Source base:
-`2c362689356081876303b9e01944af899091f231`, 2026-10-07.
-
-Reading this as: macOS ops cockpit for Jovie operators, with a calm dense native
-language, leaning toward Linear-style product UI adapted to macOS.
+Owner: JOV-8012, bounded implementation of JOV-7363 (2026-10-07).
 
 ## Reuse boundary
 

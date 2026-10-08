@@ -137,10 +137,6 @@ export function ConnectorCard({
               ? 'Reconnect to continue syncing.'
               : 'Connection failed. Try again.')
           : undefined);
-  const grantedScopeLabels = definition.oauthScopes.flatMap((scope, index) => {
-    const label = definition.oauthScopeLabels[index];
-    return scopes?.includes(scope) && label ? [label] : [];
-  });
   const grantedCapabilities = getGrantedConnectorCapabilities(
     definition,
     status,
@@ -158,7 +154,7 @@ export function ConnectorCard({
     syncedAt && Number.isFinite(syncedAt.getTime())
       ? `Last synced ${syncedAt.toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC`
       : definition.syncRunner
-        ? 'No completed sync recorded'
+        ? 'No sync completed yet'
         : 'Sync runs when used';
 
   return (
@@ -211,14 +207,9 @@ export function ConnectorCard({
             </Badge>
           </div>
           <p className='text-xs text-secondary'>{definition.description}</p>
-          <p className='text-xs text-tertiary'>
-            {definition.accountScope === 'identity'
-              ? 'Selected identity'
-              : 'Your signed-in account'}
-            {(!isConnected || !available) && accountLabel
-              ? ` · ${accountLabel}`
-              : ''}
-          </p>
+          {(!isConnected || !available) && accountLabel && (
+            <p className='text-xs text-tertiary'>{accountLabel}</p>
+          )}
           <p
             className={cn(
               'min-h-4 text-xs',
@@ -228,29 +219,44 @@ export function ConnectorCard({
           >
             {detailLine ?? <span aria-hidden='true'>&nbsp;</span>}
           </p>
-          {isConnected && grantedScopeLabels.length > 0 && (
-            <ul
-              className='text-xs text-tertiary'
-              aria-label={`${definition.label} granted scopes`}
-            >
-              <li>Scopes: {grantedScopeLabels.join(', ')}</li>
-            </ul>
-          )}
-          {isConnected && (
-            <div className='min-h-8 text-xs text-tertiary'>
-              <p>
-                {grantedCapabilities.length > 0
-                  ? grantedCapabilities
-                      .map(capability => capability.label)
-                      .join(' · ')
-                  : 'No operation permissions verified'}
-              </p>
-              <p>{syncLabel}</p>
-            </div>
+          {(isConnected || accountLabel) && (
+            <details className='text-xs text-tertiary'>
+              <summary
+                className='cursor-pointer rounded-sm focus-ring-themed'
+                aria-label={`${definition.label} connection details`}
+              >
+                Details
+              </summary>
+              <div className='space-y-1 pt-2'>
+                <p>
+                  {definition.accountScope === 'identity'
+                    ? 'Selected identity'
+                    : 'Your signed-in account'}
+                </p>
+                {isConnected && (
+                  <div>
+                    <ul aria-label={`${definition.label} permissions`}>
+                      {grantedCapabilities.map(capability => (
+                        <li key={capability.id}>
+                          {capability.label}
+                          {capability.requiresApproval
+                            ? ' · Requires approval'
+                            : ''}
+                        </li>
+                      ))}
+                    </ul>
+                    {grantedCapabilities.length === 0 && (
+                      <p>No permissions confirmed</p>
+                    )}
+                    <p>{syncLabel}</p>
+                  </div>
+                )}
+              </div>
+            </details>
           )}
           {missingCapabilities && (
             <p className='text-xs text-warning'>
-              Some permissions are missing. Reconnect to enable them.
+              Reconnect to enable missing permissions.
             </p>
           )}
         </div>

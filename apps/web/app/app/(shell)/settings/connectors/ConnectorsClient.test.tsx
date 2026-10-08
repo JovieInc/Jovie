@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
@@ -61,6 +61,19 @@ function youtubeRow() {
   return within(row);
 }
 
+function renderClient(
+  props: Partial<ComponentProps<typeof ConnectorsClient>> = {}
+) {
+  return render(
+    <ConnectorsClient
+      connectors={disconnectedConnectors}
+      creatorProfileId='profile-1'
+      isDev={false}
+      {...props}
+    />
+  );
+}
+
 describe('ConnectorsClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,13 +84,7 @@ describe('ConnectorsClient', () => {
 
   it('shows consent failure without echoing callback details or claiming connection success', () => {
     urlError.value = 'oauth_denied_private_provider_detail';
-    render(
-      <ConnectorsClient
-        connectors={disconnectedConnectors}
-        creatorProfileId='profile-1'
-        isDev={false}
-      />
-    );
+    renderClient();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'The connection did not finish.'
     );
@@ -87,20 +94,17 @@ describe('ConnectorsClient', () => {
   });
 
   it('keeps unavailable and identity-less providers visible without offering usable connections', async () => {
-    render(
-      <ConnectorsClient
-        connectors={{
-          ...disconnectedConnectors,
-          spotify: {
-            status: 'not_connected',
-            available: false,
-            unavailableReason: 'Setup unavailable',
-          },
-        }}
-        creatorProfileId={null}
-        isDev={false}
-      />
-    );
+    renderClient({
+      connectors: {
+        ...disconnectedConnectors,
+        spotify: {
+          status: 'not_connected',
+          available: false,
+          unavailableReason: 'Setup unavailable',
+        },
+      },
+      creatorProfileId: null,
+    });
     expect(
       screen.getByRole('button', { name: 'Connect Spotify' })
     ).toBeDisabled();
@@ -113,14 +117,10 @@ describe('ConnectorsClient', () => {
 
   it('uses the same OAuth path from the operator entry and preserves its return context', async () => {
     const user = userEvent.setup();
-    render(
-      <ConnectorsClient
-        connectors={disconnectedConnectors}
-        creatorProfileId='22222222-2222-4222-8222-222222222222'
-        isDev={false}
-        returnTo='/app/ov/integrations'
-      />
-    );
+    renderClient({
+      creatorProfileId: '22222222-2222-4222-8222-222222222222',
+      returnTo: '/app/ov/integrations',
+    });
     await user.click(
       youtubeRow().getByRole('button', { name: 'Connect YouTube' })
     );
@@ -142,16 +142,12 @@ describe('ConnectorsClient', () => {
           finish = resolve;
         })
     );
-    render(
-      <ConnectorsClient
-        connectors={{
-          ...disconnectedConnectors,
-          youtube: { status: 'connected', scopes: YOUTUBE_OAUTH_SCOPES },
-        }}
-        creatorProfileId='profile-1'
-        isDev={false}
-      />
-    );
+    renderClient({
+      connectors: {
+        ...disconnectedConnectors,
+        youtube: { status: 'connected', scopes: YOUTUBE_OAUTH_SCOPES },
+      },
+    });
     const button = youtubeRow().getByRole('button', {
       name: 'Disconnect YouTube',
     });
@@ -173,7 +169,7 @@ describe('ConnectorsClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('lists every registered provider and shows connected YouTube scopes', () => {
+  it('lists providers and discloses connected YouTube permissions', async () => {
     render(
       <ConnectorsClient
         connectors={{
@@ -193,29 +189,24 @@ describe('ConnectorsClient', () => {
       expect(screen.getByText(provider)).toBeInTheDocument();
     }
     expect(youtubeRow().getByText('Artist Channel')).toBeInTheDocument();
+    await userEvent.click(youtubeRow().getByText('Details'));
     expect(
-      youtubeRow().getByRole('list', { name: 'YouTube granted scopes' })
-    ).toHaveTextContent(
-      'Read Channel Data, Manage Videos, View Channel Analytics, Post Approved Replies'
-    );
+      youtubeRow().getByRole('list', { name: 'YouTube permissions' })
+    ).toHaveTextContent('Apply approved thumbnails · Requires approval');
   });
 
   it('clears both Google rows after an acknowledged shared disconnect', async () => {
     const user = userEvent.setup();
-    render(
-      <ConnectorsClient
-        connectors={{
-          ...disconnectedConnectors,
-          gmail: { status: 'connected', accountLabel: 'artist@example.test' },
-          google_calendar: {
-            status: 'connected',
-            accountLabel: 'artist@example.test',
-          },
-        }}
-        creatorProfileId='profile-1'
-        isDev={false}
-      />
-    );
+    renderClient({
+      connectors: {
+        ...disconnectedConnectors,
+        gmail: { status: 'connected', accountLabel: 'artist@example.test' },
+        google_calendar: {
+          status: 'connected',
+          accountLabel: 'artist@example.test',
+        },
+      },
+    });
     await user.click(screen.getByRole('button', { name: 'Disconnect Gmail' }));
     await waitFor(() =>
       expect(
