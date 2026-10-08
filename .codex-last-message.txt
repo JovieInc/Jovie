@@ -1,0 +1,10 @@
+STATUS: BLOCKED
+
+- Fixed the root cause by adding `<!-- customer-changelog/v1 {"releaseWorthy":false} -->` to [PR #20776](https://github.com/JovieInc/Jovie/pull/20776).
+- Source Validation is now green at `f0836684b32d921ffad5b94630d84b53b8339d22`.
+- Local iOS lint, diff check, metadata validation, and bug-to-test gate passed.
+- No push was needed: the clean local branch exactly matches the remote.
+- GitHub canceled Exact-head Coverage before assigning a runner. Consequently, `PR Ready` cannot pass this run.
+- `gbrain-unavailable`: the query timed out.
+
+NOT-SHIPPABLE: Exact-head Coverage was canceled by CI infrastructure before runner assignment.
