@@ -96,10 +96,9 @@ updates:
       - 'dependencies'
       - 'automated'
     ignore:
-      # Unfixable advisories (exact pins by upstream CLIs) tracked in the
-      # 'unfixable transitive security advisories' Linear issue — see the
-      # superseding PR body for the issue reference. Scoped to these exact
-      # versions only; new advisories in other versions still raise.
+      # Unfixable advisories tracked in JOV-8060 (exact pins by upstream
+      # CLIs; dev-only paths). Scoped to these exact versions only; new
+      # advisories in other versions still raise.
       - dependency-name: 'undici'
         versions: ['5.28.4', '5.29.0']
       - dependency-name: '@fastify/busboy'
@@ -124,9 +123,7 @@ updates:
       - 'dependencies'
       - 'automated'
     ignore:
-      # Unfixable advisories tracked in the 'unfixable transitive security
-      # advisories' Linear issue — see the superseding PR body for the issue
-      # reference. Exact-version scope only:
+      # Unfixable advisories tracked in JOV-8060. Exact-version scope only:
       # - undici 8.5.0 pinned through pi-coding-agent 0.81.1 (deepsec 2.3.10
       #   exact pin; next is a major).
       # - sprintf-js 1.1.3 (GHSA-hp3w-g68c-fv3c): no patched release ever
