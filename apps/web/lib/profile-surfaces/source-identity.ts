@@ -52,6 +52,53 @@ function httpsImage(value: string | null | undefined): string | null {
   }
 }
 
+function metadataMatchesProfile(
+  metadataUrl: string | null,
+  source: URL
+): boolean {
+  if (!metadataUrl) return false;
+  try {
+    const metadata = new URL(metadataUrl);
+    const host = source.hostname.replace(/^www\./, '');
+    if (
+      metadata.protocol !== 'https:' ||
+      metadata.username ||
+      metadata.password ||
+      metadata.port ||
+      metadata.hostname.replace(/^www\./, '') !== host
+    )
+      return false;
+    if (host === 'deezer.com') {
+      const artist = /^\/(?:[a-z]{2}\/)?artist\/(\d+)\/?$/;
+      const sourceId = artist.exec(source.pathname)?.[1];
+      return !!sourceId && sourceId === artist.exec(metadata.pathname)?.[1];
+    }
+    return (
+      metadata.pathname.replace(/\/$/, '') ===
+      source.pathname.replace(/\/$/, '')
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isSourceAvatar(source: URL, imageUrl: string): boolean {
+  const image = new URL(imageUrl);
+  if (image.port) return false;
+  if (['soundcloud.com', 'www.soundcloud.com'].includes(source.hostname)) {
+    return (
+      /^\/[^/]+\/?$/.test(source.pathname) &&
+      /^i\d+\.sndcdn\.com$/.test(image.hostname) &&
+      /^\/avatars-[^/]+\.jpg$/.test(image.pathname)
+    );
+  }
+  return (
+    ['deezer.com', 'www.deezer.com'].includes(source.hostname) &&
+    image.hostname === 'cdn-images.dzcdn.net' &&
+    /^\/images\/artist\/(?!0+\/)[a-f0-9]+\/[^/]+\.jpg$/i.test(image.pathname)
+  );
+}
+
 export async function readSourceIdentity(
   sourceUrl: string
 ): Promise<SourceIdentity> {
@@ -72,6 +119,7 @@ export async function readSourceIdentity(
     url.protocol !== 'https:' ||
     url.username ||
     url.password ||
+    url.port ||
     isCoreSocialHtmlHost(url.hostname) ||
     !PUBLIC_PAGE_HOSTS.has(url.hostname)
   ) {
@@ -92,11 +140,13 @@ export async function readSourceIdentity(
         }
       }
     } else if (url.hostname === 'music.apple.com' && isAppleMusicAvailable()) {
-      const id = /^\/[a-z]{2}\/artist\/[^/]+\/(\d+)\/?$/.exec(
+      const match = /^\/([a-z]{2})\/artist\/[^/]+\/(\d+)\/?$/.exec(
         url.pathname
-      )?.[1];
-      if (id) {
-        const artist = await getAppleMusicArtist(id);
+      );
+      const id = match?.[2];
+      const storefront = match?.[1];
+      if (id && storefront) {
+        const artist = await getAppleMusicArtist(id, { storefront });
         if (artist) {
           displayName = artist.attributes.name;
           const images = extractAppleMusicImageUrls(artist.attributes.artwork);
@@ -149,7 +199,7 @@ export async function readSourceIdentity(
         return {
           ...unavailable,
           status: 'available',
-          displayName: channel.displayName,
+          displayName: channel.displayName ?? null,
           photo: {
             url: avatar,
             kind: 'profile',
@@ -161,10 +211,34 @@ export async function readSourceIdentity(
         };
     }
     const ogImage = httpsImage(extractMetaContent(html, 'og:image'));
+    const pageTitle = extractMetaContent(html, 'og:title')?.trim() || null;
+    if (!ogImage && !pageTitle) return unavailable;
+    if (
+      ogImage &&
+      pageTitle &&
+      extractMetaContent(html, 'og:type') === 'music.musician' &&
+      metadataMatchesProfile(extractMetaContent(html, 'og:url'), url) &&
+      isSourceAvatar(url, ogImage)
+    ) {
+      return {
+        ...unavailable,
+        status: 'available',
+        displayName: pageTitle,
+        pageTitle,
+        photo: {
+          url: ogImage,
+          kind: 'profile',
+          source: 'public_metadata',
+          verified: false,
+          observedAt,
+          freshness: 'current',
+        },
+      };
+    }
     return {
       ...unavailable,
       status: 'available',
-      pageTitle: extractMetaContent(html, 'og:title'),
+      pageTitle,
       // Even og:type=profile and a square image can be artwork (observed on Tidal).
       photo: ogImage
         ? {

@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   error: vi.fn(),
   select: vi.fn(),
   where: vi.fn(),
+  join: vi.fn(),
   rows: vi.fn(),
 }));
 vi.mock('@/lib/auth/session', () => ({
@@ -38,11 +40,12 @@ describe('owner-authorized profile source inspection', () => {
     const query = {
       from: () => query,
       innerJoin: () => query,
-      leftJoin: () => query,
+      leftJoin: mocks.join,
       where: mocks.where,
       limit: mocks.rows,
     };
     mocks.where.mockReturnValue(query);
+    mocks.join.mockReturnValue(query);
     mocks.select.mockReturnValue(query);
     mocks.session.mockImplementation(async callback =>
       callback({ select: mocks.select }, 'owner-id')
@@ -56,6 +59,20 @@ describe('owner-authorized profile source inspection', () => {
     expect(mocks.limit).toHaveBeenCalledWith('owner-id');
     expect(mocks.where).toHaveBeenCalledTimes(1);
     expect(mocks.source).toHaveBeenCalledWith('https://tidal.com/artist/1');
+  });
+  it('binds canonical rows to the current owner, an owner claim, and the non-retired surface', async () => {
+    await call();
+    const dialect = new PgDialect();
+    const where = dialect.sqlToQuery(mocks.where.mock.calls[0][0]);
+    const claim = dialect.sqlToQuery(mocks.join.mock.calls[0][1]);
+    expect(where.sql).toContain('"profile_surfaces"."id" = $1');
+    expect(where.params).toEqual([id, 'owner-id']);
+    expect(where.sql).toContain('"profile_surfaces"."retired_at" is null');
+    expect(where.sql).toContain('"creator_profiles"."user_id" = $2');
+    expect(where.sql).toContain('"user_profile_claims"."id" is not null');
+    expect(claim.sql).toContain('"user_profile_claims"."user_id" = $1');
+    expect(claim.sql).toContain('"user_profile_claims"."role" = $2');
+    expect(claim.params).toEqual(['owner-id', 'owner']);
   });
   it('rejects invalid IDs before any DB or outbound read', async () => {
     expect((await call('not-a-uuid')).status).toBe(400);

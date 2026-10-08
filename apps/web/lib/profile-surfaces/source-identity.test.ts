@@ -40,6 +40,7 @@ describe('readSourceIdentity', () => {
     'https://127.0.0.1/admin',
     'https://unlisted.example/profile',
     'http://tidal.com/artist/1',
+    'https://tidal.com:8443/artist/1',
     (() => {
       const url = new URL('https://tidal.com/artist/1');
       url.username = 'fixture';
@@ -70,6 +71,7 @@ describe('readSourceIdentity', () => {
   });
   it.each([
     ['https://music.apple.com/us/artist/tim/123', 'apple'],
+    ['https://music.apple.com/ca/artist/tim/123', 'apple'],
     ['https://www.deezer.com/en/artist/123', 'deezer'],
   ])('uses the exact provider source %s', async (url, provider) => {
     mocks.apple.mockResolvedValue({
@@ -77,10 +79,64 @@ describe('readSourceIdentity', () => {
     });
     mocks.deezer.mockResolvedValue({ name: 'Source Name' });
     expect((await readSourceIdentity(url)).displayName).toBe('Source Name');
-    expect(
-      provider === 'apple' ? mocks.apple : mocks.deezer
-    ).toHaveBeenCalledWith('123');
+    if (provider === 'apple') {
+      expect(mocks.apple).toHaveBeenCalledWith('123', {
+        storefront: new URL(url).pathname.split('/')[1],
+      });
+    } else {
+      expect(mocks.deezer).toHaveBeenCalledWith('123');
+    }
   });
+  it('does not report empty public-page metadata as available', async () => {
+    mocks.fetch.mockResolvedValue({ html: '<html><body></body></html>' });
+    expect(
+      (await readSourceIdentity('https://tidal.com/artist/123')).status
+    ).toBe('unavailable');
+  });
+  it.each([
+    [
+      'https://soundcloud.com/artist',
+      'https://soundcloud.com/artist',
+      'https://i1.sndcdn.com/avatars-profile-t500x500.jpg',
+    ],
+    [
+      'https://www.deezer.com/artist/123',
+      'https://www.deezer.com/us/artist/123',
+      'https://cdn-images.dzcdn.net/images/artist/abcdef/500x500.jpg',
+    ],
+  ])(
+    'recognizes the bound avatar namespace for %s',
+    async (url, canonical, image) => {
+      mocks.available.mockReturnValue(false);
+      mocks.fetch.mockResolvedValue({
+        html: `<meta property="og:type" content="music.musician"><meta property="og:url" content="${canonical}"><meta property="og:title" content="Source Name"><meta property="og:image" content="${image}">`,
+      });
+      expect(await readSourceIdentity(url)).toMatchObject({
+        displayName: 'Source Name',
+        photo: { kind: 'profile', verified: false, url: image },
+      });
+    }
+  );
+  it.each([
+    [
+      'https://soundcloud.com/other',
+      'https://i1.sndcdn.com/avatars-profile-t500x500.jpg',
+    ],
+    [
+      'https://soundcloud.com/artist',
+      'https://i1.sndcdn.com/artworks-cover-t500x500.jpg',
+    ],
+  ])(
+    'keeps mismatched profile metadata or artwork generic',
+    async (canonical, image) => {
+      mocks.fetch.mockResolvedValue({
+        html: `<meta property="og:type" content="music.musician"><meta property="og:url" content="${canonical}"><meta property="og:title" content="Source Name"><meta property="og:image" content="${image}">`,
+      });
+      expect(
+        (await readSourceIdentity('https://soundcloud.com/artist')).photo.kind
+      ).toBe('generic');
+    }
+  );
   it('keeps square OG profile artwork generic and bounded', async () => {
     mocks.fetch.mockResolvedValue({
       html: '<meta property="og:type" content="profile"><meta property="og:title" content="Tim White"><meta property="og:image" content="https://resources.tidal.com/artwork.jpg">',
