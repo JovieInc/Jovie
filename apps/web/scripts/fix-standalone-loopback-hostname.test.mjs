@@ -1,13 +1,8 @@
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-
-const scriptPath = new URL(
-  './fix-standalone-loopback-hostname.mjs',
-  import.meta.url
-).pathname;
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pinStandaloneLoopbackHostname } from './fix-standalone-loopback-hostname.mjs';
 
 const generatedServer = `#!/usr/bin/env node
 const path = require('path')
@@ -19,37 +14,37 @@ const hostname = process.env.HOSTNAME || '0.0.0.0'
 startServer({ dir, isDev: false, hostname, port: currentPort })
 `;
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 function runOn(serverJs) {
-  const root = mkdtempSync(join(tmpdir(), 'loopback-pin-'));
-  mkdirSync(join(root, 'apps', 'web', '.next', 'standalone', 'apps', 'web'), {
-    recursive: true,
-  });
-  const serverPath = join(root, 'apps/web/.next/standalone/apps/web/server.js');
-  if (serverJs !== null) writeFileSync(serverPath, serverJs);
-  let script = readFileSync(scriptPath, 'utf8');
-  script = script.replace(
-    "const appRoot = path.resolve(\n  path.dirname(fileURLToPath(import.meta.url)),\n  '..'\n);",
-    `const appRoot = ${JSON.stringify(join(root, 'apps/web'))};`
+  const appRoot = join(
+    mkdtempSync(join(tmpdir(), 'loopback-pin-')),
+    'apps',
+    'web'
   );
-  const patchedScriptPath = join(root, 'script.mjs');
-  writeFileSync(patchedScriptPath, script);
-  const result = { serverPath, stdout: '' };
-  try {
-    result.stdout = execFileSync(process.execPath, [patchedScriptPath], {
-      encoding: 'utf8',
-    });
-    result.code = 0;
-  } catch (error) {
-    result.code = error.status ?? 1;
-    result.stderr = error.stderr ?? '';
+  const serverPath = join(
+    appRoot,
+    '.next',
+    'standalone',
+    'apps',
+    'web',
+    'server.js'
+  );
+  if (serverJs !== null) {
+    mkdirSync(join(serverPath, '..'), { recursive: true });
+    writeFileSync(serverPath, serverJs);
   }
-  return result;
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  pinStandaloneLoopbackHostname(appRoot);
+  const stdout = log.mock.calls.map(call => call.join(' ')).join('\n');
+  return { serverPath, stdout };
 }
 
 describe('fix-standalone-loopback-hostname', () => {
   it('pins the generated default and HOSTNAME=localhost/::1 to the IPv4 loopback', () => {
-    const { code, stdout, serverPath } = runOn(generatedServer);
-    expect(code).toBe(0);
+    const { stdout, serverPath } = runOn(generatedServer);
     expect(stdout).toContain('Pinned standalone server.js loopback hostname');
     const patched = readFileSync(serverPath, 'utf8');
     expect(patched).toContain(": '127.0.0.1'");
@@ -58,17 +53,14 @@ describe('fix-standalone-loopback-hostname', () => {
 
   it('is idempotent', () => {
     const first = runOn(generatedServer);
-    expect(first.code).toBe(0);
     const once = readFileSync(first.serverPath, 'utf8');
     const second = runOn(once);
-    expect(second.code).toBe(0);
     expect(second.stdout).toContain('already pins');
     expect(readFileSync(second.serverPath, 'utf8')).toBe(once);
   });
 
   it('preserves explicit non-loopback HOSTNAME semantics', () => {
-    const { code, serverPath } = runOn(generatedServer);
-    expect(code).toBe(0);
+    const { serverPath } = runOn(generatedServer);
     const patched = readFileSync(serverPath, 'utf8');
     expect(patched).toContain('includes(process.env.HOSTNAME)');
   });
@@ -78,16 +70,13 @@ describe('fix-standalone-loopback-hostname', () => {
       "const hostname = process.env.HOSTNAME || '0.0.0.0'",
       'const hostname = nextServeHost(process.env)'
     );
-    const result = runOn(future);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain(
+    expect(() => runOn(future)).toThrow(
       'does not match the expected hostname template'
     );
   });
 
   it('exits cleanly when no standalone output exists', () => {
-    const result = runOn(null);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain('No standalone server.js found');
+    const { stdout } = runOn(null);
+    expect(stdout).toContain('No standalone server.js found');
   });
 });
