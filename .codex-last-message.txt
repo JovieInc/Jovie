@@ -1,0 +1,8 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T234627Z-JOV-5568-codex-brief-df0010/.design-brief.md).
+
+Validation:
+
+- Design-gate tests: 32 passed.
+- Only `.design-brief.md` changed.
+- Steps 2, 6, and 9 remain intentionally empty because no supported capability, registered `atom.badge` primitive, Pen node, or ImageGen artifact exists.
+- No code edits, commit, push, or PR.
