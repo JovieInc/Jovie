@@ -507,7 +507,9 @@ describe('Dependabot discovery contract', () => {
 
   it('does not create default reviewer requests for the founder', () => {
     const ecosystems = CONFIG.split('  - package-ecosystem:').slice(1);
-    expect(ecosystems).toHaveLength(3);
+    // 5 entries: root npm, eve-pilot npm (security-only), deepsec npm
+    // (security-only), github-actions, docker.
+    expect(ecosystems).toHaveLength(5);
     for (const ecosystem of ecosystems) {
       expect(ecosystem).not.toMatch(/^\s+reviewers:/m);
       expect(ecosystem).toContain("assignees:\n      - 'itstimwhite'");
