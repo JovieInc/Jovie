@@ -1,10 +1,14 @@
 /**
- * Official Elixir Symphony backlog remediation (JOV-5492).
- * Feed only POST /api/v1/refresh. Homemade admission and JOV-5466 wrappers are forbidden.
+ * Official Symphony backlog remediation (JOV-5492).
+ * Capacity evidence reads the shipping lanes' own measured state (the lanes
+ * doctor writes LANES_STATE/doctor.json every tick; JOV-8000 retired the
+ * Elixir :4041 API). Homemade admission and JOV-5466 wrappers are forbidden.
  */
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 import { classifyAdmissionDisposition } from './admission-disposition.mjs';
 import { classifyBacklogReduction } from './backlog-reduction.mjs';
@@ -19,9 +23,14 @@ export const WORKPAD_PREFIX = '<!-- symphony-backlog-remediation/v1 -->';
 export const WORKPAD_SUFFIX = '<!--/symphony-backlog-remediation-->';
 export const WORKPAD_HEADING = '## Codex Workpad';
 const LEGACY_WORKPAD_HEADING = '## Symphony backlog remediation';
+// Retired with symphony-elixir (JOV-8000): the Elixir HTTP API is gone. The
+// constants stay exported for legacy readers/tests; live capacity now flows
+// from readLanesCapacity below.
 export const OFFICIAL_SYMPHONY_REFRESH_URL =
   'http://127.0.0.1:4041/api/v1/refresh';
 export const OFFICIAL_SYMPHONY_STATE_URL = 'http://127.0.0.1:4041/api/v1/state';
+export const LANES_STATE_DIR =
+  process.env.LANES_STATE || join(homedir(), '.local/state/jovie-lanes');
 export const DEFAULT_WORKPAD_ISSUE = 'JOV-5492';
 export const CLEAN_STREAK_REQUIRED = 3;
 export const MAX_CLONE_LATENCY_MS = 15_000;
@@ -383,6 +392,73 @@ export function readHostPressure(procRoot) {
   }
 }
 
+/**
+ * Measured shipping-lanes capacity (JOV-8000): the lanes doctor rewrites
+ * LANES_STATE/doctor.json every tick with live seat occupancy
+ * (observed.capacityByProvider) and measured codex account attribution
+ * (observed.codexAttribution). Returns null when the report is missing,
+ * malformed, or older than CAPACITY_MAX_AGE_MS so callers fail closed.
+ */
+export function readLanesCapacity({
+  lanesStateDir = LANES_STATE_DIR,
+  nowMs = Date.now(),
+  maxAgeMs = CAPACITY_MAX_AGE_MS,
+} = {}) {
+  try {
+    const path = join(lanesStateDir, 'doctor.json');
+    const observedAtMs = statSync(path).mtimeMs;
+    if (
+      !Number.isFinite(observedAtMs) ||
+      observedAtMs > nowMs + 60_000 ||
+      nowMs - observedAtMs > maxAgeMs
+    ) {
+      return null;
+    }
+    const report = JSON.parse(readFileSync(path, 'utf8'));
+    const observed = report?.observed;
+    if (!report || typeof report !== 'object' || !observed) return null;
+    const lanes = observed.capacityByProvider;
+    if (!lanes || typeof lanes !== 'object' || Array.isArray(lanes))
+      return null;
+    let running = 0;
+    let slots = 0;
+    for (const row of Object.values(lanes)) {
+      if (!row || typeof row !== 'object') return null;
+      if (!nonNegativeInteger(row.running)) return null;
+      if (!nonNegativeInteger(row.slots)) return null;
+      running += row.running;
+      slots += row.slots;
+    }
+    if (slots <= 0) return null;
+    const attribution = observed.codexAttribution;
+    const provider =
+      attribution &&
+      typeof attribution === 'object' &&
+      nonNegativeInteger(attribution.count)
+        ? {
+            accounts: attribution.count,
+            ready: nonNegativeInteger(attribution.eligibleByCooldown)
+              ? attribution.eligibleByCooldown
+              : 0,
+          }
+        : null;
+    return {
+      source: 'lanes-doctor-report',
+      observedAt: new Date(observedAtMs).toISOString(),
+      workers: {
+        running,
+        // The lanes carry retries through the failure ledger, not a retrying
+        // seat pool; zero is the measured absence, not assumed slack.
+        retrying: 0,
+        maxConcurrent: slots,
+      },
+      provider,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function hostPressureClass(host) {
   if (
     !host ||
@@ -595,9 +671,13 @@ export function selectRemediationCohort(classifications, capacity) {
 
 export function assertOfficialSymphonyFeed(url) {
   const target = String(url || '');
+  if (!target) return target;
   if (target !== OFFICIAL_SYMPHONY_REFRESH_URL) {
     throw new Error('homemade-symphony-admission-forbidden');
   }
+  // JOV-8000: the retired Elixir endpoint is no longer a permitted feed
+  // target — only an explicit legacy caller may still address it, and any
+  // homemade wrapper marker is forbidden on every path.
   if (
     HOMEMADE_WRAPPER_MARKERS.some(marker =>
       target.toLowerCase().includes(marker.toLowerCase())
@@ -608,12 +688,24 @@ export function assertOfficialSymphonyFeed(url) {
   return target;
 }
 
-/** @param {{ url?: string, fetchImpl?: (input: string, init?: RequestInit) => Promise<{ ok?: boolean, status?: number, json: () => Promise<unknown> }> }} [args] */
+/**
+ * The retired Elixir :4041 refresh endpoint is gone (JOV-8000). The shipping
+ * lanes are event-driven — workers re-exec on finish and the minute timer
+ * restarts idle lanes — so an admitted cohort needs no HTTP wake. The receipt
+ * records the cohort as observed; fabricating a POST would fail remediate.
+ */
 export async function feedOfficialSymphony({
   url = OFFICIAL_SYMPHONY_REFRESH_URL,
   fetchImpl = globalThis.fetch,
 } = {}) {
   const target = assertOfficialSymphonyFeed(url);
+  if (!target) {
+    return {
+      status: 'event-driven',
+      url: null,
+      operations: ['minute-timer', 'worker-reexec'],
+    };
+  }
   const response = await fetchImpl(target, {
     method: 'POST',
     signal: AbortSignal.timeout(5000),
@@ -660,7 +752,7 @@ export function buildRemediationWorkpad(receipt) {
     `Observed: ${receipt.observedAt}`,
     `Main: \`${receipt.inventory?.mainSha || 'unknown'}\``,
     `Capacity: ${receipt.capacity?.reason || 'unknown'} (cohort ${receipt.capacity?.cohortSize ?? 0})`,
-    `Feed: official Elixir Symphony \`${OFFICIAL_SYMPHONY_REFRESH_URL}\``,
+    `Feed: shipping lanes (event-driven tick; no HTTP refresh)`,
     '',
     '### Selected',
     selected.length === 0
@@ -740,8 +832,8 @@ export function buildRemediationReceipt({
     })),
     counts,
     feed: {
-      owner: 'official-elixir-symphony',
-      refreshUrl: OFFICIAL_SYMPHONY_REFRESH_URL,
+      owner: 'shipping-lanes',
+      refreshUrl: null,
       homemadeWrappers: 'forbidden',
     },
   };
