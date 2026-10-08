@@ -159,7 +159,7 @@ export function readStorybookBuildResources(
 
 /**
  * Existing detached-child ownership and timeout remain authoritative.
- * @param {{pid: number, exitCode: number | null, signalCode: string | null, once: (event: string, listener: () => void) => unknown}} child
+ * @param {{pid?: number, exitCode: number | null, signalCode: string | null, once: (event: string, listener: () => void) => unknown}} child
  */
 export function watchStorybookBuildResources(
   child,

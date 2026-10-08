@@ -1,6 +1,5 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { EventEmitter } from 'node:events';
 import {
   existsSync,
   mkdirSync,
@@ -93,7 +92,7 @@ describe('live Storybook owned build resource bounds', () => {
     leaderStartedAt: 'Wed Oct 7 22:00:00 2026',
   };
   const child = () =>
-    Object.assign(new EventEmitter(), {
+    Object.assign(new ChildProcess(), {
       pid: 1234,
       exitCode: null,
       signalCode: null,
