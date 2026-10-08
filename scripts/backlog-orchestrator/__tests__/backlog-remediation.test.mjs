@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   assertOfficialSymphonyFeed,
   buildRemediationReceipt,
+  CAPACITY_MAX_AGE_MS,
   CAPACITY_SCHEMA,
   CLEAN_STREAK_REQUIRED,
   classifyRemediationCandidate,
@@ -22,7 +23,6 @@ import {
   feedOfficialSymphony,
   findWorkpadComment,
   inventoryBacklog,
-  CAPACITY_MAX_AGE_MS,
   OFFICIAL_SYMPHONY_REFRESH_URL,
   REMEDIATION_SCHEMA,
   readHostPressure,
@@ -493,10 +493,7 @@ describe('official Symphony backlog remediation', () => {
     const legacyFed = await feedOfficialSymphony({
       fetchImpl: async url => {
         assert.equal(url, OFFICIAL_SYMPHONY_REFRESH_URL);
-        return {
-          ok: true,
-          json: async () => ({ queued: true, operations: ['poll'] }),
-        };
+        return Response.json({ queued: true, operations: ['poll'] });
       },
     });
     assert.equal(legacyFed.status, 'queued');
@@ -656,16 +653,22 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
       assert.deepEqual(capacity.provider, { accounts: 5, ready: 4 });
       assert.equal(capacity.source, 'lanes-doctor-report');
       assert.equal(typeof capacity.observedAt, 'string');
-      const required = evaluateRuntimeCapacity({
-        schema: CAPACITY_SCHEMA,
-        observedAt: new Date(NOW_MS).toISOString(),
-        ...capacity,
-        host: healthySignals().host,
-        cloneLatencyMs: 800,
-        ci: { saturating: false, running: 2, queued: 0 },
-        pullRequests: [],
-        mergeQueue: { health: 'healthy', entries: 1 },
-      }, { now: new Date(NOW_MS).toISOString(), previousCleanStreak: CLEAN_STREAK_REQUIRED });
+      const required = evaluateRuntimeCapacity(
+        {
+          schema: CAPACITY_SCHEMA,
+          observedAt: new Date(NOW_MS).toISOString(),
+          ...capacity,
+          host: healthySignals().host,
+          cloneLatencyMs: 800,
+          ci: { saturating: false, running: 2, queued: 0 },
+          pullRequests: [],
+          mergeQueue: { health: 'healthy', entries: 1 },
+        },
+        {
+          now: new Date(NOW_MS).toISOString(),
+          previousCleanStreak: CLEAN_STREAK_REQUIRED,
+        }
+      );
       assert.equal(required.allowed, true);
       assert.equal(required.cohortSize, 6);
       assert.equal(required.reason, 'capacity-available');
@@ -709,7 +712,9 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
       const emptySeatsDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
       writeReport(
         emptySeatsDir,
-        lanesDoctorReport({ capacityByProvider: { codex: { slots: 0, running: 0 } } })
+        lanesDoctorReport({
+          capacityByProvider: { codex: { slots: 0, running: 0 } },
+        })
       );
       assert.equal(
         readLanesCapacity({ lanesStateDir: emptySeatsDir, nowMs: NOW_MS }),
@@ -721,10 +726,7 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
   });
 
   it('keeps the lanes doctor report as the primary orchestrator capacity source', () => {
-    assert.match(
-      ORCHESTRATOR,
-      /backlogRemediation\.readLanesCapacity\(\)/
-    );
+    assert.match(ORCHESTRATOR, /backlogRemediation\.readLanesCapacity\(\)/);
     assert.match(MODULE, /source: 'lanes-doctor-report'/);
   });
 });
