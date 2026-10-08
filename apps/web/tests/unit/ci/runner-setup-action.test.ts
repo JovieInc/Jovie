@@ -373,7 +373,10 @@ describe('full browser matrix setup routing', () => {
     jobs: Record<
       string,
       {
-        strategy?: { 'max-parallel'?: number; matrix?: { browser?: string[] } };
+        strategy?: {
+          'max-parallel'?: number;
+          matrix?: { browser?: string[]; shard?: number[] };
+        };
         env?: Record<string, string>;
         steps: ActionStep[];
       }
@@ -408,12 +411,16 @@ describe('full browser matrix setup routing', () => {
     );
   });
 
-  it('serializes the matrix and never skips browser host validation', () => {
+  it('serializes browsers per shard and never skips browser host validation', () => {
     expect(matrixJob?.strategy?.matrix?.browser).toEqual([
       'chromium',
       'firefox',
     ]);
-    expect(matrixJob?.strategy?.['max-parallel']).toBe(1);
+    // Sharded four ways per browser (JOV-8001): the standalone production
+    // server removed the OOM kill (exit 143) and sharding fits the suite in
+    // the 60m job budget.
+    expect(matrixJob?.strategy?.['max-parallel']).toBe(8);
+    expect(matrixJob?.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
     // Four workers starve the hosted runner ("lost communication", JOV-7677).
     expect(matrixJob?.env?.PLAYWRIGHT_WORKERS).toBe('2');
     const playwrightAction = parseYaml(

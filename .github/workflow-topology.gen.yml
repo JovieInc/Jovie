@@ -432,7 +432,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:notify
-    jobCount: 2
+    jobCount: 3
   - name: Real-Model Eval Lane
     path: .github/workflows/eval-real-model.yml
     active: false
