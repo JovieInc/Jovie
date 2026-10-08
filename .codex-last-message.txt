@@ -1,0 +1,16 @@
+Implemented and published [draft PR #20788](https://github.com/JovieInc/Jovie/pull/20788).
+
+- Filters Git ref-update lines from deprecation intake: [deprecation-intake.mjs](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T213010Z-JOV-7935-codex-200395/scripts/deprecation-intake.mjs:18)
+- Added exact JOV-7935 regression coverage: [deprecation-intake.test.mjs](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T213010Z-JOV-7935-codex-200395/scripts/deprecation-intake.test.mjs:32)
+- Commit: `156dce8b16`
+
+Verified:
+
+- Regression test: 5/5 passed
+- Biome passed
+- Turbo typecheck: 18/18 tasks passed
+- Replayed cited Actions log: false fingerprint absent; genuine warnings retained
+- Hosted CI has no failures, with three checks still running at handoff
+- PR remains draft and unmerged
+
+Deviations: GBrain was unavailable as stated. Linear required reauthentication, so its issue-state receipt could not be independently verified.
