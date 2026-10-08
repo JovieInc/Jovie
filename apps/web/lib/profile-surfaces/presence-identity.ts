@@ -35,6 +35,14 @@ export interface PresenceIdentityPhoto {
   readonly verified: boolean;
 }
 
+export interface SourceIdentity {
+  readonly status: 'available' | 'unavailable' | 'unsupported';
+  readonly displayName: string | null;
+  readonly pageTitle: string | null;
+  readonly photo: PresenceIdentityPhoto;
+  readonly sourceUrl: string;
+}
+
 export interface PresenceIdentitySubject {
   readonly kind: string;
   readonly platform: string;
@@ -455,5 +463,29 @@ export function isPhotoStripRow(
     subject.kind === 'website' ||
     subject.kind === 'dsp' ||
     subject.kind === 'social'
+  );
+}
+
+/** A platform match alone can point at a different artist. Bind photos to the exact source. */
+export function findSurfaceDspMatch<
+  T extends {
+    readonly providerId: string;
+    readonly externalArtistUrl: string | null;
+    readonly externalArtistId: string | null;
+  },
+>(
+  surface: {
+    readonly platform: string;
+    readonly url: string;
+    readonly externalId: string | null;
+  },
+  matches: readonly T[]
+): T | undefined {
+  return matches.find(
+    match =>
+      match.providerId === surface.platform &&
+      (match.externalArtistUrl === surface.url ||
+        (surface.externalId !== null &&
+          match.externalArtistId === surface.externalId))
   );
 }
