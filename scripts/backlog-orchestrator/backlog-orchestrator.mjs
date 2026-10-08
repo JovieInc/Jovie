@@ -1444,13 +1444,14 @@ async function runRemediate(isDryRun) {
     workpadBody: receipt.workpad,
     // The pullRequests capacity evidence keeps failing closed inside the
     // capacity verdict; the exact gh failure is surfaced here so a
-    // capacity-evidence gap names its producer.
+    // capacity-evidence gap names its producer. Access stays property-safe
+    // across the collector's return shapes (array, {error}, or null).
     pullRequestsEvidence: Array.isArray(pullRequests)
       ? { count: pullRequests.length, error: null }
       : {
           count: null,
           error:
-            pullRequests?.error ??
+            /** @type {Record<string, any>} */ (pullRequests ?? {})?.error ??
             (pullRequests === null
               ? 'gh-pr-list:unparseable-output'
               : 'gh-pr-list:unknown-failure'),
