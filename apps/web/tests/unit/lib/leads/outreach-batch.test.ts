@@ -136,7 +136,7 @@ describe('processOutreachBatch', () => {
     expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
   });
 
-  it('skips send for suppressed leads (Fix #1)', async () => {
+  it('blocks delivery before suppression/provider work, including suppressed leads', async () => {
     const lead = makeLead();
     // Claim phase: return one lead
     mockTransaction.mockResolvedValue([{ ...lead, claimedAt: new Date() }]);
@@ -156,7 +156,7 @@ describe('processOutreachBatch', () => {
       reason: 'user_request',
     });
 
-    // db.update().set().where() chain for marking dismissed + final remaining count
+    // db.update().set().where() chain for releasing the claim
     const updateChain = {
       set: () => ({ where: () => Promise.resolve(undefined) }),
     };
@@ -178,9 +178,12 @@ describe('processOutreachBatch', () => {
     const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
     const result = await processOutreachBatch(10);
 
-    expect(mockIsEmailSuppressed).toHaveBeenCalledWith('artist@example.com');
+    expect(mockIsEmailSuppressed).not.toHaveBeenCalled();
     expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(result.dismissed).toBe(1);
+    expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
+    expect(result.unapproved).toBe(1);
+    expect(result.attempted).toBe(0);
+    expect(result.dismissed).toBe(0);
     expect(result.queued).toBe(0);
   });
 
@@ -295,37 +298,43 @@ describe('processOutreachBatch', () => {
     expect(result.unapproved).toBe(1);
   });
 
-  it('sends exactly the approved copy revision', async () => {
-    const approved = approvedLedger();
-    const lead = { ...makeLead(), claimedAt: new Date() };
-    mockTransaction.mockResolvedValue([lead]);
-    mockIsEmailSuppressed.mockResolvedValue({ suppressed: false });
-    mockPushLeadToInstantly.mockResolvedValue('instantly-1');
-    mockDbSelect
-      .mockReturnValueOnce({
-        from: () => ({
-          where: () => ({ limit: () => Promise.resolve([{ enabled: true }]) }),
-        }),
-      })
-      // duplicate-email check
-      .mockReturnValueOnce({
-        from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
-      })
-      .mockReturnValueOnce({
-        from: () => ({ where: () => Promise.resolve([{ total: 0 }]) }),
+  it.each([false, true])(
+    'never enrolls an exactly approved copy with a ready provider (pipeline bypass=%s)',
+    async ignorePipelineEnabled => {
+      const approved = approvedLedger();
+      mockReadOutboundLedger.mockResolvedValue(approved.ledger);
+      const lead = { ...makeLead(), claimedAt: new Date() };
+      mockTransaction.mockResolvedValue([lead]);
+      mockIsEmailSuppressed.mockResolvedValue({ suppressed: false });
+      mockPushLeadToInstantly.mockResolvedValue('instantly-1');
+      mockDbSelect.mockReturnValue({
+        from: () => ({ where: () => Promise.resolve([{ total: 1 }]) }),
       });
-    mockDbUpdate.mockReturnValue({
-      set: () => ({ where: () => Promise.resolve(undefined) }),
-    });
+      if (!ignorePipelineEnabled) {
+        mockDbSelect.mockReturnValueOnce({
+          from: () => ({
+            where: () => ({
+              limit: () => Promise.resolve([{ enabled: true }]),
+            }),
+          }),
+        });
+      }
+      mockDbUpdate.mockReturnValue({
+        set: () => ({ where: () => Promise.resolve(undefined) }),
+      });
 
-    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
+      const { processOutreachBatch } = await import(
+        '@/lib/leads/outreach-batch'
+      );
+      const result = await processOutreachBatch(10, { ignorePipelineEnabled });
 
-    expect(result.queued).toBe(1);
-    expect(mockPushLeadToInstantly).toHaveBeenCalledWith(
-      expect.objectContaining({
-        approvedCopy: { ...approved.copy, revision: approved.revision },
-      })
-    );
-  });
+      expect(result.attempted).toBe(0);
+      expect(result.queued).toBe(0);
+      expect(result.unapproved).toBe(1);
+      expect(result.remainingPending).toBe(1);
+      expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+      expect(mockIsEmailSuppressed).not.toHaveBeenCalled();
+      expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
+    }
+  );
 });

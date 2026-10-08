@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   draftOutboundCopy,
+  evaluateOutboundHistoryRecord,
   evaluateOutboundSend,
   type OutboundCopy,
   type OutboundLedgerRow,
@@ -72,7 +73,7 @@ describe('outbound approval: never auto-send', () => {
   it('refuses a target nobody reviewed', () => {
     expect(
       evaluateOutboundSend({ target: TARGET, channel: 'email', rows: [] })
-    ).toEqual({ allowed: false, reason: 'target_not_approved' });
+    ).toEqual({ allowed: false, reason: 'audience_delivery_disabled' });
   });
 
   it('refuses an approved target whose copy is unapproved', () => {
@@ -82,10 +83,10 @@ describe('outbound approval: never auto-send', () => {
         channel: 'email',
         rows: [targetRow('yes')],
       })
-    ).toEqual({ allowed: false, reason: 'copy_not_approved' });
+    ).toEqual({ allowed: false, reason: 'audience_delivery_disabled' });
   });
 
-  it('allows exactly the approved copy revision for an approved target', () => {
+  it('refuses even the exact approved copy revision for an approved target', () => {
     const rows = [targetRow('yes'), copyRow('yes')];
     const permission = evaluateOutboundSend({
       target: TARGET,
@@ -93,11 +94,8 @@ describe('outbound approval: never auto-send', () => {
       rows,
     });
     expect(permission).toEqual({
-      allowed: true,
-      copy: {
-        ...COPY,
-        revision: outboundCopyRevision(outboundTargetRevision(TARGET), COPY),
-      },
+      allowed: false,
+      reason: 'audience_delivery_disabled',
     });
   });
 
@@ -109,10 +107,10 @@ describe('outbound approval: never auto-send', () => {
     expect(state.latestCopy?.body).toBe(edited.body);
     expect(
       evaluateOutboundSend({ target: TARGET, channel: 'email', rows })
-    ).toEqual({ allowed: false, reason: 'copy_not_approved' });
+    ).toEqual({ allowed: false, reason: 'audience_delivery_disabled' });
   });
 
-  it('allows the edited copy only once Tim approves that revision', () => {
+  it('refuses the edited copy even after Tim approves that revision', () => {
     const edited = { ...COPY, body: `${COPY.body}\nP.S. edited` };
     const rows = [
       targetRow('yes'),
@@ -125,7 +123,13 @@ describe('outbound approval: never auto-send', () => {
       channel: 'email',
       rows,
     });
-    expect(permission.allowed && permission.copy.body).toBe(edited.body);
+    expect(resolveOutboundApproval(TARGET, rows).latestCopy?.body).toBe(
+      edited.body
+    );
+    expect(permission).toEqual({
+      allowed: false,
+      reason: 'audience_delivery_disabled',
+    });
   });
 
   it('refuses copy whose stored text no longer matches its revision', () => {
@@ -154,7 +158,7 @@ describe('outbound approval: never auto-send', () => {
     expect(resolveOutboundApproval(moved, rows).target).toBe('stale');
     expect(
       evaluateOutboundSend({ target: moved, channel: 'email', rows })
-    ).toEqual({ allowed: false, reason: 'target_not_approved' });
+    ).toEqual({ allowed: false, reason: 'audience_delivery_disabled' });
   });
 
   it('refuses when the claim token rotated out of the approved copy', () => {
@@ -163,7 +167,7 @@ describe('outbound approval: never auto-send', () => {
     const rows = [targetRow('yes', rotated), copyRow('yes', copy, rotated)];
     expect(
       evaluateOutboundSend({ target: rotated, channel: 'email', rows })
-    ).toEqual({ allowed: false, reason: 'copy_not_approved' });
+    ).toEqual({ allowed: false, reason: 'audience_delivery_disabled' });
   });
 
   it('a later hold or reject revokes an earlier approval', () => {
@@ -193,7 +197,75 @@ describe('outbound approval: never auto-send', () => {
     const rows = [targetRow('yes'), copyRow('yes')];
     expect(
       evaluateOutboundSend({ target: TARGET, channel: 'dm', rows })
-    ).toEqual({ allowed: false, reason: 'channel_mismatch' });
+    ).toEqual({ allowed: false, reason: 'audience_delivery_disabled' });
+  });
+});
+
+describe('manual contact history is local activity, never a dispatch grant', () => {
+  it('preserves exact approved history review while delivery remains denied', () => {
+    const rows = [targetRow('yes'), copyRow('yes')];
+    const history = evaluateOutboundHistoryRecord({
+      target: TARGET,
+      channel: 'email',
+      rows,
+    });
+    expect(history).toEqual({
+      historyRecordAllowed: true,
+      dispatchAllowed: false,
+      copy: {
+        ...COPY,
+        revision: outboundCopyRevision(outboundTargetRevision(TARGET), COPY),
+      },
+    });
+    expect(
+      evaluateOutboundSend({ target: TARGET, channel: 'email', rows })
+    ).toEqual({
+      allowed: false,
+      reason: 'audience_delivery_disabled',
+    });
+  });
+
+  it('refuses unreviewed or changed targets, unapproved edits and channel switches', () => {
+    const approved = [targetRow('yes'), copyRow('yes')];
+    const cases = [
+      {
+        target: TARGET,
+        channel: 'email' as const,
+        rows: [],
+        reason: 'target_not_approved',
+      },
+      {
+        target: { ...TARGET, contactEmail: 'changed@example.invalid' },
+        channel: 'email' as const,
+        rows: approved,
+        reason: 'target_not_approved',
+      },
+      {
+        target: TARGET,
+        channel: 'email' as const,
+        rows: [targetRow('yes')],
+        reason: 'copy_not_approved',
+      },
+      {
+        target: TARGET,
+        channel: 'email' as const,
+        rows: [...approved, copyRow('unsure', { ...COPY, body: 'edited' })],
+        reason: 'copy_not_approved',
+      },
+      {
+        target: TARGET,
+        channel: 'dm' as const,
+        rows: approved,
+        reason: 'channel_mismatch',
+      },
+    ];
+    for (const { reason, ...input } of cases) {
+      expect(evaluateOutboundHistoryRecord(input)).toEqual({
+        historyRecordAllowed: false,
+        dispatchAllowed: false,
+        reason,
+      });
+    }
   });
 });
 

@@ -339,7 +339,7 @@ describe('GET /api/admin/outreach', () => {
     );
   });
 
-  it('queues pending email outreach only when explicitly triggered', async () => {
+  it('refuses delivery even when an operator explicitly triggers approved outreach', async () => {
     mockSelect
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
@@ -383,14 +383,7 @@ describe('GET /api/admin/outreach', () => {
       }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([]),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+          where: vi.fn().mockResolvedValue([{ total: 1 }]),
         })),
       }));
 
@@ -417,21 +410,16 @@ describe('GET /api/admin/outreach', () => {
     expect(mockParseJsonBody).toHaveBeenCalled();
     expect(mockOr).toHaveBeenCalledWith('eq-clause', 'eq-clause');
     expect(mockUpdate).toHaveBeenCalledTimes(2);
-    expect(mockPushLeadToInstantly).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: 'artist@example.com',
-        claimLink: 'https://app.jovie.test/claim/token',
-        priorityScore: 88,
-      })
-    );
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
     expect(data).toEqual({
       ok: true,
-      attempted: 1,
-      queued: 1,
+      attempted: 0,
+      queued: 0,
       failed: 0,
       dismissed: 0,
-      unapproved: 0,
-      remainingPending: 0,
+      unapproved: 1,
+      remainingPending: 1,
     });
   });
 
