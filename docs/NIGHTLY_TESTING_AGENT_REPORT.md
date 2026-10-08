@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37713774468)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37718728292)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-08T01:57:57.905Z
+Generated: 2026-10-08T03:00:23.712Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -19,10 +19,10 @@ Workflow conclusion: failure
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 8280 | 8241 | 2 | 0 | 37 |
-| unit | 10163 | 10154 | 1 | 0 | 8 |
-| unit | 7925 | 7895 | 0 | 0 | 30 |
-| unit | 7660 | 7633 | 0 | 0 | 27 |
+| unit | 10173 | 10166 | 3 | 0 | 4 |
+| unit | 8243 | 8202 | 0 | 0 | 41 |
+| unit | 7689 | 7663 | 0 | 0 | 26 |
+| unit | 7946 | 7914 | 1 | 0 | 31 |
 
 ## Selected Targets
 
@@ -46,6 +46,7 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-9yYizj/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-STEsDh/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
-| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for bf6a9ce985e8d37856dc4e137c8b1e6af339a334: expected null not to be null |
+| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for 8a1cf034c0aeb90716df0c1e02174f3df5447a5c: expected null not to be null |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-Ud8jPL/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-663Hcb/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | tests/unit/design-system/story-source-sha-ancestry.test.ts story receipt SHA ancestry > keeps every literal receipt ancestral and able to replay its story path |  | expected 3 to be 5 // Object.is equality |
