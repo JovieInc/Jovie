@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS } from '@/lib/security/production-blocked-routes';
 
 describe('development-only security helpers', () => {
   beforeEach(() => {
@@ -147,6 +148,214 @@ describe('development-only security helpers', () => {
           '/api/dev/test-auth/session',
           'jov.ie',
           new Headers({ host: 'jov.ie' })
+        )
+      ).toBe(false);
+    });
+  });
+
+  describe('local production-build shell screenshot fixtures', () => {
+    beforeEach(() => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      vi.stubEnv('HOSTNAME', 'localhost');
+      vi.stubEnv('VERCEL', '');
+      vi.stubEnv('VERCEL_ENV', '');
+    });
+
+    const routes = PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS.filter(path =>
+      path.startsWith('/demo')
+    );
+
+    it.each(routes)(
+      'permits the exact local capture fixture %s',
+      async route => {
+        const { shouldBypassProductionBlockedDebugPath } = await import(
+          '@/lib/security/development-only'
+        );
+        expect(
+          shouldBypassProductionBlockedDebugPath(
+            route,
+            'localhost',
+            new Headers({ host: 'localhost:3000' })
+          )
+        ).toBe(true);
+      }
+    );
+
+    it.each([
+      'https://public.example@localhost:3000',
+      'http://localhost:3000',
+      'user@localhost:3000',
+      'localhost:3000/path',
+      'localhost:3000?query',
+      'localhost:3000#fragment',
+      'localhost:99999',
+      'localhost:invalid',
+    ])(
+      'rejects malformed request and forwarding authority %s',
+      async authority => {
+        const { shouldBypassProductionBlockedDebugPath } = await import(
+          '@/lib/security/development-only'
+        );
+        for (const route of routes) {
+          expect(
+            shouldBypassProductionBlockedDebugPath(
+              route,
+              'localhost',
+              new Headers({ host: authority })
+            )
+          ).toBe(false);
+          expect(
+            shouldBypassProductionBlockedDebugPath(
+              route,
+              'localhost',
+              new Headers({
+                host: 'localhost:3000',
+                'x-forwarded-host': authority,
+              })
+            )
+          ).toBe(false);
+        }
+      }
+    );
+
+    it.each(['127.0.0.1:3000', '[::1]:3000', 'localhost:3000'])(
+      'permits a valid loopback authority %s',
+      async host => {
+        const { shouldBypassProductionBlockedDebugPath } = await import(
+          '@/lib/security/development-only'
+        );
+        expect(
+          shouldBypassProductionBlockedDebugPath(
+            '/demo',
+            'localhost',
+            new Headers({ host, 'x-forwarded-host': host })
+          )
+        ).toBe(true);
+      }
+    );
+
+    it.each([
+      {
+        name: 'missing opt-in',
+        env: { E2E_USE_TEST_AUTH_BYPASS: '' },
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'public server binding',
+        env: { HOSTNAME: '0.0.0.0' },
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'missing server binding',
+        env: { HOSTNAME: '' },
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'production deployment',
+        env: { VERCEL_ENV: 'production' },
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'preview deployment',
+        env: { VERCEL_ENV: 'preview' },
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'hosted development',
+        env: { VERCEL_ENV: 'development' },
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'hosted runtime',
+        env: { VERCEL: '1' },
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'public request URL',
+        env: {},
+        hostname: 'jov.ie',
+        headers: { host: 'localhost:3000' },
+      },
+      {
+        name: 'spoofed forwarding',
+        env: {},
+        hostname: 'localhost',
+        headers: { host: 'jov.ie', 'x-forwarded-host': 'localhost:3000' },
+      },
+      {
+        name: 'spoofed origin and referer',
+        env: {},
+        hostname: 'localhost',
+        headers: {
+          host: 'jov.ie',
+          origin: 'http://localhost:3000',
+          referer: 'http://localhost:3000/demo',
+        },
+      },
+      {
+        name: 'public forwarding',
+        env: {},
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000', 'x-forwarded-host': 'jov.ie' },
+      },
+      {
+        name: 'forwarded host chain',
+        env: {},
+        hostname: 'localhost',
+        headers: {
+          host: 'localhost:3000',
+          'x-forwarded-host': 'localhost:3000,jov.ie',
+        },
+      },
+      {
+        name: 'host chain',
+        env: {},
+        hostname: 'localhost',
+        headers: { host: 'localhost:3000,jov.ie' },
+      },
+      { name: 'missing host', env: {}, hostname: 'localhost', headers: {} },
+    ])(
+      'denies every shell fixture with $name',
+      async ({ env, hostname, headers }) => {
+        for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+        const { shouldBypassProductionBlockedDebugPath } = await import(
+          '@/lib/security/development-only'
+        );
+        for (const route of routes) {
+          expect(
+            shouldBypassProductionBlockedDebugPath(
+              route,
+              hostname,
+              new Headers(headers)
+            )
+          ).toBe(false);
+        }
+      }
+    );
+
+    it.each([
+      '/demo/',
+      '/demo/other',
+      '/demo/showcase/settings/other',
+      '/demo/%2e%2e',
+      '/demo%2faudience',
+    ])('does not expand capture to %s', async route => {
+      const { shouldBypassProductionBlockedDebugPath } = await import(
+        '@/lib/security/development-only'
+      );
+      expect(
+        shouldBypassProductionBlockedDebugPath(
+          route,
+          'localhost',
+          new Headers({ host: 'localhost:3000' })
         )
       ).toBe(false);
     });

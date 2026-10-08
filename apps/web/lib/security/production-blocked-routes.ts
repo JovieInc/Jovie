@@ -34,7 +34,17 @@ export const PRODUCTION_BLOCKED_PAGE_EXACT = [
  * few legacy experiment fixtures. Keep the inventory exact so the proxy can
  * allow only screenshot automation without reopening all /exp routes.
  */
-export const PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS = ['/exp/shell-v1'] as const;
+export const PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS = [
+  '/exp/shell-v1',
+  '/demo',
+  '/demo/audience',
+  '/demo/showcase/analytics',
+  '/demo/showcase/earnings',
+  '/demo/showcase/links',
+  '/demo/showcase/releases',
+  '/demo/showcase/settings',
+  '/demo/showcase/release-tracked-links',
+] as const;
 
 /**
  * Routes that intentionally stay reachable outside development.
@@ -84,11 +94,36 @@ interface ProductionBlockedDebugPathOptions {
   readonly allowProductScreenshotCaptureRoutes?: boolean;
 }
 
+/** Decode only for denial: encoded spellings never gain a fixture exemption. */
+function debugDenialPaths(pathname: string): string[] | null {
+  try {
+    let decoded = pathname;
+    const paths = [pathname];
+    for (let depth = 0; depth < 3; depth++) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) {
+        return [...paths, new URL(`http://localhost${decoded}`).pathname];
+      }
+      decoded = next;
+      paths.push(decoded);
+    }
+    // Keep deeply encoded or malformed request paths fail-closed and bounded.
+    if (decodeURIComponent(decoded) !== decoded) return null;
+    return [...paths, new URL(`http://localhost${decoded}`).pathname];
+  } catch {
+    return null;
+  }
+}
+
 export function isProductionBlockedDebugPath(
   pathname: string,
   options: ProductionBlockedDebugPathOptions = {}
 ): boolean {
-  if (isProxyAllowlistedDevelopmentRoute(pathname)) {
+  const deniedPaths = debugDenialPaths(pathname);
+  if (deniedPaths === null) return true;
+  const literalPath = deniedPaths.every(path => path === pathname);
+
+  if (literalPath && isProxyAllowlistedDevelopmentRoute(pathname)) {
     return false;
   }
 
@@ -100,6 +135,7 @@ export function isProductionBlockedDebugPath(
   }
 
   if (
+    literalPath &&
     DEVELOPMENT_ROUTE_PROXY_API_ALLOWLIST.some(
       allowed => pathname === allowed || pathname.startsWith(`${allowed}/`)
     )
@@ -107,19 +143,12 @@ export function isProductionBlockedDebugPath(
     return false;
   }
 
-  if (
-    PRODUCTION_BLOCKED_API_PREFIXES.some(prefix =>
-      matchesRoutePrefix(pathname, prefix)
-    )
-  ) {
-    return true;
-  }
-
-  if ((PRODUCTION_BLOCKED_PAGE_EXACT as readonly string[]).includes(pathname)) {
-    return true;
-  }
-
-  return PRODUCTION_BLOCKED_PAGE_PREFIXES.some(prefix =>
-    pathname.startsWith(prefix)
+  return deniedPaths.some(
+    path =>
+      PRODUCTION_BLOCKED_API_PREFIXES.some(prefix =>
+        matchesRoutePrefix(path, prefix)
+      ) ||
+      (PRODUCTION_BLOCKED_PAGE_EXACT as readonly string[]).includes(path) ||
+      PRODUCTION_BLOCKED_PAGE_PREFIXES.some(prefix => path.startsWith(prefix))
   );
 }

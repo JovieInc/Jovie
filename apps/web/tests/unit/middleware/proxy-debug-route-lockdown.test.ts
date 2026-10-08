@@ -3,6 +3,7 @@
  */
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS } from '@/lib/security/production-blocked-routes';
 
 const mocks = vi.hoisted(() => ({
   getUserState: vi.fn(),
@@ -298,6 +299,84 @@ describe('proxy debug/test route lockdown', () => {
 
       expect(rewriteUrl).toBeTruthy();
       expect(new URL(rewriteUrl!).pathname).toBe('/404');
+    }
+  });
+
+  it('passes all exact shell fixtures through the local production-built proxy', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('VERCEL', '');
+    vi.stubEnv('HOSTNAME', 'localhost');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    for (const pathname of PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS.filter(path =>
+      path.startsWith('/demo')
+    )) {
+      const response = await callMiddleware(
+        createTestRequest({
+          pathname,
+          hostname: 'localhost',
+          headers: { host: 'localhost:3000' },
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+    }
+  });
+
+  it.each(['production', 'preview'])(
+    'blocks every shell fixture in hosted %s despite spoofed loopback headers',
+    async deployment => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('VERCEL_ENV', deployment);
+      vi.stubEnv('VERCEL', '1');
+      vi.stubEnv('HOSTNAME', 'localhost');
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      for (const pathname of PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS.filter(
+        path => path.startsWith('/demo')
+      )) {
+        const response = await callMiddleware(
+          createTestRequest({
+            pathname,
+            hostname: 'jov.ie',
+            headers: {
+              host: 'jov.ie',
+              'x-forwarded-host': 'localhost:3000',
+              origin: 'http://localhost:3000',
+              referer: 'http://localhost:3000/demo',
+            },
+          })
+        );
+        expect(
+          new URL(response.headers.get('x-middleware-rewrite')!).pathname
+        ).toBe('/404');
+      }
+    }
+  );
+
+  it('keeps encoded and unknown fixtures blocked through the actual proxy', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('VERCEL', '');
+    vi.stubEnv('HOSTNAME', 'localhost');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    for (const pathname of [
+      '/demo%2faudience',
+      '/%64emo/audience',
+      '/demo%252faudience',
+      '/demo/other',
+      '/demo/showcase/settings/other',
+    ]) {
+      const response = await callMiddleware(
+        createTestRequest({
+          pathname,
+          hostname: 'localhost',
+          headers: { host: 'localhost:3000' },
+        })
+      );
+      expect(
+        new URL(response.headers.get('x-middleware-rewrite')!).pathname
+      ).toBe('/404');
     }
   });
 
