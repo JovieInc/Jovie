@@ -375,13 +375,16 @@ export async function tryHandleAnonymousOnboardingChat(
   // cookie is cleared. Only the verified account owner can use that identifier.
   const existingSessionId = ownedConversation?.sessionId ?? cookieSessionId;
 
-  let sessionId: string;
+  const sessionId = existingSessionId ?? randomUUID();
   let mintedSessionCookie: string | null = null;
-  if (existingSessionId) {
-    sessionId = existingSessionId;
-  } else {
-    sessionId = randomUUID();
-    // Sign the new sessionId. encodeSessionCookie throws if SESSION_SECRET is
+  if (
+    !existingSessionId ||
+    (ownedConversation && cookieSessionId !== sessionId)
+  ) {
+    // A genuine owned turn restores the signed cookie needed by the existing
+    // claim/handoff route. Reading history alone must not claim or redirect.
+    // This identifier came from verified ownership, never a client locator.
+    // encodeSessionCookie throws if SESSION_SECRET is
     // missing/short — surface that as a 503 (not 500) so observability can tell
     // an ops-config gap from a true crash.
     try {

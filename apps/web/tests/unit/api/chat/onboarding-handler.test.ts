@@ -180,55 +180,77 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     installDefaultDbMocks();
   });
 
-  it('continues the same owned conversation after claim cleared its anonymous cookie', async () => {
-    const id = '11111111-1111-4111-8111-111111111111';
-    hoisted.getBetterAuthSessionMock.mockResolvedValue({
-      user: { id: 'ba-user-1' },
-    });
-    hoisted.appUserMock.mockResolvedValue({
-      id: 'app-user-1',
-      userStatus: 'waitlisted',
-      deletedAt: null,
-    });
-    hoisted.findConversationMock.mockResolvedValue({
-      id,
-      sessionId: 'owned-session',
-      owned: true,
-    });
-    hoisted.executeChatTurnMock.mockResolvedValue({
-      streamResult: {
-        toUIMessageStreamResponse: () => new Response('continued reply'),
-      },
-      selectedModel: 'test',
-      systemPrompt: '',
-      toolNames: [],
-      modelMessages: [],
-    });
-    const { tryHandleAnonymousOnboardingChat } = await import(
-      '@/app/api/chat/onboarding-handler'
-    );
-    const response = await tryHandleAnonymousOnboardingChat(
-      makeRequest({
-        mode: 'onboarding',
-        onboardingConversationId: id,
-        messages: [userMessage('Continue my profile')],
-      }),
-      'req-owned-resume'
-    );
-    expect(response?.status).toBe(200);
-    expect(hoisted.findConversationMock).toHaveBeenCalledExactlyOnceWith({
-      userId: 'app-user-1',
-      sessionId: null,
-    });
-    expect(hoisted.executeChatTurnMock).toHaveBeenCalledWith(
-      expect.objectContaining({ resolvedConversationId: id })
-    );
-    expect(
-      hoisted.checkAuthenticatedOnboardingChatRateLimitMock
-    ).toHaveBeenCalledWith('ba-user-1', 'owned-session');
-    expect(hoisted.encodeSessionCookieMock).not.toHaveBeenCalled();
-    expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
-  });
+  it.each([
+    '',
+    'jovie_onboarding_session=valid-session.owned-session',
+    'jovie_onboarding_session=valid-session.another-session',
+  ])(
+    'continues the owned conversation and restores only its claim cookie (cookie=%s)',
+    async cookieHeader => {
+      const id = '11111111-1111-4111-8111-111111111111';
+      hoisted.getBetterAuthSessionMock.mockResolvedValue({
+        user: { id: 'ba-user-1' },
+      });
+      hoisted.appUserMock.mockResolvedValue({
+        id: 'app-user-1',
+        userStatus: 'waitlisted',
+        deletedAt: null,
+      });
+      hoisted.findConversationMock.mockResolvedValue({
+        id,
+        sessionId: 'owned-session',
+        owned: true,
+      });
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: (options: { headers: HeadersInit }) =>
+            new Response('continued reply', { headers: options.headers }),
+        },
+        selectedModel: 'test',
+        systemPrompt: '',
+        toolNames: [],
+        modelMessages: [],
+      });
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const response = await tryHandleAnonymousOnboardingChat(
+        makeRequest(
+          {
+            mode: 'onboarding',
+            onboardingConversationId: id,
+            messages: [userMessage('Continue my profile')],
+          },
+          cookieHeader
+        ),
+        'req-owned-resume'
+      );
+      expect(response?.status).toBe(200);
+      expect(hoisted.findConversationMock).toHaveBeenCalledExactlyOnceWith({
+        userId: 'app-user-1',
+        sessionId: null,
+      });
+      expect(hoisted.executeChatTurnMock).toHaveBeenCalledWith(
+        expect.objectContaining({ resolvedConversationId: id })
+      );
+      expect(
+        hoisted.checkAuthenticatedOnboardingChatRateLimitMock
+      ).toHaveBeenCalledWith('ba-user-1', 'owned-session');
+      if (cookieHeader.endsWith('valid-session.owned-session')) {
+        expect(hoisted.encodeSessionCookieMock).not.toHaveBeenCalled();
+        expect(response?.headers.get('set-cookie')).toBeNull();
+      } else {
+        expect(hoisted.encodeSessionCookieMock).toHaveBeenCalledExactlyOnceWith(
+          'owned-session'
+        );
+        expect(response?.headers.get('set-cookie')).toContain(
+          'jovie_onboarding_session=signed.owned-session.sig'
+        );
+        expect(response?.headers.get('set-cookie')).toContain('HttpOnly');
+      }
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([true, false])(
     'rejects a stale or foreign conversation locator before writing or streaming (signedIn=%s)',
@@ -268,6 +290,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       );
       expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
       expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(response?.headers.get('set-cookie')).toBeNull();
     }
   );
 

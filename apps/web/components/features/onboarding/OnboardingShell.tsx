@@ -213,7 +213,7 @@ export function OnboardingShell({
   // artist identity stays in this chat.
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation
+    !resumeOwnedConversation || claimTrigger > 0
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
