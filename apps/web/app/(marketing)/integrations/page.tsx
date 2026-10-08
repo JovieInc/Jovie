@@ -11,9 +11,9 @@ export const metadata: Metadata = {
     'See the account integrations and specific capabilities available in Jovie.',
 };
 
-// Availability is evaluated on the server so configuration changes never leave
-// a statically cached, unusable provider advertised as a live connection.
-export const dynamic = 'force-dynamic';
+// Public capabilities reflect deployment configuration. Rebuild this static
+// reference when provider configuration changes; Settings checks live availability.
+export const revalidate = false;
 
 export default function IntegrationsDirectoryPage() {
   const integrations = getAdvertisedConnectorIntegrations(

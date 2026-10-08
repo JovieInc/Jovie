@@ -49,8 +49,9 @@ without silently changing provider consent or enabling unsupported providers.
 
 ## Marketing and cross-product mapping
 
-The public `/integrations` directory projects only configured providers and
-implemented available operations. Planned/blocked operations and unsupported
+The static public `/integrations` directory projects deployment configuration and
+implemented available operations. Rebuild when provider configuration changes;
+Settings checks live availability. Planned/blocked operations and unsupported
 platforms are filtered. Generated directory content is application reference,
 not an independent manually curated marketing promise list (JOV-6259/JOV-4069).
 
