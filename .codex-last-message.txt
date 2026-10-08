@@ -1,0 +1,16 @@
+Implemented and opened [draft PR #20789](https://github.com/JovieInc/Jovie/pull/20789).
+
+- Filters Git ref-update output from deprecation intake.
+- Added an exact regression for fingerprint `deprecation-56312da12b4c`.
+- Commit: `9a3148e697`
+
+Verified:
+
+- Regression tests: 5/5 passed
+- Biome passed
+- Monorepo typecheck: 18/18 passed
+- Script typecheck: no new errors
+- Cited build-log replay rejects the false positive while retaining real `DEP0169` warnings
+- Pre-commit secret and policy checks passed
+
+Deviations: GBrain was unavailable as noted. The Linear connector requires reauthentication, so the `In Review` transition could not be confirmed. Hosted PR checks were pending at handoff; the PR remains draft and was not merged or marked ready.
