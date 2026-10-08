@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -21,9 +22,11 @@ import {
   feedOfficialSymphony,
   findWorkpadComment,
   inventoryBacklog,
+  CAPACITY_MAX_AGE_MS,
   OFFICIAL_SYMPHONY_REFRESH_URL,
   REMEDIATION_SCHEMA,
   readHostPressure,
+  readLanesCapacity,
   upsertRemediationWorkpad,
   WORKPAD_HEADING,
   WORKPAD_PREFIX,
@@ -464,24 +467,30 @@ describe('official Symphony backlog remediation', () => {
     assert.equal(overloaded.allowed, false);
   });
 
-  it('writes a single workpad matrix and feeds only the official Elixir Symphony refresh', async () => {
+  it('writes a single workpad matrix and records the event-driven lanes feed', async () => {
     const built = receiptFor([issue('JOV-50')]);
     assert.match(built.workpad, new RegExp(`^${WORKPAD_HEADING}`));
     assert.match(built.workpad, new RegExp(WORKPAD_PREFIX));
     assert.match(built.workpad, new RegExp(WORKPAD_HEADING));
     assert.match(built.workpad, /JOV-50/);
-    assert.match(built.workpad, /official Elixir Symphony/);
-    assert.equal(built.feed.refreshUrl, OFFICIAL_SYMPHONY_REFRESH_URL);
+    // JOV-8000: the Elixir :4041 feed is retired; the lanes are event-driven.
+    assert.match(built.workpad, /shipping lanes \(event-driven tick/);
+    assert.doesNotMatch(built.workpad, /official Elixir Symphony/);
+    assert.equal(built.feed.refreshUrl, null);
+    assert.equal(built.feed.owner, 'shipping-lanes');
     assert.equal(built.feed.homemadeWrappers, 'forbidden');
-    assert.equal(
-      assertOfficialSymphonyFeed(OFFICIAL_SYMPHONY_REFRESH_URL),
-      OFFICIAL_SYMPHONY_REFRESH_URL
-    );
+    // The official constant survives for legacy readers; new feed calls pass
+    // no URL. Any homemade endpoint is forbidden.
     assert.throws(
       () => assertOfficialSymphonyFeed('http://127.0.0.1:9999/homemade'),
       /homemade-symphony-admission-forbidden/
     );
-    const fed = await feedOfficialSymphony({
+    assert.equal(assertOfficialSymphonyFeed(null), '');
+    const fed = await feedOfficialSymphony({ url: null });
+    assert.equal(fed.status, 'event-driven');
+    assert.deepEqual(fed.operations, ['minute-timer', 'worker-reexec']);
+    // An explicit legacy URL still routes through the guarded POST path.
+    const legacyFed = await feedOfficialSymphony({
       fetchImpl: async url => {
         assert.equal(url, OFFICIAL_SYMPHONY_REFRESH_URL);
         return {
@@ -490,7 +499,7 @@ describe('official Symphony backlog remediation', () => {
         };
       },
     });
-    assert.equal(fed.status, 'queued');
+    assert.equal(legacyFed.status, 'queued');
 
     const comments = [];
     const result = await upsertRemediationWorkpad({
@@ -581,7 +590,6 @@ describe('official Symphony backlog remediation', () => {
   it('does not revive homemade Symphony admission or JOV-5466 wrappers', () => {
     assert.match(MODULE, /JOV-5466/);
     assert.match(MODULE, /homemadeWrappers: 'forbidden'/);
-    assert.match(MODULE, /official-elixir-symphony/);
     assert.doesNotMatch(MODULE, /custom-symphony-controller\s*=/);
     assert.match(ORCHESTRATOR, /backlog-remediation/);
     const workflow = readFileSync(
@@ -598,5 +606,125 @@ describe('official Symphony backlog remediation', () => {
     assert.match(workflow, /backlog-orchestrator\.mjs" remediate/);
     assert.doesNotMatch(workflow, /run-backlog\.sh/);
     assert.doesNotMatch(workflow, /JOV-5466/);
+  });
+});
+
+describe('lanes-measured capacity evidence (JOV-8000)', () => {
+  const NOW_MS = Date.parse('2026-10-08T12:00:00.000Z');
+  const lanesDoctorReport = overrides => ({
+    at: '2026-10-08T11:59:59Z',
+    alerts: {},
+    issues: {},
+    conditions: {},
+    observed: {
+      now: NOW_MS / 1000 - 30,
+      capacityByProvider: {
+        devin: { slots: 4, running: 1, base: 4 },
+        codex: { slots: 3, running: 2, base: 3 },
+        claude: { slots: 2, running: 0, base: 2 },
+      },
+      codexAttribution: {
+        state: 'unleased-available',
+        count: 5,
+        leased: 2,
+        eligibleByCooldown: 4,
+        unleasedAvailable: 3,
+        quotaBanked: 0,
+      },
+      ...overrides,
+    },
+  });
+
+  const writeReport = (dir, report, ageMs = 30_000) => {
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'doctor.json');
+    writeFileSync(path, JSON.stringify(report));
+    const past = new Date(NOW_MS - ageMs);
+    execFileSync('touch', ['-d', past.toISOString(), path]);
+  };
+
+  it('maps the doctor report to measured workers and provider evidence', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+    try {
+      writeReport(dir, lanesDoctorReport(), 30_000);
+      const capacity = readLanesCapacity({ lanesStateDir: dir, nowMs: NOW_MS });
+      assert.deepEqual(capacity.workers, {
+        running: 3,
+        retrying: 0,
+        maxConcurrent: 9,
+      });
+      assert.deepEqual(capacity.provider, { accounts: 5, ready: 4 });
+      assert.equal(capacity.source, 'lanes-doctor-report');
+      assert.equal(typeof capacity.observedAt, 'string');
+      const required = evaluateRuntimeCapacity({
+        schema: CAPACITY_SCHEMA,
+        observedAt: new Date(NOW_MS).toISOString(),
+        ...capacity,
+        host: healthySignals().host,
+        cloneLatencyMs: 800,
+        ci: { saturating: false, running: 2, queued: 0 },
+        pullRequests: [],
+        mergeQueue: { health: 'healthy', entries: 1 },
+      }, { now: new Date(NOW_MS).toISOString(), previousCleanStreak: CLEAN_STREAK_REQUIRED });
+      assert.equal(required.allowed, true);
+      assert.equal(required.cohortSize, 6);
+      assert.equal(required.reason, 'capacity-available');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when the doctor report is missing, stale, or malformed', () => {
+    const missing = readLanesCapacity({
+      lanesStateDir: join(tmpdir(), 'lanes-capacity-absent'),
+      nowMs: NOW_MS,
+    });
+    assert.equal(missing, null);
+
+    const staleDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+    try {
+      writeReport(staleDir, lanesDoctorReport(), CAPACITY_MAX_AGE_MS + 60_000);
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: staleDir, nowMs: NOW_MS }),
+        null
+      );
+
+      const malformedDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+      writeReport(malformedDir, { observed: { capacityByProvider: [] } });
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: malformedDir, nowMs: NOW_MS }),
+        null
+      );
+
+      const badSeatsDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+      writeReport(
+        badSeatsDir,
+        lanesDoctorReport({ capacityByProvider: { codex: { slots: 3 } } })
+      );
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: badSeatsDir, nowMs: NOW_MS }),
+        null
+      );
+
+      const emptySeatsDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+      writeReport(
+        emptySeatsDir,
+        lanesDoctorReport({ capacityByProvider: { codex: { slots: 0, running: 0 } } })
+      );
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: emptySeatsDir, nowMs: NOW_MS }),
+        null
+      );
+    } finally {
+      rmSync(staleDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the lanes doctor report as the primary orchestrator capacity source', () => {
+    assert.match(
+      ORCHESTRATOR,
+      /backlogRemediation\.readLanesCapacity\(\)/
+    );
+    assert.match(MODULE, /source: 'lanes-doctor-report'/);
   });
 });
