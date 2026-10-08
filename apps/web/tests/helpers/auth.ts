@@ -224,12 +224,24 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   const chatComposer = page
     .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
     .first();
+  // The `creator` persona keeps onboarding incomplete by design, so the
+  // post-bypass landing can be the /start onboarding chat instead of the
+  // /app dashboard shell. That surface renders inside AppShellFrame but its
+  // section is not a <main>, and since OnboardingSessionBoundary (JOV-7689)
+  // it also renders no composer textarea while a conversation restore is in
+  // flight (a failed restore leaves only a Try Again alert). Treat the
+  // onboarding chat shell as shell-ready: the session is live and the specs
+  // navigate to their own routes from here.
+  const onboardingShell = page
+    .locator("[data-testid='onboarding-chat']")
+    .first();
 
   await expect
     .poll(
       async () =>
         (await main.isVisible().catch(() => false)) ||
-        (await chatComposer.isVisible().catch(() => false)),
+        (await chatComposer.isVisible().catch(() => false)) ||
+        (await onboardingShell.isVisible().catch(() => false)),
       { timeout: 30_000, intervals: [2_000, 5_000, 10_000] }
     )
     .toBe(true);
