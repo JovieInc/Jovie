@@ -768,25 +768,34 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
 # ---------------------------------------------------------------- lane side (runs on Gem)
 
 def queued_prs(lane, kinds) -> list[dict]:
-    """Open PRs carrying any of these queue labels: one search, never a scan."""
-    search = "label:" + ",".join(PREFIX + kind for kind in kinds)
+    """Select event labels from the shared inventory; claims still reread their target."""
+    summary = getattr(lane, "open_prs_summary", None)
+    if callable(summary):
+        # FIX and TICK workers already share this aggregate inventory with admission.
+        # Full per-check censuses under distinct queue keys exhaust the same GitHub
+        # installation budget. Actual claim and publication fences remain fresh.
+        prs = summary()
+        if any(pr.get("labelsComplete") is not True for pr in prs or []):
+            raise RuntimeError("event-label-inventory-incomplete")
+    else:
+        # Older callers without the maintained aggregate reader retain their adapter.
+        search = "label:" + ",".join(PREFIX + kind for kind in kinds)
 
-    def fetch():
-        listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
-                          "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
-        return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
-    # Per-check rollups over 100 PRs are the costliest GraphQL read the lanes make, and every
-    # worker pass asked for them; one read per minute per host serves them all. This is part
-    # of the claim scan, so it shares that TTL with lane issues, in-flight, and fix candidates.
-    shared = getattr(lane, "shared", None)
-    ttl = getattr(lane, "CLAIM_SCAN_TTL_S", 60)
-    prs = shared("queued-" + "-".join(sorted(kinds)), ttl, fetch) if shared else fetch()
-    if prs is None:
-        return []
-    for pr in prs:
-        pr["eventKinds"] = [name[len(PREFIX):] for name in label_names(pr)
-                            if name.startswith(PREFIX) and name[len(PREFIX):] in kinds]
-    return prs
+        def fetch():
+            listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
+                              "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
+            return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
+        shared = getattr(lane, "shared", None)
+        ttl = getattr(lane, "CLAIM_SCAN_TTL_S", 60)
+        prs = shared("queued-" + "-".join(sorted(kinds)), ttl, fetch) if shared else fetch()
+    selected = []
+    for pr in prs or []:
+        event_kinds = [name[len(PREFIX):] for name in label_names(pr)
+                       if name.startswith(PREFIX) and name[len(PREFIX):] in kinds]
+        if event_kinds:
+            # A FIX projection must not overwrite TICK event kinds on shared rows.
+            selected.append({**pr, "eventKinds": event_kinds})
+    return selected
 
 
 def consume(lane, pr: dict, kinds=None, *, timeout: float | None = None) -> None:
@@ -1377,7 +1386,7 @@ OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repositor
 pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
 baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
 isCrossRepository createdAt updatedAt
-labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
+labels(first:100){totalCount nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
@@ -1403,7 +1412,9 @@ def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
         for node in page["nodes"]:
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
-            node["labels"] = node.get("labels", {}).get("nodes", [])
+            labels = node.get("labels") or {}
+            node["labels"] = labels.get("nodes") or []
+            node["labelsComplete"] = isinstance(labels.get("totalCount"), int) and labels["totalCount"] == len(node["labels"])
             files = node.pop("files", {}) or {}
             node["files"] = files.get("nodes") or []
             total = files.get("totalCount")
@@ -1425,7 +1436,7 @@ def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
                 report["complete"] = True
             return prs
         cursor = page["pageInfo"]["endCursor"]
-    return prs
+    return prs if report is not None else None
 
 
 def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_attempts: int, now: float,

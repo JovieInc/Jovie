@@ -493,8 +493,11 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     now = utcnow()
     local, linear, github, system = model["local"], model["linear"], model["github"], model["system"]
     lines: list[str] = []
+    open_error = github.get("errors", {}).get("open")
+    open_known = not open_error and isinstance(github.get("open"), list)
+    open_prs = github["open"] if open_known else []
     titles = {}
-    for pr in github.get("open", []):
+    for pr in open_prs:
         titles[f"PR{pr['number']}"] = pr["title"]
     titles.update(linear.get("active", {}))
 
@@ -608,12 +611,13 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             lines.append(pad("  " + part, width))
 
     # pipeline
-    open_prs = github.get("open", [])
     queue = github.get("queue", {})
     queued = {e["number"]: e for e in queue.get("entries", [])}
-    head = f"PIPELINE · open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · ready {sum(1 for p in open_prs if not p['draft'])} · merge queue {queue.get('depth', rgb(RED, github.get('errors', {}).get('queue', 'unread')))}"
-    if "open" in github.get("errors", {}):
-        head += " · " + rgb(RED, "PR list: " + github["errors"]["open"])
+    counts = (f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · ready {sum(1 for p in open_prs if not p['draft'])}"
+              if open_known else "open lane PRs unknown · draft unknown · ready unknown")
+    head = f"PIPELINE · {counts} · merge queue {queue.get('depth', rgb(RED, github.get('errors', {}).get('queue', 'unread')))}"
+    if not open_known:
+        head += " · " + rgb(RED, "PR list: " + (open_error or "not-read-yet"))
     lines.append(rgb(FG, head, bold=True))
     pipeline_budget = max(4, height - len(lines) - 15)
     merge_colors = {"CLEAN": GREEN, "UNSTABLE": ORANGE, "BLOCKED": ORANGE, "DIRTY": RED, "BEHIND": DIM, "HAS_HOOKS": DIM, "UNKNOWN": DIM}

@@ -81,6 +81,39 @@ def model(**overrides) -> dict:
 
 
 class MergeEvidenceTest(unittest.TestCase):
+    def test_unread_open_inventory_is_unknown_not_zero(self):
+        sample = model()
+        sample["github"].pop("open")
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+        self.assertIn("PR list: not-read-yet", text)
+        self.assertNotIn("open lane PRs 0", text)
+
+    def test_failed_inventory_suppresses_partial_or_stale_rows(self):
+        sample = model()
+        sample["github"]["errors"]["open"] = "github-budget-floor: 529 (< 600) until reset"
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+        self.assertIn("github-budget-floor: 529 (< 600) until reset", text)
+        self.assertNotIn("#18724", text)
+        self.assertNotIn("#18712", text)
+
+    def test_non_list_inventory_renders_unknown_without_iterating_titles(self):
+        for inventory in (None, {"partial": "unread"}):
+            with self.subTest(inventory=inventory):
+                sample = model()
+                sample["github"]["open"] = inventory
+                text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+                self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+                self.assertNotIn("open lane PRs 0", text)
+
+    def test_complete_empty_open_inventory_keeps_true_zero(self):
+        sample = model()
+        sample["github"]["open"] = []
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("open lane PRs 0 · draft 0 · ready 0", text)
+        self.assertNotIn("PR list: not-read-yet", text)
+
     def test_initial_remote_state_does_not_claim_zero_merges(self):
         sample = model(github=hud.Remote(None).github)
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
