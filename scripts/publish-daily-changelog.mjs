@@ -87,13 +87,16 @@ const observedAt = new Date().toISOString();
 const maxBindingAttempts = 6;
 /** @type {null | { status: string, [key: string]: unknown }} */
 let binding = null;
+/** @type {null | { environment?: unknown, commitSha?: unknown, deploymentId?: unknown, [key: string]: unknown }} */
 let buildInfo = null;
 /** @type {null | Error} */
 let lastBindingError = null;
 for (let attempt = 1; attempt <= maxBindingAttempts; attempt += 1) {
   const buildResponse = await fetchPage('https://jov.ie/api/health/build-info');
   if (!buildResponse.ok) throw new Error('Public build identity unavailable');
-  buildInfo = await buildResponse.json();
+  buildInfo = /** @type {NonNullable<typeof buildInfo>} */ (
+    await buildResponse.json()
+  );
   try {
     const candidate = checkPublicationBinding(marker, buildInfo, controller);
     if (candidate.status !== 'deferred') {
