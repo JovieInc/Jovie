@@ -633,7 +633,6 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     const status = within(spotifyRow as HTMLElement)
       .getAllByText('Limit Reached')[0]
       ?.closest('[tabindex="0"]');
-    expect(status).toHaveAttribute('tabindex', '0');
     fireEvent.focus(status as HTMLElement);
     expect(
       await screen.findByText(
@@ -970,6 +969,43 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
+  });
+
+  it('keeps outage diagnostics available by keyboard without repeating them across the inspector', async () => {
+    const user = userEvent.setup();
+    const instagram = data.rows.find(row => row.id === 'instagram');
+    if (!instagram) throw new Error('Missing profile fixture');
+    renderWorkspace({ ...data, providerAvailable: false, rows: [instagram] });
+    for (const status of screen.getAllByLabelText(
+      'Monitoring Unknown: Search Unavailable'
+    ))
+      expect(status).toHaveTextContent('Unknown');
+    fireEvent.click(screen.getByRole('row', { name: /Instagram/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    expect(screen.getByTestId('profiles-rail-content')).toHaveClass(
+      'px-3',
+      'py-3'
+    );
+    expect(
+      screen.queryByTestId('profiles-rail-summary')
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute(
+      'href',
+      instagram.url
+    );
+    const details = screen.getByRole('button', { name: 'Monitoring details' });
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/Search Unavailable\./)).not.toBeInTheDocument();
+    details.focus();
+    await user.keyboard('{Enter}');
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/Search Unavailable\./)).toHaveTextContent(
+      'Search checks are unavailable'
+    );
+    expect(
+      within(screen.getByTestId('profiles-monitoring-details')).getByText('—')
+    ).toBeInTheDocument();
   });
 
   it('uses the row action registry to open connection-specific details', async () => {

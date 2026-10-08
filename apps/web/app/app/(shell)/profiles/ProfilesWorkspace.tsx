@@ -545,8 +545,19 @@ function StatusCell({
   row,
   providerAvailable,
 }: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
+  const status = getConnectionStatus(row, providerAvailable);
+  if (status.label !== 'Search Unavailable')
+    return <PresenceStatusBadge status={status} />;
   return (
-    <PresenceStatusBadge status={getConnectionStatus(row, providerAvailable)} />
+    <span role='img' aria-label='Monitoring Unknown: Search Unavailable'>
+      <PresenceStatusBadge
+        status={{
+          ...status,
+          label: 'Unknown',
+          nextAction: `${status.label}. ${status.nextAction}`,
+        }}
+      />
+    </span>
   );
 }
 
@@ -614,6 +625,8 @@ function ConnectionRail({
   contextMenuItems: CommonDropdownItem[];
 }>) {
   const primaryAction = row ? getConnectionPrimaryAction(row) : null;
+  const status = row ? getConnectionStatus(row, data.providerAvailable) : null;
+  const searchUnavailable = status?.label === 'Search Unavailable';
   const rankChange =
     row?.rowType === 'surface'
       ? formatProfileRankChange(row.rank, row.previousRank)
@@ -687,40 +700,49 @@ function ConnectionRail({
       }
     >
       {row ? (
-        <div className='space-y-2'>
-          <DrawerAnalyticsSummaryCard
-            state='ready'
-            metrics={[
-              {
-                id: 'status',
-                label: 'Status',
-                value: getConnectionStatus(row, data?.providerAvailable).label,
-                hint: MONITORING_LABELS[row.monitoringState],
-              },
-              {
-                id: 'rank',
-                label: 'Search Rank',
-                value:
-                  row.rowType === 'surface' && row.monitoringState !== 'locked'
-                    ? String(row.rank ?? '—')
-                    : '—',
-                hint: rankChange === '—' ? 'No change yet' : rankChange,
-              },
-            ]}
-            footer={null}
-            stableLayout
-            reserveFooterSlot={false}
-            testId='profiles-rail-summary'
-          />
-          <DrawerSection title='Profile / Page' sectionKind='facts'>
-            <div className='space-y-2'>
-              <RailMetric label='Type' value={kindLabel(row)} />
-              <RailMetric
-                label='Monitoring'
-                value={MONITORING_LABELS[row.monitoringState]}
-              />
-            </div>
-          </DrawerSection>
+        <div
+          className='space-y-3 px-3 py-3'
+          data-testid='profiles-rail-content'
+        >
+          {!searchUnavailable ? (
+            <DrawerAnalyticsSummaryCard
+              state='ready'
+              metrics={[
+                {
+                  id: 'status',
+                  label: 'Status',
+                  value: getConnectionStatus(row, data?.providerAvailable)
+                    .label,
+                  hint: MONITORING_LABELS[row.monitoringState],
+                },
+                {
+                  id: 'rank',
+                  label: 'Search Rank',
+                  value:
+                    row.rowType === 'surface' &&
+                    row.monitoringState !== 'locked'
+                      ? String(row.rank ?? '—')
+                      : '—',
+                  hint: rankChange === '—' ? 'No change yet' : rankChange,
+                },
+              ]}
+              footer={null}
+              stableLayout
+              reserveFooterSlot={false}
+              testId='profiles-rail-summary'
+            />
+          ) : null}
+          {!searchUnavailable ? (
+            <DrawerSection title='Profile / Page' sectionKind='facts'>
+              <div className='space-y-2'>
+                <RailMetric label='Type' value={kindLabel(row)} />
+                <RailMetric
+                  label='Monitoring'
+                  value={MONITORING_LABELS[row.monitoringState]}
+                />
+              </div>
+            </DrawerSection>
+          ) : null}
           {row.rowType === 'surface' && row.kind !== 'jovie' ? (
             <DrawerSection title='Source Identity' sectionKind='facts'>
               <p className='text-xs text-secondary-token'>
@@ -751,10 +773,12 @@ function ConnectionRail({
               ) : null}
             </DrawerSection>
           ) : null}
-          <PresenceSignalSection
-            row={row}
-            providerAvailable={data.providerAvailable}
-          />
+          {!searchUnavailable ? (
+            <PresenceSignalSection
+              row={row}
+              providerAvailable={data.providerAvailable}
+            />
+          ) : null}
           {row.rowType === 'surface' &&
           (row.qualificationStatus === 'suggested' ||
             row.qualificationStatus === 'conflicting') ? (
@@ -809,6 +833,26 @@ function ConnectionRail({
               ) : null}
             </div>
           </DrawerSection>
+          {searchUnavailable && status ? (
+            <DrawerSection
+              title='Monitoring details'
+              sectionKind='status'
+              defaultOpen={false}
+              lazyMount
+              testId='profiles-monitoring-details'
+            >
+              <div className='space-y-2 text-xs text-secondary-token'>
+                <p>
+                  {status.label}. {status.nextAction}
+                </p>
+                <RailMetric
+                  label='Monitoring'
+                  value={MONITORING_LABELS[row.monitoringState]}
+                />
+                <RailMetric label='Search Rank' value='—' />
+              </div>
+            </DrawerSection>
+          ) : null}
         </div>
       ) : null}
     </EntitySidebarShell>
