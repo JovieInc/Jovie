@@ -224,25 +224,36 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   const chatComposer = page
     .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
     .first();
+  const isShellReady = async () =>
+    (await main.isVisible().catch(() => false)) ||
+    (await chatComposer.isVisible().catch(() => false));
+
   // The `creator` persona keeps onboarding incomplete by design, so the
-  // post-bypass landing can be the /start onboarding chat instead of the
-  // /app dashboard shell. That surface renders inside AppShellFrame but its
-  // section is not a <main>, and since OnboardingSessionBoundary (JOV-7689)
-  // it also renders no composer textarea while a conversation restore is in
-  // flight (a failed restore leaves only a Try Again alert). Treat the
-  // onboarding chat shell as shell-ready: the session is live and the specs
-  // navigate to their own routes from here.
-  const onboardingShell = page
-    .locator("[data-testid='onboarding-chat']")
-    .first();
+  // post-bypass landing can be /start instead of /app. There, the
+  // OnboardingSessionBoundary (JOV-7689) mounts the shell only after a
+  // client-side conversation restore resolves; a failed restore leaves a
+  // static Try Again state with no <main>/composer — a reload is the same
+  // recovery the surface itself offers. Retry the navigation once mid-poll:
+  // /app states always render <main> (shell skeleton included), so the
+  // reload can only fire on a stuck /start boundary.
+  const reloaded = { value: false };
 
   await expect
     .poll(
-      async () =>
-        (await main.isVisible().catch(() => false)) ||
-        (await chatComposer.isVisible().catch(() => false)) ||
-        (await onboardingShell.isVisible().catch(() => false)),
-      { timeout: 30_000, intervals: [2_000, 5_000, 10_000] }
+      async () => {
+        if (await isShellReady()) return true;
+        if (!reloaded.value) {
+          const url = new URL(page.url());
+          if (url.pathname.startsWith('/start')) {
+            reloaded.value = true;
+            await page
+              .reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
+              .catch(() => undefined);
+          }
+        }
+        return false;
+      },
+      { timeout: 90_000, intervals: [2_000, 5_000, 10_000] }
     )
     .toBe(true);
 }
