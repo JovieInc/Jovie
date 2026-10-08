@@ -26,25 +26,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-web:
+    name: Build standalone E2E server
+    # A filtered manual diagnostic retains the existing managed dev server.
+    if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+    environment: Preview – jovie
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build production-mode standalone server
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Package standalone server and static assets
+        run: |
+          test -f apps/web/.next/standalone/apps/web/server.js
+          tar -czf "$RUNNER_TEMP/e2e-web-server.tgz" -C apps/web .next/standalone .next/static public
+
+      - name: Upload standalone build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-web-server-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/e2e-web-server.tgz
+          if-no-files-found: error
+          retention-days: 1
+
   e2e-full-matrix:
     name: E2E (Chrome + Firefox)
+    needs: [build-web]
+    if: >-
+      always() && (needs.build-web.result == 'success' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != ''))
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       E2E_FULL_MATRIX: '1'
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
-      # The hosted runner lost communication running the full suite at the
-      # default 4 workers: browser workers plus the managed dev server starve
-      # it for CPU/memory. Cap at 2; browsers already serialize via
-      # max-parallel: 1.
+      # Two workers per shard avoid exhausting a hosted runner.
       PLAYWRIGHT_WORKERS: '2'
     strategy:
       fail-fast: false
-      # Preserve both browsers without occupying two self-hosted runners at once.
-      max-parallel: 1
+      # Each hosted job has its own isolated database and production-mode server.
+      max-parallel: 8
       matrix:
         browser: [chromium, firefox]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,22 +97,109 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Create ephemeral Neon database branch
+        if: ${{ matrix.shard == 1 || github.event_name == 'push' || github.event.inputs.test_filter == '' }}
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
+          branch_name: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != '' && format('e2e-full-{0}-{1}', github.run_id, matrix.browser)) || format('e2e-full-{0}-{1}-shard{2}', github.run_id, matrix.browser, matrix.shard) }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
           expires_in_hours: '3'
 
       - name: Run database migrations
+        if: ${{ matrix.shard == 1 || github.event_name == 'push' || github.event.inputs.test_filter == '' }}
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
           GIT_BRANCH: e2e-weekly
           ALLOW_PROD_MIGRATIONS: 'true'
+
+
+      - name: Download standalone E2E server
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-web-server-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}
+
+      - name: Extract standalone E2E server
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        run: |
+          tar -xzf "$RUNNER_TEMP/e2e-web-server.tgz" -C apps/web
+          test -f apps/web/.next/standalone/apps/web/server.js
+
+      - name: Seed full-matrix QA data
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        run: |
+          cd apps/web
+          pnpm run seed:test-data
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+
+      - name: Start standalone E2E server
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        run: |
+          cd apps/web
+          rm -rf .next/standalone/apps/web/.next/static .next/standalone/apps/web/public
+          mkdir -p .next/standalone/apps/web/.next
+          cp -r .next/static .next/standalone/apps/web/.next/static
+          cp -r public .next/standalone/apps/web/public
+          PORT=3100 HOSTNAME=localhost node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/e2e-full-web.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/e2e-full-web.pid"
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session >/dev/null; then
+              for persona in creator creator-ready; do
+                ready=0
+                for attempt in 1 2 3; do
+                  if curl -fsS -X POST http://127.0.0.1:3100/api/dev/test-auth/session -H 'content-type: application/json' --data "{\"persona\":\"$persona\"}" >/dev/null; then
+                    ready=1
+                    break
+                  fi
+                  sleep 5
+                done
+                if [ "$ready" != 1 ]; then
+                  echo "::error::Failed to prepare $persona bypass persona"
+                  cat "$RUNNER_TEMP/e2e-full-web.log"
+                  exit 1
+                fi
+              done
+              echo "Standalone E2E server and personas ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Standalone E2E server failed to start"
+          cat "$RUNNER_TEMP/e2e-full-web.log"
+          exit 1
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          VERCEL_ENV: development
+          HOSTNAME: localhost
+          PORT: '3100'
+          BASE_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_FAST_ONBOARDING: '1'
+          E2E_TEST_AUTH_PERSONA: creator
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_DISABLE_TOOLBAR: '1'
+          E2E_ALLOW_DEV_CSP: '1'
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Setup Playwright (Chromium)
         if: matrix.browser == 'chromium'
@@ -89,6 +219,7 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps
 
       - name: Run E2E tests (${{ matrix.browser }})
+        if: ${{ matrix.shard == 1 || github.event_name == 'push' || github.event.inputs.test_filter == '' }}
         id: e2e-matrix
         run: |
           cd apps/web
@@ -97,9 +228,11 @@ jobs:
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line 2>&1 | tee "$log"
           else
             # The nightly-tagged chaos lane remains owned by nightly-tests.yml.
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line 2>&1 | tee "$log"
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --reporter=line 2>&1 | tee "$log"
           fi
         env:
+          BASE_URL: ${{ (github.event_name == 'push' || github.event.inputs.test_filter == '') && 'http://127.0.0.1:3100' || '' }}
+          E2E_SKIP_WEB_SERVER: ${{ (github.event_name == 'push' || github.event.inputs.test_filter == '') && '1' || '0' }}
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           PROFILE_CTA_TEST_FILTER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter || '' }}
           PROFILE_CTA_NEON_BRANCH_ID: ${{ steps.neon-branch.outputs.branch_id }}
@@ -142,14 +275,14 @@ jobs:
         if: ${{ always() && (failure() || (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts')) && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
+          name: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != '' && format('e2e-full-{0}-results-{1}', matrix.browser, github.run_id)) || format('e2e-full-{0}-shard{1}-results-{2}', matrix.browser, matrix.shard, github.run_id) }}
           path: apps/web/test-results/
           retention-days: 7
           allow-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           public-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
 
       - name: Cleanup Clerk E2E test users
-        if: always()
+        if: ${{ always() && steps.neon-branch.outcome == 'success' }}
         continue-on-error: true
         run: |
           cd apps/web
@@ -163,12 +296,12 @@ jobs:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
 
       - name: Cleanup Neon branch
-        if: always()
+        if: ${{ always() && steps.neon-branch.outcome == 'success' }}
         continue-on-error: true
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          BRANCH_NAME: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
+          BRANCH_NAME: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != '' && format('e2e-full-{0}-{1}', github.run_id, matrix.browser)) || format('e2e-full-{0}-{1}-shard{2}', github.run_id, matrix.browser, matrix.shard) }}
         run: |
           if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
             echo "Neon credentials missing; skipping branch cleanup."
@@ -181,12 +314,12 @@ jobs:
 
   notify:
     name: Notify Results
-    needs: [e2e-full-matrix]
+    needs: [build-web, e2e-full-matrix]
     if: ${{ always() && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
       - name: Slack notification on failure
-        if: ${{ needs.e2e-full-matrix.result == 'failure' }}
+        if: ${{ needs.build-web.result == 'failure' || needs.e2e-full-matrix.result == 'failure' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -210,7 +343,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notification on success
-        if: ${{ needs.e2e-full-matrix.result == 'success' }}
+        if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom

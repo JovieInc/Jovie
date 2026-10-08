@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
@@ -274,6 +275,25 @@ test('catch-up is bounded and reports deferred work rather than dropping it', as
       },
     }),
     /inventory-unavailable/
+  );
+});
+
+test('the sweep CLI names failing and blocked rows instead of an anonymous exit', async () => {
+  // The workflow step consumes the module's CLI (--sweep); the exit rule is
+  // unchanged (failed > 0 || blocked > 0), but each failing or blocked row
+  // is annotated with its issue identifier so a red step names its rows.
+  const source = readFileSync(
+    new URL('../triage-event-assess.mjs', import.meta.url),
+    'utf8'
+  );
+  assert.match(
+    source,
+    /receipt\.failed > 0 \|\| receipt\.blocked > 0\) process\.exitCode = 1/
+  );
+  assert.match(source, /::error title=Triage assessment failed::/);
+  assert.match(
+    source,
+    /::warning title=Urgent Triage investigation required::/
   );
 });
 

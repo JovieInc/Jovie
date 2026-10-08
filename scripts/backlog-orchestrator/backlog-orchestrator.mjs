@@ -1351,10 +1351,24 @@ async function runRemediate(isDryRun) {
   const fleetGate = await fleetGateForTeam(team);
   const rawReceipt = loadFleetGateReceipt(team);
   const queue = rawReceipt?.signals?.queue;
-  const workers = await readOfficialSymphonyWorkers(
-    fleetGate.concurrency?.gem?.maxConcurrent
-  );
-  const provider = readCodexRotateCapacity();
+  // JOV-8000: the Elixir :4041 state API is retired. The shipping lanes'
+  // doctor report is the measured capacity source; the legacy read survives
+  // only as a fallback so a future controller can re-own the signal.
+  const lanes = backlogRemediation.readLanesCapacity();
+  const rotateProvider = () => {
+    const rotate = readCodexRotateCapacity();
+    return rotate ? { accounts: rotate.accounts, ready: rotate.ready } : null;
+  };
+  const workers = lanes
+    ? lanes.workers
+    : await readOfficialSymphonyWorkers(
+        fleetGate.concurrency?.gem?.maxConcurrent
+      );
+  // The lanes doctor owns worker seats, but its codex attribution can be
+  // unknown (status-probe error) while the report itself is fresh — the same
+  // codex-rotate account evidence backs the provider signal in that case,
+  // so one stale sub-signal cannot blank the whole capacity receipt.
+  const provider = (lanes && lanes.provider) || rotateProvider();
   const previous = loadCache().backlogRemediation || {};
   const receipt = backlogRemediation.buildRemediationReceipt({
     issues,
@@ -1412,13 +1426,13 @@ async function runRemediate(isDryRun) {
       receipt,
     });
     if (receipt.cohort.selected.length > 0) {
+      // JOV-8000: the lanes pick up admitted work on their own event-driven
+      // tick — there is no HTTP refresh endpoint to POST anymore. Passing no
+      // URL records an event-driven feed receipt instead of failing remediate
+      // on a dead connection.
       result.feed = {
         ...receipt.feed,
-        refresh: await backlogRemediation.feedOfficialSymphony({
-          url:
-            TEAM_FILE_CONFIG.remediation?.symphonyRefreshUrl ||
-            backlogRemediation.OFFICIAL_SYMPHONY_REFRESH_URL,
-        }),
+        refresh: await backlogRemediation.feedOfficialSymphony({ url: null }),
       };
     }
     const clean = receipt.capacity.allowed === true;
