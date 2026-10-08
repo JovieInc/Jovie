@@ -30,28 +30,41 @@ const PINNED_DEFAULT = `const hostname = process.env.HOSTNAME &&
   : '127.0.0.1'`;
 
 /**
- * Pure transform so the changed-line coverage ratchet can select this
- * script's unit test through a real module import.
+ * Pure transform: rewrite the generated default, or classify why not.
  *
  * @param {string} source the generated standalone server.js contents
  * @returns {{ content: string, action: 'pinned' | 'already-pinned' | 'unknown-template' }}
  */
 export function pinStandaloneLoopbackHostname(source) {
-  if (source.includes(PINNED_DEFAULT))
+  if (source.includes(PINNED_DEFAULT)) {
     return { content: source, action: 'already-pinned' };
-  if (!source.includes(GENERATED_DEFAULT))
+  }
+  if (!source.includes(GENERATED_DEFAULT)) {
     return { content: source, action: 'unknown-template' };
+  }
   return {
     content: source.replace(GENERATED_DEFAULT, PINNED_DEFAULT),
     action: 'pinned',
   };
 }
 
-function main() {
-  const appRoot = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '..'
-  );
+/**
+ * One postbuild execution over the app's standalone output. All fs/log
+ * dependencies are injectable so the unit test exercises this in-process
+ * (the changed-line coverage ratchet only sees Vitest-worker execution).
+ *
+ * @param {{
+ *   appRoot?: string,
+ *   log?: (message: string) => void,
+ * }} [options]
+ * @returns {{ action: 'pinned' | 'already-pinned' | 'no-standalone' | 'unknown-template', message: string }}
+ * @throws when the generated template no longer matches (next version drift)
+ */
+export function runLoopbackPin(options = {}) {
+  const log = options.log ?? (message => console.log(message));
+  const appRoot =
+    options.appRoot ??
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const standaloneServerPath = path.join(
     appRoot,
     '.next',
@@ -60,14 +73,12 @@ function main() {
     'web',
     'server.js'
   );
-
   if (!existsSync(standaloneServerPath)) {
-    console.log(
-      'No standalone server.js found; skipping loopback hostname pin (non-standalone or preview build).'
-    );
-    process.exit(0);
+    const message =
+      'No standalone server.js found; skipping loopback hostname pin (non-standalone or preview build).';
+    log(message);
+    return { action: 'no-standalone', message };
   }
-
   const { content, action } = pinStandaloneLoopbackHostname(
     readFileSync(standaloneServerPath, 'utf8')
   );
@@ -77,11 +88,16 @@ function main() {
     );
   }
   if (action === 'pinned') writeFileSync(standaloneServerPath, content);
-  console.log(
+  const message =
     action === 'already-pinned'
       ? 'Standalone server.js already pins the loopback hostname.'
-      : 'Pinned standalone server.js loopback hostname to 127.0.0.1 (HOSTNAME=localhost resolves ::1 first on some runners; JOV-8015).'
-  );
+      : 'Pinned standalone server.js loopback hostname to 127.0.0.1 (HOSTNAME=localhost resolves ::1 first on some runners; JOV-8015).';
+  log(message);
+  return { action, message };
+}
+
+function main() {
+  runLoopbackPin();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();
