@@ -382,6 +382,7 @@ const MARKETING_PREFIXES = [
 
 export function classifySurface(pathname: string): SeoPageSurface {
   if (pathname === '/' || pathname === '') return 'home';
+  if (pathname === '/integrations') return 'marketing';
   if (pathname.startsWith('/blog')) return 'blog';
   if (pathname.startsWith('/support') || pathname.startsWith('/docs'))
     return 'docs';

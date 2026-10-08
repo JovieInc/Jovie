@@ -154,11 +154,6 @@ export function ConnectorsClient({
             try connecting again.
           </p>
         )}
-        <p className='py-3 text-xs text-tertiary'>
-          Connections with an identity apply to that identity. Account
-          connections apply to your signed-in account. Actions still require
-          their own approval.
-        </p>
         <p className='pb-3 text-xs text-tertiary'>
           Gmail and Calendar share a Google connection. Disconnecting either
           removes both.

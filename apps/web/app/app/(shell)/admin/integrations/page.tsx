@@ -3,8 +3,6 @@ import { SettingsIntegrationsPage } from '../../settings/connectors/SettingsInte
 import SettingsLayout from '../../settings/layout';
 
 export const runtime = 'nodejs';
-
-/** Thin operator entry; identity, loader, OAuth and UI remain canonical. */
 export default async function OperatorIntegrationsPage() {
   await requireCurrentAdminPageAccess();
   return (
