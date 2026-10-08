@@ -1,0 +1,3 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T010427Z-JOV-6178-codex-brief-165309/.design-brief.md).
+
+Triage: implement as one bounded story/test-only sibling PR; do not close or split. Sections 1–8 validate successfully. Pen and ImageGen remain empty as required. No build, commit, push, or PR was performed.
