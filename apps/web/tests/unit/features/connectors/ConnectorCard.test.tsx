@@ -118,6 +118,7 @@ describe('ConnectorCard', () => {
   });
 
   it('keeps unknown connection state unusable and pending actions visible', () => {
+    const onDisconnect = vi.fn();
     const { rerender, container } = render(
       <ConnectorCard
         provider='spotify'
@@ -137,15 +138,86 @@ describe('ConnectorCard', () => {
         status='connected'
         pending
         pendingAction='disconnect'
-        onDisconnect={vi.fn()}
+        onDisconnect={onDisconnect}
       />
     );
     expect(
       screen.getByRole('button', { name: 'Disconnect Spotify' })
-    ).toBeDisabled();
+    ).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect Spotify' }));
+    expect(onDisconnect).not.toHaveBeenCalled();
     expect(screen.getByText('Disconnecting…')).toBeInTheDocument();
     expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true');
   });
+
+  it.each(['connected', 'needs_reauth'] as const)(
+    'keeps all pending %s actions focusable without activating them',
+    status => {
+      const onConnect = vi.fn();
+      const onDisconnect = vi.fn();
+      render(
+        <ConnectorCard
+          provider='youtube'
+          status={status}
+          accountLabel='Demo channel'
+          scopes={[]}
+          pending
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+        />
+      );
+      for (const button of screen.getAllByRole('button')) {
+        button.focus();
+        expect(button).toHaveFocus();
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        fireEvent.click(button);
+      }
+      expect(onConnect).not.toHaveBeenCalled();
+      expect(onDisconnect).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    {
+      status: 'unavailable',
+      available: true,
+      hasHandler: true,
+      blocked: false,
+    },
+    {
+      status: 'not_connected',
+      available: false,
+      hasHandler: true,
+      blocked: false,
+    },
+    {
+      status: 'not_connected',
+      available: true,
+      hasHandler: false,
+      blocked: false,
+    },
+    { status: 'connected', available: true, hasHandler: true, blocked: true },
+  ] as const)(
+    'preserves pending action restrictions for $status (available=$available, callback=$hasHandler, blocked=$blocked)',
+    ({ status, available, hasHandler, blocked }) => {
+      const action = vi.fn();
+      render(
+        <ConnectorCard
+          provider='spotify'
+          status={status}
+          available={available}
+          pending
+          actionDisabled={blocked}
+          onConnect={hasHandler ? action : undefined}
+          onDisconnect={hasHandler ? action : undefined}
+        />
+      );
+      const button = screen.getByRole('button');
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(action).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(STATUS_CASES)(
     'maps $status to its semantic status and $actionLabel action',

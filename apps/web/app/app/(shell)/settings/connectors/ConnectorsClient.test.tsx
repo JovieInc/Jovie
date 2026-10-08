@@ -129,7 +129,7 @@ describe('ConnectorsClient', () => {
     );
     expect(
       youtubeRow().getByRole('button', { name: 'Connect YouTube' })
-    ).toBeDisabled();
+    ).toHaveAttribute('aria-disabled', 'true');
     expect(youtubeRow().getByText('Connecting…')).toBeInTheDocument();
   });
 
@@ -153,11 +153,14 @@ describe('ConnectorsClient', () => {
     });
     button.focus();
     await user.keyboard('{Enter}');
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveFocus();
+    await user.keyboard('{Enter}');
     expect(youtubeRow().getByText('Disconnecting…')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledOnce();
     finish?.({ ok: false });
-    await waitFor(() => expect(button).toBeEnabled());
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled'));
+    expect(button).toHaveFocus();
     expect(
       youtubeRow().getByText('Failed to disconnect. Try again.')
     ).toBeInTheDocument();
@@ -167,6 +170,7 @@ describe('ConnectorsClient', () => {
       expect(success).toHaveBeenCalledWith('YouTube disconnected')
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(button).toHaveFocus();
   });
 
   it.each([true, false])(

@@ -122,7 +122,6 @@ export function ConnectorCard({
   const canAct =
     Boolean(actionHandler) &&
     !actionDisabled &&
-    !pending &&
     (isConnected || (available && status !== 'unavailable'));
   const normalizedError = errorMessage?.trim();
   const detailLine =
@@ -267,8 +266,9 @@ export function ConnectorCard({
           <Button
             variant='secondary'
             size='sm'
-            onClick={onConnect}
-            disabled={pending || actionDisabled || !available}
+            onClick={pending ? undefined : onConnect}
+            disabled={actionDisabled || !available}
+            aria-disabled={pending || undefined}
           >
             Reconnect
           </Button>
@@ -278,8 +278,9 @@ export function ConnectorCard({
             variant='tertiary'
             destructive
             size='sm'
-            onClick={onDisconnect}
-            disabled={pending || actionDisabled}
+            onClick={pending ? undefined : onDisconnect}
+            disabled={actionDisabled}
+            aria-disabled={pending || undefined}
             aria-label={`Disconnect ${definition.label}`}
           >
             Disconnect
@@ -289,8 +290,9 @@ export function ConnectorCard({
           variant={isConnected ? 'tertiary' : 'secondary'}
           destructive={isConnected}
           size='sm'
-          onClick={actionHandler}
+          onClick={canAct && !pending ? actionHandler : undefined}
           disabled={!canAct}
+          aria-disabled={pending || undefined}
           aria-label={`${actionLabel} ${definition.label}`}
           className='w-32'
         >
