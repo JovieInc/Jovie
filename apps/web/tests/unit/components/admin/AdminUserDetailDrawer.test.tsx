@@ -27,34 +27,27 @@ vi.mock('@/components/feedback', async importOriginal => {
   };
 });
 
-vi.mock('@/components/molecules/drawer', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/components/molecules/drawer')>();
-
-  return {
-    ...actual,
-    EntitySidebarShell: ({
-      children,
-      entityHeader,
-      entityHeaderSurface,
-      workspaceSurface,
-    }: {
-      children: ReactNode;
-      entityHeader?: ReactNode;
-      entityHeaderSurface?: string;
-      workspaceSurface?: string;
-    }) => (
-      <div
-        data-entity-header-surface={entityHeaderSurface}
-        data-workspace-surface={workspaceSurface}
-        data-testid='entity-sidebar-shell'
+vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
+  RightDrawer: ({
+    children,
+    isOpen,
+    ariaLabel,
+    onKeyDown,
+  }: {
+    children: ReactNode;
+    isOpen: boolean;
+    ariaLabel: string;
+    onKeyDown?: (event: KeyboardEvent) => void;
+  }) =>
+    isOpen ? (
+      <aside
+        aria-label={ariaLabel}
+        onKeyDown={event => onKeyDown?.(event.nativeEvent)}
       >
-        {entityHeader}
         {children}
-      </div>
-    ),
-  };
-});
+      </aside>
+    ) : null,
+}));
 
 const user: AdminUserRow = {
   id: 'user-1',
@@ -134,12 +127,13 @@ describe('AdminUserDetailDrawer', () => {
       />
     );
 
-    expect(screen.getByTestId('entity-sidebar-shell')).toHaveAttribute(
-      'data-workspace-surface',
-      'raised'
-    );
-    expect(screen.getByTestId('entity-sidebar-shell')).toHaveAttribute(
-      'data-entity-header-surface',
+    expect(
+      screen
+        .getByRole('complementary', { name: 'User details' })
+        .querySelector('[data-right-rail-workspace]')
+    ).toHaveAttribute('data-surface-variant', 'raised');
+    expect(screen.getByTestId('entity-sidebar-entity-header')).toHaveAttribute(
+      'data-surface-variant',
       'flat'
     );
     expect(screen.getByTestId('admin-user-entity-header')).toHaveClass(
@@ -160,5 +154,32 @@ describe('AdminUserDetailDrawer', () => {
     ).toHaveTextContent('1');
     expect(screen.getByText('jov.ie/alex')).toBeInTheDocument();
     expect(screen.getByText('User ID')).toBeInTheDocument();
+  });
+
+  it('closes the composed user rail through Escape and removes stale details after selection clears', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <AdminUserDetailDrawer
+        user={user}
+        onClose={onClose}
+        contextMenuItems={[]}
+      />
+    );
+    fireEvent.keyDown(
+      screen.getByRole('complementary', { name: 'User details' }),
+      { key: 'Escape' }
+    );
+    expect(onClose).toHaveBeenCalledOnce();
+    rerender(
+      <AdminUserDetailDrawer
+        user={null}
+        onClose={onClose}
+        contextMenuItems={[]}
+      />
+    );
+    expect(
+      screen.queryByRole('complementary', { name: 'User details' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('alex@example.com')).not.toBeInTheDocument();
   });
 });
