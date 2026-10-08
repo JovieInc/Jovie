@@ -2940,12 +2940,19 @@ class DispatchTest(unittest.TestCase):
                 patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane.subprocess, "Popen") as spawn:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            lane._save_event_delivery(host, {
+                "schema": lane.EVENT_DELIVERY_SCHEMA,
+                "actions": {"delivery": {"key": "delivery", "kind": "comments", "status": "failed",
+                                         "nextAt": 123, "createdAt": 100}},
+            })
             self.assertEqual(lane.dispatch(host), 0)
             self.assertEqual(spawn.call_count, 1)
             self.assertEqual(spawn.call_args.args[0][-1], "codex")
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual(tick["spawned"], ["codex"])
             self.assertIsNone(tick["error"])
+            self.assertEqual(tick["remediationEvents"]["deliveryFailed"], 1)
+            self.assertEqual(tick["remediationEvents"]["deliveryNextAt"], 123)
             self.assertIn("reasonError", tick)
             self.assertIn("doctorError", tick)
 
@@ -6731,12 +6738,16 @@ class EventDeliveryTest(unittest.TestCase):
         lane.save_escalation(self.host, {'events': self.events})
         self.issue = {'id': 'issue', 'state': {'id': 'done', 'name': 'Done'}, 'labels': {'nodes': []}}
         self.comments, self.writes, self.transport_error, self.false = {}, [], None, False
+        self.missing_comment_error = False
         self.linear = SimpleNamespace(gql=self.gql)
 
     def gql(self, query, variables):
         if query.startswith('query'):
             if 'comment(' in query:
-                return {'comment': self.comments.get(variables['id'])}
+                comment = self.comments.get(variables['id'])
+                if comment is None and self.missing_comment_error:
+                    raise RuntimeError('linear: Entity not found: Comment')
+                return {'comment': comment}
             return {'issue': json.loads(json.dumps(self.issue))}
         self.writes.append((query, variables))
         if self.false:
@@ -6776,6 +6787,14 @@ class EventDeliveryTest(unittest.TestCase):
         self.drain(200)
         self.assertEqual(len(self.writes), 1)
         self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
+
+    def test_linear_missing_comment_error_is_the_absent_preimage_before_send(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        self.missing_comment_error = True
+        report = self.drain()
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        self.assertEqual(report['deliveryFailed'], 0)
+        self.assertEqual(len(self.writes), 1)
 
     def test_timeout_after_remote_acceptance_is_read_back_without_duplicate_send(self):
         self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
