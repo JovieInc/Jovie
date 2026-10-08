@@ -1,0 +1,3 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T005918Z-JOV-5826-codex-brief-109579/.design-brief.md).
+
+It scopes migration to `CatalogTaskBuilderDialog`’s raw search input and canonical `atom.input`. Validation passes with only step 9 incomplete, as required because no Pen/ImageGen artifact was produced. No implementation, commit, push, or PR was performed.
