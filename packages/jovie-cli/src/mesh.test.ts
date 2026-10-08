@@ -217,6 +217,116 @@ describe('jovie mesh', () => {
     });
   });
 
+  it('keeps a response-body deadline retryable with the same correlation id', async () => {
+    const abort = new AbortController();
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(abort.signal);
+    const calls: Call[] = [];
+    const fetchImpl: FetchImplementation = async (input, init) => {
+      calls.push({ url: String(input), init: init ?? {} });
+      if (calls.length > 1)
+        return new Response(JSON.stringify({ ok: true, replay: true }));
+      return new Response(
+        new ReadableStream(
+          {
+            pull(controller) {
+              controller.enqueue(new TextEncoder().encode('{"ok":'));
+              abort.abort(new DOMException('deadline', 'TimeoutError'));
+            },
+          },
+          { highWaterMark: 0 }
+        ),
+        { status: 202 }
+      );
+    };
+    const flags = { 'correlation-id': 'mesh-deadline-0001' };
+    try {
+      await expect(
+        meshSend('ping', flags, { env, fetchImpl })
+      ).rejects.toMatchObject({
+        apiCode: 'TEMPORARILY_UNAVAILABLE',
+        retryable: true,
+        status: 202,
+        responseBody: undefined,
+        message: expect.stringContaining('same --correlation-id'),
+      });
+      expect(timeout).toHaveBeenCalledWith(30_000);
+      expect(calls).toHaveLength(1);
+      timeout.mockRestore();
+      expect(await meshSend('ping', flags, { env, fetchImpl })).toMatchObject({
+        correlationId: flags['correlation-id'],
+        replay: true,
+      });
+      const messages = calls.map(call => JSON.parse(String(call.init.body)));
+      expect(messages[1].correlationId).toBe(messages[0].correlationId);
+      expect(messages[1].sha256).toBe(messages[0].sha256);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
+  it('exposes body deadline recovery through CLI JSON without claiming storage', async () => {
+    const abort = new AbortController();
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(abort.signal);
+    const fetchImpl: FetchImplementation = async () =>
+      new Response(
+        new ReadableStream({ pull: () => abort.abort() }, { highWaterMark: 0 }),
+        { status: 202 }
+      );
+    const out = sink();
+    try {
+      expect(
+        await runCli(
+          [
+            'mesh',
+            'send',
+            'ping',
+            '--correlation-id',
+            'mesh-cli-deadline-0001',
+            '--json',
+          ],
+          { stdout: out.output, mesh: { env, fetchImpl } }
+        )
+      ).toBe(1);
+      const result = JSON.parse(out.text());
+      expect(result.error).toMatchObject({
+        code: 'REQUEST_FAILED',
+        apiCode: 'TEMPORARILY_UNAVAILABLE',
+        retryable: true,
+        status: 202,
+      });
+      expect(result).not.toHaveProperty('stored');
+      expect(result.error).not.toHaveProperty('responseBody');
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
+  it('does not retry malformed or oversized response bodies or a disabled inbox', async () => {
+    for (const api of [
+      server(202, 'not json'),
+      server(202, 'x'.repeat(1_048_577)),
+    ]) {
+      await expect(
+        meshSend('ping', {}, { env, fetchImpl: api.fetchImpl })
+      ).rejects.toMatchObject({
+        message: 'Invalid mesh response.',
+        retryable: undefined,
+        responseBody: undefined,
+      });
+    }
+    const disabled = server(503, { ok: false, code: 'mesh_inbox_disabled' });
+    await expect(
+      meshSend('ping', {}, { env, fetchImpl: disabled.fetchImpl })
+    ).rejects.toMatchObject({
+      apiCode: 'mesh_inbox_disabled',
+      retryable: false,
+    });
+  });
+
   it('reads the caller mailbox for a day and keeps bodies quoted', async () => {
     const api = server(200, {
       ok: true,
