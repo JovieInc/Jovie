@@ -1,0 +1,24 @@
+Draft PR opened: [#21010](https://github.com/JovieInc/Jovie/pull/21010)  
+Commit: `e74bde640d fix(lanes): acknowledge new remediation comments`
+
+Changed:
+
+- Handle Linear’s missing-comment response as an absent preimage, allowing remediation comments to send and acknowledge.
+- Preserve journal-derived delivery metrics when reconciliation fails.
+- Prevent doctor from falsely reporting unknown acknowledgement/retry state.
+- Added regression coverage for both cases.
+
+Verified:
+
+- Lane delivery tests: 41 passed.
+- Doctor tests: 90 passed.
+- Focused unittest selection: 19 passed.
+- Python compilation, diff checks, commit hooks, secret scans, and pre-push policy passed.
+- Biome completed but checked 0 files because these are Python files.
+
+Concerns/deviations:
+
+- Broader isolated suite: 482 passed, 6 unrelated release-bundle fixture failures, tracked as JOV-8036.
+- GBrain was unavailable as noted in the issue context.
+- GitHub’s budget guard blocked an optional PR read-back; `gh pr create --draft` succeeded and returned #21010.
+- No additional worktrees were created.
