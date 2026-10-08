@@ -1161,23 +1161,28 @@ describe('entrypoint contract', () => {
     );
   });
 
-  it('collects the pullRequests capacity evidence with one bounded retry and fails closed with the cause named', async () => {
+  it('collects the pullRequests capacity evidence paginated with a 504 retry and fails closed with the cause named', async () => {
     // The PR inventory is the pullRequests capacity evidence (JOV-8000
-    // follow-up 5): one gh call per state with the rollup + body fields, the
-    // heaviest query in the remediate lane. It gets one bounded retry per
-    // state on any failure; a double failure keeps the inventory failed
-    // closed (never an empty-array pass) and names the gh cause.
+    // follow-up 7): the live residual failure was a GitHub GraphQL 504 on
+    // the single heavy open-PR query. The inventory drops statusCheckRollup
+    // (the error-rate signal survives via mergeStateStatus UNSTABLE), pages
+    // the open list into two 50-PR queries, retries transient 504/502 with
+    // a short backoff, and fails closed with the exact gh cause named.
     const executableSource = await readFile(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
       'utf8'
     );
     assert.match(executableSource, /timeout: 45_000/);
-    assert.match(executableSource, /for \(let attempt = 0; attempt < 2/);
+    assert.match(executableSource, /HTTP 50\[24\]/);
     assert.match(executableSource, /gh-pr-list-\$\{state\}:/);
+    // The rollup field is gone from the capacity inventory query;
+    // mergeStateStatus carries the error signal.
+    assert.doesNotMatch(executableSource, /statusCheckRollup',/);
+    assert.match(executableSource, /state === 'open' \? \[50, 50\] : \[50\]/);
 
     // Behavioral: a fake gh on PATH drives the exported collector through
-    // the retry (fail once, succeed on the second call) and through the
-    // fail-closed double failure.
+    // the pagination (two open pages + one merged page), a 504 retry, and
+    // the fail-closed non-gateway failure.
     const tempDir = await mkdtemp('/tmp/backlog-gh-');
     const fakeBin = resolve(tempDir, 'bin');
     await mkdir(fakeBin, { recursive: true });
@@ -1193,10 +1198,11 @@ describe('entrypoint contract', () => {
         'if [ "$6" = "open" ]; then',
         '  echo x >> "$OPEN_ATTEMPTS_PATH"',
         '  if [ "$(wc -l < "$OPEN_ATTEMPTS_PATH")" -le 1 ]; then',
+        '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)" >&2',
         '    exit 1',
         '  fi',
         'fi',
-        `printf '%s' '[{"number":1,"title":"fix JOV-1","body":"JOV-1","headRefName":"symphony/JOV-1","state":"OPEN","mergeStateStatus":"CLEAN","url":"https://example/pr/1","mergedAt":null,"isDraft":false,"statusCheckRollup":{"state":"SUCCESS"}}]'`,
+        `printf '%s' '[{"number":1,"title":"fix JOV-1","body":"JOV-1","headRefName":"symphony/JOV-1","state":"OPEN","mergeStateStatus":"CLEAN","url":"https://example/pr/1","mergedAt":null,"isDraft":false}]'`,
       ].join('\n')
     );
     await chmod(fakeGh, 0o755);
@@ -1205,8 +1211,9 @@ describe('entrypoint contract', () => {
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
 
-    // Retry path: the first `--state open` call fails once, its retry
-    // succeeds; the merged call succeeds first try. One PR per state.
+    // Pagination + 504 retry: the first `--state open` call 504s once and
+    // its retry succeeds; the second open page runs (2 pages: one retried)
+    // plus one merged call — 4 logged gh calls, all paginated at 50.
     await writeFile(callsPath, '');
     await writeFile(openAttemptsPath, '');
     const env = {
@@ -1217,22 +1224,19 @@ describe('entrypoint contract', () => {
     };
     const firstAttempt = await collectGitHubPullRequests(env);
     assert.ok(Array.isArray(firstAttempt));
-    assert.equal(firstAttempt.length, 2);
-    const openAttempts = (await readFile(openAttemptsPath, 'utf8'))
-      .trim()
-      .split('\n')
-      .filter(Boolean);
-    assert.equal(openAttempts.length, 2);
+    assert.equal(firstAttempt.length, 3);
     const callLog = (await readFile(callsPath, 'utf8'))
       .trim()
       .split('\n')
       .filter(Boolean);
-    assert.equal(callLog.length, 3);
+    assert.equal(callLog.length, 4);
     assert.ok(callLog.every(call => call.includes('pr list')));
+    // The open pages use --limit 50 (pagination), not one --limit 100 query.
+    assert.equal(callLog.filter(call => call.includes('--limit 50')).length, 4);
 
-    // Fail-closed path: every attempt fails; the collector names the cause
-    // with the exit code, signal, kill flag and stderr tail, and stays
-    // failed closed (no empty-array pass).
+    // Fail-closed path: a non-gateway failure does not burn the extra
+    // retry; the collector names the cause with the exit code, signal, kill
+    // flag and stderr tail, and stays failed closed (no empty-array pass).
     await writeFile(
       fakeGh,
       ['#!/bin/sh', 'echo "gh: auth required" >&2', 'exit 1'].join('\n')
@@ -1288,7 +1292,8 @@ describe('entrypoint contract', () => {
     };
     const inventory = await collectGitHubPullRequests(env);
     assert.ok(Array.isArray(inventory));
-    assert.equal(inventory.length, 5200);
+    // Two open pages (2600 rows each) plus one merged page (2600 rows).
+    assert.equal(inventory.length, 7800);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {
