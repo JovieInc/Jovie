@@ -67,7 +67,7 @@ describe('connector provider registry', () => {
 
     expect(description).toContain('into Work');
     expect(description).toContain('thumbnail changes');
-    expect(description).toContain('post approved comment replies');
+    expect(description).toContain('Comment reply sending is disabled.');
   });
 
   it('exposes oauth scopes, token handler, sync runner, and webhook key', () => {

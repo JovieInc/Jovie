@@ -4,21 +4,14 @@ import {
   getGrantedConnectorCapabilities,
 } from './capabilities';
 import { getConnectorDefinition, getConnectorDefinitions } from './registry';
-import type {
-  ConnectorAvailability,
-  ConnectorDefinition,
-  ConnectorProviderId,
-} from './types';
+import type { ConnectorAvailability, ConnectorProviderId } from './types';
 
 const available = Object.fromEntries(
-  getConnectorDefinitions().map(definition => [
-    definition.id,
-    { available: true },
-  ])
+  getConnectorDefinitions().map(({ id }) => [id, { available: true }])
 ) as Record<ConnectorProviderId, ConnectorAvailability>;
 
 describe('connector capability access and advertising', () => {
-  it('distinguishes read grants from write approval and completed operations', () => {
+  it('grants only requested YouTube read permissions', () => {
     const youtube = getConnectorDefinition('youtube');
     const capabilities = getGrantedConnectorCapabilities(youtube, 'connected', [
       youtube.oauthScopes[0],
@@ -26,14 +19,6 @@ describe('connector capability access and advertising', () => {
     expect(capabilities.map(capability => capability.id)).toEqual([
       'channel_videos.read',
     ]);
-    expect(
-      getGrantedConnectorCapabilities(youtube, 'connected', youtube.oauthScopes)
-    ).toHaveLength(4);
-    for (const capability of youtube.capabilities.filter(
-      capability => capability.mode === 'write'
-    )) {
-      expect(capability.requiresApproval).toBe(true);
-    }
   });
   it.each([
     'not_connected',
@@ -60,23 +45,30 @@ describe('connector capability access and advertising', () => {
       ]).map(capability => capability.id)
     ).toEqual(['playlists.read']);
   });
-  it('filters planned and blocked capabilities even if all permissions were granted', () => {
-    const base = getConnectorDefinition('gmail');
-    const definition: ConnectorDefinition = {
-      ...base,
-      capabilities: base.capabilities.map(capability => ({
-        ...capability,
-        availability: 'blocked',
-      })),
-    };
-    expect(
-      getGrantedConnectorCapabilities(
-        definition,
-        'connected',
-        definition.oauthScopes
-      )
-    ).toEqual([]);
-  });
+  it.each(['connected', 'syncing'] as const)(
+    'blocks YouTube reply capability despite every OAuth grant (%s)',
+    status => {
+      const definition = getConnectorDefinition('youtube');
+      const reply = definition.capabilities.find(
+        capability => capability.id === 'comment_replies.write'
+      );
+      expect(reply?.availability).toBe('blocked');
+      expect(
+        getGrantedConnectorCapabilities(
+          definition,
+          status,
+          definition.oauthScopes
+        )
+      ).not.toContainEqual(reply);
+      for (const platform of ['web', 'mac'] as const) {
+        expect(
+          getAdvertisedConnectorIntegrations(available, platform).find(
+            provider => provider.id === 'youtube'
+          )?.capabilities
+        ).not.toContainEqual(reply);
+      }
+    }
+  );
   it('advertises only configured providers and implemented operations supported on the platform', () => {
     const projection = getAdvertisedConnectorIntegrations({
       ...available,

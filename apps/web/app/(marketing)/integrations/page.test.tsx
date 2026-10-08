@@ -29,7 +29,10 @@ describe('public integrations projection', () => {
       screen.queryByRole('heading', { name: 'Spotify' })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Post approved replies.*Requires approval/)
+      screen.queryByText(/comment replies|Post approved replies/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Apply approved thumbnails.*Requires approval/)
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/Instagram|Search Console|all comments/)
