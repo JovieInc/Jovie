@@ -1,0 +1,10 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T005324Z-JOV-5581-codex-brief-935150/.design-brief.md).
+
+Validation:
+
+- Exact sections 1–9 and required field lines.
+- Only approved states, viewports, and primitive IDs.
+- Steps 2 and 9 intentionally blank due to unsupported capability/artifact evidence.
+- Scope and whitespace checks passed.
+- `gbrain-unavailable`; repository evidence used.
+- No build, commit, push, PR, or skill workflow performed.
