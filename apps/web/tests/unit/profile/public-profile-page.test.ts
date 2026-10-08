@@ -147,8 +147,23 @@ const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
   it('uses only structured Spotify links to resolve the profile owner identity', () => {
-    expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
-      /\.filter\(link => link\.platform === 'spotify'\)[\s\S]{0,100}\.map\(link => link\.url\)/
+    // Stryker copies this suite into its sandbox with the page's arrow bodies
+    // instrumented (stryS calls + block rewrites), which hides the plain
+    // `.filter(link => ...)` shape. Strip the instrumentation calls and
+    // tolerate the block/return rewrite so the assertion checks the same
+    // structural contract in both environments instead of failing the
+    // mutation dry run on rewritten source.
+    const source = PUBLIC_PROFILE_PAGE_SOURCE.replace(
+      /\bstryS(?:Thin)?\(\s*\d+\s*,\s*(?:\[\s*\]\s*,\s*)?\d+\s*\)\s*;?/g,
+      ''
+    )
+      // The if(stryNS().activeMutant) cover blocks rewrite arrow bodies; drop
+      // them (bounded to the closing brace) before the preamble strip so the
+      // spanning preamble match cannot eat unrelated source.
+      .replace(/if\s*\(\s*stryNS_\w+\(\)\.[\s\S]*?\n?\}\s*;?\s*/g, '')
+      .replace(/\bstryNS_\w+\(\)\s*\{[^}]*\}\s*;?/g, '');
+    expect(source).toMatch(
+      /\.filter\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.platform === 'spotify'\s*;?\s*\}?\)[\s\S]{0,200}\.map\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.url\s*;?\s*\}?\)/
     );
   });
 
