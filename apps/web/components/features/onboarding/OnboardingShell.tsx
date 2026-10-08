@@ -2,7 +2,8 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Skeleton } from '@jovie/ui';
+import { Button, Skeleton } from '@jovie/ui';
+import type { UIMessage } from 'ai';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
@@ -37,7 +38,16 @@ import { useOnboardingClaim } from './useOnboardingClaim';
  *
  * Holds the Turnstile token until the chat client wires its first request.
  */
-interface OnboardingShellProps {
+export interface OnboardingShellProps {
+  readonly initialMessages?: UIMessage[];
+  readonly conversationId?: string | null;
+  readonly resumeOwnedConversation?: boolean;
+  readonly onRestart?: () => void;
+  readonly onLogout?: () => void;
+  readonly actionPending?: boolean;
+  readonly controlsDisabled?: boolean;
+  readonly actionError?: string | null;
+  readonly onBusyChange?: (busy: boolean) => void;
   /** Whether the server resolved a verified account for this request. */
   readonly isSignedIn?: boolean;
   /** First 8 chars of the session id. Debug breadcrumb only — not sensitive. */
@@ -83,6 +93,15 @@ export function OnboardingShell({
   starterHandoff,
   turnstileTestMode = false,
   entryProfile,
+  initialMessages = [],
+  conversationId = null,
+  resumeOwnedConversation = false,
+  onRestart,
+  onLogout,
+  actionPending = false,
+  controlsDisabled = false,
+  actionError = null,
+  onBusyChange,
 }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
@@ -192,7 +211,10 @@ export function OnboardingShell({
   // authenticated, then retry after completed chat turns. Durable waitlist
   // receipts route to /waitlist; admitted users go to checkout; missing
   // artist identity stays in this chat.
-  const claimStatus = useOnboardingClaim(claimTrigger);
+  const claimStatus = useOnboardingClaim(
+    claimTrigger,
+    !resumeOwnedConversation || claimTrigger > 0
+  );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
   const entryBuilderState = useMemo(
@@ -220,20 +242,48 @@ export function OnboardingShell({
               className='relative flex min-h-0 min-w-0 flex-1 flex-col'
               data-onboarding-session={sessionLabel}
             >
-              {!isSignedIn ? (
+              {onRestart || onLogout || !isSignedIn ? (
                 <div
-                  className='flex min-h-11 shrink-0 items-center justify-end px-3 sm:px-4'
+                  className='flex min-h-11 shrink-0 items-center justify-end gap-2 px-3 sm:px-4'
                   data-testid='onboarding-sign-in-header'
                 >
-                  <Link
-                    className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
-                    href={APP_ROUTES.SIGNIN}
-                  >
-                    Sign in
-                  </Link>
+                  {onRestart ? (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='shrink-0 whitespace-nowrap'
+                      disabled={actionPending || controlsDisabled}
+                      onClick={onRestart}
+                    >
+                      Start Over
+                    </Button>
+                  ) : null}
+                  {isSignedIn && onLogout ? (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='shrink-0 whitespace-nowrap'
+                      disabled={actionPending || controlsDisabled}
+                      onClick={onLogout}
+                    >
+                      Log Out
+                    </Button>
+                  ) : null}
+                  {!isSignedIn ? (
+                    <Link
+                      className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+                      href={APP_ROUTES.SIGNIN}
+                    >
+                      Sign in
+                    </Link>
+                  ) : null}
                 </div>
               ) : null}
               <OnboardingChat
+                initialMessages={initialMessages}
+                conversationId={conversationId}
+                interactionDisabled={actionPending}
+                onBusyChange={onBusyChange}
                 headerOverlay={!isSignedIn}
                 intentId={intentId}
                 onConversationActivity={handleConversationActivity}
@@ -246,6 +296,12 @@ export function OnboardingShell({
                 turnstilePanelVisible={turnstilePanelVisible}
                 onTurnstileRequired={handleTurnstileRequired}
                 onTurnstileRejected={handleTurnstileRejected}
+              />
+
+              <OnboardingShellStatus
+                kind='error'
+                message={actionError}
+                visible={Boolean(actionError)}
               />
 
               <OnboardingShellStatus
