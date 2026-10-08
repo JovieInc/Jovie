@@ -1369,11 +1369,113 @@ async function ghPullRequestList(state, limit, env) {
 
 async function ghPullRequestInventory(state, env) {
   // `gh pr list` has no page offset — a second call with the same --limit
-  // returns the SAME page. One query per state; with statusCheckRollup
-  // dropped the 100-PR open query is the light form that stays under the
-  // GraphQL 504 threshold (the heavy 504-ing form was rollup + body).
-  const limit = state === 'open' ? 100 : 50;
-  return ghPullRequestList(state, limit, env);
+  // returns the SAME page, and one --limit 100 call cannot prove
+  // completeness past 100 open PRs. The open inventory pages through the
+  // GraphQL API with a real cursor (pageSize 50, the same light fields),
+  // deduped by number by the caller, so completeness is proven by
+  // pagination instead of capped. The merged inventory stays one
+  // --limit 50 call (merged PRs are only attribution evidence).
+  if (state !== 'open') return ghPullRequestList(state, 50, env);
+  const pageSize = 50;
+  const query = `query($owner:String!$name:String!$cursor:String$pageSize:Int!){
+    repository(owner:$owner,name:$name){
+      pullRequests(states:OPEN,first:$pageSize,after:$cursor,orderBy:{field:UPDATED_AT,direction:DESC}){
+        pageInfo{endCursor hasNextPage}
+        nodes{
+          number
+          title
+          body
+          headRefName
+          state
+          mergeable
+          mergeStateStatus
+          labels(first:20){nodes{name}}
+          url
+          mergedAt
+          isDraft
+        }
+      }
+    }
+  }`;
+  const rows = [];
+  let cursor = null;
+  for (;;) {
+    const stdout = await execGraphQL(
+      query,
+      {
+        owner: 'JovieInc',
+        name: 'Jovie',
+        cursor,
+        pageSize,
+      },
+      env
+    );
+    const parsed = JSON.parse(stdout);
+    const nodes = parsed?.data?.repository?.pullRequests?.nodes ?? [];
+    for (const node of nodes) {
+      rows.push({
+        number: node.number,
+        title: node.title,
+        body: node.body,
+        headRefName: node.headRefName,
+        state: node.state,
+        mergeable: node.mergeable,
+        mergeStateStatus: node.mergeStateStatus,
+        labels: (node.labels?.nodes ?? []).map(label => ({ name: label.name })),
+        url: node.url,
+        mergedAt: node.mergedAt,
+        isDraft: node.isDraft,
+      });
+    }
+    const pageInfo = parsed?.data?.repository?.pullRequests?.pageInfo;
+    if (!pageInfo?.hasNextPage) break;
+    cursor = pageInfo.endCursor;
+  }
+  return rows;
+}
+
+/**
+ * One `gh api graphql` call with the transient-gateway retry (the same
+ * bounded backoff as ghPullRequestList). Any non-transient failure throws
+ * with the exact gh cause named.
+ */
+async function execGraphQL(query, variables, env) {
+  const args = [
+    'api',
+    'graphql',
+    '--repo',
+    'JovieInc/Jovie',
+    '-F',
+    `query=${query}`,
+  ];
+  for (const [key, value] of Object.entries(variables ?? {})) {
+    if (value === null || value === undefined) continue;
+    args.push('-F', `${key}=${String(value)}`);
+  }
+  const maxAttempts = 3;
+  let lastError = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
+    try {
+      const { stdout } = await execFileAsync('gh', args, {
+        timeout: 45_000,
+        maxBuffer: 32 * 1024 * 1024,
+        env,
+      });
+      return stdout;
+    } catch (error) {
+      lastError = error;
+      const transient = GH_TRANSIENT_GATEWAY.test(
+        String(error?.stderr || '') + String(error?.message || '')
+      );
+      if (!transient) break;
+    }
+  }
+  throw new Error(
+    `gh-graphql-pr-inventory:${describeExecFailure(lastError, 'api graphql')}`
+  );
 }
 
 export async function collectGitHubPullRequests(env = process.env) {
@@ -1382,9 +1484,9 @@ export async function collectGitHubPullRequests(env = process.env) {
       try {
         return await ghPullRequestInventory(state, env);
       } catch (error) {
-        // ghPullRequestList already carries the full untruncated failure
-        // description; keep the raw message as a fallback if it is ever
-        // replaced by a non-Error throw.
+        // ghPullRequestList / ghPullRequestInventory already carry the full
+        // untruncated failure description; keep the raw message as a
+        // fallback if it is ever replaced by a non-Error throw.
         return {
           error:
             error instanceof Error && error.message.startsWith('gh-pr-list-')
@@ -1421,24 +1523,11 @@ export async function collectGitHubPullRequests(env = process.env) {
     if (String(record.state || '').toUpperCase() === 'OPEN') openUnique += 1;
   }
   const inventory = [...byNumber.values()];
-  // Fail closed on silent truncation: `gh pr list` has no page offset, so
-  // one --limit N call can silently miss PRs beyond the first N. When the
-  // open page is full (returned exactly the limit), the inventory did not
-  // prove completeness — report it instead of guessing.
-  const openLimit = 100;
-  const openRows = inventory.filter(
-    row => String(row.state || '').toUpperCase() === 'OPEN'
-  ).length;
-  const truncated = openRows >= openLimit;
-  if (truncated) {
-    return {
-      error: `gh-pr-list-open:page-limit-reached:${openRows} open rows at --limit ${openLimit}; the inventory cannot prove completeness — fail closed`,
-      count: inventory.length,
-      openUnique,
-      duplicatesDropped,
-      truncated: true,
-    };
-  }
+  // The open inventory pages through GraphQL with a real cursor, so its
+  // completeness is proven by pagination (pageInfo.hasNextPage false) —
+  // no page-limit fail-closed is needed for the open side; the merged side
+  // is attribution-only evidence (never rate-defining) and a partial merged
+  // page cannot silently close the gate.
   return {
     pullRequests: inventory,
     count: inventory.length,
@@ -1542,6 +1631,60 @@ async function runRemediate(isDryRun) {
       }
     }
   }
+  // Check-rollup fetch (JOV-8000 follow-up 10): the error gate reads each
+  // rate-population row's check-rollup STATE (FAILURE/ERROR = a failing
+  // required check on the head), which the inventory query does not carry.
+  // ONE light GraphQL query for the population's rollup states (no
+  // contexts); on failure the gate fails closed with
+  // 'pr-check-rollup-unavailable' via the prRollups:false signal — never
+  // treated as zero errored.
+  let prRollups = true;
+  if (Array.isArray(pullRequests)) {
+    // Population = every counted row (open, non-draft, not
+    // label-quarantined) — the same predicate as pullRequestRates.
+    const counted = pullRequests.filter(
+      row =>
+        String(row?.state || '').toUpperCase() === 'OPEN' &&
+        row?.isDraft !== true &&
+        !(row?.labels ?? []).some(label =>
+          ['queue-poison', 'hold'].includes(
+            String(
+              typeof label === 'string'
+                ? label
+                : /** @type {any} */ ((label)?.name ?? '')
+            ).toLowerCase()
+          )
+        )
+    );
+    const countedNumbers = counted
+      .map(row => row?.number)
+      .filter(number => Number.isInteger(number));
+    try {
+      const query =
+        'query($owner:String!$name:String!$numbers:[Int!]){' +
+        'repository(owner:$owner,name:$name){pullRequests(numbers:$numbers,states:OPEN,first:100){nodes{number commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}';
+      const stdout = await execGraphQL(
+        query,
+        {
+          owner: 'JovieInc',
+          name: 'Jovie',
+          numbers: countedNumbers.length > 0 ? countedNumbers : [0],
+        },
+        process.env
+      );
+      const parsed = JSON.parse(stdout);
+      const nodes = parsed?.data?.repository?.pullRequests?.nodes ?? [];
+      for (const node of nodes) {
+        const state =
+          node?.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state;
+        const row = pullRequests.find(item => item?.number === node.number);
+        if (row && state)
+          row.statusCheckRollup = { state: String(state).toUpperCase() };
+      }
+    } catch {
+      prRollups = false;
+    }
+  }
   const cloneLatencyMs = await measureCloneLatencyMs();
   const fleetGate = await fleetGateForTeam(team);
   const rawReceipt = loadFleetGateReceipt(team);
@@ -1577,6 +1720,7 @@ async function runRemediate(isDryRun) {
       provider: provider
         ? { accounts: provider.accounts, ready: provider.ready }
         : null,
+      prRollups,
       cloneLatencyMs,
       ci: {
         saturating:
