@@ -429,12 +429,17 @@ class LabeledEventTest(unittest.TestCase):
             linear_issue("JOV-7", "musicfetch-quota", title="Renew MusicFetch", description="renew MusicFetch"),
         ]
         calls = []
+        states = {node["id"]: {"id": "todo", "name": "Todo"} for node in nodes}
 
         class Linear:
             def gql(self, query, variables):
                 calls.append(query)
                 if "issues(" in query:
                     return {"issues": {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}}
+                if query.startswith("query") and "issue(" in query:
+                    return {"issue": {"id": variables["id"], "state": states[variables["id"]]}}
+                if query.startswith("mutation") and "issueUpdate" in query:
+                    states[variables["id"]] = {"id": variables["s"], "name": "In Progress"}
                 return {"issueUpdate": {"success": True}, "issueAddLabel": {"success": True}}
 
             def comment(self, issue_id, body):
@@ -453,6 +458,9 @@ class LabeledEventTest(unittest.TestCase):
             self.assertEqual(stored["events"]["musicfetch-quota"]["route"], "JOV-7323")
             self.assertIn("Do not renew MusicFetch", stored["events"]["musicfetch-quota"]["dossier"])
             self.assertNotEqual(stored["events"]["billing-health-public"]["lane"], "devin")
+            # Planning remains one shared bulk inventory read. Targeted start
+            # and acknowledgement readbacks belong to worker admission.
+            self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
             lane_name = stored["events"]["musicfetch-quota"]["lane"]
             for fingerprint, row in stored["events"].items():
                 if fingerprint != "musicfetch-quota" and row.get("lane") == lane_name:
@@ -470,7 +478,7 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(len(reads), 2)
         self.assertIn('"JOV"', reads[0])
         self.assertIn('"LYB"', reads[0])
-        self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
+        self.assertEqual(sum(isinstance(query, str) and "issue(id:" in query for query in calls), 2)
 
     def test_closed_label_is_history_and_titles_do_not_match(self):
         """JOV-7544's title uses the colon form. Match the label, including across JOV and LYB."""

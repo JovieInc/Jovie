@@ -20,8 +20,14 @@ vi.mock('@/hooks/useClerkSafe', () => ({
   }),
 }));
 
-function ClaimHarness({ trigger }: { readonly trigger: number }) {
-  const status = useOnboardingClaim(trigger);
+function ClaimHarness({
+  trigger,
+  enabled = true,
+}: {
+  readonly trigger: number;
+  readonly enabled?: boolean;
+}) {
+  const status = useOnboardingClaim(trigger, enabled);
   return <span data-testid='claim-status'>{status}</span>;
 }
 
@@ -38,6 +44,16 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
 }
 
 describe('useOnboardingClaim', () => {
+  it('does not reclaim or redirect a restored account-owned conversation on mount or later turns', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { rerender } = render(<ClaimHarness trigger={0} enabled={false} />);
+    rerender(<ClaimHarness trigger={2} enabled={false} />);
+    expect(screen.getByTestId('claim-status')).toHaveTextContent('idle');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();

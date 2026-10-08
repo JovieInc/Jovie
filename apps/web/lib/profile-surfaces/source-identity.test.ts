@@ -170,6 +170,15 @@ describe('readSourceIdentity', () => {
       html: `<script>var ytInitialData = ${JSON.stringify(channelData)};</script><meta property="og:image" content="https://example.com/banner.jpg">`,
     });
     const result = await readSourceIdentity('https://www.youtube.com/@actual');
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      'https://www.youtube.com/@actual/about',
+      expect.objectContaining({
+        timeoutMs: 4000,
+        maxRetries: 0,
+        maxResponseBytes: 6_000_000,
+        allowedHosts: new Set(['youtube.com', 'www.youtube.com']),
+      })
+    );
     expect(result).toMatchObject({
       status: 'available',
       displayName: 'Channel Name',
@@ -179,6 +188,22 @@ describe('readSourceIdentity', () => {
         verified: false,
       },
     });
+  });
+
+  it('retains unavailable identity when the bounded YouTube read fails', async () => {
+    mocks.fetch.mockRejectedValue(new Error('Response too large'));
+    const result = await readSourceIdentity(
+      'https://www.youtube.com/channel/UCactual'
+    );
+    expect(result).toMatchObject({
+      status: 'unavailable',
+      displayName: null,
+      photo: { kind: 'missing', verified: false },
+    });
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.fetch.mock.calls[0][0]).toBe(
+      'https://www.youtube.com/channel/UCactual/about'
+    );
   });
 
   it('reports failures honestly and allows a subsequent request to recover', async () => {

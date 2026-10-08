@@ -292,6 +292,41 @@ function expectDesktop32Control(
 }
 
 describe('LibrarySurface', () => {
+  it('renders stored child assets under a visible album with dependency guides and working selection', async () => {
+    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'list');
+    const album = buildAsset({
+      id: 'album',
+      title: 'Album',
+      releaseType: 'album',
+    });
+    const child = buildAsset({
+      id: 'video-child',
+      title: 'Album Video',
+      itemKind: 'video',
+      linkedReleaseId: 'album',
+      source: { provider: 'youtube', canonicalId: 'video-child' },
+      catalogType: 'media',
+    });
+    renderLibrary([child, album]);
+    const row = await screen.findByTestId('library-release-row-video-child');
+    expect(within(row).getByTestId('table-dependency-guide')).toHaveAttribute(
+      'data-last',
+      'true'
+    );
+    expect(within(row).getByText('Part of Album')).toHaveClass('sr-only');
+    const rows = within(screen.getByRole('table'))
+      .getAllByRole('row')
+      .filter(element => element.hasAttribute('data-testid'));
+    expect(rows.map(element => element.getAttribute('data-testid'))).toEqual([
+      'library-release-row-album',
+      'library-release-row-video-child',
+    ]);
+    fireEvent.click(row);
+    expect(
+      await screen.findByRole('heading', { name: 'Album Video' })
+    ).toBeInTheDocument();
+  });
+
   it('disables YouTube import when the creator profile is unavailable', async () => {
     const user = userEvent.setup();
     const onImportYouTube = vi.fn();
