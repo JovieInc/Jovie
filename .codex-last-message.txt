@@ -1,0 +1,9 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T005631Z-JOV-5591-codex-brief-522368/.design-brief.md).
+
+Validation:
+
+- `git diff --check` passed.
+- Certified capability IDs left empty because the component makes no product claim.
+- Pen and ImageGen fields left empty as required.
+- Design-gate parser reports only expected missing steps `2` and `9`.
+- No builds, tests, commits, pushes, or PR actions performed.
