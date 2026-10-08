@@ -19,6 +19,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { captureError } from '@/lib/error-tracking';
 import { getReleaseNotificationEligibility } from '@/lib/notifications/release-eligibility';
+import {
+  type BlockedEffectReceipt,
+  denyAudienceEffect,
+} from '@/lib/outbound/audience-effect-policy';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -211,7 +215,13 @@ async function scheduleNotificationsForRelease(
 export async function scheduleReleaseNotifications(): Promise<{
   scheduled: number;
   releasesFound: number;
+  policyBlocked?: BlockedEffectReceipt;
 }> {
+  const policy = denyAudienceEffect('audience.delivery.schedule');
+  if (!policy.dispatchAllowed) {
+    // Do not create or revive audience jobs while dispatch is disabled.
+    return { scheduled: 0, releasesFound: 0, policyBlocked: policy };
+  }
   const now = new Date();
   const windowStart = new Date(now.getTime() - SCHEDULING_LOOKBACK_MS);
   const windowEnd = new Date(now.getTime() + SCHEDULING_LOOKAHEAD_MS);
@@ -405,12 +415,16 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        message:
-          result.releasesFound === 0
+        message: result.policyBlocked
+          ? 'Audience delivery is disabled; no release notifications were scheduled'
+          : result.releasesFound === 0
             ? 'No release notifications to schedule in the current window'
             : `Processed ${result.scheduled} notifications`,
         scheduled: result.scheduled,
         releasesFound: result.releasesFound,
+        ...(result.policyBlocked
+          ? { policyBlocked: result.policyBlocked }
+          : {}),
         timestamp: new Date().toISOString(),
       },
       { headers: NO_STORE_HEADERS }
