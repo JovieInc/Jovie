@@ -1651,7 +1651,7 @@ async function runRemediate(isDryRun) {
             String(
               typeof label === 'string'
                 ? label
-                : /** @type {any} */ ((label)?.name ?? '')
+                : /** @type {any} */ (label?.name ?? '')
             ).toLowerCase()
           )
         )
