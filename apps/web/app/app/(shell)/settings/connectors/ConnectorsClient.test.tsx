@@ -5,16 +5,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 
-const { error, fetchMock, push, refresh, success } = vi.hoisted(() => ({
-  error: vi.fn(),
-  fetchMock: vi.fn(),
-  push: vi.fn(),
-  refresh: vi.fn(),
-  success: vi.fn(),
-}));
+const { error, fetchMock, push, refresh, success, urlError } = vi.hoisted(
+  () => ({
+    error: vi.fn(),
+    fetchMock: vi.fn(),
+    push: vi.fn(),
+    refresh: vi.fn(),
+    success: vi.fn(),
+    urlError: { value: '' },
+  })
+);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, refresh }),
+  useSearchParams: () => new URLSearchParams({ error: urlError.value }),
 }));
 vi.mock('@/components/feedback', () => ({
   toast: { error, success },
@@ -60,8 +64,26 @@ function youtubeRow() {
 describe('ConnectorsClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    urlError.value = '';
     vi.stubGlobal('fetch', fetchMock);
     fetchMock.mockResolvedValue({ ok: true });
+  });
+
+  it('shows consent failure without echoing callback details or claiming connection success', () => {
+    urlError.value = 'oauth_denied_private_provider_detail';
+    render(
+      <ConnectorsClient
+        connectors={disconnectedConnectors}
+        creatorProfileId='profile-1'
+        isDev={false}
+      />
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The connection did not finish.'
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(urlError.value);
+    expect(screen.getByRole('button', { name: 'Connect Gmail' })).toBeEnabled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps unavailable and identity-less providers visible without offering usable connections', async () => {

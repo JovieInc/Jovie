@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import { ConnectorCard } from '@/components/features/connectors/ConnectorCard';
@@ -42,6 +42,7 @@ export function ConnectorsClient({
   returnTo = APP_ROUTES.SETTINGS_CONNECTORS,
 }: ConnectorsClientProps) {
   const router = useRouter();
+  const oauthFailed = Boolean(useSearchParams().get('error'));
   const [isPendingExtract, startExtract] = useTransition();
   const [pendingBundle, setPendingBundle] = useState<string | null>(null);
   const [disconnectedBundles, setDisconnectedBundles] = useState<
@@ -149,6 +150,12 @@ export function ConnectorsClient({
       description='Connect the services Jovie uses to understand and manage your work.'
     >
       <SettingsPanel title='Connected Accounts' bodyClassName='px-4 sm:px-5'>
+        {oauthFailed && (
+          <p role='alert' className='py-3 text-xs text-error'>
+            The connection did not finish. Check the account status below, then
+            try connecting again.
+          </p>
+        )}
         <p className='py-3 text-xs text-tertiary'>
           Connections with an identity apply to that identity. Account
           connections apply to your signed-in account. Actions still require
