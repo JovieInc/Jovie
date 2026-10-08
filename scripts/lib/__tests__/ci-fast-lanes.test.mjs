@@ -51,6 +51,8 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_design_gate.py');
     expect(command).toContain('scripts/tests/test_disk_guard.py');
     expect(command).toContain('scripts/tests/test_hud.py');
+    expect(command).toContain('scripts/tests/test_codex_lane.py');
+    expect(command).toContain('*/scripts/lanes/codex_lane.py" --fail-under=85');
     expect(command).toContain('scripts/tests/test_devin_free_policy.py');
     expect(command).toContain(
       '*/scripts/lanes/devin_free_policy.py" --fail-under=85'

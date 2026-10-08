@@ -13,7 +13,13 @@ describe('ActivityHoverRow', () => {
       />
     );
     expect(screen.getByText('Canvas regenerated')).toBeInTheDocument();
-    expect(screen.getByText('2m ago')).toBeInTheDocument();
+    const meta = screen.getByText('2m ago');
+    expect(meta).toBeInTheDocument();
+    expect(meta).toHaveClass('tracking-normal');
+    expect(meta).not.toHaveClass('uppercase');
+    expect(meta).not.toHaveClass('capitalize');
+    expect(meta.className).not.toMatch(/tracking-\[/);
+    expect(screen.getByRole('button')).toHaveClass('h-8');
   });
 
   it('shows the running indicator only when running is true', () => {

@@ -215,61 +215,65 @@ export function OnboardingShell({
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
         main={
-          <div
-            className='relative flex min-h-0 flex-1 flex-col'
-            data-onboarding-session={sessionLabel}
-          >
-            {!isSignedIn ? (
-              <div
-                className='flex min-h-11 shrink-0 items-center justify-end px-3 sm:px-4'
-                data-testid='onboarding-sign-in-header'
-              >
-                <Link
-                  className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
-                  href={APP_ROUTES.SIGNIN}
+          <div className='flex min-h-0 min-w-0 flex-1'>
+            <div
+              className='relative flex min-h-0 min-w-0 flex-1 flex-col'
+              data-onboarding-session={sessionLabel}
+            >
+              {!isSignedIn ? (
+                <div
+                  className='flex min-h-11 shrink-0 items-center justify-end px-3 sm:px-4'
+                  data-testid='onboarding-sign-in-header'
                 >
-                  Sign in
-                </Link>
-              </div>
-            ) : null}
-            <OnboardingChat
-              headerOverlay={!isSignedIn}
-              intentId={intentId}
-              onConversationActivity={handleConversationActivity}
-              onProfileBuilderChange={setProfileBuilderState}
-              starterHandoff={starterHandoff}
-              entryProfile={entryProfile}
-              turnstileToken={turnstileToken}
-              turnstileStatus={turnstileState.status}
-              turnstilePanel={turnstilePanel}
-              turnstilePanelVisible={turnstilePanelVisible}
-              onTurnstileRequired={handleTurnstileRequired}
-              onTurnstileRejected={handleTurnstileRejected}
-            />
+                  <Link
+                    className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+                    href={APP_ROUTES.SIGNIN}
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              ) : null}
+              <OnboardingChat
+                headerOverlay={!isSignedIn}
+                intentId={intentId}
+                onConversationActivity={handleConversationActivity}
+                onProfileBuilderChange={setProfileBuilderState}
+                starterHandoff={starterHandoff}
+                entryProfile={entryProfile}
+                turnstileToken={turnstileToken}
+                turnstileStatus={turnstileState.status}
+                turnstilePanel={turnstilePanel}
+                turnstilePanelVisible={turnstilePanelVisible}
+                onTurnstileRequired={handleTurnstileRequired}
+                onTurnstileRejected={handleTurnstileRejected}
+              />
 
-            <OnboardingShellStatus
-              kind='error'
-              message='This Spotify artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow. Choosing another handle will not resolve this conflict.'
-              visible={claimStatus === 'identity-conflict'}
-            />
-            <OnboardingShellStatus
-              kind='error'
-              message={turnstileFailureMessage}
-              visible={Boolean(turnstileFailureMessage)}
-            />
-            <OnboardingShellStatus
-              kind='status'
-              message='Linking your conversation...'
-              visible={isLinking}
-            />
-            <OnboardingShellStatus
-              kind='error'
-              message="We couldn't save your request. Refresh this page to try again."
-              visible={claimStatus === 'error'}
-            />
+              <OnboardingShellStatus
+                kind='error'
+                message='This Spotify artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow. Choosing another handle will not resolve this conflict.'
+                visible={claimStatus === 'identity-conflict'}
+              />
+              <OnboardingShellStatus
+                kind='error'
+                message={turnstileFailureMessage}
+                visible={Boolean(turnstileFailureMessage)}
+              />
+              <OnboardingShellStatus
+                kind='status'
+                message='Linking your conversation...'
+                visible={isLinking}
+              />
+              <OnboardingShellStatus
+                kind='error'
+                message="We couldn't save your request. Refresh this page to try again."
+                visible={claimStatus === 'error'}
+              />
+            </div>
+            {sideProfileRail ? (
+              <div className='hidden shrink-0 lg:flex'>{sideProfileRail}</div>
+            ) : null}
           </div>
         }
-        rightPanel={sideProfileRail}
       />
     </SidebarProvider>
   );

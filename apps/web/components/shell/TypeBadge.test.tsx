@@ -5,10 +5,17 @@ import { describe, expect, it } from 'vitest';
 import { TypeBadge } from './TypeBadge';
 
 describe('TypeBadge', () => {
-  it('renders the label as-is', () => {
-    render(<TypeBadge label='single' />);
-    expect(screen.getByText('single')).toBeInTheDocument();
-  });
+  it.each(['single', 'Music Video', 'EP'])(
+    'renders %s with Title Case and normal tracking',
+    authoredLabel => {
+      render(<TypeBadge label={authoredLabel} />);
+      const label = screen.getByText(authoredLabel);
+      expect(label).toBeInTheDocument();
+      expect(label).toHaveClass('capitalize', 'tracking-normal', 'h-4');
+      expect(label).not.toHaveClass('uppercase');
+      expect(label.className).not.toMatch(/tracking-\[/);
+    }
+  );
 
   it('forwards custom classNames to the chip', () => {
     const { container } = render(

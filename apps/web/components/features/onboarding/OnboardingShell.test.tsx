@@ -15,8 +15,8 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
     readonly rightPanel?: ReactNode;
   }) => (
     <>
-      {main}
-      {rightPanel}
+      <div data-testid='onboarding-shell-main'>{main}</div>
+      <div data-testid='onboarding-shell-overlay'>{rightPanel}</div>
     </>
   ),
 }));
@@ -28,17 +28,25 @@ vi.mock('@/components/organisms/sidebar', () => ({
 }));
 
 const builderState = vi.hoisted(() => ({ current: null as unknown }));
+const chatProps = vi.hoisted(() => ({
+  current: null as null | {
+    onConversationActivity: () => void;
+    onTurnstileRequired: (message?: string) => void;
+    onTurnstileRejected: () => void;
+    turnstileToken: string | null;
+  },
+}));
 
 vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
-  OnboardingChat: ({
-    headerOverlay,
-    onProfileBuilderChange,
-    turnstilePanel,
-  }: {
-    readonly headerOverlay?: boolean;
-    readonly onProfileBuilderChange?: (state: never) => void;
-    readonly turnstilePanel: ReactNode;
-  }) => {
+  OnboardingChat: (
+    props: {
+      readonly headerOverlay?: boolean;
+      readonly onProfileBuilderChange?: (state: never) => void;
+      readonly turnstilePanel: ReactNode;
+    } & NonNullable<typeof chatProps.current>
+  ) => {
+    chatProps.current = props;
+    const { headerOverlay, onProfileBuilderChange, turnstilePanel } = props;
     useEffect(() => {
       if (builderState.current) {
         onProfileBuilderChange?.(builderState.current as never);
@@ -58,6 +66,10 @@ vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
 
 const turnstileProps = vi.hoisted(() => ({
   current: null as {
+    readonly onToken: (token: string) => void;
+    readonly instruction: string | null;
+    readonly focusSignal: number;
+    readonly resetSignal: number;
     readonly onStateChange?: (state: {
       status: string;
       message: string | null;
@@ -68,21 +80,28 @@ const turnstileProps = vi.hoisted(() => ({
 vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
   getBrowserTurnstileHostname: () => 'localhost',
   isOnboardingTurnstilePanelVisible: () => false,
-  OnboardingTurnstile: (props: Record<string, unknown>) => {
+  OnboardingTurnstile: (props: NonNullable<typeof turnstileProps.current>) => {
     turnstileProps.current = props;
     return null;
   },
   resolveTurnstileSiteKey: () => null,
 }));
 
-const claimState = vi.hoisted(() => ({ value: 'error' }));
+const claimState = vi.hoisted(() => ({ value: 'error', trigger: 0 }));
 vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
-  useOnboardingClaim: () => claimState.value,
+  useOnboardingClaim: (trigger: number) => {
+    claimState.trigger = trigger;
+    return claimState.value;
+  },
 }));
 
 describe('OnboardingShell status', () => {
   beforeEach(() => {
     claimState.value = 'error';
+    claimState.trigger = 0;
+    builderState.current = null;
+    chatProps.current = null;
+    turnstileProps.current = null;
   });
 
   it.each([false, true])(
@@ -193,6 +212,47 @@ describe('OnboardingShell status', () => {
     expect(
       screen.queryByTestId('onboarding-profile-rail')
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the profile preview in the chat main rather than the shell overlay', () => {
+    render(
+      <OnboardingShell sessionLabel='pending' entryProfile={MEGARAN_ENTRY} />
+    );
+    const preview = screen.getByTestId('onboarding-profile-rail');
+    expect(screen.getByTestId('onboarding-shell-main')).toContainElement(
+      preview
+    );
+    expect(screen.getByTestId('onboarding-shell-main')).toContainElement(
+      screen.getByTestId('onboarding-chat')
+    );
+    expect(screen.getByTestId('onboarding-shell-overlay')).not.toContainElement(
+      preview
+    );
+  });
+
+  it('retries claim after a completed turn while retaining sign-in access', () => {
+    render(<OnboardingShell sessionLabel='anonymous' />);
+    expect(claimState.trigger).toBe(0);
+    act(() => chatProps.current?.onConversationActivity());
+    expect(claimState.trigger).toBe(1);
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBeVisible();
+  });
+
+  it('clears a rejected challenge token and keeps a fresh verification action available', () => {
+    render(<OnboardingShell sessionLabel='anonymous' />);
+    act(() => chatProps.current?.onTurnstileRequired('Verify before sending'));
+    expect(turnstileProps.current?.instruction).toBe('Verify before sending');
+    expect(turnstileProps.current?.focusSignal).toBe(1);
+    act(() => turnstileProps.current?.onToken('verified-test-token'));
+    expect(chatProps.current?.turnstileToken).toBe('verified-test-token');
+    expect(turnstileProps.current?.instruction).toBeNull();
+    act(() => chatProps.current?.onTurnstileRejected());
+    expect(chatProps.current?.turnstileToken).toBeNull();
+    expect(turnstileProps.current?.resetSignal).toBe(1);
+    expect(turnstileProps.current?.focusSignal).toBe(2);
+    expect(turnstileProps.current?.instruction).toBe(
+      'One quick check before we send'
+    );
   });
 });
 
