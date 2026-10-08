@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/components/release-provider-matrix/TrackRow.test.tsx
 'use client';
 
 import { Badge } from '@jovie/ui';
