@@ -1,0 +1,12 @@
+Already fixed on `main` by commit `991385826c` (JOV-6618 / PR #18611). The cited September 21 build predates that September 26 fix.
+
+Verification:
+
+- Edge runtime policy test: passed.
+- Fresh `@jovie/web` production build: passed with no Edge Runtime deprecation warning.
+- Current HEAD matches `origin/main`.
+- Worktree remains clean; no commit or PR created.
+
+No task-specific concerns or deviations.
+
+NOT-SHIPPABLE: already fixed on main by JOV-6618; a duplicate PR would contain no change.
