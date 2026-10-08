@@ -518,6 +518,56 @@ function pullRequestRates(pullRequests) {
   };
 }
 
+/**
+ * Name every absent capacity sub-signal instead of one generic verdict, so a
+ * red remediate receipt points at the exact input that failed (the lanes
+ * doctor report, the codex account evidence, or the fleet-gate queue
+ * signals) rather than "missing-malformed-or-stale" with no pointer.
+ */
+export function capacityEvidenceGaps(signals, nowMs = Date.now()) {
+  const gaps = [];
+  if (signals?.schema !== CAPACITY_SCHEMA) gaps.push('schema');
+  if (
+    !Number.isFinite(Date.parse(signals?.observedAt || '')) ||
+    !freshTimestamp(signals?.observedAt, nowMs, CAPACITY_MAX_AGE_MS)
+  )
+    gaps.push('observedAt');
+  const workers = signals?.workers;
+  if (
+    !workers ||
+    !nonNegativeInteger(workers.running) ||
+    !nonNegativeInteger(workers.retrying) ||
+    !Number.isInteger(workers.maxConcurrent) ||
+    workers.maxConcurrent <= 0
+  )
+    gaps.push('workers');
+  const provider = signals?.provider;
+  if (
+    !provider ||
+    !nonNegativeInteger(provider.accounts) ||
+    !nonNegativeInteger(provider.ready)
+  )
+    gaps.push('provider');
+  if (!finiteNumber(signals?.cloneLatencyMs)) gaps.push('cloneLatencyMs');
+  const ci = signals?.ci;
+  if (
+    !ci ||
+    typeof ci.saturating !== 'boolean' ||
+    !nonNegativeInteger(ci.running) ||
+    !nonNegativeInteger(ci.queued)
+  )
+    gaps.push('ci');
+  const mergeQueue = signals?.mergeQueue;
+  if (
+    !mergeQueue ||
+    !['healthy', 'degraded', 'blocked'].includes(mergeQueue.health) ||
+    !nonNegativeInteger(mergeQueue.entries)
+  )
+    gaps.push('mergeQueue');
+  if (!Array.isArray(signals?.pullRequests)) gaps.push('pullRequests');
+  return gaps;
+}
+
 export function evaluateRuntimeCapacity(signals, options = {}) {
   const now = options.now || new Date().toISOString();
   const nowMs = Date.parse(now);
@@ -554,10 +604,14 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
     nonNegativeInteger(mergeQueue.entries) &&
     Array.isArray(signals.pullRequests);
   if (!required) {
+    const gaps = capacityEvidenceGaps(signals, nowMs);
     return {
       allowed: false,
       cohortSize: 0,
-      reason: 'capacity-evidence-missing-malformed-or-stale',
+      reason: gaps.length
+        ? `capacity-evidence-missing-malformed-or-stale:${gaps.join(',')}`
+        : 'capacity-evidence-missing-malformed-or-stale',
+      gaps,
       pressure: 'unknown',
       cleanStreak: 0,
     };

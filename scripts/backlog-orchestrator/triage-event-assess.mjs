@@ -336,6 +336,25 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     ? await assessTriageSweep()
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
-  if ('failed' in receipt && (receipt.failed > 0 || receipt.blocked > 0))
-    process.exitCode = 1;
+  if ('failed' in receipt) {
+    // Named rows, never an anonymous exit: the exit rule is unchanged
+    // (failed > 0 || blocked > 0), but every failing or blocked row is now
+    // annotated with its issue identifier so a red step names its rows.
+    // Row access stays property-safe across the sweep's heterogeneous
+    // result shapes (an assessment-failed row carries `error`; other rows
+    // carry `reason` or neither).
+    for (const result of receipt.results ?? []) {
+      const row = /** @type {Record<string, any>} */ (result ?? {});
+      const identifier = String(row.issue ?? 'unknown-issue');
+      if (row.disposition === 'assessment-failed')
+        console.error(
+          `::error title=Triage assessment failed::${identifier}: ${row.error ?? row.reason ?? 'assessment failed'}`
+        );
+      else if (row.requiresImmediateInvestigation)
+        console.error(
+          `::warning title=Urgent Triage investigation required::${identifier}: ${row.reason ?? row.disposition ?? 'urgent investigation required'}`
+        );
+    }
+    if (receipt.failed > 0 || receipt.blocked > 0) process.exitCode = 1;
+  }
 }
