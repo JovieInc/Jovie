@@ -2964,6 +2964,20 @@ class DispatchTest(unittest.TestCase):
                 tick = json.loads((host.state / "tick.json").read_text())
                 self.assertFalse(tick["disk"]["admitted"])
 
+    def test_disk_denial_is_backpressure_not_a_tick_error(self):
+        # JOV-8024: a denied tick is deliberate backpressure the disk-critical/disk-low
+        # alert already names; recording it as a tick error opens a duplicate,
+        # unactionable doctor issue.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(lane.disk_guard, "free_pct", return_value=4.0), \
+                patch.object(lane.doctor, "run"):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.dispatch(host), 1)
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertIsNone(tick["error"])
+            self.assertEqual(tick["admissionDenied"], "disk-critical")
+            self.assertNotIn("tick-error", lane.doctor.judge({"tick": tick, "now": 0.0}))
+
     def test_critical_disk_still_starts_the_worktree_sweep(self):
         # JOV-7704: admission denial must not also deny the cleanup that would end it.
         with tempfile.TemporaryDirectory() as tmp, \
