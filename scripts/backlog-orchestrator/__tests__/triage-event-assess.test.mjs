@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 import {
   assessTriageEvent as assessWithRealClient,
+  escalationBlockOf,
   parseTriageEvent,
   assessTriageSweep as sweepWithRealClient,
 } from '../triage-event-assess.mjs';
@@ -279,21 +280,68 @@ test('catch-up is bounded and reports deferred work rather than dropping it', as
 });
 
 test('the sweep CLI names failing and blocked rows instead of an anonymous exit', async () => {
-  // The workflow step consumes the module's CLI (--sweep); the exit rule is
-  // unchanged (failed > 0 || blocked > 0), but each failing or blocked row
-  // is annotated with its issue identifier so a red step names its rows.
+  // The workflow step consumes the module's CLI (--sweep); the exit rule
+  // keeps its full strength for every failure the sweep owns (failed > 0,
+  // or a blocked row with no provider-blocked escalation), and each
+  // failing/blocked/provider-blocked row is annotated by name.
   const source = readFileSync(
     new URL('../triage-event-assess.mjs', import.meta.url),
     'utf8'
   );
-  assert.match(
-    source,
-    /receipt\.failed > 0 \|\| receipt\.blocked > 0\) process\.exitCode = 1/
-  );
+  assert.match(source, /blockedWithoutEscalation > 0/);
   assert.match(source, /::error title=Triage assessment failed::/);
   assert.match(
     source,
     /::warning title=Urgent Triage investigation required::/
+  );
+  assert.match(source, /::warning title=Triage escalation provider-blocked::/);
+});
+
+test('a Summer provider-blocked escalation is named and counted without failing the sweep', async () => {
+  const blocked = issue({ identifier: 'JOV-8015', priority: 1 });
+  const urgent = issue({ identifier: 'JOV-6500', priority: 1 });
+  const escalated = {
+    ...(await summer('existing-intake-reconcile')()),
+    escalation: {
+      status: 'provider-block',
+      code: 'reason-lane-model-capacity-cost-binding-unverified',
+      requestedModel: 'openai/gpt-6.1-sol',
+      owner: 'Gem reason lane',
+    },
+  };
+  const receipt = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [blocked, urgent],
+      fetchIssue: async id => (id === blocked.identifier ? blocked : urgent),
+    },
+    async delivery =>
+      delivery.identifier === blocked.identifier
+        ? escalated
+        : summer('urgent-investigation-required')()
+  );
+  assert.equal(receipt.providerBlocked, 1);
+  assert.equal(receipt.blocked, 1);
+  assert.equal(receipt.failed, 0);
+  const escalatedRow = receipt.results.find(
+    result => result.issue === 'JOV-8015'
+  );
+  assert.equal(escalatedRow.escalation.status, 'provider-block');
+  assert.equal(
+    escalatedRow.escalation.code,
+    'reason-lane-model-capacity-cost-binding-unverified'
+  );
+
+  assert.equal(escalationBlockOf(escalated).code, escalated.escalation.code);
+  assert.equal(
+    escalationBlockOf(await summer('urgent-investigation-required')()),
+    null
+  );
+  assert.equal(escalationBlockOf(null), null);
+  assert.equal(
+    escalationBlockOf({
+      escalation: { status: 'provider-unavailable', code: 'other' },
+    }),
+    null
   );
 });
 
