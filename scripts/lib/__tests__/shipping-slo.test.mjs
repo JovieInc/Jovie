@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { collectRaw } from '../../shipping-slo-report.mjs';
+// This suite is selected by the maintained CI structural regression manifest.
+import './shipping-slo-intake.test.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   /** @type {typeof import('node:child_process')} */
