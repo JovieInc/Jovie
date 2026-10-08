@@ -78,6 +78,74 @@ for (const operator of [false, true]) {
 }
 
 for (const operator of [false, true]) {
+  test(`Electron zoom keeps ${operator ? 'Ovie' : 'Jovie'} titlebar controls fully contained`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 720, height: 450 });
+    await page.addInitScript(() => {
+      Object.assign(window, { electronAPI: { platform: 'darwin' } });
+      document.addEventListener('DOMContentLoaded', () => {
+        document.documentElement.dataset.desktopRuntime = 'electron';
+      });
+    });
+    await page.goto(story(operator), { waitUntil: 'domcontentloaded' });
+    const toggle = page.getByTestId('electron-sidebar-toggle');
+    await expect(toggle).toBeVisible();
+    const titlebar = page.getByTestId('electron-titlebar-row');
+    const header = page.locator('[data-app-shell-header="true"]');
+    // Actual Electron zoom2 reports a22px native overlay in CSS coordinates.
+    // Zooming out can report a taller overlay; preserve that native clearance.
+    for (const nativeHeight of [22, 44, 55]) {
+      await page.evaluate(height => {
+        document.documentElement.style.setProperty(
+          '--electron-native-titlebar-height',
+          `${height}px`
+        );
+      }, nativeHeight);
+      const bounds = await titlebar.boundingBox();
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+      expect(bounds!.height).toBeGreaterThanOrEqual(nativeHeight);
+      expect((await header.boundingBox())!.height).toBe(bounds!.height);
+      const controls = [
+        'ask-jovie-trigger',
+        'electron-sidebar-toggle',
+        'electron-nav-back',
+        'electron-nav-forward',
+      ];
+      for (const id of controls) {
+        const control = await titlebar.getByTestId(id).boundingBox();
+        expect(control!.y).toBeGreaterThanOrEqual(0);
+        expect(control!.y + control!.height).toBeLessThanOrEqual(
+          bounds!.y + bounds!.height
+        );
+        expect(control!.x).toBeGreaterThanOrEqual(bounds!.x);
+        expect(control!.x + control!.width).toBeLessThanOrEqual(720);
+      }
+      expect((await toggle.boundingBox())!.height).toBe(28);
+      expect((await toggle.boundingBox())!.width).toBe(28);
+      const closedHeader = await header.boundingBox();
+      const closedToggle = await toggle.boundingBox();
+      await toggle.press('Enter');
+      const drawer = page.locator(
+        '[data-sidebar="sidebar"][data-mobile="true"]'
+      );
+      await expect(drawer).toBeVisible();
+      await expect(
+        drawer.getByRole('link', {
+          name: operator ? 'Now' : 'Home',
+          exact: true,
+        })
+      ).toBeVisible();
+      expect(await header.boundingBox()).toEqual(closedHeader);
+      expect(await toggle.boundingBox()).toEqual(closedToggle);
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeHidden();
+      await expect(toggle).toBeFocused();
+    }
+  });
+}
+
+for (const operator of [false, true]) {
   test(`shared ${operator ? 'Ovie' : 'Jovie'} rail keeps vertical geometry and exclusive controls`, async ({
     page,
   }, info) => {

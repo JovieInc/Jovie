@@ -1506,7 +1506,11 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
   assert.match(
     globalsCss,
-    /--electron-titlebar-height: env\(titlebar-area-height, 44px\);/
+    /--electron-native-titlebar-height: env\(titlebar-area-height, 44px\);/
+  );
+  assert.match(
+    globalsCss,
+    /--electron-titlebar-height: max\(44px, var\(--electron-native-titlebar-height\)\);/
   );
   assert.match(
     globalsCss,
@@ -1559,7 +1563,7 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   );
   const titlebarHeight = Number(
     globalsCss.match(
-      /--electron-titlebar-height: env\(titlebar-area-height, (\d+)px\);/
+      /--electron-native-titlebar-height: env\(titlebar-area-height, (\d+)px\);/
     )?.[1]
   );
   const safeWidth = Number(

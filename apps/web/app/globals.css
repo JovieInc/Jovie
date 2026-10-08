@@ -110,7 +110,10 @@ body {
 }
 
 html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: env(titlebar-area-height, 44px);
+  --electron-native-titlebar-height: env(titlebar-area-height, 44px);
+  /* Electron reports native bounds in zoomed CSS coordinates. Keep the
+     application hit targets inside a full row, including at 200% zoom. */
+  --electron-titlebar-height: max(44px, var(--electron-native-titlebar-height));
   /* Native reserve + shell inset (8), cell padding (20), brand (38),
      toggle (28), history controls (50), and three gaps (18). Reserve the
      full hit targets so collapsing never squeezes a control into the title. */
