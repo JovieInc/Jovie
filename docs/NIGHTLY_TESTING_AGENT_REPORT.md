@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37736956512)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37765178725)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-08T06:40:17.736Z
+Generated: 2026-10-08T11:04:57.833Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -19,10 +19,10 @@ Workflow conclusion: failure
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 7871 | 7841 | 2 | 0 | 28 |
-| unit | 7618 | 7585 | 1 | 0 | 32 |
-| unit | 8184 | 8145 | 1 | 0 | 38 |
-| unit | 10433 | 10429 | 0 | 0 | 4 |
+| unit | 7827 | 7791 | 4 | 0 | 32 |
+| unit | 7638 | 7621 | 0 | 0 | 17 |
+| unit | 10154 | 10150 | 0 | 0 | 4 |
+| unit | 8518 | 8469 | 0 | 0 | 49 |
 
 ## Selected Targets
 
@@ -46,7 +46,7 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-g2d1TV/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-nKldKA/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for 99719a1f942965f737c742287465fb5bc2aeb042: expected null not to be null |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-lYv0H4/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-oFvlh4/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
 | unit | tests/unit/design-system/story-source-sha-ancestry.test.ts story receipt SHA ancestry > keeps every literal receipt ancestral and able to replay its story path |  | expected 3 to be 5 // Object.is equality |
-| unit | tests/unit/storybook/story-quality-guard.test.ts storybook story quality guard > passes on the current product story library and provenance receipts |  | Test timed out in 60000ms. If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTime |

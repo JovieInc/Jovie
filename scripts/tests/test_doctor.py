@@ -61,6 +61,42 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_failed_event_delivery_is_actionable_and_acknowledgement_clears_it(self):
+        failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryExhausted': 0, 'deliveryNextAt': 100}})
+        alerts = doctor.judge(failed)
+        self.assertIn('remediation-delivery', alerts)
+        receipt = doctor.condition_receipts(alerts, {}, failed, 'gem')['remediation-delivery']
+        self.assertEqual(receipt['recovery']['action'], 'repair-and-read-back-existing-event-delivery')
+        self.assertEqual(doctor.judge(obs(tick={'remediationEvents': {'deliveryFailed': 0}})), {})
+
+    def test_reconciliation_error_reports_durable_delivery_state_instead_of_inventing_a_failure(self):
+        current = obs(tick={
+            'remediationEventsError': 'RuntimeError: remediation-inventory-unreadable',
+            'remediationEvents': {'deliveryFailed': 0, 'deliveryExhausted': 0, 'deliveryNextAt': None},
+        })
+        alert = doctor.judge(current)['remediation-delivery']
+        self.assertIn('reconciliation failed', alert)
+        self.assertIn('remediation-inventory-unreadable', alert)
+        self.assertIn('journal failed=0, exhausted=0, next retry=None', alert)
+        self.assertNotIn('lacks authoritative acknowledgement', alert)
+        self.assertNotIn('unknown', alert)
+
+    def test_busy_unknown_and_stale_delivery_cannot_resolve_prior_failure(self):
+        failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryObservedAt': 1_000_000.0}})
+        prior = {'conditions': doctor.condition_receipts(doctor.judge(failed), {}, failed, 'gem')}
+        for report in [{'deliveryBusy': True}, {}, {'deliveryFailed': 0},
+                       {'deliveryFailed': 0, 'deliveryPending': 0, 'deliveryObservedAt': 900_000.0}]:
+            with self.subTest(report=report):
+                current = obs(tick={'remediationEvents': report})
+                alerts = doctor.judge(current, prior)
+                receipt = doctor.condition_receipts(alerts, prior, current, 'gem')['remediation-delivery']
+                self.assertEqual(receipt['state'], 'active')
+                self.assertEqual(receipt['deadlineAt'], prior['conditions']['remediation-delivery']['deadlineAt'])
+        good = obs(tick={'remediationEvents': {'deliveryFailed': 0, 'deliveryPending': 0, 'deliveryObservedAt': 1_000_000.0}})
+        alerts = doctor.judge(good, prior)
+        self.assertNotIn('remediation-delivery', alerts)
+        self.assertEqual(doctor.condition_receipts(alerts, prior, good, 'gem')['remediation-delivery']['state'], 'resolved')
+
     def test_design_brief_held_past_24h_alerts(self):
         alerts = doctor.judge(obs(designGate={"stale": ["JOV-3"]}))
         self.assertIn("JOV-3", alerts["design-brief-stale"])

@@ -552,6 +552,35 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    delivery = tick.get("remediationEvents") or {}
+    delivery_error = tick.get("remediationEventsError")
+    if delivery.get("deliveryFailed"):
+        alerts["remediation-delivery"] = (
+            "remediation action lacks authoritative acknowledgement; "
+            f"failed={delivery.get('deliveryFailed', 'unknown')}, "
+            f"exhausted={delivery.get('deliveryExhausted', 'unknown')}, "
+            f"next retry={delivery.get('deliveryNextAt', 'unknown')}"
+            + (f", reconciliation error={delivery_error}" if delivery_error else "")
+            + "; inspect event-delivery.json")
+    elif delivery_error:
+        status_error = tick.get("remediationDeliveryStatusError")
+        journal = ("journal status unavailable"
+                   if status_error else
+                   f"journal failed={delivery.get('deliveryFailed', 'unknown')}, "
+                   f"exhausted={delivery.get('deliveryExhausted', 'unknown')}, "
+                   f"next retry={delivery.get('deliveryNextAt', 'unknown')}")
+        alerts["remediation-delivery"] = (
+            f"remediation reconciliation failed before a healthy delivery pass; error={delivery_error}; "
+            f"{journal}"
+            + (f", status error={status_error}" if status_error else "")
+            + "; inspect event-delivery.json")
+    elif ((previous or {}).get("conditions") or {}).get("remediation-delivery", {}).get("state") == "active":
+        observed = delivery.get("deliveryObservedAt")
+        confirmed = (isinstance(observed, (int, float)) and 0 <= obs["now"] - observed <= 180
+                     and not delivery.get("deliveryBusy") and delivery.get("deliveryPending") == 0
+                     and delivery.get("deliveryFailed") == 0)
+        if not confirmed:
+            alerts["remediation-delivery"] = "remediation delivery remains unverified; retain prior failure owner and deadline"
     account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
     for name in tick.get("unhealthy", []):
         if name == "codex" and account_state["state"] in {"leases-occupied", "quota-banked", "cooldown"}:
@@ -730,6 +759,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
+        "remediation-delivery": "repair-and-read-back-existing-event-delivery",
     }
     resources = {
         "linear-down": ["linear", "pool"],

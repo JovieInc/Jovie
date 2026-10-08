@@ -1512,6 +1512,8 @@ class ClaimScanCacheTest(unittest.TestCase):
         self.saved = (lane.SHARED_CACHE_DIR, os.environ.pop("LANES_EXECUTION_BACKEND", None), lane.sh,
                       lane.lane_prs, lane.repo_prs)
         lane.SHARED_CACHE_DIR = Path(self.tmp.name)
+        self.summary = dict(lane._SUMMARY)
+        lane._SUMMARY.update(at=0.0, prs=[], readable=False)
         self.clock = {"now": 1_700_000_000.0}
         self.counts = {"issues": 0, "fix": 0, "flight": 0, "queued": 0}
 
@@ -1521,6 +1523,8 @@ class ClaimScanCacheTest(unittest.TestCase):
             os.environ.pop("LANES_EXECUTION_BACKEND", None)
         else:
             os.environ["LANES_EXECUTION_BACKEND"] = backend
+        lane._SUMMARY.clear()
+        lane._SUMMARY.update(self.summary)
         self.tmp.cleanup()
 
     def test_cache_hits_within_ttl_and_refreshes_after_it(self):
@@ -1556,7 +1560,11 @@ class ClaimScanCacheTest(unittest.TestCase):
             queued = lane.pr_events.queued_prs(lane, ("red",))
             return issues, fixes, flight, queued
 
-        with patch.object(lane.time, "time", lambda: self.clock["now"]):
+        def inventory(_module):
+            self.counts["queued"] += 1
+            return []
+        with patch.object(lane.time, "time", lambda: self.clock["now"]), \
+                patch.object(lane.pr_events, "open_prs_state", side_effect=inventory):
             issues, fixes, flight, queued = read_all()
             self.assertEqual([item.identifier for item in issues], ["JOV-1", "JOV-2"])
             self.assertEqual(fixes[0]["number"], 1)
@@ -2932,12 +2940,19 @@ class DispatchTest(unittest.TestCase):
                 patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane.subprocess, "Popen") as spawn:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            lane._save_event_delivery(host, {
+                "schema": lane.EVENT_DELIVERY_SCHEMA,
+                "actions": {"delivery": {"key": "delivery", "kind": "comments", "status": "failed",
+                                         "nextAt": 123, "createdAt": 100}},
+            })
             self.assertEqual(lane.dispatch(host), 0)
             self.assertEqual(spawn.call_count, 1)
             self.assertEqual(spawn.call_args.args[0][-1], "codex")
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual(tick["spawned"], ["codex"])
             self.assertIsNone(tick["error"])
+            self.assertEqual(tick["remediationEvents"]["deliveryFailed"], 1)
+            self.assertEqual(tick["remediationEvents"]["deliveryNextAt"], 123)
             self.assertIn("reasonError", tick)
             self.assertIn("doctorError", tick)
 
@@ -6713,6 +6728,189 @@ process.stdout.write(JSON.stringify({ loaded: typeof metrics.computeMetrics === 
         self.assertEqual(json.loads(result.stdout)['blockers'], ['evidence-unavailable'])
 
 
+class EventDeliveryTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.host = lane.Host(state=root, repo=root)
+        self.events = {'fp': {'issueId': 'issue', 'status': 'exhausted', 'attempts': [{'kind': 'model', 'lane': 'codex'}], 'noted': ['signal-1']}}
+        lane.save_escalation(self.host, {'events': self.events})
+        self.issue = {'id': 'issue', 'state': {'id': 'done', 'name': 'Done'}, 'labels': {'nodes': []}}
+        self.comments, self.writes, self.transport_error, self.false = {}, [], None, False
+        self.missing_comment_error = False
+        self.linear = SimpleNamespace(gql=self.gql)
+
+    def gql(self, query, variables):
+        if query.startswith('query'):
+            if 'comment(' in query:
+                comment = self.comments.get(variables['id'])
+                if comment is None and self.missing_comment_error:
+                    raise RuntimeError('linear: Entity not found: Comment')
+                return {'comment': comment}
+            return {'issue': json.loads(json.dumps(self.issue))}
+        self.writes.append((query, variables))
+        if self.false:
+            field = 'commentCreate' if 'commentCreate' in query else 'issueUpdate' if 'issueUpdate' in query else 'issueAddLabel'
+            return {field: {'success': False}}
+        if 'commentCreate' in query:
+            value = variables['i']
+            self.comments[value['id']] = {'id': value['id'], 'body': value['body'], 'issue': {'id': value['issueId']}}
+            field = 'commentCreate'
+        elif 'issueUpdate' in query:
+            self.issue['state'] = {'id': variables['s'], 'name': 'Todo'}
+            field = 'issueUpdate'
+        else:
+            self.issue['labels']['nodes'].append({'id': variables['l']})
+            field = 'issueAddLabel'
+        if self.transport_error:
+            raise self.transport_error
+        return {field: {'success': True}}
+
+    def intent(self, **actions):
+        plan = {'events': self.events, **actions}
+        data = lane._event_delivery_state(self.host)
+        lane._queue_event_delivery(data, plan, [self.issue], {'fp'}, 100)
+        lane._save_event_delivery(self.host, data)
+        return data
+
+    def drain(self, now=100):
+        return lane._apply_event_plan(self.linear, {}, self.host, lane._event_delivery_state(self.host), now)
+
+    def test_intent_survives_restart_before_send_and_readback_is_required(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        report = self.drain()
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        self.assertEqual(len(self.writes), 1)
+        row = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+        self.assertEqual(row['history'][-1]['outcome'], 'authoritative-readback')
+        self.drain(200)
+        self.assertEqual(len(self.writes), 1)
+        self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
+
+    def test_linear_missing_comment_error_is_the_absent_preimage_before_send(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        self.missing_comment_error = True
+        report = self.drain()
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        self.assertEqual(report['deliveryFailed'], 0)
+        self.assertEqual(len(self.writes), 1)
+
+    def test_timeout_after_remote_acceptance_is_read_back_without_duplicate_send(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        self.transport_error = TimeoutError('remote timeout')
+        self.assertEqual(self.drain()['deliveryFailed'], 1)
+        self.assertEqual(self.drain(120)['deliveryFailed'], 1)  # backoff
+        self.transport_error = None
+        self.assertEqual(self.drain(160)['deliveryAcknowledged'], 1)
+        self.assertEqual(len(self.writes), 1)
+
+    def test_rejection_is_durable_and_transport_cap_never_resets_model_attempts(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        self.false = True
+        for now in [100, 160, 460, 1000]:
+            report = self.drain(now)
+        self.assertEqual(report['deliveryExhausted'], 1)
+        self.assertEqual(len(self.writes), 3)
+        self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
+        row = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+        self.assertTrue(any(x.get('error') == 'event-mutation-rejected' for x in row['history']))
+        self.assertEqual(row['attempts'], 3)
+
+    def test_partial_plan_retries_only_unacknowledged_actions(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}], labels=[{'id': 'issue', 'labelId': 'label'}])
+        self.assertEqual(self.drain()['deliveryAcknowledged'], 1)
+        self.false = True
+        self.assertEqual(self.drain(101)['deliveryFailed'], 1)
+        self.false = False
+        self.assertEqual(self.drain(161)['deliveryAcknowledged'], 2)
+        self.assertEqual(sum('commentCreate' in q for q, _ in self.writes), 1)
+        self.assertEqual(sum('issueAddLabel' in q for q, _ in self.writes), 2)
+
+    def test_changed_owner_preimage_produces_zero_mutations_and_preserves_caps(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        current = json.loads(json.dumps(self.events));current['fp']['attempts'].append({'kind': 'model', 'lane': 'devin'})
+        lane.save_escalation(self.host, {'events': current})
+        self.assertEqual(self.drain()['deliveryFailed'], 1)
+        self.assertEqual(self.writes, [])
+        self.assertEqual(lane.load_escalation(self.host)['events'], current)
+
+    def test_remote_state_changed_at_local_write_fence_is_revalidated(self):
+        self.intent(reopens=[{'id': 'issue', 'stateId': 'todo'}])
+        original = lane._event_escalation
+        def changed(host):
+            self.issue['state'] = {'id': 'active', 'name': 'In Progress'}
+            return original(host)
+        with patch.object(lane, '_event_escalation', side_effect=changed):
+            self.assertEqual(self.drain()['deliveryFailed'], 1)
+        self.assertEqual(self.writes, [])
+        self.assertEqual(self.issue['state']['name'], 'In Progress')
+
+    def test_comment_id_survives_reopen_state_change_between_hosts(self):
+        first = self.intent(reopens=[{'id': 'issue', 'stateId': 'todo'}], comments=[{'id': 'issue', 'body': 'same intent'}])
+        self.drain();self.drain(101)
+        comment = [row for row in first['actions'].values() if row['kind'] == 'comments'][0]
+        data = {'schema': lane.EVENT_DELIVERY_SCHEMA, 'actions': {}}
+        lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'same intent'}]}, [self.issue], {'fp'}, 200)
+        later = next(iter(data['actions'].values()))
+        self.assertEqual(comment['commentId'], later['commentId'])
+        lane._apply_event_plan(self.linear, {}, self.host, data, 200)
+        self.assertEqual(sum('commentCreate' in q for q, _ in self.writes), 1)
+
+    def test_changed_remote_state_is_not_downgraded(self):
+        self.intent(reopens=[{'id': 'issue', 'stateId': 'todo'}])
+        self.issue['state'] = {'id': 'active', 'name': 'In Progress'}
+        self.assertEqual(self.drain()['deliveryFailed'], 1)
+        self.assertEqual(self.writes, [])
+
+    def test_reopen_already_applied_is_acknowledged_after_restart(self):
+        self.intent(reopens=[{'id': 'issue', 'stateId': 'todo'}])
+        self.issue['state'] = {'id': 'todo', 'name': 'Todo'}
+        self.assertEqual(self.drain()['deliveryAcknowledged'], 1)
+        self.assertEqual(self.writes, [])
+
+    def test_corrupt_journal_is_preserved_and_fails_closed(self):
+        path = self.host.state / 'event-delivery.json';path.write_text('{broken')
+        with self.assertRaises(ValueError):
+            self.drain()
+        self.assertEqual(path.read_text(), '{broken')
+        self.assertEqual(self.writes, [])
+
+    def test_missing_readback_is_not_delivery_and_pending_reopen_blocks_worker(self):
+        data = self.intent(reopens=[{'id': 'issue', 'stateId': 'todo'}])
+        self.linear.gql = lambda *_: {}
+        self.assertEqual(self.drain()['deliveryFailed'], 1)
+        self.events['fp'].update(status='claimed', lane='codex', startedStateId='started')
+        lane.save_escalation(self.host, {'events': self.events})
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        self.assertFalse(lane.load_escalation(self.host)['events']['fp'].get('running', False))
+
+    def test_cross_host_stable_id_and_remote_readback_deduplicate_comment(self):
+        first = self.intent(comments=[{'id': 'issue', 'body': 'same intent'}])
+        self.drain()
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp));lane.save_escalation(host, {'events': self.events})
+            data = lane._event_delivery_state(host)
+            lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'same intent'}]}, [self.issue], {'fp'}, 200)
+            lane._save_event_delivery(host, data)
+            self.assertEqual(set(first['actions']), set(data['actions']))
+            report = lane._apply_event_plan(self.linear, {}, host, data, 200)
+            self.assertEqual(report['deliveryAcknowledged'], 1)
+            self.assertEqual(len(self.writes), 1)
+
+    def test_crash_after_intent_persistence_sends_nothing(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        with patch.object(lane, '_save_event_delivery', side_effect=OSError('disk unavailable')):
+            with self.assertRaises(OSError):
+                self.drain()
+        self.assertEqual(self.writes, [])
+
+    def test_losing_planner_enqueues_no_actions(self):
+        data = lane._event_delivery_state(self.host)
+        lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'one receipt'}]}, [self.issue], set(), 100)
+        self.assertEqual(data['actions'], {})
+
+
 class RemediationEventRecoveryTest(unittest.TestCase):
     def setUp(self):
         from scripts.tests.test_remediation import linear_issue, providers
@@ -6721,7 +6919,15 @@ class RemediationEventRecoveryTest(unittest.TestCase):
         root = Path(self.tmp.name)
         self.host = lane.Host(state=root, repo=root)
         self.issue = linear_issue('JOV-1', 'delivery-stalled', title='Gem delivery stalled')
-        self.linear = SimpleNamespace(gql=lambda *_: {}, comment=lambda *_: None)
+        self.remote_state = {'id': 'todo-JOV', 'name': 'Todo'}
+        def gql(query, variables):
+            if query.startswith('query') and 'issue(' in query:
+                return {'issue': {'id': self.issue['id'], 'state': self.remote_state, 'labels': {'nodes': []}}}
+            if query.startswith('mutation') and 'issueUpdate' in query:
+                self.remote_state = {'id': variables['s'], 'name': 'In Progress'}
+                return {'issueUpdate': {'success': True}}
+            return {}
+        self.linear = SimpleNamespace(gql=gql, comment=lambda *_: None)
         for target, value in [('fetch_labeled_events', [self.issue]), ('load_providers', providers()),
                               ('cooling', False), ('provider_healthy', True)]:
             mock = patch.object(lane, target, return_value=value)
@@ -6742,16 +6948,127 @@ class RemediationEventRecoveryTest(unittest.TestCase):
         self.assertEqual(after['attempts'], before['attempts'])
         self.assertEqual(after['claimedAt'], before['claimedAt'])
 
+    def test_rejected_unknown_or_failed_start_never_admits_model_or_erases_attempts(self):
+        event = {'issueId': self.issue['id'], 'identifier': 'JOV-1', 'status': 'claimed', 'lane': 'codex',
+                 'startedStateId': 'ip-JOV', 'attempts': [{'kind': 'model', 'lane': 'codex'}]}
+        for failure in [False, TimeoutError('transport unavailable'), {}]:
+            with self.subTest(failure=failure):
+                lane.save_escalation(self.host, {'events': {'delivery-stalled': event.copy()}})
+                def gql(query, variables):
+                    if query.startswith('query'):
+                        return {'issue': {'id': self.issue['id'], 'state': {'id': 'todo', 'name': 'Todo'}}}
+                    if isinstance(failure, Exception):
+                        raise failure
+                    return {'issueUpdate': {'success': failure}} if failure is False else failure
+                self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', SimpleNamespace(gql=gql)))
+                row = lane.load_escalation(self.host)['events']['delivery-stalled']
+                self.assertFalse(row.get('running', False))
+                self.assertEqual(row['attempts'], event['attempts'])
+                self.assertEqual(row['startDelivery']['status'], 'failed')
+
+    def test_rejected_or_timeout_start_cannot_adopt_other_host_after_restart(self):
+        for failure in [False, TimeoutError("transport unknown")]:
+            with self.subTest(failure=failure):
+                event = {"issueId": self.issue["id"], "identifier": "JOV-1", "status": "claimed", "lane": "codex",
+                         "startedStateId": "ip-JOV", "attempts": [{"kind": "model", "lane": "codex", "at": 1}]}
+                lane.save_escalation(self.host, {"events": {"delivery-stalled": event}})
+                state = {"id": "todo-JOV", "name": "Todo"}
+                writes = []
+                def gql(query, variables):
+                    if query.startswith("query"):
+                        return {"issue": {"id": self.issue["id"], "state": state}}
+                    writes.append(variables)
+                    if isinstance(failure, Exception):
+                        raise failure
+                    return {"issueUpdate": {"success": failure}}
+                client = SimpleNamespace(gql=gql)
+                with patch.object(lane.time, "time", return_value=100):
+                    self.assertIsNone(lane.claim_labeled_event(self.host, "codex", client))
+                # A different writer starts the issue before this process restarts.
+                state = {"id": "ip-JOV", "name": "In Progress"}
+                with patch.object(lane.time, "time", return_value=161):
+                    self.assertIsNone(lane.claim_labeled_event(self.host, "codex", client))
+                row = lane.load_escalation(self.host)["events"]["delivery-stalled"]
+                self.assertFalse(row.get("running", False))
+                self.assertEqual(row["attempts"], event["attempts"])
+                self.assertEqual(row["startDelivery"]["attempts"], 1)
+                self.assertEqual(row["startDelivery"]["error"], "event-start-ownership-unproven")
+                self.assertEqual(len(writes), 1)
+
+    def test_contradicted_success_cannot_survive_rejected_retry_and_other_host_start(self):
+        event = {"issueId": self.issue["id"], "identifier": "JOV-1", "status": "claimed", "lane": "codex",
+                 "startedStateId": "ip-JOV", "attempts": [{"kind": "model", "at": 1}]}
+        lane.save_escalation(self.host, {"events": {"delivery-stalled": event}})
+        state = {"id": "todo-JOV", "name": "Todo"}
+        results = iter([True, False]); writes = []
+        def gql(query, variables):
+            if query.startswith("query"):
+                return {"issue": {"id": self.issue["id"], "state": state}}
+            writes.append(variables)
+            return {"issueUpdate": {"success": next(results)}}
+        client = SimpleNamespace(gql=gql)
+        for now in [100, 161]:
+            with patch.object(lane.time, "time", return_value=now):
+                self.assertIsNone(lane.claim_labeled_event(self.host, "codex", client))
+            self.assertNotIn("mutationReceipt", lane.load_escalation(self.host)["events"]["delivery-stalled"]["startDelivery"])
+        state = {"id": "ip-JOV", "name": "In Progress"}
+        with patch.object(lane.time, "time", return_value=222):
+            self.assertIsNone(lane.claim_labeled_event(self.host, "codex", client))
+        row = lane.load_escalation(self.host)["events"]["delivery-stalled"]
+        self.assertFalse(row.get("running", False))
+        self.assertEqual(row["startDelivery"]["attempts"], 2)
+        self.assertEqual(row["attempts"], event["attempts"])
+        self.assertEqual(len(writes), 2)
+
+    def test_paired_commit_crash_recovers_original_attempt_without_replanning_generation(self):
+        original = lane._save_event_json
+        def crash(host, filename, data):
+            if filename == "escalation.json":
+                raise OSError("simulated crash between paired files")
+            return original(host, filename, data)
+        with patch.object(lane, "_save_event_json", side_effect=crash), patch.object(lane.time, "time", return_value=100):
+            with self.assertRaises(OSError):
+                lane.claim_remediation_events(self.host, self.linear)
+        journal = lane._event_delivery_state(self.host)
+        planned = json.loads(json.dumps(journal["prepared"]["rows"]["delivery-stalled"]["after"]))
+        self.assertEqual(planned["attempts"][0]["at"], 100)
+        self.assertEqual(lane.load_escalation(self.host).get("events", {}), {})
+        with patch.object(lane.time, "time", return_value=200):
+            lane.claim_remediation_events(self.host, self.linear)
+        current = lane.load_escalation(self.host)["events"]["delivery-stalled"]
+        self.assertEqual(current["attempts"], planned["attempts"])
+        recovered = lane._event_delivery_state(self.host)
+        self.assertNotIn("prepared", recovered)
+        self.assertTrue(recovered["commits"])
+        self.assertFalse(any(row.get("error") == "event-owner-preimage-changed" for row in recovered["actions"].values()))
+
+    def test_prepared_recovery_preserves_concurrent_winner_and_suppresses_old_intent(self):
+        before = {"issueId": "old", "attempts": []}
+        after = {"issueId": "old", "attempts": [{"kind": "model", "at": 100}], "noted": ["x"]}
+        winner = {"issueId": "new", "attempts": [{"kind": "model", "at": 90}, {"kind": "model", "at": 110}], "running": True}
+        lane.save_escalation(self.host, {"events": {"fp": winner}})
+        journal = lane._event_delivery_state(self.host)
+        lane._queue_event_delivery(journal, {"events": {"fp": after}, "comments": [{"id": "old", "body": "old intent"}]}, [], {"fp"}, 100)
+        journal["prepared"] = {"id": "transaction", "rows": {"fp": {"before": before, "after": after}}}
+        lane._save_event_delivery(self.host, journal)
+        lane._recover_event_preparation(self.host, journal)
+        self.assertEqual(lane.load_escalation(self.host)["events"]["fp"], winner)
+        self.assertEqual(next(iter(journal["actions"].values()))["status"], "superseded")
+        self.assertEqual(journal["commits"][-1]["conflicts"], ["fp"])
+
     def test_concurrent_terminal_receipt_and_attempts_win_whole_row(self):
         lane.save_escalation(self.host, {'events': {'delivery-stalled': {
             'issueId': self.issue['id'], 'status': 'done', 'attempts': []}}})
         terminal = {'issueId': self.issue['id'], 'status': 'exhausted', 'running': False,
                     'attempts': [{'kind': 'model', 'lane': 'codex', 'head': 'delivery-stalled'}],
                     'receipt': 'newer-worker-finish'}
-        def finish(*_):
+        planner = lane.remediation.plan_labeled_events
+        def finish(*args, **kwargs):
+            plan = planner(*args, **kwargs)
             lane.save_escalation(self.host, {'events': {'delivery-stalled': terminal,
                                   'other': {'status': 'claimed', 'running': True}}})
-        with patch.object(lane, '_apply_event_plan', side_effect=finish):
+            return plan
+        with patch.object(lane.remediation, 'plan_labeled_events', side_effect=finish):
             report = lane.claim_remediation_events(self.host, self.linear)
         self.assertEqual(lane.load_escalation(self.host)['events']['delivery-stalled'], terminal)
         self.assertTrue(lane.load_escalation(self.host)['events']['other']['running'])

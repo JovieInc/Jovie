@@ -25,7 +25,12 @@ describe('production controller risk lane (JOV-5939 follow-up)', () => {
     expect(step).toContain(
       'head_sha=$SOURCE_SHA&event=merge_group&status=success'
     );
-    expect(step).toContain('select(.path == ".github/workflows/ci.yml")');
+    expect(step).toContain(
+      'select(.path == ".github/workflows/ci.yml" and .head_sha =='
+    );
+    expect(step).toContain(
+      '.event == "merge_group" and .status == "completed" and .conclusion == "success")'
+    );
     expect(step).toContain('ci-risk-classification-');
     expect(step).toContain(
       'SOURCE_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}'
