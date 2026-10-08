@@ -550,7 +550,7 @@ describe('Statsig server initialization', () => {
     'keeps an environment stop authoritative (production=$production, admin=$admin)',
     async ({ production, admin }) => {
       if (production) {
-        process.env.NODE_ENV = 'production';
+        vi.stubEnv('NODE_ENV', 'production');
         process.env.VERCEL_ENV = 'production';
       }
       mockIsAdmin.mockResolvedValue(admin);
@@ -581,7 +581,7 @@ describe('Statsig server initialization', () => {
   );
 
   it('rereads a stopped feature after an authorized environment repair', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     process.env.VERCEL_ENV = 'production';
     mockIsAdmin.mockResolvedValue(true);
     mockGetFlagOverrideMap
@@ -600,7 +600,7 @@ describe('Statsig server initialization', () => {
   });
 
   it('retains the personal ordinary-experience opt-out when the environment enables a feature', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     process.env.VERCEL_ENV = 'production';
     mockIsAdmin.mockResolvedValue(true);
     mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: true });
@@ -620,7 +620,7 @@ describe('Statsig server initialization', () => {
   it.each(['enabled', 'unavailable'])(
     'retains the existing ordinary-user fallback with an %s override store',
     async store => {
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       process.env.VERCEL_ENV = 'production';
       if (store === 'enabled') {
         mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: true });
