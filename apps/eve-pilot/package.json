@@ -23,7 +23,7 @@
     "@opentelemetry/api": "1.9.1",
     "@vercel/blob": "2.8.1",
     "ai": "7.0.122",
-    "braintrust": "3.36.0",
+    "braintrust": "3.37.0",
     "eve": "0.71.3",
     "just-bash": "3.6.0",
     "microsandbox": "0.7.7",
