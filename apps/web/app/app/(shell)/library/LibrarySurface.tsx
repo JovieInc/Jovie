@@ -2364,6 +2364,7 @@ function AssetDrawer({
       objectHeader={
         current ? (
           <EntityHeader
+            className='px-3 pt-3'
             thumbnail={
               <div className='h-12 w-12 shrink-0 overflow-hidden'>
                 <LibraryMediaThumbnail asset={current} size='drawer' />
