@@ -49,6 +49,9 @@ vi.mock('next/image', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  LoadingSkeleton: ({ label }: { label: string }) => (
+    <div role='status' aria-label={label} />
+  ),
   Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
     open ? <div role='dialog'>{children}</div> : null,
   DialogContent: ({ children }: { children: ReactNode }) => (
@@ -186,6 +189,30 @@ function makeDashboard(isAdmin = false): DashboardData {
 function CommandPaletteHeaderHarness() {
   const { commandPaletteHeader } = useHeaderActions();
   return <div>{commandPaletteHeader}</div>;
+}
+
+function PageSearchTrigger() {
+  const { openPageSearch } = useHeaderActions();
+  return (
+    <button
+      type='button'
+      onClick={() =>
+        openPageSearch([
+          {
+            kind: 'nav',
+            id: 'ov-people',
+            label: 'People',
+            description: 'Permitted people page',
+            iconName: 'Users',
+            href: '/app/ov/people',
+            surfaces: ['cmdk'],
+          },
+        ])
+      }
+    >
+      Find a page
+    </button>
+  );
 }
 
 function CommandPaletteState() {
@@ -428,6 +455,35 @@ describe('CommandPalette', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(pushMock).toHaveBeenCalledWith('/app/calendar');
+  });
+
+  it('confines Find a page to the supplied permitted destinations without chat or skill results', async () => {
+    render(
+      withDashboard(
+        <>
+          <CommandPalette />
+          <PageSearchTrigger />
+        </>,
+        true
+      )
+    );
+    const trigger = screen.getByRole('button', { name: 'Find a page' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const search = await screen.findByLabelText('Command Palette Search');
+    expect(search).toHaveAttribute('placeholder', 'Find a page…');
+    expect(search).toHaveFocus();
+    const list = screen.getByTestId('cmdk-main-plane');
+    expect(within(list).getAllByRole('option')).toHaveLength(1);
+    expect(within(list).getByRole('option')).toHaveTextContent('People');
+    expect(within(list).queryByText('Recent Chats')).toBeNull();
+    expect(within(list).queryByText('Workspace')).toBeNull();
+    fireEvent.change(search, { target: { value: 'People' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith('/app/ov/people')
+    );
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it('lists recent chats with safe fallback titles', async () => {

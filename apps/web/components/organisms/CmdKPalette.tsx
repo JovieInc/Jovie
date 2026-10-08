@@ -63,6 +63,7 @@ import {
 } from './SharedCommandPalette';
 
 interface CmdKPaletteProps {
+  readonly pages?: readonly NavCommand[];
   readonly profileId: string;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -80,7 +81,13 @@ interface CmdKPaletteProps {
   readonly onHeaderChange?: (header: ReactNode | null) => void;
 }
 
-function useCmdkData(profileId: string, query: string, open: boolean) {
+function useCmdkData(
+  profileId: string,
+  query: string,
+  open: boolean,
+  pages?: readonly NavCommand[]
+) {
+  const includeEntities = open && pages === undefined;
   const youtubeWorkspaceNav = useAppFlag('YOUTUBE_WORKSPACE_NAV');
   const jovieWorkNav = useAppFlag('JOVIE_WORK_NAV');
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
@@ -96,27 +103,29 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
   );
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
     profileId,
-    enabled: open,
+    enabled: includeEntities,
   });
   const skills = useMemo(
     () =>
       filterSkillsHidingBrokenAlbumArt(
-        commands.filter((c): c is SkillCommand => c.kind === 'skill'),
+        pages === undefined
+          ? commands.filter((c): c is SkillCommand => c.kind === 'skill')
+          : [],
         chatCapabilities?.tools.albumArt
       ),
-    [chatCapabilities?.tools.albumArt, commands]
+    [chatCapabilities?.tools.albumArt, commands, pages]
   );
   const navs = useMemo(
-    () => commands.filter((c): c is NavCommand => c.kind === 'nav'),
-    [commands]
+    () => pages ?? commands.filter((c): c is NavCommand => c.kind === 'nav'),
+    [commands, pages]
   );
 
-  const releases = useReleasesQuery(profileId, { enabled: open });
+  const releases = useReleasesQuery(profileId, { enabled: includeEntities });
   const releaseData = releases.data;
   const releaseEntities = useMemo<EntityRef[]>(
     () =>
       rankPaletteReleases(
-        (releaseData ?? []).filter(r =>
+        (includeEntities ? (releaseData ?? []) : []).filter(r =>
           releaseRowMatches(r as ReleaseLikeRow, query.trim().toLowerCase())
         )
       ).map(r =>
@@ -124,22 +133,23 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
           includeWorkflowStatus: true,
         })
       ),
-    [releaseData, query]
+    [releaseData, query, includeEntities]
   );
 
   const artistSearch = useArtistSearchQuery({ limit: 8, minQueryLength: 1 });
   const artistSearchSearch = artistSearch.search;
   const artistSearchClear = artistSearch.clear;
   useEffect(() => {
-    if (!open) return;
+    if (!includeEntities) return;
     artistSearchSearch(query);
-  }, [query, artistSearchSearch, open]);
+  }, [query, artistSearchSearch, includeEntities]);
   useEffect(() => {
-    if (!open) artistSearchClear();
-  }, [open, artistSearchClear]);
+    if (!includeEntities) artistSearchClear();
+  }, [includeEntities, artistSearchClear]);
   const artistEntities = useMemo<EntityRef[]>(
-    () => artistSearch.results.map(artistResultToEntityRef),
-    [artistSearch.results]
+    () =>
+      includeEntities ? artistSearch.results.map(artistResultToEntityRef) : [],
+    [artistSearch.results, includeEntities]
   );
 
   const sections = useMemo(
@@ -156,14 +166,16 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
 
   const hasArtistQuery = query.trim().length > 0;
   const isSearching =
-    releases.isLoading ||
-    releases.isFetching ||
-    (hasArtistQuery &&
-      (artistSearch.query.trim() !== query.trim() ||
-        artistSearch.isPending ||
-        artistSearch.state === 'loading'));
+    includeEntities &&
+    (releases.isLoading ||
+      releases.isFetching ||
+      (hasArtistQuery &&
+        (artistSearch.query.trim() !== query.trim() ||
+          artistSearch.isPending ||
+          artistSearch.state === 'loading')));
   const hasSearchError =
-    releases.isError || (hasArtistQuery && artistSearch.state === 'error');
+    includeEntities &&
+    (releases.isError || (hasArtistQuery && artistSearch.state === 'error'));
   const retrySearch = () => {
     if (releases.isError) void releases.refetch();
     if (hasArtistQuery && artistSearch.state === 'error') {
@@ -182,6 +194,7 @@ export function CmdKPalette({
   onAdditionalSelect,
   presentation = 'dialog',
   onHeaderChange,
+  pages,
 }: CmdKPaletteProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -207,7 +220,7 @@ export function CmdKPalette({
     isSearching,
     hasSearchError,
     retrySearch,
-  } = useCmdkData(profileId, query, open);
+  } = useCmdkData(profileId, query, open, pages);
   const pendingMessage =
     query.trim().length > 0 ? 'Searching…' : 'Loading results…';
   const filteredAdditional = useMemo(
@@ -440,7 +453,11 @@ export function CmdKPalette({
           setQuery(e.target.value);
           setSelectedIndex(0);
         }}
-        placeholder='Search Jovie or run a command…'
+        placeholder={
+          pages !== undefined
+            ? 'Find a page…'
+            : 'Search Jovie or run a command…'
+        }
         className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
         aria-label='Command Palette Search'
         role='combobox'
@@ -465,6 +482,7 @@ export function CmdKPalette({
     }
     onHeaderChange?.(
       <CmdKMainPlaneSearchInput
+        placeholder={pages !== undefined ? 'Find a page…' : undefined}
         value={query}
         open={open}
         onQueryChange={nextQuery => {
@@ -488,6 +506,7 @@ export function CmdKPalette({
     open,
     paletteDescriptionId,
     presentation,
+    pages,
     query,
   ]);
 

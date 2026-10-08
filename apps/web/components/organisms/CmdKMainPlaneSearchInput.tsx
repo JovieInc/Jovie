@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 interface CmdKMainPlaneSearchInputProps {
+  readonly placeholder?: string;
   readonly value: string;
   readonly open: boolean;
   readonly onQueryChange: (query: string) => void;
@@ -25,6 +26,7 @@ export function CmdKMainPlaneSearchInput({
   listId,
   activeRowId,
   descriptionId,
+  placeholder = 'Search Jovie or run a command…',
 }: CmdKMainPlaneSearchInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -50,7 +52,7 @@ export function CmdKMainPlaneSearchInput({
           event.stopPropagation();
           onKeyDown(event.nativeEvent);
         }}
-        placeholder='Search Jovie or run a command…'
+        placeholder={placeholder}
         className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
         aria-label='Command Palette Search'
         role='combobox'

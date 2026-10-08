@@ -15,6 +15,7 @@ import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
+import type { NavCommand } from '@/lib/commands/registry';
 import { isFormElement } from '@/lib/utils/keyboard';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +62,8 @@ interface HeaderActionsState {
   isSearchOpen: boolean;
   /** Main-plane command/search takeover state (JOV-3940). */
   isCommandPaletteOpen: boolean;
+  /** A defined list confines this invocation to already-permitted pages. */
+  commandPalettePages: readonly NavCommand[] | undefined;
   /** Replaces the breadcrumb slot while the command surface is active. */
   commandPaletteHeader: ReactNode;
 }
@@ -72,6 +75,10 @@ interface HeaderActionsDispatch {
   openSearch: () => void;
   closeSearch: () => void;
   openCommandPalette: () => void;
+  openPageSearch: (
+    pages: readonly NavCommand[],
+    returnFocus?: HTMLElement
+  ) => void;
   closeCommandPalette: () => void;
   setCommandPaletteHeader: (header: ReactNode) => void;
 }
@@ -126,6 +133,9 @@ export function HeaderActionsProvider({
     useState<HeaderSearchAdapter | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [commandPalettePages, setCommandPalettePages] = useState<
+    readonly NavCommand[] | undefined
+  >();
   const [commandPaletteHeader, setCommandPaletteHeader] =
     useState<ReactNode>(null);
   const priorFocusRef = useRef<HTMLElement | null>(null);
@@ -164,8 +174,26 @@ export function HeaderActionsProvider({
       activeElement instanceof HTMLElement ? activeElement : null;
     // The former sidebar popover must never compete with the main-plane surface.
     setIsSearchOpen(false);
+    setCommandPalettePages(undefined);
     setIsCommandPaletteOpen(true);
   }, []);
+
+  const openPageSearch = useCallback(
+    (pages: readonly NavCommand[], returnFocus?: HTMLElement) => {
+      if (focusRestoreFrameRef.current !== null) {
+        cancelAnimationFrame(focusRestoreFrameRef.current);
+        focusRestoreFrameRef.current = null;
+      }
+      const activeElement = document.activeElement;
+      priorFocusRef.current =
+        returnFocus ??
+        (activeElement instanceof HTMLElement ? activeElement : null);
+      setIsSearchOpen(false);
+      setCommandPalettePages(pages);
+      setIsCommandPaletteOpen(true);
+    },
+    []
+  );
 
   const closeCommandPalette = useCallback(() => {
     if (focusRestoreFrameRef.current !== null) {
@@ -234,10 +262,12 @@ export function HeaderActionsProvider({
       headerSearchAdapter,
       isSearchOpen,
       isCommandPaletteOpen,
+      commandPalettePages,
       commandPaletteHeader,
     }),
     [
       commandPaletteHeader,
+      commandPalettePages,
       headerActions,
       headerBadge,
       headerSearchAdapter,
@@ -255,10 +285,17 @@ export function HeaderActionsProvider({
       openSearch,
       closeSearch,
       openCommandPalette,
+      openPageSearch,
       closeCommandPalette,
       setCommandPaletteHeader,
     }),
-    [closeCommandPalette, closeSearch, openCommandPalette, openSearch]
+    [
+      closeCommandPalette,
+      closeSearch,
+      openCommandPalette,
+      openPageSearch,
+      openSearch,
+    ]
   );
 
   return (

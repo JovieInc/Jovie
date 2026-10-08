@@ -11,6 +11,7 @@
  *   - injecting the "Recent chats" section as an additional source.
  */
 
+import { LoadingSkeleton } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -50,7 +51,19 @@ const RECENT_CHAT_QUERY_LIMIT = 50;
 // its list and query UI loads. The main-plane surface mounts only while open.
 const CmdKPalette = dynamic(
   () => import('./CmdKPalette').then(module => module.CmdKPalette),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className='px-3 py-4' data-testid='command-palette-loading'>
+        <LoadingSkeleton
+          lines={3}
+          height='h-7'
+          label='Loading Search'
+          announce
+        />
+      </div>
+    ),
+  }
 );
 
 function getCurrentConversationId(pathname: string): string | null {
@@ -79,13 +92,18 @@ export function CommandPalette() {
  */
 export function CommandPaletteMainSurface() {
   const dashboardData = useContext(DashboardDataContext);
-  const { closeCommandPalette, isCommandPaletteOpen, setCommandPaletteHeader } =
-    useHeaderActions();
+  const {
+    closeCommandPalette,
+    isCommandPaletteOpen,
+    commandPalettePages,
+    setCommandPaletteHeader,
+  } = useHeaderActions();
   if (!dashboardData || !isCommandPaletteOpen) return null;
   return (
     <CommandPaletteInner
       profileId={dashboardData.selectedProfile?.id}
       isAdmin={dashboardData.isAdmin}
+      pages={commandPalettePages}
       open={isCommandPaletteOpen}
       onOpenChange={next => {
         if (!next) closeCommandPalette();
@@ -97,6 +115,7 @@ export function CommandPaletteMainSurface() {
 }
 
 interface CommandPaletteInnerProps {
+  readonly pages?: readonly NavCommand[];
   readonly profileId: string | undefined;
   readonly isAdmin: boolean;
   readonly open: boolean;
@@ -179,13 +198,15 @@ function CommandPaletteInner({
   onOpenChange,
   presentation,
   onHeaderChange,
+  pages,
 }: CommandPaletteInnerProps) {
   const router = useRouter();
   const pathname = usePathname();
 
   const { data: conversations } = useChatConversationsQuery({
     limit: RECENT_CHAT_QUERY_LIMIT,
-    enabled: open,
+    enabled:
+      open && pages === undefined && !pathname.startsWith(APP_ROUTES.ADMIN),
   });
 
   // Recent chats are not part of the
@@ -193,6 +214,7 @@ function CommandPaletteInner({
   // entity section so the shared list+keyboard machinery picks them up.
   const additionalSections = useMemo<PaletteSection[]>(() => {
     const sections: PaletteSection[] = [];
+    if (pages !== undefined) return sections;
     if (isAdmin) {
       const currentWorkspace = getCurrentAppShellWorkspace(pathname);
       const nextWorkspace = getNextAppShellWorkspace(
@@ -217,7 +239,11 @@ function CommandPaletteInner({
         });
       }
     }
-    if (conversations && conversations.length > 0) {
+    if (
+      !pathname.startsWith(APP_ROUTES.ADMIN) &&
+      conversations &&
+      conversations.length > 0
+    ) {
       const currentConversationId = getCurrentConversationId(pathname);
       const rankedConversations = rankPaletteConversations(
         conversations,
@@ -245,7 +271,7 @@ function CommandPaletteInner({
       });
     }
     return sections;
-  }, [conversations, isAdmin, pathname]);
+  }, [conversations, isAdmin, pathname, pages]);
 
   const handleAdditionalSelect = useCallback(
     (id: string) => {
@@ -271,6 +297,7 @@ function CommandPaletteInner({
   return (
     <CmdKPalette
       profileId={profileId ?? ''}
+      pages={pages}
       open={open}
       onOpenChange={onOpenChange}
       additionalSectionsAfter={additionalSections}
