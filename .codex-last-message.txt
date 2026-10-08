@@ -1,0 +1,8 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261005T005433Z-JOV-5582-codex-brief-4e64f4/.design-brief.md).
+
+Validation:
+
+- Steps 1–8 pass; no invalid capability IDs.
+- Step 9 intentionally remains empty because no real Pen/ImageGen artifact exists.
+- Design-gate suite: 32 tests passed.
+- No implementation, commit, push, PR, or Linear mutation performed.
