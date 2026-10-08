@@ -9,7 +9,6 @@ const release: ReleaseViewModel = {
   title: 'Album',
   artistNames: ['Artist'],
   status: 'released',
-  artworkUrl: null,
   slug: 'album',
   smartLinkPath: '/artist/album',
   providers: [],
