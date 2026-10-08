@@ -5,7 +5,11 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fastRender } from '@/tests/utils/fast-render';
-import { EntityHoverLink, type EntityPopoverData } from './EntityPopover';
+import {
+  EntityHoverLink,
+  EntityPopover,
+  type EntityPopoverData,
+} from './EntityPopover';
 
 vi.mock('next/image', () => ({
   default: ({
@@ -37,6 +41,8 @@ const spotifyUrlArtist = {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function advanceTimers(ms: number) {
@@ -135,5 +141,88 @@ describe('EntityPopover source contract', () => {
     expect(source).not.toContain("'bg-surface-0 text-primary-token");
     expect(source).not.toContain('zoom-in');
     expect(source).not.toContain('slide-in');
+  });
+});
+
+describe('EntityPopover positioning', () => {
+  function setup() {
+    const anchor = document.createElement('button');
+    document.body.append(anchor);
+    anchor.focus();
+    vi.stubGlobal('innerHeight', 360);
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+      top: 310,
+      bottom: 334,
+      left: 40,
+      right: 140,
+      width: 100,
+      height: 24,
+    } as DOMRect);
+    let height = 80;
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+      function (this: HTMLElement) {
+        return this.getAttribute('role') === 'tooltip' ? height : 0;
+      }
+    );
+    const frames = new Map<number, FrameRequestCallback>();
+    let frameId = 0;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.set(++frameId, callback);
+      return frameId;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(id => {
+      frames.delete(id);
+    });
+    const view = fastRender(<EntityPopover entity={release} anchor={anchor} />);
+    return {
+      anchor,
+      view,
+      grow: () => {
+        height = 200;
+      },
+      flush: () =>
+        act(() => {
+          const pending = [...frames.values()];
+          frames.clear();
+          for (const callback of pending) callback(0);
+        }),
+      dispose: () => {
+        view.unmount();
+        anchor.remove();
+      },
+    };
+  }
+
+  it('keeps the first visible position stable when the deferred measure runs', () => {
+    const fixture = setup();
+    try {
+      const tooltip = screen.getByRole('tooltip');
+      const firstTop = tooltip.style.top;
+      fixture.flush();
+      expect(tooltip.style.top).toBe(firstTop);
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  it('keeps refreshed taller content inside the viewport without stealing focus', () => {
+    const fixture = setup();
+    try {
+      fixture.flush();
+      fixture.grow();
+      fixture.view.rerender(
+        <EntityPopover
+          entity={{ ...release, totalTracks: 12 }}
+          anchor={fixture.anchor}
+        />
+      );
+      const tooltip = screen.getByRole('tooltip');
+      expect(
+        Number.parseFloat(tooltip.style.top) + tooltip.offsetHeight
+      ).toBeLessThanOrEqual(window.innerHeight);
+      expect(fixture.anchor).toHaveFocus();
+    } finally {
+      fixture.dispose();
+    }
   });
 });

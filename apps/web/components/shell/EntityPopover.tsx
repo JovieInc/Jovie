@@ -622,8 +622,9 @@ export function EntityPopover({
     setMounted(true);
   }, []);
 
+  // Measure the first portal commit and refreshed metadata before paint.
   useLayoutEffect(() => {
-    if (!anchor) return;
+    if (!anchor || !mounted) return;
     const update = () => {
       const a = anchor.getBoundingClientRect();
       const contentHeight = popoverRef.current?.offsetHeight ?? 96;
@@ -654,7 +655,7 @@ export function EntityPopover({
       window.removeEventListener('scroll', update, true);
       window.removeEventListener('resize', update);
     };
-  }, [anchor]);
+  }, [anchor, entity, mounted]);
 
   if (!entity || !entity.kind || typeof entity.label !== 'string') {
     return null;
