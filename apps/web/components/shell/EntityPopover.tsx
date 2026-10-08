@@ -599,11 +599,15 @@ interface EntityPopoverProps {
 const POPOVER_WIDTH = 272;
 const POPOVER_MARGIN = 8;
 const SIDE_OFFSET = 6;
+// The shared Button expands its hit container without enlarging its face.
+const BUTTON_HIT_TARGET_SIZE = 44;
 
 interface PopoverPosition {
   readonly left: number;
   readonly top: number;
-  readonly side: 'left' | 'right';
+  readonly width: number;
+  readonly maxHeight: number;
+  readonly side: 'left' | 'right' | 'top' | 'bottom';
 }
 
 export function EntityPopover({
@@ -627,23 +631,74 @@ export function EntityPopover({
     if (!anchor || !mounted) return;
     const update = () => {
       const a = anchor.getBoundingClientRect();
-      const contentHeight = popoverRef.current?.offsetHeight ?? 96;
-      const wantsRight =
-        a.right + SIDE_OFFSET + POPOVER_WIDTH <=
-        window.innerWidth - POPOVER_MARGIN;
-      const left = wantsRight
-        ? a.right + SIDE_OFFSET
-        : Math.max(POPOVER_MARGIN, a.left - SIDE_OFFSET - POPOVER_WIDTH);
-      // Smart vertical positioning: center on anchor (near trigger/cursor) for
-      // tight coupling instead of always pinning to a.top. Minimal clamp keeps
-      // it near the row even near viewport edges (prevents "far jump" bug).
-      let top = a.top + a.height / 2 - contentHeight / 2;
+      const card = popoverRef.current;
+      // Keep the natural height after a short-window scrolling constraint, so
+      // resizing or refreshing can release that constraint again.
+      const contentHeight = card
+        ? Math.max(
+            card.offsetHeight,
+            card.scrollHeight + card.offsetHeight - card.clientHeight
+          )
+        : 96;
       const margin = POPOVER_MARGIN;
-      if (top < margin) top = margin;
-      if (top + contentHeight > window.innerHeight - margin) {
-        top = window.innerHeight - margin - contentHeight;
+      const width = Math.min(
+        POPOVER_WIDTH,
+        Math.max(0, window.innerWidth - margin * 2)
+      );
+      const hitSize = anchor.tagName === 'BUTTON' ? BUTTON_HIT_TARGET_SIZE : 0;
+      const hitInsetX = Math.max(0, (hitSize - a.width) / 2);
+      const hitInsetY = Math.max(0, (hitSize - a.height) / 2);
+      const hitLeft = a.left - hitInsetX;
+      const hitRight = a.right + hitInsetX;
+      const hitTop = a.top - hitInsetY;
+      const hitBottom = a.bottom + hitInsetY;
+      const rightFits =
+        hitRight + SIDE_OFFSET + width <= window.innerWidth - margin;
+      const leftFits = hitLeft - SIDE_OFFSET - width >= margin;
+
+      if (rightFits || leftFits) {
+        const maxHeight = Math.max(0, window.innerHeight - margin * 2);
+        const height = Math.min(contentHeight, maxHeight);
+        const top = Math.max(
+          margin,
+          Math.min(
+            a.top + a.height / 2 - height / 2,
+            window.innerHeight - margin - height
+          )
+        );
+        setPos({
+          left: rightFits
+            ? hitRight + SIDE_OFFSET
+            : hitLeft - SIDE_OFFSET - width,
+          top,
+          width,
+          maxHeight,
+          side: rightFits ? 'right' : 'left',
+        });
+        return;
       }
-      setPos({ left, top, side: wantsRight ? 'right' : 'left' });
+
+      // Neither side fits: preserve the trigger's hit area rather than clamp
+      // the card over it. Prefer below when it fits, otherwise the roomier side.
+      const above = Math.max(0, hitTop - SIDE_OFFSET - margin);
+      const below = Math.max(
+        0,
+        window.innerHeight - margin - hitBottom - SIDE_OFFSET
+      );
+      const useBelow =
+        contentHeight <= below || (contentHeight > above && below >= above);
+      const maxHeight = useBelow ? below : above;
+      const height = Math.min(contentHeight, maxHeight);
+      setPos({
+        left: Math.max(
+          margin,
+          Math.min(a.left, window.innerWidth - margin - width)
+        ),
+        top: useBelow ? hitBottom + SIDE_OFFSET : hitTop - SIDE_OFFSET - height,
+        width,
+        maxHeight,
+        side: useBelow ? 'bottom' : 'top',
+      });
     };
     update();
     // Re-measure once the element is in the DOM with a real height.
@@ -673,7 +728,10 @@ export function EntityPopover({
         position: 'fixed',
         left: pos?.left ?? -9999,
         top: pos?.top ?? -9999,
-        width: POPOVER_WIDTH,
+        width: pos?.width ?? POPOVER_WIDTH,
+        maxWidth: `calc(100vw - ${POPOVER_MARGIN * 2}px)`,
+        maxHeight: pos?.maxHeight,
+        overflowY: 'auto',
         visibility: pos ? 'visible' : 'hidden',
         zIndex: 'var(--jovie-shell-overlay-z-index)',
       }}
