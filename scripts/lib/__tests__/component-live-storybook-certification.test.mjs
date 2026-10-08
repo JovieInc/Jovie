@@ -853,6 +853,109 @@ afterEach(() => {
   }
 });
 
+describe('live Storybook production resolver', () => {
+  it('terminates production compiled React resolution and preserves dev and client interop', async () => {
+    const { default: config } = await import(
+      '../../../apps/web/.storybook/main.ts'
+    );
+    const vite = await config.viteFinal({
+      plugins: [],
+      resolve: { alias: [] },
+    });
+    const rewrite = vite.plugins.find(
+      plugin => plugin.name === 'jovie-storybook-rewrite-next-react'
+    );
+    const resolveThroughVite = vi.fn(async bare => ({ id: bare }));
+    const context = { resolve: resolveThroughVite };
+    rewrite.configResolved({ command: 'build' });
+    for (const bare of [
+      'react',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+      'react-dom',
+    ]) {
+      await expect(
+        rewrite.resolveId.call(context, `next/dist/compiled/${bare}`, undefined)
+      ).resolves.toEqual({ id: requireFromWeb.resolve(bare) });
+    }
+    await expect(
+      rewrite.resolveId.call(
+        context,
+        'next/dist/compiled/react-dom/client',
+        undefined
+      )
+    ).resolves.toEqual({ id: '\0jovie-react-dom-client' });
+    expect(resolveThroughVite).not.toHaveBeenCalled();
+    const requireFromVite = createRequire(requireFromWeb.resolve('vite'));
+    const { rolldown } = await import(requireFromVite.resolve('rolldown'));
+    const trace = [];
+    const record = hook => {
+      trace.push(hook);
+      if (trace.length > 16) throw new Error('bounded native resolver cycle');
+    };
+    let bundle;
+    try {
+      bundle = await rolldown({
+        input: 'entry',
+        plugins: [
+          {
+            name: 'bounded-entry',
+            resolveId(id) {
+              if (id === 'entry') return '\0entry';
+            },
+            load(id) {
+              if (id === '\0entry')
+                return "import value from 'react'; export default value;";
+              if (id === requireFromWeb.resolve('react'))
+                return 'export default 42;';
+            },
+          },
+          {
+            name: 'pinned-next-react-alias',
+            async resolveId(id, importer, options) {
+              if (id !== 'react') return null;
+              record('alias');
+              return this.resolve(
+                '/fixture/next/dist/compiled/react/index.js',
+                importer,
+                options
+              );
+            },
+          },
+          {
+            ...rewrite,
+            async resolveId(id, importer) {
+              record('rewrite');
+              return rewrite.resolveId.call(this, id, importer);
+            },
+          },
+        ],
+      });
+      const result = await bundle.generate({ format: 'es' });
+      expect(result.output[0].code).toContain('42');
+      expect(trace).toEqual(['alias', 'rewrite']);
+    } finally {
+      await bundle?.close();
+    }
+    rewrite.configResolved({ command: 'serve' });
+    await expect(
+      rewrite.resolveId.call(
+        context,
+        'next/dist/compiled/react-dom/client',
+        undefined
+      )
+    ).resolves.toEqual({ id: 'react-dom/client' });
+    expect(resolveThroughVite).toHaveBeenCalledExactlyOnceWith(
+      'react-dom/client',
+      undefined,
+      { skipSelf: true }
+    );
+    await expect(
+      rewrite.resolveId.call(context, 'unrelated-package', undefined)
+    ).resolves.toBeNull();
+  });
+});
+
 describe('live Storybook component certification', () => {
   /** @type {import('playwright').Browser | undefined} */
   let browser;
