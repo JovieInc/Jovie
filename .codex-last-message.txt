@@ -1,0 +1,9 @@
+Opened draft PR [#20783](https://github.com/JovieInc/Jovie/pull/20783) at commit `bafa71d707`.
+
+- Separates expected quota banks from genuine provider health failures.
+- Prevents banked Claude lanes from triggering `provider-down`.
+- Adds quota status-feed reporting and regression coverage.
+- Verified 16 dispatch tests and 102 related doctor/Claude/routing tests, plus compilation and pre-commit/push gates.
+- PR remains draft and unmerged; CI is queued.
+
+Limitation: direct macOS state inspection was unavailable due SSH authentication. Diagnosis is corroborated by successful Claude lane activity 11 minutes before the alert and the reproduced quota-bank control path. An exploratory broader suite encountered four host slot-override failures; the scoped suites passed with registry fixture values restored.
