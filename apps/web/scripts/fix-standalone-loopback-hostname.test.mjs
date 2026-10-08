@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { pinStandaloneLoopbackHostname } from './fix-standalone-loopback-hostname.mjs';
 
 const scriptPath = new URL(
   './fix-standalone-loopback-hostname.mjs',
@@ -28,7 +29,7 @@ function runOn(serverJs) {
   if (serverJs !== null) writeFileSync(serverPath, serverJs);
   let script = readFileSync(scriptPath, 'utf8');
   script = script.replace(
-    "const appRoot = path.resolve(\n  path.dirname(fileURLToPath(import.meta.url)),\n  '..'\n);",
+    /const appRoot = path\.resolve\([\s\S]*?\);/,
     `const appRoot = ${JSON.stringify(join(root, 'apps/web'))};`
   );
   const patchedScriptPath = join(root, 'script.mjs');
@@ -47,6 +48,24 @@ function runOn(serverJs) {
 }
 
 describe('fix-standalone-loopback-hostname', () => {
+  it('rewrites only the generated default and reports each action', () => {
+    const generated = "const hostname = process.env.HOSTNAME || '0.0.0.0'";
+    expect(pinStandaloneLoopbackHostname(generated).action).toBe('pinned');
+    expect(pinStandaloneLoopbackHostname(generated).content).not.toBe(
+      generated
+    );
+    const pinned = pinStandaloneLoopbackHostname(
+      pinStandaloneLoopbackHostname(generated).content
+    );
+    expect(pinned.action).toBe('already-pinned');
+    expect(pinned.content).toBe(pinned.content);
+    const future = 'const hostname = nextServeHost(process.env)';
+    expect(pinStandaloneLoopbackHostname(future).action).toBe(
+      'unknown-template'
+    );
+    expect(pinStandaloneLoopbackHostname(future).content).toBe(future);
+  });
+
   it('pins the generated default and HOSTNAME=localhost/::1 to the IPv4 loopback', () => {
     const { code, stdout, serverPath } = runOn(generatedServer);
     expect(code).toBe(0);
