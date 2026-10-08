@@ -1178,12 +1178,12 @@ describe('entrypoint contract', () => {
     assert.match(executableSource, /HTTP 50\[24\]/);
     assert.match(executableSource, /gh-pr-list-\$\{state\}:/);
     // The rollup contexts are gone from the capacity inventory query;
-    // mergeable + labels + mergeStateStatus carry the signals.
+    // mergeable + labels + mergeStateStatus carry the signals. The open
+    // inventory pages through GraphQL with a real cursor (no page-limit
+    // fail-closed); the merged side stays one gh pr list call.
     assert.doesNotMatch(executableSource, /statusCheckRollup',/);
-    assert.match(
-      executableSource,
-      /const limit = state === 'open' \? 100 : 50;/
-    );
+    assert.match(executableSource, /pageInfo\{endCursor hasNextPage\}/);
+    assert.doesNotMatch(executableSource, /page-limit-reached/);
     assert.match(executableSource, /mergeable,labels/);
 
     // Behavioral: a fake gh on PATH drives the exported collector through
@@ -1255,19 +1255,29 @@ describe('entrypoint contract', () => {
         isDraft: false,
       },
     ]);
+    const graphqlOpen = JSON.stringify({
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false },
+            nodes: JSON.parse(openPayload),
+          },
+        },
+      },
+    });
     await writeFile(
       fakeGh,
       [
         '#!/bin/sh',
-        'echo "$@" >> "$CALLS_PATH"',
-        '# $6 is the --state value (pr list --repo JovieInc/Jovie --state <state>)',
-        'if [ "$6" = "open" ]; then',
+        'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
+        '# open inventory: gh api graphql; merged: gh pr list',
+        'if [ "$1" = "api" ]; then',
         '  echo x >> "$OPEN_ATTEMPTS_PATH"',
         '  if [ "$(wc -l < "$OPEN_ATTEMPTS_PATH")" -le 1 ]; then',
         '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)" >&2',
         '    exit 1',
         '  fi',
-        `printf '%s' '${openPayload.replace(/'/g, "'\\''")}'`,
+        `printf '%s' '${graphqlOpen.replace(/'/g, "'\\''")}'`,
         'else',
         `printf '%s' '${mergedPayload.replace(/'/g, "'\\''")}'`,
         'fi',
@@ -1279,8 +1289,9 @@ describe('entrypoint contract', () => {
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
 
-    // One query per state, the first open call 504s once and its retry
-    // succeeds; the receipt keeps one row per PR number (draft INCLUDED for
+    // The open GraphQL pages once (hasNextPage false), its first call 504s
+    // once and its retry succeeds; the merged call is one gh pr list
+    // query; the receipt keeps one row per PR number (draft INCLUDED for
     // attribution — the rates exclude it), and reports the audit numbers.
     await writeFile(callsPath, '');
     await writeFile(openAttemptsPath, '');
@@ -1305,7 +1316,8 @@ describe('entrypoint contract', () => {
       .split('\n')
       .filter(Boolean);
     assert.equal(callLog.length, 3);
-    assert.ok(callLog.every(call => call.includes('pr list')));
+    assert.equal(callLog.filter(call => call === 'api').length, 2);
+    assert.equal(callLog.filter(call => call === 'pr').length, 1);
 
     // Fail-closed path: a non-gateway failure does not burn the extra
     // retry; the collector names the cause with the exit code, signal, kill
@@ -1349,11 +1361,41 @@ describe('entrypoint contract', () => {
     }));
     const payload = JSON.stringify(rows);
     assert.ok(payload.length > 2 * 1024 * 1024);
+    const graphqlPayload = JSON.stringify({
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false },
+            nodes: JSON.parse(payload),
+          },
+        },
+      },
+    });
+    const mergedSmall = JSON.stringify([
+      {
+        number: 9999,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        labels: [],
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
     await writeFile(
       fakeGh,
-      ['#!/bin/sh', `printf '%s' '${payload.replace(/'/g, "'\\''")}'`].join(
-        '\n'
-      )
+      [
+        '#!/bin/sh',
+        'if [ "$1" = "api" ]; then',
+        `printf '%s' '${graphqlPayload.replace(/'/g, "'\\''")}'`,
+        'else',
+        `printf '%s' '${mergedSmall.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
     );
     await chmod(fakeGh, 0o755);
     const { collectGitHubPullRequests } = await import(
@@ -1366,10 +1408,10 @@ describe('entrypoint contract', () => {
     const receipt = await collectGitHubPullRequests(env);
     assert.ok(Array.isArray(receipt?.pullRequests));
     // 90 rows (~24KB bodies each ≈ 2.2MB payload) parse past the 1MB
-    // default; open rows stay under the page limit so the receipt is
-    // complete, not truncated.
-    assert.equal(receipt.pullRequests.length, 90);
-    assert.ok(receipt.openUnique < 100);
+    // default through the paginated open GraphQL; the small merged row
+    // adds one more inventory entry.
+    assert.equal(receipt.pullRequests.length, 91);
+    assert.equal(receipt.openUnique, 45);
     assert.equal(receipt.truncated, false);
   });
 
