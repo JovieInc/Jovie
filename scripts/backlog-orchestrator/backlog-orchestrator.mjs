@@ -1400,7 +1400,7 @@ async function runRemediate(isDryRun) {
   const previous = loadCache().backlogRemediation || {};
   const receipt = backlogRemediation.buildRemediationReceipt({
     issues,
-    pullRequests: pullRequests || [],
+    pullRequests: Array.isArray(pullRequests) ? pullRequests : [],
     mainSha: rawReceipt?.signals?.main?.sha || null,
     capacitySignals: {
       schema: backlogRemediation.CAPACITY_SCHEMA,
