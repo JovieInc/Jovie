@@ -361,7 +361,7 @@ export function OnboardingIdentityConflict({
   return (
     <div className='shrink-0' data-testid='onboarding-identity-recovery-slot'>
       <div
-        className='flex h-11 items-center justify-end gap-2 overflow-x-auto px-3 sm:px-4'
+        className='flex h-11 shrink-0 items-center justify-end gap-2 overflow-x-auto px-3 sm:px-4'
         data-testid='onboarding-sign-in-header'
       >
         {visible ? (
