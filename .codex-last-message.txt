@@ -1,0 +1,9 @@
+DONE — [PR #20957](https://github.com/JovieInc/Jovie/pull/20957) is green on exact head `96dada3555892297b94196f6d662064f08bdeedd`.
+
+- Added `releaseWorthy:false` customer changelog metadata.
+- Added adjacent Storybook coverage for the catalog task dialog.
+- Passed 44 changelog tests, 9 component tests, story typecheck, component ship gate, Biome, and full workspace typecheck.
+- Source Validation, PR Ready, and all required GitHub checks pass.
+- Pushed to the existing branch; worktree is clean.
+
+The local gbrain service was unavailable, so the durable RCA note could not be written.
