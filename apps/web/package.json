@@ -61,6 +61,7 @@
     "evals": "bash scripts/run-deterministic-promptfoo-evals.sh eval",
     "evals:golden": "bash scripts/run-golden-eval-set-ci.sh",
     "evals:validate": "bash scripts/run-deterministic-promptfoo-evals.sh validate",
+    "parity:music-resolver": "NODE_OPTIONS=--conditions=react-server tsx scripts/music-resolver-parity-eval.ts",
     "test:evals:deterministic": "node scripts/eval-lanes.mjs deterministic",
     "test:evals:live": "node scripts/eval-lanes.mjs live",
     "evals:live": "bash scripts/run-live-promptfoo-evals.sh smoke",
@@ -222,7 +223,7 @@
     "qa:releases:loop": "tsx scripts/releases-dashboard-qa-loop.ts"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^4.0.106",
+    "@ai-sdk/gateway": "^4.0.107",
     "@ai-sdk/react": "^4.0.133",
     "@better-auth/oauth-provider": "1.7.6",
     "@better-auth/passkey": "1.7.7",
