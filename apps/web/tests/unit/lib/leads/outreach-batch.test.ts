@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockTransaction,
@@ -115,11 +117,40 @@ describe('processOutreachBatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+    // Disable quiet hours (equal start/end) so tests are time-independent.
+    vi.stubEnv('OUTREACH_QUIET_HOURS_START_UTC', '0');
+    vi.stubEnv('OUTREACH_QUIET_HOURS_END_UTC', '0');
     mockReadOutboundLedger.mockResolvedValue(approvedLedger().ledger);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
   });
 
   it('does not claim or push leads when Instantly outbound is off', async () => {
     vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', '');
+
+    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
+    const result = await processOutreachBatch(10);
+
+    expect(result).toEqual({
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      dismissed: 0,
+      unapproved: 0,
+      remainingPending: 0,
+    });
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+  });
+
+  it('does not claim or push leads during quiet hours', async () => {
+    vi.stubEnv('OUTREACH_QUIET_HOURS_START_UTC', '1');
+    vi.stubEnv('OUTREACH_QUIET_HOURS_END_UTC', '15');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-03T05:00:00Z'));
 
     const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
     const result = await processOutreachBatch(10);
@@ -327,5 +358,13 @@ describe('processOutreachBatch', () => {
         approvedCopy: { ...approved.copy, revision: approved.revision },
       })
     );
+  });
+
+  it('gates the pending-email query on recorded outreach consent', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../../../lib/leads/outreach-batch.ts'),
+      'utf8'
+    );
+    expect(source).toMatch(/isNotNull\(leads\.outreachConsentAt\)/);
   });
 });

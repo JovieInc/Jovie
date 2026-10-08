@@ -139,6 +139,10 @@ export const leads = pgTable(
     claimTokenExpiresAt: timestamp('claim_token_expires_at'),
     instantlyLeadId: text('instantly_lead_id'),
     outreachQueuedAt: timestamp('outreach_queued_at'),
+    // Recorded consent for outbound contact. Outbound sends are gated on
+    // this being set; nothing may send to a lead without proven consent.
+    outreachConsentAt: timestamp('outreach_consent_at'),
+    outreachConsentSource: text('outreach_consent_source'),
     dmSentAt: timestamp('dm_sent_at'),
     dmCopy: text('dm_copy'),
     firstContactedAt: timestamp('first_contacted_at'),
@@ -220,7 +224,7 @@ export const leadPipelineSettings = pgTable('lead_pipeline_settings', {
     })
     .notNull(),
   dmTemplate: text('dm_template').default(
-    "Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here's your free page: {claimLink}"
+    "Hey {displayName}! I found your Linktree and built Jovie to give creators a better link-in-bio. Here's your free page: {claimLink}"
   ),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
