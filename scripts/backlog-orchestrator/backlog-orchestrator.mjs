@@ -1394,7 +1394,9 @@ export async function collectGitHubPullRequests(env = process.env) {
       }
     })
   );
-  const failed = lists.filter(list => list && !Array.isArray(list));
+  const failed = /** @type {{ error?: string }[]} */ (
+    lists.filter(list => list && !Array.isArray(list))
+  );
   if (failed.length > 0) {
     return {
       error: failed.flatMap(list => list?.error ?? 'unknown').join('|'),
