@@ -1304,9 +1304,29 @@ function describeExecFailure(error, command) {
   ].join(';');
 }
 
-async function ghPullRequestList(state, env) {
+/**
+ * The capacity inventory query (JOV-8000 follow-up 7): the live residual
+ * failure was GitHub GraphQL 504 (`HTTP 504: 504 Gateway Timeout
+ * (https://api.github.com/graphql)`) on the single heavy open-PR query
+ * (body + statusCheckRollup on ~100 PRs). Three load reductions, same
+ * evidence semantics:
+ * - `statusCheckRollup` is dropped: the error-rate signal survives through
+ *   `mergeStateStatus: UNSTABLE` (GitHub sets UNSTABLE exactly when
+ *   required checks fail; `isErroredPullRequest` already accepts it).
+ * - The open list is paginated: two 50-PR pages instead of one 100-PR
+ *   GraphQL query, each far under the 504 threshold. `body` stays — the
+ *   PR→issue attribution (inventory classifications) reads JOV binds from
+ *   PR bodies.
+ * - A transient 504/502 gets one extra bounded retry with a short backoff
+ *   (server-side timeouts are transient by nature). Any other failure keeps
+ *   the existing two attempts; the gate stays fail-closed with the exact
+ *   cause named in pullRequestsEvidence.
+ */
+const GH_TRANSIENT_GATEWAY = /HTTP 50[24]/;
+
+async function ghPullRequestList(state, limit, env) {
   const fields =
-    'number,title,body,headRefName,state,mergeStateStatus,url,mergedAt,isDraft,statusCheckRollup';
+    'number,title,body,headRefName,state,mergeStateStatus,url,mergedAt,isDraft';
   const args = [
     'pr',
     'list',
@@ -1315,12 +1335,18 @@ async function ghPullRequestList(state, env) {
     '--state',
     state,
     '--limit',
-    state === 'open' ? '100' : '50',
+    String(limit),
     '--json',
     fields,
   ];
+  const maxAttempts = 3;
   let lastError = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) {
+      // Backoff before a retry: a full second for the first retry of a
+      // gateway timeout, two for the second.
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
     try {
       const { stdout } = await execFileAsync('gh', args, {
         timeout: 45_000,
@@ -1330,6 +1356,10 @@ async function ghPullRequestList(state, env) {
       return JSON.parse(stdout);
     } catch (error) {
       lastError = error;
+      const transient = GH_TRANSIENT_GATEWAY.test(
+        String(error?.stderr || '') + String(error?.message || '')
+      );
+      if (!transient) break;
     }
   }
   throw new Error(
@@ -1337,11 +1367,20 @@ async function ghPullRequestList(state, env) {
   );
 }
 
+async function ghPullRequestInventory(state, env) {
+  const pages = state === 'open' ? [50, 50] : [50];
+  const lists = [];
+  for (const limit of pages) {
+    lists.push(await ghPullRequestList(state, limit, env));
+  }
+  return lists.flat();
+}
+
 export async function collectGitHubPullRequests(env = process.env) {
   const lists = await Promise.all(
     ['open', 'merged'].map(async state => {
       try {
-        return await ghPullRequestList(state, env);
+        return await ghPullRequestInventory(state, env);
       } catch (error) {
         // ghPullRequestList already carries the full untruncated failure
         // description; keep the raw message as a fallback if it is ever
