@@ -3,6 +3,7 @@
 import { Sheet, SheetContent } from '@jovie/ui';
 import React from 'react';
 import { SHELL_RAIL_ALLOCATION } from '@/components/shell/rail-motion';
+import { isAvailable } from '@/components/shell/useRailFocusReturn';
 import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './context';
@@ -37,6 +38,7 @@ export const Sidebar = React.forwardRef<
       isFloating,
       open: pinned,
     } = useSidebar();
+    const drawerFocusOrigin = React.useRef<HTMLElement | null>(null);
     // Shared rail lifecycle: certification samples data-rail-phase to prove
     // opening/closing resolve toward the latest requested state (JOV-4522).
     const railPhase = useRailMotionPhase(state === 'open');
@@ -78,6 +80,36 @@ export const Sidebar = React.forwardRef<
               } as React.CSSProperties
             }
             side={side}
+            onOpenAutoFocus={() => {
+              drawerFocusOrigin.current =
+                document.activeElement instanceof HTMLElement
+                  ? document.activeElement
+                  : null;
+            }}
+            onCloseAutoFocus={event => {
+              const origin = drawerFocusOrigin.current;
+              drawerFocusOrigin.current = null;
+              const active = document.activeElement;
+              // A new route/editor/palette can already own focus when this
+              // sheet finishes closing. Only restore abandoned drawer focus.
+              if (
+                active?.isConnected &&
+                active !== document.body &&
+                active !== document.documentElement
+              )
+                return;
+              const target =
+                origin && isAvailable(origin)
+                  ? origin
+                  : Array.from(
+                      document.querySelectorAll<HTMLElement>(
+                        `[data-rail-toggle="${side}"]`
+                      )
+                    ).find(isAvailable);
+              if (!target) return;
+              event.preventDefault();
+              target.focus({ preventScroll: true });
+            }}
           >
             <div className='flex h-full w-full flex-col overflow-hidden'>
               {toolbar ? (
