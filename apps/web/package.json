@@ -325,7 +325,7 @@
     "unist-util-visit": "^5.1.0",
     "vaul": "^1.1.2",
     "web-vitals": "^6.2.3",
-    "workflow": "4.8.12",
+    "workflow": "5.0.0",
     "ws": "^8.22.0",
     "zod": "^4.6.5"
   },
