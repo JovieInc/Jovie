@@ -76,10 +76,18 @@ class FreePolicyTest(unittest.TestCase):
             run.return_value.returncode = 1
             with self.assertRaises(free.FreeProofHeld):
                 free.supported_read(['devin', 'auth', 'status'])
+            self.assertEqual(run.call_count, 2)
         with patch.object(free.time, 'time', return_value=free.policy()['deadline']-60), patch.object(free.subprocess, 'run') as run:
             with self.assertRaises(free.FreeProofHeld):
                 free.supported_read(['devin', 'auth', 'status'])
             run.assert_not_called()
+
+    def test_transient_cli_read_failure_retries_once(self):
+        failed = free.subprocess.CompletedProcess([], 1, stdout='')
+        healthy = free.subprocess.CompletedProcess([], 0, stdout=ACCOUNT)
+        with patch.object(free.subprocess, 'run', side_effect=[failed, healthy]) as run:
+            self.assertEqual(free.supported_read(['devin', 'auth', 'status']), ACCOUNT)
+        self.assertEqual(run.call_count, 2)
 
     def test_first_run_crossing_cutoff_and_wrong_verify_model_rejected(self):
         with self.assertRaises(free.FreeProofHeld):

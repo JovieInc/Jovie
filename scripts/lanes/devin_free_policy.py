@@ -16,6 +16,7 @@ HERE = Path(__file__).resolve().parent
 MODELS = frozenset(('swe-2-medium', 'swe-2-high', 'swe-2-max'))
 PROOF_INTERVAL_S = 30
 CLEANUP_MARGIN_S = 60
+READ_ATTEMPTS = 2
 
 
 class FreeProofHeld(RuntimeError):
@@ -41,13 +42,19 @@ def admission_open(timeout, now=None):
 
 
 def supported_read(args):
-    remaining = policy()['deadline'] - time.time() - CLEANUP_MARGIN_S
-    if remaining <= 0:
-        raise FreeProofHeld('devin-free-policy-expiring')
-    result = subprocess.run(args, capture_output=True, text=True, timeout=min(10, remaining))
-    if result.returncode:
-        raise FreeProofHeld('devin-free-proof-read-failed')
-    return result.stdout
+    for attempt in range(READ_ATTEMPTS):
+        remaining = policy()['deadline'] - time.time() - CLEANUP_MARGIN_S
+        if remaining <= 0:
+            raise FreeProofHeld('devin-free-policy-expiring')
+        try:
+            result = subprocess.run(args, capture_output=True, text=True, timeout=min(10, remaining))
+        except (OSError, subprocess.SubprocessError) as error:
+            if attempt + 1 == READ_ATTEMPTS:
+                raise FreeProofHeld('devin-free-proof-unavailable') from error
+            continue
+        if result.returncode == 0:
+            return result.stdout
+    raise FreeProofHeld('devin-free-proof-read-failed')
 
 
 def verify(model, cli='devin'):
