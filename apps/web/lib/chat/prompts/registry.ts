@@ -21,7 +21,7 @@ export const CHAT_PROMPT_REGISTRY = {
   },
   onboarding: {
     name: 'jovie-chat-onboarding-system',
-    version: 1,
+    version: 2,
     versionId: 'jovie-chat-onboarding-system:v1',
   },
 } as const satisfies Record<'app' | 'onboarding', ChatPromptRegistryEntry>;
