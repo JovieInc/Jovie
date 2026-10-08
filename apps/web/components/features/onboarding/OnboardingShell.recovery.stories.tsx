@@ -1,6 +1,7 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useEffect, useState } from 'react';
-import { OnboardingShell } from './OnboardingShell';
+import { OnboardingIdentityConflict, OnboardingShell } from './OnboardingShell';
 
 const artist = {
   id: '1ZlSI1juLMMN1HU8X7RViN',
@@ -105,3 +106,53 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const SecondTurn: Story = {};
+
+// The real recovery component in the shell's normal-flow interaction boundary.
+// This fixture has no account, backend, provider, or customer mutation.
+function IdentityConflictFixture() {
+  const [visible, setVisible] = useState(false);
+  const [switches, setSwitches] = useState(0);
+  return (
+    <div className='flex h-dvh min-h-0 flex-col bg-surface-0 text-primary-token'>
+      <OnboardingIdentityConflict
+        visible={visible}
+        isSignedIn
+        onLogout={() => setSwitches(value => value + 1)}
+      >
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() => setVisible(value => !value)}
+        >
+          Toggle Conflict
+        </Button>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() => setSwitches(value => value + 1)}
+        >
+          Log Out
+        </Button>
+      </OnboardingIdentityConflict>
+      <div
+        className='flex min-h-0 flex-1 flex-col px-3'
+        data-testid='recovery-transcript'
+      >
+        <p>Progressive house, mostly. I want a profile that converts fans.</p>
+        <div className='mt-auto py-3'>
+          <label htmlFor='recovery-message'>Chat message</label>
+          <input
+            id='recovery-message'
+            className='focus-ring-themed block w-full rounded-md border border-subtle bg-surface-1 p-2'
+          />
+        </div>
+      </div>
+      <output className='sr-only' data-testid='recovery-switch-count'>
+        {switches}
+      </output>
+    </div>
+  );
+}
+export const IdentityConflict: Story = {
+  render: () => <IdentityConflictFixture />,
+};

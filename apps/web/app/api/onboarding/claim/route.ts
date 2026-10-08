@@ -273,7 +273,13 @@ async function resolveClaimHandoff(params: {
 
 function claimHandoffPayload(handoff: ClaimHandoff) {
   return {
-    ...(handoff.profileError ? { profileError: handoff.profileError } : {}),
+    ...(handoff.profileError
+      ? {
+          profileError: handoff.profileError,
+          errorCode: handoff.profileError.errorCode,
+          error: handoff.profileError.message,
+        }
+      : {}),
     ...(handoff.waitlist ? { waitlist: handoff.waitlist } : {}),
     ...(handoff.waitlistIntakeRequired ? { waitlistIntakeRequired: true } : {}),
     ...profilePayload(handoff.profile),
@@ -391,12 +397,15 @@ export async function POST(req: Request) {
           userAgent,
         });
         if (!handoff.profileError) await clearOnboardingSessionCookie();
-        return NextResponse.json({
-          claimed: 0,
-          conversationId: alreadyClaimed.id,
-          alreadyClaimed: true,
-          ...claimHandoffPayload(handoff),
-        });
+        return NextResponse.json(
+          {
+            claimed: 0,
+            conversationId: alreadyClaimed.id,
+            alreadyClaimed: true,
+            ...claimHandoffPayload(handoff),
+          },
+          { status: handoff.profileError ? 409 : 200 }
+        );
       }
 
       // Nothing to claim — clear the cookie so future visits start fresh.
@@ -482,12 +491,15 @@ export async function POST(req: Request) {
           userAgent,
         });
         if (!handoff.profileError) await clearOnboardingSessionCookie();
-        return NextResponse.json({
-          claimed: 0,
-          conversationId: primary.id,
-          alreadyClaimed: true,
-          ...claimHandoffPayload(handoff),
-        });
+        return NextResponse.json(
+          {
+            claimed: 0,
+            conversationId: primary.id,
+            alreadyClaimed: true,
+            ...claimHandoffPayload(handoff),
+          },
+          { status: handoff.profileError ? 409 : 200 }
+        );
       }
 
       const handoff = await resolveClaimHandoff({
@@ -546,11 +558,14 @@ export async function POST(req: Request) {
 
       if (!handoff.profileError) await clearOnboardingSessionCookie();
 
-      return NextResponse.json({
-        claimed: candidates.length,
-        conversationId: primary.id,
-        ...claimHandoffPayload(handoff),
-      });
+      return NextResponse.json(
+        {
+          claimed: candidates.length,
+          conversationId: primary.id,
+          ...claimHandoffPayload(handoff),
+        },
+        { status: handoff.profileError ? 409 : 200 }
+      );
     } catch (error) {
       // Ownership gate: unauthenticated / non-owner / missing conversation.
       // Fail closed — never surface reserved / locked-in success without verify.

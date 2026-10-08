@@ -5,7 +5,14 @@
 import { Button, Skeleton } from '@jovie/ui';
 import type { UIMessage } from 'ai';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
@@ -243,9 +250,11 @@ export function OnboardingShell({
               data-onboarding-session={sessionLabel}
             >
               {onRestart || onLogout || !isSignedIn ? (
-                <div
-                  className='flex min-h-11 shrink-0 items-center justify-end gap-2 px-3 sm:px-4'
-                  data-testid='onboarding-sign-in-header'
+                <OnboardingIdentityConflict
+                  visible={claimStatus === 'identity-conflict'}
+                  isSignedIn={isSignedIn}
+                  onLogout={onLogout}
+                  disabled={actionPending || controlsDisabled}
                 >
                   {onRestart ? (
                     <Button
@@ -277,7 +286,7 @@ export function OnboardingShell({
                       Sign in
                     </Link>
                   ) : null}
-                </div>
+                </OnboardingIdentityConflict>
               ) : null}
               <OnboardingChat
                 initialMessages={initialMessages}
@@ -306,11 +315,6 @@ export function OnboardingShell({
 
               <OnboardingShellStatus
                 kind='error'
-                message='This Spotify artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow. Choosing another handle will not resolve this conflict.'
-                visible={claimStatus === 'identity-conflict'}
-              />
-              <OnboardingShellStatus
-                kind='error'
                 message={turnstileFailureMessage}
                 visible={Boolean(turnstileFailureMessage)}
               />
@@ -332,6 +336,84 @@ export function OnboardingShell({
         }
       />
     </SidebarProvider>
+  );
+}
+
+/** Async recovery uses the existing header; details expand only on explicit request. */
+export function OnboardingIdentityConflict({
+  visible,
+  isSignedIn,
+  onLogout,
+  disabled = false,
+  children,
+}: Readonly<{
+  visible: boolean;
+  isSignedIn: boolean;
+  onLogout?: () => void;
+  disabled?: boolean;
+  children?: ReactNode;
+}>) {
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
+  useEffect(() => {
+    if (!visible) setExpanded(false);
+  }, [visible]);
+  return (
+    <div className='shrink-0' data-testid='onboarding-identity-recovery-slot'>
+      <div
+        className='flex h-11 items-center justify-end gap-2 overflow-x-auto px-3 sm:px-4'
+        data-testid='onboarding-sign-in-header'
+      >
+        {visible ? (
+          <>
+            <span role='alert' aria-live='assertive' className='sr-only'>
+              This artist already has a Jovie profile. Sign in with the original
+              account or use the verified profile claim flow.
+            </span>
+            <Button
+              variant='ghost'
+              size='sm'
+              className='mr-auto shrink-0'
+              aria-expanded={expanded}
+              aria-controls={detailsId}
+              onClick={() => setExpanded(value => !value)}
+            >
+              Profile Conflict
+            </Button>
+          </>
+        ) : null}
+        {children}
+      </div>
+      {visible && expanded ? (
+        <div
+          className='flex flex-col items-start gap-2 px-3 py-2 sm:px-4'
+          id={detailsId}
+          data-testid='onboarding-identity-conflict'
+        >
+          <p className='text-xs leading-5 text-error'>
+            This artist already has a Jovie profile. Sign in with the original
+            account or use the verified profile claim flow.
+          </p>
+          {isSignedIn && onLogout ? (
+            <Button
+              variant='ghost'
+              size='sm'
+              disabled={disabled}
+              onClick={onLogout}
+            >
+              Switch Account
+            </Button>
+          ) : !isSignedIn ? (
+            <Link
+              href={APP_ROUTES.SIGNIN}
+              className='btn-linear-login focus-ring-themed'
+            >
+              Sign in with original account
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
