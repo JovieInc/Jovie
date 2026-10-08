@@ -1231,13 +1231,64 @@ describe('entrypoint contract', () => {
     assert.ok(callLog.every(call => call.includes('pr list')));
 
     // Fail-closed path: every attempt fails; the collector names the cause
-    // and stays failed closed (no empty-array pass).
-    await writeFile(fakeGh, ['#!/bin/sh', 'exit 1'].join('\n'));
+    // with the exit code, signal, kill flag and stderr tail, and stays
+    // failed closed (no empty-array pass).
+    await writeFile(
+      fakeGh,
+      ['#!/bin/sh', 'echo "gh: auth required" >&2', 'exit 1'].join('\n')
+    );
     await chmod(fakeGh, 0o755);
     await writeFile(callsPath, '');
     const failed = await collectGitHubPullRequests(env);
     assert.equal(Array.isArray(failed), false);
     assert.match(String(failed?.error), /gh-pr-list-(open|merged):/);
+    assert.match(String(failed?.error), /exit=1/);
+    assert.match(String(failed?.error), /signal=none/);
+    assert.match(String(failed?.error), /killed=false/);
+    assert.match(String(failed?.error), /stderr=.*gh: auth required/);
+  });
+
+  it('parses a multi-megabyte gh pr list payload past the 1MB execFile default maxBuffer', async () => {
+    // The PR inventory query (body + statusCheckRollup on ~100 open PRs)
+    // measures multiple MB — beyond execFile's 1MB default maxBuffer, which
+    // kills the child mid-read. The collector runs with a 32MB maxBuffer, so
+    // a payload of this size parses instead of dying as a truncated cause.
+    const tempDir = await mkdtemp('/tmp/backlog-gh-mb-');
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const filler = 'x'.repeat(1024);
+    const rows = Array.from({ length: 2600 }, (_, i) => ({
+      number: i + 1,
+      title: 'fix JOV-1',
+      body: filler,
+      headRefName: `symphony/JOV-1-${i}`,
+      state: 'OPEN',
+      mergeStateStatus: 'CLEAN',
+      url: 'https://example/pr/1',
+      mergedAt: null,
+      isDraft: false,
+      statusCheckRollup: { state: 'SUCCESS' },
+    }));
+    const payload = JSON.stringify(rows);
+    assert.ok(payload.length > 2 * 1024 * 1024);
+    await writeFile(
+      fakeGh,
+      ['#!/bin/sh', `printf '%s' '${payload.replace(/'/g, "'\\''")}'`].join(
+        '\n'
+      )
+    );
+    await chmod(fakeGh, 0o755);
+    const { collectGitHubPullRequests } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const env = {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+    };
+    const inventory = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(inventory));
+    assert.equal(inventory.length, 5200);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {

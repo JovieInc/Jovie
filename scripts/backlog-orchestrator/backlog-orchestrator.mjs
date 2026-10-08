@@ -1277,6 +1277,33 @@ function uniqueIssuesByIdentifier(issues) {
  * run in parallel; a state that fails twice leaves the whole inventory null
  * and the capacity gate reports the exact gap (fail-closed, never guessed).
  */
+/**
+ * The PR inventory query includes `body` and `statusCheckRollup` on ~100
+ * open PRs — measured at multiple MB of JSON (the equivalent REST payload
+ * is ~1.8MB), far beyond execFile's 1MB default maxBuffer. A maxBuffer
+ * overrun kills the child with SIGTERM and a `stdout maxBuffer exceeded`
+ * message that names no cause in its truncated form, so the call runs with
+ * an explicit 32MB maxBuffer and every failure is described with its exit
+ * code, signal, kill flag and untruncated stderr tail.
+ */
+function describeExecFailure(error, command) {
+  const code = typeof error?.code === 'number' ? error.code : null;
+  const signal = typeof error?.signal === 'string' ? error.signal : null;
+  const killed = error?.killed === true ? 'true' : 'false';
+  const message = String(error?.message || error || 'unknown-error');
+  const stderrTail = String(error?.stderr || '')
+    .trim()
+    .slice(-400);
+  const messageTail = message.slice(-400);
+  return [
+    `exit=${code ?? 'none'}`,
+    `signal=${signal ?? 'none'}`,
+    `killed=${killed}`,
+    `stderr=${stderrTail || 'empty'}`,
+    `message=${messageTail}`,
+  ].join(';');
+}
+
 async function ghPullRequestList(state, env) {
   const fields =
     'number,title,body,headRefName,state,mergeStateStatus,url,mergedAt,isDraft,statusCheckRollup';
@@ -1297,6 +1324,7 @@ async function ghPullRequestList(state, env) {
     try {
       const { stdout } = await execFileAsync('gh', args, {
         timeout: 45_000,
+        maxBuffer: 32 * 1024 * 1024,
         env,
       });
       return JSON.parse(stdout);
@@ -1304,7 +1332,9 @@ async function ghPullRequestList(state, env) {
       lastError = error;
     }
   }
-  throw lastError ?? new Error('gh-pr-list-failed');
+  throw new Error(
+    `gh-pr-list-${state}:${describeExecFailure(lastError, args.join(' '))}`
+  );
 }
 
 export async function collectGitHubPullRequests(env = process.env) {
@@ -1313,8 +1343,14 @@ export async function collectGitHubPullRequests(env = process.env) {
       try {
         return await ghPullRequestList(state, env);
       } catch (error) {
+        // ghPullRequestList already carries the full untruncated failure
+        // description; keep the raw message as a fallback if it is ever
+        // replaced by a non-Error throw.
         return {
-          error: `gh-pr-list-${state}:${String(error?.message || error).slice(0, 160)}`,
+          error:
+            error instanceof Error && error.message.startsWith('gh-pr-list-')
+              ? error.message
+              : `gh-pr-list-${state}:${String(error?.message || error).slice(0, 400)}`,
         };
       }
     })
@@ -1450,11 +1486,12 @@ async function runRemediate(isDryRun) {
       ? { count: pullRequests.length, error: null }
       : {
           count: null,
-          error:
+          error: String(
             /** @type {Record<string, any>} */ (pullRequests ?? {})?.error ??
-            (pullRequests === null
-              ? 'gh-pr-list:unparseable-output'
-              : 'gh-pr-list:unknown-failure'),
+              (pullRequests === null
+                ? 'gh-pr-list:unparseable-output'
+                : 'gh-pr-list:unknown-failure')
+          ).slice(0, 2000),
         },
     feed: receipt.feed,
     workpadUpsert: null,
