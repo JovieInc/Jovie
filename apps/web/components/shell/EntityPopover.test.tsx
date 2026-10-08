@@ -159,7 +159,7 @@ describe('EntityPopover positioning', () => {
     anchor.focus();
     vi.stubGlobal('innerWidth', viewportWidth);
     vi.stubGlobal('innerHeight', viewportHeight);
-    const anchorRect = {
+    let anchorRect = {
       top,
       bottom: top + anchorHeight,
       left,
@@ -167,7 +167,9 @@ describe('EntityPopover positioning', () => {
       width,
       height: anchorHeight,
     } as DOMRect;
-    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(anchorRect);
+    vi.spyOn(anchor, 'getBoundingClientRect').mockImplementation(
+      () => anchorRect
+    );
     let height = contentHeight;
     // jsdom has no layout. Model the card's natural and constrained heights,
     // leaving positioning and event-driven updates to the real component.
@@ -203,7 +205,16 @@ describe('EntityPopover positioning', () => {
     const view = fastRender(<EntityPopover entity={release} anchor={anchor} />);
     return {
       anchor,
-      anchorRect,
+      get anchorRect() {
+        return anchorRect;
+      },
+      move: (nextTop: number) => {
+        anchorRect = {
+          ...anchorRect,
+          top: nextTop,
+          bottom: nextTop + anchorRect.height,
+        };
+      },
       view,
       grow: (nextHeight = 200) => {
         height = nextHeight;
@@ -366,8 +377,7 @@ describe('EntityPopover positioning', () => {
       viewportWidth: 390,
     });
     try {
-      fixture.anchorRect.top = 0;
-      fixture.anchorRect.bottom = 28;
+      fixture.move(0);
       act(() => {
         window.dispatchEvent(new Event('scroll'));
       });
