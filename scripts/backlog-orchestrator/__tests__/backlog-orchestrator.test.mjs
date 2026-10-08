@@ -298,6 +298,92 @@ describe('classifier', () => {
     assert.equal(scorer.scoreIssue(c).score, 0);
   });
 
+  it('uses Linear priority tiers and keeps absent or invalid priority last', () => {
+    const candidates = [0, 4, 3, 2, 1, undefined, -1, 1.5, '1', NaN, 9].map(
+      (priority, index) => ({
+        identifier: `JOV-${100 + index}`,
+        score: 100 - index,
+        issue: { priority },
+      })
+    );
+    const result = scorer.rankQueueCandidates(candidates);
+    assert.deepEqual(
+      result.ranked.slice(0, 4).map(item => item.issue.priority),
+      [1, 2, 3, 4]
+    );
+    assert.deepEqual(
+      result.ranked.slice(4).map(item => item.identifier),
+      [
+        'JOV-100',
+        'JOV-105',
+        'JOV-106',
+        'JOV-107',
+        'JOV-108',
+        'JOV-109',
+        'JOV-110',
+      ]
+    );
+    assert.deepEqual(
+      result.receipt.rankings.map(item => item.priority),
+      [1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0]
+    );
+    // A cached classification cannot replace the authoritative current priority.
+    assert.equal(
+      scorer.rankQueueCandidates([
+        {
+          identifier: 'JOV-1',
+          score: 100,
+          priority: 1,
+          issue: { priority: 4 },
+        },
+        { identifier: 'JOV-2', score: 1, issue: { priority: 2 } },
+      ]).receipt.selectedCandidate,
+      'JOV-2'
+    );
+  });
+
+  it('keeps economic ordering within a priority tier without allowing value to displace urgency', () => {
+    const candidate = (identifier, priority, value) => ({
+      identifier,
+      score: value,
+      issue: { priority },
+      economic: {
+        expectedValue: {
+          amount: value,
+          unit: 'usd',
+          confidence: 1,
+          sourceRef: `value://${identifier}`,
+        },
+        preventionLeverage: {
+          amount: 0,
+          unit: 'usd',
+          confidence: 1,
+          sourceRef: `prevention://${identifier}`,
+        },
+        fullyLoadedCost: {
+          expectedTotal: { amount: 1, unit: 'usd' },
+          uncertainty: { confidence: 1, missingSourceContracts: [] },
+          sourceContracts: [`cost://${identifier}`],
+        },
+      },
+    });
+    const result = scorer.rankQueueCandidates([
+      candidate('JOV-1', 2, 100),
+      candidate('JOV-2', 1, 10),
+      candidate('JOV-3', 1, 20),
+    ]);
+    assert.deepEqual(
+      result.ranked.map(item => item.identifier),
+      ['JOV-3', 'JOV-2', 'JOV-1']
+    );
+    assert.equal(result.receipt.mode, 'fully-loaded-economic');
+    assert.deepEqual(result.receipt.missingSourceContracts, []);
+    assert.deepEqual(result.receipt.orderingReasons, ['linear-priority']);
+    assert.equal(result.receipt.estimatedOpportunityCost.amount, 9);
+    assert.deepEqual(scorer.rankQueueCandidates([]).ranked, []);
+    assert.equal(scorer.rankQueueCandidates([]).receipt.selectedPriority, null);
+  });
+
   it('counts only fresh active machine leases, not ordinary In Progress work', () => {
     const now = '2026-08-03T12:00:00.000Z';
     const activeMachineLease = makeIssue({
@@ -2164,6 +2250,86 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(result.admit.length, 1);
     assert.equal(result.admit[0].identifier, 'JOV-4396');
     assert.equal(result.admit[0].type, 'issue');
+  });
+
+  it('admits Urgent Backlog before higher-scored eligible work and records priority displacement', async () => {
+    const urgent = admissionIssue({ identifier: 'JOV-8022', state: 'Backlog' });
+    urgent.priority = 1;
+    const profitable = admissionIssue({ identifier: 'JOV-4396' });
+    profitable.priority = 2;
+    const result = await admitter.selectNextToAdmit(
+      [
+        {
+          ...classification(urgent),
+          mrrCategory: 'unknown',
+          mrrConfidence: 'low',
+        },
+        { ...classification(profitable), mrrCategory: 'revenue-protection' },
+      ],
+      [],
+      { fleetGate: greenFleetGate() }
+    );
+    assert.equal(result.admit.length, 1);
+    assert.equal(result.admit[0].identifier, urgent.identifier);
+    assert.equal(result.queueRankingReceipt.selectedPriority, 1);
+    assert.ok(
+      result.queueRankingReceipt.orderingReasons.includes('linear-priority')
+    );
+    assert.equal(result.queueRankingReceipt.orderingChanged, true);
+    assert.equal(
+      result.queueRankingReceipt.displacedCandidate,
+      profitable.identifier
+    );
+    assert.ok(result.queueRankingReceipt.missingSourceContracts.length > 0);
+  });
+
+  it('does not let Urgent priority bypass missing evidence, dependency holds, ownership or fleet closure', async () => {
+    const missing = admissionIssue({
+      identifier: 'JOV-8001',
+      skipReceipts: true,
+    });
+    const held = admissionIssue({ identifier: 'JOV-8002', labels: ['held'] });
+    const owned = admissionIssue({
+      identifier: 'JOV-8003',
+      state: 'In Progress',
+      assignee: { id: 'tim', name: 'Tim White' },
+    });
+    const dependent = admissionIssue({ identifier: 'JOV-8004' });
+    for (const issue of [missing, held, owned, dependent]) issue.priority = 1;
+    const safe = admissionIssue({ identifier: 'JOV-8005' });
+    safe.priority = 3;
+    const candidates = [
+      classification(missing),
+      classification(held),
+      classification(owned),
+      {
+        ...classification(dependent),
+        category: 'blocked',
+        relatedIssues: [{ identifier: 'JOV-9999', relation: 'blockedBy' }],
+      },
+      classification(safe),
+    ];
+    const result = await admitter.selectNextToAdmit(candidates, [], {
+      fleetGate: greenFleetGate(),
+    });
+    assert.deepEqual(
+      result.admit.map(item => item.identifier),
+      [safe.identifier]
+    );
+    for (const issue of [missing, held, owned, dependent]) {
+      assert.equal(
+        result.admissionDecisions.find(
+          item => item.identifier === issue.identifier
+        ).allowed,
+        false
+      );
+    }
+    const fleetGate = greenFleetGate();
+    fleetGate.workAdmission.allowed = false;
+    assert.deepEqual(
+      (await admitter.selectNextToAdmit(candidates, [], { fleetGate })).admit,
+      []
+    );
   });
 
   it('records the displaced candidate and opportunity cost when economics change queue order', async () => {
