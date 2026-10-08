@@ -1355,19 +1355,20 @@ async function runRemediate(isDryRun) {
   // doctor report is the measured capacity source; the legacy read survives
   // only as a fallback so a future controller can re-own the signal.
   const lanes = backlogRemediation.readLanesCapacity();
+  const rotateProvider = () => {
+    const rotate = readCodexRotateCapacity();
+    return rotate ? { accounts: rotate.accounts, ready: rotate.ready } : null;
+  };
   const workers = lanes
     ? lanes.workers
     : await readOfficialSymphonyWorkers(
         fleetGate.concurrency?.gem?.maxConcurrent
       );
-  const provider = lanes
-    ? lanes.provider
-    : (() => {
-        const rotate = readCodexRotateCapacity();
-        return rotate
-          ? { accounts: rotate.accounts, ready: rotate.ready }
-          : null;
-      })();
+  // The lanes doctor owns worker seats, but its codex attribution can be
+  // unknown (status-probe error) while the report itself is fresh — the same
+  // codex-rotate account evidence backs the provider signal in that case,
+  // so one stale sub-signal cannot blank the whole capacity receipt.
+  const provider = (lanes && lanes.provider) || rotateProvider();
   const previous = loadCache().backlogRemediation || {};
   const receipt = backlogRemediation.buildRemediationReceipt({
     issues,

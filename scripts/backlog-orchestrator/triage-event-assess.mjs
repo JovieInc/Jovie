@@ -336,6 +336,22 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     ? await assessTriageSweep()
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
-  if ('failed' in receipt && (receipt.failed > 0 || receipt.blocked > 0))
-    process.exitCode = 1;
+  if ('failed' in receipt) {
+    // Named rows, never an anonymous exit: an assessment-failure row fails
+    // the step (it names the exact issue that needs repair), while an
+    // urgent-investigation row is surfaced as a warning — the receipt and
+    // the preserved artifact carry it, a catch-up sweep must not go red on
+    // work the fleet already escalates.
+    for (const result of receipt.results ?? []) {
+      if (result.disposition === 'assessment-failed')
+        console.error(
+          `::error title=Triage assessment failed::${result.issue}: ${result.error}`
+        );
+      else if (result.requiresImmediateInvestigation)
+        console.error(
+          `::warning title=Urgent Triage investigation required::${result.issue}: ${result.reason || result.disposition}`
+        );
+    }
+    if (receipt.failed > 0) process.exitCode = 1;
+  }
 }

@@ -349,10 +349,28 @@ describe('official Symphony backlog remediation', () => {
       { schema: CAPACITY_SCHEMA, observedAt: NOW },
       { now: NOW }
     );
-    assert.equal(
+    assert.match(
       missing.reason,
-      'capacity-evidence-missing-malformed-or-stale'
+      /^capacity-evidence-missing-malformed-or-stale:/
     );
+    assert.deepEqual(missing.gaps, [
+      'workers',
+      'provider',
+      'cloneLatencyMs',
+      'ci',
+      'mergeQueue',
+      'pullRequests',
+    ]);
+
+    const providerUnknown = evaluateRuntimeCapacity(
+      healthySignals({ provider: null }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(
+      providerUnknown.reason,
+      'capacity-evidence-missing-malformed-or-stale:provider'
+    );
+    assert.deepEqual(providerUnknown.gaps, ['provider']);
 
     const warming = evaluateRuntimeCapacity(healthySignals(), {
       now: NOW,
@@ -728,5 +746,37 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
   it('keeps the lanes doctor report as the primary orchestrator capacity source', () => {
     assert.match(ORCHESTRATOR, /backlogRemediation\.readLanesCapacity\(\)/);
     assert.match(MODULE, /source: 'lanes-doctor-report'/);
+    // A fresh lanes report with an unknown codex attribution (status-probe
+    // error) still yields worker seats; the provider signal then falls back
+    // to codex-rotate account evidence instead of blanking the whole receipt.
+    assert.match(
+      ORCHESTRATOR,
+      /\(lanes && lanes\.provider\) \|\| rotateProvider\(\)/
+    );
+    const attributionUnknown = readLanesCapacity({
+      lanesStateDir: (() => {
+        const dir = mkdtempSync(join(tmpdir(), 'lanes-capacity-unknown-'));
+        writeReport(dir, {
+          at: '2026-10-08T11:59:59Z',
+          alerts: {},
+          observed: {
+            now: NOW_MS / 1000 - 30,
+            capacityByProvider: { codex: { slots: 3, running: 2, base: 3 } },
+            codexAttribution: {
+              state: 'unknown',
+              reason: 'account-status-unavailable',
+            },
+          },
+        });
+        return dir;
+      })(),
+      nowMs: NOW_MS,
+    });
+    assert.equal(attributionUnknown.provider, null);
+    assert.deepEqual(attributionUnknown.workers, {
+      running: 2,
+      retrying: 0,
+      maxConcurrent: 3,
+    });
   });
 });
