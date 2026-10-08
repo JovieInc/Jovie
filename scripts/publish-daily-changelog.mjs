@@ -77,25 +77,45 @@ const observedAt = new Date().toISOString();
 // The public readback and its binding proof are re-checked on failure with
 // bounded backoff (JOV-8013): run 37798337152 failed once when the readback
 // served an unexpected identity seconds after the alias gate re-proved it,
-// while the marker stayed verified. Transient readback divergence retries;
-// a persistent mismatch still fails the step (deferred bindings exit 0).
-const maxBindingAttempts = 4;
+// while the marker stayed verified. Run 37812630550 (JOV-8016) then showed
+// the PLAIN binding error is transient too — the live readback's VERCEL_ENV
+// identity (or the recomputed controller-jobs read) can diverge for seconds
+// around a promote — so the plain error retries as well and only fails
+// closed after the final attempt, with the observed identities in the
+// message. Deferred bindings (a genuinely newer public generation) still
+// exit 0; a persistent binding failure still fails the step.
+const maxBindingAttempts = 6;
 /** @type {null | { status: string, [key: string]: unknown }} */
 let binding = null;
 let buildInfo = null;
+/** @type {null | Error} */
+let lastBindingError = null;
 for (let attempt = 1; attempt <= maxBindingAttempts; attempt += 1) {
   const buildResponse = await fetchPage('https://jov.ie/api/health/build-info');
   if (!buildResponse.ok) throw new Error('Public build identity unavailable');
   buildInfo = await buildResponse.json();
-  const candidate = checkPublicationBinding(marker, buildInfo, controller);
-  if (candidate.status !== 'deferred') {
+  try {
+    const candidate = checkPublicationBinding(marker, buildInfo, controller);
+    if (candidate.status !== 'deferred') {
+      binding = candidate;
+      lastBindingError = null;
+      break;
+    }
     binding = candidate;
-    break;
+  } catch (error) {
+    // Plain binding errors are transient candidates too (JOV-8016): the live
+    // readback's VERCEL_ENV identity or the recomputed controller-jobs read
+    // can diverge for seconds around a promote. Remember the observed
+    // identities for the final failure; keep retrying.
+    lastBindingError =
+      error instanceof Error ? error : new Error(String(error));
+    binding = { status: 'unbound' };
   }
-  binding = candidate;
   if (attempt < maxBindingAttempts) {
     console.error(
-      `Public readback not bound to the verified generation yet (attempt ${attempt}/${maxBindingAttempts}); retrying`
+      `Public readback not bound to the verified generation yet (attempt ${attempt}/${maxBindingAttempts})${
+        lastBindingError ? `: ${lastBindingError.message}` : '; retrying'
+      }`
     );
     await new Promise(resolve => setTimeout(resolve, attempt * 5_000));
   }
@@ -107,6 +127,17 @@ if (binding?.status === 'deferred') {
   );
   process.stdout.write(`${JSON.stringify(binding)}\n`);
   process.exit(0);
+}
+if (lastBindingError) {
+  // Fail closed after every attempt observed an unbound identity — with the
+  // observed (non-secret) identities in the message so the next failure is
+  // diagnosable without job-log access.
+  throw Object.assign(
+    new Error(
+      `${lastBindingError.message} [observed marker.sha=${marker?.sha ?? 'none'} terminalReason=${String(marker?.terminalReason)} authSmoke=${String(marker?.authSmoke)} lanes=${JSON.stringify(marker?.selectedLanes ?? null)} deploymentId=${String(marker?.deploymentId)}; readback.environment=${String(buildInfo?.environment)} commitSha=${String(buildInfo?.commitSha)} deploymentId=${String(buildInfo?.deploymentId)}; controller.verified=${String(controller?.verified)} runId=${String(controller?.runId)} attempt=${String(controller?.attempt)}]`
+    ),
+    { cause: lastBindingError }
+  );
 }
 const markdown = readFileSync('CHANGELOG.md', 'utf8');
 const seed = process.argv.includes('--seed')
