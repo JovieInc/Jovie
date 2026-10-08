@@ -89,7 +89,8 @@ function isSourceAvatar(source: URL, imageUrl: string): boolean {
     return (
       /^\/[^/]+\/?$/.test(source.pathname) &&
       /^i\d+\.sndcdn\.com$/.test(image.hostname) &&
-      /^\/avatars-[^/]+\.jpg$/.test(image.pathname)
+      image.pathname.startsWith('/avatars-') &&
+      /^[^/]+\.jpg$/.test(image.pathname.slice('/avatars-'.length))
     );
   }
   return (
