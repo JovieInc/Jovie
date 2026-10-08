@@ -42,12 +42,18 @@ describe('onboarding prompt voice (JOV-3806)', () => {
     expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/Never claim Jovie notifies/i);
   });
 
-  it('keeps post-Spotify calibration non-ownership and source-cited', () => {
+  it('keeps post-Spotify calibration non-ownership with reference-chip source citation', () => {
     expect(ONBOARDING_CALIBRATION_EXAMPLES.afterSpotifyPick).toMatch(
       /this artist/i
     );
-    expect(ONBOARDING_CALIBRATION_EXAMPLES.afterSpotifyPick).toMatch(
-      /source: enrichment/i
+    expect(ONBOARDING_SYSTEM_PROMPT).toContain(
+      'Use typed enrichment reference chips when available'
+    );
+    expect(ONBOARDING_SYSTEM_PROMPT).toContain(
+      'Keep source provenance in the inspectable reference chip'
+    );
+    expect(ONBOARDING_CALIBRATION_EXAMPLES.afterSpotifyPick).not.toMatch(
+      /\(source:\s*enrichment\)/i
     );
     expect(ONBOARDING_CALIBRATION_EXAMPLES.afterSpotifyPick).not.toMatch(
       /Pulled you up/i
