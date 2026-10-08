@@ -358,6 +358,19 @@ export async function assessTriageEvent(
       requiresImmediateInvestigation: false,
     };
   }
+  if (summerReceipt.decision === 'existing-intake-reconcile') {
+    const escalation = escalationBlockOf(summerReceipt);
+    if (escalation) {
+      return {
+        ...base,
+        disposition: summerReceipt.decision,
+        summerAssessment: summerReceipt,
+        mutations: 0,
+        wakeSymphony: false,
+        escalation,
+      };
+    }
+  }
 
   const current = await client.fetchIssue(delivery.identifier);
   if (
