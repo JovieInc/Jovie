@@ -10,6 +10,7 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
+import { TableDependencyGuide } from '@/components/organisms/table/atoms/TableDependencyGuide';
 import type {
   ProviderKey,
   ReleaseViewModel,
@@ -35,6 +36,7 @@ interface TrackRowProps {
   readonly isSelected?: boolean;
   readonly onClick?: () => void;
   readonly renderMode?: 'table' | 'stack';
+  readonly lastDependency?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ export const TrackRow = memo(function TrackRow({
   isSelected,
   onClick,
   renderMode = 'table',
+  lastDependency = false,
 }: TrackRowProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const rowClassName = [
@@ -169,7 +172,9 @@ export const TrackRow = memo(function TrackRow({
         {track.isExplicit ? (
           <Badge
             variant='secondary'
-            className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
+            size='sm'
+            tone='neutral'
+            className='shrink-0'
             title='Explicit content'
             aria-label='Explicit Content'
           >
@@ -249,7 +254,10 @@ export const TrackRow = memo(function TrackRow({
         data-testid={`track-row-${track.id}`}
         data-state={isSelected ? 'selected' : 'idle'}
       >
-        {stackContent}
+        <div className='flex items-stretch'>
+          <TableDependencyGuide last={lastDependency} />
+          <div className='min-w-0 flex-1'>{stackContent}</div>
+        </div>
       </div>
     );
   }
@@ -273,11 +281,8 @@ export const TrackRow = memo(function TrackRow({
       {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (
         <td className='py-2 pr-3 align-top'>
-          <div className='relative flex items-center gap-2.5 pl-5'>
-            <span
-              aria-hidden='true'
-              className='system-b-track-row-release-rail absolute left-2 top-0.5 bottom-0.5 w-px rounded-full'
-            />
+          <div className='relative flex items-center gap-2.5'>
+            <TableDependencyGuide last={lastDependency} className='min-h-10' />
             {/* Track number */}
             <span className='w-7 shrink-0 text-right text-2xs tabular-nums text-tertiary-token'>
               {trackLabel}.
@@ -297,7 +302,9 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
+                    size='sm'
+                    tone='neutral'
+                    className='shrink-0'
                     title='Explicit content'
                     aria-label='Explicit Content'
                   >
@@ -467,9 +474,10 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
   if (renderMode === 'stack') {
     return (
       <div className='space-y-2'>
-        {tracks.map(track => (
+        {tracks.map((track, index) => (
           <TrackRow
             key={track.id}
+            lastDependency={index === tracks.length - 1}
             track={track}
             release={release}
             providerConfig={providerConfig}
@@ -487,9 +495,10 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
 
   return (
     <>
-      {tracks.map(track => (
+      {tracks.map((track, index) => (
         <TrackRow
           key={track.id}
+          lastDependency={index === tracks.length - 1}
           track={track}
           release={release}
           providerConfig={providerConfig}
