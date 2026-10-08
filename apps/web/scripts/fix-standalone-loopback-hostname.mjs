@@ -23,44 +23,65 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const appRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..'
-);
-const standaloneServerPath = path.join(
-  appRoot,
-  '.next',
-  'standalone',
-  'apps',
-  'web',
-  'server.js'
-);
+const GENERATED_DEFAULT = "const hostname = process.env.HOSTNAME || '0.0.0.0'";
+const PINNED_DEFAULT = `const hostname = process.env.HOSTNAME &&
+  !['localhost', '::1'].includes(process.env.HOSTNAME)
+  ? process.env.HOSTNAME
+  : '127.0.0.1'`;
 
-if (!existsSync(standaloneServerPath)) {
-  console.log(
-    'No standalone server.js found; skipping loopback hostname pin (non-standalone or preview build).'
-  );
-  process.exit(0);
+/**
+ * Pure transform so the changed-line coverage ratchet can select this
+ * script's unit test through a real module import.
+ *
+ * @param {string} source the generated standalone server.js contents
+ * @returns {{ content: string, action: 'pinned' | 'already-pinned' | 'unknown-template' }}
+ */
+export function pinStandaloneLoopbackHostname(source) {
+  if (source.includes(PINNED_DEFAULT))
+    return { content: source, action: 'already-pinned' };
+  if (!source.includes(GENERATED_DEFAULT))
+    return { content: source, action: 'unknown-template' };
+  return {
+    content: source.replace(GENERATED_DEFAULT, PINNED_DEFAULT),
+    action: 'pinned',
+  };
 }
 
-const original = readFileSync(standaloneServerPath, 'utf8');
-const pattern = /const hostname = process\.env\.HOSTNAME \|\| '0\.0\.0\.0'/;
-if (!pattern.test(original)) {
-  if (original.includes("'127.0.0.1'")) {
-    console.log('Standalone server.js already pins the loopback hostname.');
-  } else {
+function main() {
+  const appRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..'
+  );
+  const standaloneServerPath = path.join(
+    appRoot,
+    '.next',
+    'standalone',
+    'apps',
+    'web',
+    'server.js'
+  );
+
+  if (!existsSync(standaloneServerPath)) {
+    console.log(
+      'No standalone server.js found; skipping loopback hostname pin (non-standalone or preview build).'
+    );
+    process.exit(0);
+  }
+
+  const { content, action } = pinStandaloneLoopbackHostname(
+    readFileSync(standaloneServerPath, 'utf8')
+  );
+  if (action === 'unknown-template') {
     throw new Error(
       'Standalone server.js does not match the expected hostname template; refusing to guess (next version changed?).'
     );
   }
-  process.exit(0);
+  if (action === 'pinned') writeFileSync(standaloneServerPath, content);
+  console.log(
+    action === 'already-pinned'
+      ? 'Standalone server.js already pins the loopback hostname.'
+      : 'Pinned standalone server.js loopback hostname to 127.0.0.1 (HOSTNAME=localhost resolves ::1 first on some runners; JOV-8015).'
+  );
 }
 
-const patched = original.replace(
-  pattern,
-  "const hostname = process.env.HOSTNAME &&\n  !['localhost', '::1'].includes(process.env.HOSTNAME)\n  ? process.env.HOSTNAME\n  : '127.0.0.1'"
-);
-writeFileSync(standaloneServerPath, patched);
-console.log(
-  'Pinned standalone server.js loopback hostname to 127.0.0.1 (HOSTNAME=localhost resolves ::1 first on some runners; JOV-8015).'
-);
+if (import.meta.url === `file://${process.argv[1]}`) main();
