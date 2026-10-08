@@ -224,13 +224,36 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   const chatComposer = page
     .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
     .first();
+  const isShellReady = async () =>
+    (await main.isVisible().catch(() => false)) ||
+    (await chatComposer.isVisible().catch(() => false));
+
+  // The `creator` persona keeps onboarding incomplete by design, so the
+  // post-bypass landing can be /start instead of /app. There, the
+  // OnboardingSessionBoundary (JOV-7689) mounts the shell only after a
+  // client-side conversation restore resolves; a failed restore leaves a
+  // static Try Again state with no <main>/composer — a reload is the same
+  // recovery the surface itself offers. Retry the navigation once mid-poll:
+  // /app states always render <main> (shell skeleton included), so the
+  // reload can only fire on a stuck /start boundary.
+  const reloaded = { value: false };
 
   await expect
     .poll(
-      async () =>
-        (await main.isVisible().catch(() => false)) ||
-        (await chatComposer.isVisible().catch(() => false)),
-      { timeout: 30_000, intervals: [2_000, 5_000, 10_000] }
+      async () => {
+        if (await isShellReady()) return true;
+        if (!reloaded.value) {
+          const url = new URL(page.url());
+          if (url.pathname.startsWith('/start')) {
+            reloaded.value = true;
+            await page
+              .reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
+              .catch(() => undefined);
+          }
+        }
+        return false;
+      },
+      { timeout: 90_000, intervals: [2_000, 5_000, 10_000] }
     )
     .toBe(true);
 }
