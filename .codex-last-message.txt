@@ -1,0 +1,9 @@
+Draft PR opened: [#20784](https://github.com/JovieInc/Jovie/pull/20784) at commit `dc2bb21009`.
+
+- macOS gate timeout now defaults to 3,600 seconds; Linux remains at 2,400.
+- `LANES_GATE_TIMEOUT_S` overrides remain supported.
+- Added platform/override regression coverage and documented re-evaluation criteria.
+- Verified 317 lane-runner tests passed, 2 skipped; focused tests, compilation, commit hooks, secret scans, and publication checks passed.
+- Biome processed no files because Python and Markdown are ignored by repository configuration.
+
+Concerns/deviations: GBrain and the mac host were unreachable from this runner, so runtime clearance remains the doctor’s post-release proof. The PR remains draft with CI currently queued.
