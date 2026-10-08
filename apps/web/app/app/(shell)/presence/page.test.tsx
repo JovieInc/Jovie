@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -93,6 +94,10 @@ describe('Profiles public page route', () => {
     });
 
     const result = await PresencePage();
+
+    if (!isValidElement(result)) {
+      throw new Error('Expected the Profiles workspace element');
+    }
 
     expect(result.props).toEqual({
       data: null,
