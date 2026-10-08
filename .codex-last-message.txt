@@ -1,0 +1,5 @@
+Created [.design-brief.md](/home/timwhite/.local/state/jovie-lanes/worktrees/20261004T232937Z-JOV-5295-codex-brief-77205e/.design-brief.md).
+
+Taste decision: implement as one bounded follow-up, retain shortcut `<kbd>` styling, and use normal readable casing with `tracking-normal` elsewhere.
+
+Validation passes Steps 1–8. Step 9 is intentionally empty because no real Pen or ImageGen artifact was produced. No code, commits, pushes, or PRs.
