@@ -3409,6 +3409,7 @@ jobs:
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
+                  tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
