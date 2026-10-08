@@ -1,88 +1,90 @@
-/**
- * Instantly Push — Timeout Behavior Tests
- *
- * Verifies the 15s AbortSignal.timeout is applied to the Instantly API fetch.
- */
-
-import { describe, expect, it, vi } from 'vitest';
+/** Direct provider policy regressions; no real network or credentials. */
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const { mockPipelineLog } = vi.hoisted(() => ({
-  mockPipelineLog: vi.fn(),
-}));
-
-vi.mock('@/lib/leads/pipeline-logger', () => ({
-  pipelineLog: mockPipelineLog,
-}));
-
-const APPROVED_COPY = {
-  channel: 'email' as const,
-  subject: 'Your Jovie page is ready',
-  body: 'Hey Test, here is your page: https://app/claim/tok',
-  revision: 'rev-1',
+const INPUT = {
+  email: 'creator@example.invalid',
+  firstName: 'Creator',
+  claimLink: 'https://example.invalid/claim/synthetic',
+  artistName: 'Creator',
+  priorityScore: 50,
+  approvedCopy: {
+    channel: 'email' as const,
+    subject: 'Reviewed copy',
+    body: 'Reviewed draft',
+    revision: 'synthetic-review-revision',
+  },
 };
 
-describe('Instantly push timeout', () => {
-  it('fetch call includes AbortSignal.timeout(15000)', async () => {
-    // We verify the timeout is configured by checking that the fetch
-    // call receives a signal option. This tests the integration point.
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ lead_id: 'inst-1' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
-
-    // Dynamic import to get fresh module after global mock
-    vi.resetModules();
-
-    const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
-
-    vi.stubEnv('INSTANTLY_API_KEY', 'test-key');
-    vi.stubEnv('INSTANTLY_CAMPAIGN_ID', 'campaign-1');
-    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
-
-    await pushLeadToInstantly({
-      email: 'test@example.com',
-      firstName: 'Test',
-      claimLink: 'https://app/claim/tok',
-      artistName: 'Test',
-      priorityScore: 50,
-      approvedCopy: APPROVED_COPY,
-    });
-
-    expect(mockFetch).toHaveBeenCalledOnce();
-    const fetchOptions = mockFetch.mock.calls[0]?.[1];
-    expect(fetchOptions).toHaveProperty('signal');
-
+describe('Instantly provider audience denial', () => {
+  afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
-  it('does not call fetch when Instantly outbound is disabled', async () => {
-    const mockFetch = vi.fn();
-    vi.stubGlobal('fetch', mockFetch);
-    vi.resetModules();
-    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', '');
-    vi.stubEnv('INSTANTLY_API_KEY', 'test-key');
-    vi.stubEnv('INSTANTLY_CAMPAIGN_ID', 'campaign-1');
+  it.each(['', 'true', '1'])(
+    'never enrolls when the feature flag is %s',
+    async flag => {
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 'synthetic-provider-id' }),
+      });
+      vi.stubGlobal('fetch', fetcher);
+      vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', flag);
+      vi.stubEnv('INSTANTLY_API_KEY', 'test-key');
+      vi.stubEnv('INSTANTLY_CAMPAIGN_ID', 'synthetic-campaign');
+      const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
+      await expect(pushLeadToInstantly(INPUT)).rejects.toMatchObject({
+        name: 'InstantlyAudienceDeliveryBlockedError',
+        code: 'audience_delivery_disabled',
+        retryable: false,
+        policyReceipt: {
+          dispatchAllowed: false,
+          retryable: false,
+          queueDisposition: 'do_not_enqueue_or_retry',
+        },
+      });
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+  );
 
+  it('refuses replay, recipient switches and edited copy without transport or retry', async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: false, status: 429 });
+    vi.stubGlobal('fetch', fetcher);
     const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
+    for (const input of [
+      INPUT,
+      INPUT,
+      { ...INPUT, email: 'switched@example.invalid' },
+      {
+        ...INPUT,
+        approvedCopy: {
+          ...INPUT.approvedCopy,
+          channel: 'dm' as const,
+          body: 'Edited draft',
+        },
+      },
+    ]) {
+      await expect(pushLeadToInstantly(input)).rejects.toMatchObject({
+        code: 'audience_delivery_disabled',
+        retryable: false,
+      });
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 
-    await expect(
-      pushLeadToInstantly({
-        email: 'test@example.com',
-        firstName: 'Test',
-        claimLink: 'https://app/claim/tok',
-        artistName: 'Test',
-        priorityScore: 50,
-        approvedCopy: APPROVED_COPY,
-      })
-    ).rejects.toThrow(/disabled/i);
-    expect(mockFetch).not.toHaveBeenCalled();
-
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
+  it('refuses before reading recipient or copy input', async () => {
+    const recipientRead = vi.fn(() => {
+      throw new Error('recipient must not be read');
+    });
+    const input = { ...INPUT };
+    Object.defineProperty(input, 'email', { get: recipientRead });
+    const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
+    await expect(pushLeadToInstantly(input)).rejects.toMatchObject({
+      code: 'audience_delivery_disabled',
+      retryable: false,
+    });
+    expect(recipientRead).not.toHaveBeenCalled();
   });
 });
