@@ -1,0 +1,9 @@
+Already fixed by JOV-7885 (`2f1a385e98`), which corrected the direct-main product-lane receipt predicate.
+
+- Current-main CI [37255688508](https://github.com/JovieInc/Jovie/actions/runs/37255688508): success with sealed release receipt.
+- Staging Controller [37255723121](https://github.com/JovieInc/Jovie/actions/runs/37255723121): authorization and `staging-result` succeeded.
+- Focused workflow tests: 123/123 passed.
+- No files changed, commit created, branch pushed, or PR opened.
+- GBrain was unavailable; repository and live GitHub evidence were used.
+
+NOT-SHIPPABLE: the exact failure was already repaired and verified on current main by JOV-7885.
