@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 // The JOV-7703 contract is TypeScript in another package; load it at runtime
@@ -460,6 +461,57 @@ describe('validation sync: founder taste (JOV-7759)', () => {
         rows: [{ ...UI_MATRIX.rows[0], ui: { requiredEvidence: [] } }],
       })?.[0]?.judgment
     ).toBe('deterministic');
+  });
+
+  it('does not turn queue invariant metadata into a founder build approval', async () => {
+    const { world, fetchImpl } = createWorld();
+    // PR19749 / JOV-5117: queue controls plus the shared invariant registry.
+    world.pulls[101].files = [
+      '.github/MERGE_QUEUE.md',
+      '.github/scripts/auto-merge-stuck-triage.js',
+      'canon/invariants.jsonl',
+      'scripts/lib/source-admission-policy.mjs',
+      'scripts/merge-group-failure-hold.mjs',
+    ];
+    const matrix = JSON.parse(
+      readFileSync(
+        new URL('../../invariants/assurance-matrix.json', import.meta.url),
+        'utf8'
+      )
+    );
+    expect(mergedUiEvidence(world.pulls[101].files, matrix)).toEqual([]);
+    await merge(world, fetchImpl, 101, { assuranceMatrix: matrix });
+    expect(world.issues['JOV-1'].comments.at(-1).body).not.toContain(
+      'founder-taste'
+    );
+    expect(world.descriptions).toEqual([]);
+    // A real taste detector changed alongside metadata still owes its row.
+    expect(
+      mergedUiEvidence(
+        [
+          'canon/invariants.jsonl',
+          'apps/web/scripts/design-ci-judge-router.ts',
+        ],
+        matrix
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ row: 'AM-024', judgment: 'taste' }),
+      ])
+    );
+    expect(
+      mergedUiEvidence(
+        [
+          'canon/invariants.jsonl',
+          'apps/web/lib/animation/motion-primitives.ts',
+        ],
+        matrix
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ row: 'AM-018', judgment: 'mixed' }),
+      ])
+    );
   });
 
   it('does not ask for taste when the change touches no UI row', async () => {
