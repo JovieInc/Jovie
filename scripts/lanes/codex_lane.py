@@ -143,12 +143,12 @@ class LaunchEvidence:
     """Allowlisted identity from verified CLIs' first, pre-prompt startup header.
 
     Codex 0.147.0 JSON thread.started exposes only thread_id. The verified
-    0.144.6/0.147.0/0.160.1 human header (exec/src/event_processor_with_human_output.rs)
+    0.144.6/0.147.0 human header (exec/src/event_processor_with_human_output.rs)
     reports the thread/start model/provider and configured reasoning effort.
     This is CLI launch evidence, never provider attestation or generated text.
     A different format/version stays unknown until its contract is verified.
     """
-    VERSIONS = {"0.144.6", "0.147.0", "0.160.1"}
+    VERSIONS = {"0.144.6", "0.147.0"}
     KEYS = ("workdir", "model", "provider", "approval", "sandbox",
             "reasoning effort", "reasoning summaries", "session id")
     REQUIRED = {"workdir", "model", "provider", "approval", "sandbox", "session id"}
