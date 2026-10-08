@@ -343,6 +343,124 @@ test('a Summer provider-blocked escalation is named and counted without failing 
     }),
     null
   );
+
+  // Live receipts carry the escalation at other depths: inside the Jev
+  // assessment (ambiguous rows) and in a list. Every location matches.
+  const inAssessment = {
+    ...(await summer('existing-intake-reconcile')()),
+    assessment: {
+      schema: 'summer.jev-triage/v1',
+      model: 'typesafe-ai/jev',
+      status: 'ambiguous',
+      destination: null,
+      priority: null,
+      category: 'operations',
+      confidence: 0.4,
+      reason: 'ambiguous-or-serious',
+      assessmentKey: 'key-1',
+      escalation: {
+        status: 'provider-block',
+        code: 'reason-lane-model-capacity-cost-binding-unverified',
+        requestedModel: 'anthropic/claude-opus-5.5',
+        owner: 'Gem reason lane',
+      },
+    },
+  };
+  assert.equal(
+    escalationBlockOf(inAssessment).requestedModel,
+    'anthropic/claude-opus-5.5'
+  );
+  const inList = {
+    ...(await summer('urgent-investigation-required')()),
+    escalations: [
+      { status: 'provider-block', code: 'reason-lane-capacity-unverified' },
+    ],
+  };
+  assert.equal(
+    escalationBlockOf(inList).code,
+    'reason-lane-capacity-unverified'
+  );
+
+  // An ambiguous Jev assessment carrying the escalation is provider-blocked:
+  // the row carries the escalation and does not count as blocked.
+  const ambiguousReceipt = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [blocked],
+      fetchIssue: async () => blocked,
+    },
+    async () => inAssessment
+  );
+  assert.equal(ambiguousReceipt.providerBlocked, 1);
+  assert.equal(ambiguousReceipt.blocked, 0);
+  assert.equal(ambiguousReceipt.failed, 0);
+
+  // An urgent-investigation row carrying the escalation is provider-blocked
+  // too, not blocked.
+  const urgentEscalated = {
+    ...(await summer('urgent-investigation-required')()),
+    escalation: {
+      status: 'provider-block',
+      code: 'reason-lane-model-capacity-cost-binding-unverified',
+    },
+  };
+  const urgentReceipt = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [urgent],
+      fetchIssue: async () => urgent,
+    },
+    async () => urgentEscalated
+  );
+  assert.equal(urgentReceipt.providerBlocked, 1);
+  assert.equal(urgentReceipt.blocked, 0);
+});
+
+test('a transient Summer 5xx is retried once and a repeated 5xx fails the row', async () => {
+  const target = issue({ identifier: 'JOV-6500' });
+  let calls = 0;
+  const flaky = async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('summer-triage-assessment-http-503');
+    return summer('urgent-investigation-required')();
+  };
+  const recovered = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [target],
+      fetchIssue: async () => target,
+    },
+    flaky
+  );
+  assert.equal(recovered.failed, 0);
+  assert.equal(calls, 2);
+
+  calls = 0;
+  const persistent = async () => {
+    calls += 1;
+    throw new Error('summer-triage-assessment-http-503');
+  };
+  const failing = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [target],
+      fetchIssue: async () => target,
+    },
+    persistent
+  );
+  assert.equal(failing.failed, 1);
+  assert.equal(failing.results[0].error, 'summer-triage-assessment-http-503');
+  assert.equal(calls, 2);
+
+  calls = 0;
+  const badRequest = async () => {
+    calls += 1;
+    throw new Error('summer-triage-assessment-http-400');
+  };
+  await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [target],
+      fetchIssue: async () => target,
+    },
+    badRequest
+  );
+  assert.equal(calls, 1);
 });
 
 test('rejects untrusted or malformed repository dispatch before Linear access', () => {
