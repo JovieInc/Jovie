@@ -163,10 +163,10 @@ describe('official Symphony backlog remediation', () => {
         },
       ],
     });
-    // The dedup lives in the collector (one row per PR number); rows that
-    // still arrive duplicated map per-row — the collector's dedup keeps
-    // this at one entry per PR, so the issue never splits.
-    assert.deepEqual(splitCheck.rows[0].openPullRequests, [8, 8]);
+    // Defense in depth (follow-up 10): inventoryBacklog dedupes by PR
+    // number while building byIssue, so duplicated rows never split the
+    // issue — one entry per PR.
+    assert.deepEqual(splitCheck.rows[0].openPullRequests, [8]);
   });
 
   it('inventories Linear issues against open and merged GitHub PRs', () => {
@@ -544,6 +544,64 @@ describe('official Symphony backlog remediation', () => {
       { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
     );
     assert.equal(unknownHeavy.reason, 'pr-mergeability-unknown');
+    // Follow-up 10: a missing rollup fetch NEVER reads as zero errored —
+    // the prRollups:false signal fails the gate closed with the named cause.
+    const rollupMissing = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+        ],
+        prRollups: false,
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(rollupMissing.allowed, false);
+    assert.equal(rollupMissing.reason, 'pr-check-rollup-unavailable');
+    // mergeable CONFLICTING counts as a conflict even with a CLEAN
+    // mergeStateStatus (gh computes mergeable as MERGEABLE/CONFLICTING/UNKNOWN).
+    const mergeableConflicting = pullRequestRates([
+      {
+        number: 1,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'CONFLICTING',
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 2,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+      },
+    ]);
+    assert.deepEqual(mergeableConflicting.conflictingPullRequests, [1]);
+    assert.equal(mergeableConflicting.conflictRate, 0.5);
     const unknownLight = evaluateRuntimeCapacity(
       healthySignals({
         pullRequests: [
