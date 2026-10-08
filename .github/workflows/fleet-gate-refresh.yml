@@ -195,9 +195,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -s "$RECEIPT_FILE" ]] && jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
-            curl --fail --silent --show-error --max-time 5 \
-              -H 'content-type: application/json' -d '{}' \
-              http://127.0.0.1:4041/api/v1/refresh
+            # JOV-8000: the Elixir :4041 refresh endpoint is retired. The lanes
+            # pick up the Todo transition on their own tick; record the wake.
+            echo "wakeSymphony recorded; lanes pick up the Todo transition on their own tick"
           fi
 
       - name: Preserve Triage catch-up receipt
@@ -262,9 +262,9 @@ jobs:
         run: |
           set -euo pipefail
           if jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
-            curl --fail --silent --show-error --max-time 5 \
-              -H 'content-type: application/json' -d '{}' \
-              http://127.0.0.1:4041/api/v1/refresh
+            # JOV-8000: the Elixir :4041 refresh endpoint is retired. The
+            # lanes pick up the Todo transition on their own tick.
+            echo "wakeSymphony recorded; lanes pick up the Todo transition on their own tick"
           fi
       - name: Preserve exact assessment receipt
         if: always()
