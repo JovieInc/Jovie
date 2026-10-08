@@ -342,6 +342,74 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     vi.restoreAllMocks();
   });
 
+  it('hydrates the exact source name and photo without removing the inventory, and retries failures', async () => {
+    const user = userEvent.setup();
+    const base = data.rows[1];
+    if (base.rowType !== 'surface') throw new Error('Missing DSP fixture');
+    const id = '33333333-3333-4333-8333-333333333333';
+    let attempts = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async input => {
+      if (String(input).endsWith(`/profile-surfaces/${id}/source`)) {
+        attempts++;
+        return attempts === 1
+          ? jsonResponse({ status: 'unavailable' })
+          : jsonResponse({
+              status: 'available',
+              displayName: 'Observed Artist Name',
+              pageTitle: null,
+              sourceUrl: base.url,
+              photo: {
+                url: 'https://i.scdn.co/image/actual-source.jpg',
+                kind: 'profile',
+                source: 'connector',
+                observedAt: '2026-10-07T00:00:00.000Z',
+                freshness: 'current',
+                verified: false,
+              },
+            });
+      }
+      return jsonResponse(suggestionsResponse([]));
+    });
+    renderWorkspace({
+      ...data,
+      rows: [{ ...base, id, identityPhoto: undefined }],
+    });
+    await waitFor(() => expect(attempts).toBe(1));
+    fireEvent.click(screen.getByRole('row', { name: /Spotify/ }));
+    await waitFor(() =>
+      expect(
+        (
+          vi
+            .mocked(useRegisterRightPanel)
+            .mock.calls.at(-1)?.[0] as ReactElement<{ sourceLoading: boolean }>
+        ).props.sourceLoading
+      ).toBe(false)
+    );
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    const rail = render(
+      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
+    );
+    await user.click(screen.getByRole('button', { name: 'Retry Source' }));
+    expect(
+      await within(screen.getByRole('table')).findByText('Observed Artist Name')
+    ).toBeInTheDocument();
+    expect(attempts).toBe(2);
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'data-table-row-mode',
+      'list'
+    );
+    const rowPhoto = within(screen.getByRole('table')).getByTestId(
+      'presence-identity-photo'
+    );
+    expect(rowPhoto).toHaveAttribute('data-photo-verified', 'false');
+    expect(
+      decodeURIComponent(
+        rowPhoto.querySelector('img')?.getAttribute('src') ?? ''
+      )
+    ).toContain('actual-source.jpg');
+    rail.unmount();
+  });
+
   it('stops retrying forbidden suggestions and recovers saved suggestions on explicit retry', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.mocked(globalThis.fetch);
@@ -356,7 +424,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       )
     );
     renderWorkspace(data);
-    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    await user.click(
+      screen.getByRole('button', { name: /Review Suggestions/ })
+    );
     expect(await screen.findByText("Couldn't Load Suggestions")).toBeVisible();
     expect(
       screen.queryByText('Saved suggestions are still available. Try again.')
@@ -412,13 +482,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         },
       ],
     });
-    expect(
-      screen.getByRole('button', { name: 'Review Pages (2)' })
-    ).toHaveAttribute('aria-pressed', 'true');
     const table = screen.getByRole('table');
-    expect(within(table).getAllByRole('row')).toHaveLength(3);
-    expect(within(table).queryByText('Known Page')).not.toBeInTheDocument();
-    expect(within(table).getAllByText('Instagram')).toHaveLength(2);
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
+    expect(within(table).getByText('Known Page')).toBeInTheDocument();
     await user.click(screen.getByText('Ambiguous A'));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     const rail = render(
@@ -443,22 +509,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.getByRole('button', { name: 'No' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Unsure' })).toBeEnabled();
     rail.unmount();
-    await user.click(screen.getByRole('button', { name: 'All Pages' }));
     expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
       4
     );
     expect(screen.getByText('Known Page')).toBeInTheDocument();
     expect(screen.queryByText('Up to Date')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Identity Outcome' }));
-    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
-      4
-    );
-    expect(
-      within(screen.getByTestId('presence-outcomes')).getByText('3 Pages')
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Search Outcome' })
-    ).not.toBeInTheDocument();
   });
 
   it('persists an identity rejection and refreshes the canonical workspace', async () => {
@@ -519,17 +574,17 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     rail.unmount();
   });
 
-  it('retains a useful inventory destination when the review queue is empty', async () => {
+  it('keeps every profile available when there are no pending reviews', () => {
     renderWorkspace(data);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Review Pages (0)' }));
-    expect(
-      screen.getByText('No Pages Awaiting Identity Review')
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'All Pages' }));
     expect(
       screen.getByRole('button', { name: 'Actions for Spotify' })
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'All Pages' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Review Pages/ })
+    ).not.toBeInTheDocument();
   });
 
   it('uses the canonical empty state with a direct identity action', () => {
@@ -566,8 +621,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       .getByRole('button', { name: 'Actions for Spotify' })
       .closest('tr');
     expect(
-      within(spotifyRow as HTMLElement).getByRole('cell', { name: 'Tim White' })
-    ).toBeInTheDocument();
+      within(spotifyRow as HTMLElement).queryByRole('cell', {
+        name: 'Tim White',
+      })
+    ).not.toBeInTheDocument();
     expect(
       within(spotifyRow as HTMLElement).getByRole('cell', {
         name: /Spotify/,
@@ -592,86 +649,24 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(spotifyRow).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('shows recurring artist outcomes, all monitored pages, and a focused header action', async () => {
-    renderWorkspace(data);
-
-    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
+  it('shows one full profile inventory and a focused add action without category controls', () => {
+    renderWorkspace(dataWithConnector);
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Actions for Instagram' })
-    ).toBeInTheDocument();
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'All Pages' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    const outcomes = screen.getByTestId('presence-outcomes');
-    expect(within(outcomes).getByText('Identity')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Profiles')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Catalog')).toBeInTheDocument();
-    expect(within(outcomes).getByText('Search')).toBeInTheDocument();
-    expect(within(outcomes).getByText('#2')).toBeInTheDocument();
-    expect(within(outcomes).getByText('0 Pages')).toBeInTheDocument();
+    expect(screen.queryByTestId('presence-outcomes')).not.toBeInTheDocument();
+    for (const name of [
+      'All Pages',
+      'Identity',
+      'Profiles',
+      'Catalog',
+      'Suggested',
+      'Connectors',
+    ]) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
     expect(
-      screen.queryByTestId('presence-photo-strip')
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText('7')).not.toBeInTheDocument();
-
-    // JOV-6170: presence outcomes group by artist goal, not raw type.
-    expect(
-      screen.getByRole('button', { name: /^Identity$/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /^Profiles$/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /^Catalog$/ })
-    ).toBeInTheDocument();
-    const typeGlyph = screen.getByRole('img', {
-      name: 'DSP profile type',
-    });
-    expect(typeGlyph).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'DSP profile type' })
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId('registered-header-actions')).getByRole(
-        'button',
-        { name: 'Add Profile Or Site' }
-      )
-    ).toBeInTheDocument();
-
-    const spotifyRow = screen.getByText('Spotify').closest('tr');
-    expect(spotifyRow).not.toBeNull();
-    expect(
-      within(spotifyRow as HTMLElement)
-        .getAllByText('Limit Reached')
-        .some(element => !element.classList.contains('sr-only'))
-    ).toBe(true);
-
-    fireEvent.click(screen.getByRole('button', { name: /^Profiles$/ }));
-    expect(screen.getByText('Spotify')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Actions for Instagram' })
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /^Identity$/ }));
-    expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
-    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
-
-    // Catalog outcome: authority/directory sources. Base fixture has none,
-    // so the outcome tab renders the category empty state.
-    fireEvent.click(screen.getByRole('button', { name: /^Catalog$/ }));
-    expect(
-      screen.getByText('No Presence in This Category')
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
-    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
-
-    expect(
-      screen.getByRole('button', { name: 'Connectors' })
+      screen.getByRole('button', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
   });
 
@@ -718,29 +713,6 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     const user = userEvent.setup();
     renderWorkspace(dataWithConnector);
 
-    await user.click(screen.getByText('Gmail'));
-    const connectorPanel = vi
-      .mocked(useRegisterRightPanel)
-      .mock.calls.at(-1)?.[0];
-    expect(connectorPanel).not.toBeNull();
-    const connectorRender = render(
-      <TooltipProvider>{connectorPanel as ReactElement}</TooltipProvider>
-    );
-
-    const signalList = screen.getByTestId('presence-signal-list');
-    // Connected connector: quiet state primitive only, no fabricated recs.
-    expect(
-      within(signalList).getByTestId('presence-signal-state')
-    ).toHaveTextContent('Active');
-    expect(
-      within(signalList).queryByTestId('presence-signal-blocker')
-    ).not.toBeInTheDocument();
-    expect(
-      within(signalList).queryByTestId('presence-signal-recommendation')
-    ).not.toBeInTheDocument();
-
-    connectorRender.unmount();
-    await user.click(screen.getByRole('button', { name: 'All Pages' }));
     await user.click(screen.getByText('Spotify'));
     const dspPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     render(<TooltipProvider>{dspPanel as ReactElement}</TooltipProvider>);
@@ -790,7 +762,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
     );
-    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    await user.click(
+      screen.getByRole('button', { name: /Review Suggestions/ })
+    );
 
     expect(
       await screen.findAllByTestId('suggested-connection-row')
@@ -816,7 +790,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toContain('justify-between');
     expect(screen.getByText('TikTok')).toBeInTheDocument();
     expect(screen.getByText('YouTube')).toBeInTheDocument();
-    expect(screen.queryByText('Fan Wiki')).not.toBeInTheDocument();
+    expect(screen.getByText('Fan Wiki')).toBeInTheDocument();
 
     await user.click(
       within(screen.getByTestId('registered-header-actions')).getByRole(
@@ -843,7 +817,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole('button', { name: 'Suggested' }));
+      .click(screen.getByRole('button', { name: /Review Suggestions/ }));
 
     expect(
       await screen.findByText('Add canonical Alpha Artist profile')
@@ -868,7 +842,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ]);
     renderWorkspace(data);
 
-    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    await user.click(
+      screen.getByRole('button', { name: /Review Suggestions/ })
+    );
     expect(await screen.findByText('TikTok')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add' }));
@@ -896,7 +872,6 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: /^Profiles$/ }));
     const acceptedRow = screen
       .getByRole('button', { name: 'Actions for TikTok' })
       .closest('tr');
@@ -921,7 +896,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ]);
     renderWorkspace(data);
 
-    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    await user.click(
+      screen.getByRole('button', { name: /Review Suggestions/ })
+    );
     expect(await screen.findByText('Alpha Artist')).toBeInTheDocument();
 
     const notMeButtons = screen.getAllByRole('button', { name: 'Not me' });
@@ -955,7 +932,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     renderWorkspace(data);
 
-    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    await user.click(
+      screen.getByRole('button', { name: /Review Suggestions/ })
+    );
     expect(await screen.findByText('TikTok')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
@@ -977,32 +956,20 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     expect(await screen.findByText('TikTok')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Suggested' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Close Suggestions' })
+    ).toHaveAttribute('aria-expanded', 'true');
     expect(navigationMock.replace).toHaveBeenCalledWith('/app/presence');
     expect(navigationMock.replace).not.toHaveBeenCalledWith(
       '/app/settings/connectors'
     );
   });
 
-  it('exposes connector rows through a dedicated filter', async () => {
-    const user = userEvent.setup();
+  it('keeps account connectors out of the public profile inventory', () => {
     renderWorkspace(dataWithConnector);
-
-    await user.click(screen.getByRole('button', { name: 'Connectors' }));
-
-    expect(screen.getByText('Gmail')).toBeInTheDocument();
-    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Actions for Instagram' })
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Connectors' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
+    expect(screen.getByText('Spotify')).toBeInTheDocument();
+    expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
   });
 
   it('uses the row action registry to open connection-specific details', async () => {
@@ -1048,7 +1015,6 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
   it('uses the canonical Jovie URL only for supported social connections', async () => {
     const user = userEvent.setup();
     renderWorkspace(data);
-    await user.click(screen.getByRole('button', { name: /^Profiles$/ }));
 
     const instagramRow = screen
       .getByRole('button', { name: 'Actions for Instagram' })
@@ -1119,7 +1085,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
   });
 
-  it('clears connection details when the table filter changes', async () => {
+  it('preserves selected profile details when opening suggestions', async () => {
     const user = userEvent.setup();
     renderWorkspace(data);
 
@@ -1131,8 +1097,12 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
     ).not.toBeNull();
 
-    await user.click(screen.getByRole('button', { name: /^Profiles$/ }));
-    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
+    await user.click(
+      screen.getByRole('button', { name: /Review Suggestions/ })
+    );
+    expect(
+      vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
+    ).not.toBeNull();
   });
 
   it('adds monitored public pages without exposing account authorization', async () => {
@@ -1236,11 +1206,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.getByRole('columnheader', { name: 'Status' })
     ).toHaveTextContent('Status');
     expect(
-      screen.getByRole('columnheader', { name: 'Platform / Page' })
+      screen.getByRole('columnheader', { name: 'Profile' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('columnheader', { name: 'Artist' })
-    ).toBeInTheDocument();
+      screen.queryByRole('columnheader', { name: 'Artist' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('connections-toolbar-actions')).toBeNull();
   });
 
@@ -1248,10 +1218,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'two-line');
-    expect(table.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table).toHaveAttribute('data-table-row-mode', 'list');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('44px');
     expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
-      '48px'
+      '36px'
     );
     expect(table.parentElement).toHaveClass(
       'overflow-auto',

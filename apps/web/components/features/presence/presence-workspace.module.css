@@ -40,3 +40,26 @@
     min-height: 0;
   }
 }
+
+/* Preserve avatar geometry; hover and keyboard focus change opacity only. */
+.profilePhoto {
+  opacity: 0.65;
+  transition: opacity var(--system-b-duration-fast);
+}
+:global(.group\/connection-row):is(
+    :hover,
+    :focus-within,
+    [aria-selected="true"]
+  )
+  .profilePhoto {
+  opacity: 1;
+}
+.profilePhoto[data-photo-kind="missing"],
+.profilePhoto[data-photo-kind="generic"] {
+  opacity: 0.35;
+}
+@media (prefers-reduced-motion: reduce) {
+  .profilePhoto {
+    transition: none;
+  }
+}
