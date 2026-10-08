@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "label": "",
+  "flaky": [],
+  "run": {
+    "repository": null,
+    "headSha": null,
+    "runId": null,
+    "runAttempt": null,
+    "event": null,
+    "job": null
+  },
+  "generatedAt": "2026-10-07T23:51:06.694Z",
+  "complete": true,
+  "executions": [
+    {
+      "file": "components/organisms/AuthShellWrapper.search-state.test.tsx",
+      "fileHash": "3ec21061b1eb8974d890ab17cae5079359111aee066b71cc54365131dd882421",
+      "executedCount": 10,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    }
+  ]
+}
