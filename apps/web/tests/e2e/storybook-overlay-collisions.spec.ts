@@ -207,39 +207,63 @@ for (const width of [1100, 390]) {
   });
 }
 
-test('Ovie user rail aligns its header and content within the drawer surface', async ({
-  page,
-}, testInfo) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(
-    '/iframe.html?id=features-admin-adminuserdetaildrawer--selected&viewMode=story'
-  );
-  const header = page.getByTestId('admin-user-entity-header');
-  await expect(header).toBeVisible({ timeout: 90_000 });
-  const rail = page.getByRole('complementary', {
-    name: 'User details',
-    exact: true,
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1100, height: 600 },
+  { width: 820, height: 600 },
+  { width: 390, height: 844 },
+]) {
+  test(`Ovie user rail keeps canonical insets (${viewport.width})`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto(
+      '/iframe.html?id=features-admin-adminuserdetaildrawer--selected&viewMode=story'
+    );
+    const header = page.getByTestId('admin-user-entity-header');
+    await expect(header).toBeVisible({ timeout: 90_000 });
+    const rail = page.getByRole(
+      viewport.width < 1024 ? 'dialog' : 'complementary',
+      {
+        name: 'User details',
+        exact: true,
+      }
+    );
+    const inset = await header.evaluate(element => {
+      const rail = element.closest('aside')!.getBoundingClientRect();
+      const title = element.querySelector('h2')!.getBoundingClientRect();
+      return { left: title.left - rail.left, right: rail.right - title.right };
+    });
+    // The header's avatar occupies its own column; body surface begins at the
+    // same canonical 12px inset. This catches the original edge-touching header.
+    const summary = await page.getByTestId('admin-user-summary').boundingBox();
+    const bounds = await rail.boundingBox();
+    expect(summary!.x - bounds!.x).toBeGreaterThanOrEqual(12);
+    expect(summary!.x - bounds!.x).toBeLessThanOrEqual(14);
+    expect(
+      bounds!.x + bounds!.width - summary!.x - summary!.width
+    ).toBeLessThanOrEqual(14);
+    const details = await page
+      .getByText('Details', { exact: true })
+      .evaluate(element => {
+        const card = element.closest('[data-surface-variant="card"]')!;
+        return { y: card.getBoundingClientRect().y };
+      });
+    expect(details.y - summary!.y - summary!.height).toBeGreaterThanOrEqual(
+      11.5
+    );
+    expect(details.y - summary!.y - summary!.height).toBeLessThanOrEqual(12.5);
+    expect(inset.left).toBeGreaterThan(12);
+    expect(inset.right).toBeGreaterThanOrEqual(12);
+    await page.screenshot({ path: testInfo.outputPath('ovie-user-rail.png') });
+    // Deliberate-red: removing the consumer inset reproduces the escaped defect.
+    await page.getByTestId('admin-user-summary').evaluate(element => {
+      element.parentElement!.style.paddingInline = '0';
+    });
+    const failed = await page.getByTestId('admin-user-summary').boundingBox();
+    expect(failed!.x - bounds!.x).toBeLessThan(12);
   });
-  const inset = await header.evaluate(element => {
-    const rail = element.closest('aside')!.getBoundingClientRect();
-    const title = element.querySelector('h2')!.getBoundingClientRect();
-    return { left: title.left - rail.left, right: rail.right - title.right };
-  });
-  // The header's avatar occupies its own column; body surface begins at the
-  // same canonical 12px inset. This catches the original edge-touching header.
-  const summary = await page.getByTestId('admin-user-summary').boundingBox();
-  const bounds = await rail.boundingBox();
-  expect(summary!.x - bounds!.x).toBeGreaterThanOrEqual(12);
-  expect(inset.left).toBeGreaterThan(12);
-  expect(inset.right).toBeGreaterThanOrEqual(12);
-  await page.screenshot({ path: testInfo.outputPath('ovie-user-rail.png') });
-  // Deliberate-red: removing the consumer inset reproduces the escaped defect.
-  await page.getByTestId('admin-user-summary').evaluate(element => {
-    element.parentElement!.style.paddingInline = '0';
-  });
-  const failed = await page.getByTestId('admin-user-summary').boundingBox();
-  expect(failed!.x - bounds!.x).toBeLessThan(12);
-});
+}
 
 /**
  * Overlay collision stress suite.
