@@ -1387,13 +1387,12 @@ async function ghPullRequestInventory(state, env) {
       throw new Error(`gh-pr-list-open:gh-api-rest:non-array-page:${page}`);
     }
     for (const row of batch) {
-      const mergeableState = String(row.mergeable_state ?? 'UNKNOWN')
-        .toUpperCase()
-        .replace('CLEAN', 'CLEAN')
-        .replace('DIRTY', 'DIRTY')
-        .replace('UNKNOWN', 'UNKNOWN')
-        .replace('BEHIND', 'BEHIND')
-        .replace('BLOCKED', 'BLOCKED');
+      // The /pulls LIST payload never includes mergeable/mergeable_state
+      // (they are lazily computed per-PR), so no row is marked measured
+      // here — mergeStateStatus stays undefined and the mergeability
+      // phase (measureMergeability) measures every population row with
+      // the per-PR REST GET. mergeabilityUnknown treats unmeasured rows
+      // as unknown.
       rows.push({
         number: row.number,
         title: row.title,
@@ -1404,7 +1403,6 @@ async function ghPullRequestInventory(state, env) {
           String(row.state ?? 'OPEN').toUpperCase() === 'MERGED'
             ? 'MERGED'
             : 'OPEN',
-        mergeStateStatus: mergeableState,
         labels: (row.labels ?? []).map(label => ({ name: label.name })),
         url: row.html_url,
         mergedAt: row.merged_at,
@@ -1554,63 +1552,6 @@ async function readOfficialSymphonyWorkers(maxConcurrent) {
 }
 
 /**
- * Mergeability re-poll with a bounded retry (JOV-8000 follow-ups 9+19):
- * the REST list payload carries a lazily-computed mergeable_state — right
- * after a push or base change most rows read UNKNOWN because the list
- * endpoint does not trigger GitHub's mergeable computation, and even the
- * per-PR view computes it asynchronously on first read. Each unknown row
- * is re-polled up to 3 attempts (2s/4s backoff; a row measured at any
- * attempt stops retrying); a row still UNKNOWN after the bounded retries
- * stays unknown and the gate fails closed on the unknown share
- * (pr-mergeability-unknown, > 0.2 strict) instead of guessing — the
- * threshold is untouched; only the measurement becomes honest against
- * GitHub's recompute lag.
- * @param {Record<string, any>[]} pullRequests
- * @param {NodeJS.ProcessEnv} [env]
- */
-export async function pollUnknownMergeability(pullRequests, env) {
-  const unknown = backlogRemediation
-    .pullRequestRates(pullRequests)
-    .unknownPullRequests.filter(number => Number.isInteger(number));
-  const maxPollAttempts = 3;
-  for (const number of unknown) {
-    for (let attempt = 0; attempt < maxPollAttempts; attempt += 1) {
-      if (attempt > 0) {
-        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
-      }
-      try {
-        const { stdout } = await execFileAsync(
-          'gh',
-          [
-            'pr',
-            'view',
-            String(number),
-            '--repo',
-            'JovieInc/Jovie',
-            '--json',
-            'mergeable,mergeStateStatus',
-          ],
-          { timeout: 20_000, maxBuffer: 1024 * 1024, env: env ?? process.env }
-        );
-        const detail = /** @type {Record<string, any>} */ (JSON.parse(stdout));
-        const row = pullRequests.find(item => item?.number === number);
-        if (row) {
-          if (detail.mergeable !== undefined) row.mergeable = detail.mergeable;
-          if (detail.mergeStateStatus !== undefined)
-            row.mergeStateStatus = detail.mergeStateStatus;
-        }
-        const stillUnknown = backlogRemediation.mergeabilityUnknown(row ?? {});
-        if (!stillUnknown) break;
-      } catch {
-        // A failed poll attempt continues the bounded retry; a row still
-        // unknown after all attempts fails the gate closed on the unknown
-        // share rather than being treated as measured.
-      }
-    }
-  }
-}
-
-/**
  * Check-rollup enrichment (JOV-8000 follow-ups 10+15): attaches each
  * rate-population row's check-rollup state from the per-commit REST
  * combined-status view — `gh api repos/.../commits/{sha}/status` keyed by
@@ -1622,23 +1563,198 @@ export async function pollUnknownMergeability(pullRequests, env) {
  * (run 37872694219). Returns false when any fetch fails or the deadline
  * passes — the gate fails closed on prRollups:false, never zero errored.
  */
-export async function attachCheckRollups(pullRequests, env = process.env) {
+/**
+ * Mergeability measurement (JOV-8000 follow-up 19, Ops spec): the
+ * /pulls LIST payload never includes mergeable/mergeable_state (they
+ * are lazily computed per-PR), so every population row starts
+ * unmeasured. This phase measures each population row with the
+ * per-PR REST GET (`gh api repos/JovieInc/Jovie/pulls/<N>`) — the
+ * request that triggers GitHub's mergeable computation — mapping
+ * mergeable true/false/null to MERGEABLE/CONFLICTING/UNKNOWN and
+ * mergeable_state (uppercased) to mergeStateStatus, refreshing
+ * headSha. Rows still null get up to 3 re-GETs (2s/4s/8s backoff);
+ * the whole phase has a 20s hard deadline (the remediate step's 90s
+ * budget already spends ~60s). Fallback: a null-mergeable row with a
+ * known mergeable_state is measured — dirty means conflicting; clean,
+ * unstable, blocked, behind or has_hooks mean known and not
+ * conflicting. Merge-queue awareness: one call to
+ * `repos/.../git/matching-refs/heads/gh-readonly-queue/main/` — a row
+ * still null with a `pr-<N>-` queue ref is in the merge queue: known
+ * and not conflicting, staying in the denominator (stale queue refs
+ * exist, so this applies only to still-null rows; a failed refs call
+ * leaves the row unknown). Leftovers stay unknown and nothing throws
+ * — the gate fails closed on the unknown share.
+ * @param {Record<string, any>[]} pullRequests
+ * @param {NodeJS.ProcessEnv} env
+ * @param {{ sleep?: (ms: number) => Promise<void>, now?: () => number }} [timing]
+ * @returns {Promise<{measured: number, polls: number, inMergeQueue: number[], stillUnknown: number[], errors: string[]}>}
+ */
+export async function measureMergeability(
+  pullRequests,
+  env,
+  timing = {
+    sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+    now: () => Date.now(),
+  }
+) {
+  const sleep =
+    timing.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  const now = timing.now ?? (() => Date.now());
+  const population = pullRequests.filter(isRatePopulationRow);
+  const backoffMs = [2000, 4000, 8000];
+  const deadline = now() + 20_000;
+  const evidence = {
+    measured: 0,
+    polls: 0,
+    inMergeQueue: [],
+    stillUnknown: [],
+    errors: [],
+  };
+
+  /**
+   * Apply a per-PR GET result to a row; returns true when the row is
+   * measured (known mergeability, or the fallback reads a known
+   * mergeable_state), false when still unknown.
+   * @param {Record<string, any>} row
+   * @param {Record<string, any>} detail
+   */
+  const applyDetail = (row, detail) => {
+    const mergeable = detail?.mergeable;
+    if (
+      typeof row?.headSha !== 'string' &&
+      typeof detail?.head?.sha === 'string'
+    ) {
+      row.headSha = detail.head.sha;
+    }
+    if (detail?.mergeable_state !== undefined) {
+      row.mergeStateStatus = String(detail.mergeable_state).toUpperCase();
+    }
+    if (mergeable === true) {
+      row.mergeable = 'MERGEABLE';
+    } else if (mergeable === false) {
+      row.mergeable = 'CONFLICTING';
+    }
+    if (mergeable === null || mergeable === undefined) {
+      // Fallback: null mergeable with a known mergeable_state still
+      // measures the row — dirty means conflicting; clean, unstable,
+      // blocked, behind or has_hooks mean known and not conflicting.
+      const state = String(detail?.mergeable_state ?? '').toUpperCase();
+      if (state && state !== 'UNKNOWN') {
+        row.mergeable = state === 'DIRTY' ? 'CONFLICTING' : 'MERGEABLE';
+        return true;
+      }
+      return false;
+    }
+    return true;
+  };
+
+  /** @param {Record<string, any>} row */
+  const measureRow = async row => {
+    const maxGetAttempts = 1 + backoffMs.length;
+    for (let attempt = 0; attempt < maxGetAttempts; attempt += 1) {
+      if (now() > deadline) return;
+      if (attempt > 0) {
+        const wait = backoffMs[attempt - 1];
+        if (now() + wait > deadline) return;
+        await sleep(wait);
+        if (now() > deadline) return;
+      }
+      try {
+        const body = await execGhApi(
+          `repos/JovieInc/Jovie/pulls/${row.number}`,
+          env
+        );
+        evidence.polls += 1;
+        const detail = /** @type {Record<string, any>} */ (JSON.parse(body));
+        if (applyDetail(row, detail)) return;
+      } catch (error) {
+        if (evidence.errors.length < 5) {
+          evidence.errors.push(
+            `pulls/${row.number}:${describeExecFailure(error, 'api')}`
+          );
+        }
+        return;
+      }
+    }
+  };
+
+  for (let i = 0; i < population.length; i += 4) {
+    if (now() > deadline) break;
+    const batch = population.slice(i, i + 4);
+    await Promise.all(batch.map(row => measureRow(row)));
+  }
+
+  // Merge-queue awareness: only rows STILL unknown after the retries —
+  // stale queue refs exist, so a queue ref alone never marks a row.
+  const stillNull = population.filter(
+    row =>
+      String(row?.mergeable ?? '').toUpperCase() === 'UNKNOWN' ||
+      String(row?.mergeable ?? '') === '' ||
+      row?.mergeable === undefined ||
+      String(row?.mergeStateStatus ?? '').toUpperCase() === 'UNKNOWN' ||
+      row?.mergeStateStatus === undefined
+  );
+  if (stillNull.length > 0) {
+    try {
+      const refsBody = await execGhApi(
+        'repos/JovieInc/Jovie/git/matching-refs/heads/gh-readonly-queue/main/',
+        env
+      );
+      const refs = /** @type {Record<string, any>[]} */ (JSON.parse(refsBody));
+      const queuePrNumbers = new Set(
+        (Array.isArray(refs) ? refs : [])
+          .map(ref => /pr-([0-9]+)-/.exec(String(ref?.ref ?? '')))
+          .filter(Boolean)
+          .map(match => Number(/** @type {RegExpExecArray} */ (match)[1]))
+          .filter(number => Number.isInteger(number))
+      );
+      for (const row of stillNull) {
+        if (queuePrNumbers.has(Number(row?.number))) {
+          // In the merge queue: mergeable stays uncomputed by design —
+          // known and not conflicting, staying in the denominator. A
+          // stale 'UNKNOWN' mergeStateStatus from the retried GETs is
+          // replaced too: the queue's synthetic merge group is the
+          // authority, not the lazily-computed per-PR state.
+          row.mergeable = 'MERGEABLE';
+          row.mergeStateStatus = 'HAS_HOOKS';
+          row.inMergeQueue = true;
+          evidence.inMergeQueue.push(Number(row?.number));
+        }
+      }
+    } catch {
+      // A failed refs call leaves the rows unknown — fail closed.
+    }
+  }
+
+  evidence.measured = population.filter(
+    row => !backlogRemediation.mergeabilityUnknown(row ?? {})
+  ).length;
+  evidence.stillUnknown = population
+    .filter(row => backlogRemediation.mergeabilityUnknown(row ?? {}))
+    .map(row => row?.number);
+  return evidence;
+}
+
+export function isRatePopulationRow(pullRequest) {
   // Population = every counted row (open, non-draft, not
   // label-quarantined) — the same predicate as pullRequestRates.
-  const counted = pullRequests.filter(
-    row =>
-      String(row?.state || '').toUpperCase() === 'OPEN' &&
-      row?.isDraft !== true &&
-      !(row?.labels ?? []).some(label =>
-        ['queue-poison', 'hold'].includes(
-          String(
-            typeof label === 'string'
-              ? label
-              : /** @type {any} */ (label?.name ?? '')
-          ).toLowerCase()
-        )
+  return (
+    String(pullRequest?.state || '').toUpperCase() === 'OPEN' &&
+    pullRequest?.isDraft !== true &&
+    !(pullRequest?.labels ?? []).some(label =>
+      ['queue-poison', 'hold'].includes(
+        String(
+          typeof label === 'string'
+            ? label
+            : /** @type {any} */ (label?.name ?? '')
+        ).toLowerCase()
       )
+    )
   );
+}
+
+export async function attachCheckRollups(pullRequests, env = process.env) {
+  const counted = pullRequests.filter(isRatePopulationRow);
   const rollupRows = counted.filter(row => typeof row?.headSha === 'string');
   let prRollups = true;
   const rollupDeadline = Date.now() + 25_000;
@@ -1687,19 +1803,23 @@ async function runRemediate(isDryRun) {
   )
     ? /** @type {Record<string, any>} */ (pullRequestsReceipt).pullRequests
     : null;
-  // Mergeability re-poll (JOV-8000 follow-ups 9+19): the REST list payload
-  // carries a lazily-computed mergeable_state — right after a push or base
-  // change most rows read UNKNOWN because the list endpoint does not trigger
-  // GitHub's mergeable computation, and even the per-PR view computes it
-  // asynchronously on first read. Each unknown row is re-polled with a
-  // BOUNDED retry (up to 3 attempts, 2s/4s backoff — a row measured at any
-  // attempt stops retrying); a row still UNKNOWN after the bounded retries
-  // stays unknown and the gate fails closed on the unknown share
-  // (pr-mergeability-unknown, > 0.2 strict) instead of guessing it clean or
-  // conflicting — the threshold is untouched; only the measurement becomes
-  // honest against GitHub's recompute lag.
+  // Mergeability measurement (JOV-8000 follow-up 19, Ops spec): the
+  // /pulls LIST payload never carries mergeable/mergeable_state, so every
+  // population row starts unmeasured. measureMergeability runs the per-PR
+  // REST GET per row (which triggers GitHub's computation), bounded-parallel
+  // with retries and a hard deadline; merge-queue rows (still null after
+  // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
+  // conflicting. The receipt carries the full evidence.
+  let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
-    await pollUnknownMergeability(pullRequests, process.env);
+    mergeabilityEvidence = await measureMergeability(
+      pullRequests,
+      process.env,
+      {
+        sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+        now: () => Date.now(),
+      }
+    );
   }
   // Check-rollup fetch (JOV-8000 follow-up 10): the error gate reads each
   // rate-population row's check-rollup STATE (FAILURE/ERROR = a failing
@@ -1757,6 +1877,10 @@ async function runRemediate(isDryRun) {
         queued: Number.isInteger(queue?.eligiblePrs) ? queue.eligiblePrs : null,
       },
       pullRequests,
+      // JOV-8000 follow-up 19: the mergeability measurement evidence rides
+      // the capacity signals (measured/polls/inMergeQueue/stillUnknown/
+      // errors) so the receipt is auditable against the live fleet.
+      mergeabilityEvidence,
       mergeQueue: {
         health:
           fleetGate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
@@ -1845,6 +1969,17 @@ async function runRemediate(isDryRun) {
     });
   }
   console.log(JSON.stringify(result, null, 2));
+  // One-line capacity.rates summary as the LAST log line (JOV-8000
+  // follow-up 19): the full receipt block sits ~300KB above the end of a
+  // ~1.45MB log — the summary lands the auditable numbers at the tail.
+  const ratesSummary = Array.isArray(pullRequests)
+    ? backlogRemediation.pullRequestRates(pullRequests)
+    : null;
+  if (ratesSummary) {
+    console.log(
+      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'}`
+    );
+  }
 }
 
 if (
