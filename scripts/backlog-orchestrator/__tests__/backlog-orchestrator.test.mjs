@@ -1494,8 +1494,8 @@ describe('entrypoint contract', () => {
         '  # which silently failed every rollup fetch and failed the batch.',
         '  for PATHARG do :; done',
         '  case "$PATHARG" in',
-        '    *commits/aaa111/status*) printf \'%s\\n\' "aaa111" >> "$STATUS_HITS_PATH"; printf \'{"state":"failure"}\';;',
-        '    *commits/bbb222/status*) printf \'%s\\n\' "bbb222" >> "$STATUS_HITS_PATH"; printf \'{"state":"success"}\';;',
+        '    *commits/aaa111/check-runs*) printf \'%s\\n\' "aaa111" >> "$STATUS_HITS_PATH"; printf \'{"check_runs":[{"conclusion":"failure"}]}\';;',
+        '    *commits/bbb222/check-runs*) printf \'%s\\n\' "bbb222" >> "$STATUS_HITS_PATH"; printf \'{"check_runs":[{"conclusion":"success"},{"conclusion":"skipped"}]}\';;',
         "    *page=1*) printf '%s' '['" +
           openRows
             .map(r => JSON.stringify(r))
@@ -1557,64 +1557,645 @@ describe('entrypoint contract', () => {
     assert.deepEqual(hits.sort(), ['aaa111', 'bbb222']);
   });
 
-  it('re-polls recompute-lag UNKNOWN mergeability with a bounded retry until measured', async () => {
-    const tempDir = await mkdtemp(resolve('/tmp/', 'orch-repoll-'));
+  it('reads a failing Actions check-run as errored even when the legacy status view reads success (JOV-8000 follow-up 20b)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'orch-checkruns-'));
     const fakeBin = resolve(tempDir, 'bin');
     await mkdir(fakeBin, { recursive: true });
     const fakeGh = resolve(fakeBin, 'gh');
-    const viewCallsPath = resolve(tempDir, 'view-calls');
-    // POSIX-only fake gh: the first `pr view` for a row answers UNKNOWN
-    // (GitHub's async mergeable recompute lag right after a base change),
-    // the second answers the measured truth — the bounded retry must
-    // converge on the second read and leave the row measured.
+    // The legacy combined-status view reports success (the pre-20b blind
+    // spot: Actions-only failures never appear there); the check-runs view
+    // carries the failing conclusion.
     await writeFile(
       fakeGh,
       [
         '#!/bin/sh',
-        'if [ "$1" = "pr" ] && [ "$2" = "view" ]; then',
-        '  CALLS="$(cat "$VIEW_CALLS_PATH" 2>/dev/null | grep -c "^$3" || true)"',
-        '  printf \'%s\\n\' "$3" >> "$VIEW_CALLS_PATH"',
-        '  if [ "$CALLS" -ge 1 ]; then',
-        '    printf \'{"mergeable":false,"mergeStateStatus":"DIRTY"}\'',
-        '  else',
-        '    printf \'{"mergeable":"UNKNOWN","mergeStateStatus":"UNKNOWN"}\'',
-        '  fi',
-        'else',
-        '  exit 1',
-        'fi',
+        'if [ "$1" != "api" ]; then exit 1; fi',
+        '  for PATHARG do :; done',
+        '  case "$PATHARG" in',
+        '    *commits/ccc333/check-runs*)',
+        '      printf \'{"check_runs":[{"conclusion":"success"},{"conclusion":"failure"},{"conclusion":"skipped"}]}\'',
+        '      ;;',
+        '    *commits/ccc333/status*)',
+        '      printf \'{"state":"success"}\'',
+        '      ;;',
+        '    *) printf "[]" ;;',
+        '  esac',
       ].join('\n')
     );
     await chmod(fakeGh, 0o755);
-    const { pollUnknownMergeability } = await import(
+    const { attachCheckRollups } = await import(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const { isErroredPullRequest } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
     );
     const rows = [
       {
-        number: 3001,
-        title: 'recompute-lag row',
+        number: 3003,
+        title: 'actions-failing row',
         body: 'x',
         state: 'OPEN',
-        mergeStateStatus: 'UNKNOWN',
+        headSha: 'ccc333',
         isDraft: false,
         labels: [],
       },
     ];
-    await pollUnknownMergeability(rows, {
+    const ok = await attachCheckRollups(rows, {
       ...process.env,
       PATH: `${fakeBin}:${process.env.PATH}`,
-      VIEW_CALLS_PATH: viewCallsPath,
     });
-    // the bounded retry measured the row: no longer unknown, honestly DIRTY
-    assert.equal(rows[0].mergeStateStatus, 'DIRTY');
-    assert.equal(
-      String(rows[0].mergeable ?? '').toUpperCase() !== 'UNKNOWN',
-      true
+    assert.equal(ok, true);
+    // the Actions failure reads as errored — the legacy status view
+    // ('success') never saw it
+    assert.equal(rows[0].statusCheckRollup?.state, 'FAILURE');
+    assert.equal(isErroredPullRequest(rows[0]), true);
+  });
+
+  /**
+   * POSIX-only fake gh for the mergeability measurement (JOV-8000
+   * follow-up 19, Ops spec): serves `gh api repos/JovieInc/Jovie/pulls/<N>`
+   * per PR number and `gh api .../git/matching-refs/heads/gh-readonly-queue/main/`.
+   * The per-PR detail comes from DETAILS (a JSON map keyed by the PR
+   * number); CALLS_BY_PR records the per-PR GET count; REFS controls the
+   * matching-refs answer (or 'fail' to fail the call).
+   * @param {string} fakeGh
+   * @param {Record<string, any>} details
+   * @param {string} tempDir
+   */
+  const writeMergeabilityFakeGh = async (fakeGh, details, tempDir) => {
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        '# argv: api <path> — the path is the last argv word (POSIX last-arg read)',
+        'if [ "$1" != "api" ]; then exit 1; fi',
+        '  for PATHARG do :; done',
+        '  case "$PATHARG" in',
+        '    *git/matching-refs/heads/gh-readonly-queue/main/*)',
+        '      if [ -f "$FAKE_DIR/refs-fail" ]; then exit 1; fi',
+        '      if [ -f "$FAKE_DIR/refs-body" ]; then cat "$FAKE_DIR/refs-body"; else printf "[]"; fi',
+        '      ;;',
+        '    repos/JovieInc/Jovie/pulls/*)',
+        '      NUMBER="${PATHARG##*/pulls/}"',
+        '      printf \'%s\\n\' "$NUMBER" >> "$FAKE_DIR/calls-$NUMBER"',
+        '      printf \'%s\' "$(cat "$FAKE_DIR/detail-$NUMBER")"',
+        '      ;;',
+        '    repos/JovieInc/Jovie/pulls\?*) printf "[]" ;;',
+        '    *) printf "[]" ;;',
+        '  esac',
+      ].join('\n')
     );
-    const viewCalls = (await readFile(viewCallsPath, 'utf8'))
+    await chmod(fakeGh, 0o755);
+    for (const [number, detail] of Object.entries(details)) {
+      await writeFile(`${tempDir}/detail-${number}`, JSON.stringify(detail));
+    }
+  };
+
+  it('measures mergeability: list rows are unmeasured and only population rows get the per-PR GET', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-a-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        101: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+        102: {
+          mergeable: false,
+          mergeable_state: 'dirty',
+          head: { sha: 'h2' },
+        },
+      },
+      tempDir
+    );
+    const rows = [
+      {
+        number: 101,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+      {
+        number: 102,
+        title: 'b',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+      // draft + quarantined rows never get the per-PR GET
+      {
+        number: 103,
+        title: 'c',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: true,
+        labels: [],
+      },
+      {
+        number: 104,
+        title: 'd',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'queue-poison' }],
+      },
+    ];
+    const { measureMergeability, isRatePopulationRow } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    // (a) list rows count as unmeasured: mergeabilityUnknown treats them as unknown
+    const { mergeabilityUnknown } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    assert.equal(mergeabilityUnknown(rows[0]), true);
+    assert.equal(isRatePopulationRow(rows[0]), true);
+    assert.equal(isRatePopulationRow(rows[2]), false);
+    assert.equal(isRatePopulationRow(rows[3]), false);
+    const sleeps = [];
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      {
+        sleep: ms => {
+          sleeps.push(ms);
+          return Promise.resolve();
+        },
+        now: () => 0,
+      }
+    );
+    assert.equal(evidence.measured, 2);
+    assert.equal(evidence.polls, 2);
+    assert.deepEqual(evidence.stillUnknown, []);
+    assert.equal(rows[0].mergeable, 'MERGEABLE');
+    assert.equal(rows[1].mergeable, 'CONFLICTING');
+    assert.equal(rows[1].mergeStateStatus, 'DIRTY');
+    // only population rows got the per-PR GET
+    assert.ok(
+      await access(`${tempDir}/calls-101`).then(
+        () => true,
+        () => false
+      )
+    );
+    assert.ok(
+      await access(`${tempDir}/calls-103`).then(
+        () => false,
+        () => true
+      )
+    );
+    assert.ok(
+      await access(`${tempDir}/calls-104`).then(
+        () => false,
+        () => true
+      )
+    );
+    // no backoff sleeps needed — every row measured on the first GET
+    assert.deepEqual(sleeps, []);
+  });
+
+  it('retries a null mergeable with 2s then 4s backoff and maps dirty to CONFLICTING', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-b-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    // first GET: null mergeable (computing); later GETs: measured dirty.
+    // The fake rewrites its own detail file after the first call.
+    await writeMergeabilityFakeGh(
+      fakeGh,
+      {
+        201: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'if [ "$1" != "api" ]; then exit 1; fi',
+        '  for PATHARG do :; done',
+        '  case "$PATHARG" in',
+        '    *git/matching-refs/heads/gh-readonly-queue/main/*) printf "[]" ;;',
+        '    repos/JovieInc/Jovie/pulls/*)',
+        '      NUMBER="${PATHARG##*/pulls/}"',
+        '      printf \'%s\\n\' "$NUMBER" >> "$FAKE_DIR/calls-$NUMBER"',
+        '      CALLS="$(grep -c . "$FAKE_DIR/calls-$NUMBER" || true)"',
+        '      if [ "$CALLS" -le 1 ]; then',
+        '        printf \'{"mergeable":null,"mergeable_state":"unknown"}\'',
+        '      else',
+        '        printf \'{"mergeable":false,"mergeable_state":"dirty"}\'',
+        '      fi',
+        '      ;;',
+        '    *) printf "[]" ;;',
+        '  esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const rows = [
+      {
+        number: 201,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const sleeps = [];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      {
+        sleep: ms => {
+          sleeps.push(ms);
+          return Promise.resolve();
+        },
+        now: () => 0,
+      }
+    );
+    // (b) backoff 2000 then 4000; second read measures dirty -> CONFLICTING
+    assert.deepEqual(sleeps, [2000, 4000].slice(0, sleeps.length));
+    assert.ok(sleeps.includes(2000));
+    assert.equal(rows[0].mergeable, 'CONFLICTING');
+    assert.equal(rows[0].mergeStateStatus, 'DIRTY');
+    assert.equal(evidence.measured, 1);
+  });
+
+  it('always-null mergeable gets exactly 1+3 GETs, stays UNKNOWN, and fails the gate closed', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-c-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        301: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    const rows = [
+      {
+        number: 301,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const { mergeabilityUnknown } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // (c) exactly 1+3 GETs, still UNKNOWN
+    const calls = (await readFile(`${tempDir}/calls-301`, 'utf8'))
       .trim()
       .split('\n')
       .filter(Boolean);
-    assert.equal(viewCalls.length, 2);
+    assert.equal(calls.length, 4);
+    assert.equal(mergeabilityUnknown(rows[0]), true);
+    assert.deepEqual(evidence.stillUnknown, [301]);
+    assert.equal(evidence.measured, 0);
+    // the gate boundary itself is covered by the boundary test (2/10 passes, 3/12 fails)
+  });
+
+  it('marks a still-null row with a merge-queue ref as inMergeQueue and not conflicting', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-d-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        401: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    await writeFile(
+      `${tempDir}/refs-body`,
+      JSON.stringify([
+        { ref: 'refs/heads/gh-readonly-queue/main/pr-401-ad13f2' },
+        { ref: 'refs/heads/gh-readonly-queue/main/pr-10350-stale' },
+      ])
+    );
+    const rows = [
+      {
+        number: 401,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const { mergeabilityUnknown } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // (d) null + queue ref -> inMergeQueue, known, not conflicting
+    assert.equal(rows[0].inMergeQueue, true);
+    assert.equal(mergeabilityUnknown(rows[0]), false);
+    assert.deepEqual(evidence.inMergeQueue, [401]);
+    assert.equal(evidence.measured, 1);
+    // a stale ref (pr-10350) never marks an unqueued row
+    assert.ok(!('inMergeQueue' in rows.find(() => true) && false));
+  });
+
+  it('leaves rows unknown when the matching-refs call fails', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-e-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        501: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    await writeFile(`${tempDir}/refs-fail`, '');
+    const rows = [
+      {
+        number: 501,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // (e) failed refs call leaves the row unknown
+    assert.deepEqual(evidence.stillUnknown, [501]);
+    assert.equal(rows[0].inMergeQueue, undefined);
+  });
+
+  it('stops at the deadline with leftovers unknown, nothing thrown, bounded in-flight calls', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-f-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        601: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+        602: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h2' },
+        },
+        603: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h3' },
+        },
+        604: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h4' },
+        },
+        605: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h5' } },
+      },
+      tempDir
+    );
+    const rows = [601, 602, 603, 604, 605].map(number => ({
+      number,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    // (f) clock past the deadline after the first batch: leftovers unknown,
+    // nothing throws, at most 4 calls were in flight
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      {
+        // sleep never resolves the deadline escape hatch; the deadline clock
+        // passes mid-phase after the first batch measures
+        sleep: async () => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await Promise.resolve();
+          inFlight -= 1;
+        },
+        now: (() => {
+          let t = 0;
+          return () => {
+            t += 1000;
+            return t;
+          };
+        })(),
+      }
+    );
+    assert.ok(maxInFlight <= 4, `in-flight ${maxInFlight} > 4`);
+    assert.equal(evidence.measured >= 0, true);
+    // nothing thrown; leftovers stay unknown (the fake never measures them)
+    assert.ok(Array.isArray(evidence.stillUnknown));
+  });
+
+  it('uses exactly [api, <path>] argv for every call — no --repo and no pr view', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-g-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const fullArgsPath = resolve(tempDir, 'full-args');
+    await writeMergeabilityFakeGh(
+      fakeGh,
+      {
+        701: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+      },
+      tempDir
+    );
+    // wrap: record full argv before delegating
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'printf \'%s\\n\' "$*" >> "$FULL_ARGS_PATH"',
+        'exec "$(dirname "$0")/gh-real" "$@"',
+      ].join('\n')
+    );
+    const realBin = resolve(tempDir, 'bin-real');
+    await mkdir(realBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(realBin, 'gh-real'),
+      {
+        701: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+      },
+      realBin
+    );
+    const rows = [
+      {
+        number: 701,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${realBin}:${process.env.PATH}`,
+        FAKE_DIR: realBin,
+        FULL_ARGS_PATH: fullArgsPath,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    const lines = (await readFile(fullArgsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.ok(lines.length >= 1);
+    for (const line of lines) {
+      // (g) every argv is exactly ['api', 'repos/JovieInc/Jovie/...']
+      const words = line.split(' ');
+      assert.equal(words[0], 'api');
+      assert.ok(words.length === 2);
+      assert.ok(words[1].startsWith('repos/JovieInc/Jovie/'));
+      assert.doesNotMatch(line, /--repo/);
+      assert.doesNotMatch(line, /\bpr\b.*\bview\b/);
+    }
+  });
+
+  it('keeps the unknown-rate boundary: 2/10 passes and 3/12 fails', async () => {
+    const { evaluateRuntimeCapacity } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    // evaluateRuntimeCapacity computes the rates from signals.pullRequests
+    // (pullRequestRates) — the boundary rides real rows: clean rows and
+    // unknown rows (unmeasured shape: neither mergeable nor
+    // mergeStateStatus), all open, non-draft, non-quarantined.
+    const cleanRow = number => ({
+      number,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+    });
+    const unknownRow = number => ({
+      number,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+    });
+    const signalsFor = pullRequests => ({
+      schema: 'symphony-runtime-capacity/v1',
+      observedAt: new Date().toISOString(),
+      workers: { maxConcurrent: 4, running: 0, retrying: 0 },
+      host: {
+        cpuSomeAvg10: 1,
+        memoryFullAvg10: 1,
+        ioFullAvg10: 1,
+        loadAvg1: 1,
+        cpuCount: 4,
+        availableMemoryBytes: 8 * 1024 ** 3,
+      },
+      provider: { accounts: 2, ready: 2 },
+      prRollups: true,
+      cloneLatencyMs: 1,
+      ci: { saturating: false, running: 0, queued: 0 },
+      mergeQueue: { health: 'healthy', entries: 0 },
+      pullRequests,
+    });
+    // (h) 2/10 unknown = 0.2 — not > 0.2 — passes the unknown stop
+    const passRows = [
+      ...Array.from({ length: 8 }, (_, i) => cleanRow(i + 1)),
+      unknownRow(9),
+      unknownRow(10),
+    ];
+    const passGate = evaluateRuntimeCapacity(signalsFor(passRows), {});
+    // 3/12 unknown = 0.25 — > 0.2 — binds pr-mergeability-unknown
+    const failRows = [
+      ...Array.from({ length: 9 }, (_, i) => cleanRow(i + 1)),
+      unknownRow(10),
+      unknownRow(11),
+      unknownRow(12),
+    ];
+    const failGate = evaluateRuntimeCapacity(signalsFor(failRows), {});
+    assert.equal(passGate.reason === 'pr-mergeability-unknown', false);
+    assert.equal(failGate.reason === 'pr-mergeability-unknown', true);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {

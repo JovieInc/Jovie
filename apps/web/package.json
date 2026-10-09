@@ -279,7 +279,7 @@
     "@vercel/blob": "^2.8.1",
     "@vercel/oidc": "3.8.10",
     "@vercel/toolbar": "^0.2.7",
-    "ai": "^7.0.122",
+    "ai": "^7.0.133",
     "better-auth": "1.7.7",
     "chart.js": "4.5.1",
     "class-variance-authority": "^0.7.1",
