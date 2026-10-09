@@ -13,10 +13,8 @@ const available = Object.fromEntries(
 
 describe('connector capability access and advertising', () => {
   it('grants only requested YouTube read permissions', () => {
-    const capabilities = granted(youtube, 'connected', [
-      youtube.oauthScopes[0],
-    ]);
-    expect(capabilities.map(item => item.id)).toEqual(['channel_videos.read']);
+    const access = granted(youtube, 'connected', [youtube.oauthScopes[0]]);
+    expect(access.map(item => item.id)).toEqual(['channel_videos.read']);
   });
   it.each([
     'not_connected',

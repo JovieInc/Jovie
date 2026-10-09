@@ -142,6 +142,14 @@ const SETTINGS_CONNECTORS_PAGE = findSourceFile(
   )
 );
 
+function readSettingsRouteSource(filePath: string): string {
+  const source = readFileSync(filePath, 'utf8');
+  if (filePath !== SETTINGS_CONNECTORS_PAGE) return source;
+  expect(source).toContain("from './SettingsIntegrationsPage'");
+  expect(source).toContain('<SettingsIntegrationsPage />');
+  const shared = resolve(filePath, '../SettingsIntegrationsPage.tsx');
+  return source + readFileSync(shared, 'utf8');
+}
 const GATED_SETTINGS_ROUTE_FILES = [
   {
     route: 'settings admin',
@@ -311,7 +319,7 @@ describe('settings shell normalization', () => {
         );
       }
 
-      const source = readFileSync(filePath, 'utf8');
+      const source = readSettingsRouteSource(filePath);
       expect(source).toContain('loadAppShellRouteContext');
       expect(source).not.toContain('getDashboardData');
       expect(source).not.toContain('getCachedAuth');
@@ -326,7 +334,7 @@ describe('settings shell normalization', () => {
       throw new Error('Could not find settings connectors source');
     }
 
-    const source = readFileSync(SETTINGS_CONNECTORS_PAGE, 'utf8');
+    const source = readSettingsRouteSource(SETTINGS_CONNECTORS_PAGE);
     expect(source).toContain('loadAppShellRouteContext');
     expect(source).toContain('loadSettingsConnectorsData');
     expect(source).toContain('ConnectorsClient');

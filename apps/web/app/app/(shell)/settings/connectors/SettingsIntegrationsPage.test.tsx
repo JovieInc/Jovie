@@ -1,10 +1,7 @@
 import { isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { context, load } = vi.hoisted(() => ({
-  context: vi.fn(),
-  load: vi.fn(),
-}));
+const [context, load] = vi.hoisted(() => [vi.fn(), vi.fn()] as const);
 vi.mock('../../app-shell-route-context', () => ({
   loadAppShellRouteContext: context,
 }));
@@ -31,9 +28,8 @@ describe('shared settings integrations loader', () => {
       const element = await SettingsIntegrationsPage({ route });
       expect(load).toHaveBeenCalledWith('session-user', 'selected-identity');
       expect(context).toHaveBeenCalledWith(expect.objectContaining({ route }));
-      if (!isValidElement(element)) throw new Error('Expected rendered page');
-      expect(element.key).toBe('session-user:selected-identity');
-      expect(element.props).toMatchObject({
+      expect(element).toHaveProperty('key', 'session-user:selected-identity');
+      expect(isValidElement(element) && element.props).toMatchObject({
         creatorProfileId: 'selected-identity',
         returnTo: route,
         isDev: false,
@@ -49,8 +45,7 @@ describe('shared settings integrations loader', () => {
   it('keeps missing account data as an error rather than an empty connections list', async () => {
     load.mockResolvedValue(null);
     const element = await SettingsIntegrationsPage({});
-    if (!isValidElement(element)) throw new Error('Expected error page');
-    expect(element.props).toHaveProperty(
+    expect(isValidElement(element) && element.props).toHaveProperty(
       'message',
       'Unable to load your account connections. Please refresh the page.'
     );
