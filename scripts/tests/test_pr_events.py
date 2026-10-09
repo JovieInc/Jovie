@@ -1061,6 +1061,7 @@ class GapTest(unittest.TestCase):
         plan = events.reconcile_plan(prs, {}, set(), 2, now)
         rows = {row["pr"]: row for row in plan["dispositions"]}
         self.assertEqual(set(rows), {1, 2, 3, 4}, "every open PR has exactly one disposition")
+        self.assertEqual(rows[1]["headSha"], prs[0]["headRefOid"])
         self.assertEqual([row["pr"] for row in plan["dispositions"]], [3, 1, 4, 2],
                          "oldest first for the cockpit")
         self.assertEqual(rows[1]["state"], "queued")

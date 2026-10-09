@@ -32,6 +32,16 @@ const meta = {
     user,
     onClose: fn(),
   },
+  decorators: [
+    Story => (
+      <div
+        className='flex min-h-0 justify-end'
+        style={{ height: 'calc(100svh - 2rem)' }}
+      >
+        <Story />
+      </div>
+    ),
+  ],
 } satisfies Meta<typeof AdminUserDetailDrawer>;
 
 export default meta;

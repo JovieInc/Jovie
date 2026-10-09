@@ -10,7 +10,12 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 export default async function AdminPresencePage() {
-  await requireCurrentAdminPageAccess();
+  const actorId = await requireCurrentAdminPageAccess();
   const data = await loadCompanyPresenceData();
-  return <CompanyPresenceWorkspace data={data} />;
+  return (
+    <CompanyPresenceWorkspace
+      data={data}
+      scope={{ actorId, workspaceId: 'jovie-company', target: 'company' }}
+    />
+  );
 }

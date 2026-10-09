@@ -22,6 +22,8 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -91,7 +93,7 @@ RUN_FAILURES = (
 
 
 def run(args: list[str], timeout: int = 120):
-    return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    return lifecycle.run(args, capture_output=True, text=True, timeout=timeout)
 
 
 # ---------------------------------------------------------------- reason codes
@@ -281,7 +283,8 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
                 if kind.startswith(PREFIX) and kind[len(PREFIX):] in FIX_KINDS + TICK_KINDS]
         row = {"pr": number, "draft": bool(pr.get("isDraft")),
                "ageH": round((now - created) / 3600, 1) if created is not None else None,
-               "idleH": round(idle_s / 3600, 1), "head": pr.get("headRefName")}
+               "idleH": round(idle_s / 3600, 1), "head": pr.get("headRefName"),
+               "headSha": pr.get("headRefOid")}
         protected = preservation_reason(pr, attempts.get(str(number), {}), max_attempts,
                                         held=(held or {}).get(str(number)), now=now)
         if protected:

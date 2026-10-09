@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const pilot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const common = [
   'scripts/check-built-app.mjs',
-  'patches/eve@0.70.0.patch',
+  'patches/eve@0.71.3.patch',
   'tests/prompt-prefix-stability.test.ts',
   'package.json',
   'pnpm-lock.yaml',

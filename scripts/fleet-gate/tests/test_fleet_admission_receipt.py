@@ -14,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -616,6 +617,38 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         )
         self.assertEqual(refused.returncode, 2)
         self.assertIn("Fleet admission projection failed", refused.stderr)
+
+    def test_anonymous_database_probe_and_screenshot_have_independent_production_holds(self):
+        for healthy, screenshot_failed, expected in (
+            (None, True, {"database", "check:Generate Screenshots"}),
+            (True, True, {"check:Generate Screenshots"}),
+            (None, False, {"database"}),
+            (True, False, set()),
+        ):
+            with self.subTest(healthy=healthy, screenshot_failed=screenshot_failed):
+                def open_url(url, timeout=0):
+                    payload = {"healthy": healthy if url.endswith("/db") else True,
+                               "timestamp": now_iso()}
+                    if url.endswith("/build-info"):
+                        payload = {"commitSha": SHA}
+                    response = mock.MagicMock()
+                    response.__enter__.return_value = response
+                    response.status = 200
+                    response.geturl.return_value = url
+                    response.read.return_value = json.dumps(payload).encode()
+                    return response
+                with mock.patch.object(GATE_MODULE.urllib.request, "urlopen", side_effect=open_url):
+                    production = GATE_MODULE.observe_production("https://jov.ie/api/health/deploy")
+                receipt = evaluate_receipt(
+                    production=production, controller={"status": "failed"},
+                    main={"status": "green", "sha": SHA, "checks": [{
+                        "name": "Generate Screenshots", "classification": "optional",
+                        "verdict": "failed" if screenshot_failed else "success"}]},
+                )
+                admission = PROJECT.project_fleet_admission_receipt(
+                    receipt, scoped_request(risk_lane="high"))["scopedAdmission"]
+                self.assertEqual({row["signal"] for row in admission["relevantBlockers"]}, expected)
+                self.assertEqual(admission["allowed"], not expected)
 
     def test_scopes_unhealthy_signals_to_the_exact_mutation(self):
         receipt = evaluate_receipt(

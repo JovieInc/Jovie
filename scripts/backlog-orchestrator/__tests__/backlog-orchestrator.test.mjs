@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   access,
+  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -43,6 +44,9 @@ const admitter = await import('../admitter.mjs');
 const routing = await import('../symphony-routing.mjs');
 const triageRouter = await import('../triage-router.mjs');
 const deterministicGates = await import('../deterministic-gates.mjs');
+const { buildEligibilityCensus, completeAuditInventory } = await import(
+  '../eligibility-census.mjs'
+);
 const { withFullGateReceipts } = await import('./pre-lease.mjs');
 
 describe('team production health contract', () => {
@@ -161,6 +165,92 @@ function makeIssue(overrides = {}) {
   };
 }
 
+describe('complete eligibility census', () => {
+  it('accounts for every observed issue, including unchanged classifications beyond 100', () => {
+    const issues = Array.from({ length: 101 }, (_, index) =>
+      makeIssue({ identifier: `JOV-${index}`, labels: ['agent-ready'] })
+    );
+    const before = JSON.stringify(issues);
+    const classifications = issues.map(issue => ({
+      identifier: issue.identifier,
+      category: 'triageable',
+      needsModel: false,
+      preexisting: { fp: 'same' },
+    }));
+    const census = buildEligibilityCensus(issues, classifications);
+    assert.equal(census.issueCount, 101);
+    assert.equal(census.entries[100].identifier, 'JOV-100');
+    assert.equal(census.entries[100].candidateForAdmission, true);
+    assert.equal(census.executionGrant, false);
+    assert.ok(census.entries.every(row => row.executionEligible === null));
+    assert.equal(JSON.stringify(issues), before);
+  });
+  it('retains ownership and dependency holds and ranks dependency repair fanout', () => {
+    const dep = { type: 'blocked_by', relatedIssue: { identifier: 'JOV-7' } };
+    const issues = [
+      makeIssue({
+        identifier: 'JOV-1',
+        labels: ['agent-ready'],
+        relations: [dep, dep],
+      }),
+      makeIssue({
+        identifier: 'JOV-2',
+        labels: ['agent-ready'],
+        relations: [dep],
+      }),
+      makeIssue({
+        identifier: 'JOV-3',
+        labels: ['agent-ready'],
+        assignee: { id: 'human', name: 'Owner' },
+      }),
+      makeIssue({ identifier: 'JOV-4', labels: ['agent-ready'] }),
+      makeIssue({ identifier: 'JOV-5' }),
+      makeIssue({ identifier: 'JOV-6', labels: ['agent-ready'] }),
+    ];
+    const census = buildEligibilityCensus(issues, [
+      { identifier: 'JOV-4', category: 'duplicate' },
+      { identifier: 'JOV-6', category: 'superseded' },
+    ]);
+    assert.equal(census.entries[0].reason, 'blocked-by-relation');
+    assert.equal(
+      census.entries[0].nextAction,
+      'repair-or-reconcile-dependencies'
+    );
+    assert.equal(census.entries[2].owner, 'human');
+    assert.equal(census.entries[2].reason, 'already-assigned');
+    assert.equal(census.entries[3].reason, 'terminal-intake-classification');
+    assert.equal(census.entries[5].reason, 'terminal-intake-classification');
+    assert.ok(census.entries.every(row => !row.candidateForAdmission));
+    assert.deepEqual(census.dependencyRepairs, [
+      { identifier: 'JOV-7', affectedIssues: 2 },
+    ]);
+  });
+  it('refuses partial audit coverage when a team read fails', () => {
+    const teams = [{ key: 'JOV' }, { key: 'LYB' }];
+    assert.throws(
+      () =>
+        completeAuditInventory(
+          [
+            { status: 'fulfilled', value: [] },
+            { status: 'rejected', reason: new Error('offline') },
+          ],
+          teams
+        ),
+      /audit inventory incomplete: LYB/
+    );
+    assert.deepEqual(
+      completeAuditInventory(
+        [
+          { status: 'fulfilled', value: [1] },
+          { status: 'fulfilled', value: [2] },
+        ],
+        teams
+      ),
+      [1, 2]
+    );
+  });
+});
+
 describe('classifier', () => {
   it('classifies a standard issue as triageable', () => {
     const issue = makeIssue({
@@ -207,6 +297,92 @@ describe('classifier', () => {
     const c = new classifier.IssueClassification(makeIssue());
     c.category = 'duplicate';
     assert.equal(scorer.scoreIssue(c).score, 0);
+  });
+
+  it('uses Linear priority tiers and keeps absent or invalid priority last', () => {
+    const candidates = [0, 4, 3, 2, 1, undefined, -1, 1.5, '1', NaN, 9].map(
+      (priority, index) => ({
+        identifier: `JOV-${100 + index}`,
+        score: 100 - index,
+        issue: { priority },
+      })
+    );
+    const result = scorer.rankQueueCandidates(candidates);
+    assert.deepEqual(
+      result.ranked.slice(0, 4).map(item => item.issue.priority),
+      [1, 2, 3, 4]
+    );
+    assert.deepEqual(
+      result.ranked.slice(4).map(item => item.identifier),
+      [
+        'JOV-100',
+        'JOV-105',
+        'JOV-106',
+        'JOV-107',
+        'JOV-108',
+        'JOV-109',
+        'JOV-110',
+      ]
+    );
+    assert.deepEqual(
+      result.receipt.rankings.map(item => item.priority),
+      [1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0]
+    );
+    // A cached classification cannot replace the authoritative current priority.
+    assert.equal(
+      scorer.rankQueueCandidates([
+        {
+          identifier: 'JOV-1',
+          score: 100,
+          priority: 1,
+          issue: { priority: 4 },
+        },
+        { identifier: 'JOV-2', score: 1, issue: { priority: 2 } },
+      ]).receipt.selectedCandidate,
+      'JOV-2'
+    );
+  });
+
+  it('keeps economic ordering within a priority tier without allowing value to displace urgency', () => {
+    const candidate = (identifier, priority, value) => ({
+      identifier,
+      score: value,
+      issue: { priority },
+      economic: {
+        expectedValue: {
+          amount: value,
+          unit: 'usd',
+          confidence: 1,
+          sourceRef: `value://${identifier}`,
+        },
+        preventionLeverage: {
+          amount: 0,
+          unit: 'usd',
+          confidence: 1,
+          sourceRef: `prevention://${identifier}`,
+        },
+        fullyLoadedCost: {
+          expectedTotal: { amount: 1, unit: 'usd' },
+          uncertainty: { confidence: 1, missingSourceContracts: [] },
+          sourceContracts: [`cost://${identifier}`],
+        },
+      },
+    });
+    const result = scorer.rankQueueCandidates([
+      candidate('JOV-1', 2, 100),
+      candidate('JOV-2', 1, 10),
+      candidate('JOV-3', 1, 20),
+    ]);
+    assert.deepEqual(
+      result.ranked.map(item => item.identifier),
+      ['JOV-3', 'JOV-2', 'JOV-1']
+    );
+    assert.equal(result.receipt.mode, 'fully-loaded-economic');
+    assert.deepEqual(result.receipt.missingSourceContracts, []);
+    assert.deepEqual(result.receipt.orderingReasons, ['linear-priority']);
+    assert.equal(result.receipt.estimatedOpportunityCost.amount, 9);
+    assert.deepEqual(scorer.rankQueueCandidates([]).ranked, []);
+    assert.equal(scorer.rankQueueCandidates([]).receipt.selectedPriority, null);
   });
 
   it('counts only fresh active machine leases, not ordinary In Progress work', () => {
@@ -745,6 +921,62 @@ describe('stale lease guard', () => {
     assert.equal(result.skipped[0].reason, 'active-pr');
   });
 
+  it('preserves native PR ownership and fresh lane evidence over historical terminal comments', () => {
+    assert.equal(
+      staleLease.classifyStaleLease(
+        {
+          ...staleIssue(),
+          attachments: {
+            nodes: [{ url: 'https://github.com/JovieInc/Jovie/pull/20771' }],
+          },
+        },
+        { now }
+      ).reason,
+      'active-pr'
+    );
+    assert.equal(
+      staleLease.classifyStaleLease(
+        staleIssue({
+          comments: [
+            terminalComment,
+            {
+              body: '🤖 lane `claude`: exact-head gate remains owned',
+              createdAt: now,
+            },
+          ],
+        }),
+        { now }
+      ).reason,
+      'latest-agent-evidence-not-terminal'
+    );
+    assert.equal(
+      staleLease.classifyStaleLease(
+        {
+          ...staleIssue(),
+          comments: {
+            nodes: [terminalComment],
+            pageInfo: { hasNextPage: true },
+          },
+        },
+        { now }
+      ).reason,
+      'nested-evidence-incomplete'
+    );
+  });
+
+  it('never releases a missing current issue using a stale snapshot', async () => {
+    const issue = staleIssue();
+    const client = fakeClient(issue);
+    client.fetchIssue = async () => null;
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
+    assert.equal(result.failed[0].reason, 'reread-failed');
+    assert.equal(client.calls.transitions.length, 0);
+  });
+
   it('does not recover assigned or unknown leases', async () => {
     const assigned = staleIssue({
       assignee: { id: 'other', name: 'Other Owner' },
@@ -927,6 +1159,283 @@ describe('entrypoint contract', () => {
       executableSource,
       /CACHE_FILE = resolve\(__dirname, '\.orchestrator-cache\.json'\)/
     );
+  });
+
+  it('collects the pullRequests capacity evidence deduped with drafts kept for attribution, a 504 retry, and fails closed with the cause named', async () => {
+    // The PR inventory is the pullRequests capacity evidence (JOV-8000
+    // follow-up 9): one query per state (open --limit 100, merged --limit
+    // 50), deduped by number with drafts INCLUDED (the issue->PR
+    // attribution must see draft PRs; the capacity rates exclude drafts
+    // inside pullRequestRates). A full open page fails closed with a named
+    // cause instead of silently truncating; a transient 504/502 retries
+    // with a short backoff; any other failure fails closed with the exact
+    // gh cause named.
+    const executableSource = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    assert.match(executableSource, /timeout: 45_000/);
+    assert.match(executableSource, /HTTP 50\[24\]/);
+    assert.match(executableSource, /gh-pr-list-\$\{state\}:/);
+    // The rollup contexts are gone from the capacity inventory query;
+    // mergeable + labels + mergeStateStatus carry the signals. The open
+    // inventory pages through GraphQL with a real cursor (no page-limit
+    // fail-closed); the merged side stays one gh pr list call.
+    assert.doesNotMatch(executableSource, /statusCheckRollup',/);
+    assert.match(executableSource, /per_page=50&page=\$\{page\}/);
+    assert.doesNotMatch(executableSource, /page-limit-reached/);
+    assert.match(executableSource, /mergeable,labels/);
+
+    // Behavioral: a fake gh on PATH drives the exported collector through
+    // the 504 retry, the dedup, and the draft exclusion.
+    const tempDir = await mkdtemp('/tmp/backlog-gh-');
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const callsPath = resolve(tempDir, 'calls');
+    const openAttemptsPath = resolve(tempDir, 'open-attempts');
+    const openPayload = JSON.stringify([
+      {
+        number: 1,
+        title: 'fix JOV-1',
+        body: 'JOV-1',
+        headRefName: 'symphony/JOV-1',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/1',
+        mergedAt: null,
+        isDraft: false,
+      },
+      // A duplicate number (paging overlap defense) and a draft row are
+      // dropped from the inventory.
+      {
+        number: 1,
+        title: 'fix JOV-1 (dup)',
+        body: 'JOV-1',
+        headRefName: 'symphony/JOV-1',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/1',
+        mergedAt: null,
+        isDraft: false,
+      },
+      {
+        number: 2,
+        title: 'draft JOV-2',
+        body: 'JOV-2',
+        headRefName: 'codex/JOV-2',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/2',
+        mergedAt: null,
+        isDraft: true,
+      },
+      {
+        number: 3,
+        title: 'fix JOV-3',
+        body: 'JOV-3',
+        headRefName: 'symphony/JOV-3',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/3',
+        mergedAt: null,
+        isDraft: false,
+      },
+    ]);
+    const mergedPayload = JSON.stringify([
+      {
+        number: 9,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
+        'printf \'%s\\n\' "$*" >> "$FULL_ARGS_PATH"',
+        '# open inventory: gh api (REST); merged: gh pr list',
+        'if [ "$1" = "api" ]; then',
+        '  echo x >> "$OPEN_ATTEMPTS_PATH"',
+        '  if [ "$(wc -l < "$OPEN_ATTEMPTS_PATH")" -le 1 ]; then',
+        '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com)" >&2',
+        '    exit 1',
+        '  fi',
+        `printf '%s' '${openPayload.replace(/'/g, "'\\''")}'`,
+        'else',
+        `printf '%s' '${mergedPayload.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+
+    const { collectGitHubPullRequests } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+
+    // The open GraphQL pages once (hasNextPage false), its first call 504s
+    // once and its retry succeeds; the merged call is one gh pr list
+    // query; the receipt keeps one row per PR number (draft INCLUDED for
+    // attribution — the rates exclude it), and reports the audit numbers.
+    await writeFile(callsPath, '');
+    await writeFile(openAttemptsPath, '');
+    const fullArgsPath = resolve(tempDir, 'full-args');
+    const env = {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      CALLS_PATH: callsPath,
+      FULL_ARGS_PATH: fullArgsPath,
+      OPEN_ATTEMPTS_PATH: openAttemptsPath,
+    };
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    assert.equal(receipt.truncated, false);
+    assert.equal(receipt.duplicatesDropped, 1);
+    assert.equal(receipt.openUnique, 3);
+    assert.equal(receipt.count, 4);
+    const numbers = receipt.pullRequests.map(row => row.number).sort();
+    assert.deepEqual(numbers, [1, 2, 3, 9]);
+    const draftRow = receipt.pullRequests.find(row => row.number === 2);
+    assert.equal(draftRow.isDraft, true);
+    const callLog = (await readFile(callsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(callLog.length, 3);
+    assert.equal(callLog.filter(call => call === 'api').length, 2);
+    assert.equal(callLog.filter(call => call === 'pr').length, 1);
+
+    // argv hygiene (JOV-8000 follow-up 11): the gh CLI usage failure on the
+    // Gem runner was `gh api graphql -F` with a multi-line query string
+    // ("Add a string parameter in key=value format"). The inventory now
+    // uses `gh api` with URL query params only — every recorded argv line
+    // must be flag-free (-f/-F absent everywhere), non-empty, and well
+    // formed (every key=value param carries its '=').
+    const fullArgs = (await readFile(fullArgsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(fullArgs.length, 3);
+    for (const line of fullArgs) {
+      assert.ok(line.length > 0);
+      assert.doesNotMatch(line, /(^|\s)-(f|F)(\s|$|=)/);
+      assert.doesNotMatch(line, /graphql/);
+      // `gh api` takes no --repo/-R flag (it is a `gh pr` flag; passing it
+      // dumps usage help whose -F description is the misleading "Add a
+      // string parameter in key=value format" line the Gem runner showed).
+      if (line.startsWith('api ')) {
+        assert.doesNotMatch(line, /--repo|--repo=|(^|\s)-R(\s|$)/);
+        assert.equal(line.split(' ').length, 2);
+      }
+    }
+    const apiLines = fullArgs.filter(line => line.startsWith('api '));
+    assert.equal(apiLines.length, 2);
+    for (const line of apiLines) {
+      // The REST path carries its query params as URL key=value pairs —
+      // every param segment contains an '='.
+      const path = line.split(' ').at(-1);
+      assert.ok(path.includes('pulls?'));
+      for (const segment of path.split('?').at(-1).split('&')) {
+        assert.ok(segment.includes('='), `param ${segment} missing =`);
+      }
+    }
+
+    // Fail-closed path: a non-gateway failure does not burn the extra
+    // retry; the collector names the cause with the exit code, signal, kill
+    // flag and stderr tail, and stays failed closed (no empty-array pass).
+    await writeFile(
+      fakeGh,
+      ['#!/bin/sh', 'echo "gh: auth required" >&2', 'exit 1'].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    await writeFile(callsPath, '');
+    const failed = await collectGitHubPullRequests(env);
+    assert.equal(Array.isArray(failed?.pullRequests), false);
+    assert.match(String(failed?.error), /gh-pr-list-(open|merged):/);
+    assert.match(String(failed?.error), /exit=1/);
+    assert.match(String(failed?.error), /signal=none/);
+    assert.match(String(failed?.error), /killed=false/);
+    assert.match(String(failed?.error), /stderr=.*gh: auth required/);
+  });
+
+  it('parses a multi-megabyte gh pr list payload past the 1MB execFile default maxBuffer', async () => {
+    // The PR inventory query (body + statusCheckRollup on ~100 open PRs)
+    // measures multiple MB — beyond execFile's 1MB default maxBuffer, which
+    // kills the child mid-read. The collector runs with a 32MB maxBuffer, so
+    // a payload of this size parses instead of dying as a truncated cause.
+    const tempDir = await mkdtemp('/tmp/backlog-gh-mb-');
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const filler = 'x'.repeat(24 * 1024);
+    const rows = Array.from({ length: 90 }, (_, i) => ({
+      number: i + 1,
+      title: 'fix JOV-1',
+      body: filler,
+      headRefName: `symphony/JOV-1-${i}`,
+      state: i % 2 === 0 ? 'OPEN' : 'MERGED',
+      mergeStateStatus: 'CLEAN',
+      url: 'https://example/pr/1',
+      mergedAt: null,
+      isDraft: false,
+      statusCheckRollup: { state: 'SUCCESS' },
+    }));
+    const payload = JSON.stringify(rows);
+    assert.ok(payload.length > 2 * 1024 * 1024);
+    const mergedSmall = JSON.stringify([
+      {
+        number: 9999,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        labels: [],
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        '# $2 is the REST path (api <path>); page>=2 ends pagination',
+        'if [ "$1" = "api" ]; then',
+        '  PAGE="${2##*page=}"',
+        '  case "$PAGE" in',
+        '    1) ' + `printf '%s' '${payload.replace(/'/g, "'\\''")}'` + ';;',
+        '    *) printf "[]";;',
+        '  esac',
+        'else',
+        `printf '%s' '${mergedSmall.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const { collectGitHubPullRequests } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const env = {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+    };
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    // 90 rows (~24KB bodies each ≈ 2.2MB payload) parse past the 1MB
+    // default through the paginated open GraphQL; the small merged row
+    // adds one more inventory entry.
+    assert.equal(receipt.pullRequests.length, 91);
+    assert.equal(receipt.openUnique, 45);
+    assert.equal(receipt.truncated, false);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {
@@ -2019,6 +2528,86 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(result.admit.length, 1);
     assert.equal(result.admit[0].identifier, 'JOV-4396');
     assert.equal(result.admit[0].type, 'issue');
+  });
+
+  it('admits Urgent Backlog before higher-scored eligible work and records priority displacement', async () => {
+    const urgent = admissionIssue({ identifier: 'JOV-8022', state: 'Backlog' });
+    urgent.priority = 1;
+    const profitable = admissionIssue({ identifier: 'JOV-4396' });
+    profitable.priority = 2;
+    const result = await admitter.selectNextToAdmit(
+      [
+        {
+          ...classification(urgent),
+          mrrCategory: 'unknown',
+          mrrConfidence: 'low',
+        },
+        { ...classification(profitable), mrrCategory: 'revenue-protection' },
+      ],
+      [],
+      { fleetGate: greenFleetGate() }
+    );
+    assert.equal(result.admit.length, 1);
+    assert.equal(result.admit[0].identifier, urgent.identifier);
+    assert.equal(result.queueRankingReceipt.selectedPriority, 1);
+    assert.ok(
+      result.queueRankingReceipt.orderingReasons.includes('linear-priority')
+    );
+    assert.equal(result.queueRankingReceipt.orderingChanged, true);
+    assert.equal(
+      result.queueRankingReceipt.displacedCandidate,
+      profitable.identifier
+    );
+    assert.ok(result.queueRankingReceipt.missingSourceContracts.length > 0);
+  });
+
+  it('does not let Urgent priority bypass missing evidence, dependency holds, ownership or fleet closure', async () => {
+    const missing = admissionIssue({
+      identifier: 'JOV-8001',
+      skipReceipts: true,
+    });
+    const held = admissionIssue({ identifier: 'JOV-8002', labels: ['held'] });
+    const owned = admissionIssue({
+      identifier: 'JOV-8003',
+      state: 'In Progress',
+      assignee: { id: 'tim', name: 'Tim White' },
+    });
+    const dependent = admissionIssue({ identifier: 'JOV-8004' });
+    for (const issue of [missing, held, owned, dependent]) issue.priority = 1;
+    const safe = admissionIssue({ identifier: 'JOV-8005' });
+    safe.priority = 3;
+    const candidates = [
+      classification(missing),
+      classification(held),
+      classification(owned),
+      {
+        ...classification(dependent),
+        category: 'blocked',
+        relatedIssues: [{ identifier: 'JOV-9999', relation: 'blockedBy' }],
+      },
+      classification(safe),
+    ];
+    const result = await admitter.selectNextToAdmit(candidates, [], {
+      fleetGate: greenFleetGate(),
+    });
+    assert.deepEqual(
+      result.admit.map(item => item.identifier),
+      [safe.identifier]
+    );
+    for (const issue of [missing, held, owned, dependent]) {
+      assert.equal(
+        result.admissionDecisions.find(
+          item => item.identifier === issue.identifier
+        ).allowed,
+        false
+      );
+    }
+    const fleetGate = greenFleetGate();
+    fleetGate.workAdmission.allowed = false;
+    assert.deepEqual(
+      (await admitter.selectNextToAdmit(candidates, [], { fleetGate })).admit,
+      []
+    );
   });
 
   it('records the displaced candidate and opportunity cost when economics change queue order', async () => {

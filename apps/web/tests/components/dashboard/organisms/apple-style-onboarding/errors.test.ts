@@ -20,6 +20,25 @@ describe('apple-style onboarding error helpers', () => {
     });
   });
 
+  it.each([
+    new Error('[CLAIM_EXPIRED] private provider detail'),
+    { message: '[CLAIM_EXPIRED] private provider detail' },
+    '[CLAIM_EXPIRED]',
+  ])('maps expired claims to fixed recovery copy', error => {
+    expect(mapErrorToUserMessage(error, '/onboarding')).toEqual({
+      userMessage:
+        'This claim link has expired or is no longer valid. Please request a new claim link.',
+    });
+  });
+
+  it('keeps unknown private errors generic', () => {
+    expect(
+      mapErrorToUserMessage(new Error('private provider detail'), '/onboarding')
+    ).toEqual({
+      userMessage: 'Could not save. Please try again.',
+    });
+  });
+
   it('extracts error codes even when prefixed by Error:', () => {
     const error = new Error(
       'Error: [DATABASE_ERROR] Database operation failed'

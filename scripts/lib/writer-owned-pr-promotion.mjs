@@ -308,19 +308,22 @@ export function evaluateWriterPromotion(input = {}) {
     writerLogin,
     prNumber,
   });
-  if (!proof.ok) return { ...proof, action: 'block' };
-
   const expected = exactSha(expectedHeadSha);
   const normalized = normalizePromotionState(state);
   if (!expected)
     return { ok: false, action: 'block', reason: 'expected-head-missing' };
   if (normalized.state === 'MERGED' && normalized.headSha === expected) {
     return {
-      ok: true,
-      action: 'already-complete',
+      ok: proof.ok,
+      action: proof.ok ? 'already-complete' : 'merged-proof-blocked',
       reason: 'merged-at-exact-head',
+      sourceDisposition: 'merged',
+      proofAcceptance: proof.ok ? 'complete' : 'blocked',
+      proofReason: proof.reason,
+      writerLogin: normalizeLogin(writerLogin),
     };
   }
+  if (!proof.ok) return { ...proof, action: 'block' };
   if (hasNativePromotionIntent(normalized, expected)) {
     return {
       ok: true,
@@ -351,33 +354,50 @@ export function evaluateWriterPromotion(input = {}) {
 
 export function buildPromotionBlocker(input = {}) {
   const compensation = input.compensation ?? {};
+  const state =
+    compensation.state && typeof compensation.state === 'object'
+      ? normalizePromotionState(compensation.state)
+      : null;
+  const headSha = exactSha(input.headSha);
+  const merged = Boolean(
+    headSha && state?.state === 'MERGED' && state.headSha === headSha
+  );
   return {
     schema: WRITER_PROMOTION_BLOCKER_SCHEMA,
     emittedAt:
       typeof input.emittedAt === 'string'
         ? input.emittedAt
         : new Date().toISOString(),
-    status: 'terminal-blocker',
+    status: merged ? 'merged-acceptance-blocked' : 'terminal-blocker',
+    sourceDisposition: merged
+      ? 'merged'
+      : state?.state === 'MERGED'
+        ? 'merged-other-head'
+        : (state?.state.toLowerCase() ?? 'unknown'),
+    acceptance: {
+      state: 'blocked',
+      reason: hasText(input.reason) ? input.reason : 'unknown',
+      owner: normalizeLogin(input.writerLogin),
+    },
     issueId: normalizeIssue(input.issueId),
     prNumber: positiveInteger(input.prNumber),
-    headSha: exactSha(input.headSha),
+    headSha,
     writerLogin: normalizeLogin(input.writerLogin),
     phase: hasText(input.phase) ? input.phase : 'promotion',
     reason: hasText(input.reason) ? input.reason : 'unknown',
     compensation: {
       attempted: compensation.attempted === true,
       verified: compensation.verified === true,
-      state:
-        compensation.state && typeof compensation.state === 'object'
-          ? normalizePromotionState(compensation.state)
-          : null,
+      state,
     },
   };
 }
 
 export function renderPromotionBlockerComment(blocker) {
   return [
-    'Writer-owned PR promotion blocked.',
+    blocker.sourceDisposition === 'merged'
+      ? 'Source merged at the exact head. Acceptance remains blocked; draft compensation is unavailable.'
+      : 'Writer-owned PR promotion blocked.',
     '',
     `Schema: \`${WRITER_PROMOTION_BLOCKER_SCHEMA}\``,
     `Issue: \`${blocker.issueId || 'unknown'}\``,
@@ -469,6 +489,10 @@ function main(argv) {
     process.stdout.write(
       `${renderPromotionBlockerComment(buildPromotionBlocker(JSON.parse(readStdin())))}\n`
     );
+    return 0;
+  }
+  if (command === 'blocker') {
+    writeJson(buildPromotionBlocker(JSON.parse(readStdin())));
     return 0;
   }
   console.error(

@@ -40,3 +40,12 @@ export const RightOpen: Story = {
     closedLabel: 'Expand details',
   },
 };
+
+export const RightClosed: Story = {
+  args: {
+    side: 'right',
+    open: false,
+    openLabel: 'Collapse details',
+    closedLabel: 'Expand details',
+  },
+};

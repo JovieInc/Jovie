@@ -39,6 +39,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import lifecycle  # noqa: E402
+import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
@@ -54,6 +56,7 @@ import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
+import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -89,12 +92,12 @@ CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
-              "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
+              "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
-              "scripts/tests/test_worktree_sweep.py",
+              "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
@@ -468,6 +471,8 @@ class Host:
     gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
 
     def base_slots(self, provider: str, default: int) -> int:
+        if provider == 'devin' and not devin_free_policy.admission_open(self.agent_timeout):
+            return 0
         return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
 
     def slots(self, provider: str, default: int) -> int:
@@ -623,7 +628,8 @@ def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None) ->
 def admission_order(issue: Issue, now: float) -> tuple:
     """Dispatch rule shared by every lane and the doctor (JOV-7423 leverage-first):
 
-    1. tier 0 = urgent (effective P1, including aged work) or compounding infrastructure
+    1. tier -1 = operator-designated `dispatch-next` in the agent-ready pool;
+       tier 0 = urgent (effective P1, including aged work) or compounding infrastructure
        (CI, Symphony throughput); everything else is tier 1;
     2. aged priority: waiting work gains one level per day until it reaches P1;
     3. workstream rank (workstreams.RANK);
@@ -634,7 +640,9 @@ def admission_order(issue: Issue, now: float) -> tuple:
     waited = max(0, now - created_at) if created_at is not None else 0
     effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
     stream = workstreams.classify(issue.title, issue.labels)
-    tier = 0 if effective_priority == 1 or workstreams.compounding(stream) else 1
+    labels = {label.lower() for label in issue.labels}
+    tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
+            else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
     return (tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
@@ -972,7 +980,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
     ])
 
 
-def context_pack(issue: Issue, run=subprocess.run) -> str:
+def context_pack(issue: Issue, run=lifecycle.run) -> str:
     """Bounded, best-effort GBrain recall. A miss is reported, never invented."""
     try:
         result = run(["gbrain", "search", issue.title[:200]], capture_output=True, text=True, timeout=20)
@@ -993,23 +1001,34 @@ class Change:
     deleted: int
 
 
-def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES) -> list[str]:
+def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES, *,
+               worktree: Path | None = None, pr: dict | None = None) -> list[str]:
     """Deterministic checks on the diff itself; returns failure reasons (empty = pass)."""
+    return gate_assessment(changes, max_reviewable_lines, worktree=worktree, pr=pr)[0]
+
+
+def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES, *,
+                    worktree: Path | None = None, pr: dict | None = None) -> tuple[list[str], dict | None]:
+    """Retain the same bound evidence that justifies a version-chore classification."""
     if not changes:
-        return ["empty-diff"]
+        return ["empty-diff"], None
     failures = []
+    versions = None
     paths = [change.path for change in changes]
     if any(SECRET_FILE.search(path) for path in paths):
         failures.append("secret-like-file-changed")
     code = [p for p in paths if not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
     if code and not any(TEST_FILE.search(p) for p in paths):
-        failures.append("code-change-without-test")
+        versions = (dependency_diff.classify(worktree, pr.get("headRefOid"), paths, pr)
+                    if worktree is not None and isinstance(pr, dict) else None)
+        if versions is None:
+            failures.append("code-change-without-test")
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
         failures.append("lockfile-without-manifest")
     reviewable = sum(c.added + c.deleted for c in changes if not GENERATED.search(c.path))
     if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
-    return failures
+    return failures, versions
 
 
 def not_shippable_reason(output: str) -> str | None:
@@ -1092,8 +1111,9 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
             log.flush()
         command = [sys.executable, str(Path(__file__).resolve()), "gate-command",
                    "--timeout", str(timeout), "--", *args]
-        with subprocess.Popen(command, cwd=cwd, env=env, text=True, start_new_session=True,
-                              pass_fds=tuple(pass_fds), stdout=log if stream and log else subprocess.PIPE,
+        with subprocess.Popen(command, cwd=cwd, text=True, start_new_session=True,
+                              **lifecycle.spawn_kwargs(env=env, pass_fds=pass_fds),
+                              stdout=log if stream and log else subprocess.PIPE,
                               stderr=subprocess.STDOUT if stream and log else subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
         if log is not None:
@@ -1104,11 +1124,11 @@ def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, l
     if stream and log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n")
         log.flush()
-        result = subprocess.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
+        result = lifecycle.run(args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
                                 timeout=timeout, env=env)
         log.flush()
         return subprocess.CompletedProcess(args, result.returncode, "", "")
-    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
+    result = lifecycle.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
     if log is not None:
         log.write(f"$ {' '.join(args)[:300]}\n{result.stdout[-4000:]}{result.stderr[-4000:]}\n")
     return result
@@ -1139,6 +1159,10 @@ LINEAR_BUDGET_HEADERS = (
     ("X-RateLimit-Complexity-Remaining", "X-RateLimit-Complexity-Limit", "X-RateLimit-Complexity-Reset"),
 )
 LINEAR_RESET_HEADERS = ("X-RateLimit-Requests-Reset", "X-RateLimit-Complexity-Reset")
+
+
+class LaneInventoryUnknown(RuntimeError):
+    """A bounded native scan did not prove complete candidate/ownership coverage."""
 
 
 class LinearRateLimited(RuntimeError):
@@ -1543,21 +1567,39 @@ class Linear:
             raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
         return payload["data"]
 
-    def _paginated_lane_issues(self, label: str) -> list[dict]:
-        """Up to 500 Todo issues. Only the claim-scan cache fill calls this."""
-        nodes, after = [], None
+    def _bounded_lane_nodes(self, query: str, variables: dict) -> list[dict]:
+        """Retain the request cap, but never treat a truncated inventory as complete."""
+        nodes, ids, cursors, after = [], set(), set(), None
         for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+            data = self.gql(query, {**variables, "after": after})
+            edge = data.get("issues") if isinstance(data, dict) else None
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise LaneInventoryUnknown("lane-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"]:
+                    raise LaneInventoryUnknown("lane-inventory-malformed")
+                if row["id"] not in ids:
+                    nodes.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return nodes
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
+            cursors.add(after)
+        raise LaneInventoryUnknown("lane-inventory-page-limit")
+
+    def _paginated_lane_issues(self, label: str) -> list[dict]:
+        """Complete Todo inventory within 500 rows, only on a claim-scan cache fill."""
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt '
-                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL], "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
         return [{"id": n["id"], "identifier": n["identifier"], "title": n["title"],
                  "description": n.get("description") or "", "priority": n.get("priority") or 0,
                  "created_at": n["createdAt"], "labels": [l["name"] for l in n["labels"]["nodes"]]}
@@ -1568,7 +1610,7 @@ class Linear:
 
         The 500-issue read (JOV-7514) runs only as the shared claim-scan fill. A hit
         within CLAIM_SCAN_TTL_S returns the stored pool and does not paginate."""
-        rows = shared(f"claim-lane-issues-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
+        rows = shared(f"claim-lane-issues-v2-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
                       lambda: self._paginated_lane_issues(label)) or []
         return [Issue(row["id"], row["identifier"], row["title"], row.get("description") or "",
                       row.get("priority") or 0, row["created_at"], list(row.get("labels") or []))
@@ -1576,19 +1618,12 @@ class Linear:
 
     def active_lane_issues(self, labels: list[str]) -> list[Issue]:
         """In Progress work claimed from a lane pool, for cross-host overlap admission."""
-        nodes, after = [], None
-        for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(
+        nodes = self._bounded_lane_nodes(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
-                {"labels": labels, "after": after})
-            nodes += data["issues"]["nodes"]
-            page = data["issues"].get("pageInfo") or {}
-            after = page.get("endCursor")
-            if not page.get("hasNextPage") or not after:
-                break
+                {"labels": labels})
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
                 for n in nodes]
@@ -1640,10 +1675,22 @@ class Locked:
     """flock-held file: released by the kernel if the holder dies, so no stale locks."""
     def __init__(self, path: Path, blocking: bool):
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.handle = open(path, "w")
+        # A contender must not erase the current owner's acquisition receipt before
+        # failing LOCK_NB.  The doctor uses that receipt to distinguish a newly busy
+        # slot from a worker that has made no progress for an hour.
+        self.handle = open(path, "a+")
         try:
             fcntl.flock(self.handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
             self.held = True
+            try:
+                self.handle.seek(0)
+                self.handle.truncate()
+                self.handle.write(json.dumps({"pid": os.getpid(), "host": HOST, "acquiredAt": now_iso()}))
+                self.handle.flush()
+            except OSError:
+                # The kernel lease is still authoritative.  Missing metadata keeps
+                # the doctor's diagnosis degraded instead of forfeiting ownership.
+                pass
         except BlockingIOError:
             self.held = False
 
@@ -1654,7 +1701,7 @@ class Locked:
 
 def provider_healthy(spec: dict) -> bool:
     try:
-        result = subprocess.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
+        result = lifecycle.run(template(spec["health"], {}), capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and re.search(spec.get("healthy", "."), result.stdout + result.stderr) is not None
@@ -1737,8 +1784,14 @@ class RunStopped(BaseException):
     before the owned process tree is killed."""
 
 
+class CommandNotStarted(OSError):
+    """Popen failed before any command child existed."""
+
+
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
-              guard_interval: float = 30, on_kill=None) -> subprocess.CompletedProcess:
+              guard_interval: float = 30, on_kill=None,
+              _lifecycle_helper: bool = False, _lifecycle_terminal: bool = False,
+              stderr=subprocess.STDOUT) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
@@ -1748,11 +1801,29 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     stopped run can never be published later (JOV-5060).
     """
     import signal
+    free_guard = devin_free_policy.command_guard(cmd, timeout)
+    if free_guard:
+        existing_guard = guard
+        def guard():
+            if existing_guard:
+                existing_guard()
+            free_guard()
+        guard_interval = min(guard_interval, 1)
     if guard:
         guard()
     env = {**os.environ, "npm_config_package_import_method": "hardlink"}
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True,
-                            start_new_session=True, env=env)
+    # The tracked helper retains controller ownership if its worker dies. It
+    # also keeps the guard while descendant cleanup is unproven. Its own agent
+    # launch is the terminal rung, so this cannot recursively wrap itself.
+    command = ([sys.executable, str(Path(__file__).resolve()), "gate-command",
+                "--timeout", str(timeout), "--", *cmd]
+               if lifecycle.active() and not _lifecycle_helper else cmd)
+    try:
+        proc = subprocess.Popen(command, cwd=cwd, stdout=log, stderr=stderr, text=True,
+                                start_new_session=True,
+                                **({"env": env} if _lifecycle_terminal else lifecycle.spawn_kwargs(env=env)))
+    except OSError as error:
+        raise CommandNotStarted(error.errno, error.strerror, error.filename) from error
     owned = AgentProcesses(proc.pid)
     restored = {}
 
@@ -2335,7 +2406,12 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
 
 
 GATE_RESULT_SCHEMA = "jovie.lane-gate-result/v1"
-GATE_POLICY_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+def gate_policy_digest() -> str:
+    return hashlib.sha256(Path(__file__).read_bytes() + b"\0dependency_diff\0" +
+                          Path(dependency_diff.__file__).read_bytes()).hexdigest()
+
+
+GATE_POLICY_DIGEST = gate_policy_digest()
 
 
 @dataclass
@@ -2355,6 +2431,14 @@ def reserve_gate(host: Host, pr: dict) -> GateClaim | None:
 
 def terminal_gate(pr: dict, verified: dict, sensitive: bool = False) -> dict | None:
     result = verified.get(f"{pr['number']}:{pr['headRefOid']}") if isinstance(verified, dict) else None
+    if isinstance(result, dict) and result.get("dependencyVersionDiff") is not None:
+        versions = result["dependencyVersionDiff"]
+        if (not isinstance(versions, dict) or versions.get("schema") != "jovie-dependency-version-diff/v1"
+                or not dependency_diff.SHA.fullmatch(str(versions.get("baseSha", "")))
+                or not isinstance(versions.get("manifests"), list) or not versions["manifests"]
+                or dependency_diff.metadata_digest(pr) is None or versions.get("headSha") != pr["headRefOid"]
+                or versions.get("metadataDigest") != dependency_diff.metadata_digest(pr)):
+            return None
     # Old SHA strings were written at claim time, so they cannot certify anything.
     if (isinstance(result, dict) and result.get("schema") == GATE_RESULT_SCHEMA
             and result.get("headSha") == pr["headRefOid"]
@@ -2484,7 +2568,10 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
         raise RepairStopped("gate-checkout-head-mismatch", pr, "before-gate-checks")
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
-    reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
+    reasons, versions = gate_assessment(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES,
+                                       worktree=worktree, pr=pr)
+    if versions is not None:
+        result["dependencyVersionDiff"] = versions
     evidence = []
     # The caller retains this same receipt if a later authority read refuses.
     result.update(changedFiles=len(changes), reasons=reasons)
@@ -2525,6 +2612,12 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
                 seat.release()
         result["reasons"] = reasons
     live = require_gate_authority(host, pr, "after-gate", sensitive)
+    if result.get("dependencyVersionDiff") is not None:
+        live_reasons, live_versions = gate_assessment(changes,
+            SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES, worktree=worktree, pr=live)
+        reasons.extend(reason for reason in live_reasons if reason not in reasons)
+        if live_versions != result["dependencyVersionDiff"]:
+            reasons.append("dependency-version-evidence-changed")
     checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
     if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
         raise RepairStopped("gate-checkout-head-mismatch", live, "after-gate")
@@ -2848,7 +2941,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
         gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
         if not conflicted and not gate_held and not reviewed:
-            if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
+            if any((check.get("status") is not None and check["status"] != "COMPLETED")
+                   or check.get("state") in ("PENDING", "EXPECTED") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
@@ -3139,43 +3233,289 @@ def arm_ready_prs(host: Host, prs: list[dict]) -> None:
 
 
 def fetch_labeled_events(linear) -> list:
-    """The one label-filtered Linear read per tick, shared across workers via `shared`.
+    """One complete bounded inventory per cache fill; never plan from a truncated page.
 
     JOV and LYB issues labeled `remediation:<fingerprint>` come back together.
     Callers must not issue a follow-up read per issue.
     """
     def fetch():
-        data = linear.gql(remediation.LABELED_EVENT_QUERY, {})
-        return (data.get("issues") or {}).get("nodes") or []
+        rows, ids, cursors, after = [], set(), set(), None
+        for _ in range(remediation.EVENT_INVENTORY_PAGES):
+            data = linear.gql(remediation.LABELED_EVENT_QUERY, {"after": after})
+            edge = data.get("issues")
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
+                raise RuntimeError("remediation-inventory-unreadable")
+            for row in edge["nodes"]:
+                if not isinstance(row, dict) or not row.get("id"):
+                    raise RuntimeError("remediation-inventory-malformed")
+                if row["id"] not in ids:
+                    rows.append(row)
+                    ids.add(row["id"])
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
+                raise RuntimeError("remediation-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                return rows
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise RuntimeError("remediation-inventory-cursor-invalid")
+            cursors.add(after)
+        raise RuntimeError("remediation-inventory-page-limit")
 
-    return shared("remediation-events", SUMMARY_TTL_S, fetch) or []
+    # New cache namespace fences old first-page-only receipts after source installation.
+    return shared("remediation-events-v2", SUMMARY_TTL_S, fetch) or []
 
 
-def _apply_event_plan(linear, plan: dict) -> None:
-    """Writes only: reopen, one comment, one needs-human label. No extra reads."""
-    for row in plan.get("reopens") or []:
-        if not row.get("id") or not row.get("stateId"):
+EVENT_DELIVERY_SCHEMA = "jovie.event-delivery/v1"
+EVENT_DELIVERY_ATTEMPTS = 3
+EVENT_DELIVERY_STALE_S = 3600
+
+
+def _event_digest(value) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _event_delivery_state(host: Host) -> dict:
+    path = host.state / "event-delivery.json"
+    if not path.exists():
+        return {"schema": EVENT_DELIVERY_SCHEMA, "actions": {}}
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or data.get("schema") != EVENT_DELIVERY_SCHEMA or not isinstance(data.get("actions"), dict):
+        raise RuntimeError("event-delivery-journal-unreadable")
+    for key, row in data["actions"].items():
+        if not isinstance(row, dict) or row.get("key") != key or row.get("kind") not in {"comments", "reopens", "labels"}:
+            raise RuntimeError("event-delivery-journal-unreadable")
+    return data
+
+
+def _save_event_json(host: Host, filename: str, data: dict) -> None:
+    # Intent and terminal readback survive a controller restart. A failed write
+    # leaves the prior journal intact and prevents the external mutation.
+    import tempfile
+    host.state.mkdir(parents=True, exist_ok=True)
+    path = host.state / filename
+    fd, name = tempfile.mkstemp(prefix=".event-delivery-", dir=host.state)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            json.dump(data, handle, sort_keys=True)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(name, path)
+        directory = os.open(host.state, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def _save_event_delivery(host: Host, data: dict) -> None:
+    _save_event_json(host, "event-delivery.json", data)
+
+
+def _event_escalation(host: Host) -> dict:
+    path = host.state / "escalation.json"
+    if not path.exists():
+        return load_escalation(host)
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or not isinstance(data.get("events", {}), dict):
+        raise RuntimeError("event-escalation-unreadable")
+    return data
+
+
+def _recover_event_preparation(host: Host, journal: dict) -> None:
+    """Finish the paired local commit before replanning; never renew attempts.
+
+    The durable journal is the write-ahead record for escalation.json. Each
+    row has its original preimage and exact prepared postimage. A concurrent
+    worker owns its whole changed row; recovery never overwrites that winner.
+    Caller holds event-delivery.lock and this function takes claim.lock.
+    """
+    prepared = journal.get("prepared")
+    if prepared is None:
+        return
+    if not isinstance(prepared, dict) or not isinstance(prepared.get("rows"), dict):
+        raise RuntimeError("event-delivery-preparation-unreadable")
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        current = _event_escalation(host)
+        events = current.setdefault("events", {})
+        conflicts = []
+        for fingerprint, pair in prepared["rows"].items():
+            if not isinstance(pair, dict) or "before" not in pair or not isinstance(pair.get("after"), dict):
+                raise RuntimeError("event-delivery-preparation-unreadable")
+            existing = events.get(fingerprint)
+            if existing == pair["before"]:
+                events[fingerprint] = pair["after"]
+            elif existing != pair["after"]:
+                conflicts.append(fingerprint)
+        _save_event_json(host, "escalation.json", current)
+        # Unsigned local preparation is never remote ownership. Only intents
+        # whose exact postimage survived are eligible for external delivery.
+        for action in journal["actions"].values():
+            if action["fingerprint"] in conflicts and action["status"] not in {"acknowledged", "superseded"}:
+                action["status"] = "superseded"
+                action["history"].append({"at": time.time(), "outcome": "prepared-owner-changed"})
+        journal.setdefault("commits", []).append({"id": prepared["id"], "at": time.time(),
+                                                  "outcome": "committed", "conflicts": conflicts})
+        journal.pop("prepared")
+        _save_event_delivery(host, journal)
+    finally:
+        lock.release()
+
+
+def _queue_event_delivery(data: dict, plan: dict, issues: list, accepted: set[str], now: float) -> None:
+    snapshots = {issue["id"]: issue for issue in issues}
+    for kind in ("reopens", "comments", "labels"):
+        for payload in plan.get(kind) or []:
+            target = payload.get("id")
+            owners = [fp for fp, row in plan["events"].items()
+                      if row.get("issueId") == target or f"fp={fp} -->" in payload.get("body", "")]
+            if len(owners) != 1 or owners[0] not in accepted:
+                continue  # A concurrently changed event owns its entire row.
+            fp = owners[0]
+            event = plan["events"][fp]
+            issue = snapshots.get(target) or {}
+            intent = {"kind": kind, "payload": payload, "fingerprint": fp,
+                      "ownerIssueId": event.get("issueId"),
+                      "generation": sorted(event.get("noted") or [])}
+            key = _event_digest(intent)
+            if key not in data["actions"]:
+                data["actions"][key] = {**intent, "key": key, "createdAt": now, "nextAt": now,
+                    "expectedState": (issue.get("state") or {}).get("name"),
+                    "deadline": now + EVENT_DELIVERY_STALE_S, "attempts": 0, "status": "pending",
+                    "expectedEvent": _event_digest(event), "history": [],
+                    "commentId": str(uuid.uuid5(uuid.NAMESPACE_URL, "jovie-event:" + key))}
+
+
+def _event_delivery_readback(linear, row: dict) -> tuple[bool, dict]:
+    payload = row["payload"]
+    if row["kind"] == "comments":
+        try:
+            result = linear.gql('query($id:String!){comment(id:$id){id body issue{id}}}', {"id": row["commentId"]})
+        except RuntimeError as error:
+            # Linear reports a missing comment as a GraphQL error rather than
+            # `{comment: null}`. This is the expected preimage before attempt 1;
+            # every other read failure remains unknown and fails closed.
+            if str(error) == "linear: Entity not found: Comment":
+                return False, {"commentId": row["commentId"]}
+            raise
+        if not isinstance(result, dict) or "comment" not in result:
+            raise RuntimeError("event-comment-readback-unreadable")
+        comment = result["comment"]
+        if comment is None:
+            return False, {"commentId": row["commentId"]}
+        if comment.get("body") != payload.get("body") or (comment.get("issue") or {}).get("id") != payload["id"]:
+            raise RuntimeError("event-comment-readback-mismatch")
+        return True, {"commentId": comment["id"], "issueId": payload["id"]}
+    result = linear.gql('query($id:String!){issue(id:$id){id state{id name} labels{nodes{id}}}}', {"id": payload["id"]})
+    issue = result.get("issue") if isinstance(result, dict) else None
+    if not isinstance(issue, dict) or issue.get("id") != payload["id"] or not isinstance(issue.get("state"), dict):
+        raise RuntimeError("event-issue-readback-unreadable")
+    if row["kind"] == "reopens":
+        done = issue["state"].get("id") == payload["stateId"]
+        # Never downgrade a newly claimed/active issue on a stale reopen plan.
+        if not done and issue["state"].get("name") != row["expectedState"]:
+            raise RuntimeError("event-state-preimage-changed")
+        return done, {"issueId": issue["id"], "stateId": issue["state"].get("id")}
+    nodes = (issue.get("labels") or {}).get("nodes")
+    if not isinstance(nodes, list):
+        raise RuntimeError("event-label-readback-unreadable")
+    return any(label.get("id") == payload["labelId"] for label in nodes), {"issueId": issue["id"], "labelId": payload["labelId"]}
+
+
+def _event_delivery_report(data: dict, now: float) -> dict:
+    active = [row for row in data["actions"].values()
+              if row["status"] not in {"acknowledged", "superseded"}]
+    return {"deliveryPending": len(active),
+            "deliveryFailed": sum(row["status"] in {"failed", "exhausted", "sending"} for row in active),
+            "deliveryExhausted": sum(row["status"] == "exhausted" for row in active),
+            "deliveryAcknowledged": sum(row["status"] == "acknowledged" for row in data["actions"].values()),
+            "deliveryObservedAt": now,
+            "deliveryNextAt": min((row["nextAt"] for row in active), default=None)}
+
+
+def _event_delivery_snapshot(host: Host, now: float) -> dict:
+    """Report durable action state when the wider remediation pass fails."""
+    report = _event_delivery_report(_event_delivery_state(host), now)
+    starts = [row.get("startDelivery") or {}
+              for row in (_event_escalation(host).get("events") or {}).values()
+              if isinstance(row, dict)]
+    report["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
+    return report
+
+
+def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) -> dict:
+    """Drain one durable intent per tick under the existing delivery/claim locks.
+
+    Transport attempts are separate from model attempts; none are refunded or
+    reset. An uncertain send is read back by its stable remote ID before retry.
+    The caller holds event-delivery.lock; claim.lock only covers the write fence.
+    """
+    for row in sorted(data["actions"].values(), key=lambda row: (
+            row["createdAt"], ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
+        if row["status"] in {"acknowledged", "superseded"} or now < row["nextAt"]:
             continue
         try:
-            linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
-                       {"id": row["id"], "s": row["stateId"]})
-        except Exception:
-            pass
-    for row in plan.get("comments") or []:
-        if not row.get("id") or not row.get("body"):
-            continue
-        try:
-            linear.comment(row["id"], row["body"])
-        except Exception:
-            pass
-    for row in plan.get("labels") or []:
-        if not row.get("id"):
-            continue
-        try:
-            linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
-                       {"id": row["id"], "l": row["labelId"]})
-        except Exception:
-            pass
+            acknowledged, receipt = _event_delivery_readback(linear, row)
+            if not acknowledged and row["attempts"] < EVENT_DELIVERY_ATTEMPTS and now < row["deadline"]:
+                lock = Locked(host.state / "claim.lock", blocking=True)
+                try:
+                    owner = (_event_escalation(host).get("events") or {}).get(row["fingerprint"]) or {}
+                    if owner.get("issueId") != row["ownerIssueId"]:
+                        row["status"] = "superseded"
+                        row["history"].append({"at": now, "outcome": "owner-changed"})
+                        _save_event_delivery(host, data)
+                        break
+                    if _event_digest(owner) != row["expectedEvent"]:
+                        raise RuntimeError("event-owner-preimage-changed")
+                    # The remote preimage is refreshed INSIDE the mutation fence.
+                    # A state changed since the earlier read is never downgraded.
+                    if row["kind"] == "reopens":
+                        acknowledged, receipt = _event_delivery_readback(linear, row)
+                        if acknowledged:
+                            row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
+                            row["history"].append({"at": now, "outcome": "authoritative-readback"})
+                            _save_event_delivery(host, data)
+                            break
+                    row["attempts"] += 1
+                    row["status"] = "sending"
+                    row["history"].append({"at": now, "outcome": "intent-persisted", "attempt": row["attempts"]})
+                    _save_event_delivery(host, data)
+                    payload = row["payload"]
+                    if row["kind"] == "comments":
+                        result = linear.gql('mutation($i:CommentCreateInput!){commentCreate(input:$i){success}}',
+                            {"i": {"id": row["commentId"], "issueId": payload["id"], "body": payload["body"]}})
+                        field = "commentCreate"
+                    elif row["kind"] == "reopens":
+                        result = linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                            {"id": payload["id"], "s": payload["stateId"]})
+                        field = "issueUpdate"
+                    else:
+                        result = linear.gql('mutation($id:String!,$l:String!){issueAddLabel(id:$id,labelId:$l){success}}',
+                            {"id": payload["id"], "l": payload["labelId"]})
+                        field = "issueAddLabel"
+                    if not isinstance(result, dict) or not isinstance(result.get(field), dict) or result[field].get("success") is not True:
+                        raise RuntimeError("event-mutation-rejected")
+                finally:
+                    lock.release()
+                acknowledged, receipt = _event_delivery_readback(linear, row)
+            if acknowledged:
+                row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
+                row["history"].append({"at": now, "outcome": "authoritative-readback"})
+            else:
+                raise RuntimeError("event-delivery-unacknowledged")
+        except Exception as error:
+            # No provider response/credential content in controller health output.
+            row["error"] = str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__
+            row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
+            row["history"].append({"at": now, "outcome": row["status"], "error": row["error"]})
+        row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
+        _save_event_delivery(host, data)
+        break  # Bounded work; a transport outage must not monopolize dispatch.
+    return _event_delivery_report(data, now)
 
 
 def claim_remediation_events(host: Host, linear) -> dict:
@@ -3187,47 +3527,56 @@ def claim_remediation_events(host: Host, linear) -> dict:
     def healthy(_name, spec):
         return provider_healthy(spec)
 
-    data = load_escalation(host)
-    plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
-                                           healthy=healthy, cooled=cooled)
-    _apply_event_plan(linear, plan)
-    lock = Locked(host.state / "claim.lock", blocking=True)
+    delivery_lock = Locked(host.state / "event-delivery.lock", blocking=False)
+    if not delivery_lock.held:
+        delivery_lock.release()
+        return {"deliveryBusy": True}
     try:
-        current = load_escalation(host)
-        previous = current.get("events") or {}
-        merged = plan["events"]
-        for fingerprint, row in merged.items():
-            prior = previous.get(fingerprint) or {}
-            if not isinstance(prior, dict):
-                continue
-            # A worker can finish while this plan was being built. Keep that outcome.
-            if prior.get("status") in {"done", "exhausted"} and row.get("status") not in {"done", "exhausted"}:
-                row["status"] = prior["status"]
-                row["running"] = False
-                row["lane"] = prior.get("lane")
-                row["release"] = prior.get("release", False)
-            elif prior.get("release") and not row.get("release"):
-                row["release"] = True
-                row["running"] = False
-                row["lane"] = None
-                row["status"] = prior.get("status") or row.get("status")
-            elif prior.get("running") and not row.get("release"):
-                row["running"] = True
-                row["claimedAt"] = prior.get("claimedAt")
-                row["lane"] = prior.get("lane", row.get("lane"))
-                row["status"] = prior.get("status", row.get("status"))
-        current["events"] = merged
-        save_escalation(host, current)
+        journal = _event_delivery_state(host)  # Fail closed before changing event rows.
+        _recover_event_preparation(host, journal)
+        data = _event_escalation(host)
+        baseline = json.loads(json.dumps(data.get("events") or {}))
+        plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
+                                               healthy=healthy, cooled=cooled)
+        lock = Locked(host.state / "claim.lock", blocking=True)
+        try:
+            current = _event_escalation(host)
+            previous = current.get("events") or {}
+            merged = dict(previous)
+            accepted = set()
+            pairs = {}
+            for fingerprint, row in plan["events"].items():
+                if previous.get(fingerprint) == baseline.get(fingerprint):
+                    merged[fingerprint] = row
+                    accepted.add(fingerprint)
+                    pairs[fingerprint] = {"before": previous.get(fingerprint), "after": row}
+            _queue_event_delivery(journal, plan, issues, accepted, time.time())
+            # Pair the original plan (including attempt timestamps) with its
+            # actions before either file can expose a new owner generation.
+            journal["prepared"] = {"id": _event_digest(pairs), "rows": pairs}
+            _save_event_delivery(host, journal)
+            current["events"] = merged
+            _save_event_json(host, "escalation.json", current)
+            journal.setdefault("commits", []).append({"id": journal["prepared"]["id"], "at": time.time(),
+                                                      "outcome": "committed", "conflicts": []})
+            journal.pop("prepared")
+            _save_event_delivery(host, journal)
+            plan["events"] = merged
+        finally:
+            lock.release()
+        delivery = _apply_event_plan(linear, plan, host, journal, time.time())
     finally:
-        lock.release()
+        delivery_lock.release()
     summary = remediation.events_summary({"events": plan["events"]})
+    starts = [row.get("startDelivery") or {} for row in plan["events"].values()]
+    delivery["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
     return {"eventsOpen": summary["eventsOpen"], "eventsClaimed": summary["eventsClaimed"],
-            "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"]}
+            "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"], **delivery}
 
 
 def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
-    """Take a fixable event this lane was assigned. No Linear read; state comes from the tick."""
-    data = load_escalation(host)
+    """Under claim.lock: admit one event only after its remote start is acknowledged."""
+    data = _event_escalation(host)
     events = data.get("events") or {}
     now = time.time()
     held_back = held_back_issues(host, now)
@@ -3240,17 +3589,66 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
             continue
         if not row.get("issueId"):
             continue
+        deliveries = _event_delivery_state(host)["actions"].values()
+        if any(action["kind"] == "reopens" and action["ownerIssueId"] == row["issueId"]
+               and action["status"] not in {"acknowledged", "superseded"} for action in deliveries):
+            continue  # A planned reopen is not an accepted remote issue state.
+        started = row.get("startedStateId")
+        if started:
+            delivery = row.setdefault("startDelivery", {"attempts": 0, "status": "pending", "nextAt": now,
+                                                        "deadline": now + EVENT_DELIVERY_STALE_S})
+            if now < delivery.get("nextAt", 0):
+                continue
+            try:
+                query = 'query($id:String!){issue(id:$id){id state{id name}}}'
+                remote = linear.gql(query, {"id": row["issueId"]})
+                state = (remote.get("issue") or {}).get("state") if isinstance(remote, dict) else None
+                if not isinstance(state, dict):
+                    raise RuntimeError("event-start-readback-unreadable")
+                correlation = _event_digest({"issueId": row["issueId"], "startedStateId": started,
+                                             "owner": HOST, "generation": row.get("attempts") or []})
+                receipt = delivery.get("mutationReceipt") or {}
+                if state.get("id") == started and receipt != {"correlation": correlation, "success": True}:
+                    # A rejected/ambiguous intent never proves this host owns
+                    # another host's start. Preserve it for owned recovery.
+                    raise RuntimeError("event-start-ownership-unproven")
+                if state.get("id") != started:
+                    # Fresh contradictory state invalidates every earlier
+                    # success before any retry can be sent or adopted.
+                    delivery.pop("mutationReceipt", None)
+                    _save_event_json(host, "escalation.json", data)
+                    if state.get("name") != "Todo":
+                        raise RuntimeError("event-start-preimage-changed")
+                    if delivery["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= delivery["deadline"]:
+                        raise RuntimeError("event-start-cap-exhausted")
+                    delivery.update(status="sending", attempts=delivery["attempts"] + 1)
+                    _save_event_json(host, "escalation.json", data)
+                    result = linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                               {"id": row["issueId"], "s": started})
+                    if not isinstance(result, dict) or (result.get("issueUpdate") or {}).get("success") is not True:
+                        raise RuntimeError("event-start-mutation-rejected")
+                    delivery["mutationReceipt"] = {"correlation": correlation, "success": True}
+                    _save_event_json(host, "escalation.json", data)
+                    remote = linear.gql(query, {"id": row["issueId"]})
+                    observed_state = (remote.get("issue") or {}).get("state")
+                    if not isinstance(observed_state, dict):
+                        raise RuntimeError("event-start-readback-unreadable")
+                    if observed_state.get("id") != started:
+                        delivery.pop("mutationReceipt", None)
+                        _save_event_json(host, "escalation.json", data)
+                        raise RuntimeError("event-start-unacknowledged")
+                delivery.update(status="acknowledged", acknowledgedAt=now)
+            except Exception as error:
+                delivery.update(status="failed", error=str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__,
+                                nextAt=now + 60)
+                _save_event_json(host, "escalation.json", data)
+                continue  # No model invocation or local running claim from intent alone.
+        else:
+            continue  # Missing start-state evidence cannot admit a model repair.
         row["running"] = True
         row["claimedAt"] = now
         row["release"] = False
-        save_escalation(host, data)
-        started = row.get("startedStateId")
-        if started:
-            try:
-                linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
-                           {"id": row["issueId"], "s": started})
-            except Exception:
-                pass
+        _save_event_json(host, "escalation.json", data)
         description = row.get("description") or ""
         dossier = row.get("dossier") or ""
         if dossier:
@@ -3502,29 +3900,117 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
-REPAIR_TARGET_FIELDS = """number title state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+REPAIR_TARGET_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
 isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
-commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{__typename
-... on CheckRun{name status conclusion detailsUrl startedAt completedAt}
-... on StatusContext{context state targetUrl}}}}}}}"""
-REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
+totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
+pageInfo{hasNextPage endCursor} nodes{__typename
+... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
+... on StatusContext{id context state targetUrl}}}}}}}"""
+REPAIR_CHECK_PAGES = 5  # At most 500 contexts; incomplete authority still refuses repair.
+REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
 
 
+def repair_checks_census(contexts: dict) -> tuple:
+    """Canonical count evidence for the entire mutable connection, not just this page."""
+    counts = [contexts[key] for key in ("totalCount", "checkRunCount", "statusContextCount")]
+    if any(type(count) is not int or count < 0 for count in counts) or sum(counts[1:]) != counts[0]:
+        raise ValueError("repair-check-counts-invalid")
+    states = []
+    for key, total in zip(("checkRunCountsByState", "statusContextCountsByState"), counts[1:]):
+        rows = contexts[key]
+        if not isinstance(rows, list) or len(rows) > 32:
+            raise ValueError("repair-check-state-counts-invalid")
+        grouped = {}
+        for row in rows:
+            name, count = row["state"], row["count"]
+            if (not isinstance(name, str) or not name or name in grouped
+                    or type(count) is not int or count < 0):
+                raise ValueError("repair-check-state-counts-invalid")
+            grouped[name] = count
+        if sum(grouped.values()) != total:
+            raise ValueError("repair-check-state-counts-incomplete")
+        states.append({name: count for name, count in grouped.items() if count})
+    return (*counts, *states)
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
-    """One fresh target read binds repair ownership and complete checks to the same head."""
+    """Bounded fresh pages bind complete checks to one unchanged ownership/head snapshot."""
     try:
         owner, name = REPO_SLUG.split("/")
         number = pr["number"]
         if type(number) is not int or number <= 0:
             return None
-        viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
-                     "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"], timeout=30)
-        data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
-        if not isinstance(data, dict) or data.get("errors"):
-            return None
-        return repair_target_node(pr, data["data"]["repository"]["pullRequest"])
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        cursor, cursors, seen, checks, anchor, census = None, set(), set(), [], None, None
+        for page in range(REPAIR_CHECK_PAGES):
+            args = ["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
+                    "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"]
+            if cursor is not None:
+                args += ["-f", f"cursor={cursor}"]
+            viewed = sh(args, timeout=30)
+            data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+            if not isinstance(data, dict) or data.get("errors"):
+                return None
+            live = data["data"]["repository"]["pullRequest"]
+            if isinstance(live, dict) and live.get("state") in {"MERGED", "CLOSED"}:
+                return repair_target_node(pr, live)  # Positive terminal evidence still cancels work.
+            rollup = live["commits"]["nodes"][0]["commit"]["statusCheckRollup"]
+            if rollup is None:
+                return repair_target_node(pr, live) if page == 0 else None
+            contexts = rollup["contexts"]
+            info, rows = contexts["pageInfo"], contexts["nodes"]
+            if (type(info.get("hasNextPage")) is not bool or not isinstance(rows, list)
+                    or len(rows) > 100 or (page and not rows)):
+                return None
+            # Validate every page with the normal strict target validator; this
+            # temporary page copy never escapes as complete repair authority.
+            snapshot = json.loads(json.dumps(live))
+            snapshot["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"]["pageInfo"]["hasNextPage"] = False
+            normalized = repair_target_node(pr, snapshot)
+            if normalized is None:
+                return None
+            ownership = {key: normalized[key] for key in
+                         ("number", "state", "headRefOid", "headRefName", "isInMergeQueue",
+                          "isCrossRepository", "isDraft", "mergeStateStatus", "reviewDecision", "labels")}
+            ownership["dependencyMetadataDigest"] = normalized["dependencyMetadataDigest"]
+            if anchor is not None and ownership != anchor:
+                return None  # Never splice checks across a head, queue, review or hold transition.
+            anchor = ownership
+            if page or info["hasNextPage"]:
+                current_census = repair_checks_census(contexts)
+                if current_census[0] > 100 * REPAIR_CHECK_PAGES or (census is not None and current_census != census):
+                    return None
+                census = current_census
+                ids = [row.get("id") for row in rows]
+                if (any(not isinstance(key, str) or not key for key in ids)
+                        or len(set(ids)) != len(ids) or seen.intersection(ids)):
+                    return None
+                seen.update(ids)
+            checks.extend(rows)
+            if not info["hasNextPage"]:
+                if census is not None:
+                    # Counts catch insertions before an already consumed cursor;
+                    # state counts also catch a pending transition on an earlier page.
+                    run_states, status_states = {}, {}
+                    for check in checks:
+                        if check["__typename"] == "CheckRun":
+                            state = check.get("conclusion") if check["status"] == "COMPLETED" else check["status"]
+                            grouped = run_states
+                        else:
+                            state, grouped = check["state"], status_states
+                        grouped[state] = grouped.get(state, 0) + 1
+                    if (len(checks) != census[0] or sum(run_states.values()) != census[1]
+                            or sum(status_states.values()) != census[2]
+                            or run_states != census[3] or status_states != census[4]):
+                        return None
+                return {**normalized, "statusCheckRollup": checks}
+            cursor = info.get("endCursor")
+            if not isinstance(cursor, str) or not cursor or cursor in cursors or not rows:
+                return None
+            cursors.add(cursor)
+        return None
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None
 
 
@@ -3576,6 +4062,7 @@ def repair_target_node(pr: dict, live) -> dict | None:
                             or (check["conclusion"] is not None and not isinstance(check["conclusion"], str))))):
                     return None
         fresh = {**pr, **live, "labels": labels["nodes"], "statusCheckRollup": checks}
+        fresh["dependencyMetadataDigest"] = dependency_diff.metadata_digest(live)
         fresh.pop("commits", None)
         return fresh
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
@@ -4093,13 +4580,22 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     pushed = receipt.get("verdict") == "fix-pushed"
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headAfter"),
                          "pr": receipt.get("pr")}
+    # An unreadable ownership boundary is not evidence of a coding/provider failure.
+    # Preserve the existing bounded recovery envelope and repeated-failure fingerprint.
+    target_unavailable = (receipt.get("verdict") == "reconcile-unavailable"
+                          and receipt.get("cancellation", {}).get("reason") == "target-state-unavailable")
+    evidence = {"before": pr["headRefOid"], "after": receipt.get("headAfter")}
+    if target_unavailable:
+        evidence["targetObservation"] = {key: receipt["cancellation"].get(key)
+                                       for key in ("reason", "stage", "observedState")}
     receipt["execution"] = execution_attempt.finish(
         runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], "succeeded" if pushed else "failed_known",
-        {"failureClass": None if pushed else "repair_incomplete",
+        {"failureClass": None if pushed else "target_state_unavailable" if target_unavailable else "repair_incomplete",
          "failureFingerprint": None if pushed else execution_attempt.digest(receipt.get("reasons", ["no-head-change"])),
-         "evidenceDigest": execution_attempt.digest({"before": pr["headRefOid"], "after": receipt.get("headAfter")}),
+         "evidenceDigest": execution_attempt.digest(evidence),
          "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
-         "confidence": "high", "dependencies": [name]}, coordination=coordination)
+         "confidence": "unknown" if target_unavailable else "high",
+         "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -4239,19 +4735,24 @@ def shared(key: str, ttl: float, fetch):
     if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
         return fetch()
     path = SHARED_CACHE_DIR / f"{key}.json"
-    try:
-        cached = json.loads(path.read_text())
-        if time.time() - cached["at"] < ttl:
-            return cached["value"]
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    value = fetch()
-    if value is not None:
-        SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(f".{os.getpid()}.tmp")
-        tmp.write_text(json.dumps({"at": time.time(), "value": value}))
-        os.replace(tmp, path)
-    return value
+    SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # Independent idle workers can miss the same expired cache simultaneously.
+    # Serialize the fill, then re-read under the lock; shared storage alone did
+    # not prevent duplicate GraphQL censuses consuming the installation budget.
+    with open(path.with_suffix('.lock'), 'a+') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            cached = json.loads(path.read_text())
+            if 0 <= time.time() - cached["at"] < ttl:
+                return cached["value"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        value = fetch()
+        if value is not None:
+            tmp = path.with_suffix(f".{os.getpid()}.tmp")
+            tmp.write_text(json.dumps({"at": time.time(), "value": value}))
+            os.replace(tmp, path)
+        return value
 
 
 def open_prs_summary() -> list[dict]:
@@ -4263,7 +4764,7 @@ def open_prs_summary() -> list[dict]:
     now = time.time()
     if now - _SUMMARY["at"] < SUMMARY_TTL_S:
         return _SUMMARY["prs"]
-    prs = shared("open-prs", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(THIS))
+    prs = shared("open-prs-labels-v2", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(THIS))
     if prs is None:
         _SUMMARY["readable"] = False
         return []
@@ -4300,7 +4801,7 @@ def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict
                  "createdAt": issue.created_at, "labels": issue.labels}
                 for issue in linear.active_lane_issues([SHARED_LABEL, *provider_labels])]
     try:
-        active = shared("file-overlap-tasks", SUMMARY_TTL_S, fetch_active)
+        active = shared("file-overlap-tasks-v2", SUMMARY_TTL_S, fetch_active)
     except LinearRateLimited:
         raise
     except Exception:
@@ -4984,7 +5485,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
 
 def reexec(host: Host, name: str) -> int:
     """Slot free -> pull the next piece of work now, on whatever release is current (drain-safe)."""
+    if lifecycle.draining(host.state):
+        return 0  # admitted unit finished; do not acquire another assignment
     current = host.state / "current" / "lane_runner.py"
+    lifecycle.prepare_reexec()
     os.execv(sys.executable, [sys.executable, str(current if current.exists() else Path(__file__)),
                               "worker", "--provider", name])
     return 0
@@ -4998,7 +5502,8 @@ def ensure_full_history(host: Host) -> None:
 
 
 def dispatch(host: Host) -> int:
-    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
+    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [],
+            "error": None, "admissionDenied": None}
     try:
         tick["disk"] = disk_guard.check(host)
         if autoscale.mode() != "off":
@@ -5020,6 +5525,10 @@ def dispatch(host: Host) -> int:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
         except Exception as error:  # the label scan never takes worker spawn down
             tick["remediationEventsError"] = f"{type(error).__name__}: {error}"[:200]
+            try:
+                tick["remediationEvents"] = _event_delivery_snapshot(host, time.time())
+            except Exception as status_error:
+                tick["remediationDeliveryStatusError"] = f"{type(status_error).__name__}: {status_error}"[:200]
         for name, spec in load_providers().items():
             slots = host.slots(name, spec.get("slots", 1))
             # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
@@ -5031,11 +5540,16 @@ def dispatch(host: Host) -> int:
             for _ in range(slots):
                 subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 start_new_session=True)
+                                 start_new_session=True, **lifecycle.spawn_kwargs())
                 tick["spawned"].append(name)
+    except DiskAdmissionError as error:
+        # Deliberate backpressure, not a tick fault: the doctor's disk-critical/disk-low
+        # alert already names the cause. Recording it as a tick error would raise a
+        # duplicate tick-error issue no agent can act on (JOV-8024).
+        tick["admissionDenied"] = str(error)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
-    if tick["error"]:
+    if tick["error"] or tick.get("admissionDenied"):
         # A denied tick must not launch another worker through ancillary event paths.
         return finish_dispatch(host, tick)
     try:
@@ -5066,7 +5580,7 @@ def finish_dispatch(host: Host, tick: dict) -> int:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
     except Exception as error:  # never let the doctor take dispatch down
         update_json(host.state / "tick.json", lambda data: data.update(doctorError=f"{type(error).__name__}: {error}"[:200]))
-    return 1 if tick["error"] else 0
+    return 1 if tick["error"] or tick.get("admissionDenied") else 0
 
 
 def read_marker(host: Host) -> str | None:
@@ -5205,7 +5719,7 @@ def release_identity(host: Host) -> dict:
 
 # Per-host tuning (LANES_SLOTS_DEVIN=2, SYMPHONY_FILE_OVERLAP_GUARD=flag, ...) must not reach the
 # release self-test: the fixtures assume defaults, so a tuned host refused every release.
-HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_")
+HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 
 
 def selftest_env(scratch: Path) -> dict:
@@ -5232,9 +5746,9 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+        archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
-        subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+        lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.
         scratch = staging / ".selftest-state"
         scratch.mkdir(exist_ok=True)
@@ -5244,7 +5758,7 @@ def install_release(host: Host) -> int:
             refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
             return 1
         try:
-            test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                                   cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
                                   env=selftest_env(scratch))
         except subprocess.TimeoutExpired:
@@ -5316,7 +5830,7 @@ def graphql_budget() -> tuple[int, str] | None:
         return None
 
 
-def main(argv: list[str] | None = None) -> int:
+def guarded_main(argv: list[str] | None = None) -> int:
     disk_guard.ensure_sbin_on_path()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -5324,6 +5838,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("update")
     gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
     gate.add_argument("--timeout", type=float, required=True)
+    gate.add_argument("--result-fd", type=int)
+    gate.add_argument("--separate-stderr", action="store_true")
+    gate.add_argument("--child-state")
     gate.add_argument("args", nargs=argparse.REMAINDER)
     context = sub.add_parser("context-manifest", help="check or generate the local context contract")
     context.add_argument("--write", action="store_true")
@@ -5332,13 +5849,38 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "gate-command":
         command = args.args[1:] if args.args[:1] == ["--"] else args.args
+        if args.child_state is not None:
+            os.environ["LANES_STATE"] = args.child_state
+        def report_outcome(receipt):
+            if args.result_fd is not None:
+                try:
+                    os.write(args.result_fd, json.dumps(receipt).encode())
+                except BrokenPipeError:
+                    pass  # dead controller; command is already proven drained
+                finally:
+                    os.close(args.result_fd)
         try:
-            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1).returncode
+            code = run_agent(command, Path.cwd(), sys.stdout, args.timeout, guard_interval=.1,
+                             _lifecycle_helper=True, _lifecycle_terminal=args.result_fd is not None,
+                             stderr=sys.stderr if args.separate_stderr else subprocess.STDOUT).returncode
+            report_outcome({"returncode": code, "timeout": False})
             return 125 if code == 124 else code  # 124 is reserved for a drained timeout
         except subprocess.TimeoutExpired:
+            report_outcome({"returncode": None, "timeout": True})
             return 124  # run_agent has drained its observed descendants before raising
+        except CommandNotStarted as error:
+            report_outcome({"spawnError": {"errno": error.errno,
+                            "strerror": error.strerror, "filename": error.filename}})
+            return 127
         except RunStopped:
             return 143  # explicit stop also completes the existing drain protocol
+        except devin_free_policy.FreeProofHeld as error:
+            # This policy error is returned only after run_agent drained its owned
+            # tree (or refused Popen). A cleanup failure replaces the exception and
+            # still enters the cleanup-unproven lock hold below.
+            report_outcome({"returncode": 75, "policyHeld": str(error), "timeout": False})
+            print(f"devin-free-policy-held:{error}", file=sys.stderr, flush=True)
+            return 75
         except BaseException as error:
             # A cleanup error is not proof that the descendants stopped. Keep the
             # inherited locks and leave an observable operator boundary, not a retry.
@@ -5366,6 +5908,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        host = Host()
+        arguments = sys.argv[1:] if argv is None else argv
+        with lifecycle.Guard(host.state, allow_drain=arguments[:1] == ["gate-command"]):
+            if lifecycle.draining(host.state) and arguments[:1] != ["gate-command"]:
+                return 75
+            return guarded_main(argv)
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

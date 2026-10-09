@@ -66,7 +66,10 @@ interface ClaimResponse {
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1_500;
 
-export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
+export function useOnboardingClaim(
+  claimTrigger = 0,
+  enabled = true
+): ClaimStatus {
   const { isLoaded, isSignedIn } = useAuthSafe();
   const router = useRouter();
   const [status, setStatus] = useState<ClaimStatus>('idle');
@@ -75,7 +78,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
   const claimedRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!enabled || !isLoaded || !isSignedIn) return;
     if (claimedRef.current) return;
     if (completedTriggersRef.current.has(claimTrigger)) return;
     // Prevent duplicate in-flight requests for the same trigger value.
@@ -247,7 +250,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
     // The router closure value is always current for the navigate-on-claim
     // path because navigation only happens after a successful fetch response,
     // long after any router reference churn would have settled.
-  }, [claimTrigger, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [claimTrigger, enabled, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return status;
 }

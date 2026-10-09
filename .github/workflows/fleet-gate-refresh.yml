@@ -24,8 +24,7 @@ name: Fleet Gate Refresh
 
 on:
   repository_dispatch:
-    # Signed JOV Triage events bridged by /api/webhooks/linear. Keyed per
-    # issue so a receipt refresh cannot cancel an in-flight assessment.
+    # Signed JOV Triage events bridged by /api/webhooks/linear.
     types: [linear_triage_assess]
   push:
     branches: [main]
@@ -37,8 +36,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event_name == 'repository_dispatch' && format('fleet-gate-triage-{0}', github.event.client_payload.issue_identifier) || 'fleet-gate-receipt' }}
-  cancel-in-progress: true
+  # The catch-up and exact-event path share one writer fence. Never cancel a
+  # paid assessment or a status mutation midway through its readback.
+  group: fleet-gate-receipt
+  cancel-in-progress: false
 
 jobs:
   refresh:
@@ -100,13 +101,13 @@ jobs:
           permission-contents: read
           permission-pull-requests: read
       - name: Checkout exact main gate code
-        if: steps.debounce.outputs.skip != 'true'
+        id: main-checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
       - name: Setup Node.js
-        if: steps.debounce.outputs.skip != 'true'
+        id: main-node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -158,11 +159,61 @@ jobs:
           fi
           timeout 90s node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/backlog-orchestrator.mjs" remediate
 
+      - name: Recover missed Linear Triage events
+        # Independent of the receipt debounce and new-work admission. A missed
+        # webhook must not wait for another issue edit or a main push.
+        # Preserve upstream failures while recovering after their bounded timeout.
+        # Candidate or incomplete checkout/setup must never execute this writer.
+        if: >-
+          always() &&
+          steps.main-checkout.outcome == 'success' &&
+          steps.main-node.outcome == 'success'
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-catch-up.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          linear_env="${HOME}/.config/jovie-lanes/linear.env"
+          [[ -r "$linear_env" ]] || linear_env="${HOME}/.config/symphony/linear.env"
+          if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
+            LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
+            export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
+          fi
+          test -n "${LINEAR_API_KEY:-}"
+          set -a
+          source "${HOME}/.config/symphony/summer-bottleneck.env"
+          source "${HOME}/.config/symphony/summer-bottleneck-signing.env"
+          set +a
+          timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs \
+            --sweep > "$RECEIPT_FILE"
+
+      - name: Wake existing picker after catch-up Todo transitions
+        if: always()
+        env:
+          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-catch-up.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s "$RECEIPT_FILE" ]] && jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
+            curl --fail --silent --show-error --max-time 5 \
+              -H 'content-type: application/json' -d '{}' \
+              http://127.0.0.1:4041/api/v1/refresh
+          fi
+
+      - name: Preserve Triage catch-up receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linear-triage-catch-up-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/linear-triage-catch-up.json
+          if-no-files-found: warn
+          retention-days: 14
+
   # Retired linear-triage-assessment.yml; signed Linear Issue events are bridged
   # by /api/webhooks/linear. This job rereads the exact current issue on Gem,
   # records its disposition, and wakes the lanes picker only after the existing
   # reconciler moves it to Todo. It does not select workers or bypass
-  # Summer/fleet gates. Per-issue ordering is the fleet-gate-triage group.
+  # Summer/fleet gates. Events and catch-up share the same mutation fence.
   assess:
     name: Assess exact Linear Triage event
     if: github.event_name == 'repository_dispatch'

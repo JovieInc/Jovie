@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -14,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   assertOfficialSymphonyFeed,
   buildRemediationReceipt,
+  CAPACITY_MAX_AGE_MS,
   CAPACITY_SCHEMA,
   CLEAN_STREAK_REQUIRED,
   classifyRemediationCandidate,
@@ -21,9 +23,12 @@ import {
   feedOfficialSymphony,
   findWorkpadComment,
   inventoryBacklog,
+  isErroredPullRequest,
   OFFICIAL_SYMPHONY_REFRESH_URL,
+  pullRequestRates,
   REMEDIATION_SCHEMA,
   readHostPressure,
+  readLanesCapacity,
   upsertRemediationWorkpad,
   WORKPAD_HEADING,
   WORKPAD_PREFIX,
@@ -111,6 +116,59 @@ function receiptFor(issues, options = {}) {
 }
 
 describe('official Symphony backlog remediation', () => {
+  it('keeps draft PRs in the issue attribution so a draft-only issue is not PR-less', () => {
+    // JOV-8000 follow-up 9 (a)1: the collector keeps drafts in the inventory
+    // (only pullRequestRates excludes them); inventoryBacklog maps them, so
+    // an issue whose only open PR is a draft still has an open PR and is not
+    // re-selected, and a duplicate PR row does not split the issue.
+    const draftOnly = inventoryBacklog([issue('JOV-30')], {
+      pullRequests: [
+        {
+          number: 7,
+          state: 'OPEN',
+          title: 'fix JOV-30',
+          headRefName: 'symphony/JOV-30',
+          body: 'JOV-30',
+          isDraft: true,
+          mergeStateStatus: 'DIRTY',
+          mergeable: false,
+          labels: [],
+        },
+      ],
+    });
+    assert.deepEqual(draftOnly.rows[0].openPullRequests, [7]);
+    const splitCheck = inventoryBacklog([issue('JOV-31')], {
+      pullRequests: [
+        {
+          number: 8,
+          state: 'OPEN',
+          title: 'fix JOV-31',
+          headRefName: 'symphony/JOV-31',
+          body: 'JOV-31',
+          isDraft: false,
+          mergeable: true,
+          mergeStateStatus: 'CLEAN',
+          labels: [],
+        },
+        {
+          number: 8,
+          state: 'OPEN',
+          title: 'fix JOV-31 (duplicate row)',
+          headRefName: 'symphony/JOV-31',
+          body: 'JOV-31',
+          isDraft: false,
+          mergeable: true,
+          mergeStateStatus: 'CLEAN',
+          labels: [],
+        },
+      ],
+    });
+    // Defense in depth (follow-up 10): inventoryBacklog dedupes by PR
+    // number while building byIssue, so duplicated rows never split the
+    // issue — one entry per PR.
+    assert.deepEqual(splitCheck.rows[0].openPullRequests, [8]);
+  });
+
   it('inventories Linear issues against open and merged GitHub PRs', () => {
     const inventory = inventoryBacklog(
       [
@@ -342,14 +400,283 @@ describe('official Symphony backlog remediation', () => {
     );
     assert.equal(conflicts.reason, 'pr-conflict-rate-high');
 
+    // JOV-8000 follow-up 9: auditable rates — the population excludes drafts
+    // and label-quarantined rows (queue-poison, hold; `gated` stays counted),
+    // BEHIND is not a conflict, UNKNOWN never counts as conflicting/clean/
+    // errored, and the rates list PR numbers with the excluded breakdown.
+    const fleet = [
+      {
+        number: 1,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+      {
+        number: 2,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 3,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'BEHIND',
+      },
+      {
+        number: 4,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'UNSTABLE',
+        statusCheckRollup: { state: 'SUCCESS' },
+      },
+      {
+        number: 5,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'UNSTABLE',
+        statusCheckRollup: { state: 'FAILURE' },
+      },
+      {
+        number: 6,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'UNKNOWN',
+        mergeStateStatus: 'UNKNOWN',
+      },
+      {
+        number: 7,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'queue-poison' }],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+      {
+        number: 8,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'hold' }],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 9,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'gated' }],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 10,
+        state: 'OPEN',
+        isDraft: true,
+        labels: [],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+    ];
+    const auditable = pullRequestRates(fleet);
+    assert.equal(auditable.total, 7);
+    assert.deepEqual(auditable.conflictingPullRequests, [1]);
+    assert.deepEqual(auditable.erroredPullRequests, [5]);
+    assert.deepEqual(auditable.unknownPullRequests, [6]);
+    assert.deepEqual(auditable.excluded.draft, [10]);
+    assert.deepEqual(auditable.excluded.quarantined, [7, 8]);
+    assert.equal(auditable.conflictRate, 1 / 7);
+    assert.equal(auditable.errorRate, 1 / 7);
+    // Error definition: UNSTABLE with a SUCCESS rollup is NOT errored;
+    // rollup FAILURE IS errored regardless of mergeStateStatus.
+    assert.equal(isErroredPullRequest(fleet[3]), false);
+    assert.equal(isErroredPullRequest(fleet[4]), true);
+    assert.equal(isErroredPullRequest({ mergeStateStatus: 'UNSTABLE' }), false);
+    assert.equal(
+      isErroredPullRequest({ statusCheckRollup: { state: 'FAILURE' } }),
+      true
+    );
+    assert.equal(
+      isErroredPullRequest({ reviewDecision: 'CHANGES_REQUESTED' }),
+      false
+    );
+    // UNKNOWN rows fail the gate closed above a 20% share, never silently
+    // counted as clean or conflicting.
+    const unknownHeavy = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+        ],
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(unknownHeavy.reason, 'pr-mergeability-unknown');
+    // Follow-up 10: a missing rollup fetch NEVER reads as zero errored —
+    // the prRollups:false signal fails the gate closed with the named cause.
+    const rollupMissing = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+        ],
+        prRollups: false,
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(rollupMissing.allowed, false);
+    assert.equal(rollupMissing.reason, 'pr-check-rollup-unavailable');
+    // mergeable CONFLICTING counts as a conflict even with a CLEAN
+    // mergeStateStatus (gh computes mergeable as MERGEABLE/CONFLICTING/UNKNOWN).
+    const mergeableConflicting = pullRequestRates([
+      {
+        number: 1,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'CONFLICTING',
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 2,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+      },
+    ]);
+    assert.deepEqual(mergeableConflicting.conflictingPullRequests, [1]);
+    assert.equal(mergeableConflicting.conflictRate, 0.5);
+    const unknownLight = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 4,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 5,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+        ],
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.notEqual(unknownLight.reason, 'pr-mergeability-unknown');
+
     const missing = evaluateRuntimeCapacity(
       { schema: CAPACITY_SCHEMA, observedAt: NOW },
       { now: NOW }
     );
-    assert.equal(
+    assert.match(
       missing.reason,
-      'capacity-evidence-missing-malformed-or-stale'
+      /^capacity-evidence-missing-malformed-or-stale:/
     );
+    assert.deepEqual(missing.gaps, [
+      'workers',
+      'provider',
+      'cloneLatencyMs',
+      'ci',
+      'mergeQueue',
+      'pullRequests',
+    ]);
+
+    const providerUnknown = evaluateRuntimeCapacity(
+      healthySignals({ provider: null }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(
+      providerUnknown.reason,
+      'capacity-evidence-missing-malformed-or-stale:provider'
+    );
+    assert.deepEqual(providerUnknown.gaps, ['provider']);
 
     const warming = evaluateRuntimeCapacity(healthySignals(), {
       now: NOW,
@@ -464,33 +791,36 @@ describe('official Symphony backlog remediation', () => {
     assert.equal(overloaded.allowed, false);
   });
 
-  it('writes a single workpad matrix and feeds only the official Elixir Symphony refresh', async () => {
+  it('writes a single workpad matrix and records the event-driven lanes feed', async () => {
     const built = receiptFor([issue('JOV-50')]);
     assert.match(built.workpad, new RegExp(`^${WORKPAD_HEADING}`));
     assert.match(built.workpad, new RegExp(WORKPAD_PREFIX));
     assert.match(built.workpad, new RegExp(WORKPAD_HEADING));
     assert.match(built.workpad, /JOV-50/);
-    assert.match(built.workpad, /official Elixir Symphony/);
-    assert.equal(built.feed.refreshUrl, OFFICIAL_SYMPHONY_REFRESH_URL);
+    // JOV-8000: the Elixir :4041 feed is retired; the lanes are event-driven.
+    assert.match(built.workpad, /shipping lanes \(event-driven tick/);
+    assert.doesNotMatch(built.workpad, /official Elixir Symphony/);
+    assert.equal(built.feed.refreshUrl, null);
+    assert.equal(built.feed.owner, 'shipping-lanes');
     assert.equal(built.feed.homemadeWrappers, 'forbidden');
-    assert.equal(
-      assertOfficialSymphonyFeed(OFFICIAL_SYMPHONY_REFRESH_URL),
-      OFFICIAL_SYMPHONY_REFRESH_URL
-    );
+    // The official constant survives for legacy readers; new feed calls pass
+    // no URL. Any homemade endpoint is forbidden.
     assert.throws(
       () => assertOfficialSymphonyFeed('http://127.0.0.1:9999/homemade'),
       /homemade-symphony-admission-forbidden/
     );
-    const fed = await feedOfficialSymphony({
+    assert.equal(assertOfficialSymphonyFeed(null), '');
+    const fed = await feedOfficialSymphony({ url: null });
+    assert.equal(fed.status, 'event-driven');
+    assert.deepEqual(fed.operations, ['minute-timer', 'worker-reexec']);
+    // An explicit legacy URL still routes through the guarded POST path.
+    const legacyFed = await feedOfficialSymphony({
       fetchImpl: async url => {
         assert.equal(url, OFFICIAL_SYMPHONY_REFRESH_URL);
-        return {
-          ok: true,
-          json: async () => ({ queued: true, operations: ['poll'] }),
-        };
+        return Response.json({ queued: true, operations: ['poll'] });
       },
     });
-    assert.equal(fed.status, 'queued');
+    assert.equal(legacyFed.status, 'queued');
 
     const comments = [];
     const result = await upsertRemediationWorkpad({
@@ -581,7 +911,6 @@ describe('official Symphony backlog remediation', () => {
   it('does not revive homemade Symphony admission or JOV-5466 wrappers', () => {
     assert.match(MODULE, /JOV-5466/);
     assert.match(MODULE, /homemadeWrappers: 'forbidden'/);
-    assert.match(MODULE, /official-elixir-symphony/);
     assert.doesNotMatch(MODULE, /custom-symphony-controller\s*=/);
     assert.match(ORCHESTRATOR, /backlog-remediation/);
     const workflow = readFileSync(
@@ -598,5 +927,162 @@ describe('official Symphony backlog remediation', () => {
     assert.match(workflow, /backlog-orchestrator\.mjs" remediate/);
     assert.doesNotMatch(workflow, /run-backlog\.sh/);
     assert.doesNotMatch(workflow, /JOV-5466/);
+  });
+});
+
+describe('lanes-measured capacity evidence (JOV-8000)', () => {
+  const NOW_MS = Date.parse('2026-10-08T12:00:00.000Z');
+  const lanesDoctorReport = overrides => ({
+    at: '2026-10-08T11:59:59Z',
+    alerts: {},
+    issues: {},
+    conditions: {},
+    observed: {
+      now: NOW_MS / 1000 - 30,
+      capacityByProvider: {
+        devin: { slots: 4, running: 1, base: 4 },
+        codex: { slots: 3, running: 2, base: 3 },
+        claude: { slots: 2, running: 0, base: 2 },
+      },
+      codexAttribution: {
+        state: 'unleased-available',
+        count: 5,
+        leased: 2,
+        eligibleByCooldown: 4,
+        unleasedAvailable: 3,
+        quotaBanked: 0,
+      },
+      ...overrides,
+    },
+  });
+
+  const writeReport = (dir, report, ageMs = 30_000) => {
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'doctor.json');
+    writeFileSync(path, JSON.stringify(report));
+    const past = new Date(NOW_MS - ageMs);
+    execFileSync('touch', ['-d', past.toISOString(), path]);
+  };
+
+  it('maps the doctor report to measured workers and provider evidence', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+    try {
+      writeReport(dir, lanesDoctorReport(), 30_000);
+      const capacity = readLanesCapacity({ lanesStateDir: dir, nowMs: NOW_MS });
+      assert.deepEqual(capacity.workers, {
+        running: 3,
+        retrying: 0,
+        maxConcurrent: 9,
+      });
+      assert.deepEqual(capacity.provider, { accounts: 5, ready: 4 });
+      assert.equal(capacity.source, 'lanes-doctor-report');
+      assert.equal(typeof capacity.observedAt, 'string');
+      const required = evaluateRuntimeCapacity(
+        {
+          schema: CAPACITY_SCHEMA,
+          observedAt: new Date(NOW_MS).toISOString(),
+          ...capacity,
+          host: healthySignals().host,
+          cloneLatencyMs: 800,
+          ci: { saturating: false, running: 2, queued: 0 },
+          pullRequests: [],
+          mergeQueue: { health: 'healthy', entries: 1 },
+        },
+        {
+          now: new Date(NOW_MS).toISOString(),
+          previousCleanStreak: CLEAN_STREAK_REQUIRED,
+        }
+      );
+      assert.equal(required.allowed, true);
+      assert.equal(required.cohortSize, 6);
+      assert.equal(required.reason, 'capacity-available');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when the doctor report is missing, stale, or malformed', () => {
+    const missing = readLanesCapacity({
+      lanesStateDir: join(tmpdir(), 'lanes-capacity-absent'),
+      nowMs: NOW_MS,
+    });
+    assert.equal(missing, null);
+
+    const staleDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+    try {
+      writeReport(staleDir, lanesDoctorReport(), CAPACITY_MAX_AGE_MS + 60_000);
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: staleDir, nowMs: NOW_MS }),
+        null
+      );
+
+      const malformedDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+      writeReport(malformedDir, { observed: { capacityByProvider: [] } });
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: malformedDir, nowMs: NOW_MS }),
+        null
+      );
+
+      const badSeatsDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+      writeReport(
+        badSeatsDir,
+        lanesDoctorReport({ capacityByProvider: { codex: { slots: 3 } } })
+      );
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: badSeatsDir, nowMs: NOW_MS }),
+        null
+      );
+
+      const emptySeatsDir = mkdtempSync(join(tmpdir(), 'lanes-capacity-'));
+      writeReport(
+        emptySeatsDir,
+        lanesDoctorReport({
+          capacityByProvider: { codex: { slots: 0, running: 0 } },
+        })
+      );
+      assert.equal(
+        readLanesCapacity({ lanesStateDir: emptySeatsDir, nowMs: NOW_MS }),
+        null
+      );
+    } finally {
+      rmSync(staleDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the lanes doctor report as the primary orchestrator capacity source', () => {
+    assert.match(ORCHESTRATOR, /backlogRemediation\.readLanesCapacity\(\)/);
+    assert.match(MODULE, /source: 'lanes-doctor-report'/);
+    // A fresh lanes report with an unknown codex attribution (status-probe
+    // error) still yields worker seats; the provider signal then falls back
+    // to codex-rotate account evidence instead of blanking the whole receipt.
+    assert.match(
+      ORCHESTRATOR,
+      /\(lanes && lanes\.provider\) \|\| rotateProvider\(\)/
+    );
+    const attributionUnknown = readLanesCapacity({
+      lanesStateDir: (() => {
+        const dir = mkdtempSync(join(tmpdir(), 'lanes-capacity-unknown-'));
+        writeReport(dir, {
+          at: '2026-10-08T11:59:59Z',
+          alerts: {},
+          observed: {
+            now: NOW_MS / 1000 - 30,
+            capacityByProvider: { codex: { slots: 3, running: 2, base: 3 } },
+            codexAttribution: {
+              state: 'unknown',
+              reason: 'account-status-unavailable',
+            },
+          },
+        });
+        return dir;
+      })(),
+      nowMs: NOW_MS,
+    });
+    assert.equal(attributionUnknown.provider, null);
+    assert.deepEqual(attributionUnknown.workers, {
+      running: 2,
+      retrying: 0,
+      maxConcurrent: 3,
+    });
   });
 });

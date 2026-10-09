@@ -66,7 +66,11 @@ async function resolveProfileRailSeed(clerkUserId: string): Promise<{
   }
 }
 
-export async function OpportunityInboxRoute() {
+export async function OpportunityInboxRoute({
+  initialView = 'needs',
+}: {
+  readonly initialView?: 'needs' | 'done';
+} = {}) {
   const clerkUserId = await loadAuthenticatedAppShellUserId({
     route: APP_ROUTES.DASHBOARD,
   });
@@ -118,8 +122,10 @@ export async function OpportunityInboxRoute() {
 
   return (
     <OpportunityInboxPageClient
-      key={clerkUserId}
+      key={`${clerkUserId}:${profileRailSeed.profileId ?? 'no-profile'}`}
       inbox={inbox}
+      profileId={profileRailSeed.profileId}
+      initialView={initialView}
       initialLinks={initialLinks}
       connectedDSPs={connectedDSPs}
     />

@@ -26,7 +26,10 @@ import {
   type OvieCertificationDecisionKind,
   type OvieCertificationRow,
 } from '@/lib/ovie/certifications/types';
-import { canStartWalkthrough } from '@/lib/ovie/certifications/walkthrough';
+import {
+  canStartWalkthrough,
+  walkthroughEvidenceHref,
+} from '@/lib/ovie/certifications/walkthrough';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import {
   CertificationStateGlyph,
@@ -103,30 +106,33 @@ function EvidenceSection({ row }: { readonly row: OvieCertificationRow }) {
               </div>
               {items.length > 0 ? (
                 <ul className='space-y-1 pl-4.5'>
-                  {items.map(item => (
-                    <li
-                      key={`${item.tier}:${item.id}`}
-                      className='flex min-w-0 items-start gap-2'
-                    >
-                      <CertificationTierGlyph
-                        tier={item.tier}
-                        status={item.status}
-                        className='mt-1'
-                      />
-                      <div className='min-w-0 flex-1'>
-                        <p className='text-xs leading-4 text-secondary-token'>
-                          {item.summary || item.id}
-                        </p>
-                        {item.href ? (
-                          <EvidenceLink href={item.href} label={item.ref} />
-                        ) : item.ref ? (
-                          <p className='truncate text-2xs text-tertiary-token'>
-                            {item.ref}
+                  {items.map(item => {
+                    const href = walkthroughEvidenceHref(item);
+                    return (
+                      <li
+                        key={`${item.tier}:${item.id}`}
+                        className='flex min-w-0 items-start gap-2'
+                      >
+                        <CertificationTierGlyph
+                          tier={item.tier}
+                          status={item.status}
+                          className='mt-1'
+                        />
+                        <div className='min-w-0 flex-1'>
+                          <p className='text-xs leading-4 text-secondary-token'>
+                            {item.summary || item.id}
                           </p>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
+                          {href ? (
+                            <EvidenceLink href={href} label={item.ref} />
+                          ) : item.ref ? (
+                            <p className='truncate text-2xs text-tertiary-token'>
+                              {item.ref}
+                            </p>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : null}
             </li>
@@ -183,6 +189,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
   return (
     <DrawerSection
       title='History'
+      defaultOpen={false}
       surface='card'
       testId='certification-history'
     >
@@ -218,7 +225,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
 
 function SourceSection({ row }: { readonly row: OvieCertificationRow }) {
   return (
-    <DrawerSection title='Source' surface='card'>
+    <DrawerSection title='Source' surface='card' defaultOpen={false}>
       <div className='space-y-1'>
         <DrawerPropertyRow
           label='Subject'

@@ -1,21 +1,15 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { OnboardingShell } from '@/components/features/onboarding/OnboardingShell';
+import { OnboardingSessionBoundary } from '@/components/features/onboarding/OnboardingSessionBoundary';
 import { getStartRouteRedirect } from '@/lib/auth/access-route-redirect';
 import { auth } from '@/lib/auth/better-auth';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
-import {
-  type AuthGateResult,
-  getWaitlistAccess,
-  resolveUserState,
-} from '@/lib/auth/gate';
+import { resolveUserState } from '@/lib/auth/gate';
 import { captureWarning } from '@/lib/error-tracking';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.server';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
-import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
-import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
 /**
  * Canonical onboarding chat entry point.
@@ -40,43 +34,6 @@ export const metadata: Metadata = {
   description: 'Start your artist profile in one conversation.',
   robots: { index: false, follow: false },
 };
-
-async function resolveStartPageRedirect(
-  authResult: AuthGateResult
-): Promise<string | null> {
-  if (authResult.state !== CanonicalUserState.WAITLIST_PENDING) {
-    return getStartRouteRedirect(authResult.state);
-  }
-
-  // JOV-6449: with the launch gate off, waitlist table reads are irrelevant
-  // and must not 500 /start. Canonical WAITLIST_PENDING still goes to the
-  // receipt so already-waitlisted accounts stay gated.
-  // JOV-5225: the gate check and entry lookup are advisory refinement on top
-  // of the canonical state — if either read fails, fall back to the canonical
-  // redirect instead of 500-ing the signup golden path.
-  try {
-    const waitlistGateEnabled = await isWaitlistGateEnabled();
-    if (!waitlistGateEnabled) {
-      return getStartRouteRedirect(authResult.state);
-    }
-
-    const email = authResult.context.email;
-    if (!email) return null;
-
-    const access = await getWaitlistAccess(email);
-    if (!access.entryId || !isWaitlistPendingStatus(access.status)) {
-      return null;
-    }
-  } catch (error) {
-    await captureWarning(
-      '[start] waitlist gate/entry read failed; falling back to canonical redirect',
-      error,
-      { operation: 'resolveStartPageRedirect' }
-    );
-  }
-
-  return getStartRouteRedirect(authResult.state);
-}
 
 /**
  * Approved synthetic principals (JOV-7697) get Cloudflare's test sitekey so
@@ -121,7 +78,7 @@ export default async function StartPage(
       ? Promise.resolve(null)
       : resolveStartEntryProfile(params),
   ]);
-  const startRedirect = await resolveStartPageRedirect(authResult);
+  const startRedirect = getStartRouteRedirect(authResult.state);
   if (startRedirect) {
     redirect(startRedirect);
   }
@@ -130,7 +87,7 @@ export default async function StartPage(
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
 
   return (
-    <OnboardingShell
+    <OnboardingSessionBoundary
       isSignedIn={isSignedIn}
       turnstileTestMode={turnstileTestMode}
       intentId={intentId}

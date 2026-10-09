@@ -15,6 +15,7 @@ const ANSI = /\u001b\[[0-9;]*m/g;
 // GitHub log lines are `<job>\t<step>\t<ISO time> <text>`; keep only the text.
 const LOG_PREFIX = /^.*?\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/;
 const DEPRECATION = /\bdeprecat(ed|ion)\b|\[DEP\d{4}\]/i;
+// Ref names may contain "deprecated" without reporting a deprecation warning.
 const GIT_REF_UPDATE =
   /^(?:[+*!=t-]\s+)?(?:\[(?:new branch|new tag|deleted|up to date|rejected|tag update)\]|[0-9a-f]+\.\.\.?[0-9a-f]+)\s+\S+\s+->\s+\S+(?:\s+\(.*\))?$/i;
 // ponytail: 10 per run caps Linear spam if a toolchain bump floods warnings.

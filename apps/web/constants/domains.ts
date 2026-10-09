@@ -20,23 +20,11 @@ export const STAGING_HOSTNAMES = new Set([
   `main.${HOSTNAME}`, // Legacy staging hostname
 ]);
 
-/** @deprecated Use HOSTNAME instead */
-export const PROFILE_HOSTNAME = HOSTNAME;
-
-/** @deprecated Use HOSTNAME instead - now same as PROFILE_HOSTNAME */
-export const APP_HOSTNAME = publicEnv.NEXT_PUBLIC_APP_HOSTNAME;
-
 /** Admin email domain - emails ending with this domain get admin access */
 export const ADMIN_EMAIL_DOMAIN = publicEnv.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN;
 
 /** Base URL (https://jov.ie) */
 export const BASE_URL = publicEnv.NEXT_PUBLIC_PROFILE_URL;
-
-/** @deprecated Use BASE_URL instead */
-export const PROFILE_URL = BASE_URL;
-
-/** @deprecated Use BASE_URL instead */
-export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL;
 
 // ============================================================================
 // Helper Functions

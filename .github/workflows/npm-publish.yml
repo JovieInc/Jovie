@@ -397,7 +397,9 @@ jobs:
             'process.stdout.write(encodeURIComponent(process.env.PACKAGE_NAME))')"
 
           registry_status=000
-          for attempt in {1..12}; do
+          # npm trusted publishing can acknowledge a release several minutes
+          # before the version is readable from the public registry.
+          for attempt in {1..60}; do
             registry_status="$(curl --silent --show-error \
               --connect-timeout 10 \
               --max-time 30 \

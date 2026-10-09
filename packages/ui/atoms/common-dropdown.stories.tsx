@@ -59,6 +59,44 @@ export const SimpleActionMenu: Story = {
   },
 };
 
+export const LargeActionChooser: Story = {
+  args: {
+    items: Array.from({ length: 13 }, (_, index) => ({
+      type: 'action' as const,
+      id: `destination-${index}`,
+      label: `Destination ${index + 1}`,
+      onClick: () => undefined,
+    })),
+  },
+};
+
+export const DeepActionChooser: Story = {
+  args: {
+    items: [
+      {
+        type: 'submenu',
+        id: 'share',
+        label: 'Share',
+        items: [
+          {
+            type: 'submenu',
+            id: 'export',
+            label: 'Export',
+            items: [
+              {
+                type: 'action',
+                id: 'csv',
+                label: 'CSV',
+                onClick: () => undefined,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
 /**
  * Action menu with badges, subtext, and shortcuts
  */

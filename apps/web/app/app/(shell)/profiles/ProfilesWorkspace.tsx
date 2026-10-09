@@ -40,6 +40,18 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
+  PresenceSignalList,
+  PresenceStatusBadge,
+} from '@/components/features/presence/PresenceStatusParts';
+import styles from '@/components/features/presence/presence-workspace.module.css';
+import { CREATOR_PRESENCE_ADAPTER } from '@/components/features/presence/workspace-adapters';
+import {
+  PresenceWorkspaceBoundary,
+  type PresenceWorkspaceScope,
+  presenceWorkspaceScopeKey,
+  usePresenceWorkspaceController,
+} from '@/components/features/presence/workspace-controller';
+import {
   DrawerAnalyticsSummaryCard,
   DrawerSection,
   EntityHeader,
@@ -67,13 +79,11 @@ import {
   getPresencePlatformLabel,
 } from '@/lib/profile-surfaces/presence-identity';
 import {
-  filterProfileWorkspaceRows,
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
   getPresenceSignals,
   selectPresenceReviewRows,
-  sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import {
   FetchError,
@@ -104,8 +114,6 @@ import {
   PresenceOutcomeStrip as PresenceOutcomeBoard,
   presenceFilterForGroup,
 } from './PresenceOutcomes';
-import { PresenceSignalList, PresenceStatusBadge } from './PresenceStatusParts';
-import styles from './profiles-workspace.module.css';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
 type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested' | 'review';
@@ -181,8 +189,15 @@ const SUGGESTED_CONNECTION_SKELETON_IDS = [
   'suggested-connection-loading-3',
 ] as const;
 
-function connectionSuggestionsQueryKey(profileId: string) {
-  return [...queryKeys.suggestions.list(profileId), 'connections-review'];
+function connectionSuggestionsQueryKey(
+  profileId: string,
+  scope: PresenceWorkspaceScope
+) {
+  return [
+    ...queryKeys.suggestions.list(profileId),
+    'connections-review',
+    presenceWorkspaceScopeKey(scope),
+  ];
 }
 
 function isConnectionSuggestion(
@@ -1169,11 +1184,25 @@ function SuggestedConnectionsReview({
 
 export function ProfilesWorkspace({
   data,
-}: Readonly<{ data: ProfilesWorkspaceData | null }>) {
-  const [filter, setFilter] = useState<ProfilesWorkspaceView>(() =>
-    selectPresenceReviewRows(data?.rows ?? []).length > 0 ? 'review' : 'all'
+  scope,
+}: Readonly<{
+  data: ProfilesWorkspaceData | null;
+  scope: PresenceWorkspaceScope;
+}>) {
+  return (
+    <PresenceWorkspaceBoundary scope={scope}>
+      <ProfilesWorkspaceContent data={data} scope={scope} />
+    </PresenceWorkspaceBoundary>
   );
-  const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
+}
+
+function ProfilesWorkspaceContent({
+  data,
+  scope,
+}: Readonly<{
+  data: ProfilesWorkspaceData | null;
+  scope: PresenceWorkspaceScope;
+}>) {
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
   const [pendingCandidate, setPendingCandidate] =
     useState<ConnectionIntakeCandidate | null>(null);
@@ -1182,6 +1211,55 @@ export function ProfilesWorkspace({
   const [acceptedSuggestionRows, setAcceptedSuggestionRows] = useState<
     ProfileWorkspaceSurfaceRow[]
   >([]);
+  const persistedAcceptedRows = useMemo(() => {
+    const currentSurfaceKeys = new Set(
+      (data?.rows ?? [])
+        .filter(row => row.rowType === 'surface')
+        .map(row => `${row.platform}:${row.url}`)
+    );
+
+    return acceptedSuggestionRows.filter(
+      row => !currentSurfaceKeys.has(`${row.platform}:${row.url}`)
+    );
+  }, [acceptedSuggestionRows, data?.rows]);
+  const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
+    if (!pendingCandidate) return null;
+    return {
+      id: `preview:${pendingCandidate.id}`,
+      rowType: 'surface',
+      kind:
+        pendingCandidate.category === 'website'
+          ? 'website'
+          : pendingCandidate.category,
+      platform: pendingCandidate.platformId,
+      label: pendingCandidate.title,
+      handle: 'Preview only · not saved',
+      url: pendingCandidate.url,
+      trackedUrl: null,
+      qualificationStatus: 'suggested',
+      isOfficial: false,
+      monitoringState: 'unavailable',
+      rank: null,
+      previousRank: null,
+      lastObservedAt: null,
+    };
+  }, [pendingCandidate]);
+  const sourceRows = useMemo(
+    () =>
+      pendingRow
+        ? [pendingRow, ...persistedAcceptedRows, ...(data?.rows ?? [])]
+        : [...persistedAcceptedRows, ...(data?.rows ?? [])],
+    [pendingRow, persistedAcceptedRows, data?.rows]
+  );
+  const { filter, setFilter, selected, setSelected, rows } =
+    usePresenceWorkspaceController({
+      sourceRows,
+      adapter: CREATOR_PRESENCE_ADAPTER,
+      initialFilter:
+        selectPresenceReviewRows(data?.rows ?? []).length > 0
+          ? 'review'
+          : 'all',
+    });
   const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
@@ -1190,8 +1268,8 @@ export function ProfilesWorkspace({
   const queryClient = useQueryClient();
   const profileId = data?.profileId ?? null;
   const connectionSuggestionKey = useMemo(
-    () => connectionSuggestionsQueryKey(profileId ?? ''),
-    [profileId]
+    () => connectionSuggestionsQueryKey(profileId ?? '', scope),
+    [profileId, scope]
   );
   const connectionSuggestionsQuery = useQuery({
     ...STANDARD_CACHE,
@@ -1231,7 +1309,7 @@ export function ProfilesWorkspace({
     setIsAddConnectionOpen(false);
     setFilter('suggested');
     router.replace(APP_ROUTES.PRESENCE);
-  }, [router, searchParams]);
+  }, [router, searchParams, setFilter, setSelected]);
   useEffect(() => {
     const target = pendingSuggestionFocusTargetRef.current;
     if (!target) return;
@@ -1257,17 +1335,6 @@ export function ProfilesWorkspace({
       },
     []
   );
-  const persistedAcceptedRows = useMemo(() => {
-    const currentSurfaceKeys = new Set(
-      (data?.rows ?? [])
-        .filter(row => row.rowType === 'surface')
-        .map(row => `${row.platform}:${row.url}`)
-    );
-
-    return acceptedSuggestionRows.filter(
-      row => !currentSurfaceKeys.has(`${row.platform}:${row.url}`)
-    );
-  }, [acceptedSuggestionRows, data?.rows]);
   const handleSuggestionAction = useCallback(
     async (suggestion: ConnectionSuggestion, action: SuggestionAction) => {
       if (!profileId) return;
@@ -1358,46 +1425,13 @@ export function ProfilesWorkspace({
       setSelected(null);
       router.refresh();
     },
-    [router]
+    [router, setSelected]
   );
-  const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
-    if (!pendingCandidate) return null;
-    return {
-      id: `preview:${pendingCandidate.id}`,
-      rowType: 'surface',
-      kind:
-        pendingCandidate.category === 'website'
-          ? 'website'
-          : pendingCandidate.category,
-      platform: pendingCandidate.platformId,
-      label: pendingCandidate.title,
-      handle: 'Preview only · not saved',
-      url: pendingCandidate.url,
-      trackedUrl: null,
-      qualificationStatus: 'suggested',
-      isOfficial: false,
-      monitoringState: 'unavailable',
-      rank: null,
-      previousRank: null,
-      lastObservedAt: null,
-    };
-  }, [pendingCandidate]);
-  const rows = useMemo(() => {
-    if (filter === 'suggested') return [];
-    const sourceRows = pendingRow
-      ? [pendingRow, ...persistedAcceptedRows, ...(data?.rows ?? [])]
-      : [...persistedAcceptedRows, ...(data?.rows ?? [])];
-    return sortProfileWorkspaceRows(
-      filter === 'review'
-        ? selectPresenceReviewRows(sourceRows)
-        : filterProfileWorkspaceRows(sourceRows, filter)
-    );
-  }, [data?.rows, filter, pendingRow, persistedAcceptedRows]);
   const handleAddConnection = useCallback(() => {
     setSelected(null);
     setPendingCandidate(null);
     setIsAddConnectionOpen(true);
-  }, []);
+  }, [setSelected]);
   const headerActions = useMemo(
     () => (
       <DashboardHeaderActionGroup>
@@ -1442,7 +1476,7 @@ export function ProfilesWorkspace({
         },
       });
     },
-    [router]
+    [router, setSelected]
   );
   const columns = useMemo(
     () => [
@@ -1734,7 +1768,7 @@ export function ProfilesWorkspace({
             }
           }}
           getContextMenuItems={getContextMenuItems}
-          rowHeight={56}
+          rowMode='two-line'
           containerClassName='min-h-0 flex-1'
           minWidth='0'
           className={styles.table}

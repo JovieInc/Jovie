@@ -15,7 +15,7 @@ jobs:
   authorize-staging:
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    outputs: {exact_sha: "${{ steps.lineage.outputs.exact_sha }}", outcome: "${{ steps.lineage.outputs.outcome }}"}
+    outputs: {exact_sha: "${{ steps.lineage.outputs.exact_sha }}", outcome: "${{ steps.routing.outputs.outcome }}"}
     steps:
       - name: Fetch sealed product-lane release receipt
         env: {EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", REPOSITORY: "${{ github.repository }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", SOURCE_CI_RUN_ATTEMPT: "${{ github.event.workflow_run.run_attempt }}", GH_TOKEN: "${{ github.token }}"}
@@ -94,6 +94,44 @@ jobs:
           printf 'exact_sha=%s\noutcome=%s\nreplacement_sha=%s\n' "$EXPECTED_SHA" "$outcome" "$replacement_sha" >> "$GITHUB_OUTPUT"
           jq -n --arg sha "$EXPECTED_SHA" --arg outcome "$outcome" --arg replacementSha "$replacement_sha" --arg sourceCiRunId "$SOURCE_CI_RUN_ID" '{schema:"jovie-staging-lineage/v1", sha:$sha, outcome:$outcome, replacementSha:$replacementSha, sourceCiRunId:$sourceCiRunId}' > "$RUNNER_TEMP/staging-lineage.json"
           echo "::notice::Staging lineage $EXPECTED_SHA outcome=$outcome replacement=$replacement_sha"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        if: steps.lineage.outputs.outcome == 'not_applicable'
+        with: {ref: "${{ github.event.workflow_run.head_sha }}", fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        if: steps.lineage.outputs.outcome == 'not_applicable'
+        with: {node-version: 24.21.0}
+      - id: routing
+        env: {INITIAL_OUTCOME: "${{ steps.lineage.outputs.outcome }}", EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", REPOSITORY: "${{ github.repository }}", GH_TOKEN: "${{ github.token }}"}
+        run: |
+          set -euo pipefail
+          outcome="$INITIAL_OUTCOME"
+          if [ "$outcome" = not_applicable ]; then
+            current_main="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Current main identity is malformed."; exit 1; }
+            if [ "$current_main" != "$EXPECTED_SHA" ]; then
+              relation="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
+              [ "$relation" = ahead ] || { echo "::error::Staging carryover main is not on the source lineage."; exit 1; }
+              outcome=superseded
+              jq --arg replacement "$current_main" '.outcome="superseded" | .replacementSha=$replacement' "$RUNNER_TEMP/staging-lineage.json" > "$RUNNER_TEMP/staging-lineage-next.json"
+            else
+              CANONICAL_STAGING_IDENTITY="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+              export CANONICAL_STAGING_IDENTITY
+              node --input-type=module <<'NODE' > "$RUNNER_TEMP/staging-carryover.json"
+          import { readFileSync } from 'node:fs';
+          import { resolveStagingCarryover } from './.github/scripts/staging-lane-carryover.mjs';
+          const env = process.env;
+          console.log(JSON.stringify(resolveStagingCarryover({
+            repository: env.REPOSITORY, expectedSha: env.EXPECTED_SHA, sourceCiRunId: env.SOURCE_CI_RUN_ID,
+            identity: JSON.parse(env.CANONICAL_STAGING_IDENTITY),
+            currentReceipt: JSON.parse(readFileSync(`${env.RUNNER_TEMP}/product-lane-release/release.json`, 'utf8')),
+          })));
+          NODE
+              outcome="$(jq -er '.outcome' "$RUNNER_TEMP/staging-carryover.json")"
+              jq --arg outcome "$outcome" --slurpfile proof "$RUNNER_TEMP/staging-carryover.json" '.outcome=$outcome | .carryover=$proof[0]' "$RUNNER_TEMP/staging-lineage.json" > "$RUNNER_TEMP/staging-lineage-next.json"
+            fi
+            mv "$RUNNER_TEMP/staging-lineage-next.json" "$RUNNER_TEMP/staging-lineage.json"
+          fi
+          printf 'outcome=%s\n' "$outcome" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with: {name: "staging-lineage-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}", path: "${{ runner.temp }}/staging-lineage.json", if-no-files-found: error, retention-days: 30}
   staging-release:

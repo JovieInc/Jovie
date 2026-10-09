@@ -72,7 +72,9 @@ export function PreviewDataHydrator({
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
     <ErrorBoundary fallback={null}>
-      <ProfileContactSidebar />
+      <div data-shell-profile-only='true' className='contents'>
+        <ProfileContactSidebar />
+      </div>
     </ErrorBoundary>
   );
 

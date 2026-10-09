@@ -64,6 +64,8 @@ def urlopen_router(payloads: dict[str, object]):
                 if isinstance(payload, Exception):
                     raise payload
                 return FakeResponse(url, payload)
+        if url.endswith("/api/health/db"):
+            raise MODULE.urllib.error.URLError("database fixture unavailable")
         raise AssertionError(f"unexpected urlopen target: {url}")
 
     return _open
@@ -525,7 +527,7 @@ class ProductionHealthTests(unittest.TestCase):
                 "status": "green",
                 "url": url,
                 "reportedStatus": "healthy",
-                "dependencies": {"vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"}, "database": {"status": "unknown", "detail": "deploy health database check"}},
+                "dependencies": {"vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"}, "database": {"status": "unknown", "detail": "database health probe: transport or malformed response"}},
                 "deployedSha": "a" * 40,
             },
         )
@@ -632,6 +634,121 @@ class ProductionHealthTests(unittest.TestCase):
         unbound = MODULE.repository_bound_production({"status": "unknown"})
         self.assertEqual(unbound["status"], "unknown")
         self.assertIsNone(unbound["deployedSha"])
+
+
+class DatabaseObservationTests(unittest.TestCase):
+    URL = "https://jov.ie/api/health/deploy"
+    DB_URL = "https://jov.ie/api/health/db"
+
+    def observe(self, probe, *, origin=URL, deploy=None):
+        now = MODULE.utc_now()
+        calls = []
+
+        def open_url(url, timeout=0):
+            calls.append(url)
+            if url == origin:
+                return FakeResponse(url, deploy or {"healthy": True, "timestamp": MODULE.isoformat(now)})
+            if url.endswith("/api/health/db"):
+                if isinstance(probe, Exception):
+                    raise probe
+                if isinstance(probe, FakeResponse):
+                    return probe
+                return FakeResponse(url, probe)
+            if url.endswith("/build-info"):
+                return FakeResponse(url, {"commitSha": "a" * 40})
+            raise AssertionError(url)
+
+        with (
+            mock.patch.object(MODULE, "utc_now", return_value=now),
+            mock.patch.object(MODULE.urllib.request, "urlopen", side_effect=open_url),
+        ):
+            result = MODULE.observe_production(origin)
+        return result, calls
+
+    def test_stripped_deploy_liveness_uses_the_dedicated_database_probe(self):
+        result, calls = self.observe({"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())})
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["dependencies"]["database"]["status"], "green")
+        self.assertEqual(calls.count(self.DB_URL), 1)
+        self.assertEqual(result["deployedSha"], "a" * 40)
+
+    def test_database_failure_remains_red_despite_green_deploy_diagnostics(self):
+        payload = {"healthy": False, "timestamp": MODULE.isoformat(MODULE.utc_now())}
+        for probe in (payload, FakeResponse(self.DB_URL, payload, 503),
+                      MODULE.urllib.error.HTTPError(self.DB_URL, 503, "unhealthy", {}, io.BytesIO(json.dumps(payload).encode()))):
+            with self.subTest(probe=type(probe).__name__):
+                result, _ = self.observe(probe, deploy={"healthy": True, "checks": {"database": {"ok": True}}})
+                self.assertEqual(result["dependencies"]["database"]["status"], "red")
+
+    def test_malformed_stale_future_and_untyped_database_evidence_is_unknown(self):
+        now = MODULE.utc_now()
+        for payload in (
+            [], {}, {"healthy": "true", "timestamp": MODULE.isoformat(now)},
+            {"healthy": 1, "timestamp": MODULE.isoformat(now)},
+            {"status": "ok", "checks": {"database": {"ok": True}}},
+            {"healthy": True, "timestamp": "malformed"},
+            {"healthy": True, "timestamp": now.replace(tzinfo=None).isoformat()},
+            {"healthy": True, "timestamp": MODULE.isoformat(now - MODULE.timedelta(minutes=11))},
+            {"healthy": True, "timestamp": MODULE.isoformat(now + MODULE.timedelta(minutes=1))},
+        ):
+            with self.subTest(payload=payload):
+                result, _ = self.observe(payload)
+                self.assertEqual(result["dependencies"]["database"]["status"], "unknown")
+
+    def test_redirect_transport_and_non_success_cannot_report_database_green(self):
+        payload = {"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())}
+        for probe in (
+            FakeResponse("https://other.test/api/health/db", payload),
+            FakeResponse("https://jov.ie/other", payload),
+            FakeResponse(self.DB_URL, payload, 302),
+            FakeResponse(self.DB_URL, payload, 503),
+            FakeResponse(self.DB_URL, payload, 429),
+            MODULE.urllib.error.URLError("down"),
+            MODULE.urllib.error.HTTPError(self.DB_URL, 503, "unhealthy", {}, io.BytesIO(b"not json")),
+        ):
+            with self.subTest(probe=type(probe).__name__):
+                result, _ = self.observe(probe)
+                self.assertNotEqual(result["dependencies"]["database"]["status"], "green")
+
+    def test_probe_is_bound_to_the_configured_origin_without_credentials(self):
+        payload = {"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())}
+        origin = "https://staged.example.test:8443/api/health/deploy"
+        result, calls = self.observe(payload, origin=origin)
+        self.assertEqual(result["dependencies"]["database"]["status"], "green")
+        self.assertIn("https://staged.example.test:8443/api/health/db", calls)
+        self.assertNotIn(self.DB_URL, calls)
+        credential_fixture = MODULE.urllib.parse.urlunsplit((
+            "https", "fixture-user:fixture-password@example.test", "/api/health/deploy", "", ""))
+        for origin in ("http://jov.ie/api/health/deploy", credential_fixture,
+                       "https://jov.ie/api/health/deploy?token=secret", "https://jov.ie/api/health/deploy#fragment"):
+            with self.subTest(origin=origin):
+                result, calls = self.observe(payload, origin=origin)
+                self.assertEqual(result["dependencies"]["database"]["status"], "unknown")
+                self.assertFalse(any(url.endswith("/api/health/db") for url in calls))
+
+    def test_scoped_admission_retains_independent_screenshot_and_freshness_holds(self):
+        from scoped_admission import build_scoped_admission
+        now = MODULE.utc_now()
+        request = {"consumer": "deployment", "surface": "production-web", "repository": "JovieInc/Jovie",
+                   "revision": "a" * 40, "mutation": "promote-staged-web-release", "riskLane": "high"}
+        for db_healthy, screenshot_failed, expected in ((None, True, {"database", "check:Generate Screenshots"}),
+                                                      (True, True, {"check:Generate Screenshots"}),
+                                                      (None, False, {"database"}), (True, False, set())):
+            production, _ = self.observe({"healthy": db_healthy, "timestamp": MODULE.isoformat(now)})
+            receipt = {"observedAt": MODULE.isoformat(now), "signals": {
+                "production": production, "main": {"status": "green", "checks": [
+                    {"name": "Generate Screenshots", "classification": "optional", "verdict": "failed" if screenshot_failed else "success"}]},
+                "integrity": {"status": "clear"}, "controller": {"status": "failed"},
+                "concurrencyEvidence": {"accepted": False},
+                "closureHealth": {"repository": "JovieInc/Jovie", "newIssueIntakeAllowed": False}}}
+            admission = build_scoped_admission(receipt, request, now)
+            self.assertEqual({row["signal"] for row in admission["relevantBlockers"]}, expected)
+            self.assertEqual(admission["allowed"], not expected)
+            # Appending healthy evidence cannot erase the original unknown.
+            extra = {**request, "healthSignals": [{"signal": "database", "status": "green", "proof": "untrusted"}]}
+            self.assertEqual(build_scoped_admission(receipt, extra, now)["allowed"], not expected)
+            stale = {**receipt, "observedAt": MODULE.isoformat(now - MODULE.timedelta(minutes=11))}
+            self.assertFalse(build_scoped_admission(stale, request, now)["allowed"])
 
 
 MAIN_SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
@@ -4385,7 +4502,9 @@ class WorkflowContractTests(unittest.TestCase):
             content,
         )
         self.assertIn("jovie-fixed", content)
-        self.assertIn("cancel-in-progress: true", content)
+        self.assertIn("cancel-in-progress: false", content)
+        self.assertIn("group: fleet-gate-receipt", content)
+        self.assertIn("--sweep", content)
         self.assertIn("fleet-gate-receipt", content)
         self.assertIn("0 <= age < 120", content)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)
@@ -4754,6 +4873,46 @@ class ClosureObservationContractTests(unittest.TestCase):
         )
         self.assertEqual(no_capacity["concurrency"]["gem"]["maxConcurrent"], 0)
         self.assertFalse(no_capacity["concurrency"]["gem"]["evidenceAccepted"])
+
+
+class PublicTrustDiagnosticsTest(unittest.TestCase):
+    def test_public_diagnostics_never_read_account_credentials_or_accept_capacity(self):
+        import symphony_proof_context as context
+        now = MODULE.utc_now()
+        runtime = {"schema": context.contract.V2_RUNTIME_IDENTITY_SCHEMA,
+                   "service": context.contract.V2_OFFICIAL_RUNTIME_SERVICE,
+                   "sourceRevision": "a" * 40, "binarySha256": "b" * 64,
+                   "workflowSha256": "c" * 64,
+                   "contractSha256": context.digest(pathlib.Path(context.contract.__file__))}
+        value = {"runtime": runtime, "observedAt": MODULE.isoformat(now),
+                 "accounts": [{"authPath": "/must-not-read"}], "secret": "must-not-emit"}
+        with mock.patch.object(context, "private_json", return_value=value), \
+                mock.patch.object(context, "validate_account_row", side_effect=AssertionError("credential read")), \
+                mock.patch.object(context, "live_runtime", side_effect=AssertionError("runtime probe")):
+            result = context.public_context_diagnostics(now)
+            self.assertEqual(result["status"], "unknown")
+            self.assertFalse(result["capacityProven"])
+            self.assertFalse(result["credentialReads"])
+            self.assertNotIn("must-not", json.dumps(result))
+            value["runtime"] = {**runtime, "contractSha256": "0" * 64}
+            self.assertEqual(context.public_context_diagnostics(now)["reason"], "imported-contract-mismatch")
+            value["runtime"] = runtime
+            value["observedAt"] = "2020-01-01T00:00:00Z"
+            self.assertEqual(context.public_context_diagnostics(now)["reason"], "stale-enrollment")
+        with mock.patch.object(context, "private_json", side_effect=ValueError("secret-value")):
+            self.assertNotIn("secret-value", json.dumps(context.public_context_diagnostics(now)))
+
+    def test_observation_diagnostics_do_not_change_rejected_admission(self):
+        now = MODULE.utc_now()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "receipt.json"
+            path.write_text(json.dumps({"maxConcurrent": 99}))
+            with mock.patch.object(MODULE, "validate_capacity_receipt", return_value=(False, "capacity-evidence-trust-context-unavailable", [])), \
+                    mock.patch.object(MODULE, "public_context_diagnostics", return_value={"capacityProven": False}):
+                result = MODULE.observe_concurrency(path, now)
+        self.assertFalse(result["accepted"])
+        self.assertEqual(result["acceptedEvidence"], [])
+        self.assertEqual(result["reason"], "capacity-evidence-trust-context-unavailable")
 
 
 if __name__ == "__main__":

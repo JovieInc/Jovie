@@ -92,6 +92,10 @@ function main() {
   runGit(['checkout', '-b', branch]);
   runGit(['add', ...fixes.map(fix => fix.file)]);
   runGit([
+    '-c',
+    'user.name=jovie-bot[bot]',
+    '-c',
+    'user.email=jovie-bot[bot]@users.noreply.github.com',
     'commit',
     '-m',
     'docs: refresh doc-gardening seed freshness marker',

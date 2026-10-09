@@ -315,11 +315,15 @@ jobs:
           else
             # Queue-proven main pushes skip the classifier by design; the exact SHA
             # was classified in its successful merge-group CI run (same head SHA).
-            proof_run="$(gh api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
-              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml")] | max_by(.run_attempt) | .id // empty')"
-            if [[ "$proof_run" =~ ^[0-9]+$ ]]; then
-              proof_artifact="$(gh api "repos/$REPO/actions/runs/$proof_run/artifacts" \
-                --jq '[.artifacts[] | select(.name | startswith("ci-risk-classification-'"$proof_run"'-")) | select(.expired == false)] | max_by(.name) | .name // empty')"
+            proof="$(gh api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
+              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .head_sha == "'"$SOURCE_SHA"'" and .event == "merge_group" and .status == "completed" and .conclusion == "success")] | max_by(.run_started_at, .id) | if . == null then empty else [.id, .run_attempt] | @tsv end')"
+            IFS=$'\t' read -r proof_run proof_attempt <<< "$proof"
+            if [[ "$proof_run" =~ ^[0-9]+$ && "$proof_attempt" =~ ^[1-9][0-9]*$ ]]; then
+              # Follow every artifact page and bind the receipt to this exact attempt.
+              # gh --slurp cannot be combined with --jq; use the standalone parser.
+              proof_artifact="$(gh api --paginate --slurp "repos/$REPO/actions/runs/$proof_run/artifacts" \
+                | jq -r --arg name "ci-risk-classification-$proof_run-$proof_attempt" --arg sha "$SOURCE_SHA" --argjson run "$proof_run" \
+                  '[.[].artifacts[] | select(.name == $name and .expired == false and .workflow_run.id == $run and .workflow_run.head_sha == $sha)] | if length == 1 then .[0].name else empty end')"
               if [[ -n "$proof_artifact" ]] && gh run download "$proof_run" --name "$proof_artifact" --dir "$root"; then
                 risk_lane="$(jq -r '.riskLevel // "unknown"' "$root/ci-risk-classification.json")"
                 echo "::notice::Risk lane $risk_lane from merge-group CI run $proof_run for $SOURCE_SHA."
@@ -727,6 +731,26 @@ jobs:
                 staging_artifact_id="$(gh api \
                   "repos/$REPOSITORY/actions/artifacts?name=$staging_artifact_name&per_page=100" \
                   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
+                if [ -z "$staging_artifact_id" ]; then
+                  # Coalesced pushes can qualify Web only on a merge-group
+                  # historical head. A carryover staging run deploys a later
+                  # main head. Further non-Web commits may advance main before
+                  # production authorizes; require Web <= staging <= release.
+                  canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+                  canonical_staging_sha="$(jq -er '.commitSha | select(type == "string" and test("^[0-9a-f]{40}$"))' <<<"$canonical_staging_identity")"
+                  web_to_staging="$(gh api "repos/$REPOSITORY/compare/${staging_receipt_sha}...${canonical_staging_sha}" --jq '.status // empty')"
+                  staging_to_release="$(gh api "repos/$REPOSITORY/compare/${canonical_staging_sha}...${EXPECTED_SHA}" --jq '.status // empty')"
+                  [[ "$web_to_staging" =~ ^(ahead|identical)$ ]] && [[ "$staging_to_release" =~ ^(ahead|identical)$ ]] || {
+                    echo "::error::Canonical staging does not contain the historical Web head on this production lineage."
+                    exit 1
+                  }
+                  staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
+                    REPOSITORY="$REPOSITORY" EXPECTED_SHA="$canonical_staging_sha" \
+                    node .github/scripts/canonical-staging-receipt.mjs)"
+                  staging_receipt_sha="$canonical_staging_sha"
+                  staging_deployment_id="$(jq -er '.deploymentId' <<<"$canonical_staging_identity")"
+                  staging_artifact_name="staging-deployment-${staging_receipt_sha}"
+                fi
                 if [ -z "$staging_artifact_id" ]; then
                   # A superseded staging generation never deploys, so its exact
                   # receipt can never exist. Its durable lineage receipt either

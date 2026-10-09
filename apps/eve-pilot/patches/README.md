@@ -1,7 +1,7 @@
 # Eve compaction patch
 
 Ship now: preserve already capped tool results during repeated compaction on
-Eve 0.70.0. The regression uses the installed harness, appends an exchange,
+Eve 0.71.3. The regression uses the installed harness, appends an exchange,
 and requires earlier messages to stay identical without a model call.
 
 Re-evaluate when: the pinned Eve dependency changes or upstream fixes the cap.

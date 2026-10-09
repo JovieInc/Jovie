@@ -94,7 +94,7 @@ export function DueChip({ dueIso, now, muted, className }: DueChipProps) {
     <ShellMetadataChip
       tone={resolveDueTone(days, Boolean(muted))}
       className={cn('tabular-nums', className)}
-      contentClassName='uppercase tracking-[0.04em]'
+      contentClassName='tracking-normal'
       title={dueDate.toLocaleDateString()}
     >
       {label}
