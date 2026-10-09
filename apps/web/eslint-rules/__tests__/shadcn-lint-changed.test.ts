@@ -92,27 +92,18 @@ describe('shadcn-lint-changed probe', () => {
   // The probe's target needs BOTH a parent commit (`${sha}^`) and a
   // production apps/web TS change inside `git log -50`. A shallow checkout
   // (the nightly deterministic lane checks out at depth 1) guarantees
-  // neither, and no test-side fix can restore history. Skip that
-  // environment with a named condition; the assertion still runs everywhere
-  // history exists (PR lane, full nightly suite, local).
+  // neither: even though git synthesizes a file list for the grafted root
+  // commit, its synthetic root has no parent, so `git diff <root>^...` can
+  // never resolve and the probe returns null. No test-side fix can restore
+  // history. Skip that environment by the shallow flag alone (verified on
+  // the live lane: the file-list conjunct alone does not fire on grafted
+  // checkouts); the assertion still runs everywhere history exists (PR
+  // lane, full nightly suite, local).
   it.skipIf(
     spawnSync('git', ['rev-parse', '--is-shallow-repository'], {
       cwd: repoRoot,
       encoding: 'utf8',
-    }).stdout.trim() === 'true' &&
-      spawnSync(
-        'git',
-        [
-          'log',
-          '-50',
-          '--pretty=format:%H',
-          '--',
-          'apps/web/components',
-          'apps/web/app',
-          'apps/web/lib',
-        ],
-        { cwd: repoRoot, encoding: 'utf8' }
-      ).stdout.trim().length === 0
+    }).stdout.trim() === 'true'
   )(
     'sees a changed production apps/web TS file from git root and misses it from apps/',
     () => {
