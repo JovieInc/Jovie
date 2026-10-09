@@ -1248,20 +1248,30 @@ function planAffectedTests(
     '.github/scripts/sentry-read-json.sh',
     'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
   ]);
+  const sentryDeploymentContract =
+    'apps/web/tests/unit/ci/deploy-workflow.test.ts';
   if (
-    files.some(file => sentryGateInputs.has(file)) &&
+    files.some(
+      file => sentryGateInputs.has(file) || file === sentryDeploymentContract
+    ) &&
     files.every(
       file =>
         sentryGateInputs.has(file) ||
+        file === sentryDeploymentContract ||
         AFFECTED_TEST_SELECTOR_MANIFEST.has(file) ||
         file === 'docs/runbooks/production-sentry-uncertainty-recovery.md'
     )
   ) {
+    if (!isFileAvailable(sentryDeploymentContract)) {
+      return fullSuitePlan(
+        'Sentry deployment workflow contract is unavailable'
+      );
+    }
     return {
       mode: 'selected',
       relatedFiles: [],
       mandatoryTests: [],
-      selectedTests: [],
+      selectedTests: [sentryDeploymentContract],
       rootVitestTests: [],
       pythonTests: [],
       pythonUnittestTests: [],
