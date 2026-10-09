@@ -516,6 +516,9 @@ test.describe('overlay collisions: dialog opened from a dropdown', () => {
       await expect(page.getByTestId('dialog-content')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.getByTestId('dialog-content')).toBeHidden();
+      // Regression: mixed dismissable-layer versions restored the menu's
+      // temporary pointer lock after the dialog closed.
+      await expectNoPointerLock(page);
     }
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expectNoPointerLock(page);
