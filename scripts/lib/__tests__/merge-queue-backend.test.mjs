@@ -803,7 +803,9 @@ describe('native live preflight', () => {
   });
   it.each([undefined, null, '0', -1, 0.5, 1])('rejects invalid aggregate count %s before mutation', async count => {
     const proof = aggregateProof();
-    proof.response.data.repository.ruleset.bypassActors.totalCount = count;
+    Object.assign(proof.response.data.repository.ruleset.bypassActors, {
+      totalCount: count,
+    });
     expect(validateNativePreflightEvidence(aggregateInput(proof)).ok).toBe(false);
     const runner = createNativeRunner({
       ruleset: aggregateRuleset(), bypassAggregatePayload: proof.response,

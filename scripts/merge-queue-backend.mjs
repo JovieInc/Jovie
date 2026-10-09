@@ -338,6 +338,8 @@ function validateBypassActorAggregate(proof, ruleset, repository, rulesetId) {
 /**
  * Validate live GitHub ruleset, repository, and workflow evidence for native
  * merge-queue enrollment.
+ * The legacy allowUnavailableBypassActors option is accepted but ignored;
+ * complete zero-bypass proof is always required.
  *
  * @param {{
  *   ruleset?: object | null,
@@ -349,6 +351,7 @@ function validateBypassActorAggregate(proof, ruleset, repository, rulesetId) {
  *   baseBranch?: string,
  *   repositorySlug?: string,
  *   bypassActorAggregate?: object,
+ *   allowUnavailableBypassActors?: boolean,
  * }} [input]
  */
 export function validateNativePreflightEvidence({
@@ -508,12 +511,15 @@ export function validateNativePreflightEvidence({
 }
 
 /**
+ * The legacy allowUnavailableBypassActors option is accepted but ignored;
+ * acquisition and validation remain fail closed.
  * @param {{
  *   backend?: string,
  *   repository?: string,
  *   rulesetId?: string,
  *   baseBranch?: string,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   allowUnavailableBypassActors?: boolean,
  * }} [input]
  */
 export async function preflightMergeQueue({
