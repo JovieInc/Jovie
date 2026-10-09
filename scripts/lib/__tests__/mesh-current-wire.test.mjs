@@ -296,7 +296,7 @@ test('signed original-host GET binds the full query, preserves new fields and re
     outboxTrust: trust(),
     now: () => now,
     fetchImpl: async (url, options) => {
-      const u = new URL(url);
+      const u = new URL(url instanceof Request ? url.url : url);
       calls.push(u.pathname);
       const h = options.headers,
         unsigned = {

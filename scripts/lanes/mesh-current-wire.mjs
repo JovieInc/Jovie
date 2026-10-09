@@ -40,6 +40,7 @@ const actions = new Map([
     'reconcile-release-certification-starvation',
   ],
 ]);
+/** @type {Readonly<Record<string, string>>} */
 const approvedOutboxTrust = Object.freeze({
   'eve-outbox-2026-09-04':
     '497d60783004dbb9a714f243d08039335f56ef0ecc9f05a65ae9ac685f113754',
