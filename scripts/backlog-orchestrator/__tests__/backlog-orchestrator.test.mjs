@@ -1327,6 +1327,13 @@ describe('entrypoint contract', () => {
       assert.ok(line.length > 0);
       assert.doesNotMatch(line, /(^|\s)-(f|F)(\s|$|=)/);
       assert.doesNotMatch(line, /graphql/);
+      // `gh api` takes no --repo/-R flag (it is a `gh pr` flag; passing it
+      // dumps usage help whose -F description is the misleading "Add a
+      // string parameter in key=value format" line the Gem runner showed).
+      if (line.startsWith('api ')) {
+        assert.doesNotMatch(line, /--repo|--repo=|(^|\s)-R(\s|$)/);
+        assert.equal(line.split(' ').length, 2);
+      }
     }
     const apiLines = fullArgs.filter(line => line.startsWith('api '));
     assert.equal(apiLines.length, 2);
@@ -1401,9 +1408,9 @@ describe('entrypoint contract', () => {
       fakeGh,
       [
         '#!/bin/sh',
-        '# $4 is the REST path (api --repo JovieInc/Jovie <path>); page>=2 ends pagination',
+        '# $2 is the REST path (api <path>); page>=2 ends pagination',
         'if [ "$1" = "api" ]; then',
-        '  PAGE="${4##*page=}"',
+        '  PAGE="${2##*page=}"',
         '  case "$PAGE" in',
         '    1) ' + `printf '%s' '${payload.replace(/'/g, "'\\''")}'` + ';;',
         '    *) printf "[]";;',
