@@ -100,7 +100,8 @@ function validateBinding(value, now) {
   if (
     !exact(lineage, [
       'parentRecordedAt',
-      'outboxPublishedAt',
+      'callerIntentRecordedAt',
+      'dispatchObservedAt',
       'projectionCompletedAt',
       'parentOrderDigest',
       'sourceVersion',
@@ -113,15 +114,26 @@ function validateBinding(value, now) {
     throw new Error('mesh-child-lineage-invalid');
   const times = [
     lineage.parentRecordedAt,
-    lineage.outboxPublishedAt,
+    lineage.callerIntentRecordedAt,
+    lineage.dispatchObservedAt,
     lineage.projectionCompletedAt,
     order.createdAt,
     value.dispatchAck?.dispatchedAt,
   ];
+  const [parentAt, intentAt, observedAt, projectedAt, createdAt, dispatchedAt] =
+    times.map(t => Date.parse(t));
+  // The publisher's durable dispatch row records an observation, never an
+  // attested publication event. The original host may already have projected.
+  // Both independent prerequisites must precede the child's actual sealing.
   if (
     times.some(t => !timestamp(t)) ||
-    times.some((t, i) => i > 0 && Date.parse(t) < Date.parse(times[i - 1])) ||
-    Date.parse(times.at(-1)) > now ||
+    parentAt > intentAt ||
+    intentAt > observedAt ||
+    intentAt > projectedAt ||
+    projectedAt > createdAt ||
+    observedAt > createdAt ||
+    createdAt > dispatchedAt ||
+    dispatchedAt > now ||
     now > Date.parse(order.budget.deadline)
   )
     throw new Error('mesh-child-time-invalid');
@@ -139,7 +151,9 @@ function validateBinding(value, now) {
  * owner activation watermark, never a caller field; pre-activation children hold.
  * verifyAuthority(request, operation) returns the EXACT verified binding above;
  * it must use existing cryptographic authority, never caller identity fields,
- * prove actual parent persistence/projection and preserve parent budgets/bounds.
+ * prove immutable signed parent/intent persistence before any side effect and
+ * original-host projection/dispatch-observation lineage, preserving parent
+ * budgets/bounds. Observed dispatch time never attests exact publication time.
  * withOwnerLock(taskKey, operation) holds current binding/lifecycle authority
  * through the entire callback; it must throw on revoked/closed/draining state.
  * decideRecipientAdmission(binding) is the real recipient decision, not an

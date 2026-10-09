@@ -92,7 +92,8 @@ function binding() {
     }),
     lineage: {
       parentRecordedAt: first,
-      outboxPublishedAt: first,
+      callerIntentRecordedAt: first,
+      dispatchObservedAt: first,
       projectionCompletedAt: projected,
       parentOrderDigest: 'b'.repeat(64),
       sourceVersion: 'c'.repeat(40),
@@ -705,3 +706,72 @@ test(
       assert.deepEqual(readFileSync(f.receiptPath), bytes);
     })
 );
+
+test('early authenticated projection may precede later dispatch observation without repeating recipient decision', async () =>
+  using(async f => {
+    const b = binding();
+    b.lineage.projectionCompletedAt = '2026-10-09T01:01:05.000Z';
+    // This is the persisted caller dispatch observation, not an attestation
+    // of the exact outbox publication time.
+    b.lineage.dispatchObservedAt = '2026-10-09T01:01:10.000Z';
+    f.setCurrent(b);
+    const evidence = await f.receive();
+    const bytes = readFileSync(f.receiptPath);
+    assert.equal(evidence.acknowledgment.disposition, 'accepted');
+    assert.deepEqual(evidence.scope, b.order.scope);
+    assert.deepEqual(evidence.dispatchAck, b.dispatchAck);
+    assert.deepEqual(
+      JSON.parse(bytes.toString('utf8')).binding.order.budget,
+      b.order.budget
+    );
+    assert.deepEqual(
+      await f.read(evidence.acknowledgment.receiptRef),
+      evidence
+    );
+    assert.deepEqual(await f.receive(), evidence);
+    assert.equal(f.calls, 1);
+    assert.deepEqual(readFileSync(f.receiptPath), bytes);
+  }));
+
+test('independent causal prerequisites reject invalid orderings, missing intent and legacy publication claims', async () =>
+  using(async f => {
+    for (const mutate of [
+      b => {
+        b.lineage.callerIntentRecordedAt = '2026-10-09T00:59:59.000Z';
+      },
+      b => {
+        b.lineage.dispatchObservedAt = '2026-10-09T00:59:59.000Z';
+      },
+      b => {
+        b.lineage.callerIntentRecordedAt = '2026-10-09T01:01:01.000Z';
+        b.lineage.dispatchObservedAt = '2026-10-09T01:01:02.000Z';
+      },
+      b => {
+        b.lineage.projectionCompletedAt = '2026-10-09T01:02:01.000Z';
+      },
+      b => {
+        b.lineage.dispatchObservedAt = '2026-10-09T01:02:01.000Z';
+      },
+      b => {
+        b.dispatchAck.dispatchedAt = '2026-10-09T01:01:59.000Z';
+      },
+      b => {
+        b.dispatchAck.dispatchedAt = '2026-10-09T01:04:01.000Z';
+      },
+      b => {
+        delete b.lineage.callerIntentRecordedAt;
+      },
+      b => {
+        delete b.lineage.dispatchObservedAt;
+        b.lineage.outboxPublishedAt = first;
+      },
+    ]) {
+      const b = binding();
+      mutate(b);
+      f.setCurrent(b);
+      await assert.rejects(f.receive(), /lineage-invalid|time-invalid/);
+      assert.equal(f.calls, 0);
+      assert.equal(existsSync(f.intentPath), false);
+      assert.equal(existsSync(f.receiptPath), false);
+    }
+  }));
