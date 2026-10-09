@@ -1398,6 +1398,7 @@ async function ghPullRequestInventory(state, env) {
         number: row.number,
         title: row.title,
         body: row.body,
+        headSha: typeof row.head?.sha === 'string' ? row.head.sha : undefined,
         headRefName: row.head?.ref ?? row.headRefName,
         state:
           String(row.state ?? 'OPEN').toUpperCase() === 'MERGED'
@@ -1552,6 +1553,65 @@ async function readOfficialSymphonyWorkers(maxConcurrent) {
   }
 }
 
+/**
+ * Check-rollup enrichment (JOV-8000 follow-ups 10+15): attaches each
+ * rate-population row's check-rollup state from the per-commit REST
+ * combined-status view — `gh api repos/.../commits/{sha}/status` keyed by
+ * the head SHA the REST inventory already carries (no per-PR lookup, no
+ * graphql). The fetches run in bounded-parallelism batches (4 at a time)
+ * under a hard deadline so the whole pass stays well inside the remediate
+ * step's 90s budget — the sequential form (two calls per row, one row at a
+ * time) hit the step timeout and failed the job with exit 124
+ * (run 37872694219). Returns false when any fetch fails or the deadline
+ * passes — the gate fails closed on prRollups:false, never zero errored.
+ */
+export async function attachCheckRollups(pullRequests, env = process.env) {
+  // Population = every counted row (open, non-draft, not
+  // label-quarantined) — the same predicate as pullRequestRates.
+  const counted = pullRequests.filter(
+    row =>
+      String(row?.state || '').toUpperCase() === 'OPEN' &&
+      row?.isDraft !== true &&
+      !(row?.labels ?? []).some(label =>
+        ['queue-poison', 'hold'].includes(
+          String(
+            typeof label === 'string'
+              ? label
+              : /** @type {any} */ (label?.name ?? '')
+          ).toLowerCase()
+        )
+      )
+  );
+  const rollupRows = counted.filter(row => typeof row?.headSha === 'string');
+  let prRollups = true;
+  const rollupDeadline = Date.now() + 25_000;
+  for (let i = 0; i < rollupRows.length; i += 4) {
+    if (Date.now() > rollupDeadline) {
+      // A slow runner fails the gate closed on the named cause instead of
+      // timing out the remediate step (the 124 exit class).
+      prRollups = false;
+      break;
+    }
+    const batch = rollupRows.slice(i, i + 4);
+    await Promise.all(
+      batch.map(async row => {
+        try {
+          const statusBody = await execGhApi(
+            `repos/JovieInc/Jovie/commits/${row.headSha}/status`,
+            env
+          );
+          const status = JSON.parse(statusBody);
+          const state = String(status?.state ?? '').toUpperCase();
+          if (state) row.statusCheckRollup = { state };
+        } catch {
+          prRollups = false;
+        }
+      })
+    );
+  }
+  return prRollups;
+}
+
 async function runRemediate(isDryRun) {
   const team = TEAM_CONFIGS.find(item => item.key === 'JOV');
   if (!team) throw new Error('jov-team-config-missing');
@@ -1611,57 +1671,11 @@ async function runRemediate(isDryRun) {
   // Check-rollup fetch (JOV-8000 follow-up 10): the error gate reads each
   // rate-population row's check-rollup STATE (FAILURE/ERROR = a failing
   // required check on the head), which the inventory query does not carry.
-  // ONE light GraphQL query for the population's rollup states (no
-  // contexts); on failure the gate fails closed with
-  // 'pr-check-rollup-unavailable' via the prRollups:false signal — never
-  // treated as zero errored.
-  let prRollups = true;
-  if (Array.isArray(pullRequests)) {
-    // Population = every counted row (open, non-draft, not
-    // label-quarantined) — the same predicate as pullRequestRates.
-    const counted = pullRequests.filter(
-      row =>
-        String(row?.state || '').toUpperCase() === 'OPEN' &&
-        row?.isDraft !== true &&
-        !(row?.labels ?? []).some(label =>
-          ['queue-poison', 'hold'].includes(
-            String(
-              typeof label === 'string'
-                ? label
-                : /** @type {any} */ (label?.name ?? '')
-            ).toLowerCase()
-          )
-        )
-    );
-    // The rollup states ride the per-PR REST combined status view —
-    // `gh api repos/.../commits/{sha}/status` per population row (the
-    // state field is exactly the rollup state: failure/success/error/...).
-    // Any fetch failure fails the gate closed via prRollups:false.
-    for (const row of counted) {
-      if (!Number.isInteger(row?.number)) continue;
-      try {
-        const head = await execGhApi(
-          `repos/JovieInc/Jovie/pulls/${row.number}`,
-          process.env
-        );
-        const detail = JSON.parse(head);
-        const headSha = detail?.head?.sha;
-        if (!headSha) {
-          prRollups = false;
-          continue;
-        }
-        const statusBody = await execGhApi(
-          `repos/JovieInc/Jovie/commits/${headSha}/status`,
-          process.env
-        );
-        const status = JSON.parse(statusBody);
-        const state = String(status?.state ?? '').toUpperCase();
-        if (state) row.statusCheckRollup = { state };
-      } catch {
-        prRollups = false;
-      }
-    }
-  }
+  // On failure the gate fails closed with 'pr-check-rollup-unavailable' via
+  // the prRollups:false signal — never treated as zero errored.
+  const prRollups = Array.isArray(pullRequests)
+    ? await attachCheckRollups(pullRequests, process.env)
+    : true;
   const cloneLatencyMs = await measureCloneLatencyMs();
   const fleetGate = await fleetGateForTeam(team);
   const rawReceipt = loadFleetGateReceipt(team);
