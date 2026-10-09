@@ -21,10 +21,13 @@ import {
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const helper = resolve(root, '.github/scripts/sentry-read-json.sh');
-const action = load(
-  readFileSync(
-    resolve(root, '.github/actions/sentry-error-gate/action.yml'),
-    'utf8'
+/** @typedef {{runs: {steps: Array<{id: string, run: string}>}}} SentryAction */
+const action = /** @type {SentryAction} */ (
+  load(
+    readFileSync(
+      resolve(root, '.github/actions/sentry-error-gate/action.yml'),
+      'utf8'
+    )
   )
 );
 
@@ -82,6 +85,7 @@ describe('single-document Sentry evidence', () => {
   );
 });
 
+/** @param {Array<{status: number, body?: string, headers?: Record<string, string>}>} responses */
 async function configurationProbe(
   responses,
   { stepId = 'sentry-config', shortDeadline = false } = {}
@@ -104,7 +108,7 @@ async function configurationProbe(
   });
   await new Promise((resolveListen, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolveListen);
+    server.listen(0, '127.0.0.1', () => resolveListen(undefined));
   });
   try {
     let fixturePath = process.env.PATH;
@@ -122,12 +126,13 @@ async function configurationProbe(
       );
       fixturePath = `${bin}:${fixturePath}`;
     }
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Sentry fixture requires a bound loopback TCP address');
+    }
     const source = action.runs.steps
       .find(step => step.id === stepId)
-      .run.replaceAll(
-        'https://sentry.io',
-        `http://127.0.0.1:${server.address().port}`
-      )
+      .run.replaceAll('https://sentry.io', `http://127.0.0.1:${address.port}`)
       .replaceAll('${{ inputs.soak_minutes }}', '5')
       .replaceAll('${{ inputs.baseline_window_minutes }}', '30')
       .replaceAll('${{ inputs.threshold_multiplier }}', '3')
@@ -273,10 +278,14 @@ describe.each(['baseline', 'post-deploy', 'candidate-release'])(
       const start = stepId === 'baseline' ? 1800 : 3600;
       const minutes = stepId === 'baseline' ? 30 : 5;
       return {
-        data: Array.from({ length: minutes }, (_, i) => [
-          start + i * 60,
-          [{ count }],
-        ]),
+        data: Array.from(
+          { length: minutes },
+          (_, i) =>
+            /** @type {[number, Array<{count?: number}>]} */ ([
+              start + i * 60,
+              [{ count }],
+            ])
+        ),
       };
     }
     async function probe(body) {
