@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   MESH_HOST_ACK_COVERAGE_COMMAND,
   MESH_NATIVE_TERMINAL_COVERAGE_COMMAND,
+  MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND,
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
@@ -50,6 +51,10 @@ describe('scripts test inventory guard', () => {
       const commands = execute.mock.calls.map(([command]) => command);
       expect(commands).toContain(MESH_HOST_ACK_COVERAGE_COMMAND);
       expect(commands).toContain(MESH_NATIVE_TERMINAL_COVERAGE_COMMAND);
+      expect(commands).toContain(MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND);
+      expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
+        'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs'
+      );
       expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
         'scripts/lib/__tests__/mesh-native-terminal.test.mjs'
       );
