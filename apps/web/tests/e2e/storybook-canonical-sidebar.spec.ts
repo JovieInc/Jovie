@@ -2,6 +2,34 @@ import { expect, type Page, test } from '@playwright/test';
 
 test.use({ viewport: { width: 1126, height: 798 } });
 
+test('collapsed demo keeps its command allocation and stages secondary controls', async ({
+  page,
+}) => {
+  await page.goto(
+    '/iframe.html?id=organisms-unifiedsidebar--demo&viewMode=story'
+  );
+  const nav = page.getByRole('navigation', { name: 'Dashboard Navigation' });
+  await expect(nav).toBeVisible({ timeout: 60_000 });
+  const create = nav.getByRole('link', { name: 'New Chat' });
+  const before = await create.boundingBox();
+  await page
+    .getByRole('button', { name: 'Collapse sidebar', exact: true })
+    .click();
+  const after = await create.boundingBox();
+  expect(after!.y).toBe(before!.y);
+  expect(after!.height).toBe(before!.height);
+  const rail = await page
+    .locator('[data-shell-rail-motion="left"]')
+    .boundingBox();
+  expect(after!.x).toBeGreaterThanOrEqual(rail!.x);
+  expect(after!.x + after!.width).toBeLessThanOrEqual(rail!.x + rail!.width);
+  const secondary = page.locator('[data-sidebar-search-slot] > [inert]');
+  await expect(secondary).toHaveAttribute('aria-hidden', 'true');
+  await expect(
+    nav.getByRole('link', { name: 'Home', exact: true })
+  ).toHaveCount(1);
+});
+
 for (const theme of ['dark', 'light']) {
   test(`canonical sidebar keeps geometry and keyboard actions in ${theme}`, async ({
     page,
@@ -94,6 +122,7 @@ async function readSidebarAnchors(page: Page) {
     });
     const accountBox = account.getBoundingClientRect();
     return {
+      railWidth: rail.getBoundingClientRect().width,
       brandY: brandBox.top + brandBox.height / 2,
       // AskJovieMark intentionally rests at 60% opacity. Ancestor staging
       // must never fade it below that visible resting treatment.
@@ -147,7 +176,12 @@ function expectStableSidebar(
   }
 }
 
-for (const product of ['dashboard', 'operator'] as const) {
+for (const product of [
+  'dashboard',
+  'operator',
+  'admin-dashboard',
+  'admin-operator',
+] as const) {
   for (const theme of ['dark', 'light'] as const) {
     test(`${product} keeps logo and vertical anchors through rail intent in ${theme}`, async ({
       page,
@@ -164,7 +198,9 @@ for (const product of ['dashboard', 'operator'] as const) {
         `/iframe.html?id=organisms-unifiedsidebar--${product}&viewMode=story`
       );
       const nav = page.getByRole('navigation', {
-        name: product === 'operator' ? 'OV Navigation' : 'Dashboard Navigation',
+        name: product.endsWith('operator')
+          ? 'OV Navigation'
+          : 'Dashboard Navigation',
       });
       await expect(nav).toBeVisible({ timeout: 60_000 });
       // This spec checks motion, so restore the real media query and remove only
@@ -190,7 +226,11 @@ for (const product of ['dashboard', 'operator'] as const) {
           page.getByRole('button', { name: 'Expand sidebar', exact: true })
         ).toBeVisible();
         await page.waitForTimeout(80);
-        expectStableSidebar(expanded, await readSidebarAnchors(page));
+        const closing = await readSidebarAnchors(page);
+        captures.push(closing);
+        expectStableSidebar(expanded, closing);
+        expect(closing.railWidth).toBeGreaterThan(52);
+        expect(closing.railWidth).toBeLessThan(expanded.railWidth);
         await page.waitForTimeout(470);
         const collapsed = await readSidebarAnchors(page);
         captures.push(collapsed);
@@ -199,7 +239,11 @@ for (const product of ['dashboard', 'operator'] as const) {
           .getByRole('button', { name: 'Expand sidebar', exact: true })
           .press(cycle % 2 ? 'Space' : 'Enter');
         await page.waitForTimeout(80);
-        expectStableSidebar(expanded, await readSidebarAnchors(page));
+        const opening = await readSidebarAnchors(page);
+        captures.push(opening);
+        expectStableSidebar(expanded, opening);
+        expect(opening.railWidth).toBeGreaterThan(52);
+        expect(opening.railWidth).toBeLessThan(expanded.railWidth);
         await page.waitForTimeout(470);
         expectStableSidebar(expanded, await readSidebarAnchors(page));
       }

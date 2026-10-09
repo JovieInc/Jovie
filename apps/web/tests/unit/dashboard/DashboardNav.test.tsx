@@ -115,7 +115,10 @@ describe('DashboardNav', () => {
     expect(
       search.compareDocumentPosition(newChat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(search.parentElement).toHaveClass('h-9', 'shrink-0');
+    expect(search.closest('[data-sidebar-search-slot]')).toHaveClass(
+      'h-9',
+      'shrink-0'
+    );
   });
 
   it('hides Identity when PROFILES_WORKSPACE is off so the rail cannot 404', () => {
@@ -401,6 +404,7 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
       appFlags: { PROFILES_WORKSPACE: true },
       sidebarProps: { defaultOpen: false },
+      navChildren: <button type='button'>Search fixture</button>,
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
@@ -410,6 +414,11 @@ describe('DashboardNav', () => {
       'href',
       APP_ROUTES.CHAT
     );
+    const secondary = container.querySelector(
+      '[data-sidebar-search-divider]'
+    )?.parentElement;
+    expect(secondary).toHaveAttribute('inert');
+    expect(secondary).toHaveAttribute('aria-hidden', 'true');
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: false,
