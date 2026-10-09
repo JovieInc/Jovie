@@ -1182,7 +1182,7 @@ describe('entrypoint contract', () => {
     // inventory pages through GraphQL with a real cursor (no page-limit
     // fail-closed); the merged side stays one gh pr list call.
     assert.doesNotMatch(executableSource, /statusCheckRollup',/);
-    assert.match(executableSource, /pageInfo\{endCursor hasNextPage\}/);
+    assert.match(executableSource, /per_page=50&page=\$\{page\}/);
     assert.doesNotMatch(executableSource, /page-limit-reached/);
     assert.match(executableSource, /mergeable,labels/);
 
@@ -1255,29 +1255,20 @@ describe('entrypoint contract', () => {
         isDraft: false,
       },
     ]);
-    const graphqlOpen = JSON.stringify({
-      data: {
-        repository: {
-          pullRequests: {
-            pageInfo: { hasNextPage: false },
-            nodes: JSON.parse(openPayload),
-          },
-        },
-      },
-    });
     await writeFile(
       fakeGh,
       [
         '#!/bin/sh',
         'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
-        '# open inventory: gh api graphql; merged: gh pr list',
+        'printf \'%s\\n\' "$*" >> "$FULL_ARGS_PATH"',
+        '# open inventory: gh api (REST); merged: gh pr list',
         'if [ "$1" = "api" ]; then',
         '  echo x >> "$OPEN_ATTEMPTS_PATH"',
         '  if [ "$(wc -l < "$OPEN_ATTEMPTS_PATH")" -le 1 ]; then',
-        '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)" >&2',
+        '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com)" >&2',
         '    exit 1',
         '  fi',
-        `printf '%s' '${graphqlOpen.replace(/'/g, "'\\''")}'`,
+        `printf '%s' '${openPayload.replace(/'/g, "'\\''")}'`,
         'else',
         `printf '%s' '${mergedPayload.replace(/'/g, "'\\''")}'`,
         'fi',
@@ -1295,10 +1286,12 @@ describe('entrypoint contract', () => {
     // attribution — the rates exclude it), and reports the audit numbers.
     await writeFile(callsPath, '');
     await writeFile(openAttemptsPath, '');
+    const fullArgsPath = resolve(tempDir, 'full-args');
     const env = {
       ...process.env,
       PATH: `${fakeBin}:${process.env.PATH}`,
       CALLS_PATH: callsPath,
+      FULL_ARGS_PATH: fullArgsPath,
       OPEN_ATTEMPTS_PATH: openAttemptsPath,
     };
     const receipt = await collectGitHubPullRequests(env);
@@ -1318,6 +1311,34 @@ describe('entrypoint contract', () => {
     assert.equal(callLog.length, 3);
     assert.equal(callLog.filter(call => call === 'api').length, 2);
     assert.equal(callLog.filter(call => call === 'pr').length, 1);
+
+    // argv hygiene (JOV-8000 follow-up 11): the gh CLI usage failure on the
+    // Gem runner was `gh api graphql -F` with a multi-line query string
+    // ("Add a string parameter in key=value format"). The inventory now
+    // uses `gh api` with URL query params only — every recorded argv line
+    // must be flag-free (-f/-F absent everywhere), non-empty, and well
+    // formed (every key=value param carries its '=').
+    const fullArgs = (await readFile(fullArgsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(fullArgs.length, 3);
+    for (const line of fullArgs) {
+      assert.ok(line.length > 0);
+      assert.doesNotMatch(line, /(^|\s)-(f|F)(\s|$|=)/);
+      assert.doesNotMatch(line, /graphql/);
+    }
+    const apiLines = fullArgs.filter(line => line.startsWith('api '));
+    assert.equal(apiLines.length, 2);
+    for (const line of apiLines) {
+      // The REST path carries its query params as URL key=value pairs —
+      // every param segment contains an '='.
+      const path = line.split(' ').at(-1);
+      assert.ok(path.includes('pulls?'));
+      for (const segment of path.split('?').at(-1).split('&')) {
+        assert.ok(segment.includes('='), `param ${segment} missing =`);
+      }
+    }
 
     // Fail-closed path: a non-gateway failure does not burn the extra
     // retry; the collector names the cause with the exit code, signal, kill
@@ -1361,16 +1382,6 @@ describe('entrypoint contract', () => {
     }));
     const payload = JSON.stringify(rows);
     assert.ok(payload.length > 2 * 1024 * 1024);
-    const graphqlPayload = JSON.stringify({
-      data: {
-        repository: {
-          pullRequests: {
-            pageInfo: { hasNextPage: false },
-            nodes: JSON.parse(payload),
-          },
-        },
-      },
-    });
     const mergedSmall = JSON.stringify([
       {
         number: 9999,
@@ -1390,8 +1401,13 @@ describe('entrypoint contract', () => {
       fakeGh,
       [
         '#!/bin/sh',
+        '# $4 is the REST path (api --repo JovieInc/Jovie <path>); page>=2 ends pagination',
         'if [ "$1" = "api" ]; then',
-        `printf '%s' '${graphqlPayload.replace(/'/g, "'\\''")}'`,
+        '  PAGE="${4##*page=}"',
+        '  case "$PAGE" in',
+        '    1) ' + `printf '%s' '${payload.replace(/'/g, "'\\''")}'` + ';;',
+        '    *) printf "[]";;',
+        '  esac',
         'else',
         `printf '%s' '${mergedSmall.replace(/'/g, "'\\''")}'`,
         'fi',

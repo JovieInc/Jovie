@@ -1371,87 +1371,59 @@ async function ghPullRequestInventory(state, env) {
   // `gh pr list` has no page offset — a second call with the same --limit
   // returns the SAME page, and one --limit 100 call cannot prove
   // completeness past 100 open PRs. The open inventory pages through the
-  // GraphQL API with a real cursor (pageSize 50, the same light fields),
-  // deduped by number by the caller, so completeness is proven by
+  // REST API (`gh api` with URL query params only — the `gh api graphql -F`
+  // form was malformed on the Gem runner's gh CLI: exit=1 "Add a string
+  // parameter in key=value format"), ?page=N&per_page=50 until a short
+  // page, deduped by number by the caller, so completeness is proven by
   // pagination instead of capped. The merged inventory stays one
   // --limit 50 call (merged PRs are only attribution evidence).
   if (state !== 'open') return ghPullRequestList(state, 50, env);
-  const pageSize = 50;
-  const query = `query($owner:String!$name:String!$cursor:String$pageSize:Int!){
-    repository(owner:$owner,name:$name){
-      pullRequests(states:OPEN,first:$pageSize,after:$cursor,orderBy:{field:UPDATED_AT,direction:DESC}){
-        pageInfo{endCursor hasNextPage}
-        nodes{
-          number
-          title
-          body
-          headRefName
-          state
-          mergeable
-          mergeStateStatus
-          labels(first:20){nodes{name}}
-          url
-          mergedAt
-          isDraft
-        }
-      }
-    }
-  }`;
   const rows = [];
-  let cursor = null;
-  for (;;) {
-    const stdout = await execGraphQL(
-      query,
-      {
-        owner: 'JovieInc',
-        name: 'Jovie',
-        cursor,
-        pageSize,
-      },
-      env
-    );
-    const parsed = JSON.parse(stdout);
-    const nodes = parsed?.data?.repository?.pullRequests?.nodes ?? [];
-    for (const node of nodes) {
+  for (let page = 1; ; page += 1) {
+    const path = `repos/JovieInc/Jovie/pulls?state=open&sort=updated&direction=desc&per_page=50&page=${page}`;
+    const stdout = await execGhApi(path, env);
+    const batch = JSON.parse(stdout);
+    if (!Array.isArray(batch)) {
+      throw new Error(`gh-pr-list-open:gh-api-rest:non-array-page:${page}`);
+    }
+    for (const row of batch) {
+      const mergeableState = String(row.mergeable_state ?? 'UNKNOWN')
+        .toUpperCase()
+        .replace('CLEAN', 'CLEAN')
+        .replace('DIRTY', 'DIRTY')
+        .replace('UNKNOWN', 'UNKNOWN')
+        .replace('BEHIND', 'BEHIND')
+        .replace('BLOCKED', 'BLOCKED');
       rows.push({
-        number: node.number,
-        title: node.title,
-        body: node.body,
-        headRefName: node.headRefName,
-        state: node.state,
-        mergeable: node.mergeable,
-        mergeStateStatus: node.mergeStateStatus,
-        labels: (node.labels?.nodes ?? []).map(label => ({ name: label.name })),
-        url: node.url,
-        mergedAt: node.mergedAt,
-        isDraft: node.isDraft,
+        number: row.number,
+        title: row.title,
+        body: row.body,
+        headRefName: row.head?.ref ?? row.headRefName,
+        state:
+          String(row.state ?? 'OPEN').toUpperCase() === 'MERGED'
+            ? 'MERGED'
+            : 'OPEN',
+        mergeStateStatus: mergeableState,
+        labels: (row.labels ?? []).map(label => ({ name: label.name })),
+        url: row.html_url,
+        mergedAt: row.merged_at,
+        isDraft: row.draft ?? row.isDraft ?? false,
       });
     }
-    const pageInfo = parsed?.data?.repository?.pullRequests?.pageInfo;
-    if (!pageInfo?.hasNextPage) break;
-    cursor = pageInfo.endCursor;
+    if (batch.length < 50) break;
   }
   return rows;
 }
 
 /**
- * One `gh api graphql` call with the transient-gateway retry (the same
- * bounded backoff as ghPullRequestList). Any non-transient failure throws
- * with the exact gh cause named.
+ * One `gh api` REST call with the transient-gateway retry (the same bounded
+ * backoff as ghPullRequestList). URL query params only — no `-F` typed
+ * fields (the `gh api graphql -F` form was a CLI usage error on the Gem
+ * runner's gh). Any non-transient failure throws with the exact gh cause
+ * named.
  */
-async function execGraphQL(query, variables, env) {
-  const args = [
-    'api',
-    'graphql',
-    '--repo',
-    'JovieInc/Jovie',
-    '-F',
-    `query=${query}`,
-  ];
-  for (const [key, value] of Object.entries(variables ?? {})) {
-    if (value === null || value === undefined) continue;
-    args.push('-F', `${key}=${String(value)}`);
-  }
+async function execGhApi(path, env) {
+  const args = ['api', '--repo', 'JovieInc/Jovie', path];
   const maxAttempts = 3;
   let lastError = null;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -1474,7 +1446,7 @@ async function execGraphQL(query, variables, env) {
     }
   }
   throw new Error(
-    `gh-graphql-pr-inventory:${describeExecFailure(lastError, 'api graphql')}`
+    `gh-api-pr-inventory:${describeExecFailure(lastError, `api ${path}`)}`
   );
 }
 
@@ -1656,33 +1628,33 @@ async function runRemediate(isDryRun) {
           )
         )
     );
-    const countedNumbers = counted
-      .map(row => row?.number)
-      .filter(number => Number.isInteger(number));
-    try {
-      const query =
-        'query($owner:String!$name:String!$numbers:[Int!]){' +
-        'repository(owner:$owner,name:$name){pullRequests(numbers:$numbers,states:OPEN,first:100){nodes{number commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}';
-      const stdout = await execGraphQL(
-        query,
-        {
-          owner: 'JovieInc',
-          name: 'Jovie',
-          numbers: countedNumbers.length > 0 ? countedNumbers : [0],
-        },
-        process.env
-      );
-      const parsed = JSON.parse(stdout);
-      const nodes = parsed?.data?.repository?.pullRequests?.nodes ?? [];
-      for (const node of nodes) {
-        const state =
-          node?.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state;
-        const row = pullRequests.find(item => item?.number === node.number);
-        if (row && state)
-          row.statusCheckRollup = { state: String(state).toUpperCase() };
+    // The rollup states ride the per-PR REST combined status view —
+    // `gh api repos/.../commits/{sha}/status` per population row (the
+    // state field is exactly the rollup state: failure/success/error/...).
+    // Any fetch failure fails the gate closed via prRollups:false.
+    for (const row of counted) {
+      if (!Number.isInteger(row?.number)) continue;
+      try {
+        const head = await execGhApi(
+          `repos/JovieInc/Jovie/pulls/${row.number}`,
+          process.env
+        );
+        const detail = JSON.parse(head);
+        const headSha = detail?.head?.sha;
+        if (!headSha) {
+          prRollups = false;
+          continue;
+        }
+        const statusBody = await execGhApi(
+          `repos/JovieInc/Jovie/commits/${headSha}/status`,
+          process.env
+        );
+        const status = JSON.parse(statusBody);
+        const state = String(status?.state ?? '').toUpperCase();
+        if (state) row.statusCheckRollup = { state };
+      } catch {
+        prRollups = false;
       }
-    } catch {
-      prRollups = false;
     }
   }
   const cloneLatencyMs = await measureCloneLatencyMs();
