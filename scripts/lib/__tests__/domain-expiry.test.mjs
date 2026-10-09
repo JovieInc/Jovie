@@ -101,7 +101,10 @@ describe('domain expiry tiers', () => {
       reopenTerminal: true,
     });
     expect(remediate.title).toContain('(domain-expiry:jov.ie)');
-    expect(remediate.description).not.toContain('jovie.work-order/v1');
+    // Renewal needs the registrar account only the founder holds, so the
+    // order goes out at the remediation tier too — not just inside the
+    // founder window (JOV-8078: 44 days out had no actionable path).
+    expect(extractWorkBlocks(remediate.description).orders).toHaveLength(1);
     const founder = planDomainExpiry(jovIe(), expiry - 14 * DAY_MS);
     expect(founder.priority).toBe(1);
     expect(extractWorkBlocks(founder.description).orders).toHaveLength(1);
@@ -154,14 +157,15 @@ describe('domain expiry founder order', () => {
     ]);
   });
 
-  it('writes an identical order on every nightly rerun inside the window', () => {
-    const orders = [13, 9, 2].map(days =>
+  it('writes an identical order on every nightly rerun, across the founder window', () => {
+    const orders = [44, 15, 13, 9, 2].map(days =>
       sealWorkOrder(
         extractWorkBlocks(plan(expiry - days * DAY_MS).description).orders[0]
       )
     );
     expect(new Set(orders.map(order => order.digest)).size).toBe(1);
     expect(orders[0].createdAt).toBe('2026-11-09T08:06:49.000Z');
+    expect(orders[0].orderId).toBe('domain-continuity-jov-ie-20261109');
   });
 });
 
