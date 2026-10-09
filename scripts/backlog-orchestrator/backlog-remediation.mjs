@@ -188,16 +188,22 @@ export function isErroredPullRequest(pullRequest) {
 }
 
 /**
- * Mergeability is unknown when gh reported UNKNOWN for either signal:
- * never counted as conflicting, clean, or errored — re-polled once by the
- * caller and failing the gate closed above a 20% unknown share.
+ * Mergeability is unknown when gh reported UNKNOWN for either signal, or
+ * when the row is UNMEASURED (the /pulls LIST payload never carries
+ * mergeable/mergeable_state, so a row with neither signal set is
+ * unmeasured, not clean): never counted as conflicting, clean, or errored —
+ * measured by measureMergeability in the caller and failing the gate
+ * closed above a 20% unknown share.
  */
 export function mergeabilityUnknown(pullRequest) {
-  const mergeable = String(pullRequest?.mergeable ?? '').toUpperCase();
-  const mergeStateStatus = String(
-    pullRequest?.mergeStateStatus ?? ''
-  ).toUpperCase();
-  return mergeable === 'UNKNOWN' || mergeStateStatus === 'UNKNOWN';
+  const mergeable = pullRequest?.mergeable;
+  const mergeStateStatus = pullRequest?.mergeStateStatus;
+  // unmeasured: neither signal present
+  if (mergeable === undefined && mergeStateStatus === undefined) return true;
+  return (
+    String(mergeable ?? '').toUpperCase() === 'UNKNOWN' ||
+    String(mergeStateStatus ?? '').toUpperCase() === 'UNKNOWN'
+  );
 }
 
 const RATE_EXCLUDED_LABELS = new Set(['queue-poison', 'hold']);
