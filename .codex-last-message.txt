@@ -1,0 +1,18 @@
+Implemented and opened draft PR [#20829](https://github.com/JovieInc/Jovie/pull/20829), commit `f77aff5f`.
+
+The fix:
+
+- Records fenced lease acquisition time without allowing contenders to truncate ownership metadata.
+- Requires both stale completions and stale current leases before raising `workers-without-completions`.
+- Adds regression coverage for fresh, stale, unknown, and contended leases.
+- Documents the two-clock watchdog behavior.
+
+Verification:
+
+- Lane suite: 896 tests passed, 2 skipped.
+- Typecheck: 18/18 packages passed.
+- Python compilation and `git diff --check`: passed.
+- All draft PR CI checks passed.
+- PR remains draft, clean, and targets `main`.
+
+Concern/deviation: direct SSH access to `mac` was unavailable. GitHub fencing evidence showed its lease was only 13 seconds old when the 505-minute alert fired, confirming a startup false positive. No workers were added and no repair holds were altered. Biome matched zero files because the diff contains only Python and Markdown.
