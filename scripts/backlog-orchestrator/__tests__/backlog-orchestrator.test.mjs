@@ -1557,6 +1557,66 @@ describe('entrypoint contract', () => {
     assert.deepEqual(hits.sort(), ['aaa111', 'bbb222']);
   });
 
+  it('re-polls recompute-lag UNKNOWN mergeability with a bounded retry until measured', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'orch-repoll-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const viewCallsPath = resolve(tempDir, 'view-calls');
+    // POSIX-only fake gh: the first `pr view` for a row answers UNKNOWN
+    // (GitHub's async mergeable recompute lag right after a base change),
+    // the second answers the measured truth — the bounded retry must
+    // converge on the second read and leave the row measured.
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'if [ "$1" = "pr" ] && [ "$2" = "view" ]; then',
+        '  CALLS="$(cat "$VIEW_CALLS_PATH" 2>/dev/null | grep -c "^$3" || true)"',
+        '  printf \'%s\\n\' "$3" >> "$VIEW_CALLS_PATH"',
+        '  if [ "$CALLS" -ge 1 ]; then',
+        '    printf \'{"mergeable":false,"mergeStateStatus":"DIRTY"}\'',
+        '  else',
+        '    printf \'{"mergeable":"UNKNOWN","mergeStateStatus":"UNKNOWN"}\'',
+        '  fi',
+        'else',
+        '  exit 1',
+        'fi',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const { pollUnknownMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const rows = [
+      {
+        number: 3001,
+        title: 'recompute-lag row',
+        body: 'x',
+        state: 'OPEN',
+        mergeStateStatus: 'UNKNOWN',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    await pollUnknownMergeability(rows, {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      VIEW_CALLS_PATH: viewCallsPath,
+    });
+    // the bounded retry measured the row: no longer unknown, honestly DIRTY
+    assert.equal(rows[0].mergeStateStatus, 'DIRTY');
+    assert.equal(
+      String(rows[0].mergeable ?? '').toUpperCase() !== 'UNKNOWN',
+      true
+    );
+    const viewCalls = (await readFile(viewCallsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(viewCalls.length, 2);
+  });
+
   it('preserves an injected key and falls back to the configured file', async () => {
     const tempDir = await mkdtemp('/tmp/backlog-wrapper-');
     const fakeBin = resolve(tempDir, 'bin');
