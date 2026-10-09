@@ -1554,6 +1554,63 @@ async function readOfficialSymphonyWorkers(maxConcurrent) {
 }
 
 /**
+ * Mergeability re-poll with a bounded retry (JOV-8000 follow-ups 9+19):
+ * the REST list payload carries a lazily-computed mergeable_state — right
+ * after a push or base change most rows read UNKNOWN because the list
+ * endpoint does not trigger GitHub's mergeable computation, and even the
+ * per-PR view computes it asynchronously on first read. Each unknown row
+ * is re-polled up to 3 attempts (2s/4s backoff; a row measured at any
+ * attempt stops retrying); a row still UNKNOWN after the bounded retries
+ * stays unknown and the gate fails closed on the unknown share
+ * (pr-mergeability-unknown, > 0.2 strict) instead of guessing — the
+ * threshold is untouched; only the measurement becomes honest against
+ * GitHub's recompute lag.
+ * @param {Record<string, any>[]} pullRequests
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export async function pollUnknownMergeability(pullRequests, env) {
+  const unknown = backlogRemediation
+    .pullRequestRates(pullRequests)
+    .unknownPullRequests.filter(number => Number.isInteger(number));
+  const maxPollAttempts = 3;
+  for (const number of unknown) {
+    for (let attempt = 0; attempt < maxPollAttempts; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+      }
+      try {
+        const { stdout } = await execFileAsync(
+          'gh',
+          [
+            'pr',
+            'view',
+            String(number),
+            '--repo',
+            'JovieInc/Jovie',
+            '--json',
+            'mergeable,mergeStateStatus',
+          ],
+          { timeout: 20_000, maxBuffer: 1024 * 1024, env: env ?? process.env }
+        );
+        const detail = /** @type {Record<string, any>} */ (JSON.parse(stdout));
+        const row = pullRequests.find(item => item?.number === number);
+        if (row) {
+          if (detail.mergeable !== undefined) row.mergeable = detail.mergeable;
+          if (detail.mergeStateStatus !== undefined)
+            row.mergeStateStatus = detail.mergeStateStatus;
+        }
+        const stillUnknown = backlogRemediation.mergeabilityUnknown(row ?? {});
+        if (!stillUnknown) break;
+      } catch {
+        // A failed poll attempt continues the bounded retry; a row still
+        // unknown after all attempts fails the gate closed on the unknown
+        // share rather than being treated as measured.
+      }
+    }
+  }
+}
+
+/**
  * Check-rollup enrichment (JOV-8000 follow-ups 10+15): attaches each
  * rate-population row's check-rollup state from the per-commit REST
  * combined-status view — `gh api repos/.../commits/{sha}/status` keyed by
@@ -1630,43 +1687,19 @@ async function runRemediate(isDryRun) {
   )
     ? /** @type {Record<string, any>} */ (pullRequestsReceipt).pullRequests
     : null;
-  // Mergeability re-poll (JOV-8000 follow-up 9): gh sometimes reports UNKNOWN
-  // mergeability for rows it has not computed yet. Re-poll each unknown row
-  // once (`gh pr view --json mergeable,mergeStateStatus` — a light single-PR
-  // query); a row still UNKNOWN after the re-poll stays unknown and the gate
-  // fails closed on the unknown share (pr-mergeability-unknown) instead of
-  // guessing it clean or conflicting.
+  // Mergeability re-poll (JOV-8000 follow-ups 9+19): the REST list payload
+  // carries a lazily-computed mergeable_state — right after a push or base
+  // change most rows read UNKNOWN because the list endpoint does not trigger
+  // GitHub's mergeable computation, and even the per-PR view computes it
+  // asynchronously on first read. Each unknown row is re-polled with a
+  // BOUNDED retry (up to 3 attempts, 2s/4s backoff — a row measured at any
+  // attempt stops retrying); a row still UNKNOWN after the bounded retries
+  // stays unknown and the gate fails closed on the unknown share
+  // (pr-mergeability-unknown, > 0.2 strict) instead of guessing it clean or
+  // conflicting — the threshold is untouched; only the measurement becomes
+  // honest against GitHub's recompute lag.
   if (Array.isArray(pullRequests)) {
-    const unknown = backlogRemediation
-      .pullRequestRates(pullRequests)
-      .unknownPullRequests.filter(number => Number.isInteger(number));
-    for (const number of unknown) {
-      try {
-        const { stdout } = await execFileAsync(
-          'gh',
-          [
-            'pr',
-            'view',
-            String(number),
-            '--repo',
-            'JovieInc/Jovie',
-            '--json',
-            'mergeable,mergeStateStatus',
-          ],
-          { timeout: 20_000, maxBuffer: 1024 * 1024, env: process.env }
-        );
-        const detail = /** @type {Record<string, any>} */ (JSON.parse(stdout));
-        const row = pullRequests.find(item => item?.number === number);
-        if (row) {
-          if (detail.mergeable !== undefined) row.mergeable = detail.mergeable;
-          if (detail.mergeStateStatus !== undefined)
-            row.mergeStateStatus = detail.mergeStateStatus;
-        }
-      } catch {
-        // A failed re-poll leaves the row unknown — the gate fails closed on
-        // the unknown share rather than treating the row as measured.
-      }
-    }
+    await pollUnknownMergeability(pullRequests, process.env);
   }
   // Check-rollup fetch (JOV-8000 follow-up 10): the error gate reads each
   // rate-population row's check-rollup STATE (FAILURE/ERROR = a failing
