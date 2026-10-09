@@ -89,34 +89,52 @@ describe('shadcn-lint-changed probe', () => {
     ]);
   });
 
-  it('sees a changed production apps/web TS file from git root and misses it from apps/', () => {
-    const { sha } = findProductionWebChange(repoRoot);
-    const fromGitRoot = changedWebTsx({
-      repoRoot,
-      diffBase: `${sha}^`,
-      head: sha,
-    });
-    const fromApps = changedWebTsx({
-      repoRoot: path.join(repoRoot, 'apps'),
-      diffBase: `${sha}^`,
-      head: sha,
-    });
+  // The probe's target needs BOTH a parent commit (`${sha}^`) and a
+  // production apps/web TS change inside `git log -50`. A shallow checkout
+  // (the nightly deterministic lane checks out at depth 1) guarantees
+  // neither: even though git synthesizes a file list for the grafted root
+  // commit, its synthetic root has no parent, so `git diff <root>^...` can
+  // never resolve and the probe returns null. No test-side fix can restore
+  // history. Skip that environment by the shallow flag alone (verified on
+  // the live lane: the file-list conjunct alone does not fire on grafted
+  // checkouts); the assertion still runs everywhere history exists (PR
+  // lane, full nightly suite, local).
+  it.skipIf(
+    spawnSync('git', ['rev-parse', '--is-shallow-repository'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }).stdout.trim() === 'true'
+  )(
+    'sees a changed production apps/web TS file from git root and misses it from apps/',
+    () => {
+      const { sha } = findProductionWebChange(repoRoot);
+      const fromGitRoot = changedWebTsx({
+        repoRoot,
+        diffBase: `${sha}^`,
+        head: sha,
+      });
+      const fromApps = changedWebTsx({
+        repoRoot: path.join(repoRoot, 'apps'),
+        diffBase: `${sha}^`,
+        head: sha,
+      });
 
-    expect(
-      fromGitRoot,
-      `probe at git root saw no production files for ${sha}`
-    ).not.toBeNull();
-    expect(
-      fromGitRoot!.length,
-      `probe at git root must see production web TS for ${sha}`
-    ).toBeGreaterThan(0);
-    expect(
-      fromGitRoot!.some(file => file.endsWith('.tsx') || file.endsWith('.ts'))
-    ).toBe(true);
+      expect(
+        fromGitRoot,
+        `probe at git root saw no production files for ${sha}`
+      ).not.toBeNull();
+      expect(
+        fromGitRoot!.length,
+        `probe at git root must see production web TS for ${sha}`
+      ).toBeGreaterThan(0);
+      expect(
+        fromGitRoot!.some(file => file.endsWith('.tsx') || file.endsWith('.ts'))
+      ).toBe(true);
 
-    expect(
-      fromApps === null || fromApps.length === 0,
-      'cwd=apps with pathspec apps/web/** must not see repo-relative files'
-    ).toBe(true);
-  });
+      expect(
+        fromApps === null || fromApps.length === 0,
+        'cwd=apps with pathspec apps/web/** must not see repo-relative files'
+      ).toBe(true);
+    }
+  );
 });

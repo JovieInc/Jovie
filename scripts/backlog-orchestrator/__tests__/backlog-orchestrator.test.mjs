@@ -1161,15 +1161,15 @@ describe('entrypoint contract', () => {
     );
   });
 
-  it('collects the pullRequests capacity evidence deduped, draft-free, with a 504 retry and fails closed with the cause named', async () => {
+  it('collects the pullRequests capacity evidence deduped with drafts kept for attribution, a 504 retry, and fails closed with the cause named', async () => {
     // The PR inventory is the pullRequests capacity evidence (JOV-8000
-    // follow-up 8): the measured sample was biased — `gh pr list` has no
-    // page offset (two --limit 50 calls returned the same page, doubling
-    // rows: count 150 on an 84-PR repo), and 56 draft rows counted in the
-    // fleet's conflict/error rates. The inventory is one query per state
-    // (open --limit 100, merged --limit 50), deduped by number, and
-    // draft-free; a transient 504/502 retries with a short backoff; the
-    // fail-closed contract is unchanged with the exact gh cause named.
+    // follow-up 9): one query per state (open --limit 100, merged --limit
+    // 50), deduped by number with drafts INCLUDED (the issue->PR
+    // attribution must see draft PRs; the capacity rates exclude drafts
+    // inside pullRequestRates). A full open page fails closed with a named
+    // cause instead of silently truncating; a transient 504/502 retries
+    // with a short backoff; any other failure fails closed with the exact
+    // gh cause named.
     const executableSource = await readFile(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
       'utf8'
@@ -1177,13 +1177,14 @@ describe('entrypoint contract', () => {
     assert.match(executableSource, /timeout: 45_000/);
     assert.match(executableSource, /HTTP 50\[24\]/);
     assert.match(executableSource, /gh-pr-list-\$\{state\}:/);
-    // The rollup field is gone from the capacity inventory query;
-    // mergeStateStatus carries the error signal.
+    // The rollup contexts are gone from the capacity inventory query;
+    // mergeable + labels + mergeStateStatus carry the signals. The open
+    // inventory pages through GraphQL with a real cursor (no page-limit
+    // fail-closed); the merged side stays one gh pr list call.
     assert.doesNotMatch(executableSource, /statusCheckRollup',/);
-    assert.match(
-      executableSource,
-      /const limit = state === 'open' \? 100 : 50;/
-    );
+    assert.match(executableSource, /per_page=50&page=\$\{page\}/);
+    assert.doesNotMatch(executableSource, /page-limit-reached/);
+    assert.match(executableSource, /mergeable,labels/);
 
     // Behavioral: a fake gh on PATH drives the exported collector through
     // the 504 retry, the dedup, and the draft exclusion.
@@ -1258,12 +1259,13 @@ describe('entrypoint contract', () => {
       fakeGh,
       [
         '#!/bin/sh',
-        'echo "$@" >> "$CALLS_PATH"',
-        '# $6 is the --state value (pr list --repo JovieInc/Jovie --state <state>)',
-        'if [ "$6" = "open" ]; then',
+        'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
+        'printf \'%s\\n\' "$*" >> "$FULL_ARGS_PATH"',
+        '# open inventory: gh api (REST); merged: gh pr list',
+        'if [ "$1" = "api" ]; then',
         '  echo x >> "$OPEN_ATTEMPTS_PATH"',
         '  if [ "$(wc -l < "$OPEN_ATTEMPTS_PATH")" -le 1 ]; then',
-        '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)" >&2',
+        '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com)" >&2',
         '    exit 1',
         '  fi',
         `printf '%s' '${openPayload.replace(/'/g, "'\\''")}'`,
@@ -1278,26 +1280,72 @@ describe('entrypoint contract', () => {
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
 
-    // One query per state, the first open call 504s once and its retry
-    // succeeds; the inventory keeps one row per PR number, drafts excluded.
+    // The open GraphQL pages once (hasNextPage false), its first call 504s
+    // once and its retry succeeds; the merged call is one gh pr list
+    // query; the receipt keeps one row per PR number (draft INCLUDED for
+    // attribution — the rates exclude it), and reports the audit numbers.
     await writeFile(callsPath, '');
     await writeFile(openAttemptsPath, '');
+    const fullArgsPath = resolve(tempDir, 'full-args');
     const env = {
       ...process.env,
       PATH: `${fakeBin}:${process.env.PATH}`,
       CALLS_PATH: callsPath,
+      FULL_ARGS_PATH: fullArgsPath,
       OPEN_ATTEMPTS_PATH: openAttemptsPath,
     };
-    const inventory = await collectGitHubPullRequests(env);
-    assert.ok(Array.isArray(inventory));
-    const numbers = inventory.map(row => row.number).sort();
-    assert.deepEqual(numbers, [1, 3, 9]);
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    assert.equal(receipt.truncated, false);
+    assert.equal(receipt.duplicatesDropped, 1);
+    assert.equal(receipt.openUnique, 3);
+    assert.equal(receipt.count, 4);
+    const numbers = receipt.pullRequests.map(row => row.number).sort();
+    assert.deepEqual(numbers, [1, 2, 3, 9]);
+    const draftRow = receipt.pullRequests.find(row => row.number === 2);
+    assert.equal(draftRow.isDraft, true);
     const callLog = (await readFile(callsPath, 'utf8'))
       .trim()
       .split('\n')
       .filter(Boolean);
     assert.equal(callLog.length, 3);
-    assert.ok(callLog.every(call => call.includes('pr list')));
+    assert.equal(callLog.filter(call => call === 'api').length, 2);
+    assert.equal(callLog.filter(call => call === 'pr').length, 1);
+
+    // argv hygiene (JOV-8000 follow-up 11): the gh CLI usage failure on the
+    // Gem runner was `gh api graphql -F` with a multi-line query string
+    // ("Add a string parameter in key=value format"). The inventory now
+    // uses `gh api` with URL query params only — every recorded argv line
+    // must be flag-free (-f/-F absent everywhere), non-empty, and well
+    // formed (every key=value param carries its '=').
+    const fullArgs = (await readFile(fullArgsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(fullArgs.length, 3);
+    for (const line of fullArgs) {
+      assert.ok(line.length > 0);
+      assert.doesNotMatch(line, /(^|\s)-(f|F)(\s|$|=)/);
+      assert.doesNotMatch(line, /graphql/);
+      // `gh api` takes no --repo/-R flag (it is a `gh pr` flag; passing it
+      // dumps usage help whose -F description is the misleading "Add a
+      // string parameter in key=value format" line the Gem runner showed).
+      if (line.startsWith('api ')) {
+        assert.doesNotMatch(line, /--repo|--repo=|(^|\s)-R(\s|$)/);
+        assert.equal(line.split(' ').length, 2);
+      }
+    }
+    const apiLines = fullArgs.filter(line => line.startsWith('api '));
+    assert.equal(apiLines.length, 2);
+    for (const line of apiLines) {
+      // The REST path carries its query params as URL key=value pairs —
+      // every param segment contains an '='.
+      const path = line.split(' ').at(-1);
+      assert.ok(path.includes('pulls?'));
+      for (const segment of path.split('?').at(-1).split('&')) {
+        assert.ok(segment.includes('='), `param ${segment} missing =`);
+      }
+    }
 
     // Fail-closed path: a non-gateway failure does not burn the extra
     // retry; the collector names the cause with the exit code, signal, kill
@@ -1309,7 +1357,7 @@ describe('entrypoint contract', () => {
     await chmod(fakeGh, 0o755);
     await writeFile(callsPath, '');
     const failed = await collectGitHubPullRequests(env);
-    assert.equal(Array.isArray(failed), false);
+    assert.equal(Array.isArray(failed?.pullRequests), false);
     assert.match(String(failed?.error), /gh-pr-list-(open|merged):/);
     assert.match(String(failed?.error), /exit=1/);
     assert.match(String(failed?.error), /signal=none/);
@@ -1326,13 +1374,13 @@ describe('entrypoint contract', () => {
     const fakeBin = resolve(tempDir, 'bin');
     await mkdir(fakeBin, { recursive: true });
     const fakeGh = resolve(fakeBin, 'gh');
-    const filler = 'x'.repeat(1024);
-    const rows = Array.from({ length: 2600 }, (_, i) => ({
+    const filler = 'x'.repeat(24 * 1024);
+    const rows = Array.from({ length: 90 }, (_, i) => ({
       number: i + 1,
       title: 'fix JOV-1',
       body: filler,
       headRefName: `symphony/JOV-1-${i}`,
-      state: 'OPEN',
+      state: i % 2 === 0 ? 'OPEN' : 'MERGED',
       mergeStateStatus: 'CLEAN',
       url: 'https://example/pr/1',
       mergedAt: null,
@@ -1341,11 +1389,36 @@ describe('entrypoint contract', () => {
     }));
     const payload = JSON.stringify(rows);
     assert.ok(payload.length > 2 * 1024 * 1024);
+    const mergedSmall = JSON.stringify([
+      {
+        number: 9999,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        labels: [],
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
     await writeFile(
       fakeGh,
-      ['#!/bin/sh', `printf '%s' '${payload.replace(/'/g, "'\\''")}'`].join(
-        '\n'
-      )
+      [
+        '#!/bin/sh',
+        '# $2 is the REST path (api <path>); page>=2 ends pagination',
+        'if [ "$1" = "api" ]; then',
+        '  PAGE="${2##*page=}"',
+        '  case "$PAGE" in',
+        '    1) ' + `printf '%s' '${payload.replace(/'/g, "'\\''")}'` + ';;',
+        '    *) printf "[]";;',
+        '  esac',
+        'else',
+        `printf '%s' '${mergedSmall.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
     );
     await chmod(fakeGh, 0o755);
     const { collectGitHubPullRequests } = await import(
@@ -1355,11 +1428,14 @@ describe('entrypoint contract', () => {
       ...process.env,
       PATH: `${fakeBin}:${process.env.PATH}`,
     };
-    const inventory = await collectGitHubPullRequests(env);
-    assert.ok(Array.isArray(inventory));
-    // One open query plus one merged query, both 2600 unique rows; the
-    // dedup by number keeps one row per PR across the states.
-    assert.equal(inventory.length, 2600);
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    // 90 rows (~24KB bodies each ≈ 2.2MB payload) parse past the 1MB
+    // default through the paginated open GraphQL; the small merged row
+    // adds one more inventory entry.
+    assert.equal(receipt.pullRequests.length, 91);
+    assert.equal(receipt.openUnique, 45);
+    assert.equal(receipt.truncated, false);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {
