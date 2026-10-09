@@ -28,7 +28,7 @@
     "workflow": "4.8.12"
   },
   "devDependencies": {
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitest/coverage-v8": "5.0.3",
