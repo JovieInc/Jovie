@@ -3217,7 +3217,95 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(cached["status"], "green")
         self.assertEqual(cached["source"], "last-known")
         self.assertIn("controller-observation-failed-used-last-known", cached["error"])
-        self.assertEqual(stale["status"], "failed")
+        # JOV-8000 follow-up 24: the stale-TTL connection refusal against the
+        # retired :4041 endpoint reads parked (the permanent retired-endpoint
+        # class) instead of failed.
+        self.assertEqual(stale["status"], "parked")
+        self.assertTrue(stale["retired"])
+
+    def test_retired_controller_endpoint_observes_parked(self):
+        """JOV-8000 follow-up 24: the default symphony URL is the RETIRED
+        Elixir endpoint (:4041, decommissioned per #20931). Connection
+        refused against it is the permanent retired-endpoint class: the
+        observation names it parked with the retired flag instead of a
+        crash-shaped failed, and a NON-retired URL keeps failed."""
+        now = MODULE.datetime(2026, 10, 9, 22, 40, tzinfo=MODULE.UTC)
+        with mock.patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=ConnectionRefusedError("Connection refused"),
+        ):
+            retired = MODULE.observe_controller(
+                "http://127.0.0.1:4041/api/v1/state",
+                now=now,
+            )
+        self.assertEqual(retired["status"], "parked")
+        self.assertTrue(retired["retired"])
+        self.assertIn("controller-endpoint-retired", retired["error"])
+        with mock.patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=ConnectionRefusedError("Connection refused"),
+        ):
+            other = MODULE.observe_controller(
+                "http://127.0.0.1:9999/api/v1/state",
+                now=now,
+            )
+        self.assertEqual(other["status"], "failed")
+        self.assertNotIn("retired", other)
+
+    def test_parked_controller_with_bound_production_feeds_hold_intake(self):
+        """The parked (retired-endpoint) controller keeps the
+        controller-failure family reason so the hold-intake bounded set
+        still engages — promotion of already-green PRs continues."""
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {
+            "status": "parked",
+            "retired": True,
+            "error": "controller-endpoint-retired: Connection refused",
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"controller-failure"},
+        )
+
+    def test_parked_controller_with_red_production_stays_blocked(self):
+        # production red adds production-not-green, outside the allowed pair.
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "red"}
+        signals["controller"] = {
+            "status": "parked",
+            "retired": True,
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_parked_controller_does_not_hold_runtime_intake(self):
+        """A CRASHED controller (failed) holds runtime intake even in
+        hold-intake; a parked (retired) controller does not — the
+        hold-intake comment's own promise: already-green PRs keep
+        promoting while the controller is parked."""
+        base = dict(GREEN_SIGNALS)
+        base["production"] = {"status": "green", "deployedSha": "b" * 40}
+
+        crashed = dict(base)
+        crashed["controller"] = {"status": "failed"}
+        crashed_receipt = self.evaluate(crashed)
+        self.assertEqual(crashed_receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            crashed_receipt["workAdmission"]["activities"], ["tests", "review"]
+        )
+
+        parked = dict(base)
+        parked["controller"] = {"status": "parked", "retired": True}
+        parked_receipt = self.evaluate(parked)
+        self.assertEqual(parked_receipt["promotionMode"], "hold-intake")
+        self.assertNotEqual(
+            parked_receipt["workAdmission"]["activities"], ["tests", "review"]
+        )
 
     def test_last_known_green_controller_keeps_hold_intake(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
