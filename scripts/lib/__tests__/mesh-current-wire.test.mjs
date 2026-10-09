@@ -626,6 +626,18 @@ test('malformed original public key identity fails before any private loader rea
     );
   }
 });
+test('approved public-only handoff needs no credential installation or alternate signer', () => {
+  const env = environment();
+  delete env.SUMMER_BOTTLENECK_EVE_OUTBOX_VERIFICATION_KEYS_JSON;
+  const reader = createCurrentHostReader(registry(), {
+    environment: env,
+    fetchImpl: () => {
+      throw Error('no live read authorized by a constructor');
+    },
+  });
+  assert.equal(typeof reader.readOutbox, 'function');
+  assert.throws(() => reader.proveRead({}), /authenticated-read-required/);
+});
 test('predecessor cannot select another child even with consistent reconstructed digests', () => {
   const f = fixture(),
     p = predecessor();

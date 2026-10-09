@@ -44,6 +44,12 @@ const approvedOutboxTrust = Object.freeze({
   'eve-outbox-2026-09-04':
     '497d60783004dbb9a714f243d08039335f56ef0ecc9f05a65ae9ac685f113754',
 });
+// Approved public-only handoff, not a signer or new registry grant. The
+// original host registry binding is still required before the private loader.
+const approvedOutboxPublicKeys = Object.freeze({
+  'eve-outbox-2026-09-04':
+    '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANRwzGDzCcV0pHVEncffRsHuwOZWWWlOoHiKnceJsZqQ=\n-----END PUBLIC KEY-----\n',
+});
 const fingerprint = key =>
   createHash('sha256')
     .update(
@@ -510,7 +516,8 @@ export function createCurrentHostReader(
   )
     fail('original-host-binding-mismatch');
   const rawKeys = JSON.parse(
-    environment.SUMMER_BOTTLENECK_EVE_OUTBOX_VERIFICATION_KEYS_JSON ?? 'null'
+    environment.SUMMER_BOTTLENECK_EVE_OUTBOX_VERIFICATION_KEYS_JSON ??
+      JSON.stringify(approvedOutboxPublicKeys)
   );
   if (
     !rawKeys ||
