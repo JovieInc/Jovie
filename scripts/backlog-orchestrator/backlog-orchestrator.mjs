@@ -1769,13 +1769,26 @@ export async function attachCheckRollups(pullRequests, env = process.env) {
     await Promise.all(
       batch.map(async row => {
         try {
-          const statusBody = await execGhApi(
-            `repos/JovieInc/Jovie/commits/${row.headSha}/status`,
+          // JOV-8000 follow-up 20b: the error gate reads the Actions
+          // CHECK-RUNS view — `commits/{sha}/check-runs` — not the legacy
+          // status view (`commits/{sha}/status`), which only aggregates
+          // legacy commit statuses and reads 'success' for PRs whose
+          // failing CI is Actions check-runs (unstable rows read clean).
+          // A row is errored when ANY check-run on its head concluded
+          // FAILURE (isErroredPullRequest reads statusCheckRollup.state
+          // FAILURE/ERROR); otherwise SUCCESS. No threshold change.
+          const body = await execGhApi(
+            `repos/JovieInc/Jovie/commits/${row.headSha}/check-runs?per_page=100`,
             env
           );
-          const status = JSON.parse(statusBody);
-          const state = String(status?.state ?? '').toUpperCase();
-          if (state) row.statusCheckRollup = { state };
+          const checkRuns = JSON.parse(body);
+          const runs = Array.isArray(checkRuns?.check_runs)
+            ? checkRuns.check_runs
+            : [];
+          const anyFailure = runs.some(
+            run => String(run?.conclusion ?? '').toUpperCase() === 'FAILURE'
+          );
+          row.statusCheckRollup = { state: anyFailure ? 'FAILURE' : 'SUCCESS' };
         } catch {
           prRollups = false;
         }
