@@ -1438,6 +1438,125 @@ describe('entrypoint contract', () => {
     assert.equal(receipt.truncated, false);
   });
 
+  it('fetches check rollups from the per-commit REST status view in bounded parallel batches', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'orch-rollup-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const callsPath = resolve(tempDir, 'calls');
+    const statusHitsPath = resolve(tempDir, 'status-hits');
+    const openRows = [
+      {
+        number: 101,
+        title: 'conflicted',
+        body: 'x',
+        state: 'OPEN',
+        draft: false,
+        head: { ref: 'sym/JOV-1-a', sha: 'aaa111' },
+        labels: [],
+      },
+      {
+        number: 102,
+        title: 'clean',
+        body: 'x',
+        state: 'OPEN',
+        draft: false,
+        head: { ref: 'sym/JOV-1-b', sha: 'bbb222' },
+        labels: [],
+      },
+    ];
+    const mergedSmall = JSON.stringify([
+      {
+        number: 9999,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        labels: [],
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
+    // The REST path is the LAST argv word; commits/{sha}/status answers by
+    // the sha embedded in the path. The inventory pages until a short page.
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
+        'if [ "$1" = "api" ]; then',
+        '  # POSIX-compatible last-argv read: the endpoint path is always',
+        '  # the final argument of the api invocation. ${@: -1} is a bash-only',
+        '  # expansion that breaks under dash (/bin/sh on the CI runner),',
+        '  # which silently failed every rollup fetch and failed the batch.',
+        '  for PATHARG do :; done',
+        '  case "$PATHARG" in',
+        '    *commits/aaa111/status*) printf \'%s\\n\' "aaa111" >> "$STATUS_HITS_PATH"; printf \'{"state":"failure"}\';;',
+        '    *commits/bbb222/status*) printf \'%s\\n\' "bbb222" >> "$STATUS_HITS_PATH"; printf \'{"state":"success"}\';;',
+        "    *page=1*) printf '%s' '['" +
+          openRows
+            .map(r => JSON.stringify(r))
+            .join(',')
+            .replace(/'/g, "'\\''") +
+          "']';;",
+        '    *) printf "[]";;',
+        '  esac',
+        'else',
+        `printf '%s' '${mergedSmall.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const { attachCheckRollups } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    /** @typedef {Record<string, any>} EnrichedRow */
+    /**
+     * The enriched rows widen to `Record<string, any>` — the rollup
+     * enrichment attaches `statusCheckRollup` dynamically (the inventory
+     * rows do not statically declare it), so asserts read the attached
+     * state through the widened type.
+     * @param {Record<string, any>[]} allRows
+     * @param {number} number
+     */
+    const rollupStateOf = (allRows, number) =>
+      allRows.find(row => /** @type {any} */ (row)?.number === number)
+        ?.statusCheckRollup?.state;
+    const rows = openRows.map(
+      row =>
+        /** @type {Record<string, any>} */ ({
+          ...row,
+          headSha: row.head.sha,
+        })
+    );
+
+    const ok = await attachCheckRollups(rows, {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      CALLS_PATH: callsPath,
+      STATUS_HITS_PATH: statusHitsPath,
+    });
+    assert.equal(ok, true);
+    // both population rows carry their rollup state from the REST
+    // combined-status view — no per-PR pulls/{n} lookup, no graphql
+    assert.equal(rollupStateOf(rows, 101), 'FAILURE');
+    assert.equal(rollupStateOf(rows, 102), 'SUCCESS');
+    const callLog = (await readFile(callsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    // only api calls, one per population row — no inventory pages here
+    assert.equal(callLog.filter(c => c === 'api').length, 2);
+    const hits = (await readFile(statusHitsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.deepEqual(hits.sort(), ['aaa111', 'bbb222']);
+  });
+
   it('preserves an injected key and falls back to the configured file', async () => {
     const tempDir = await mkdtemp('/tmp/backlog-wrapper-');
     const fakeBin = resolve(tempDir, 'bin');
