@@ -36,21 +36,26 @@ sentry_error_count() (
   jq -ser --argjson start "$start_epoch" --argjson end "$end_epoch" '
     (if length == 1 then .[0]
      else error("Sentry response must contain exactly one JSON document") end) |
+    (has("start") and has("end") and .start == $start and .end == $end) as $bounds_match |
     if (
       $start >= 0 and $end > $start and
       ($start % 60) == 0 and ($end % 60) == 0 and
       type == "object" and (.data | type == "array") and
+      (((has("start") or has("end")) | not) or $bounds_match) and
       (.data | length) == (($end - $start) / 60) and
       all(.data | to_entries[];
         (.value | type == "array") and (.value | length) == 2 and
         .value[0] == ($start + .key * 60) and
-        (.value[1] | type == "array") and (.value[1] | length) > 0 and
+        (.value[1] | type == "array") and
+        ((.value[1] | length) > 0 or $bounds_match) and
         all(.value[1][];
           (.count | type == "number") and .count >= 0 and
           .count == (.count | floor)
         )
       )
-    ) then [.data[][1][].count] | add
+    ) then .data | map(
+      if (.[1] | length) == 0 then 0 else ([.[1][].count] | add) end
+    ) | add
     else error("Sentry minute series is incomplete or invalid; observation remains unknown")
     end
   ' <<<"$response"

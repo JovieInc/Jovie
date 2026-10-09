@@ -29,13 +29,19 @@ budget. An outer timeout bounds Retry-After, retries and body reads to 55s, with
 at most one further second before forced termination. HTTP/auth failures,
 malformed or concatenated JSON, missing project identity and exhausted transport
 still fail. Each successful response must contain exactly one JSON document.
-Queries use complete minute-aligned windows; empty, incomplete, stale, duplicate
-or malformed minute buckets refuse numeric evidence. Complete zero-filled
-buckets remain valid zero counts. The existing final resolver reports
+Queries use complete minute-aligned windows; empty series and incomplete, stale,
+duplicate or malformed minute buckets refuse numeric evidence. Complete zero-filled
+buckets remain valid zero counts. Sentry's serializer can zero-fill a bucket
+with an empty count array; that shape requires the full timestamp grid and exact
+returned start/end bounds. Contradictory bounds refuse evidence even when every
+bucket has a numeric count. The existing final resolver reports
 `gate_status=error` for uncertainty. Thresholds, filters and rollback authority
 stay unchanged. The existing reference window is named pre-observation because
 the gate runs after promotion; it is not an original predeploy baseline.
 No recovery is executed by this source repair.
+
+The empty-array zero-fill shape is defined by Sentry's
+[timeseries serializer](https://github.com/getsentry/sentry/blob/master/src/sentry/api/serializers/snuba.py).
 
 A recovery implementation belongs to the existing Shipping-Control workflow
 and production FIFO, not a second release controller. Before execution it needs

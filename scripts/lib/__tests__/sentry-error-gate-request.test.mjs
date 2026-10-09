@@ -313,6 +313,30 @@ describe.each(['baseline', 'post-deploy', 'candidate-release'])(
         `error_count=${stepId === 'baseline' ? 60 : 10}\n`
       );
     });
+    it('accepts Sentry serializer empty zero-fill buckets only with exact response bounds', async () => {
+      const start = stepId === 'baseline' ? 1800 : 3600;
+      const end = stepId === 'baseline' ? 3600 : 3900;
+      const body = { ...series(), start, end };
+      body.data.forEach(row => {
+        row[1] = [];
+      });
+      const result = await probe(body);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.output).toBe('error_count=0\n');
+    });
+    it.each(['start', 'end'])(
+      'refuses contradictory response %s even with otherwise complete numeric buckets',
+      async bound => {
+        const start = stepId === 'baseline' ? 1800 : 3600;
+        const end = stepId === 'baseline' ? 3600 : 3900;
+        const body = { ...series(), start, end };
+        if (bound === 'start') body.start -= 60;
+        else body.end += 60;
+        const result = await probe(body);
+        expect(result.status).not.toBe(0);
+        expect(result.output).toBe('');
+      }
+    );
     it.each([
       'empty',
       'short',
