@@ -1494,8 +1494,8 @@ describe('entrypoint contract', () => {
         '  # which silently failed every rollup fetch and failed the batch.',
         '  for PATHARG do :; done',
         '  case "$PATHARG" in',
-        '    *commits/aaa111/status*) printf \'%s\\n\' "aaa111" >> "$STATUS_HITS_PATH"; printf \'{"state":"failure"}\';;',
-        '    *commits/bbb222/status*) printf \'%s\\n\' "bbb222" >> "$STATUS_HITS_PATH"; printf \'{"state":"success"}\';;',
+        '    *commits/aaa111/check-runs*) printf \'%s\\n\' "aaa111" >> "$STATUS_HITS_PATH"; printf \'{"check_runs":[{"conclusion":"failure"}]}\';;',
+        '    *commits/bbb222/check-runs*) printf \'%s\\n\' "bbb222" >> "$STATUS_HITS_PATH"; printf \'{"check_runs":[{"conclusion":"success"},{"conclusion":"skipped"}]}\';;',
         "    *page=1*) printf '%s' '['" +
           openRows
             .map(r => JSON.stringify(r))
@@ -1555,6 +1555,60 @@ describe('entrypoint contract', () => {
       .split('\n')
       .filter(Boolean);
     assert.deepEqual(hits.sort(), ['aaa111', 'bbb222']);
+  });
+
+  it('reads a failing Actions check-run as errored even when the legacy status view reads success (JOV-8000 follow-up 20b)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'orch-checkruns-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    // The legacy combined-status view reports success (the pre-20b blind
+    // spot: Actions-only failures never appear there); the check-runs view
+    // carries the failing conclusion.
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'if [ "$1" != "api" ]; then exit 1; fi',
+        '  for PATHARG do :; done',
+        '  case "$PATHARG" in',
+        '    *commits/ccc333/check-runs*)',
+        '      printf \'{"check_runs":[{"conclusion":"success"},{"conclusion":"failure"},{"conclusion":"skipped"}]}\'',
+        '      ;;',
+        '    *commits/ccc333/status*)',
+        '      printf \'{"state":"success"}\'',
+        '      ;;',
+        '    *) printf "[]" ;;',
+        '  esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const { attachCheckRollups } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const { isErroredPullRequest } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    const rows = [
+      {
+        number: 3003,
+        title: 'actions-failing row',
+        body: 'x',
+        state: 'OPEN',
+        headSha: 'ccc333',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const ok = await attachCheckRollups(rows, {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+    });
+    assert.equal(ok, true);
+    // the Actions failure reads as errored — the legacy status view
+    // ('success') never saw it
+    assert.equal(rows[0].statusCheckRollup?.state, 'FAILURE');
+    assert.equal(isErroredPullRequest(rows[0]), true);
   });
 
   /**
