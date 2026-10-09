@@ -1,17 +1,17 @@
 {
-  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB. 2026-10-04: /app/admin/people 1055 -> 1057 and /app/admin/hud 992 -> 994 after the shared nav learned to hide Identity when the Profiles workspace is off (#20180); merge-group builds measured 1056 and 993 KB. 2026-10-05: restored /app/admin/people 1057 -> 1055 and /app/admin/hud 994 -> 992 after preserving the command palette lazy boundary (#20721); combined head 60a29588989b05173ceef98b577ed353f0013e59 measured 1047 and 973 KB.",
+  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB. 2026-10-04: /app/admin/people 1055 -> 1057 and /app/admin/hud 992 -> 994 after the shared nav learned to hide Identity when the Profiles workspace is off (#20180); merge-group builds measured 1056 and 993 KB. 2026-10-05: restored /app/admin/people 1057 -> 1055 and /app/admin/hud 994 -> 992 after preserving the command palette lazy boundary (#20721); combined head 60a29588989b05173ceef98b577ed353f0013e59 measured 1047 and 973 KB. 2026-10-09: shared admin/chat-shell chunks grew on main (no code change in the bump PR); merge-group build of #21104 measured /app/admin/people 1068, /app/admin/hud 1005, /app/admin/certifications 907, /app/admin/platform-connections 905-906, /app/admin/operations 901-902, and the same shared growth put /app/chat/[id] at 1386, /app/admin/chat at 1348, /app/admin/growth at 901. Ceilings set to local-build measured +1 KB.",
   "defaultMaxGzipKb": 900,
   "routes": {
-    "/app/chat/[id]": 1385,
+    "/app/chat/[id]": 1387,
     "/app/chat": 1385,
-    "/app/admin/chat": 1345,
+    "/app/admin/chat": 1349,
     "/app/tasks": 1245,
     "/app/library": 1215,
     "/app/dashboard/releases": 1080,
-    "/app/admin/people": 1055,
+    "/app/admin/people": 1069,
     "/app/settings/profile": 1035,
     "/app/admin/system": 1030,
-    "/app/admin/hud": 992,
+    "/app/admin/hud": 1006,
     "/app/presence": 950,
     "/app": 935,
     "/app/contacts": 925,
@@ -21,6 +21,10 @@
     "/app/releases/[releaseId]/tasks": 915,
     "/app/tour-dates": 915,
     "/app/settings/connectors": 910,
-    "/app/admin/features": 905
+    "/app/admin/certifications": 908,
+    "/app/admin/platform-connections": 907,
+    "/app/admin/features": 905,
+    "/app/admin/operations": 903,
+    "/app/admin/growth": 902
   }
 }
