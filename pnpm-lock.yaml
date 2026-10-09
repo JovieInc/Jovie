@@ -367,8 +367,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/gateway':
-        specifier: ^4.0.107
-        version: 4.0.107(zod@4.6.5)
+        specifier: ^4.0.108
+        version: 4.0.108(zod@4.6.5)
       '@ai-sdk/react':
         specifier: ^4.0.136
         version: 4.0.136(react@19.2.8)(zod@4.6.5)
