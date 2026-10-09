@@ -2540,6 +2540,9 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
             proof = {**result, "schema": GATE_RESULT_SCHEMA, "completedAt": now_iso(),
                      "policyDigest": GATE_POLICY_DIGEST, "sensitive": sensitive}
             update_json(path, lambda verified: verified.update({f"{pr['number']}:{pr['headRefOid']}": proof}))
+            # Carry the actual completed gate into the original run journal.
+            # A verdict/PR pair alone cannot attest source qualification later.
+            result["gateResult"] = proof
         return result
     except RepairStopped as error:
         return {**result, "verdict": "gate-deferred", "reasons": [str(error)], "stage": error.stage}

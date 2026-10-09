@@ -133,6 +133,23 @@ class ExecutionAttemptTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "execution-budget-exhausted"): attempt.boundary(self.path, self.ident, fence, {"spend": .01}, 102, coordination=LOCAL)
         self.finish(self.ident, claimed, "succeeded", {"costs": {}, "dependencies": []}, 103)
         with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"): attempt.boundary(self.path, self.ident, fence, {}, 104, coordination=LOCAL)
+    def test_zero_cost_policy_admits_only_zero_boundaries_and_keeps_terminal_fence(self):
+        claimed = self.claim(policy=policy(attempts=1, spend=0, mutations=0))
+        self.assertTrue(claimed["admitted"])
+        fence = claimed["fencingToken"]
+        self.assertTrue(attempt.boundary(self.path, self.ident, fence, {}, 101, coordination=LOCAL)["admitted"])
+        for cost in ({"spend": .01}, {"mutations": 1}):
+            with self.subTest(cost=cost), self.assertRaisesRegex(RuntimeError, "execution-budget-exhausted"):
+                attempt.boundary(self.path, self.ident, fence, cost, 102, coordination=LOCAL)
+        self.assertEqual(self.claim(now=103)["reason"], "duplicate_active")
+        self.finish(self.ident, claimed, "succeeded", {"costs": {}, "dependencies": []}, 104)
+        self.assertEqual(self.claim(now=105)["reason"], "generation_terminal")
+        self.assertEqual(len([r for r in attempt._rows(self.path) if r['event'] == 'attempt_started']), 1)
+    def test_fully_spent_positive_caps_still_stop_the_next_attempt(self):
+        claimed = self.claim(policy=policy(spend=1))
+        attempt.boundary(self.path, self.ident, claimed["fencingToken"], {"spend": 1}, 101, coordination=LOCAL)
+        self.finish(self.ident, claimed, "failed_known", {"failureClass": "provider_outage"}, 102)
+        self.assertEqual(self.claim(now=103, policy=policy(spend=1))["reason"], "spend_budget_exhausted")
 class GithubCoordinationBoundaryTest(unittest.TestCase):
     def setUp(self):
         self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}

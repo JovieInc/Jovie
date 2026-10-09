@@ -139,10 +139,17 @@ function fixture() {
     writeFileSync(runs, JSON.stringify(run) + '\n', { mode: 0o600 });
   };
   write();
-  const read = () => {
+  const read = (policyDigest = null) => {
     write();
     const rows = readNativeJournal(attempt);
-    return assembleNativeTerminal(binding, rows, rows, readNativeJournal(runs));
+    return assembleNativeTerminal(
+      binding,
+      rows,
+      rows,
+      readNativeJournal(runs),
+      Date.now(),
+      policyDigest
+    );
   };
   return {
     binding,
@@ -156,6 +163,83 @@ function fixture() {
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
+function qualifiedFixture() {
+  const f = fixture();
+  f.run.result.verdict = 'verified-not-queued';
+  const run = Object.assign(f.run, {
+    gateResult: {
+      schema: 'jovie.lane-gate-result/v1',
+      policyDigest: 'c'.repeat(64),
+      verdict: 'verified-not-queued',
+      pr: f.run.result.pr,
+      headSha: f.run.result.commit,
+      reasons: [],
+      sensitive: false,
+      completedAt: f.run.endedAt,
+    },
+  });
+  return { ...f, run };
+}
+test('retains the exact original qualified source evaluation without certifying deployment', () => {
+  const f = qualifiedFixture();
+  try {
+    const r = f.read('c'.repeat(64));
+    expect(r.original.sourceEvaluation).toEqual({
+      ...r.original.run,
+      pr: f.run.result.pr,
+      head: f.run.result.commit,
+      qualified: true,
+      evaluatedAt: f.run.gateResult.completedAt,
+    });
+    expect(r.original.sourceEvaluation.receiptDigest).toBe(
+      createHash('sha256')
+        .update(JSON.stringify(f.run) + '\n')
+        .digest('hex')
+    );
+    expect(r.independentOutcome).toBe('unknown');
+    expect(r.certification).toBe('uncertified');
+  } finally {
+    f.cleanup();
+  }
+});
+test.each([
+  ['missing gate', f => delete f.run.gateResult],
+  ['legacy gate', f => (f.run.gateResult.schema = 'legacy')],
+  ['stale policy', f => (f.run.gateResult.policyDigest = 'f'.repeat(64))],
+  ['held native run', f => (f.run.result.verdict = 'held')],
+  ['held source', f => (f.run.gateResult.verdict = 'held')],
+  ['wrong PR', f => f.run.gateResult.pr++],
+  ['missing PR', f => Object.assign(f.run.gateResult, { pr: null })],
+  ['wrong head', f => (f.run.gateResult.headSha = 'f'.repeat(40))],
+  ['missing sensitivity', f => delete f.run.gateResult.sensitive],
+  ['failed source assertion', f => (f.run.gateResult.reasons = ['failed'])],
+  ['missing assertions', f => delete f.run.gateResult.reasons],
+  ['malformed time', f => (f.run.gateResult.completedAt = 'not-a-time')],
+  [
+    'preexisting gate',
+    f => (f.run.gateResult.completedAt = f.binding.order.createdAt),
+  ],
+  [
+    'gate after terminal',
+    f => (f.run.gateResult.completedAt = '2026-10-09T04:00:10.000Z'),
+  ],
+])('%s is not a qualified original source receipt', (_, change) => {
+  const f = qualifiedFixture();
+  try {
+    change(f);
+    expect(f.read('c'.repeat(64)).original.sourceEvaluation).toBeNull();
+  } finally {
+    f.cleanup();
+  }
+});
+test('unconfigured installed policy never certifies source from a gate-shaped object', () => {
+  const f = qualifiedFixture();
+  try {
+    expect(f.read().original.sourceEvaluation).toBeNull();
+  } finally {
+    f.cleanup();
+  }
+});
 test('joins original attempt bytes without converting held native success into delivery', () => {
   const f = fixture();
   try {

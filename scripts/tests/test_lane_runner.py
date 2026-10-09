@@ -4613,6 +4613,14 @@ class GateCommandAuthorityTest(unittest.TestCase):
 
 
 class GateSingleflightTest(unittest.TestCase):
+    def test_original_run_receives_the_actual_completed_gate_proof(self):
+        with patch.object(lane, "sh", self.fake):
+            result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
+        proof = json.loads((self.host.state / "verified.json").read_text())["7:abc"]
+        self.assertEqual(result["gateResult"], proof)
+        self.assertEqual(proof["policyDigest"], lane.GATE_POLICY_DIGEST)
+        self.assertEqual(proof["reasons"], [])
+        self.assertEqual(result["verdict"], "landing")
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

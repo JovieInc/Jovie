@@ -112,7 +112,8 @@ export function assembleNativeTerminal(
   starts,
   finishes,
   runs,
-  observedAt = Date.now()
+  observedAt = Date.now(),
+  sourcePolicyDigest = null
 ) {
   if (!Number.isFinite(observedAt)) fail();
   const order = sealWorkOrder(binding.order);
@@ -243,6 +244,31 @@ export function assembleNativeTerminal(
     receiptRef: value.receiptRef,
     receiptDigest: value.receiptDigest,
   });
+  // Read the actual gate proof retained by gate_pr in this original native
+  // run, under the current installed policy. Missing or stale proof remains
+  // unknown. Neither a source green check nor native "succeeded" substitutes.
+  const gate = run.gateResult;
+  const evaluatedAt = Date.parse(gate?.completedAt);
+  const qualified =
+    digest(sourcePolicyDigest) &&
+    gate?.schema === 'jovie.lane-gate-result/v1' &&
+    gate.policyDigest === sourcePolicyDigest &&
+    ['landing', 'verified-not-queued', 'gate-already-completed'].includes(
+      run.result.verdict
+    ) &&
+    ['landing', 'verified-not-queued'].includes(gate.verdict) &&
+    end.terminalState === 'succeeded' &&
+    gate.pr === run.result.pr &&
+    Number.isInteger(gate.pr) &&
+    gate.pr > 0 &&
+    gate.headSha === run.result.commit &&
+    /^[a-f0-9]{40}$/u.test(gate.headSha ?? '') &&
+    typeof gate.sensitive === 'boolean' &&
+    Array.isArray(gate.reasons) &&
+    gate.reasons.length === 0 &&
+    Number.isFinite(evaluatedAt) &&
+    evaluatedAt >= start.at * 1000 &&
+    evaluatedAt <= end.at * 1000;
   return structuredClone({
     taskKey: binding.taskKey,
     orderId: order.orderId,
@@ -259,7 +285,15 @@ export function assembleNativeTerminal(
         observedAt: new Date(end.at * 1000).toISOString(),
       },
       run: record(originalRun),
-      sourceEvaluation: null,
+      sourceEvaluation: qualified
+        ? {
+            ...record(originalRun),
+            pr: gate.pr,
+            head: gate.headSha,
+            qualified: true,
+            evaluatedAt: gate.completedAt,
+          }
+        : null,
     },
     execution: {
       workKey: start.workKey,
