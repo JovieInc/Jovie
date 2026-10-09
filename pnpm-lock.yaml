@@ -367,8 +367,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/gateway':
-        specifier: ^4.0.107
-        version: 4.0.107(zod@4.6.5)
+        specifier: ^4.0.108
+        version: 4.0.108(zod@4.6.5)
       '@ai-sdk/react':
         specifier: ^4.0.134
         version: 4.0.134(react@19.2.8)(zod@4.6.5)
@@ -17102,7 +17102,7 @@ snapshots:
       '@ai-sdk/provider': 3.0.16
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.1
-      undici: 8.11.2
+      undici: 8.10.2
       zod: 4.6.5
 
   '@ai-sdk/provider-utils@5.0.43(zod@4.6.5)':
