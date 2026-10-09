@@ -1485,7 +1485,7 @@ describe('entrypoint contract', () => {
     await writeFile(
       fakeGh,
       [
-        '#!/bin/sh',
+        '#!/usr/bin/env bash',
         'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
         'if [ "$1" = "api" ]; then',
         '  PATHARG="${@: -1}"',
@@ -1509,10 +1509,12 @@ describe('entrypoint contract', () => {
     const { attachCheckRollups } = await import(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
-    const rows = openRows.map(row => ({
-      ...row,
-      headSha: row.head.sha,
-    }));
+    const rows = /** @type {any[]} */ (
+      openRows.map(row => ({
+        ...row,
+        headSha: row.head.sha,
+      }))
+    );
     const ok = await attachCheckRollups(rows, {
       ...process.env,
       PATH: `${fakeBin}:${process.env.PATH}`,
