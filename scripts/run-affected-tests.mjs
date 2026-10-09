@@ -1251,9 +1251,7 @@ function planAffectedTests(
   const sentryDeploymentContract =
     'apps/web/tests/unit/ci/deploy-workflow.test.ts';
   if (
-    files.some(
-      file => sentryGateInputs.has(file) || file === sentryDeploymentContract
-    ) &&
+    files.some(file => sentryGateInputs.has(file)) &&
     files.every(
       file =>
         sentryGateInputs.has(file) ||

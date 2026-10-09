@@ -55,15 +55,7 @@ describe('Sentry deployment contract selection', () => {
   const deploymentContract = 'apps/web/tests/unit/ci/deploy-workflow.test.ts';
 
   it('retains the existing deployment contract for transport-only and contract repair changes', () => {
-    for (const files of [
-      inputs,
-      [...inputs, deploymentContract],
-      [
-        'scripts/run-affected-tests.mjs',
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        deploymentContract,
-      ],
-    ]) {
+    for (const files of [inputs, [...inputs, deploymentContract]]) {
       const plan = buildAffectedTestPlan(files);
       expect(plan.mode).toBe('selected');
       expect(plan.selectedTests).toEqual([deploymentContract]);
@@ -74,6 +66,16 @@ describe('Sentry deployment contract selection', () => {
         'scripts/lib/__tests__/automation-verify.test.mjs'
       );
     }
+  });
+
+  it('requires a Sentry-specific input before narrowing a deployment-only repair', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        deploymentContract,
+      ]).mode
+    ).toBe('full');
   });
 
   it('fails closed when the existing deployment contract is unavailable', () => {
