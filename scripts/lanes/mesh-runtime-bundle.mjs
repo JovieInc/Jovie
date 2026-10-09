@@ -98,13 +98,18 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
     'scripts/lanes/mesh-native-terminal.mjs',
     'packages/agent-transport-contracts/work-order.ts',
     'scripts/backlog-orchestrator/summer-triage-assessment-client.mjs',
+    'scripts/lanes/mesh-current-wire.mjs',
   ];
   const allowed = new Set(
     sourceFiles.map(file => realpathSync(join(sourceRoot, file)))
   );
   const result = compiler.buildSync({
     absWorkingDir: sourceRoot,
-    entryPoints: { receiver: sourceFiles[0], terminal: sourceFiles[1] },
+    entryPoints: {
+      receiver: sourceFiles[0],
+      terminal: sourceFiles[1],
+      wire: sourceFiles[4],
+    },
     nodePaths: [dirname(zodRoot)],
     outdir: 'compiled-mesh',
     outExtension: { '.js': '.mjs' },
@@ -131,9 +136,9 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   mkdirSync(destination, { mode: 0o700 });
   const outputs = {};
   for (const output of result.outputFiles) {
-    const name = output.path.endsWith('/receiver.mjs')
-      ? 'receiver.mjs'
-      : 'terminal.mjs';
+    const name = output.path.split('/').at(-1);
+    if (!['receiver.mjs', 'terminal.mjs', 'wire.mjs'].includes(name))
+      throw new Error('mesh-runtime-output-unbound');
     writeFileSync(join(destination, name), output.contents, {
       mode: 0o600,
       flag: 'wx',
@@ -146,6 +151,7 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   // New process imports only the compiled archive. It has no caller dependencies.
   const receiver = pathToFileURL(join(destination, 'receiver.mjs')).href;
   const terminal = pathToFileURL(join(destination, 'terminal.mjs')).href;
+  const wire = pathToFileURL(join(destination, 'wire.mjs')).href;
   execFileSync(
     process.execPath,
     [
@@ -154,6 +160,7 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
       `
     const r = await import(${JSON.stringify(receiver)});
     const t = await import(${JSON.stringify(terminal)});
+    const w = await import(${JSON.stringify(wire)});
     let refused = false;
     try { await r.createMeshHostAcknowledgments({}).readOwnedTaskAcknowledgment({}); } catch (e) {
       if (e.message !== 'mesh-host-authority-unconfigured') throw e;
@@ -161,6 +168,12 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
     }
     if (!refused || typeof t.readNativeJournal !== 'function' ||
         typeof t.assembleNativeTerminal !== 'function') throw Error('mesh-runtime-port-invalid');
+    let signerRefused = false;
+    try { w.createCurrentHostReader(null); } catch (e) {
+      if (e.message !== 'mesh-current-original-host-binding-unavailable') throw e;
+      signerRefused = true;
+    }
+    if (!signerRefused) throw Error('mesh-runtime-wire-unconfigured-refusal-missing');
   `,
     ],
     { cwd: destination, timeout: 30_000, stdio: 'pipe' }
