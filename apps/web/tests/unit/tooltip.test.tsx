@@ -94,6 +94,32 @@ describe('Tooltip', () => {
     vi.useRealTimers();
   });
 
+  describe('Accessibility', () => {
+    it('preserves existing descriptions alongside the open tooltip description', () => {
+      render(
+        <TooltipWrapper>
+          <p id='trigger-description'>Existing description</p>
+          <Tooltip open>
+            <TooltipTrigger>
+              <button type='button' aria-describedby='trigger-description'>
+                Trigger
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Tooltip details</TooltipContent>
+          </Tooltip>
+        </TooltipWrapper>
+      );
+
+      const trigger = screen.getByRole('button', { name: 'Trigger' });
+      const tooltip = screen.getByRole('tooltip');
+      expect(trigger.getAttribute('aria-describedby')?.split(/\s+/)).toEqual(
+        expect.arrayContaining(['trigger-description', tooltip.id])
+      );
+      expect(trigger).toHaveAccessibleDescription(/Existing description/);
+      expect(trigger).toHaveAccessibleDescription(/Tooltip details/);
+    });
+  });
+
   describe('Rendering', () => {
     it('renders trigger without tooltip initially', () => {
       render(<BasicTooltip />);
