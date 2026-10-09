@@ -348,6 +348,7 @@ const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
 const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
@@ -1241,6 +1242,38 @@ function planAffectedTests(
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const sentryGateInputs = new Set([
+    '.github/actions/sentry-error-gate/action.yml',
+    '.github/scripts/sentry-read-json.sh',
+    'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+  ]);
+  if (
+    files.some(file => sentryGateInputs.has(file)) &&
+    files.every(
+      file =>
+        sentryGateInputs.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file) ||
+        file === 'docs/runbooks/production-sentry-uncertainty-recovery.md'
+    )
+  ) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+        'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+        'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/production-release-supersession.test.mjs',
+      ],
+    };
   }
   if (
     files.length === CODEX_CAPACITY_QUALIFICATION_MANIFEST.size &&
