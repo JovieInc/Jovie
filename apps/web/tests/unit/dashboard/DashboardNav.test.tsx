@@ -404,11 +404,11 @@ describe('DashboardNav', () => {
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
-    // JOV-4522: the search/inbox pill stages out (max-height + opacity +
-    // travel) rather than popping to display:none at frame one.
-    expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
-      'group-data-[collapsible=icon]:max-h-0',
-      'group-data-[collapsible=icon]:opacity-0'
+    // JOV-8017: New Chat retains command ownership in the icon rail.
+    // The composed Storybook spec verifies its painted geometry through motion.
+    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
     );
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
