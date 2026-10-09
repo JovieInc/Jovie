@@ -765,12 +765,52 @@ def observe_controller(
                     **cached,
                     "error": f"controller-observation-failed-used-last-known: {error}",
                 }
+        if is_retired_controller_endpoint(url, error):
+            # JOV-8000 follow-up 24: the default symphony state URL is the
+            # RETIRED Elixir endpoint (:4041, decommissioned per #20931).
+            # Connection refused against it is the permanent retired-endpoint
+            # class, not a controller crash — the parked capacity shape the
+            # hold-intake semantics already define ("A parked controller (…
+            # :4041 connection refused) is that same capacity shape, not a
+            # crash"). Named so the receipt distinguishes retired from failed:
+            # crashed (failed) holds runtime intake; parked does not — already
+            # green PRs continue promoting in hold-intake, and the reason stays
+            # in the controller-failure family so hold-intake's bounded set
+            # still engages. Fail-closed is preserved: parked is not green.
+            return {
+                "status": "parked",
+                "kind": "symphony",
+                "url": url,
+                "retired": True,
+                "error": f"controller-endpoint-retired: {error}",
+                "observedAt": isoformat(observed_at),
+            }
         return {
             "status": "failed",
             "kind": "symphony",
             "url": url,
             "error": f"controller-observation-failed: {error}",
         }
+
+
+def is_retired_controller_endpoint(url: object, error: BaseException) -> bool:
+    """Whether an observation failure is the retired-endpoint class.
+
+    The retired default symphony URL is the decommissioned Elixir state API
+    (http://127.0.0.1:4041/api/v1/state, #20931). A connection-level refusal
+    against it is permanent by construction: the service is retired, so no
+    observation can ever go green and no last-known snapshot can exist.
+    """
+    return isinstance(url, str) and url.rstrip("/") == (
+        "http://127.0.0.1:4041/api/v1/state"
+    ) and (
+        isinstance(error, (ConnectionRefusedError, ConnectionResetError))
+        or (
+            isinstance(error, urllib.error.URLError)
+            and isinstance(getattr(error, "reason", None), OSError)
+        )
+        or "connection refused" in str(error).lower()
+    )
 
 
 def load_last_known_controller(path: Path, now: datetime) -> dict[str, Any] | None:
@@ -2008,12 +2048,25 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
 
     if not any(reason["severity"] == "critical" for reason in reasons):
         if controller.get("status") != "green":
+            # JOV-8000 follow-up 24: parked (the named retired-endpoint
+            # capacity shape) stays in the controller-failure family — the
+            # hold-intake bounded reason set admits controller-failure, so a
+            # parked controller keeps qualified promotion alive instead of
+            # binding blocked; crashed (failed) and unknown keep the same
+            # mappings as before.
             reasons.append(
                 typed_reason(
-                    "controller-failure" if controller.get("status") == "failed" else "controller-unknown",
+                    "controller-failure"
+                    if controller.get("status") in {"failed", "parked"}
+                    else "controller-unknown",
                     "controller",
                     "warning",
-                    "Symphony controller is not green; promotion is frozen.",
+                    (
+                        "Symphony controller endpoint is retired (parked); "
+                        "promotion continues in hold-intake."
+                        if controller.get("status") == "parked"
+                        else "Symphony controller is not green; promotion is frozen."
+                    ),
                 )
             )
         if main.get("status") != "green":
@@ -2218,6 +2271,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and {reason["code"] for reason in reasons}
         <= {"controller-failure", "production-deployment-unbound"}
     )
+    # JOV-8000 follow-up 24: only a CRASHED controller (failed) holds runtime
+    # intake. A parked controller (the retired-endpoint capacity shape) does
+    # not — the hold-intake comment's own promise: already-green PRs continue
+    # promoting while the controller is parked.
     runtime_intake_hold = hold_intake_allowed and controller.get("status") == "failed"
     unbound_repair_allowed = (
         hold_intake_allowed
