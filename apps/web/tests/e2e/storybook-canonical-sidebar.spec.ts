@@ -272,7 +272,7 @@ for (const product of [
         .getByRole('button', { name: 'Collapse sidebar', exact: true })
         .click();
       expectStableSidebar(short, await readSidebarAnchors(page));
-      await testInfo.attach('sidebar-anchors', {
+      await testInfo.attach('sidebar-anchors.json', {
         body: JSON.stringify(captures),
         contentType: 'application/json',
       });
