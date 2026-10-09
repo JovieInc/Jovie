@@ -24,6 +24,16 @@ import {
 
 const scripts = fileURLToPath(new URL('../../', import.meta.url));
 const head = 'a'.repeat(40);
+/**
+ * Fixture response fields intentionally accept malformed untrusted values.
+ * @param {{
+ * native?: string, moved?: boolean, ambiguousDraft?: boolean, restart?: boolean,
+ * initialState?: string, mergedAtRead?: number, ticketEvidence?: string,
+ * runs?: number, mergedOnUndo?: boolean, viewerLogin?: unknown, writerLogin?: string,
+ * graphqlErrors?: unknown, unreadableState?: boolean,
+ * missingPullRequest?: boolean, missingViewer?: boolean
+ * }} [options]
+ */
 function scenario({
   native = 'unknown',
   moved = false,
