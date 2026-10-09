@@ -1,0 +1,11 @@
+Draft PR opened: [#20797](https://github.com/JovieInc/Jovie/pull/20797)
+
+- Fixed starvation by prioritizing auto-admitted design briefs until their build claim, while retaining `dispatch-next` precedence.
+- Added regression coverage and updated the Symphony runbook.
+- Commit: `2858dee50c85ae988bd8a3db5337ea4d7ac341b0`
+- Tests: 36 passed, 11 subtests passed.
+- Live cached-pool replay now selects JOV-4249.
+- Pre-commit, secret scans, publication gate, and source-admission policy passed.
+- Biome ran but found zero applicable Python/Markdown files.
+- Hosted PR checks are currently running; the doctor alert will clear after deployment and JOV-4249’s build claim.
+- GBrain was unavailable as documented. No other deviations.
