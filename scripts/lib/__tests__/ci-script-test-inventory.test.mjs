@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   MESH_HOST_ACK_COVERAGE_COMMAND,
+  MESH_NATIVE_TERMINAL_COVERAGE_COMMAND,
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
@@ -48,6 +49,19 @@ describe('scripts test inventory guard', () => {
       expect(result.code).toBe(0);
       const commands = execute.mock.calls.map(([command]) => command);
       expect(commands).toContain(MESH_HOST_ACK_COVERAGE_COMMAND);
+      expect(commands).toContain(MESH_NATIVE_TERMINAL_COVERAGE_COMMAND);
+      expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
+        'scripts/lib/__tests__/mesh-native-terminal.test.mjs'
+      );
+      for (const flag of [
+        '--coverage.include=lanes/mesh-native-terminal.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=90',
+        '--coverage.thresholds.statements=90',
+        '--coverage.thresholds.branches=85',
+        '--coverage.thresholds.functions=90',
+      ])
+        expect(MESH_NATIVE_TERMINAL_COVERAGE_COMMAND).toContain(flag);
       expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
         'scripts/lib/__tests__/mesh-host-ack.test.mjs'
       );
