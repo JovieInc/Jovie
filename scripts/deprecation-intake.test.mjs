@@ -29,12 +29,13 @@ test('ignores non-deprecation lines and echoed shell source', () => {
   assert.ok(found.every(w => !w.text.includes('echo')));
 });
 
-test('ignores git ref updates whose branch name contains deprecated', () => {
+test('ignores git ref updates whose ref name contains deprecated', () => {
   const updates = [
     'Build\tCheckout\t2026-09-21T12:56:42.5859549Z  * [new branch]          fix/sonarcloud-s1874-deprecated-app-url-batch1 -> origin/fix/sonarcloud-s1874-deprecated-app-url-batch1',
     'Build + Layout (combined)\tUNKNOWN STEP\t2026-09-21T12:59:05.7735656Z  * [new branch] fix/sonarcloud-s1874-deprecated-app-url-batch3 -> origin/fix/sonarcloud-s1874-deprecated-app-url-batch3',
-    'Build\tCheckout\t2026-09-21T13:00:00.0000000Z  t [tag update] deprecated-v1 -> deprecated-v1',
-    'Build\tCheckout\t2026-09-21T13:00:01.0000000Z  + 123abc...456def fix/deprecated-ref -> origin/fix/deprecated-ref (forced update)',
+    'Build\tCheckout\t2026-09-21T13:00:00.0000000Z  * [new ref] deadbeef -> refs/deprecated/build',
+    'Build\tCheckout\t2026-09-21T13:00:01.0000000Z  t [tag update] deprecated-v1 -> deprecated-v1',
+    'Build\tCheckout\t2026-09-21T13:00:02.0000000Z  + 123abc...456def fix/deprecated-ref -> origin/fix/deprecated-ref (forced update)',
   ];
 
   for (const update of updates) {
