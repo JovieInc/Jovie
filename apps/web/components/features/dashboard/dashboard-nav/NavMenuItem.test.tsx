@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { Music, SquarePen } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
+import { getSidebarNavRowClassName } from '@/components/shell/SidebarNavItem';
 import { chatNavItem } from './config';
 import { NavMenuItem } from './NavMenuItem';
 
@@ -98,6 +99,21 @@ describe('NavMenuItem', () => {
     // Founder lock 2026-09-25 (Linear-scale density): calm rows are 28px
     // (h-7), down from the prior 36px (h-9).
     expect(row.className).toContain('h-7');
+    // Consumers must retain the owner primitive's collapsed row height too;
+    // otherwise every item below this row moves during a rail toggle.
+    const collapsedHeight = getSidebarNavRowClassName({
+      calm: true,
+      collapsed: true,
+    })
+      .split(' ')
+      .find(value => /^h-\d+$/.test(value));
+    expect(collapsedHeight).toBeDefined();
+    expect(row).toHaveClass(collapsedHeight!);
+    for (const override of row.className
+      .split(' ')
+      .filter(value => value.startsWith('group-data-[collapsible=icon]:h-'))) {
+      expect(override.split(':').at(-1)).toBe(collapsedHeight);
+    }
     expect(row.className).toContain('rounded-lg');
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
   });
