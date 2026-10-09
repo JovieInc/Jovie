@@ -1,0 +1,17 @@
+Implemented and opened draft PR [#20827](https://github.com/JovieInc/Jovie/pull/20827).
+
+- Debounces `admission-repair-needed` until blockage persists for five minutes.
+- Preserves active alarms across temporary inventory failures.
+- Leaves concurrency, PR caps, and retry limits unchanged.
+- Added regression coverage and updated the runbook.
+- Commit: `27d86a57b05caa489d03abb48941e62131adc800`
+
+Verification:
+
+- Doctor tests: 76 passed
+- Full lane suite: 895 passed, 2 skipped
+- Python compilation passed
+- All GitHub checks passed; PR remains draft
+- Worktree is clean
+
+Limitations: GBrain and direct Mac host access were unavailable, so runtime clearance awaits deployment and the next Mac doctor cycle. Biome found no applicable Python/Markdown files.
