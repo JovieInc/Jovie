@@ -112,7 +112,32 @@ describe('route-js-budget', () => {
     expect(budgets.defaultMaxGzipKb).toBeGreaterThan(0);
     for (const [route, kb] of Object.entries(budgets.routes)) {
       expect(route.startsWith('/app')).toBe(true);
+      expect(Number.isInteger(kb)).toBe(true);
       expect(kb).toBeGreaterThan(budgets.defaultMaxGzipKb);
+    }
+  });
+
+  it('keeps explicit ceilings on the heavy admin routes re-ratcheted 2026-10-09', () => {
+    const budgets = JSON.parse(
+      readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
+    ) as { defaultMaxGzipKb: number; routes: Record<string, number> };
+
+    // Shared admin/chat-shell chunk growth on main pushed these routes past
+    // the default ceiling; each needs an explicit, tighter-than-needed cap.
+    const reRatcheted = [
+      '/app/admin/people',
+      '/app/admin/hud',
+      '/app/admin/chat',
+      '/app/admin/certifications',
+      '/app/admin/platform-connections',
+      '/app/admin/operations',
+      '/app/admin/growth',
+      '/app/chat/[id]',
+    ];
+    for (const route of reRatcheted) {
+      expect(budgets.routes[route], route).toBeGreaterThan(
+        budgets.defaultMaxGzipKb
+      );
     }
   });
 });
